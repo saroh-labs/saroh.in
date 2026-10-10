@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
 import { ReleaseLinks } from "@/components/sites/test-releases/release-links";
@@ -38,6 +39,7 @@ import {
 const BADGE = {
     success: "success",
     draft: "draft",
+    active: "active",
     neutral: "neutral",
     error: "error",
     info: "info",
@@ -97,13 +99,13 @@ export function ReleaseRow({
         onChanged();
     }
 
-    async function discard() {
+    async function discard(): Promise<ConfirmResult> {
         const res = await runAction(
             () => discardTestRelease(siteId, release.id),
             { setBusy: (on) => setBusy(on ? "discard" : null) },
         );
         if (!res) return;
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${release.name} discarded. Its links no longer open it.`);
         onChanged();
     }
@@ -126,10 +128,7 @@ export function ReleaseRow({
                         {status.line}
                     </p>
                 </div>
-                <Badge
-                    variant={BADGE[status.tone]}
-                    className="shrink-0 whitespace-nowrap"
-                >
+                <Badge variant={BADGE[status.tone]} className="shrink-0">
                     {status.label}
                 </Badge>
             </div>
@@ -160,7 +159,7 @@ export function ReleaseRow({
                         <li className="flex items-start gap-1.5 text-muted-foreground">
                             <span
                                 aria-hidden
-                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-highlight"
+                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-foreground"
                             />
                             Your draft has changed since
                         </li>
@@ -295,7 +294,8 @@ export function ReleaseRow({
                 title={`Discard ${release.name}?`}
                 description="Its links stop working at once, and it can't be reviewed or put live. Your draft and the live site are left as they are. This cannot be undone."
                 confirmLabel="Discard test release"
-                onConfirm={() => void discard()}
+                keepLabel="Keep test release"
+                onConfirm={discard}
             />
         </li>
     );

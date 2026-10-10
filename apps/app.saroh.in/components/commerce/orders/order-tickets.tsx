@@ -16,6 +16,7 @@ import {
     ticketsSummary,
     ticketWho,
 } from "@/lib/orders/tickets";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Several orders' tickets, one to a printed page (plan B, B6), from the
@@ -94,14 +95,11 @@ export function OrderTickets({
                 }
             />
             {orders.length === 0 ? (
-                <p
-                    role="status"
-                    className="rounded-[11px] border border-border bg-card px-4 py-3.5 text-[13px]"
-                >
+                <Notice role="status">
                     Nothing to print.{" "}
                     {summary.notes.join(" ") ||
                         "Pick orders on the list first."}
-                </p>
+                </Notice>
             ) : (
                 <ol
                     aria-label="Tickets"
@@ -155,9 +153,7 @@ function Ticket({ order }: { order: OrderRead }) {
                     before it goes out.
                 </div>
             ) : null}
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {order.ticketName}
-            </p>
+            <p className="label">{order.ticketName}</p>
             <h2 className="font-display text-[22px] font-semibold">
                 #{order.orderId}
             </h2>

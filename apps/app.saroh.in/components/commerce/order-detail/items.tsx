@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { OrderReadLine } from "@/lib/orders/read";
 import { productHref } from "@/lib/products/links";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS, PanelTitle } from "./parts";
 
 /**
@@ -100,9 +102,12 @@ export function OrderItems({
                                     </div>
                                 ) : null}
                                 {clashes[l.id] ? (
-                                    <div className="mt-[5px] inline-block rounded-full bg-destructive-subtle px-2 py-0.5 text-[11.5px] font-bold text-destructive-subtle-foreground">
+                                    <StatusBadge
+                                        tone="error"
+                                        className="mt-[5px]"
+                                    >
                                         {clashes[l.id]}
-                                    </div>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             <span className="whitespace-nowrap text-[12.5px] tabular-nums text-muted-foreground">
@@ -143,10 +148,7 @@ export function AllergyBanner({
 }) {
     if (unchecked) {
         return (
-            <div
-                role="status"
-                className="rounded-xl border border-border bg-muted px-4 py-3"
-            >
+            <Notice role="status">
                 <div className="text-[13.5px] font-bold">
                     Couldn&apos;t check {first}&apos;s allergies
                 </div>
@@ -154,21 +156,18 @@ export function AllergyBanner({
                     Their Needs attention didn&apos;t load, so nothing here was
                     checked against it. Ask {first} before it goes out.
                 </p>
-            </div>
+            </Notice>
         );
     }
     if (named.length === 0) return null;
     return (
-        <div
-            role="alert"
-            className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
-        >
+        <Notice tone="error">
             <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                 {first} is allergic to {hits}
             </div>
             <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
                 {named.join("; ")}. Check with {first} before it goes out.
             </p>
-        </div>
+        </Notice>
     );
 }

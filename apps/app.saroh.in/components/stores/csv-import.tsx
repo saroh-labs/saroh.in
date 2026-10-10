@@ -31,6 +31,7 @@ import type {
     PreviewResult,
     RowIssue,
 } from "@/lib/imports/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * CSV import (#175) — pick a file, check the mapping, see what will happen,
@@ -548,22 +549,25 @@ export function CsvImport({
                             ) : null}
 
                             {room?.over && meter ? (
-                                <div
-                                    role="status"
-                                    className="flex flex-wrap items-center gap-3 rounded-[10px] border border-brand-300 bg-brand-subtle px-3.5 py-3 dark:border-brand-700"
-                                >
-                                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
-                                        {room.words}{" "}
-                                        {room.fits > 0
-                                            ? `Import the first ${room.fits}, or upgrade for more.`
-                                            : "Upgrade to bring them in."}
-                                    </p>
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href={meter.href}>
-                                            {planLabel(meter.upgradeTo)}
-                                        </Link>
-                                    </Button>
-                                </div>
+                                <Notice tone="info">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
+                                            {room.words}{" "}
+                                            {room.fits > 0
+                                                ? `Import the first ${room.fits}, or upgrade for more.`
+                                                : "Upgrade to bring them in."}
+                                        </p>
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            <Link href={meter.href}>
+                                                {planLabel(meter.upgradeTo)}
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </Notice>
                             ) : null}
 
                             <div className="flex flex-wrap items-center gap-3 border-t pt-5">

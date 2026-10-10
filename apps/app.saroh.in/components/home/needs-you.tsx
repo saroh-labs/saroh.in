@@ -20,6 +20,7 @@ import {
 } from "@/lib/home/needs";
 import type { HomeNeed, HomeUnavailable } from "@/lib/home/service";
 
+import { TextLink } from "@saroh/ui/text-link";
 import {
     InlineButton,
     InlineConfirm,
@@ -74,10 +75,7 @@ export function NeedsYou({
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
             <div className="flex items-baseline gap-[9px]">
-                <h2
-                    id={headingId}
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id={headingId} className="label">
                     Needs you
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
@@ -123,14 +121,13 @@ export function NeedsYou({
             ) : null}
 
             {more || expanded ? (
-                <button
-                    type="button"
+                <TextLink
                     aria-expanded={expanded}
                     onClick={() => setExpanded((open) => !open)}
-                    className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                    className="justify-self-start text-[12.5px] coarse:min-h-11"
                 >
                     {expanded ? "Show fewer" : seeAllLabel(needs)}
-                </button>
+                </TextLink>
             ) : null}
         </section>
     );
@@ -173,7 +170,7 @@ function NeedRow({
                     a thumb, and it wraps before the tag is squeezed (§17). */}
                 <Link
                     href={need.href}
-                    className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-brand-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
+                    className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
                     <span
                         className={cn(
@@ -192,7 +189,8 @@ function NeedRow({
                 {need.tag && !done ? (
                     <Badge
                         variant={TONE_BADGE[need.tone]}
-                        className="shrink-0 self-center whitespace-nowrap px-[9px] py-[3px] text-[11.5px] font-semibold"
+                        size="sm"
+                        className="shrink-0 self-center"
                     >
                         {need.tag}
                     </Badge>

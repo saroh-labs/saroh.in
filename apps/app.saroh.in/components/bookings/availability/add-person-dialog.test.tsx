@@ -113,7 +113,7 @@ describe("Add someone who takes bookings", () => {
         await press(opener());
         type(fields()[0], "Asha");
         type(fields()[1], "Trainer");
-        await press(button("Add them"));
+        await press(button("Add person"));
         expect(createStaff).toHaveBeenCalledWith({
             name: "Asha",
             title: "Trainer",
@@ -138,10 +138,11 @@ describe("Add someone who takes bookings", () => {
         );
         await press(opener());
         type(fields()[0], " Asha ");
-        await press(button("Add them"));
+        await press(button("Add person"));
         expect(dialog()).toBeNull();
         expect(showSuccess).toHaveBeenCalledWith(
-            "Asha is on the diary. Set their hours in Availability.",
+            "Asha added.",
+            "Set their hours in Availability.",
         );
         expect(onAdded).toHaveBeenCalledWith("st_asha");
         expect(refresh).toHaveBeenCalled();

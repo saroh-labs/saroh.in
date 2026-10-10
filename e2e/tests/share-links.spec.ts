@@ -89,8 +89,21 @@ test.describe("share buttons share the link that fits (DEC-069)", () => {
             .filter({ visible: true });
         await expect(share).toHaveCount(1);
         await expect(share).toHaveCSS("cursor", "pointer");
+        // A phone that can share opens its share sheet instead, which a
+        // test can't see into: the copy is checked where it is a copy.
+        const shares = await page.evaluate(
+            () =>
+                typeof navigator.share === "function" &&
+                window.matchMedia("(pointer: coarse)").matches,
+        );
+        test.skip(shares, "This browser opens the share sheet.");
         await share.click();
-        await expect(page.getByText(want.copied)).toBeVisible();
+        // The button says it, where the eye already is: no toast.
+        await expect(
+            page
+                .getByRole("button", { name: "Copied" })
+                .filter({ visible: true }),
+        ).toHaveCount(1);
         await expect
             .poll(() => page.evaluate(() => navigator.clipboard.readText()))
             .toBe(want.url);

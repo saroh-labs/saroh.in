@@ -45,7 +45,7 @@ export function SheetButton({
                 aria-label={ariaLabel ?? label}
                 className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
             >
-                <Pencil className="size-3" strokeWidth={2} aria-hidden />
+                <Pencil className="size-3" aria-hidden />
                 {label}
             </Button>
             {kind === "details" ? (

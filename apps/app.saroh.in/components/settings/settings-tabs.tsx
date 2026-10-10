@@ -1,21 +1,19 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import { useEdgeFade } from "@saroh/ui/scroll-x";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef } from "react";
 
 import { SETTINGS_PAGES } from "@/components/shared/nav-items";
+import { SectionList } from "@/components/shared/section-list";
 import { settingsPageLabel } from "@/lib/settings/search";
 
 /**
  * The settings screen's tabs ("Saroh Settings" design): Business, Team,
  * Modules, Plan and billing, Your profile, Share, Activity and Providers in a
  * 232px column on Paper, ruled off from the page.
- * Each says in a line what it holds. The current one takes the white surface
- * and the 2px Saffron marker, as the rail's current page does, so the two
- * lists read as one system.
+ * Each says in a line what it holds. Drawn by `SectionList`, the one look
+ * for a column of sections (Website › Settings shares it): the current one
+ * sits on the muted surface in semibold Ink. No Saffron marker; that is the
+ * menu's alone.
  *
  * Below 1100px the lines of description drop, as the design has it: the page
  * needs the room more than the labels need glossing. Below 760px the column
@@ -46,73 +44,25 @@ export function SettingsTabs({
 }) {
     const pathname = usePathname();
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
-    const strip = useRef<HTMLElement>(null);
-    const fade = useEdgeFade(strip, {
-        current: '[aria-current="page"]',
-        revealKey: pathname,
-    });
+    const current = pages.find(
+        (page) =>
+            pathname === page.href || pathname.startsWith(`${page.href}/`),
+    );
     return (
-        <nav
-            ref={strip}
-            aria-label="Settings"
-            data-scroll-x=""
-            style={fade}
-            className={cn(
-                "flex gap-1 overflow-x-auto border-b border-border bg-background px-3 py-2.5",
-                "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-y-auto min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
-            )}
-        >
-            <p
-                aria-hidden
-                className="hidden px-2.5 pb-2 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground min-[760px]:block"
-            >
-                Settings
-            </p>
-            {pages.map((page) => {
-                const on =
-                    pathname === page.href ||
-                    pathname.startsWith(`${page.href}/`);
-                const Icon = page.icon;
-                const note = on ? undefined : notes?.[page.href];
-                return (
-                    <Link
-                        key={page.href}
-                        href={page.href}
-                        aria-current={on ? "page" : undefined}
-                        className={cn(
-                            "relative flex shrink-0 items-start gap-2.5 rounded-lg px-2.5 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            on
-                                ? "bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,28,26,0.08)]"
-                                : "font-medium text-foreground/80 hover:bg-muted",
-                        )}
-                    >
-                        {on ? (
-                            <span
-                                aria-hidden
-                                className="absolute -left-1.5 top-1/2 hidden h-[17px] w-0.5 -translate-y-1/2 rounded-[1px] bg-highlight min-[760px]:block"
-                            />
-                        ) : null}
-                        <Icon
-                            className="mt-px size-[18px] shrink-0"
-                            strokeWidth={1.9}
-                        />
-                        <span className="min-w-0 flex-1">
-                            <span className="block text-[13.5px]">
-                                {settingsPageLabel(page, kind)}
-                            </span>
-                            {note ? (
-                                <span className="mt-0.5 block text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground">
-                                    {note}
-                                </span>
-                            ) : (
-                                <span className="mt-0.5 hidden text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground min-[1100px]:block">
-                                    {page.description}
-                                </span>
-                            )}
-                        </span>
-                    </Link>
-                );
-            })}
-        </nav>
+        <SectionList
+            label="Settings"
+            heading="Settings"
+            value={current?.href ?? null}
+            idPrefix="settings-page"
+            className="border-b border-border bg-background px-3 py-2.5 min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:overflow-y-auto min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5"
+            items={pages.map((page) => ({
+                value: page.href,
+                label: settingsPageLabel(page, kind),
+                href: page.href,
+                icon: page.icon,
+                description: page.description,
+                note: notes?.[page.href],
+            }))}
+        />
     );
 }

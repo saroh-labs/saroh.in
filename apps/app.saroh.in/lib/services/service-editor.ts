@@ -351,11 +351,13 @@ export function stateLine({
 export function statePill(
     isNew: boolean,
     taking: boolean,
-): { label: string; tone: "neutral" | "success" } {
+): { label: string; tone: "neutral" | "success" | "warning"; hint?: string } {
     if (isNew) return { label: "New", tone: "neutral" };
+    // "Live" and "Paused", as every kind of thing says it; the service's
+    // own sentence is the hint.
     return taking
-        ? { label: "Taking bookings", tone: "success" }
-        : { label: "Not taking bookings", tone: "neutral" };
+        ? { label: "Live", tone: "success", hint: "Taking bookings." }
+        : { label: "Paused", tone: "warning", hint: "Not taking bookings." };
 }
 
 /**

@@ -2,11 +2,13 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     ReadyChecklist as Checklist,
     ReadyStep,
 } from "@/lib/settings/ready";
 import { checklistHeading } from "@/lib/settings/ready";
+import { doneOf, ProgressBar } from "@saroh/ui/progress-bar";
 
 /**
  * "Get ready to take money" ("Saroh Settings" design): the one "what's
@@ -38,7 +40,7 @@ export function ReadyChecklist({ list }: { list: Checklist }) {
             className={cn(
                 "grid gap-3 rounded-xl border px-4 py-3",
                 counted
-                    ? "border-highlight-border bg-brand-subtle"
+                    ? "border-border-strong bg-muted"
                     : "border-border bg-card",
             )}
         >
@@ -58,7 +60,6 @@ export function readyHasLeft(list: Checklist): boolean {
 
 /** The counted steps, Home's, with the plan's asides under them. */
 function Steps({ list }: { list: Checklist }) {
-    const pct = Math.round((100 * list.done) / list.total);
     const heading = checklistHeading(list);
     return (
         <div className="grid gap-2">
@@ -67,21 +68,14 @@ function Steps({ list }: { list: Checklist }) {
                     {heading}
                 </h3>
                 <span className="text-[12.5px] text-foreground/80">
-                    {list.done} of {list.total} done
+                    {doneOf(list.done, list.total)}
                 </span>
-                <div
-                    role="progressbar"
-                    aria-label="Setup done"
-                    aria-valuemin={0}
-                    aria-valuemax={list.total}
-                    aria-valuenow={list.done}
-                    className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-highlight"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={list.done}
+                    max={list.total}
+                    label={doneOf(list.done, list.total)}
+                    className="ml-auto max-w-[200px] flex-[1_1_120px] self-center"
+                />
             </div>
             <ul className="grid gap-2">
                 {list.left.map((item) => (
@@ -93,7 +87,9 @@ function Steps({ list }: { list: Checklist }) {
                             aria-hidden
                             className={cn(
                                 "size-[7px] shrink-0 rounded-full",
-                                item.broken ? "bg-destructive" : "bg-highlight",
+                                item.broken
+                                    ? "bg-destructive"
+                                    : "bg-foreground",
                             )}
                         />
                         <span className="grid min-w-0 flex-[1_1_220px] gap-px">
@@ -116,7 +112,7 @@ function Steps({ list }: { list: Checklist }) {
             {list.outside.length > 0 ? (
                 <ul
                     aria-label="Not counted: comes with another plan"
-                    className="grid gap-2 border-t border-highlight-border pt-2"
+                    className="grid gap-2 border-t border-border-strong pt-2"
                 >
                     {list.outside.map((item) => (
                         <li
@@ -130,9 +126,9 @@ function Steps({ list }: { list: Checklist }) {
                             <span className="grid min-w-0 flex-[1_1_220px] gap-px">
                                 <span className="flex flex-wrap items-center gap-2">
                                     {item.label}
-                                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
+                                    <StatusBadge tone="neutral">
                                         {item.comesWith}
-                                    </span>
+                                    </StatusBadge>
                                 </span>
                                 <span className="text-pretty text-[12.5px] leading-[1.45] text-foreground/80">
                                     {item.why}
@@ -172,7 +168,7 @@ function MakeItYours({
             aria-label="Make it yours"
             className={cn(
                 "grid gap-2",
-                ruled && "border-t border-highlight-border pt-3",
+                ruled && "border-t border-border-strong pt-3",
             )}
         >
             <h3 className="font-display text-[14px] font-semibold tracking-[-0.01em]">

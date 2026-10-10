@@ -446,6 +446,27 @@
     }
 }
 
+/* ─── The label ──────────────────────────────────────────────────────────────
+   The one small-caps line: a table or list header, an eyebrow over a group,
+   a field group's name. 11px Geist 600, uppercase at 0.1em, in the secondary
+   text colour. This is the ONLY place the product sets `uppercase`: a
+   status, a button or a title is sentence case, always (a scan test in
+   app.saroh.in fails on `uppercase` anywhere else).
+
+   In `components`, so a utility on the same element (a colour, a margin)
+   still wins.
+   ─── */
+@layer components {
+    .label {
+        font-size: 11px;
+        line-height: 1.45;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
+    }
+}
+
 /* ─── Skeleton shimmer ───────────────────────────────────────────────────────
    A directional sweep instead of a whole-block opacity pulse.
 

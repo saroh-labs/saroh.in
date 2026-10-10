@@ -26,8 +26,11 @@ import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
+import { chipClass } from "@/components/shared/chip";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
-import { chipClass, pillClass, TEXT_TONE } from "./tones";
+import { TextLink } from "@saroh/ui/text-link";
+import { PILL_TONE, TEXT_TONE } from "./tones";
 
 /**
  * A log entry on a phone: a wrapping row whose `order`s put the time, the
@@ -190,8 +193,8 @@ export function LogList({
     const more = () =>
         start(async () => {
             const cursor = loaded.next;
-            if (!cursor) return;
             setLoadError(null);
+            if (!cursor) return;
             const res = await runAction(
                 () =>
                     loadLogPage({
@@ -232,9 +235,7 @@ export function LogList({
                         aria-label={d.label}
                         className="min-w-0"
                     >
-                        <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            {d.label}
-                        </h3>
+                        <h3 className="label pb-1.5">{d.label}</h3>
                         <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
                             <ul className={cn(grid, "px-4")}>
                                 {d.rows.map((e, i) => {
@@ -264,7 +265,7 @@ export function LogList({
                                                         e.productId,
                                                         "variants",
                                                     )}
-                                                    className="font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
+                                                    className="font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
                                                 >
                                                     {e.variantTitle
                                                         ? `${e.productName} ${e.variantTitle}`
@@ -279,15 +280,15 @@ export function LogList({
                                                 </span>
                                             </span>
                                             <span className="max-[759px]:order-6">
-                                                <span
-                                                    className={pillClass(
-                                                        entryTone(e),
-                                                    )}
+                                                <StatusBadge
+                                                    tone={
+                                                        PILL_TONE[entryTone(e)]
+                                                    }
                                                 >
                                                     {e.kind === "REVERSED"
                                                         ? "Undo"
                                                         : e.word}
-                                                </span>
+                                                </StatusBadge>
                                             </span>
                                             <span
                                                 className={cn(
@@ -309,12 +310,12 @@ export function LogList({
                                                 )}
                                             >
                                                 {e.order ? (
-                                                    <Link
+                                                    <TextLink
                                                         href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
+                                                        className="max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
                                                     >
                                                         {who}
-                                                    </Link>
+                                                    </TextLink>
                                                 ) : who ? (
                                                     <span className="text-foreground/80">
                                                         {who}

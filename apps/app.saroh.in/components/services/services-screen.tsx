@@ -8,9 +8,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -29,6 +29,7 @@ import {
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock } from "lucide-react";
 
 const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
@@ -90,13 +91,12 @@ export function ServicesScreen({
         if (!res) return;
         if (!res.ok) return showError(res.error);
         router.refresh();
-        showUndo(takingToast(s.name, wasOn), () => {
-            void updateService(s.id, {
+        showUndo(takingToast(s.name, wasOn), async () => {
+            const back = await updateService(s.id, {
                 status: wasOn ? "ACTIVE" : "ARCHIVED",
-            }).then((back) => {
-                if (!back.ok) showError(back.error);
-                router.refresh();
             });
+            router.refresh();
+            return back;
         });
     }
 
@@ -189,20 +189,20 @@ export function ServicesScreen({
                                     />
                                     <Link
                                         href={`/services/${s.id}`}
-                                        className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground hover:text-brand"
+                                        className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground hover:underline"
                                     >
                                         {s.name}
                                     </Link>
                                     {live ? null : (
-                                        <StatePill
-                                            label="Paused"
-                                            tone="neutral"
+                                        <StatusBadge
+                                            thing="service"
+                                            status="NOT_TAKING"
                                         />
                                     )}
-                                    <StatePill
-                                        label={isClass ? "Class" : "One-to-one"}
-                                        tone={isClass ? "draft" : "success"}
-                                    />
+                                    {/* A kind, not a state: the outline tag. */}
+                                    <StatusBadge tone="tag">
+                                        {isClass ? "Class" : "One-to-one"}
+                                    </StatusBadge>
                                 </div>
                                 <div
                                     className={cn(
@@ -228,12 +228,9 @@ export function ServicesScreen({
                                 {problem ? (
                                     <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
                                         {problem.line}{" "}
-                                        <Link
-                                            href={problem.fix.href}
-                                            className="rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        >
+                                        <TextLink href={problem.fix.href}>
                                             {problem.fix.label}
-                                        </Link>
+                                        </TextLink>
                                     </p>
                                 ) : null}
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">

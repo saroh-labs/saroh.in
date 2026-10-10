@@ -10,9 +10,10 @@ import { useTransition } from "react";
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
+import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
-import { NameDialog } from "./name-dialog";
+import { Tip } from "@saroh/ui/tooltip";
 import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
 
 const MAX = 30;
@@ -179,40 +180,48 @@ export function AllergensTab({
                                         : "Not on any product yet"}
                                 </span>
                                 {canWrite ? (
-                                    <button
-                                        type="button"
-                                        disabled={used > 0 || pending}
-                                        title={title}
-                                        aria-label={title}
-                                        className={cn(
-                                            rowBtn,
-                                            used === 0 && "text-destructive",
-                                        )}
-                                        onClick={() =>
-                                            run(async () => {
-                                                const res =
-                                                    await removeAllergen(a.id);
-                                                if (!res.ok)
-                                                    return showError(res.error);
-                                                showUndo(
-                                                    `${a.name} removed from the list.`,
-                                                    () =>
-                                                        run(async () => {
-                                                            const undo =
-                                                                await addAllergens(
-                                                                    [a.name],
-                                                                );
-                                                            if (!undo.ok)
-                                                                showError(
-                                                                    undo.error,
-                                                                );
-                                                        }),
-                                                );
-                                            })
-                                        }
-                                    >
-                                        Remove
-                                    </button>
+                                    <Tip label={title}>
+                                        <button
+                                            type="button"
+                                            disabled={used > 0 || pending}
+                                            aria-label={title}
+                                            className={cn(
+                                                rowBtn,
+                                                used === 0 &&
+                                                    "text-destructive",
+                                            )}
+                                            onClick={() =>
+                                                run(async () => {
+                                                    const res =
+                                                        await removeAllergen(
+                                                            a.id,
+                                                        );
+                                                    if (!res.ok)
+                                                        return showError(
+                                                            res.error,
+                                                        );
+                                                    showUndo(
+                                                        `${a.name} removed from the list.`,
+                                                        () =>
+                                                            run(async () => {
+                                                                const undo =
+                                                                    await addAllergens(
+                                                                        [
+                                                                            a.name,
+                                                                        ],
+                                                                    );
+                                                                if (!undo.ok)
+                                                                    showError(
+                                                                        undo.error,
+                                                                    );
+                                                            }),
+                                                    );
+                                                })
+                                            }
+                                        >
+                                            Remove
+                                        </button>
+                                    </Tip>
                                 ) : null}
                             </li>
                         );

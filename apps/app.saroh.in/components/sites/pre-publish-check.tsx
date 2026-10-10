@@ -18,6 +18,8 @@ import type {
 } from "@/lib/sites/service";
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Notice } from "@saroh/ui/notice";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -153,36 +155,39 @@ export function PrePublishCheck({
                     >
                         Back to editing
                     </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        // An owner's override is the destructive kind of
-                        // publish: it goes past a rule the business set.
-                        variant={needsApproval ? "destructive" : "default"}
-                        disabled={
-                            publishing ||
-                            unsaved ||
-                            blocked ||
-                            (needsApproval && !canOverride)
-                        }
-                        title={
+                    <Tip
+                        label={
                             blocked
                                 ? "Choose a web address first"
                                 : unsaved
                                   ? "Saving your changes — publish is available in a moment"
                                   : undefined
                         }
-                        onClick={onPublish}
-                        className="h-8 px-3"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : needsApproval || review.outstanding
-                              ? "Publish without approval"
-                              : neverPublished
-                                ? "Publish site"
-                                : "Publish changes"}
-                    </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            // An owner's override is the destructive kind of
+                            // publish: it goes past a rule the business set.
+                            variant={needsApproval ? "destructive" : "default"}
+                            disabled={
+                                publishing ||
+                                unsaved ||
+                                blocked ||
+                                (needsApproval && !canOverride)
+                            }
+                            onClick={onPublish}
+                            className="h-8 px-3"
+                        >
+                            {publishing
+                                ? "Publishing…"
+                                : needsApproval || review.outstanding
+                                  ? "Publish without approval"
+                                  : neverPublished
+                                    ? "Publish site"
+                                    : "Publish changes"}
+                        </Button>
+                    </Tip>
                 </div>
             </header>
 
@@ -200,22 +205,14 @@ export function PrePublishCheck({
                      * Publish here leaves behind, named before it happens.
                      */}
                     {needsApproval ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground"
-                        >
+                        <Notice tone="error" role="note" className="mb-6">
                             {canOverride
                                 ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
                                 : "This site goes live only from an approved test release. Make a test release and ask for a review."}
-                        </p>
+                        </Notice>
                     ) : null}
                     {scheduledWarning ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
-                        >
-                            {scheduledWarning}
-                        </p>
+                        <Notice className="mb-6">{scheduledWarning}</Notice>
                     ) : null}
                     {/*
                      * The approval, where the spec puts it: this is the last
@@ -228,7 +225,7 @@ export function PrePublishCheck({
                             className={
                                 APPROVAL_LINE[review.latestApproval.outcome]
                                     .approved
-                                    ? "mb-6 rounded-md bg-brand-subtle px-3 py-2 text-sm text-brand-subtle-foreground"
+                                    ? "mb-6 rounded-md bg-muted px-3 py-2 text-sm text-foreground"
                                     : "mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
                             }
                         >
@@ -343,7 +340,7 @@ function Group({
 }) {
     return (
         <section>
-            <h2 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="label flex items-baseline gap-2">
                 {title}
                 {note === undefined ? null : (
                     <span className="font-mono text-[11px] normal-case tracking-normal opacity-70">
@@ -372,7 +369,7 @@ function Row({
             <li>
                 <Link
                     href={WEB_ADDRESS_SETTINGS_HREF}
-                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
                 >
                     <span
                         aria-hidden="true"
@@ -394,12 +391,12 @@ function Row({
             <button
                 type="button"
                 onClick={() => onJump(flag.pageId, flag.sectionIndex)}
-                className="flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-muted"
+                className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted"
             >
                 {/* The design's flag dot: 4px, amber #c99f6f (spec §7). */}
                 <span
                     aria-hidden="true"
-                    className="mt-1.5 size-1 shrink-0 rounded-full bg-highlight"
+                    className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
                 />
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm">{flag.message}</span>

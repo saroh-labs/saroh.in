@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
@@ -40,8 +40,10 @@ import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
+import { Notice } from "@saroh/ui/notice";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -225,16 +227,18 @@ export function ServiceEditor({
         router.replace(`/services/${res.data.id}`);
     }
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!service) return;
         setSaving(true);
-        const res = await runAction(() => archiveService(service.id));
+        // The confirm says a refusal, and one that never got there.
+        const res = await runAction(() => archiveService(service.id), {
+            quiet: true,
+        });
         if (!res?.ok) {
             setSaving(false);
-            if (res) showError(res.error);
-            return;
+            return { ok: false, error: res ? res.error : UNREACHED };
         }
-        showSuccess(`${service.name} deleted`);
+        showSuccess("Service deleted.");
         router.push(SERVICES_HREF);
     }
 
@@ -256,14 +260,18 @@ export function ServiceEditor({
                         crumb,
                     ]}
                     title={title}
-                    badge={<StatePill label={pill.label} tone={pill.tone} />}
+                    badge={
+                        <StatusBadge tone={pill.tone} hint={pill.hint}>
+                            {pill.label}
+                        </StatusBadge>
+                    }
                     description={
                         <div
                             role="status"
                             className={cn(
                                 "text-[12.5px]",
                                 dirty && canEdit
-                                    ? "text-brand"
+                                    ? "text-foreground"
                                     : "text-muted-foreground",
                             )}
                         >
@@ -322,12 +330,9 @@ export function ServiceEditor({
                 />
             </div>
             {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
-                <div
-                    role="alert"
-                    className="bg-destructive-subtle px-4 py-[9px] text-[12.5px] text-destructive-subtle-foreground sm:px-[26px]"
-                >
+                <Notice tone="error" layout="banner">
                     {problems.join(" ")}
-                </div>
+                </Notice>
             ) : null}
 
             <fieldset
@@ -396,9 +401,10 @@ export function ServiceEditor({
                     open={confirmDelete}
                     onOpenChange={setConfirmDelete}
                     title={`Delete ${service.name}?`}
-                    description="It leaves your services and can no longer be booked. Bookings already made keep it. This cannot be undone — to stop bookings for now, choose Stop taking bookings instead."
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, choose Stop taking bookings instead. This cannot be undone."
                     confirmLabel="Delete service"
-                    onConfirm={() => void remove()}
+                    keepLabel="Keep service"
+                    onConfirm={remove}
                 />
             ) : null}
         </main>

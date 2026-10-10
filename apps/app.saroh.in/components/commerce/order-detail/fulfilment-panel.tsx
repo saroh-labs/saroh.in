@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -15,6 +14,7 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -168,13 +168,7 @@ function FulfilmentDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => choose(o.type)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {o.label}
                             </button>
@@ -273,7 +267,38 @@ function FulfilmentDraft({
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    moved && cents !== null
+                        ? saveLabel({
+                              differenceCents: difference,
+                              paid,
+                              linkable,
+                              format: money,
+                          })
+                        : "Save"
+                }
+                saveOff={off}
+                onSubmit={() => {
+                    if (cents === null) return;
+                    onSave({
+                        fulfilment: pick,
+                        shipping: typed.kind === "ok" ? typed.money : "0",
+                        ...(delivery
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(canTell ? { tell } : {}),
+                    });
+                }}
                 note={
                     <p
                         id={`${ids}-note`}
@@ -288,42 +313,7 @@ function FulfilmentDraft({
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() => {
-                        if (cents === null) return;
-                        onSave({
-                            fulfilment: pick,
-                            shipping: typed.kind === "ok" ? typed.money : "0",
-                            ...(delivery
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                            ...(canTell ? { tell } : {}),
-                        });
-                    }}
-                >
-                    {moved && cents !== null
-                        ? saveLabel({
-                              differenceCents: difference,
-                              paid,
-                              linkable,
-                              format: money,
-                          })
-                        : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

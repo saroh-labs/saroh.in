@@ -251,7 +251,7 @@ export function OrdersScreen({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
-                <SearchField query={query} go={go} />
+                <SearchField query={query} go={go} searching={navigating} />
                 {/* A phone: the filters are behind one button (B5). */}
                 <OrderFiltersSheet
                     query={query}

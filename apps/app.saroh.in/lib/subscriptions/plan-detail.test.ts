@@ -124,7 +124,7 @@ describe("detailTabFromQuery", () => {
 describe("planHeader", () => {
     it("says an open plan's price, classes and how many are on it", () => {
         const h = planHeader(plan(), true);
-        expect(h.state).toEqual({ label: "Open", tone: "ok" });
+        expect(h.state).toEqual({ label: "Live", tone: "ok" });
         expect(h.subline).toBe(
             "₹1,500 every month · 8 classes a month · 15 people on it",
         );

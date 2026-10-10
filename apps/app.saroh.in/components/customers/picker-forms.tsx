@@ -17,6 +17,7 @@ import {
     walkInCopy,
     walkInPhone,
 } from "@/lib/customers/picker";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The customer picker's small inline forms (E4): someone new, a walk-in
@@ -259,27 +260,26 @@ export function DuplicateWarning({
 }) {
     const who = resultLabel(match);
     return (
-        <div
-            role="alert"
-            className="mb-3 grid gap-2 rounded-[10px] bg-warning-subtle px-3 py-2.5 text-[12.5px] leading-[1.45] text-warning-subtle-foreground"
-        >
-            <p>
-                {who} already has this phone. Likely the same person — pick
-                them, or add someone new anyway.
-            </p>
-            <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={onAddAnyway}
-                >
-                    Add someone new
-                </Button>
-                <Button type="button" size="sm" onClick={onPickThem}>
-                    Pick {who}
-                </Button>
+        <Notice tone="warning" role="alert" className="mb-3">
+            <div className="grid gap-2">
+                <p>
+                    {who} already has this phone. Likely the same person — pick
+                    them, or add someone new anyway.
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={onAddAnyway}
+                    >
+                        Add someone new
+                    </Button>
+                    <Button type="button" size="sm" onClick={onPickThem}>
+                        Pick {who}
+                    </Button>
+                </div>
             </div>
-        </div>
+        </Notice>
     );
 }

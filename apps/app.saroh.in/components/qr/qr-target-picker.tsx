@@ -11,6 +11,8 @@ import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import type { Choice } from "./choice-group";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 
@@ -94,25 +96,17 @@ export function QrTargetPicker({
                 className="flex flex-col gap-2.5"
                 itemClassName={(on) => cardClass(on)}
             />
-            {problem ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                >
-                    {problem}
-                </p>
-            ) : null}
+            {problem ? <Notice tone="error">{problem}</Notice> : null}
             {targets.more.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                    <button
-                        type="button"
+                    <TextLink
                         aria-expanded={open}
                         aria-controls={`${id}-more`}
                         onClick={() => setOpen((v) => !v)}
-                        className="w-fit cursor-pointer rounded-[4px] text-[13px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                        className="w-fit text-[13px] coarse:min-h-11"
                     >
                         {open ? "Fewer" : "More… a product or a page"}
-                    </button>
+                    </TextLink>
                     {open ? (
                         <div id={`${id}-more`} className="flex flex-col gap-2">
                             {targets.more.length >= SEARCH_FROM ? (

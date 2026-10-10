@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { OptionSelect } from "@/components/shared/option-select";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
@@ -141,7 +141,7 @@ function EditDraft({
     const money = (n: number) => (format ? format(n) : "");
 
     const note = empty
-        ? "Nothing left — cancel the order with a full refund instead."
+        ? "Nothing left. Cancel the order with a full refund instead."
         : addressMissing
           ? "An address needs its first line, town, state and PIN code."
           : diff > 0
@@ -243,25 +243,18 @@ function EditDraft({
                 ) : addable && addable.length > 0 ? (
                     <label className="mt-2.5 block text-[12px] font-medium">
                         Add an item
-                        <select
+                        <OptionSelect
+                            // Picking adds a line and the box empties again.
                             value=""
-                            onChange={(e) => pick(e.target.value)}
-                            className={cn(
-                                FOCUS,
-                                "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
-                            )}
-                        >
-                            <option value="">Choose a product…</option>
-                            {addable.map((s) => (
-                                <option
-                                    key={s.key}
-                                    value={s.key}
-                                    disabled={s.soldOut}
-                                >
-                                    {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={pick}
+                            placeholder="Choose a product…"
+                            className="mt-1 h-8 w-full min-w-[150px] rounded-lg text-[12.5px] coarse:h-11"
+                            options={addable.map((s) => ({
+                                value: s.key,
+                                label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
+                                disabled: s.soldOut,
+                            }))}
+                        />
                     </label>
                 ) : null}
                 {delivery ? (
@@ -323,7 +316,40 @@ function EditDraft({
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    diff > 0
+                        ? `Save (${money(diff)} more due)`
+                        : diff < 0
+                          ? `Save and refund ${money(-diff)}`
+                          : "Save"
+                }
+                saveOff={off}
+                onSubmit={() =>
+                    onSave({
+                        ...(changed.length
+                            ? {
+                                  lines: changed.map((l) => ({
+                                      itemId: l.id,
+                                      quantity: qty[l.id] ?? 0,
+                                  })),
+                              }
+                            : {}),
+                        ...(added.length ? { add: addedLines(added) } : {}),
+                        ...(addressChanged
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                    })
+                }
                 note={
                     <p
                         aria-live="polite"
@@ -332,51 +358,14 @@ function EditDraft({
                             empty || addressMissing
                                 ? "text-destructive-subtle-foreground"
                                 : diff !== 0
-                                  ? "text-brand-subtle-foreground"
+                                  ? "text-foreground"
                                   : "text-muted-foreground",
                         )}
                     >
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() =>
-                        onSave({
-                            ...(changed.length
-                                ? {
-                                      lines: changed.map((l) => ({
-                                          itemId: l.id,
-                                          quantity: qty[l.id] ?? 0,
-                                      })),
-                                  }
-                                : {}),
-                            ...(added.length ? { add: addedLines(added) } : {}),
-                            ...(addressChanged
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                        })
-                    }
-                >
-                    {diff > 0
-                        ? `Save — ${money(diff)} more due`
-                        : diff < 0
-                          ? `Save and refund ${money(-diff)}`
-                          : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

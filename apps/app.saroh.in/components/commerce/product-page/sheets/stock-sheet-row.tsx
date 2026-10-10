@@ -95,7 +95,7 @@ export function SheetSizeRow({
                 className,
             )}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </Button>
     );
 

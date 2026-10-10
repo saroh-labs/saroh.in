@@ -15,6 +15,7 @@ import { patternProblem } from "@/lib/products/sku-pattern";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+import { Tip } from "@saroh/ui/tooltip";
 import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
@@ -141,29 +142,30 @@ export function SkuTab({
                 </label>
                 <div className="mt-[9px] flex flex-wrap gap-1.5">
                     {TOKENS.map((t) => (
-                        <button
-                            key={t.t}
-                            type="button"
-                            disabled={!canWrite}
-                            title={t.what}
-                            aria-label={`Add ${t.t}, ${t.what}`}
-                            onClick={() =>
-                                setPattern(
-                                    (p) =>
-                                        p +
-                                        (p && !/[-_]$/.test(p) ? "-" : "") +
-                                        t.t,
-                                )
-                            }
-                            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 hover:bg-muted disabled:cursor-not-allowed coarse:h-11"
-                        >
-                            <span className="font-mono text-[12px] font-medium">
-                                {t.t}
-                            </span>
-                            <span className="text-[11.5px] text-muted-foreground">
-                                {t.what}
-                            </span>
-                        </button>
+                        <Tip label={t.what}>
+                            <button
+                                key={t.t}
+                                type="button"
+                                disabled={!canWrite}
+                                aria-label={`Add ${t.t}, ${t.what}`}
+                                onClick={() =>
+                                    setPattern(
+                                        (p) =>
+                                            p +
+                                            (p && !/[-_]$/.test(p) ? "-" : "") +
+                                            t.t,
+                                    )
+                                }
+                                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 hover:bg-muted disabled:cursor-not-allowed coarse:h-11"
+                            >
+                                <span className="font-mono text-[12px] font-medium">
+                                    {t.t}
+                                </span>
+                                <span className="text-[11.5px] text-muted-foreground">
+                                    {t.what}
+                                </span>
+                            </button>
+                        </Tip>
                     ))}
                 </div>
                 {problem ? (
@@ -199,7 +201,7 @@ export function SkuTab({
                 What your variants would be called
             </p>
             <div className="overflow-hidden rounded-[12px] border border-border bg-card">
-                <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5 border-b border-border/70 px-4 py-[9px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+                <div className="label grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5 border-b border-border/70 px-4 py-[9px] text-muted-foreground/80">
                     <span>Variant</span>
                     <span>Today</span>
                     <span>Suggested</span>
@@ -248,7 +250,7 @@ export function SkuTab({
             {dirty && canWrite ? (
                 <div
                     ref={saveBar}
-                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted px-3.5 py-2.5"
                 >
                     <span
                         role="status"

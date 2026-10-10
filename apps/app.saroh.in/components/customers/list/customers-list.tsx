@@ -113,7 +113,7 @@ export function CustomersList({
     return (
         <div>
             {heading}
-            <Filters query={query} page={page} go={go} />
+            <Filters query={query} page={page} go={go} searching={navigating} />
             {notice}
             <div aria-busy={navigating}>
                 <Rows

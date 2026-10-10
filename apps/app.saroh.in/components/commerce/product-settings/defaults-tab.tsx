@@ -19,11 +19,11 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
+import { chipClass } from "@/components/shared/chip";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import {
-    chipBtn,
     primaryBtn,
     smallBtn,
     TabIntro,
@@ -251,7 +251,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                         returns: o.choice,
                                                     })
                                                 }
-                                                className={chipBtn(
+                                                className={chipClass(
                                                     r.returns === o.choice,
                                                 )}
                                             >
@@ -265,9 +265,9 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 ? suggestions.map((s) => (
                                       <div
                                           key={`${s.key}:${s.field}`}
-                                          className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-brand-subtle px-[11px] py-[9px]"
+                                          className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-muted px-[11px] py-[9px]"
                                       >
-                                          <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-brand-subtle-foreground">
+                                          <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-foreground">
                                               {suggestionText(s, r.name)}
                                           </span>
                                           <button
@@ -314,7 +314,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             {dirty && catalogue.canWrite ? (
                 <div
                     ref={saveBar}
-                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-border-strong bg-muted px-3.5 py-2.5"
                 >
                     <div className="flex flex-wrap items-center gap-2">
                         <span

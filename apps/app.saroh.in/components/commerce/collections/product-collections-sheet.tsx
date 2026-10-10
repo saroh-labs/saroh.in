@@ -63,15 +63,10 @@ export function ProductCollectionsSheet({
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Collections saved.", () => {
-            void saveProductCollections(productId, previous).then((undo) => {
-                if (!undo.ok)
-                    showError(
-                        "Couldn't undo. The saved collections stay.",
-                        undo.error,
-                    );
-                router.refresh();
-            });
+        showUndo("Collections saved.", async () => {
+            const undo = await saveProductCollections(productId, previous);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -82,12 +77,12 @@ export function ProductCollectionsSheet({
             productName={productName}
             title="Edit collections"
             moreLink={{
-                href: "/commerce/products?view=collections",
+                href: "/commerce/products?tab=collections",
                 label: "All collections",
             }}
             dirty={dirty}
             saving={saving}
-            onSave={() => void save()}
+            onSave={save}
         >
             {rows.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
@@ -128,9 +123,7 @@ export function ProductCollectionsSheet({
                                     r.locked && r.on && "bg-muted-foreground",
                                 )}
                             >
-                                {r.on ? (
-                                    <Check className="size-3" strokeWidth={3} />
-                                ) : null}
+                                {r.on ? <Check className="size-3" /> : null}
                             </span>
                             <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-semibold">

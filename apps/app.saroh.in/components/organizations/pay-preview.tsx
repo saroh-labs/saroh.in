@@ -39,11 +39,9 @@ export function PayPreview({
             )}
         >
             <div className="flex items-baseline gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    What customers see
-                </span>
+                <span className="label">What customers see</span>
                 {live ? (
-                    <span className="text-[11.5px] text-brand-subtle-foreground">
+                    <span className="text-[11.5px] text-foreground">
                         Showing your unsaved edit
                     </span>
                 ) : null}

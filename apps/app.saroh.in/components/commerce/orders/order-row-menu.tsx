@@ -16,11 +16,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import {
-    ArrowUpRight,
     Ban,
     Check,
+    ExternalLink,
     Link2,
     MoreHorizontal,
     Printer,
@@ -28,17 +27,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { usePayLink } from "@/components/commerce/order-detail/pay-link";
 import { QrButton } from "@/components/qr/qr-button";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useHold } from "@/components/shared/use-hold";
 import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
 
-import { runAction } from "@/lib/api/run-action";
+import { IconButton } from "@saroh/ui/icon-button";
 import { useOrderStep } from "./use-order-step";
 
 /** Pointer, hover, focus and pressed on every item (the standing rule). */
@@ -60,6 +59,9 @@ const firstName = (row: OrderRow) =>
  * reason and the ten-second hold) open Order Detail with that panel up, so
  * there is one place each is done. A new pay link is shown once, here, and
  * replacing one says the old one stops working first.
+ *
+ * Cancel tells the customer, so it asks nothing and waits ten seconds with
+ * Undo (`useHold`): nothing is written until the hold ends.
  */
 export function OrderRowMenu({
     row,
@@ -80,27 +82,24 @@ export function OrderRowMenu({
     });
     // The address is shown once: after it is closed it is gone.
     const [seen, setSeen] = useState<string | null>(null);
-    const [cancelling, setCancelling] = useState(false);
-    const [busy, startTransition] = useTransition();
+    const { send, pending } = useHold();
+    const cancelKey = `cancel-order:${row.id}`;
+    const busy = pending.includes(cancelKey);
 
-    const cancel = () =>
-        startTransition(async () => {
+    const cancel = () => {
+        const idempotencyKey = crypto.randomUUID();
+        send(cancelKey, {
+            soon: `Cancelling ${ref} in 10 seconds`,
+            description:
+                "Nothing was paid on it. Its stock goes back on the shelves.",
             // The one cancel (B9): nothing was paid, so nothing goes back;
             // a treatment's visits are cancelled with it.
-            const res = await runAction(() =>
-                cancelOrder(row.id, {
-                    reason: null,
-                    idempotencyKey: crypto.randomUUID(),
-                }),
-            );
-            if (!res) return;
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            showSuccess(`${ref} cancelled — its stock is back on the shelves.`);
-            router.refresh();
+            run: () => cancelOrder(row.id, { reason: null, idempotencyKey }),
+            sent: `${ref} cancelled. Its stock is back on the shelves.`,
+            failed: `${ref} wasn't cancelled.`,
+            onSent: () => router.refresh(),
         });
+    };
 
     const top = items.filter((i) => i.kind !== "refund" && i.kind !== "cancel");
     const apart = items.filter(
@@ -171,7 +170,7 @@ export function OrderRowMenu({
                 return (
                     <DropdownMenuItem key="open" asChild className={ITEM}>
                         <Link href={item.href}>
-                            <ArrowUpRight aria-hidden />
+                            <ExternalLink aria-hidden />
                             {item.label}
                         </Link>
                     </DropdownMenuItem>
@@ -202,7 +201,7 @@ export function OrderRowMenu({
                         variant="destructive"
                         className={ITEM}
                         disabled={item.disabled !== null || busy}
-                        onSelect={() => setCancelling(true)}
+                        onSelect={cancel}
                     >
                         <Ban aria-hidden />
                         <Label text={item.label} reason={item.disabled} />
@@ -217,15 +216,12 @@ export function OrderRowMenu({
         <>
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                    <Button
-                        type="button"
+                    <IconButton
+                        label={`More actions for order ${ref}`}
+                        icon={<MoreHorizontal />}
                         variant="ghost"
-                        size="icon"
-                        aria-label={`More actions for order ${ref}`}
-                        className="relative z-[1] size-7 rounded-[7px] text-muted-foreground hover:bg-muted active:bg-secondary-hover data-[state=open]:bg-muted coarse:size-11"
-                    >
-                        <MoreHorizontal aria-hidden className="size-4" />
-                    </Button>
+                        className="relative z-[1] text-muted-foreground"
+                    />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[208px] p-1.5">
                     {top.map(draw)}
@@ -239,30 +235,17 @@ export function OrderRowMenu({
             </DropdownMenu>
 
             {payLink.dialog}
-            <ConfirmDialog
-                open={cancelling}
-                onOpenChange={setCancelling}
-                icon={Ban}
-                title={`Cancel order ${ref}?`}
-                description="Nothing was paid on it. Its reserved stock goes back on the shelves, and a cancelled order stays in the list. It can't be reopened."
-                confirmLabel="Cancel order"
-                cancelLabel="Keep order"
-                onConfirm={() => {
-                    setCancelling(false);
-                    cancel();
-                }}
-            />
             <Dialog
                 open={shown}
                 onOpenChange={(open) => {
                     if (!open) setSeen(payLink.url);
                 }}
             >
-                <DialogContent className="max-w-[420px]">
+                <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle>Pay link for {ref}</DialogTitle>
                         <DialogDescription>
-                            Shown this once — copy it now and send it to{" "}
+                            Shown this once. Copy it now and send it to{" "}
                             {firstName(row)}. Saroh doesn&apos;t send it. Any
                             link made before this one has stopped working.
                         </DialogDescription>
@@ -270,7 +253,7 @@ export function OrderRowMenu({
                     <code className="block break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
                         {payLink.url}
                     </code>
-                    <DialogFooter className="gap-2">
+                    <DialogFooter>
                         {payLink.url ? (
                             <QrButton
                                 className="h-[38px] coarse:h-11 sm:mr-auto"

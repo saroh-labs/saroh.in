@@ -144,9 +144,7 @@ function Group({
 }) {
     return (
         <section aria-label={label}>
-            <h3 className="pb-1.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {label}
-            </h3>
+            <h3 className="label pb-1.5 pt-2.5">{label}</h3>
             <dl>{children}</dl>
         </section>
     );

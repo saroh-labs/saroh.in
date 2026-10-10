@@ -9,6 +9,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";
+import { TextLink } from "@saroh/ui/text-link";
 
 export interface ActivityEntry {
     line: ActivityLine;
@@ -68,12 +69,12 @@ export function ActivityList({
                                     . Show the details
                                 </span>
                             </button>
-                            <Link
+                            <TextLink
                                 href={line.where.href}
-                                className="relative z-[1] col-start-2 justify-self-start rounded-sm text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[480px]:col-start-auto"
+                                className="relative z-[1] col-start-2 justify-self-start text-[12.5px] min-[480px]:col-start-auto"
                             >
                                 {line.where.label}
-                            </Link>
+                            </TextLink>
                         </li>
                     ))}
                 </ol>

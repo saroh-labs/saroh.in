@@ -71,9 +71,7 @@ export function StorefrontFilter({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[244px]">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </DropdownMenuLabel>
+                <DropdownMenuLabel className="label">{label}</DropdownMenuLabel>
                 {choices.map((c) => {
                     const on = c.id === value;
                     return (

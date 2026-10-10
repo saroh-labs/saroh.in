@@ -118,13 +118,7 @@ export function Eyebrow({
     children: React.ReactNode;
 }) {
     return (
-        <span
-            id={id}
-            className={cn(
-                "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
-                className,
-            )}
-        >
+        <span id={id} className={cn("label", className)}>
             {children}
         </span>
     );

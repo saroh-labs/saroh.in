@@ -8,13 +8,17 @@ import path from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const showError = vi.fn();
+const showError = vi.fn<(message: string) => void>();
 vi.mock("@saroh/ui/toast", () => ({
-    showError: (...a: unknown[]) => showError(...a),
+    showError: (message: string) => {
+        showError(message);
+    },
 }));
-const rethrow = vi.fn();
+const rethrow = vi.fn<(error: unknown) => void>();
 vi.mock("next/navigation", () => ({
-    unstable_rethrow: (error: unknown) => rethrow(error),
+    unstable_rethrow: (error: unknown) => {
+        rethrow(error);
+    },
 }));
 
 import { runAction } from "./run-action";
@@ -74,7 +78,7 @@ describe("runAction", () => {
     it("one of Next's interrupts (a redirect after the save) goes on its way, busy cleared", async () => {
         const redirect = new Error("NEXT_REDIRECT");
         rethrow.mockImplementation((error: unknown) => {
-            if (error === redirect) throw error;
+            if (error === redirect) throw redirect;
         });
         const setBusy = vi.fn();
         await expect(
@@ -117,7 +121,7 @@ function sources(dir: string): string[] {
                 ? []
                 : sources(full);
         }
-        return /\.tsx?$/.test(name) && !/\.test\./.test(name) ? [full] : [];
+        return /\.tsx?$/.test(name) && !name.includes(".test.") ? [full] : [];
     });
 }
 
@@ -132,7 +136,7 @@ function unguarded(): string[] {
             const m = ON.exec(line);
             const setter = m?.[1];
             if (!m || !setter || !BUSY.test(setter)) return;
-            if (["false", "null", "undefined"].includes(m[2] ?? "")) return;
+            if (["false", "null", "undefined"].includes(m[2])) return;
             const off = new RegExp(`\\b${setter}\\((false|null)\\)`);
             const end = lines
                 .slice(i + 1, i + 80)
@@ -179,6 +183,8 @@ const NOT_AN_ACTION = [
     "await openRazorpayWindow(",
     "await confirmPaid(",
     "await confirm(",
+    // Copies the link and says so, in the browser.
+    "await made(",
     // A hold's `commit`: the hold catches a throw and words it as failed
     // (`lib/hold-undo.ts`).
     "reportCommit(await sendBatchNow(",
@@ -195,7 +201,7 @@ function unguardedTransitions(): string[] {
         lines.forEach((line, i) => {
             const m = TRANSITION.exec(line);
             if (!m) return;
-            const indent = m[1] ?? "";
+            const indent = m[1];
             const end = lines
                 .slice(i + 1, i + 240)
                 .findIndex((l) => l.startsWith(`${indent}})`));

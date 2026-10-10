@@ -7,6 +7,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { completeUpload, createUpload } from "@/lib/media/actions";
 import { mediaSrc } from "@/lib/media/media-src";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 
 /** What a picked image hands back — the shape the section contract accepts. */
 export interface PickedImage {
@@ -402,7 +403,7 @@ export function MediaPicker({
             />
             <div
                 className={cn(
-                    "flex items-center gap-2 rounded-md border border-dashed px-2.5 py-2 transition-colors",
+                    "flex items-center gap-2 rounded-md border border-dashed px-2.5 py-2 transition-colors duration-fast",
                     // The same border as the fields around it, dashed because
                     // it is a place to drop something rather than type.
                     over ? "border-ring bg-accent" : "border-input",
@@ -427,19 +428,12 @@ export function MediaPicker({
                 </span>
             </div>
             {busy && progress !== null ? (
-                <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress}
-                    aria-label="Upload progress"
-                    className="h-1 w-full overflow-hidden rounded bg-muted"
-                >
-                    <div
-                        className="h-full bg-foreground transition-[width] duration-fast ease-out"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={progress}
+                    max={100}
+                    size="xs"
+                    label="Upload progress"
+                />
             ) : null}
             {error ? (
                 <p role="alert" className="text-xs text-destructive">

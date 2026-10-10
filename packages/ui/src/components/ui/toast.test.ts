@@ -1,70 +1,116 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const error = vi.fn();
-vi.mock("sonner", () => ({
-    toast: { error: (...a: unknown[]) => error(...a) },
+import {
+    NOT_UNDONE,
+    settleUndo,
+    showSuccess,
+    showUndo,
+    UNDO_MS,
+    UNDONE,
+} from "./toast";
+
+const { toast } = vi.hoisted(() => ({
+    toast: Object.assign(vi.fn(), {
+        success: vi.fn(),
+        error: vi.fn(),
+        warning: vi.fn(),
+        message: vi.fn(),
+        dismiss: vi.fn(),
+    }),
 }));
+vi.mock("sonner", () => ({ toast }));
 
-import { setErrorAction, showError } from "./toast";
+/** Press the Undo on the toast `showUndo` just drew. */
+async function pressUndo() {
+    const options = toast.mock.calls.at(-1)?.[1] as {
+        action: { label: string; onClick: () => void };
+    };
+    expect(options.action.label).toBe("Undo");
+    options.action.onClick();
+    await new Promise((r) => setTimeout(r, 0));
+}
 
-const SENTENCE =
-    "You've been signed out. Sign in again and what you typed stays here.";
+beforeEach(() => {
+    toast.mockReset();
+    toast.success.mockReset();
+    toast.error.mockReset();
+});
 
-describe("an error sentence with a way out (setErrorAction)", () => {
-    beforeEach(() => error.mockClear());
+describe("showUndo", () => {
+    it("lasts ten seconds, everywhere", () => {
+        expect(UNDO_MS).toBe(10_000);
+        showUndo("Note deleted.", () => Promise.resolve(true));
+        expect(toast.mock.calls[0]?.[0]).toBe("Note deleted.");
+        expect(toast.mock.calls[0]?.[1]).toMatchObject({ duration: 10_000 });
+    });
 
-    it("an ordinary error stays until dismissed, with no button", () => {
-        showError("Couldn't save the service");
-        expect(error).toHaveBeenCalledWith("Couldn't save the service", {
+    it("says Undone. when the undo worked", async () => {
+        const undo = vi.fn(() => Promise.resolve({ ok: true }));
+        showUndo("Note deleted.", undo);
+        await pressUndo();
+        expect(undo).toHaveBeenCalledTimes(1);
+        expect(toast.success).toHaveBeenCalledWith(UNDONE, {
             description: undefined,
-            duration: Number.POSITIVE_INFINITY,
-            closeButton: true,
         });
+        expect(UNDONE).toBe("Undone.");
     });
 
-    it("the registered sentence gets its button, from any call site, as one toast", () => {
-        const signIn = vi.fn();
-        const off = setErrorAction(SENTENCE, {
-            label: "Sign in",
-            onClick: signIn,
-        });
-
-        showError(SENTENCE);
-        showError(SENTENCE);
-
-        const first = error.mock.calls[0]?.[1];
-        const second = error.mock.calls[1]?.[1];
-        expect(first.action.label).toBe("Sign in");
-        expect(first.duration).toBe(Number.POSITIVE_INFINITY);
-        // The same id both times: the second replaces the first.
-        expect(first.id).toBe(second.id);
-
-        // Pressing it runs the way out and leaves the toast up.
-        const event = { preventDefault: vi.fn() };
-        first.action.onClick(event);
-        expect(signIn).toHaveBeenCalledTimes(1);
-        expect(event.preventDefault).toHaveBeenCalled();
-
-        off();
+    it("says it couldn't, with the reason, when the undo was refused", async () => {
+        showUndo("Note deleted.", () =>
+            Promise.resolve({ ok: false, error: "It was changed since." }),
+        );
+        await pressUndo();
+        expect(toast.error).toHaveBeenCalledWith(
+            NOT_UNDONE,
+            expect.objectContaining({ description: "It was changed since." }),
+        );
+        expect(NOT_UNDONE).toBe("Couldn't undo. It stays as saved.");
+        expect(toast.success).not.toHaveBeenCalled();
     });
 
-    it("finds the sentence as a second line too", () => {
-        const off = setErrorAction(SENTENCE, {
-            label: "Sign in",
-            onClick: vi.fn(),
-        });
-        showError("Couldn't save", SENTENCE);
-        expect(error.mock.calls[0]?.[1].action.label).toBe("Sign in");
-        off();
+    it.each([
+        ["resolved false", () => Promise.resolve(false)],
+        ["threw", () => Promise.reject(new Error("offline"))],
+    ])("never fails silently: it %s", async (_how, undo) => {
+        showUndo("Note deleted.", undo);
+        await pressUndo();
+        expect(toast.error).toHaveBeenCalledWith(NOT_UNDONE, expect.anything());
     });
 
-    it("taken back, the sentence is an ordinary error again", () => {
-        const off = setErrorAction(SENTENCE, {
-            label: "Sign in",
-            onClick: vi.fn(),
+    it("leaves the words to a caller that draws the outcome itself", async () => {
+        const undo = vi.fn(() => undefined);
+        showUndo("Marked sent.", undo);
+        await pressUndo();
+        expect(undo).toHaveBeenCalledTimes(1);
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(toast.error).not.toHaveBeenCalled();
+
+        expect(await settleUndo(() => Promise.resolve(true), true)).toBe(true);
+        expect(toast.success).not.toHaveBeenCalled();
+    });
+});
+
+describe("showSuccess", () => {
+    it("can carry the way to the thing just made", () => {
+        const go = vi.fn();
+        showSuccess("Lead added.", "Weekend classes", {
+            label: "Open lead",
+            onClick: go,
         });
-        off();
-        showError(SENTENCE);
-        expect(error.mock.calls[0]?.[1].action).toBeUndefined();
+        const options = toast.success.mock.calls[0]?.[1] as {
+            description: string;
+            action: { label: string; onClick: () => void };
+        };
+        expect(options.description).toBe("Weekend classes");
+        expect(options.action.label).toBe("Open lead");
+        options.action.onClick();
+        expect(go).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a plain line without one", () => {
+        showSuccess("Note added.");
+        expect(toast.success).toHaveBeenCalledWith("Note added.", {
+            description: undefined,
+        });
     });
 });

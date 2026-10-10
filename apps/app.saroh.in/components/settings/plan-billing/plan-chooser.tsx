@@ -17,6 +17,7 @@ import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { runAction } from "@/lib/api/run-action";
+import { Segmented } from "@saroh/ui/segmented";
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
 import { RefreshButton } from "./refresh-button";
@@ -134,29 +135,18 @@ export function PlanChooser({
                             : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
                     </span>
                     {yearly.on && rows ? (
-                        <div
-                            role="radiogroup"
-                            aria-label="Billing"
-                            className="flex gap-0.5 rounded-[9px] border border-border bg-muted/50 p-[3px]"
-                        >
-                            {(["month", "year"] as const).map((c) => (
-                                <button
-                                    key={c}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={cycle === c}
-                                    onClick={() => setCycle(c)}
-                                    className={cn(
-                                        "h-7 rounded-md px-3 text-[12.5px] font-semibold text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:h-11",
-                                        cycle === c && "bg-muted",
-                                    )}
-                                >
-                                    {c === "month"
-                                        ? "Monthly"
-                                        : `Yearly · ${yearly.freeMonths} months free`}
-                                </button>
-                            ))}
-                        </div>
+                        <Segmented
+                            label="Billing"
+                            value={cycle}
+                            onValueChange={setCycle}
+                            options={[
+                                { value: "month", label: "Monthly" },
+                                {
+                                    value: "year",
+                                    label: `Yearly · ${yearly.freeMonths} months free`,
+                                },
+                            ]}
+                        />
                     ) : null}
                 </div>
                 {rows === null ? (

@@ -71,12 +71,14 @@ export function stopTrackingConfirm(productName: string): {
     title: string;
     description: string;
     confirmLabel: string;
+    keepLabel: string;
 } {
     return {
         title: `Stop tracking ${productName}?`,
         description:
             "Its count goes to 0 at every location, and it sells without a count unless you mark it sold out. Turning it back on starts from 0, so you count it again.",
         confirmLabel: "Stop tracking",
+        keepLabel: "Keep tracking",
     };
 }
 

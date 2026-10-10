@@ -139,7 +139,7 @@ export function OrganizationSwitcher({
     const heading = (label: string, first: boolean) => (
         <p
             className={cn(
-                "px-[9px] pb-[5px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                "label px-[9px] pb-[5px]",
                 first ? "pt-1" : "mt-[5px] border-t border-muted pt-2.5",
             )}
         >

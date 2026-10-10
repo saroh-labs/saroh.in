@@ -1,34 +1,20 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { FileCheck2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FormDialog } from "@/components/shared/form-dialog";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import {
@@ -78,57 +64,43 @@ export function IssueDialog({
     payOnline?: boolean;
 }) {
     const router = useRouter();
-    const [busy, setBusy] = useState(false);
     // No registered address yet (DEC-068): asked here, then it issues.
     const details = useBusinessDetailsStep({
         then: "issue it",
         continueLabel: "Save and issue",
     });
 
-    async function issue() {
-        const res = await runAction(
-            () => details.run(() => issueInvoice(invoice.id)),
-            { setBusy },
-        );
-        if (!res) return;
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${res.data.number ?? "Invoice"} issued`);
-        onOpenChange(false);
+    async function issue(): Promise<ConfirmResult> {
+        const res = await details.run(() => issueInvoice(invoice.id));
+        // The details sheet was closed without saving: still a draft.
+        if (!res) return true;
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess(`${res.data.number ?? "Invoice"} issued.`);
         router.refresh();
     }
 
     return (
-        <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent className="max-w-[420px]">
-                <AlertDialogHeader>
-                    <AlertDialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                        Issue {invoice.total} to {invoice.who}?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                        It takes the next number and its lines lock — a mistake
-                        after this is corrected with a credit note.{" "}
-                        {canSend
-                            ? `Issuing doesn't send it: ${sendLabel(payOnline)} issues and sends in one step.`
-                            : payOnline
-                              ? "Saroh doesn't send it: copy its pay link or print it and hand it over."
-                              : "Saroh doesn't send it: print it or download the PDF and hand it over."}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Not yet</AlertDialogCancel>
-                    <AlertDialogAction
-                        disabled={busy}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            void issue();
-                        }}
-                    >
-                        {busy ? "Issuing…" : "Issue it"}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-                {details.step}
-            </AlertDialogContent>
-        </AlertDialog>
+        <>
+            <ConfirmDialog
+                open={open}
+                onOpenChange={onOpenChange}
+                tone="neutral"
+                icon={FileCheck2}
+                title={`Issue ${invoice.total} to ${invoice.who}?`}
+                description={`It takes the next number and its lines lock. A mistake after this is corrected with a credit note. ${
+                    canSend
+                        ? `Issuing doesn't send it: ${sendLabel(payOnline)} issues and sends in one step.`
+                        : payOnline
+                          ? "Saroh doesn't send it: copy its pay link or print it and hand it over."
+                          : "Saroh doesn't send it: print it or download the PDF and hand it over."
+                } This cannot be undone.`}
+                confirmLabel="Issue invoice"
+                busyLabel="Issuing…"
+                keepLabel="Keep draft"
+                onConfirm={issue}
+            />
+            {details.step}
+        </>
     );
 }
 
@@ -144,10 +116,10 @@ export function DeleteDraftDialog({
 }) {
     const router = useRouter();
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         const res = await deleteInvoice(invoice.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess("Draft deleted");
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess("Draft deleted.");
         router.push("/billing/invoices");
     }
 
@@ -158,16 +130,16 @@ export function DeleteDraftDialog({
             title="Delete this draft?"
             description={`The draft for ${invoice.who} goes, lines and all. It never had a number, so nothing is skipped. This cannot be undone.`}
             confirmLabel="Delete draft"
-            cancelLabel="Keep it"
-            onConfirm={() => void remove()}
+            keepLabel="Keep draft"
+            onConfirm={remove}
         />
     );
 }
 
 /**
- * Record money already taken — at the counter, by UPI, by bank transfer.
- * The design's dialog: how it was paid, a reference, the day. Nothing is
- * charged and nobody is contacted, and the dialog says so.
+ * Record money already taken: at the counter, by UPI, by bank transfer.
+ * A side sheet (four fields): how it was paid, a reference, the day, a
+ * note. Nothing is charged and nobody is contacted, and the sheet says so.
  */
 export function RecordPaymentDialog({
     open,
@@ -214,90 +186,79 @@ export function RecordPaymentDialog({
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
-        showSuccess(`${invoice.number ?? "Invoice"} marked paid`);
+        showSuccess(`${invoice.number ?? "Invoice"} marked paid.`);
         onOpenChange(false);
         router.refresh();
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Record a payment
-                    </DialogTitle>
-                    <DialogDescription>
-                        {invoice.number} · {invoice.total} from {invoice.who}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.method}>How it was paid</Label>
-                        <OptionSelect
-                            id={ids.method}
-                            value={method}
-                            onValueChange={(v) => setMethod(v)}
-                            options={METHODS}
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.ref}>
-                            Reference{" "}
-                            <span className="font-normal text-muted-foreground">
-                                (optional)
-                            </span>
-                        </Label>
-                        <Input
-                            id={ids.ref}
-                            value={reference}
-                            maxLength={120}
-                            placeholder="A UPI or bank reference"
-                            onChange={(e) => setReference(e.target.value)}
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.on}>Paid on</Label>
-                        <DatePicker
-                            id={ids.on}
-                            value={paidOn}
-                            onValueChange={setPaidOn}
-                            disabledDays={{ after: new Date() }}
-                            className="w-full"
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.note}>
-                            Note{" "}
-                            <span className="font-normal text-muted-foreground">
-                                (optional)
-                            </span>
-                        </Label>
-                        <Textarea
-                            id={ids.note}
-                            value={note}
-                            maxLength={500}
-                            rows={2}
-                            onChange={(e) => setNote(e.target.value)}
-                        />
-                    </div>
-                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                        This records money you have already taken. Nothing is
-                        charged and nobody is contacted.
-                    </p>
-                </div>
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button disabled={busy} onClick={() => void save()}>
-                        {busy ? "Saving…" : "Mark it paid"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        <FormSheet
+            open={open}
+            title="Record a payment"
+            description={`${invoice.number ?? "Invoice"} · ${invoice.total} from ${invoice.who}`}
+            pending={busy}
+            saveLabel="Record payment"
+            savingLabel="Recording…"
+            fieldsClassName="gap-4"
+            footNote={
+                <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
+                    This records money you have already taken. Nothing is
+                    charged and nobody is contacted.
+                </p>
+            }
+            onClose={() => onOpenChange(false)}
+            onSubmit={save}
+        >
+            <div className="grid gap-1.5">
+                <Label htmlFor={ids.method}>How it was paid</Label>
+                <OptionSelect
+                    id={ids.method}
+                    value={method}
+                    onValueChange={(v) => setMethod(v)}
+                    options={METHODS}
+                />
+            </div>
+            <div className="grid gap-1.5">
+                <Label htmlFor={ids.ref}>
+                    Reference{" "}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
+                </Label>
+                <Input
+                    id={ids.ref}
+                    value={reference}
+                    maxLength={120}
+                    placeholder="A UPI or bank reference"
+                    onChange={(e) => setReference(e.target.value)}
+                />
+            </div>
+            <div className="grid gap-1.5">
+                <Label htmlFor={ids.on}>Paid on</Label>
+                <DatePicker
+                    id={ids.on}
+                    value={paidOn}
+                    onValueChange={setPaidOn}
+                    disabledDays={{ after: new Date() }}
+                    className="w-full"
+                />
+            </div>
+            <div className="grid gap-1.5">
+                <Label htmlFor={ids.note}>
+                    Note{" "}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
+                </Label>
+                <Textarea
+                    id={ids.note}
+                    value={note}
+                    maxLength={500}
+                    rows={2}
+                    onChange={(e) => setNote(e.target.value)}
+                />
+            </div>
+        </FormSheet>
     );
 }
 
@@ -328,20 +289,16 @@ export function CancelInvoiceDialog({
     const router = useRouter();
     const reasonId = useId();
     const [reason, setReason] = useState("");
+    const [tried, setTried] = useState(false);
     const [busy, setBusy] = useState<"credit" | "void" | "reissue" | null>(
         null,
     );
     const byCredit = registered || refund;
+    const missing = tried && !reason.trim();
 
     async function run(kind: "credit" | "void" | "reissue") {
-        if (!reason.trim()) {
-            showError(
-                byCredit
-                    ? "Say why it is being cancelled."
-                    : "Say why it is being voided.",
-            );
-            return;
-        }
+        setTried(true);
+        if (!reason.trim()) return;
         const res = await runAction(
             () =>
                 kind === "credit"
@@ -355,95 +312,101 @@ export function CancelInvoiceDialog({
         if (!res.ok) return showError(res.error);
         onOpenChange(false);
         setReason("");
+        setTried(false);
         if (kind === "reissue") {
             showSuccess(
-                `${invoice.number ?? "Invoice"} voided — a corrected draft is open`,
+                `${invoice.number ?? "Invoice"} voided. A corrected draft is open.`,
             );
             router.push(`/billing/invoices/${res.data.id}/edit`);
             return;
         }
         showSuccess(
             kind === "credit"
-                ? `${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()
-                : `${invoice.number ?? "Invoice"} voided`,
+                ? `${`${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()}.`
+                : `${invoice.number ?? "Invoice"} voided.`,
         );
         router.refresh();
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        {refund
-                            ? `Refund ${invoice.number} with a credit note?`
-                            : `Cancel ${invoice.number}?`}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {byCredit
-                            ? `A credit note for ${invoice.total} cancels it. ${invoice.number} keeps its number and its lines, and nothing more is owed on it. This cannot be undone.`
-                            : `It keeps its number and stays in the list, marked void, so ${invoice.number} always means the same thing. This cannot be undone.`}
-                        {refund
-                            ? ` Saroh records the credit note only — pay ${invoice.who} back yourself.`
-                            : ""}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-1.5">
-                    <Label htmlFor={reasonId}>Why</Label>
-                    <Input
-                        id={reasonId}
-                        value={reason}
-                        maxLength={500}
-                        placeholder="Wrong amount, wrong person, returned…"
-                        onChange={(e) => setReason(e.target.value)}
-                    />
-                    <p className="text-[12px] text-muted-foreground">
-                        {byCredit
-                            ? "Printed on the credit note."
-                            : "Kept on the invoice, for whoever reads it later."}
-                    </p>
-                </div>
-                <DialogFooter className="gap-2 sm:space-x-0">
+        <FormDialog
+            open={open}
+            size="md"
+            title={
+                refund
+                    ? `Refund ${invoice.number} with a credit note?`
+                    : `Cancel ${invoice.number}?`
+            }
+            description={`${
+                byCredit
+                    ? `A credit note for ${invoice.total} cancels it. ${invoice.number} keeps its number and its lines, and nothing more is owed on it. This cannot be undone.`
+                    : `It keeps its number and stays in the list, marked void, so ${invoice.number} always means the same thing. This cannot be undone.`
+            }${
+                refund
+                    ? ` Saroh records the credit note only. Pay ${invoice.who} back yourself.`
+                    : ""
+            }`}
+            pending={busy !== null}
+            tone="destructive"
+            cancelLabel="Keep invoice"
+            saveLabel={
+                byCredit
+                    ? refund
+                        ? "Issue the credit note"
+                        : "Cancel with a credit note"
+                    : "Void and write again"
+            }
+            savingLabel={
+                busy === "credit" ? "Issuing the credit note…" : "Voiding…"
+            }
+            extra={
+                byCredit ? null : (
                     <Button
+                        type="button"
                         variant="outline"
-                        onClick={() => onOpenChange(false)}
+                        disabled={busy !== null}
+                        onClick={() => void run("void")}
                     >
-                        Keep invoice
+                        Void invoice
                     </Button>
-                    {byCredit ? (
-                        <Button
-                            variant="destructive"
-                            disabled={busy !== null}
-                            onClick={() => void run("credit")}
-                        >
-                            {busy === "credit"
-                                ? "Issuing the credit note…"
-                                : refund
-                                  ? "Issue the credit note"
-                                  : "Cancel with a credit note"}
-                        </Button>
-                    ) : (
-                        <>
-                            <Button
-                                variant="outline"
-                                disabled={busy !== null}
-                                onClick={() => void run("void")}
-                            >
-                                {busy === "void" ? "Voiding…" : "Void it"}
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                disabled={busy !== null}
-                                onClick={() => void run("reissue")}
-                            >
-                                {busy === "reissue"
-                                    ? "Voiding…"
-                                    : "Void and write again"}
-                            </Button>
-                        </>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                )
+            }
+            onClose={() => {
+                setTried(false);
+                onOpenChange(false);
+            }}
+            onSubmit={() => run(byCredit ? "credit" : "reissue")}
+        >
+            <div className="grid gap-1.5">
+                <Label htmlFor={reasonId}>Why</Label>
+                <Input
+                    id={reasonId}
+                    value={reason}
+                    maxLength={500}
+                    placeholder="Wrong amount, wrong person, returned…"
+                    aria-invalid={missing || undefined}
+                    aria-describedby={
+                        missing ? `${reasonId}-problem` : undefined
+                    }
+                    onChange={(e) => setReason(e.target.value)}
+                />
+                {missing ? (
+                    <p
+                        id={`${reasonId}-problem`}
+                        role="alert"
+                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                    >
+                        {byCredit
+                            ? "Say why it is being cancelled."
+                            : "Say why it is being voided."}
+                    </p>
+                ) : null}
+                <p className="text-[12px] text-muted-foreground">
+                    {byCredit
+                        ? "Printed on the credit note."
+                        : "Kept on the invoice, for whoever reads it later."}
+                </p>
+            </div>
+        </FormDialog>
     );
 }

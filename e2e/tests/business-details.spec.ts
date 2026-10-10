@@ -95,7 +95,9 @@ test.describe(
                 await page.goto(`/billing/invoices/${draft.id}`);
                 await action(page, "Issue it").click();
                 const confirm = page.getByRole("alertdialog");
-                await confirm.getByRole("button", { name: "Issue it" }).click();
+                await confirm
+                    .getByRole("button", { name: "Issue invoice" })
+                    .click();
 
                 // Refused for want of the address: asked for in place.
                 const sheet = page.getByRole("dialog", {

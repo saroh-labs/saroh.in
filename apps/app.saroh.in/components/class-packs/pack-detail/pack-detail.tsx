@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
@@ -46,6 +46,7 @@ import {
 import type { HeldPack } from "@/lib/class-packs/sell-words";
 import { invoicesHref } from "@/lib/invoices/links";
 
+import { TabStrip } from "@saroh/ui/tabs";
 import type { SellablePack } from "../sell-pack-dialog";
 import { SellPackDialog } from "../sell-pack-dialog";
 import { ActivityTab } from "./activity-tab";
@@ -62,7 +63,6 @@ import { SalesTab } from "./sales-tab";
 import { UsedTab } from "./used-tab";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
 
 /** What the sell dialog needs, read only for someone who may sell. */
 export interface SellContext {
@@ -126,7 +126,6 @@ export function PackDetailScreen({
     const [extending, setExtending] = useState<ExtendTarget | null>(null);
     const [busy, setBusy] = useState(false);
     const [, start] = useTransition();
-    const tabsRef = useRef<HTMLDivElement>(null);
 
     const kind = packKind(pack);
     const head = detailHeader(pack);
@@ -167,25 +166,11 @@ export function PackDetailScreen({
         window.history.replaceState(null, "", url.pathname + url.search);
     }
 
-    function keys(e: React.KeyboardEvent) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        const i = tabs.findIndex((t) => t.key === tab);
-        const n =
-            (i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
-        pick(tabs[n].key);
-        tabsRef.current
-            ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-            .item(n)
-            .focus();
-    }
-
     function restore() {
         setBusy(true);
         start(async () => {
-            const res = await runAction(() => setPackArchived(pack.id, false), {
-                setBusy,
-            });
+            const res = await runAction(() => setPackArchived(pack.id, false));
+            setBusy(false);
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
@@ -193,18 +178,15 @@ export function PackDetailScreen({
             }
             router.refresh();
             dismissToasts();
-            showUndo(
-                archiveToast(pack, false),
-                () =>
-                    start(async () => {
-                        const back = await runAction(() =>
-                            setPackArchived(pack.id, true),
-                        );
-                        if (!back) return;
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    }),
-                { duration: UNDO_MS },
+            showUndo(archiveToast(pack, false), () =>
+                start(async () => {
+                    const back = await runAction(() =>
+                        setPackArchived(pack.id, true),
+                    );
+                    if (!back) return;
+                    if (!back.ok) showError(back.error);
+                    router.refresh();
+                }),
             );
         });
     }
@@ -244,54 +226,26 @@ export function PackDetailScreen({
                 />
             ) : (
                 <>
-                    <div
-                        ref={tabsRef}
-                        role="tablist"
-                        aria-label="Pack sections"
-                        onKeyDown={keys}
-                        className={cn(
-                            // Scrolls sideways on a phone rather than wrapping.
-                            "flex gap-0.5 overflow-x-auto border-b border-border pt-1.5",
-                            GUTTER,
-                        )}
-                    >
-                        {tabs.map((t) => {
-                            const on = t.key === tab;
+                    <TabStrip
+                        label="Pack sections"
+                        idPrefix="pack-tab"
+                        value={tab}
+                        onValueChange={pick}
+                        listClassName={cn("pt-1.5", GUTTER)}
+                        tabs={tabs.map((t) => {
                             const meta = tabMeta(t.key, pack.overview, counts);
-                            return (
-                                <button
-                                    key={t.key}
-                                    type="button"
-                                    role="tab"
-                                    id={`pack-tab-${t.key}`}
-                                    aria-selected={on}
-                                    aria-controls="pack-panel"
-                                    tabIndex={on ? 0 : -1}
-                                    onClick={() => pick(t.key)}
-                                    className={cn(
-                                        "-mb-px inline-flex flex-none cursor-pointer items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-foreground/70 coarse:min-h-11",
-                                        on
-                                            ? "border-brand font-semibold text-foreground"
-                                            : "border-transparent font-medium text-muted-foreground hover:text-foreground",
-                                    )}
-                                >
-                                    {t.label}
-                                    {meta ? (
-                                        <span
-                                            className={cn(
-                                                "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
-                                                meta.tone === "accent"
-                                                    ? "bg-brand-subtle text-brand-subtle-foreground"
-                                                    : "bg-muted text-muted-foreground",
-                                            )}
-                                        >
-                                            {meta.text}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            );
+                            return {
+                                value: t.key,
+                                label: t.label,
+                                controls: "pack-panel",
+                                count: meta?.text,
+                                countTone:
+                                    meta?.tone === "accent"
+                                        ? ("strong" as const)
+                                        : ("neutral" as const),
+                            };
                         })}
-                    </div>
+                    />
                     <div
                         id="pack-panel"
                         role="tabpanel"

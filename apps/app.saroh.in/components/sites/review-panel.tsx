@@ -162,9 +162,7 @@ export function ReviewPanel({
      */
     const subject = (
         <div className="flex shrink-0 items-baseline gap-2 border-b px-3 py-2">
-            <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                Reviewing
-            </span>
+            <span className="label">Reviewing</span>
             <span
                 data-review-subject
                 className="min-w-0 truncate text-xs font-medium"
@@ -343,9 +341,7 @@ export function ReviewPanel({
             <div className="min-h-0 flex-1 p-2">
                 {groups.map(({ page, notes }) => (
                     <section key={page.id} className="mb-4">
-                        <h3 className="px-1 pb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                            {page.title}
-                        </h3>
+                        <h3 className="label px-1 pb-1">{page.title}</h3>
                         <ul className="grid gap-1">
                             {notes.map((note) => (
                                 <Note
@@ -366,7 +362,7 @@ export function ReviewPanel({
 
                 {strays.length > 0 ? (
                     <section className="mb-4">
-                        <h3 className="px-1 pb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                        <h3 className="label px-1 pb-1">
                             On a page that no longer exists
                         </h3>
                         <ul className="grid gap-1">

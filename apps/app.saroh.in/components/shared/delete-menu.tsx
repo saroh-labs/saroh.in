@@ -1,13 +1,12 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -15,6 +14,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { CrmResult } from "@/lib/api/http";
 import { runAction } from "@/lib/api/run-action";
+import { IconButton } from "@saroh/ui/icon-button";
 
 /**
  * A record's "…" menu with one thing in it: delete, for good.
@@ -31,6 +31,7 @@ import { runAction } from "@/lib/api/run-action";
 export function DeleteMenu<T>({
     name,
     verb,
+    keep,
     title,
     description,
     onDelete,
@@ -42,6 +43,8 @@ export function DeleteMenu<T>({
     name: string;
     /** Verb plus noun, on the menu item and the button: "Delete lead". */
     verb: string;
+    /** The way out, saying what is kept: "Keep lead". */
+    keep: string;
     title: string;
     /** What goes, what stays, and "This cannot be undone." */
     description: string;
@@ -60,6 +63,7 @@ export function DeleteMenu<T>({
     const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
 
+    /** From the confirm, which waits and says a refusal itself. */
     async function commit() {
         setBusy(true);
         const res = await runAction(onDelete);
@@ -69,25 +73,23 @@ export function DeleteMenu<T>({
         }
         if (!res.ok) {
             setBusy(false);
-            showError(res.error);
-            return;
+            return { ok: false, error: res.error };
         }
         showSuccess(done(res.data));
         router.push(then);
+        return { ok: true };
     }
 
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button
+                    <IconButton
+                        label={`More actions for ${name}`}
+                        icon={<MoreHorizontal />}
                         variant="outline"
-                        size="icon"
                         disabled={busy}
-                        aria-label={`More actions for ${name}`}
-                    >
-                        <MoreHorizontal className="size-4" />
-                    </Button>
+                    />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                     {unavailable ? (
@@ -116,11 +118,8 @@ export function DeleteMenu<T>({
                 title={title}
                 description={description}
                 confirmLabel={verb}
-                cancelLabel="Keep it"
-                onConfirm={() => {
-                    setAsking(false);
-                    void commit();
-                }}
+                keepLabel={keep}
+                onConfirm={commit}
             />
         </>
     );

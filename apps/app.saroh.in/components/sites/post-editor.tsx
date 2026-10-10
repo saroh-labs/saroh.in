@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
@@ -297,13 +298,10 @@ export function PostEditor({
         refreshServer();
     }
 
-    async function onDelete() {
+    async function onDelete(): Promise<ConfirmResult> {
         if (!postId) return;
         const res = await deletePost(siteId, postId);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Post deleted.");
         router.push(`/sites/${siteId}/posts`);
     }
@@ -554,11 +552,12 @@ export function PostEditor({
                                     title="Delete this post?"
                                     description={
                                         liveAt
-                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. This cannot be undone — to take it down and keep it, use Take off the site instead."
-                                            : "It has never been published, so nobody outside your team has seen it. It cannot be brought back."
+                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. To take it down and keep it, use Take off the site instead. This cannot be undone."
+                                            : "It has never been published, so nobody outside your team has seen it. This cannot be undone."
                                     }
                                     confirmLabel="Delete post"
-                                    onConfirm={() => void onDelete()}
+                                    keepLabel="Keep post"
+                                    onConfirm={onDelete}
                                 />
                             </div>
                         ) : null}
@@ -581,9 +580,7 @@ function Field({
 }) {
     return (
         <div className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                {label}
-            </span>
+            <span className="label">{label}</span>
             {children}
             {hint ? (
                 <p className="text-xs text-muted-foreground">{hint}</p>

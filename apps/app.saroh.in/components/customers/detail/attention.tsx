@@ -25,6 +25,7 @@ import {
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { AttentionSheet } from "./attention-sheet";
 import { CARD, LABEL } from "./parts";
 
@@ -150,13 +151,12 @@ export function AttentionCard({
             <div className="flex items-baseline gap-2">
                 <span className={cn(LABEL, "flex-1")}>Needs attention</span>
                 {canWrite && state.read ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={state.add}
-                        className="text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Add
-                    </button>
+                    </TextLink>
                 ) : null}
             </div>
             {!state.read ? (

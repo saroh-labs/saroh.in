@@ -1,5 +1,6 @@
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 import Link from "next/link";
 
 /**
@@ -36,41 +37,29 @@ export function LimitNoticeBlock({
 }) {
     const refused = full && !soft;
     return (
-        <div
+        <Notice
+            tone={refused ? "error" : "warning"}
             role="status"
-            className={cn(
-                "flex flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-[10px] border px-3.5 py-3",
-                refused
-                    ? "border-destructive bg-destructive-subtle"
-                    : "border-brand-300 bg-brand-subtle dark:border-brand-700",
-                className,
-            )}
+            icon={false}
+            title={title}
+            className={className}
+            action={
+                <Button asChild size="sm" className="shrink-0">
+                    <Link href={href}>{cta}</Link>
+                </Button>
+            }
         >
-            <div className="grid min-w-0 flex-[1_1_320px] gap-1.5">
-                <span className="text-[13px] font-semibold text-foreground">
-                    {title}
-                </span>
-                {pct ? (
-                    <div
-                        aria-hidden
-                        className="h-[5px] max-w-[320px] overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className={cn(
-                                "h-full rounded-full",
-                                refused ? "bg-destructive" : "bg-highlight",
-                            )}
-                            style={{ width: pct }}
-                        />
-                    </div>
-                ) : null}
-                <span className="text-pretty text-[12.5px] leading-normal text-foreground/80">
-                    {body}
-                </span>
-            </div>
-            <Button asChild size="sm" className="shrink-0">
-                <Link href={href}>{cta}</Link>
-            </Button>
-        </div>
+            {pct ? (
+                <ProgressBar
+                    value={Number.parseFloat(pct) || 0}
+                    max={100}
+                    size="xs"
+                    tone={refused ? "danger" : "ink"}
+                    label={`${pct} used`}
+                    className="my-1.5 max-w-[320px]"
+                />
+            ) : null}
+            <span className="text-pretty">{body}</span>
+        </Notice>
     );
 }

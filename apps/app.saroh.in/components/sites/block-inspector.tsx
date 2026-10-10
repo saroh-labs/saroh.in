@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Info } from "lucide-react";
-import Link from "next/link";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { BOUND_BLOCKS, boundHref } from "@/components/sites/block-kinds";
@@ -15,6 +14,8 @@ import { SectionPadding } from "@/components/sites/section-fields/padding";
 import type { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 import type { Flag, Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The inspector's Block tab (#340): what can be changed about the selected
@@ -99,27 +100,30 @@ export function BlockInspector({
                             {SECTION_LABELS[section.type]}
                         </span>
                     </h2>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-pressed={section.hidden === true}
-                        title={
+                    <Tip
+                        label={
                             section.hidden
                                 ? "Hidden — this block is left out when you publish"
                                 : "Visible — this block publishes with the page"
                         }
-                        onClick={onToggleHidden}
-                        className={cn(
-                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
-                            section.hidden && "text-muted-foreground",
-                        )}
                     >
-                        <span aria-hidden="true">
-                            {section.hidden ? "○" : "●"}
-                        </span>
-                        {section.hidden ? "Hidden" : "Visible"}
-                    </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-pressed={section.hidden === true}
+                            onClick={onToggleHidden}
+                            className={cn(
+                                "h-7 shrink-0 gap-1.5 px-2 text-xs",
+                                section.hidden && "text-muted-foreground",
+                            )}
+                        >
+                            <span aria-hidden="true">
+                                {section.hidden ? "○" : "●"}
+                            </span>
+                            {section.hidden ? "Hidden" : "Visible"}
+                        </Button>
+                    </Tip>
                 </div>
 
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
@@ -133,7 +137,7 @@ export function BlockInspector({
              * field that would fork it (#338).
              */}
             {bound ? (
-                <div className="flex gap-2.5 rounded-lg bg-brand-subtle p-3 text-[0.8125rem] leading-relaxed text-brand-subtle-foreground">
+                <div className="flex gap-2.5 rounded-lg bg-muted p-3 text-[0.8125rem] leading-relaxed text-foreground">
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <div className="space-y-2">
                         <p>{bound.notice}</p>
@@ -142,14 +146,9 @@ export function BlockInspector({
                          * work autosave has not sent yet.
                          */}
                         {boundLink ? (
-                            <Link
-                                href={boundLink}
-                                target="_blank"
-                                rel="noopener"
-                                className="font-medium underline underline-offset-2"
-                            >
+                            <TextLink href={boundLink} external>
                                 {bound.linkLabel}
-                            </Link>
+                            </TextLink>
                         ) : null}
                     </div>
                 </div>
@@ -188,7 +187,7 @@ export function BlockInspector({
                         >
                             <span
                                 aria-hidden="true"
-                                className="mt-1.5 size-1 shrink-0 rounded-full bg-highlight"
+                                className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
                             />
                             <span>{flag.message}</span>
                         </li>

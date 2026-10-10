@@ -11,6 +11,7 @@ import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
 import { FailedRead } from "@/components/shared/failed-read";
+import { Notice } from "@saroh/ui/notice";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -18,7 +19,7 @@ import type { QrStyleLock } from "./qr-style-lock";
 const CUSTOM = "__custom__";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 /**
  * The maker's third column, above its buttons ("Saroh QR Codes" design):
@@ -168,12 +169,7 @@ export function QrLookControls({
                     }
                 />
                 {colorProblem ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        {colorProblem}
-                    </p>
+                    <Notice tone="error">{colorProblem}</Notice>
                 ) : null}
             </div>
 

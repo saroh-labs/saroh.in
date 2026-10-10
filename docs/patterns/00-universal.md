@@ -313,8 +313,9 @@ says why.
 ## 9. No `alert()` or `confirm()`
 
 **Current** — none in app code (the last three went in #329). For a
-destructive confirmation in `app.saroh.in` use
-`components/shared/confirm-dialog.tsx`; otherwise `@saroh/ui/alert-dialog` or
+confirmation in `app.saroh.in` use `components/shared/confirm-dialog.tsx`,
+and only for what cannot be undone (`frontend-forms.md`: one sheet, one
+dialog, one confirm); elsewhere `@saroh/ui/alert-dialog` or
 `@saroh/ui/dialog`, and `@saroh/ui/toast`.
 
 ## 10. Uploads go straight to storage

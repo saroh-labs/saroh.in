@@ -23,9 +23,6 @@ import { MembershipsNote } from "./memberships-note";
 import { PackCard } from "./pack-card";
 import { SellPackDialog } from "./sell-pack-dialog";
 
-/** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
-
 /** Archived, with who keeps what: the toast Undo sits beside. */
 function archiveToast(pack: PackListItem, archived: boolean): string {
     if (!archived) return `${pack.name} is on sale again.`;
@@ -92,10 +89,10 @@ export function PacksScreen({
     function setArchived(pack: PackListItem, archived: boolean) {
         setBusyId(pack.id);
         start(async () => {
-            const res = await runAction(
-                () => setPackArchived(pack.id, archived),
-                { setBusy: (on) => setBusyId(on ? pack.id : null) },
+            const res = await runAction(() =>
+                setPackArchived(pack.id, archived),
             );
+            setBusyId(null);
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
@@ -105,18 +102,15 @@ export function PacksScreen({
             // One Undo on screen at a time: an older one would undo the
             // wrong pack.
             dismissToasts();
-            showUndo(
-                archiveToast(pack, archived),
-                () =>
-                    start(async () => {
-                        const back = await runAction(() =>
-                            setPackArchived(pack.id, !archived),
-                        );
-                        if (!back) return;
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    }),
-                { duration: UNDO_MS },
+            showUndo(archiveToast(pack, archived), () =>
+                start(async () => {
+                    const back = await runAction(() =>
+                        setPackArchived(pack.id, !archived),
+                    );
+                    if (!back) return;
+                    if (!back.ok) showError(back.error);
+                    router.refresh();
+                }),
             );
         });
     }

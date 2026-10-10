@@ -7,7 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     NOTE,
     PROBLEM,
@@ -129,7 +129,7 @@ function PrivacySheet({
     const problem = typed && url === null ? PRIVACY_URL_PROBLEM : serverError;
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={editId}
             title="Your privacy page"
             description={`Optional. The cookie notice links to it. ${PRIVACY_NOTE}`}
@@ -167,6 +167,6 @@ function PrivacySheet({
                     </p>
                 )}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

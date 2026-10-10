@@ -147,7 +147,7 @@ describe("detailHeader", () => {
         expect(head).toMatchObject({
             thumbN: "10",
             thumbUnit: "classes",
-            status: { label: "On sale", tone: "ok" },
+            status: { label: "Live", tone: "ok" },
             kindLabel: "Classes",
             firstOnly: true,
             meta: "₹1,500 · ₹150 a class · use within 60 days · HIIT, Yoga",

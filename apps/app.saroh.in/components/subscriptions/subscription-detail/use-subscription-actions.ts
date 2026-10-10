@@ -4,7 +4,7 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { runAction } from "@/lib/api/run-action";
+import { useHold } from "@/components/shared/use-hold";
 import { UNREACHED } from "@/lib/api/unreached";
 import { newPayLink as makePayLink } from "@/lib/invoices/link-actions";
 import {
@@ -25,9 +25,10 @@ import type { CollectionRow } from "@/lib/subscriptions/view";
 import { dayText } from "@/lib/subscriptions/view";
 
 /**
- * Subscription Detail's writes. Each is one call, then the page reads again;
- * its toast carries the Undo — the inverse call — and an Undo that fails says
- * so rather than going quiet.
+ * Subscription Detail's writes. Each is one call, then the page reads again.
+ * Its toast carries the Undo (the inverse call), and `showUndo` says how
+ * that went. Cancel tells the customer, so it waits ten seconds with Undo
+ * before anything is written (`useHold`).
  */
 export function useSubscriptionActions(
     sub: Subscription,
@@ -40,6 +41,7 @@ export function useSubscriptionActions(
     const [busy, setBusy] = useState(false);
     const [busyDate, setBusyDate] = useState<string | null>(null);
     const [payLink, setPayLink] = useState<string | null>(null);
+    const { send } = useHold();
 
     /** One call, then the page reads again; the toast offers the way back. */
     async function run<T extends { ok: boolean; error?: string }>(
@@ -64,13 +66,12 @@ export function useSubscriptionActions(
         return true;
     }
 
-    /** An Undo that reports its own failure rather than going quiet. */
+    /** An Undo: the inverse call, then the page reads again. */
     const undo =
-        (call: () => Promise<{ ok: boolean; error?: string }>) => () => {
-            void call().then((r) => {
-                if (!r.ok) showError(r.error ?? "Couldn't undo that.");
-                router.refresh();
-            });
+        (call: () => Promise<{ ok: boolean; error?: string }>) => async () => {
+            const r = await call();
+            router.refresh();
+            return r;
         };
 
     const periodEndText = dayText(sub.currentPeriodEnd, tz, now);
@@ -138,20 +139,29 @@ export function useSubscriptionActions(
         );
     }
     function cancel(when: "now" | "periodEnd", voidInvoiceId?: string) {
-        void run(
-            () => cancelSubscription(sub.id, when, voidInvoiceId),
-            () => {
-                closeStep();
-                if (when === "periodEnd") {
-                    showUndo(
-                        `Cancelled. It ends on ${periodEndText}.`,
-                        undo(() => keepSubscription(sub.id)),
-                    );
-                } else {
-                    showSuccess("Cancelled. Nothing more is charged.");
-                }
+        closeStep();
+        send(`cancel-subscription:${sub.id}`, {
+            soon: "Cancelling in 10 seconds",
+            description:
+                when === "periodEnd"
+                    ? `It ends on ${periodEndText}.`
+                    : "It ends today, and nothing more is charged.",
+            run: async () => {
+                const res = await cancelSubscription(
+                    sub.id,
+                    when,
+                    voidInvoiceId,
+                );
+                router.refresh();
+                return res.ok ? { ok: true } : { ok: false, error: res.error };
             },
-        );
+            sent: "Subscription cancelled.",
+            sentDescription:
+                when === "periodEnd"
+                    ? `It ends on ${periodEndText}.`
+                    : "Nothing more is charged.",
+            failed: "The subscription wasn't cancelled.",
+        });
     }
     function keep() {
         void run(
@@ -165,27 +175,25 @@ export function useSubscriptionActions(
     }
     async function toggleSkip(row: CollectionRow) {
         const skipped = row.skipped;
-        await runAction(
+        setBusyDate(row.date);
+        await run(
             () =>
-                run(
-                    () =>
+                skipped
+                    ? unskipCollection(sub.id, row.date)
+                    : skipCollection(sub.id, row.date),
+            () =>
+                showUndo(
+                    skipped
+                        ? `Back on: ${row.label}.`
+                        : `Skipped ${row.label}. Nothing is refunded. It just isn't collected.`,
+                    undo(() =>
                         skipped
-                            ? unskipCollection(sub.id, row.date)
-                            : skipCollection(sub.id, row.date),
-                    () =>
-                        showUndo(
-                            skipped
-                                ? `Back on: ${row.label}.`
-                                : `Skipped ${row.label}. Nothing is refunded — it just isn't collected.`,
-                            undo(() =>
-                                skipped
-                                    ? skipCollection(sub.id, row.date)
-                                    : unskipCollection(sub.id, row.date),
-                            ),
-                        ),
+                            ? skipCollection(sub.id, row.date)
+                            : unskipCollection(sub.id, row.date),
+                    ),
                 ),
-            { setBusy: (on) => setBusyDate(on ? row.date : null) },
         );
+        setBusyDate(null);
     }
     function newPayLink() {
         const invoiceId = sub.failedCharge?.id;
@@ -195,7 +203,8 @@ export function useSubscriptionActions(
             (res) => {
                 if ("data" in res) setPayLink(res.data.url);
                 showSuccess(
-                    "New pay link ready — the one sent before no longer works.",
+                    "Pay link made.",
+                    "The one sent before no longer works.",
                 );
             },
         );

@@ -1,15 +1,7 @@
 "use client";
 
+import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
@@ -18,6 +10,8 @@ import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { saveStages } from "@/lib/pipelines/actions";
+import { IconButton } from "@saroh/ui/icon-button";
+import { Tip } from "@saroh/ui/tooltip";
 
 interface Row {
     /** Absent for a stage added in this dialog. */
@@ -29,8 +23,8 @@ interface Row {
 }
 
 /**
- * The pipeline's stages: rename, reorder, add, remove — after the CRUD Flows
- * rule for dialogs, nothing reaches the server until Save.
+ * The pipeline's stages: rename, reorder, add, remove. Nothing reaches the
+ * server until Save.
  *
  * A stage with leads in it cannot be removed. The API refuses (a lead must
  * sit in some stage), so the row says so and how many, instead of offering a
@@ -51,6 +45,7 @@ export function StagesDialog({
     const [removed, setRemoved] = useState<Row[]>([]);
     const [draft, setDraft] = useState("");
     const [saving, setSaving] = useState(false);
+    const [tried, setTried] = useState(false);
 
     function start() {
         setRows(
@@ -64,6 +59,7 @@ export function StagesDialog({
         );
         setRemoved([]);
         setDraft("");
+        setTried(false);
     }
 
     const move = (i: number, by: -1 | 1) =>
@@ -87,6 +83,8 @@ export function StagesDialog({
         rows.some((r, i) => r.was?.name !== r.name || r.was.order !== i);
 
     async function save() {
+        setTried(true);
+        if (blank) return;
         const res = await runAction(
             () =>
                 saveStages(
@@ -108,81 +106,79 @@ export function StagesDialog({
             return;
         }
         setOpen(false);
-        showSuccess("Stages saved");
+        showSuccess("Stages saved.");
         router.refresh();
     }
 
     return (
-        <Dialog
+        <FormDialog
             open={open}
-            onOpenChange={(o) => {
-                setOpen(o);
-                if (o) start();
-            }}
-        >
-            <DialogTrigger asChild>
+            size="lg"
+            trigger={
                 <Button variant="outline">
                     <Settings2 className="mr-1.5 size-4" />
                     Stages
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
-                        Stages of {pipelineName}
-                    </DialogTitle>
-                    <DialogDescription>
-                        The columns of the board, left to right. Leads keep
-                        their stage when it is renamed or moved.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <ol className="overflow-hidden rounded-[11px] border border-border">
-                    {rows.map((r, i) => (
-                        <li
-                            key={r.key}
-                            className="flex items-center gap-2 border-b border-border px-2.5 py-2 last:border-b-0"
+            }
+            title={`Stages of ${pipelineName}`}
+            description="The columns of the board, left to right. Leads keep their stage when it is renamed or moved."
+            pending={saving}
+            dirty={dirty || draft.trim() !== ""}
+            onOpen={() => {
+                start();
+                setOpen(true);
+            }}
+            onClose={() => setOpen(false)}
+            onSubmit={save}
+        >
+            <ol className="overflow-hidden rounded-[11px] border border-border">
+                {rows.map((r, i) => (
+                    <li
+                        key={r.key}
+                        className="flex items-center gap-2 border-b border-border px-2.5 py-2 last:border-b-0"
+                    >
+                        <span className="w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
+                            {i + 1}
+                        </span>
+                        <Input
+                            aria-label={`Stage ${i + 1} name`}
+                            aria-invalid={
+                                (tried && !r.name.trim()) || undefined
+                            }
+                            value={r.name}
+                            maxLength={60}
+                            className="h-8 min-w-0 flex-1"
+                            onChange={(e) =>
+                                setRows((all) =>
+                                    all.map((x) =>
+                                        x.key === r.key
+                                            ? { ...x, name: e.target.value }
+                                            : x,
+                                    ),
+                                )
+                            }
+                        />
+                        <IconButton
+                            label={`Move ${r.name || "this stage"} left`}
+                            icon={<ArrowUp />}
+                            variant="ghost"
+                            disabled={i === 0}
+                            onClick={() => move(i, -1)}
+                        />
+                        <IconButton
+                            label={`Move ${r.name || "this stage"} right`}
+                            icon={<ArrowDown />}
+                            variant="ghost"
+                            disabled={i === rows.length - 1}
+                            onClick={() => move(i, 1)}
+                        />
+                        <Tip
+                            label={
+                                r.leads > 0
+                                    ? `${r.leads} lead${r.leads === 1 ? "" : "s"} still here. Move them first.`
+                                    : undefined
+                            }
                         >
-                            <span className="w-5 shrink-0 text-center font-mono text-[11px] text-muted-foreground">
-                                {i + 1}
-                            </span>
-                            <Input
-                                aria-label={`Stage ${i + 1} name`}
-                                value={r.name}
-                                maxLength={60}
-                                className="h-8 min-w-0 flex-1"
-                                onChange={(e) =>
-                                    setRows((all) =>
-                                        all.map((x) =>
-                                            x.key === r.key
-                                                ? { ...x, name: e.target.value }
-                                                : x,
-                                        ),
-                                    )
-                                }
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={`Move ${r.name || "this stage"} left`}
-                                disabled={i === 0}
-                                onClick={() => move(i, -1)}
-                            >
-                                <ArrowUp className="size-4" />
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={`Move ${r.name || "this stage"} right`}
-                                disabled={i === rows.length - 1}
-                                onClick={() => move(i, 1)}
-                            >
-                                <ArrowDown className="size-4" />
-                            </Button>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -192,11 +188,6 @@ export function StagesDialog({
                                     r.leads > 0
                                         ? `${r.name} has ${r.leads} lead${r.leads === 1 ? "" : "s"}; move them before removing it`
                                         : `Remove ${r.name || "this stage"}`
-                                }
-                                title={
-                                    r.leads > 0
-                                        ? `${r.leads} lead${r.leads === 1 ? "" : "s"} still here — move them first`
-                                        : undefined
                                 }
                                 disabled={r.leads > 0 || rows.length === 1}
                                 onClick={() => {
@@ -208,76 +199,67 @@ export function StagesDialog({
                             >
                                 <X className="size-4" />
                             </Button>
-                        </li>
-                    ))}
-                </ol>
+                        </Tip>
+                    </li>
+                ))}
+            </ol>
 
-                <form
-                    onSubmit={(e) => {
+            {/* Not a form of its own: Enter in the box adds the stage,
+                    and the dialog's Save stays the one submit. */}
+            <div className="flex gap-2">
+                <Input
+                    aria-label="New stage name"
+                    placeholder="New stage, e.g. Site visit"
+                    value={draft}
+                    maxLength={60}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
                         e.preventDefault();
                         add();
                     }}
-                    className="flex gap-2"
+                />
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!draft.trim()}
+                    onClick={add}
                 >
-                    <Input
-                        aria-label="New stage name"
-                        placeholder="New stage, e.g. Site visit"
-                        value={draft}
-                        maxLength={60}
-                        onChange={(e) => setDraft(e.target.value)}
-                    />
-                    <Button
-                        type="submit"
-                        variant="outline"
-                        disabled={!draft.trim()}
-                    >
-                        <Plus className="mr-1.5 size-4" />
-                        Add
-                    </Button>
-                </form>
+                    <Plus className="mr-1.5 size-4" />
+                    Add stage
+                </Button>
+            </div>
+            {tried && blank ? (
+                <p
+                    role="alert"
+                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                >
+                    Every stage needs a name.
+                </p>
+            ) : null}
 
-                {removed.length > 0 ? (
-                    <p className="text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
-                        Removing {removed.map((r) => r.name).join(", ")} when
-                        you save.{" "}
-                        <button
-                            type="button"
-                            className="font-medium text-foreground underline-offset-4 hover:underline"
-                            onClick={() => {
-                                setRows((all) =>
-                                    [...all, ...removed].sort(
-                                        (a, b) =>
-                                            (a.was?.order ?? 99) -
-                                            (b.was?.order ?? 99),
-                                    ),
-                                );
-                                setRemoved([]);
-                            }}
-                        >
-                            {removed.length === 1
-                                ? "Put it back"
-                                : "Put them back"}
-                        </button>
-                    </p>
-                ) : null}
-
-                <DialogFooter className="gap-2 sm:gap-0">
-                    <Button
+            {removed.length > 0 ? (
+                <p className="text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
+                    Removing {removed.map((r) => r.name).join(", ")} when you
+                    save.{" "}
+                    <button
                         type="button"
-                        variant="outline"
-                        onClick={() => setOpen(false)}
+                        className="font-medium text-foreground underline-offset-4 hover:underline"
+                        onClick={() => {
+                            setRows((all) =>
+                                [...all, ...removed].sort(
+                                    (a, b) =>
+                                        (a.was?.order ?? 99) -
+                                        (b.was?.order ?? 99),
+                                ),
+                            );
+                            setRemoved([]);
+                        }}
                     >
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        disabled={saving || !dirty || blank}
-                        onClick={() => void save()}
-                    >
-                        {saving ? "Saving…" : "Save stages"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                        {removed.length === 1 ? "Put it back" : "Put them back"}
+                    </button>
+                </p>
+            ) : null}
+        </FormDialog>
     );
 }

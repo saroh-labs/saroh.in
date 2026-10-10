@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
@@ -16,6 +15,8 @@ import {
 } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
+import { copyText } from "@saroh/ui/copy-button";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * Share a preview (#198): the Review tab's top block.
@@ -59,15 +60,6 @@ function dayOf(iso: string): string {
     }).format(new Date(iso));
 }
 
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 export function PreviewLinks({ siteId }: { siteId: string }) {
     const zone = useBusinessZone();
     const [links, setLinks] = useState<SitePreviewLinkView[] | null>(null);
@@ -100,7 +92,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
         }
         setLinks((prev) => [res.data, ...(prev ?? [])]);
         setSecrets((prev) => ({ ...prev, [res.data.id]: res.data.token }));
-        const copied = await copy(previewUrl(res.data.token));
+        const copied = await copyText(previewUrl(res.data.token));
         showSuccess(
             copied
                 ? `Link copied. It stops working on ${dayOf(res.data.expiresAt)}.`
@@ -125,9 +117,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
 
     return (
         <section className="shrink-0 border-b p-3">
-            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                Share a preview
-            </h3>
+            <h3 className="label">Share a preview</h3>
 
             {links === null ? (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -151,7 +141,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                         size="sm"
                                         className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
                                         onClick={() =>
-                                            void copy(
+                                            void copyText(
                                                 previewUrl(secrets[link.id]),
                                             ).then((ok) =>
                                                 ok
@@ -225,29 +215,18 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
             )}
 
             <div className="mt-2 flex items-center gap-1">
-                <div
-                    role="radiogroup"
-                    aria-label="How long the link works"
-                    className="flex rounded border p-0.5"
-                >
-                    {CHOICES.map((c) => (
-                        <button
-                            key={c.days}
-                            type="button"
-                            role="radio"
-                            aria-checked={days === c.days}
-                            onClick={() => setDays(c.days)}
-                            className={cn(
-                                "rounded px-1.5 py-0.5 text-[0.6875rem] transition-colors",
-                                days === c.days
-                                    ? "bg-foreground text-background"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {c.label}
-                        </button>
-                    ))}
-                </div>
+                <Segmented
+                    label="How long the link works"
+                    value={String(days)}
+                    onValueChange={(v) => {
+                        const to = CHOICES.find((c) => String(c.days) === v);
+                        if (to) setDays(to.days);
+                    }}
+                    options={CHOICES.map((c) => ({
+                        value: String(c.days),
+                        label: c.label,
+                    }))}
+                />
                 <Button
                     type="button"
                     size="sm"

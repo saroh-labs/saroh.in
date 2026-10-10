@@ -25,7 +25,7 @@ import {
 
 import { FieldError } from "./details-section";
 
-export const CHIP = "h-[34px] px-3 text-[13px]";
+export const CHIP = "";
 
 /**
  * Price and billing (D7): the price, then how often — month and year

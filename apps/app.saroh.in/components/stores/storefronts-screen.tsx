@@ -33,22 +33,22 @@ import type {
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { runAction } from "@/lib/api/run-action";
+import { TabStrip } from "@saroh/ui/tabs";
 import { ClosingSection } from "./closing-section";
 import { FulfilmentSection } from "./fulfilment-section";
 import { LocationReadinessCard } from "./location-readiness-card";
 import type { Saver } from "./location-save";
 import { jumpTo } from "./location-save";
-import {
-    LOCATION_PANEL_ID,
-    LocationTabs,
-    locationTabId,
-} from "./location-tabs";
 import { PaymentsSection } from "./payments-section";
 import { PeopleSection } from "./people-section";
 import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
 import { StorefrontList } from "./storefront-list";
 import { usePlaceSheets } from "./use-place-sheets";
+
+/** The id of the panel the tabs control, and of each tab. */
+const LOCATION_PANEL_ID = "location-panel";
+const locationTabId = (tab: LocationTab) => `location-tab-${tab}`;
 
 /**
  * Sell › Location: one location's own page, titled with its name, with what
@@ -344,7 +344,19 @@ function StorefrontDetail({
             }
         >
             <div className="min-w-0">
-                <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
+                <TabStrip
+                    label="Location settings"
+                    idPrefix="location-tab"
+                    value={tab}
+                    onValueChange={setTab}
+                    tabs={tabs.map((t) => ({
+                        value: t.id,
+                        label: t.label,
+                        controls: LOCATION_PANEL_ID,
+                        // Pause or close is last, set apart by a rule.
+                        separated: t.id === "pause-or-close",
+                    }))}
+                />
             </div>
             <div
                 id={LOCATION_PANEL_ID}

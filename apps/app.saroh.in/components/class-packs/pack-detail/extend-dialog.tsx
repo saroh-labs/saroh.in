@@ -1,14 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
@@ -16,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
+import { FormDialog } from "@/components/shared/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { extendHolder } from "@/lib/class-packs/actions";
 import {
@@ -66,11 +58,13 @@ export function ExtendDialog({
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [tried, setTried] = useState(false);
     const why = reason.trim();
-    const off = busy || why.length === 0;
+    const whyless = tried && why.length === 0;
 
     async function save() {
-        if (off) return;
+        setTried(true);
+        if (busy || why.length === 0) return;
         setError(null);
         const res = await runAction(
             () => extendHolder(target.purchaseId, days, why),
@@ -87,88 +81,83 @@ export function ExtendDialog({
     }
 
     return (
-        <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
-            <DialogContent className="sm:max-w-[440px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                        Extend {target.name}&apos;s pack
-                    </DialogTitle>
-                    <DialogDescription className="text-[12.5px]">
-                        Use by {day(target.expiresAt, timeZone)} now. Up to{" "}
-                        {MAX_EXTEND_DAYS} more days at a time.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-3">
-                    <div
-                        role="radiogroup"
-                        aria-label="How many days"
-                        className="flex flex-wrap gap-1.5"
+        <FormDialog
+            open
+            size="md"
+            title={`Extend ${target.name}'s pack`}
+            description={`Use by ${day(target.expiresAt, timeZone)} now. Up to ${MAX_EXTEND_DAYS} more days at a time.`}
+            pending={busy}
+            saveLabel="Extend pack"
+            savingLabel="Extending…"
+            fieldsClassName="gap-3"
+            onClose={onClose}
+            onSubmit={save}
+        >
+            <div
+                role="radiogroup"
+                aria-label="How many days"
+                className="flex flex-wrap gap-1.5"
+            >
+                {choices.map((c) => (
+                    <Chip
+                        key={c.days}
+                        on={days === c.days}
+                        disabled={!c.ok}
+                        onClick={() => setDays(c.days)}
                     >
-                        {choices.map((c) => (
-                            <Chip
-                                key={c.days}
-                                on={days === c.days}
-                                disabled={!c.ok}
-                                onClick={() => setDays(c.days)}
-                            >
-                                +{c.days} days
-                            </Chip>
-                        ))}
-                    </div>
+                        +{c.days} days
+                    </Chip>
+                ))}
+            </div>
+            <p
+                id={ids.days}
+                aria-live="polite"
+                className="m-0 text-[13px] font-semibold"
+            >
+                New use-by:{" "}
+                {dayWithWeekday(
+                    extendedTo(target.expiresAt, days).toISOString(),
+                    timeZone,
+                )}
+            </p>
+            <div className="grid gap-1.5">
+                <Label htmlFor={ids.why}>Reason</Label>
+                <Input
+                    id={ids.why}
+                    value={reason}
+                    maxLength={EXTEND_REASON_MAX}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Knee injury, doctor's note seen"
+                    aria-describedby={
+                        error ? `${ids.err} ${ids.help}` : ids.help
+                    }
+                    aria-invalid={error || whyless ? true : undefined}
+                />
+                {whyless ? (
                     <p
-                        id={ids.days}
-                        aria-live="polite"
-                        className="m-0 text-[13px] font-semibold"
+                        role="alert"
+                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                     >
-                        New use-by:{" "}
-                        {dayWithWeekday(
-                            extendedTo(target.expiresAt, days).toISOString(),
-                            timeZone,
-                        )}
+                        Say why they are getting more days.
                     </p>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.why}>Reason</Label>
-                        <Input
-                            id={ids.why}
-                            value={reason}
-                            maxLength={EXTEND_REASON_MAX}
-                            onChange={(e) => setReason(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") void save();
-                            }}
-                            placeholder="e.g. Knee injury, doctor's note seen"
-                            aria-describedby={
-                                error ? `${ids.err} ${ids.help}` : ids.help
-                            }
-                            aria-invalid={error ? true : undefined}
-                        />
-                        <p
-                            id={ids.help}
-                            className="m-0 text-[12px] text-muted-foreground"
-                        >
-                            Shown with their pack under Who has it, and kept in
-                            the pack&apos;s history.
-                        </p>
-                    </div>
-                    {error ? (
-                        <p
-                            id={ids.err}
-                            role="alert"
-                            className="m-0 text-[12.5px] font-medium text-destructive"
-                        >
-                            {error}
-                        </p>
-                    ) : null}
-                </div>
-                <DialogFooter className="gap-2 sm:gap-2">
-                    <Button variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button disabled={off} onClick={() => void save()}>
-                        {busy ? "Extending…" : "Extend"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                ) : null}
+                <p
+                    id={ids.help}
+                    className="m-0 text-[12px] text-muted-foreground"
+                >
+                    Shown with their pack under Who has it, and kept in the
+                    pack&apos;s history.
+                </p>
+            </div>
+            {error ? (
+                <p
+                    id={ids.err}
+                    role="alert"
+                    className="m-0 text-[12.5px] font-medium text-destructive"
+                >
+                    {error}
+                </p>
+            ) : null}
+        </FormDialog>
     );
 }

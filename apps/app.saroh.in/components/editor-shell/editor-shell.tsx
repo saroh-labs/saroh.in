@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
@@ -224,15 +225,15 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function discard() {
-        setConfirm(null);
+    /** From its confirm, which waits and says a refusal itself. */
+    async function discard(): Promise<ConfirmResult> {
         setBusy(true);
         try {
             const res = await editor.discard();
             if (!res) return;
             if (!res.ok) {
-                if (!res.conflict) showError(res.error);
-                return;
+                // A conflict is the page's own state, with Reload.
+                return res.conflict ? true : { ok: false, error: res.error };
             }
             setRefused(null);
             showSuccess("Changes discarded.");
@@ -242,8 +243,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function remove() {
-        setConfirm(null);
+    async function remove(): Promise<ConfirmResult> {
         setBusy(true);
         // Stays busy while it leaves; anything else gives the control back.
         const res = await runAction(() => editor.remove());
@@ -254,7 +254,7 @@ export function EditorShell<V extends Record<string, unknown>>(
             return;
         }
         setBusy(false);
-        if (res && !res.conflict) showError(res.error);
+        if (res && !res.conflict) return { ok: false, error: res.error };
     }
 
     async function reload() {
@@ -346,9 +346,9 @@ export function EditorShell<V extends Record<string, unknown>>(
                         : "Your unpublished changes go."
                 } What's live stays as it is. This cannot be undone.`}
                 confirmLabel="Discard changes"
-                cancelLabel="Keep changes"
+                keepLabel="Keep changes"
                 icon={RotateCcw}
-                onConfirm={() => void discard()}
+                onConfirm={discard}
             />
             <ConfirmDialog
                 open={confirm === "delete"}
@@ -356,8 +356,8 @@ export function EditorShell<V extends Record<string, unknown>>(
                 title={`Delete ${title}?`}
                 description={`The draft goes, with everything typed into it. It was never published, so nobody loses anything. This cannot be undone.`}
                 confirmLabel="Delete draft"
-                cancelLabel="Keep draft"
-                onConfirm={() => void remove()}
+                keepLabel="Keep draft"
+                onConfirm={remove}
             />
             {guard.dialog}
         </main>

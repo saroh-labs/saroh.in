@@ -4,12 +4,12 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
+import { Copy, Link2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId, useReducer, useState } from "react";
 
-import { reportFailure } from "@/components/billing/plan-refusal";
+import { refusedResult } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
@@ -18,18 +18,18 @@ import {
     IssueDialog,
     RecordPaymentDialog,
 } from "@/components/invoices/invoice-actions";
-
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
-import { SendDialog } from "@/components/invoices/send-dialog";
+import { useInvoiceSend } from "@/components/invoices/send-dialog";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog, sayRefusal } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
@@ -43,6 +43,8 @@ import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 import type { OnlineBlocker } from "@/lib/staff/types";
+import { copyText } from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 
 type Dialog =
     | "issue"
@@ -51,19 +53,7 @@ type Dialog =
     | "cancel"
     | "refund"
     | "newLink"
-    | "newViewLink"
-    | "send"
-    | "remind"
-    | "draftSend";
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
+    | "newViewLink";
 
 /**
  * One invoice, after "Saroh Invoice Detail": its number and status with
@@ -171,6 +161,14 @@ export function InvoiceDetail({
     });
     // A view link just made (#833): shown until something replaces it.
     const [viewUrl, setViewUrl] = useState<string | null>(null);
+    // Sending tells a customer: held ten seconds with Undo, nothing asked,
+    // except from a draft, whose issuing is asked once (`useInvoiceSend`).
+    const sending = useInvoiceSend({
+        invoice,
+        send: canWrite && canSend(send) ? send : null,
+        // It went with a fresh link: the one shown is dead.
+        onSent: () => setViewUrl(null),
+    });
     // A pay link is kept outside React (UX-048); this redraws once it is.
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     const [busy, setBusy] = useState(false);
@@ -198,35 +196,36 @@ export function InvoiceDetail({
     const nextReminderAt = send?.nextReminderAt ?? null;
     const dialog = (d: Dialog) => (v: boolean) => setOpen(v ? d : null);
 
-    async function makeLink() {
+    /** The refusal comes back, for the confirm that asked or a toast. */
+    async function makeLink(): Promise<ConfirmResult> {
         const res = await runAction(
             () => details.run(() => newPayLink(invoice.id, invoice.updatedAt)),
             { setBusy },
         );
         if (!res) return;
         // A plan without online payments: its notice and the way up.
-        if (!res.ok) return reportFailure(res);
+        if (!res.ok) return refusedResult(res);
         setViewUrl(null);
         redraw();
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? `Pay link copied. Send it to ${invoice.who}.`
                 : "Pay link ready. Copy it from the Payment panel.",
         );
     }
 
     /** No pay link can be made (#833): a link to view it and how to pay. */
-    async function makeViewLink() {
+    async function makeViewLink(): Promise<ConfirmResult> {
         // It replaces the pay link this tab made, which is forgotten.
         const res = await runAction(
             () => details.run(() => newViewLink(invoice.id)),
             { setBusy },
         );
         if (!res) return;
-        if (!res.ok) return reportFailure(res);
+        if (!res.ok) return refusedResult(res);
         setViewUrl(res.data.url);
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? s === "PAID"
                     ? `Link copied. Send it to ${invoice.who}: it shows the invoice, paid.`
                     : `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
@@ -236,7 +235,7 @@ export function InvoiceDetail({
 
     function copyShown() {
         if (!url) return;
-        void copy(url).then((ok) =>
+        void copyText(url).then((ok) =>
             ok
                 ? showSuccess(
                       urlKind === "view" ? "Link copied." : "Pay link copied.",
@@ -250,13 +249,13 @@ export function InvoiceDetail({
         // The address of a link already out was shown once; a new one
         // retires it, so that is asked first.
         if (online?.payLinkActive) setOpen("newLink");
-        else void makeLink();
+        else void makeLink().then(sayRefusal);
     }
 
     function copyViewLink() {
         if (viewUrl) return copyShown();
         if (online?.payLinkActive) setOpen("newViewLink");
-        else void makeViewLink();
+        else void makeViewLink().then(sayRefusal);
     }
 
     const print = () => window.print();
@@ -273,13 +272,13 @@ export function InvoiceDetail({
         DetailActionId,
         { onClick?: () => void; href?: string }
     > = {
-        draftSend: { onClick: () => setOpen("draftSend") },
+        draftSend: { onClick: sending.askDraft },
         issue: { onClick: () => setOpen("issue") },
         edit: { href: editHref },
         delete: { onClick: () => setOpen("delete") },
-        send: { onClick: () => setOpen("send") },
+        send: { onClick: () => sending.start(false) },
         // One a day: the Payment panel says when.
-        remind: { onClick: () => setOpen("remind") },
+        remind: { onClick: () => sending.start(true) },
         copyLink: { onClick: copyLink },
         copyViewLink: { onClick: copyViewLink },
         pay: { onClick: () => setOpen("pay") },
@@ -361,7 +360,9 @@ export function InvoiceDetail({
                     </span>
                 }
                 badge={
-                    <InvoicePill label={pill.label} variant={pill.variant} />
+                    <StatusBadge tone={pill.variant} size="default">
+                        {pill.label}
+                    </StatusBadge>
                 }
                 description={subline}
                 actions={
@@ -409,12 +410,9 @@ export function InvoiceDetail({
             ) : null}
 
             {late ? (
-                <div
-                    role="alert"
-                    className="mb-3.5 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3 text-[13px] font-semibold text-destructive-subtle-foreground print:hidden"
-                >
+                <Notice tone="error" className="mb-3.5 print:hidden">
                     {late}
-                </div>
+                </Notice>
             ) : null}
 
             <div className="flex flex-wrap items-start gap-4">
@@ -422,9 +420,7 @@ export function InvoiceDetail({
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3 print:hidden">
                     {connected}
                     <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-                        <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Payment
-                        </h2>
+                        <h2 className="label mb-1.5">Payment</h2>
                         <p className="text-[13px] leading-[1.5] text-foreground">
                             {payLine}
                         </p>
@@ -503,29 +499,7 @@ export function InvoiceDetail({
                 canSend={sendable}
                 payOnline={payOnline}
             />
-            {send && sendable ? (
-                <SendDialog
-                    open={
-                        open === "send" ||
-                        open === "remind" ||
-                        open === "draftSend"
-                    }
-                    onOpenChange={(v) => {
-                        if (!v) setOpen(null);
-                    }}
-                    invoice={invoice}
-                    send={send}
-                    // It went with a fresh link: the one shown is dead.
-                    onSent={() => setViewUrl(null)}
-                    mode={
-                        open === "remind"
-                            ? "reminder"
-                            : open === "draftSend"
-                              ? "draft"
-                              : "send"
-                    }
-                />
-            ) : null}
+            {sending.overlays}
             <DeleteDraftDialog
                 open={open === "delete"}
                 onOpenChange={dialog("delete")}
@@ -553,16 +527,18 @@ export function InvoiceDetail({
                 open={open === "newLink"}
                 onOpenChange={dialog("newLink")}
                 who={invoice.who}
-                onConfirm={() => void makeLink()}
+                onConfirm={makeLink}
             />
             <ConfirmDialog
                 open={open === "newViewLink"}
                 onOpenChange={dialog("newViewLink")}
+                tone="neutral"
+                icon={Link2}
                 title="Make a new link?"
-                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one.`}
+                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one. This cannot be undone.`}
                 confirmLabel="Make a new link"
-                cancelLabel="Keep the old one"
-                onConfirm={() => void makeViewLink()}
+                keepLabel="Keep the old link"
+                onConfirm={makeViewLink}
             />
         </div>
     );

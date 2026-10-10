@@ -5,6 +5,7 @@ import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteContact } from "@/lib/contacts/actions";
 import {
@@ -97,18 +98,16 @@ export function useMoreActions({
         setNotThem(res.data);
     }
 
-    async function separate(preview: UnlinkPreview) {
-        setNotThem(null);
+    async function separate(preview: UnlinkPreview): Promise<ConfirmResult> {
         const res = await unlinkAccountAction(d.contact.id);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess(unlinkedLine(preview.email));
         router.refresh();
     }
 
-    async function remove() {
-        setRemoving(false);
+    async function remove(): Promise<ConfirmResult> {
         const res = await deleteContact(d.contact.id);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess(deletedLine(name, res.data));
         router.push(back);
     }
@@ -188,9 +187,10 @@ export function useMoreActions({
                     onOpenChange={(o) => (o ? null : setNotThem(null))}
                     {...unlinkConfirm(name, notThem)}
                     confirmLabel="Separate them"
-                    cancelLabel="Keep them together"
+                    busyLabel="Separating…"
+                    keepLabel="Keep them together"
                     icon={Unlink}
-                    onConfirm={() => void separate(notThem)}
+                    onConfirm={() => separate(notThem)}
                 />
             ) : null}
             <ConfirmDialog
@@ -199,8 +199,8 @@ export function useMoreActions({
                 title={`Delete ${name}?`}
                 description={deleteWords}
                 confirmLabel="Delete record"
-                cancelLabel="Keep them"
-                onConfirm={() => void remove()}
+                keepLabel="Keep record"
+                onConfirm={remove}
             />
         </>
     );

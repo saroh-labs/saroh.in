@@ -1,6 +1,5 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { AllergensTab } from "@/components/commerce/product-settings/allergens-tab";
 import { CategoriesTab } from "@/components/commerce/product-settings/categories-tab";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { TextLink } from "@saroh/ui/text-link";
 
 export const metadata = { title: "Product settings" };
 
@@ -71,12 +71,12 @@ export default async function ProductSettingsPage({
                 )}
                 title="Product settings"
                 actions={
-                    <Link
+                    <TextLink
                         href="/commerce/products"
-                        className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                        className="text-[12.5px]"
                     >
                         Back to products
-                    </Link>
+                    </TextLink>
                 }
             />
             {catalogue ? (

@@ -11,8 +11,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
+import { useHold } from "@/components/shared/use-hold";
 import { Section as Rows } from "@/components/sites/settings-rows";
 import {
     removeMember,
@@ -33,6 +35,7 @@ import {
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { runAction } from "@/lib/api/run-action";
+import { Notice } from "@saroh/ui/notice";
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
 
@@ -74,6 +77,10 @@ export function PeopleSection({
         name: string;
     } | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
+    // An invitation cancelled here: gone from the list at once, and
+    // cancelled for real when its ten seconds are up (`useHold`).
+    const { hold } = useHold();
+    const [cancelled, setCancelled] = useState<readonly string[]>([]);
 
     const frame = (children: React.ReactNode) => (
         <Section
@@ -106,7 +113,9 @@ export function PeopleSection({
     }
 
     const { members, canManage, canInvite } = people;
-    const invitations = shownInvitations(people);
+    const invitations = shownInvitations(people).filter(
+        (inv) => !cancelled.includes(inv.id),
+    );
     const alone = onlyOwnerHere(people);
 
     async function onChangeRole(userId: string, next: MemberRole) {
@@ -123,31 +132,37 @@ export function PeopleSection({
         router.refresh();
     }
 
-    async function onRemove(userId: string) {
+    async function onRemove(userId: string): Promise<ConfirmResult> {
         const res = await runAction(() => removeMember(store.id, userId), {
             setBusy: (on) => setBusy(on ? userId : null),
         });
         if (!res) return;
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess("Member removed");
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess("Person removed.");
         router.refresh();
     }
 
-    async function onRevoke(invitationId: string) {
-        const res = await runAction(
-            () => revokeInvitation(store.id, invitationId),
-            { setBusy: (on) => setBusy(on ? invitationId : null) },
+    /**
+     * The API can't put a cancelled invitation back, so it is held: gone
+     * at once with Undo, and cancelled when the ten seconds are up.
+     */
+    function onCancelInvitation(invitationId: string) {
+        const back = () =>
+            setCancelled((ids) => ids.filter((id) => id !== invitationId));
+        setCancelled((ids) => [...ids, invitationId]);
+        hold(
+            `invitation:${invitationId}`,
+            "Invitation cancelled.",
+            async () => {
+                const res = await revokeInvitation(store.id, invitationId);
+                if (!res.ok) {
+                    showError("The invitation wasn't cancelled.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
         );
-        if (!res) return;
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess("Invitation revoked");
-        router.refresh();
     }
 
     const invite = canInvite ? (
@@ -176,14 +191,11 @@ export function PeopleSection({
                 ) : null}
                 <div className="grid min-w-0 gap-5 sm:col-span-2">
                     {canManage && !canInvite ? (
-                        <p
-                            role="note"
-                            className="text-pretty rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-[1.5]"
-                        >
+                        <Notice>
                             Inviting someone here also adds them to your team,
                             and your role can&apos;t invite people to the team.
                             Ask an owner or admin to invite them.
-                        </p>
+                        </Notice>
                     ) : null}
 
                     {alone ? (
@@ -299,11 +311,12 @@ export function PeopleSection({
                                             variant="ghost"
                                             size="sm"
                                             className="shrink-0"
-                                            aria-label={`Revoke the invitation to ${inv.email}`}
-                                            disabled={busy === inv.id}
-                                            onClick={() => onRevoke(inv.id)}
+                                            aria-label={`Cancel the invitation to ${inv.email}`}
+                                            onClick={() =>
+                                                onCancelInvitation(inv.id)
+                                            }
                                         >
-                                            Revoke
+                                            Cancel invitation
                                         </Button>
                                     </li>
                                 ))}
@@ -328,13 +341,10 @@ export function PeopleSection({
                         if (!o) setRemoving(null);
                     }}
                     title={`Remove ${removing.name}?`}
-                    description="They lose access to this location's catalogue, orders and customers straight away. They stay on your team; remove them there to take that away too. Bringing them back here means inviting them again."
-                    confirmLabel="Remove"
-                    onConfirm={() => {
-                        const r = removing;
-                        setRemoving(null);
-                        void onRemove(r.userId);
-                    }}
+                    description="They lose access to this location's catalogue, orders and customers straight away. They stay on your team. Remove them there to take that away too. Bringing them back here means inviting them again. This cannot be undone."
+                    confirmLabel="Remove person"
+                    keepLabel="Keep person"
+                    onConfirm={() => onRemove(removing.userId)}
                 />
             ) : null}
         </>,

@@ -12,6 +12,7 @@ import { addOption, removeOption } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
+import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
 import { bigBtn, rowBtn, TabIntro } from "./product-settings";
 
@@ -104,57 +105,61 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 option={o}
                                                 options={options}
                                             />
-                                            <button
-                                                type="button"
-                                                disabled={used || pending}
-                                                title={
+                                            <Tip
+                                                label={
                                                     used
                                                         ? usedLine
                                                         : `Delete ${o.name}`
                                                 }
-                                                aria-label={`Delete ${o.name}`}
-                                                className={cn(
-                                                    rowBtn,
-                                                    !used && "text-destructive",
-                                                )}
-                                                onClick={() =>
-                                                    run(async () => {
-                                                        const res =
-                                                            await removeOption(
-                                                                o.id,
-                                                            );
-                                                        if (!res.ok)
-                                                            return showError(
-                                                                res.error,
-                                                            );
-                                                        showUndo(
-                                                            `${o.name} deleted.`,
-                                                            () =>
-                                                                run(
-                                                                    async () => {
-                                                                        const undo =
-                                                                            await addOption(
-                                                                                res
-                                                                                    .data
-                                                                                    .name,
-                                                                                res
-                                                                                    .data
-                                                                                    .values,
-                                                                            );
-                                                                        if (
-                                                                            !undo.ok
-                                                                        )
-                                                                            showError(
-                                                                                undo.error,
-                                                                            );
-                                                                    },
-                                                                ),
-                                                        );
-                                                    })
-                                                }
                                             >
-                                                Delete
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={used || pending}
+                                                    aria-label={`Delete ${o.name}`}
+                                                    className={cn(
+                                                        rowBtn,
+                                                        !used &&
+                                                            "text-destructive",
+                                                    )}
+                                                    onClick={() =>
+                                                        run(async () => {
+                                                            const res =
+                                                                await removeOption(
+                                                                    o.id,
+                                                                );
+                                                            if (!res.ok)
+                                                                return showError(
+                                                                    res.error,
+                                                                );
+                                                            showUndo(
+                                                                `${o.name} deleted.`,
+                                                                () =>
+                                                                    run(
+                                                                        async () => {
+                                                                            const undo =
+                                                                                await addOption(
+                                                                                    res
+                                                                                        .data
+                                                                                        .name,
+                                                                                    res
+                                                                                        .data
+                                                                                        .values,
+                                                                                );
+                                                                            if (
+                                                                                !undo.ok
+                                                                            )
+                                                                                showError(
+                                                                                    undo.error,
+                                                                                );
+                                                                        },
+                                                                    ),
+                                                            );
+                                                        })
+                                                    }
+                                                >
+                                                    Delete
+                                                </button>
+                                            </Tip>
                                         </div>
                                     ) : null}
                                 </div>

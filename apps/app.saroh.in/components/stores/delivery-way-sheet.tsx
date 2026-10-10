@@ -5,8 +5,7 @@ import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     checkoutLine,
     draftProblems,
@@ -22,6 +21,7 @@ import type { StorefrontFulfilmentType } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { LateAfterField, MoneyField } from "./delivery-fields";
 import type { Saver } from "./location-save";
 
@@ -40,7 +40,7 @@ const CHIP =
  *
  * Nothing saves until Save, which sends everything changed in one update
  * (`wayInput`, the same fields the page always saved). It is drawn in the
- * app's one sheet frame (`components/shared/settings-sheet-frame.tsx`),
+ * app's one sheet frame (`components/shared/form-sheet.tsx`),
  * which says how it closes: Cancel, Escape and the close button drop the
  * draft, and a press outside does nothing once something is changed. A
  * refusal keeps the sheet open with what was typed.
@@ -80,7 +80,7 @@ export function DeliveryWaySheet({
         tried || key !== "fee" || draft.fee !== "" ? problems[key] : undefined;
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${id}-panel`}
             // Back to the row's Edit, which opened it.
             returnFocusTo={() =>
@@ -129,26 +129,19 @@ export function DeliveryWaySheet({
 
             {draft.on && paid ? (
                 <fieldset className="grid min-w-0 gap-2.5">
-                    <legend className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        What customers pay
-                    </legend>
+                    <legend className="label mb-1">What customers pay</legend>
                     <div className="flex flex-wrap items-center gap-3">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label={`What customers pay for ${label.toLowerCase()}`}
                             value={draft.charge ? "charge" : "free"}
-                            onValueChange={(v) => {
-                                if (v) set({ charge: v === "charge" });
-                            }}
-                            aria-label={`What customers pay for ${label.toLowerCase()}`}
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="free" className={SEGMENT}>
-                                Free
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="charge" className={SEGMENT}>
-                                Charge
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            onValueChange={(v) =>
+                                set({ charge: v === "charge" })
+                            }
+                            options={[
+                                { value: "free", label: "Free" },
+                                { value: "charge", label: "Charge" },
+                            ]}
+                        />
                         {draft.charge ? (
                             <div className="w-32">
                                 <Label
@@ -226,9 +219,7 @@ export function DeliveryWaySheet({
 
             {draft.on ? (
                 <fieldset className="grid min-w-0 gap-2.5">
-                    <legend className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        For your team
-                    </legend>
+                    <legend className="label mb-1">For your team</legend>
                     <p
                         id={`${id}-late-label`}
                         className="text-[13px] font-medium"
@@ -304,6 +295,6 @@ export function DeliveryWaySheet({
                     {checkout}
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

@@ -1,14 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -17,6 +8,7 @@ import { useId, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
@@ -39,12 +31,12 @@ export type EnrolCourse = Pick<
 >;
 
 /**
- * Enrol someone: who, and what they pay. The dialog says what it books and
- * charges before anything happens — and says nothing about an invoice when
- * Payments is off, because none is issued.
+ * Enrol someone: who, and what they pay, in a side sheet. It says what it
+ * books and charges before anything happens, and says nothing about an
+ * invoice when Payments is off, because none is issued.
  *
  * A course page passes its one course; a contact page passes the courses
- * open to them and its own person, and the dialog asks which course instead
+ * open to them and its own person, and the sheet asks which course instead
  * of who.
  */
 export function EnrolDialog({
@@ -112,87 +104,80 @@ export function EnrolDialog({
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
-            `${person?.name ?? "They"} enrolled${choosing ? ` on ${course.name}` : ""} — ${n} ${n === 1 ? "session" : "sessions"} booked`,
+            `${person?.name ?? "They"} enrolled${choosing ? ` on ${course.name}` : ""}.`,
+            `${n} ${n === 1 ? "session" : "sessions"} booked.`,
         );
         onOpenChange(false);
         router.refresh();
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        {initialContactId && person
-                            ? `Enrol ${person.name}`
-                            : "Enrol someone"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {course
-                            ? `${course.name} · ${seatsLeftLine(course)}`
-                            : "There is no open course with a seat left."}
-                    </DialogDescription>
-                </DialogHeader>
-                {course ? (
-                    <div className="grid gap-4">
-                        {choosing ? (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={ids.course}>Course</Label>
-                                <OptionSelect
-                                    id={ids.course}
-                                    value={courseId}
-                                    onValueChange={chooseCourse}
-                                    options={courses.map((c) => ({
-                                        value: c.id,
-                                        label: `${c.name} · ${seatsLeftLine(c)}`,
-                                    }))}
-                                />
-                            </div>
-                        ) : null}
+        <FormSheet
+            open={open}
+            title={
+                initialContactId && person
+                    ? `Enrol ${person.name}`
+                    : "Enrol someone"
+            }
+            description={
+                course
+                    ? `${course.name} · ${seatsLeftLine(course)}`
+                    : "There is no open course with a seat left."
+            }
+            pending={busy}
+            doneOnly={!course}
+            doneLabel="Close"
+            saveLabel="Enrol and book"
+            savingLabel="Enrolling…"
+            fieldsClassName="block"
+            onClose={() => onOpenChange(false)}
+            onSubmit={save}
+        >
+            {course ? (
+                <div className="grid gap-4">
+                    {choosing ? (
                         <div className="grid gap-1.5">
-                            <Label htmlFor={ids.who}>Who</Label>
-                            <ContactPicker
-                                id={ids.who}
-                                contacts={contacts}
-                                value={contactId}
-                                onValueChange={setContactId}
+                            <Label htmlFor={ids.course}>Course</Label>
+                            <OptionSelect
+                                id={ids.course}
+                                value={courseId}
+                                onValueChange={chooseCourse}
+                                options={courses.map((c) => ({
+                                    value: c.id,
+                                    label: `${c.name} · ${seatsLeftLine(c)}`,
+                                }))}
                             />
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor={ids.price}>
-                                What they pay ({course.currency})
-                            </Label>
-                            <Input
-                                id={ids.price}
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                inputMode="decimal"
-                                aria-invalid={!priceOk}
-                            />
-                        </div>
-                        <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                            {booksLine(course)}
-                            {invoicesOnEnrol
-                                ? ` · invoice ${priceOk ? invoiceMoney(price.trim(), course.currency) : "—"}. Nothing is charged and nobody is contacted.`
-                                : ". Payments is off, so no invoice is issued."}
-                        </p>
+                    ) : null}
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.who}>Who</Label>
+                        <ContactPicker
+                            id={ids.who}
+                            contacts={contacts}
+                            value={contactId}
+                            onValueChange={setContactId}
+                        />
                     </div>
-                ) : null}
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={busy || !contactId || !course}
-                        onClick={() => void save()}
-                    >
-                        {busy ? "Enrolling…" : "Enrol and book"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.price}>
+                            What they pay ({course.currency})
+                        </Label>
+                        <Input
+                            id={ids.price}
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            inputMode="decimal"
+                            aria-invalid={!priceOk}
+                        />
+                    </div>
+                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
+                        {booksLine(course)}
+                        {invoicesOnEnrol
+                            ? ` · invoice ${priceOk ? invoiceMoney(price.trim(), course.currency) : "not set"}. Nothing is charged and nobody is contacted.`
+                            : ". Payments is off, so no invoice is issued."}
+                    </p>
+                </div>
+            ) : null}
+        </FormSheet>
     );
 }

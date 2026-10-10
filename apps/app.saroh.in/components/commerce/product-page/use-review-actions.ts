@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 
 /** The longest reply the API takes. */
@@ -65,12 +66,17 @@ export function useReviewActions() {
             router.refresh();
             if (hide) {
                 showUndo(
-                    "Review hidden from the shop — it stays here, marked.",
-                    () => {
-                        void setReviewHidden(id, false).then(() =>
-                            router.refresh(),
+                    "Review hidden from the shop.",
+                    async () => {
+                        const back = await runAction(
+                            () => setReviewHidden(id, false),
+                            { quiet: true },
                         );
+                        if (!back) return { ok: false, error: UNREACHED };
+                        router.refresh();
+                        return back;
                     },
+                    { description: "It stays here, marked." },
                 );
             } else {
                 showSuccess("Review shown on the shop again.");

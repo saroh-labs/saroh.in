@@ -1,7 +1,5 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useId } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
@@ -13,6 +11,8 @@ import type { DepositMode } from "@/lib/services/service";
 import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { HELP } from "./fields";
 
 const DEPOSITS: [DepositMode, string][] = [
@@ -92,7 +92,6 @@ export function DepositField({
                     <Chip
                         key={value}
                         on={deposit === value}
-                        className="h-[34px] text-[13px]"
                         // Locked: off, or the deposit it already has.
                         disabled={
                             lock !== null && value !== "NONE" && value !== saved
@@ -114,23 +113,16 @@ export function DepositField({
                     className="mt-2.5"
                 />
             ) : problem ? (
-                <p
+                <Notice
+                    tone={problem.blocked ? "warning" : "neutral"}
                     role="status"
-                    className={cn(
-                        "mt-2 rounded-[8px] px-3 py-2 text-[12.5px] leading-[1.45]",
-                        problem.blocked
-                            ? "bg-warning-subtle text-warning-subtle-foreground"
-                            : "bg-muted text-foreground",
-                    )}
+                    className="mt-2"
                 >
                     {problem.text}{" "}
-                    <Link
-                        href={problem.fix.href}
-                        className="rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
+                    <TextLink href={problem.fix.href}>
                         {problem.fix.label}
-                    </Link>
-                </p>
+                    </TextLink>
+                </Notice>
             ) : null}
         </>
     );

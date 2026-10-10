@@ -1,9 +1,7 @@
-import { cn } from "@saroh/ui/lib/utils";
-
+import { chipClass } from "@/components/shared/chip";
 import { FailedRead } from "@/components/shared/failed-read";
-import { Pill } from "@/components/subscriptions/pill";
-import type { Tone } from "@/lib/customer-workspace/view";
 import { EmptyState } from "@saroh/ui/data-state";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 
 /** The design's white card: border-first, 12px corners, 14px by 16px. */
 export const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
@@ -14,24 +12,6 @@ export const LABEL = "text-[12.5px] text-muted-foreground";
 /** A row that opens a record: the whole card is the target. */
 export const ROW_LINK =
     "flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-foreground transition-colors duration-fast hover:border-border-strong active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-/** A state pill in a row: sentence case, as the design draws them. */
-export function RowPill({
-    tone,
-    children,
-}: {
-    tone: Tone;
-    children: React.ReactNode;
-}) {
-    return (
-        <Pill
-            tone={tone}
-            className="text-[11.5px] normal-case leading-[1.4] tracking-normal"
-        >
-            {children}
-        </Pill>
-    );
-}
 
 /**
  * A tab whose part of the read failed: the failed card, an alert with Try
@@ -88,13 +68,11 @@ export function Chips<K extends string>({
     chips,
     value,
     onChange,
-    height = 30,
 }: {
     label: string;
     chips: { key: K; label: string }[];
     value: K;
     onChange: (key: K) => void;
-    height?: 30 | 32;
 }) {
     return (
         <div
@@ -110,13 +88,7 @@ export function Chips<K extends string>({
                         type="button"
                         aria-pressed={on}
                         onClick={() => onChange(c.key)}
-                        className={cn(
-                            "rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                            height === 30 ? "h-[30px]" : "h-8",
-                            on
-                                ? "border-primary bg-primary font-semibold text-primary-foreground"
-                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-                        )}
+                        className={chipClass(on)}
                     >
                         {c.label}
                     </button>
@@ -135,18 +107,19 @@ export function Bar({
     tone: "ok" | "accent" | "off";
 }) {
     return (
-        <div className="mt-[7px] h-[5px] overflow-hidden rounded-full bg-muted">
-            <div
-                className={cn(
-                    "h-full rounded-full",
-                    tone === "ok"
-                        ? "bg-success-subtle-foreground"
-                        : tone === "accent"
-                          ? "bg-highlight"
-                          : "bg-neutral-400",
-                )}
-                style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-            />
-        </div>
+        <ProgressBar
+            value={Math.max(0, Math.min(100, pct))}
+            max={100}
+            size="xs"
+            tone={
+                tone === "ok"
+                    ? "success"
+                    : tone === "accent"
+                      ? "ink"
+                      : "neutral"
+            }
+            label={`${Math.round(Math.max(0, Math.min(100, pct)))}% left`}
+            className="mt-[7px]"
+        />
     );
 }

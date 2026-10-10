@@ -128,12 +128,7 @@ export function FixedBlockInspector({
                         className="size-4 shrink-0 text-muted-foreground"
                     />
                     {part === "header" ? "Header" : "Footer"}
-                    <Badge
-                        variant="neutral"
-                        className="uppercase tracking-[0.06em]"
-                    >
-                        Fixed
-                    </Badge>
+                    <Badge variant="neutral">Fixed</Badge>
                 </h2>
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
                     On every page of this site. Its text is edited here; where

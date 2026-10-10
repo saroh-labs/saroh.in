@@ -208,11 +208,10 @@ export function CustomerDetailScreen({
         // Undo puts back the yes they gave; with no yes on record there is
         // nothing to put back, and inventing one would be a false consent.
         if (d.consent?.status !== "GRANTED") return showSuccess(said);
-        showUndo(said, () => {
-            void restoreOffersAction(d.contact.id).then((back) => {
-                if (!back.ok) showError(back.error);
-                router.refresh();
-            });
+        showUndo(said, async () => {
+            const back = await restoreOffersAction(d.contact.id);
+            router.refresh();
+            return back;
         });
     }
 

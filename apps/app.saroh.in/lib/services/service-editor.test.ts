@@ -314,9 +314,17 @@ describe("the words around the editor", () => {
             "",
         );
         expect(statePill(true, true).label).toBe("New");
+        // One word for every kind of thing; the service's own sentence
+        // is the hint.
         expect(statePill(false, false)).toEqual({
-            label: "Not taking bookings",
-            tone: "neutral",
+            label: "Paused",
+            tone: "warning",
+            hint: "Not taking bookings.",
+        });
+        expect(statePill(false, true)).toEqual({
+            label: "Live",
+            tone: "success",
+            hint: "Taking bookings.",
         });
     });
 

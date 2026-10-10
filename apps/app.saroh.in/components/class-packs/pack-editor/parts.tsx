@@ -62,21 +62,11 @@ export function FieldError({ id, message }: { id: string; message?: string }) {
     );
 }
 
-/** The design's chip (34px, 13px), pressed a step darker, as Button is. */
+/** The pack editor's chip: the shared one, at its one size. */
 export function PackChip({
     on,
     className,
     ...props
 }: React.ComponentPropsWithoutRef<typeof Chip>) {
-    return (
-        <Chip
-            on={on}
-            className={cn(
-                "h-[34px] text-[13px]",
-                on ? "active:bg-primary-active" : "active:bg-accent-active",
-                className,
-            )}
-            {...props}
-        />
-    );
+    return <Chip on={on} className={className} {...props} />;
 }

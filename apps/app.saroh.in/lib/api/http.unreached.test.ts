@@ -14,10 +14,12 @@ vi.mock("next/headers", () => ({
         }),
     cookies: () => Promise.resolve({ get: () => ({ value: "org_1" }) }),
 }));
-const rethrow = vi.fn();
+const rethrow = vi.fn<(error: unknown) => void>();
 vi.mock("next/navigation", () => ({
     forbidden: vi.fn(),
-    unstable_rethrow: (error: unknown) => rethrow(error),
+    unstable_rethrow: (error: unknown) => {
+        rethrow(error);
+    },
 }));
 vi.mock("@saroh/auth/origins", () => ({ requestOrigin: () => null }));
 vi.mock("react", async (original) => ({
@@ -35,6 +37,10 @@ const json = (status: number, body: unknown) =>
     });
 
 type Call = (url: string, init?: RequestInit) => Promise<Response>;
+
+/** A response's JSON, as `readError` takes it. */
+const body = async (res: Response) =>
+    (await res.json()) as { message?: string } | null;
 
 describe("a write that didn't reach the API", () => {
     const fetchMock = vi.fn<Call>();
@@ -154,7 +160,7 @@ describe("a write that didn't reach the API", () => {
             method: "POST",
         });
         expect(unreached.ok).toBe(false);
-        expect(readError(await unreached.json(), "Could not mark.")).toBe(
+        expect(readError(await body(unreached), "Could not mark.")).toBe(
             UNREACHED,
         );
 
@@ -163,7 +169,7 @@ describe("a write that didn't reach the API", () => {
             method: "POST",
         });
         expect(expired.status).toBe(401);
-        expect(readError(await expired.json(), "Could not mark.")).toBe(
+        expect(readError(await body(expired), "Could not mark.")).toBe(
             SIGNED_OUT,
         );
     });
@@ -205,7 +211,7 @@ describe("a write that didn't reach the API", () => {
     it("one of Next's interrupts is passed on, not called unreached", async () => {
         const interrupt = new Error("NEXT_REDIRECT");
         rethrow.mockImplementation((error: unknown) => {
-            if (error === interrupt) throw error;
+            if (error === interrupt) throw interrupt;
         });
         write(() => Promise.reject(interrupt));
         await expect(mutate("/x", "POST", {}, "x")).rejects.toBe(interrupt);
