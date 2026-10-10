@@ -593,16 +593,26 @@ test.describe("availability and services", () => {
             page.getByRole("button", { name: "Add service" }),
         ).toBeDisabled();
 
-        await page
+        // The app's one leave question, as every create and edit flow asks
+        // it: Stay keeps what was typed, Leave goes where the link pointed.
+        const crumb = page
             .getByRole("navigation", { name: "Breadcrumb" })
-            .getByRole("link", { name: "Services" })
-            .click();
-        await expect(
-            page.getByRole("alertdialog", {
-                name: "Leave without creating it?",
-            }),
-        ).toBeVisible();
-        await page.getByRole("link", { name: "Leave without saving" }).click();
+            .getByRole("link", { name: "Services" });
+        const ask = page.getByRole("alertdialog", {
+            name: "Leave without saving?",
+        });
+        await crumb.click();
+        await expect(ask).toBeVisible();
+        await expect(ask).toContainText(
+            "The service isn't created yet, so nothing you've entered will be kept.",
+        );
+        await expect(ask.getByRole("button", { name: "Stay" })).toBeFocused();
+        await ask.getByRole("button", { name: "Stay" }).click();
+        await expect(ask).toBeHidden();
+        await expect(page.getByLabel("Name")).toHaveValue("E2E class");
+
+        await crumb.click();
+        await ask.getByRole("button", { name: "Leave", exact: true }).click();
         await expect(
             page.getByRole("heading", { level: 1, name: "Services" }),
         ).toBeVisible();

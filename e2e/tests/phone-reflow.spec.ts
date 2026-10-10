@@ -416,13 +416,16 @@ test.describe("phone reflow: Order Detail", () => {
                 cancel.getByRole("button", {
                     name: /^(Refund |Cancel order$)/,
                 }),
-                cancel.getByRole("button", { name: "Cancel", exact: true }),
+                // Its way out says what it keeps, never "Cancel" beside
+                // the button that cancels.
+                cancel.getByRole("button", { name: "Keep order" }),
             ],
             "Cancel order",
         );
-        await cancel
-            .getByRole("button", { name: "Cancel", exact: true })
-            .click();
+        await expect(
+            cancel.getByRole("button", { name: "Cancel", exact: true }),
+        ).toHaveCount(0);
+        await cancel.getByRole("button", { name: "Keep order" }).click();
         // One sheet at a time: the page is out of reach until it is gone.
         await expect(cancel).toBeHidden();
 
