@@ -108,7 +108,9 @@ must keep:
 - **Session replay is the signed-in workspace and saroh.in only**
   (DEC-125, amended 10 Oct), on in production only. The workspace masks
   everything but Saroh's own words and starts after its one-time notice;
-  saroh.in starts after the cookie notice is accepted. Never accounts, the
+  saroh.in starts after the cookie notice is accepted, through
+  `startRecording` (`apps/saroh.in/lib/tags.ts`) alone, which cuts the
+  page's address back first. Never accounts, the
   admin console or a merchant site (`check:merchant-site-tracking`). What a
   screen marks, and how: `frontend-design-system.md` → Session recordings.
 - **Degraded paths it adds, and what volume means:**
@@ -121,6 +123,42 @@ must keep:
   `product_milestone_not_sent` (WARN): the ledger has the milestone and
   PostHog's copy is missing. `job_failed_final` (ERROR): a job failed its
   last attempt; any at all is worth a look.
+
+## Ad tags: saroh.in only — **Current** (DEC-127)
+
+Saroh's own advertising tags (Google Ads, the Meta Pixel) and Google
+Analytics. What is sent and how to switch it on:
+`docs/architecture/ADS_TRACKING.md`. The rules a change must keep:
+
+- **One loader.** Only `apps/saroh.in/lib/tags.ts` adds a third party's
+  script or calls `gtag`/`fbq`. A new conversion is a name in its
+  `Conversion` type and one `fireConversion()` call; a Google Analytics
+  event is `track()` (`lib/analytics.ts`). Neither needs its own "is it
+  allowed" check.
+- **Nothing before consent, and advertising is its own answer**
+  (`lib/consent.ts`). The notice asks about two things: understanding the
+  site (Google Analytics' visit counts and the recorder, one answer) and
+  advertising. What an accept covered is kept with it, so one from before
+  the notice said it records is asked once about recording and is never
+  stretched. Every sentence the notice can show is in `question()`
+  (`app/site-tags.tsx`), with a test for each. The team's browser and one sending Do Not Track or
+  Global Privacy Control are never tagged. Off without an id, and off
+  everywhere but production.
+- **Only the fact.** Never an email, a phone number, a name or anything a
+  visitor typed, hashed or not: no enhanced conversions, no advanced
+  matching.
+- **A page reads its query through `readAddress()`**
+  (`lib/page-address.ts`), never `location.search`: before a tag loads the
+  address is cut back to one allow-list, so no tag reads a referral id, an
+  invitation, an email or a token from it. A new parameter is cut unless it
+  is added to that list, and only campaign data or the page's own choice
+  belongs there.
+- **Nowhere else.** No ad tag, ad id or ad host in the workspace, the
+  console, accounts, `apps/saroh.app` or `packages/site-blocks`:
+  `pnpm run check:merchant-site-tracking` fails the gate. A merchant's own
+  trackers on their own site (#889) are the files that check allows by name.
+  A conversion that happens on another host is counted the way sign-up is:
+  by passing through a page on saroh.in (`lib/welcome.ts`).
 
 ## Not in place yet
 

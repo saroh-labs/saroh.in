@@ -7,13 +7,10 @@ import { home } from "@/content/home";
 import { shownLegal } from "@/content/resources";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
-import { env } from "@/env";
-import { gaMeasurementId } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
-import { siteRecordingOn } from "@/lib/site-recording";
+import { siteTagConfig } from "@/lib/site-tag-config";
 
-import { GoogleAnalytics } from "./google-analytics";
-import { SiteReplay } from "./site-replay";
+import { SiteTags } from "./site-tags";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -91,9 +88,10 @@ export const metadata: Metadata = {
  */
 
 /**
- * The shell every page shares: fonts, GA and the light-only scheme. Pages
- * bring their own chrome through route groups: `(v2)` the Marketing Site V2
- * pages, `(standalone)` the waitlist, `(preview)` the pricing draft.
+ * The shell every page shares: fonts, the tags and the recorder behind the
+ * cookie notice (`site-tags.tsx`) and the light-only scheme. Pages bring their own chrome
+ * through route groups: `(v2)` the Marketing Site V2 pages, `(standalone)`
+ * the waitlist and the sign-up hand-off, `(preview)` the pricing draft.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no
  * toggle; `color-scheme: light` is set here and in site.css.
@@ -106,26 +104,15 @@ export default function RootLayout({
     const privacy = shownLegal(resourcesContext()).find(
         (p) => p.id === "privacy",
     );
-    const recording = siteRecordingOn({
-        key: env.NEXT_PUBLIC_POSTHOG_KEY,
-        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
-    });
     return (
         <html lang="en" style={{ colorScheme: "light" }}>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
             >
-                <GoogleAnalytics
-                    id={gaMeasurementId({
-                        id: env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
-                        vercelEnv: env.VERCEL_ENV,
-                    })}
+                <SiteTags
+                    config={siteTagConfig()}
                     privacyHref={privacy?.href}
-                    recording={recording}
                 />
-                {/* Session replay (DEC-125): only where it is switched on,
-                    and then only after the notice above is accepted. */}
-                <SiteReplay on={recording} />
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"

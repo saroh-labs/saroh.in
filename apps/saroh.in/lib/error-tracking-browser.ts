@@ -9,7 +9,7 @@ import { TRACKED_APP, trackedEnv } from "@/lib/error-tracking";
  * (from this app's own bundle, never from PostHog) only when there is a
  * first error to send, or a session replay that is allowed to start: the
  * switch is on and the visitor accepted the cookie notice
- * (`app/site-replay.tsx`).
+ * (`app/site-tags.tsx`).
  */
 export const browserTracking = createBrowserTracking({
     key: env.NEXT_PUBLIC_POSTHOG_KEY,

@@ -7,7 +7,7 @@
  *
  * On is not "recording": that still waits for the visitor to accept the
  * cookie notice, and never happens in a Saroh team browser or one that
- * sends Do Not Track or Global Privacy Control (`app/site-replay.tsx`).
+ * sends Do Not Track or Global Privacy Control (`app/site-tags.tsx`, `startRecording` in `lib/tags.ts`).
  */
 export function siteRecordingOn(settings: {
     key: string | undefined;

@@ -241,19 +241,39 @@ The convention, and the test that holds it
 ### saroh.in
 
 It records only when **every** one of these holds (`siteReplayDecision`;
-`apps/saroh.in/app/site-replay.tsx`):
+`apps/saroh.in/app/site-tags.tsx`, and `startRecording` in `lib/tags.ts`,
+the one way it starts):
 
 1. `NEXT_PUBLIC_POSTHOG_REPLAY` is `on` for the deployment, and there is a
    key.
 2. **The visitor accepted the cookie notice**, and the notice they accepted
    said it records. It is the one answer Google Analytics waits for too
-   (`lib/consent.ts`). Before an answer, after "Refuse", and after "Cookie
-   choices" forgets it, nothing is loaded; taking it back stops the
-   recorder at once. An "Accept" from before the notice mentioned recording
-   was for Analytics alone: the notice asks again.
+   (`lib/consent.ts`): the notice's first question is "understanding the
+   site", visit counts and recording together; advertising (DEC-127) is its
+   second, and has nothing to do with recording. Before an answer, after
+   "Refuse", and after "Cookie choices" forgets it, nothing is loaded;
+   taking it back stops the recorder at once.
 3. It is not a Saroh team browser (`saroh_team=1`).
 4. The browser sends neither Do Not Track nor Global Privacy Control.
-5. It is not a pricing draft preview.
+5. It is not a pricing draft preview, nor the sign-up hand-off (`/welcome`).
+6. **The page's address has been cut back** to the allow-list in
+   `lib/page-address.ts`, as it is before a tag loads (DEC-127, Decision
+   4a), and every later address is cut as it is set. So a recording never
+   shows `ref`, `invite`, `email`, `token` or anything unlisted in an
+   address. (`replayBeforeSend` drops the whole query string from what is
+   sent as well.)
+
+**An accept from before the notice said it records** (combined model, 10
+Oct). What an accept covered is kept beside it
+(`saroh-analytics-consent-scope`: `analytics`, `analytics+recording` or
+`analytics-only`). An accept given to the older notice, or where recording
+was off, was for visit counts: Google Analytics carries on as agreed,
+nothing is recorded, and the notice asks once, about recording alone ("You
+accepted Google Analytics cookies that count visits. May saroh.in also
+record how the site is used, so we can make it clearer? …"). "Accept" there
+starts the recorder; "Refuse" keeps the visit counts they had agreed to
+(`analytics-only`) and they are not asked again. An older refusal is left
+alone.
 
 What a recording holds (`siteReplayConfig`): the page's own text and
 pictures (Saroh's public content, Help included: it is the same app); every

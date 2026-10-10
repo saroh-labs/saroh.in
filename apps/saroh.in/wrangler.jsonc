@@ -56,6 +56,13 @@
         "DEV_REDIRECT_ORIGIN": "https://saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
+        // Ad conversions (DEC-127) are production's alone. Set here they
+        // would still load nothing: lib/ga.ts reads them only where
+        // VERCEL_ENV is "production".
+        // "NEXT_PUBLIC_GOOGLE_ADS_ID": "",
+        // "NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL": "",
+        // "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL": "",
+        // "NEXT_PUBLIC_META_PIXEL_ID": "",
     },
     "env": {
         "production": {
@@ -81,6 +88,15 @@
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+                // Ad conversions (DEC-127): Google Ads and the Meta Pixel,
+                // each off until its PUBLIC id (not a secret) is set here.
+                // Even then a tag loads only after a visitor accepts
+                // advertising cookies. Where to find each value:
+                // docs/architecture/ADS_TRACKING.md, "Turning ads tracking on".
+                // "NEXT_PUBLIC_GOOGLE_ADS_ID": "AW-XXXXXXXXXX",
+                // "NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL": "",
+                // "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL": "",
+                // "NEXT_PUBLIC_META_PIXEL_ID": "",
             },
             "services": [
                 {

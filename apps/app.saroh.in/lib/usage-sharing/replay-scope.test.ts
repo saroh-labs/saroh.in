@@ -122,17 +122,33 @@ describe("session replay is the workspace and saroh.in only", () => {
         ).toContain("noticeShown,");
     });
 
-    it("on saroh.in only SiteReplay starts it, on the cookie notice's answer", () => {
+    it("on saroh.in only startRecording starts it, on the cookie notice's answer and a cut address", () => {
         expect(filesWith("saroh.in", /\.startSiteReplay\(/)).toEqual([
-            "app/site-replay.tsx",
+            "lib/tags.ts",
         ]);
         expect(filesWith("saroh.in", /\.startReplay\(/)).toEqual([]);
-        expect(filesWith("saroh.in", /<SiteReplay\b/)).toEqual([
-            "app/layout.tsx",
+        // The one caller: the component that holds the cookie notice.
+        expect(filesWith("saroh.in", /\bstartRecording\(/).sort()).toEqual([
+            "app/site-tags.tsx",
+            "lib/tags.ts",
         ]);
-        const replay = read("saroh.in/app/site-replay.tsx");
-        expect(replay).toContain("useAnalyticsConsent(on)");
-        expect(replay).toContain('choice === "granted"');
-        expect(replay).toContain("isTeamBrowser(document.cookie)");
+        const tags = read("saroh.in/lib/tags.ts");
+        const start = tags.slice(
+            tags.indexOf("export function startRecording"),
+        );
+        // Allowed first (the answer, the team, the browser's own signal),
+        // then the address is cut, and only then does the recorder start.
+        const allowed = start.indexOf("allowedNow(win, doc).recording");
+        const cut = start.indexOf("takeAddress(win)");
+        const guard = start.indexOf("guardHistory(win)");
+        const begins = start.indexOf(".startSiteReplay(");
+        expect(allowed).toBeGreaterThan(-1);
+        expect(cut).toBeGreaterThan(allowed);
+        expect(guard).toBeGreaterThan(cut);
+        expect(begins).toBeGreaterThan(guard);
+        expect(tags).toContain(
+            'recording: readRecordingConsent() === "granted"',
+        );
+        expect(tags).toContain("isTeamBrowser(doc.cookie)");
     });
 });

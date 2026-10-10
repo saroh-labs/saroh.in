@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { fakeCatalog } from "@/lib/pricing.fixture";
+import { resetTags, syncTags } from "@/lib/tags";
 
 import { PricingPlans } from "./pricing-plans";
 
@@ -20,6 +21,9 @@ const NO_PRICE = new RegExp("\\u20B9|\\d");
 const gtag = vi.fn();
 beforeEach(() => {
     gtag.mockClear();
+    // Visit counts accepted: events go to this Analytics id (`lib/tags.ts`).
+    resetTags();
+    syncTags({ gaId: "G-TEST123" }, { analytics: true, ads: false });
     window.gtag = gtag;
 });
 afterEach(cleanup);
@@ -71,6 +75,8 @@ describe("PricingPlans", () => {
         expect(gtag).toHaveBeenCalledWith("event", "pricing_toggle", {
             control: "yearly",
             value: true,
+            send_to: "G-TEST123",
+            page_location: expect.any(String) as unknown,
         });
         // The arrow keys move back to Monthly.
         fireEvent.keyDown(yearly, { key: "ArrowLeft" });
@@ -97,6 +103,8 @@ describe("PricingPlans", () => {
         expect(gtag).toHaveBeenCalledWith("event", "pricing_toggle", {
             control: "gst",
             value: true,
+            send_to: "G-TEST123",
+            page_location: expect.any(String) as unknown,
         });
     });
 

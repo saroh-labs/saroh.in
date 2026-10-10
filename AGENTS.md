@@ -80,6 +80,7 @@ the right-hand files **before** writing code.
 | Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |
 | Add logging, a degraded path, a health check or error tracking                                             | `docs/patterns/devops-observability.md`                                                        |
 | Send anything to PostHog, add a product event, or touch tracking or session recording on any app           | `docs/architecture/ERROR_TRACKING_AND_UPTIME.md` · `docs/patterns/devops-observability.md`     |
+| Touch the cookie notice, Google Analytics, an ad tag or an ad conversion, on saroh.in or anywhere          | `docs/architecture/ADS_TRACKING.md` · `docs/patterns/devops-observability.md` → Ad tags        |
 | Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
 | Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
 
