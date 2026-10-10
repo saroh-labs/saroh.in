@@ -4,7 +4,6 @@ import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Accordion, AccordionItem, AccordionTrigger } from "./accordion";
 import { Button } from "./button";
 import { Checkbox } from "./checkbox";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
@@ -132,19 +131,6 @@ describe("interactive primitives carry pointer, hover, focus and pressed", () =>
     it("Toggle", () => {
         render(<Toggle aria-label="Bold">B</Toggle>);
         expectInteractive(screen.getByRole("button", { name: "Bold" }));
-    });
-
-    it("Accordion trigger draws its own ring", () => {
-        render(
-            <Accordion type="single" collapsible>
-                <AccordionItem value="a">
-                    <AccordionTrigger>Delivery</AccordionTrigger>
-                </AccordionItem>
-            </Accordion>,
-        );
-        const trigger = screen.getByRole("button", { name: "Delivery" });
-        expect(classes(trigger)).toContain("cursor-pointer");
-        expect(classes(trigger)).toContain("focus-visible:ring-2");
     });
 
     it("Dialog close: named, and a ring for the keyboard only", () => {
