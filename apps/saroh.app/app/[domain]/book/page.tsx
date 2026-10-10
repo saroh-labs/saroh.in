@@ -9,6 +9,7 @@ import {
     initialTimeOf,
     ModulePageUnavailable,
     MoveClass,
+    reachOf,
 } from "@saroh/site-blocks";
 
 import { PublishedPage } from "@/components/published-page";
@@ -25,6 +26,7 @@ import {
 import { dontCachePage } from "@/lib/page-cache/site-rules";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getSiteContact } from "@/lib/site-contact";
 import { getFooterFacts, soldByFor } from "@/lib/site-footer";
 import { shareable } from "@/lib/test-metadata";
 
@@ -159,7 +161,7 @@ export default async function BookPage({
         );
     }
 
-    const [lookup, visit, customer, options, facts, catalogue] =
+    const [lookup, visit, customer, options, facts, catalogue, contact] =
         await Promise.all([
             getBookingPage(resolved.siteId),
             // The header's place, hours and phone (E6); null never blocks booking.
@@ -170,6 +172,9 @@ export default async function BookPage({
             // the layout's own reads, shared through `cache`.
             getFooterFacts(resolved.siteId),
             getCatalogue(resolved.siteId),
+            // A call and a WhatsApp message, where the page can't find a
+            // time: the layout's own read, shared through `cache`.
+            getSiteContact(resolved.siteId),
         ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
@@ -204,6 +209,7 @@ export default async function BookPage({
             }}
             apiUrl={publicApiUrl()}
             soldBy={soldByFor(facts, resolved.snapshot.site.name, catalogue.ok)}
+            reach={reachOf(contact)}
             initialServiceId={typeof service === "string" ? service : null}
             initialDate={initialDateOf(date)}
             initialStart={initialTimeOf(start)}

@@ -118,12 +118,45 @@ export interface BookingDay {
     starts: BookingStart[];
 }
 
-/** One service's next two weeks: `GET /public/services/:id/days`. */
+/** One service's two weeks: `GET /public/services/:id/days`. */
 export interface BookingDays {
     timezone: string;
     kind: "one" | "class";
     capacity: number;
     days: BookingDay[];
+    /**
+     * Who takes a one-to-one, when each has their own times: the page
+     * offers "With: Anyone" or one of them when there is more than one.
+     * Absent from an older API.
+     */
+    staff?: BookingPerson[];
+}
+
+/** A person who takes a service: a display name and an opaque id. */
+export interface BookingPerson {
+    id: string;
+    name: string;
+}
+
+/** How many days the page shows at a time. */
+export const DAYS_WINDOW = 14;
+/** The furthest "Show later dates" goes: the API's own cap. */
+export const MAX_DAYS_SKIP = 70;
+
+/**
+ * Where "Show later dates" goes from a window starting `skip` days from
+ * today, or null when there is nothing later to show: past the business's
+ * own book-ahead rule nothing can be booked, and the API stops at twelve
+ * weeks.
+ */
+export function laterSkip(
+    skip: number,
+    bookAheadDays: number | null,
+): number | null {
+    const next = skip + DAYS_WINDOW;
+    if (next > MAX_DAYS_SKIP) return null;
+    if (bookAheadDays !== null && next > bookAheadDays) return null;
+    return next;
 }
 
 export type HoldState = "HELD" | "CONFIRMED" | "RELEASED" | "CANCELLED";
@@ -242,7 +275,12 @@ export function isBookingDays(v: unknown): v is BookingDays {
                 (d.closed === undefined || typeof d.closed === "boolean") &&
                 Array.isArray(d.starts) &&
                 d.starts.every(isStart),
-        )
+        ) &&
+        (v.staff === undefined ||
+            (Array.isArray(v.staff) &&
+                v.staff.every(
+                    (p: unknown) => isObj(p) && isStr(p.id) && isStr(p.name),
+                )))
     );
 }
 
@@ -848,4 +886,32 @@ export function buildIcs(input: {
         "END:VCALENDAR",
         "",
     ].join("\r\n");
+}
+
+/**
+ * The booking as a link that opens Google Calendar with it filled in, for
+ * the customer who keeps their diary there. Times in UTC, as the calendar
+ * file's are. Nothing is sent to anyone until they press Save there.
+ */
+export function googleCalendarHref(input: {
+    title: string;
+    startAt: string;
+    endAt: string;
+    description: string;
+    /** Where it happens, when the page knows. */
+    location?: string | null;
+}): string {
+    const stamp = (iso: string) =>
+        new Date(iso)
+            .toISOString()
+            .replace(/[-:]/g, "")
+            .replace(/\.\d{3}/, "");
+    const params = new URLSearchParams({
+        action: "TEMPLATE",
+        text: input.title,
+        dates: `${stamp(input.startAt)}/${stamp(input.endAt)}`,
+        details: input.description,
+    });
+    if (input.location?.trim()) params.set("location", input.location.trim());
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }

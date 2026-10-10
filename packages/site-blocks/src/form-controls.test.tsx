@@ -55,7 +55,8 @@ describe("form controls on a merchant's site are 16px or more", () => {
             <DetailsStep
                 ids="b"
                 business="Kavi Dental"
-                customer={null}
+                // Signed in with no name yet: the one time a name is asked.
+                customer={{ email: "new@example.com", name: null }}
                 signingOut={false}
                 onNotYou={() => undefined}
                 name=""

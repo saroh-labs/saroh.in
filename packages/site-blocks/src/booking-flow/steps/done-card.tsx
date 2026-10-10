@@ -10,6 +10,7 @@ import {
     changeRules,
     changeText,
     firstVisitText,
+    googleCalendarHref,
     MOVE_OR_CANCEL,
 } from "../model";
 import { card, focusRing } from "../styles";
@@ -40,16 +41,18 @@ export function DoneCard({
     onAgain: () => void;
 }) {
     const { booking } = phase;
+    // The booking as a calendar entry: the file, and Google Calendar's own
+    // page for those who keep their diary there.
+    const entry = {
+        title: `${booking.serviceName} · ${business}`,
+        startAt: booking.startAt,
+        endAt: booking.endAt,
+        description: booking.meetingUrl
+            ? `Join online: ${booking.meetingUrl} ${changeText(business, rules, phase.paid, true)}`
+            : changeText(business, rules, phase.paid, true),
+    };
     const addToCalendar = () => {
-        const ics = buildIcs({
-            reference: booking.reference,
-            title: `${booking.serviceName} · ${business}`,
-            startAt: booking.startAt,
-            endAt: booking.endAt,
-            description: booking.meetingUrl
-                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules, phase.paid, true)}`
-                : changeText(business, rules, phase.paid, true),
-        });
+        const ics = buildIcs({ reference: booking.reference, ...entry });
         const url = URL.createObjectURL(
             new Blob([ics], { type: "text/calendar;charset=utf-8" }),
         );
@@ -144,6 +147,17 @@ export function DoneCard({
                 >
                     Add to calendar
                 </button>
+                <a
+                    href={googleCalendarHref({ ...entry, location: where })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                        "border-site-border bg-site-surface text-site-fg inline-flex h-11 cursor-pointer items-center rounded-[calc(var(--site-radius)+8px)] border px-4 text-sm font-semibold",
+                        focusRing,
+                    )}
+                >
+                    Add to Google Calendar
+                </a>
                 <button
                     type="button"
                     onClick={onAgain}

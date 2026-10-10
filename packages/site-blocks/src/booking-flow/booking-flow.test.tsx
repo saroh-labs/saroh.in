@@ -1423,6 +1423,8 @@ describe("opening on a time from On today (G18)", () => {
             expect(open).toHaveAttribute("aria-checked", "true"),
         );
         unmount();
+        // Another visit: nothing chosen on the last one is kept for it.
+        window.sessionStorage.clear();
 
         serve(() => json(CLASS_DAYS));
         render(
@@ -1543,7 +1545,53 @@ describe("sign-in at the last step (A9)", () => {
         verifyCode: vi.fn(),
     });
 
-    it("a visitor gives a name, signs in at the last step, and is booked straight after the code", async () => {
+    it("a visitor types no name: they sign in at the last step, and an account with a name is booked straight after the code", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null })}
+            />,
+        );
+        await pickSeven();
+        expect(
+            screen.getByText(/You'll confirm your email with a code/),
+        ).toBeInTheDocument();
+        // A returning customer who is signed out is never asked a name
+        // that the account already has.
+        expect(screen.queryByLabelText("Name")).toBeNull();
+        payAtDesk();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        expect(
+            await screen.findByText(
+                "Last step: confirm it's you, then we'll finish. No password.",
+            ),
+        ).toBeInTheDocument();
+        expect(bookCalls()).toHaveLength(0);
+
+        await signInWithCode("asha@example.in");
+
+        expect(
+            await screen.findByRole("heading", {
+                name: "You're booked, Asha.",
+            }),
+        ).toBeInTheDocument();
+        const [body] = bookCalls();
+        expect(body).toMatchObject({
+            serviceId: "svc_pt",
+            startAt: "2026-09-20T01:30:00.000Z",
+            pay: "DESK",
+        });
+        expect(body).not.toHaveProperty("bookerName");
+        expect(body).not.toHaveProperty("bookerEmail");
+    });
+
+    it("asks for a name after signing in, only when the account has none, and books on the next press", async () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
@@ -1572,32 +1620,30 @@ describe("sign-in at the last step (A9)", () => {
             />,
         );
         await pickSeven();
-        expect(
-            screen.getByText(/You'll confirm your email with a code/),
-        ).toBeInTheDocument();
-        // Nothing is booked, and no sheet, until they've named themselves.
-        fireEvent.click(
-            screen.getByRole("button", { name: "Continue to sign in" }),
-        );
-        expect(screen.getAllByText("Add your name.").length).toBeGreaterThan(0);
-        expect(screen.queryByRole("dialog")).toBeNull();
-
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Meera Shah" },
-        });
+        expect(screen.queryByLabelText("Name")).toBeNull();
         payAtDesk();
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
         );
-        expect(
-            await screen.findByText(
-                "Last step: confirm it's you, then we'll finish. No password.",
-            ),
-        ).toBeInTheDocument();
-        expect(bookCalls()).toHaveLength(0);
-
         await signInWithCode("meera@example.in");
 
+        // Signed in, nothing booked yet: the one thing still to ask.
+        const nameField = await screen.findByLabelText("Name");
+        expect(
+            screen.getAllByText("You're signed in. Add your name, then book.")
+                .length,
+        ).toBeGreaterThan(0);
+        expect(bookCalls()).toHaveLength(0);
+        expect(verifyCode).toHaveBeenCalledWith("meera@example.in", "123456");
+        // The time chosen is as it was.
+        expect(
+            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+        ).toHaveAttribute("aria-checked", "true");
+
+        fireEvent.change(nameField, { target: { value: "Meera Shah" } });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
         expect(
             await screen.findByRole("heading", {
                 name: "You're booked, Meera.",
@@ -1608,7 +1654,6 @@ describe("sign-in at the last step (A9)", () => {
                 "We've saved this to your details with Pulse Fitness.",
             ),
         ).toBeInTheDocument();
-        expect(verifyCode).toHaveBeenCalledWith("meera@example.in", "123456");
         const [body] = bookCalls();
         expect(body).toMatchObject({
             serviceId: "svc_pt",
@@ -1719,7 +1764,8 @@ describe("sign-in at the last step (A9)", () => {
             await screen.findByRole("button", { name: "Continue to sign in" }),
         ).toBeInTheDocument();
         expect(signOut).toHaveBeenCalledTimes(1);
-        expect(screen.getByLabelText("Name")).toHaveValue("");
+        // Signed out, no name is asked for: it is asked after signing in.
+        expect(screen.queryByLabelText("Name")).toBeNull();
         expect(screen.queryByText(/Booking as/)).toBeNull();
     });
 
@@ -1788,9 +1834,6 @@ describe("sign-in at the last step (A9)", () => {
             />,
         );
         await pickSeven();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Meera Shah" },
-        });
         payAtDesk();
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
@@ -1821,9 +1864,6 @@ describe("sign-in at the last step (A9)", () => {
             />,
         );
         await pickSeven();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Meera Shah" },
-        });
         payAtDesk();
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
@@ -1864,9 +1904,6 @@ describe("sign-in at the last step (A9)", () => {
             />,
         );
         await pickSeven();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Meera Shah" },
-        });
         payAtDesk();
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
@@ -2491,9 +2528,6 @@ describe("the booking page on a test release (DEC-071, T6)", () => {
             </TestReleaseProvider>,
         );
         await chooseOneToOne();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),

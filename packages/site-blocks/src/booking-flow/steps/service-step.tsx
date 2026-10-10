@@ -40,6 +40,13 @@ export function ServiceStep({
                                 <span className="text-site-body mt-0.5 block text-[13px]">
                                     {serviceLine(s)}
                                 </span>
+                                {/* What the chosen one is, in the business's
+                                    own words, before a time is picked. */}
+                                {on && s.description?.trim() ? (
+                                    <span className="text-site-body mt-1.5 block whitespace-pre-line text-sm font-normal leading-normal [overflow-wrap:anywhere]">
+                                        {s.description.trim()}
+                                    </span>
+                                ) : null}
                             </span>
                             {p ? (
                                 <span className="text-[15px] font-semibold tabular-nums">

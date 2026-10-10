@@ -198,9 +198,6 @@ describe("the QR code a booking came from", () => {
                 name: "07:00 with Karan Mehta",
             }),
         );
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });
         if (desk) fireEvent.click(desk);
         fireEvent.click(

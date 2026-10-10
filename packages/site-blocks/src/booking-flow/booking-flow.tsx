@@ -14,10 +14,12 @@ import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { useQrSource } from "../qr-source";
+import type { BusinessReach } from "../reach-links";
+import { ReachLinks } from "../reach-links";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { TEST_RELEASE_REASON } from "../test-release/words";
-import type { BookSignedIn, CreditFor, Result } from "./api";
+import type { BookSignedIn, CreditFor, DaysAsk, Result } from "./api";
 import {
     CREDIT_GONE,
     creditRequest,
@@ -27,6 +29,13 @@ import {
     releaseHold,
     startPayment,
 } from "./api";
+import {
+    clearBookingDraft,
+    keptText,
+    NOTE_NOT_KEPT,
+    readBookingDraft,
+    writeBookingDraft,
+} from "./booking-draft";
 import {
     headerFacts,
     kicker,
@@ -56,6 +65,7 @@ import {
     dateIn,
     dateText,
     formatMoney,
+    laterSkip,
     payChoices,
     restAfterDeposit,
     rulesText,
@@ -175,6 +185,12 @@ export function accountPhone(customer: SignedInCustomer | null): string {
     return phone && phoneOk(phone) ? phone : "";
 }
 
+/**
+ * Signed in at the last step, and the account has no name yet: the one
+ * thing still to ask before the booking is made.
+ */
+const NAME_AFTER_SIGN_IN = "You're signed in. Add your name, then book.";
+
 /** What is left while the name isn't typed (UX-083: a next step until they try to book). */
 const NAME_LEFT = "Add your name.";
 export interface BookingFlowProps {
@@ -196,6 +212,12 @@ export interface BookingFlowProps {
     initialStart?: string | null;
     /** "Run by ‹legal name›" on the confirmation (DEC-121); null draws none. */
     soldBy?: string | null;
+    /**
+     * How to reach the business (the public contact read): a call and a
+     * WhatsApp message, offered where the page can't find them a time.
+     * Null or absent draws the header's phone alone, when there is one.
+     */
+    reach?: BusinessReach | null;
 }
 
 export default function BookingFlow({
@@ -207,6 +229,7 @@ export default function BookingFlow({
     initialDate = null,
     initialStart = null,
     soldBy = null,
+    reach = null,
 }: BookingFlowProps) {
     const ids = useId();
     const services = page.services;
@@ -220,6 +243,10 @@ export default function BookingFlow({
     );
     const [date, setDate] = useState<string | null>(first ? initialDate : null);
     const [start, setStart] = useState<BookingStart | null>(null);
+    // "With: Anyone" or one of the people who take it, and which two
+    // weeks are on show ("Show later dates").
+    const [person, setPerson] = useState<string | null>(null);
+    const [skip, setSkip] = useState(0);
     // Who is signed in (A9), and a name for an account that has none.
     const [customer, setCustomer] = useState<SignedInCustomer | null>(
         account.customer,
@@ -267,7 +294,7 @@ export default function BookingFlow({
 
     // The service whose days are wanted now, so a late answer for another
     // one is dropped.
-    const wanted = useRef<string | null>(first?.id ?? null);
+    const wanted = useRef<string | null>(first ? `${first.id}:0:` : null);
     // One idempotency key per attempt: a double tap sends the same one.
     const attemptKey = useRef<string | null>(null);
     // Booking it at the desk after letting a hold go (#508): its own key per
@@ -288,10 +315,13 @@ export default function BookingFlow({
         daysState.kind === "ready" ? daysState.days.timezone : page.timezone;
 
     const loadDays = useCallback(
-        (id: string) => {
-            wanted.current = id;
-            void fetchDays(apiUrl, id).then((result) => {
-                if (wanted.current !== id) return;
+        (id: string, ask: DaysAsk = {}) => {
+            // The service, the two weeks and the person asked for: a late
+            // answer for any other is dropped.
+            const key = `${id}:${ask.skip ?? 0}:${ask.staffId ?? ""}`;
+            wanted.current = key;
+            void fetchDays(apiUrl, id, ask).then((result) => {
+                if (wanted.current !== key) return;
                 setDaysState(
                     result.ok
                         ? { kind: "ready", serviceId: id, days: result.value }
@@ -343,11 +373,32 @@ export default function BookingFlow({
         setServiceId(id);
         setDate(null);
         setStart(null);
+        setPerson(null);
+        setSkip(0);
         setSessionsShown(SESSIONS_SHOWN);
         setSubmitError(null);
         attemptKey.current = null;
         setDaysState({ kind: "loading", serviceId: id });
         loadDays(id);
+    };
+
+    /** The days on show, read again: the same two weeks, the same person. */
+    const reloadDays = (id: string) => loadDays(id, { skip, staffId: person });
+
+    /** Another person, or other weeks: other times, so the time is unchosen. */
+    const showDays = (
+        id: string,
+        ask: { skip: number; person: string | null },
+    ) => {
+        setPerson(ask.person);
+        setSkip(ask.skip);
+        setDate(null);
+        setStart(null);
+        setSessionsShown(SESSIONS_SHOWN);
+        setSubmitError(null);
+        attemptKey.current = null;
+        setDaysState({ kind: "loading", serviceId: id });
+        loadDays(id, { skip: ask.skip, staffId: ask.person });
     };
 
     // Another time, person or way of paying is another request: its own key,
@@ -473,8 +524,10 @@ export default function BookingFlow({
         ...(source ? { source } : {}),
     };
 
-    // A name is asked for only while the account has none (A9).
-    const asksName = !customer?.name;
+    // A name is asked for only once they are signed in, and only while
+    // the account has none (A9): a returning customer who is signed out
+    // types nothing that would then be thrown away.
+    const asksName = customer !== null && !customer.name;
     const whoOk = !asksName || name.trim().length > 1;
     const bookerName = (customer?.name ?? name).trim();
     const bookerFirst = bookerName.split(/\s+/)[0] ?? "";
@@ -634,8 +687,156 @@ export default function BookingFlow({
         attemptKey.current = null;
         setStart(null);
         offerAfter.current = offerNext ?? null;
-        loadDays(id);
+        reloadDays(id);
     };
+
+    // ── Kept for the visit (`booking-draft.ts`) ─────────────────────────
+    //
+    // The email code is read in another app, and a phone often loads the
+    // page again on the way back. What was chosen is kept in
+    // `sessionStorage` and brought back once, on the same address: the
+    // service, the weeks on show, who with, where, how they'll pay and the
+    // phone at once; the time when its days arrive, checked against what
+    // is free now. Read in an effect, never while drawing: the server's
+    // page and the browser's first draw are the same.
+    const restoring = useRef<{
+        startAt: string | null;
+        hadNote: boolean;
+    } | null>(null);
+    // The first pass of the "keep it" effect is this mount's: nothing has
+    // been chosen yet, and it must not write over what was kept.
+    const mounted = useRef(false);
+    useEffect(() => {
+        const kept = readBookingDraft(window.location.search);
+        if (!kept) return;
+        if (!services.some((s) => s.id === kept.serviceId)) {
+            clearBookingDraft();
+            return;
+        }
+        // What was chosen is later than the time the address names.
+        linked.current = null;
+        restoring.current = { startAt: kept.startAt, hadNote: kept.hadNote };
+        // Brought back just after this first draw, never during it: what
+        // the browser kept is not what the server drew.
+        let live = true;
+        void Promise.resolve().then(() => {
+            if (!live) return;
+            setServiceId(kept.serviceId);
+            setPerson(kept.person);
+            setSkip(kept.skip);
+            setDate(null);
+            setStart(null);
+            if (kept.where) setWhere(kept.where);
+            if (kept.pay) setPayChoice(kept.pay);
+            if (kept.phone) setPhoneNo((typed) => typed || kept.phone);
+            setDaysState({ kind: "loading", serviceId: kept.serviceId });
+            loadDays(kept.serviceId, {
+                skip: kept.skip,
+                staffId: kept.person,
+            });
+        });
+        return () => {
+            live = false;
+        };
+        // Once, as the page opens.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // The kept time, once its days are here: chosen again if it is still
+    // free, and said. Gone, the next free one is chosen (below), as when a
+    // time goes while they sign in.
+    useEffect(() => {
+        const kept = restoring.current;
+        if (!kept || daysState.kind !== "ready") return;
+        if (daysState.serviceId !== serviceId) return;
+        restoring.current = null;
+        const note = kept.hadNote ? ` ${NOTE_NOT_KEPT}` : "";
+        if (!kept.startAt) {
+            if (kept.hadNote) setNotice(NOTE_NOT_KEPT);
+            return;
+        }
+        const tz = daysState.days.timezone;
+        const found = daysState.days.days
+            .flatMap((d) => d.starts)
+            .find(
+                (s) =>
+                    s.startAt === kept.startAt &&
+                    (!isClass || (s.placesLeft ?? 0) > 0 || waitlistOn),
+            );
+        if (found) {
+            setDate(dateIn(found.startAt, tz));
+            setStart(found);
+            setNotice(
+                keptText({
+                    serviceName: service?.name ?? "",
+                    whenText: `${dateText(dateIn(found.startAt, tz), true)} at ${timeIn(found.startAt, tz)}${
+                        found.staffName ? ` with ${found.staffName}` : ""
+                    }`,
+                    hadNote: kept.hadNote,
+                }),
+            );
+            return;
+        }
+        const next = nextFreeStart(daysState.days, kept.startAt, isClass);
+        if (!next) {
+            setSubmitError(`${TIME_GONE}${note}`);
+            return;
+        }
+        setDate(dateIn(next.startAt, tz));
+        setStart(next);
+        setNotice(`${nextChosenText(next, tz)}${note}`);
+    }, [
+        daysState,
+        serviceId,
+        isClass,
+        waitlistOn,
+        service?.name,
+        setNotice,
+        setSubmitError,
+    ]);
+
+    // Keep what is chosen, as it is chosen; forget it once it is booked.
+    // Never the note: only that one was typed.
+    const hadNote = note.trim() !== "";
+    const startAtChosen = start?.startAt ?? null;
+    useEffect(() => {
+        if (!mounted.current) {
+            mounted.current = true;
+            return;
+        }
+        // A kept booking still on its way back is not written over.
+        if (restoring.current) return;
+        if (phase.kind === "done" || phase.kind === "waitlisted") {
+            clearBookingDraft();
+            return;
+        }
+        if (phase.kind !== "choose") return;
+        if (!serviceId) {
+            clearBookingDraft();
+            return;
+        }
+        writeBookingDraft({
+            search: window.location.search,
+            serviceId,
+            skip,
+            person,
+            startAt: startAtChosen,
+            where,
+            pay: payChoice,
+            phone: phoneNo.trim(),
+            hadNote,
+        });
+    }, [
+        phase.kind,
+        serviceId,
+        skip,
+        person,
+        startAtChosen,
+        where,
+        payChoice,
+        phoneNo,
+        hadNote,
+    ]);
 
     // After a time went while signing in: the next free one, chosen.
     useEffect(() => {
@@ -693,7 +894,7 @@ export default function BookingFlow({
                 return;
             }
             // A place is free now: the times are read again, so it books.
-            if (result.reason === "room") loadDays(service.id);
+            if (result.reason === "room") reloadDays(service.id);
             setSubmitError(result.message);
             return;
         }
@@ -757,6 +958,13 @@ export default function BookingFlow({
                 setNotice(CREDIT_FOUND);
                 return;
             }
+        }
+        // An account with no name yet: asked for now, and only now. The
+        // time and everything chosen stay; the next press books.
+        if (!who.name && name.trim().length < 2) {
+            setTouched(false);
+            setNotice(NAME_AFTER_SIGN_IN);
+            return;
         }
         void submit(who, true);
     };
@@ -983,7 +1191,7 @@ export default function BookingFlow({
         attemptKey.current = null;
         if (service) {
             setDaysState({ kind: "loading", serviceId: service.id });
-            loadDays(service.id);
+            reloadDays(service.id);
         }
     };
 
@@ -993,6 +1201,8 @@ export default function BookingFlow({
         setDaysState({ kind: "idle" });
         setDate(null);
         setStart(null);
+        setPerson(null);
+        setSkip(0);
         setPayChoice(null);
         setWhere("IN_PERSON");
         setNote("");
@@ -1016,6 +1226,12 @@ export default function BookingFlow({
     };
     const choosing = phase.kind === "choose";
     const facts = headerFacts(visit);
+    // How to get in touch where the page can't help further: the contact
+    // read's phone and WhatsApp, else the header's own phone.
+    const callReach: BusinessReach = {
+        phone: reach?.phone ?? facts.phone,
+        whatsapp: reach?.whatsapp ?? null,
+    };
     // Online booking paused at the plan's monthly cap (DEC-095): said up
     // front, before any choosing, never after the booker has done the work.
     const paused = page.paused === true;
@@ -1108,6 +1324,7 @@ export default function BookingFlow({
                                 Get in touch with {page.businessName} to book a
                                 time.
                             </p>
+                            <ReachLinks reach={callReach} className="mt-1" />
                         </div>
                     ) : phase.kind === "done" ? (
                         <DoneCard
@@ -1175,6 +1392,7 @@ export default function BookingFlow({
                             when={phase.when}
                             business={page.businessName}
                             checkoutPaid={phase.checkoutPaid}
+                            reach={callReach}
                             headingRef={headingRef}
                             onAgain={backToChoosing}
                         />
@@ -1203,8 +1421,27 @@ export default function BookingFlow({
                                             kind: "loading",
                                             serviceId: service.id,
                                         });
-                                        loadDays(service.id);
+                                        reloadDays(service.id);
                                     }}
+                                    person={person}
+                                    onPerson={(next) =>
+                                        showDays(service.id, {
+                                            skip,
+                                            person: next,
+                                        })
+                                    }
+                                    skip={skip}
+                                    later={laterSkip(
+                                        skip,
+                                        page.rules.bookAheadDays,
+                                    )}
+                                    onSkip={(next) =>
+                                        showDays(service.id, {
+                                            skip: next,
+                                            person,
+                                        })
+                                    }
+                                    reach={callReach}
                                     onDay={(d) => {
                                         setDate(d);
                                         pickStart(null);

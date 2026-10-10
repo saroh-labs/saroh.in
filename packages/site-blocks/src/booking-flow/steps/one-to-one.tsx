@@ -1,5 +1,12 @@
 import { cn } from "../../lib/utils";
-import type { BookingDay, BookingDays, BookingStart } from "../model";
+import type { BusinessReach } from "../../reach-links";
+import { ReachLinks } from "../../reach-links";
+import type {
+    BookingDay,
+    BookingDays,
+    BookingPerson,
+    BookingStart,
+} from "../model";
 import {
     dateText,
     dayAria,
@@ -10,10 +17,18 @@ import {
     timeIn,
 } from "../model";
 import { focusRing, quietFill } from "../styles";
+import type { Weeks } from "./weeks";
+import { THESE_WEEKS, WeeksButtons } from "./weeks";
 
 /**
- * The two weeks' day strip and the chosen day's free times — the booking
+ * The two weeks' day strip and the chosen day's free times: the booking
  * page's, and the account's Move sheet's (UX-055).
+ *
+ * Where more than one person takes the service and each has their own
+ * times, "With" offers Anyone or one of them (`people`), and the days are
+ * read again for whoever is asked for. `weeks` is which two weeks are on
+ * show, and the way to later ones. With nothing free, the page offers a
+ * call and a message (`reach`) beside those.
  */
 export function OneToOne({
     days,
@@ -25,6 +40,11 @@ export function OneToOne({
     onDay,
     onStart,
     business,
+    people = [],
+    person = null,
+    onPerson,
+    weeks = THESE_WEEKS,
+    reach = null,
 }: {
     days: BookingDays;
     day: BookingDay | null;
@@ -40,17 +60,72 @@ export function OneToOne({
     onDay: (date: string) => void;
     onStart: (start: BookingStart) => void;
     business: string;
+    /** Who takes it, each with their own times; a choice with two or more. */
+    people?: BookingPerson[];
+    /** The person asked for; null for anyone. */
+    person?: string | null;
+    onPerson?: (id: string | null) => void;
+    weeks?: Weeks;
+    /** A call and a message, offered when nothing is free. */
+    reach?: BusinessReach | null;
 }) {
     const list = days.days;
     const firstDay = list.at(0);
     const lastDay = list.at(-1);
     const count = day?.starts.length ?? 0;
     const onlyOne = staff.length === 1 ? staff[0] : null;
+    const choosesWho = people.length > 1 && onPerson !== undefined;
+    const asked = people.find((p) => p.id === person) ?? null;
+    const whoChip = (on: boolean) =>
+        cn(
+            "coarse:min-h-11 min-h-9 cursor-pointer rounded-full border px-3.5 text-sm font-semibold transition-colors duration-100 ease-out",
+            focusRing,
+            on
+                ? "border-site-fg bg-site-fg text-site-bg"
+                : "border-site-border bg-site-surface text-site-fg",
+        );
     return (
         <>
+            {choosesWho ? (
+                <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                    <span
+                        aria-hidden="true"
+                        className="text-site-fg text-[13px] font-semibold"
+                    >
+                        With
+                    </span>
+                    <div
+                        role="radiogroup"
+                        aria-label="With"
+                        className="flex flex-wrap gap-2"
+                    >
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked={asked === null}
+                            onClick={() => onPerson(null)}
+                            className={whoChip(asked === null)}
+                        >
+                            Anyone
+                        </button>
+                        {people.map((p) => (
+                            <button
+                                key={p.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={asked?.id === p.id}
+                                onClick={() => onPerson(p.id)}
+                                className={whoChip(asked?.id === p.id)}
+                            >
+                                {p.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
             <div className="mb-2 flex items-baseline gap-2">
                 <span className="text-site-fg text-[13px] font-semibold">
-                    Next two weeks
+                    {weeks.skip > 0 ? "Later dates" : "Next two weeks"}
                 </span>
                 {firstDay && lastDay ? (
                     <span className="text-site-muted text-[12.5px]">
@@ -119,10 +194,18 @@ export function OneToOne({
                 })}
             </div>
             {!day ? (
-                <p className="text-site-body mt-3 text-sm">
-                    Nothing free in the next two weeks. Get in touch with{" "}
-                    {business} and they&apos;ll fit you in.
-                </p>
+                <div className="mt-3">
+                    <p className="text-site-body text-sm">
+                        {asked
+                            ? `Nothing free with ${asked.name} in these two weeks. `
+                            : weeks.skip > 0
+                              ? "Nothing free in these two weeks. "
+                              : "Nothing free in the next two weeks. "}
+                        Get in touch with {business} and they&apos;ll fit you
+                        in.
+                    </p>
+                    <ReachLinks reach={reach} className="mt-1" />
+                </div>
             ) : (
                 <div className="border-site-border mt-[18px] border-t pt-4">
                     <div className="flex flex-wrap items-baseline gap-2">
@@ -180,12 +263,13 @@ export function OneToOne({
                     </div>
                 </div>
             )}
-            {staff.length > 1 ? (
-                <p className="text-site-muted mt-2.5 text-[12.5px]">
-                    Times are with whoever is free — you&apos;ll see who before
+            {staff.length > 1 && !asked ? (
+                <p className="text-site-body mt-2.5 text-sm">
+                    Times are with whoever is free. You&apos;ll see who before
                     you confirm.
                 </p>
             ) : null}
+            <WeeksButtons weeks={weeks} className="mt-3" />
         </>
     );
 }

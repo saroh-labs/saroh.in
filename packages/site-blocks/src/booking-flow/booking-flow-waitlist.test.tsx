@@ -280,9 +280,6 @@ describe("a full class on the booking page (A12)", () => {
             />,
         );
         await pickFullSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(confirmButton(/Continue to sign in/));
         expect(wl.join).not.toHaveBeenCalled();
         const sheet = await screen.findByRole("dialog");

@@ -1,9 +1,13 @@
 import { cn } from "../../lib/utils";
+import type { BusinessReach } from "../../reach-links";
+import { ReachLinks } from "../../reach-links";
 import type { BookingStart } from "../model";
 import { dateIn, dateText, dayParts, placesText, timeIn } from "../model";
 import { focusRing, optionClasses, quietFill } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { fullSessionText } from "../waitlist";
+import type { Weeks } from "./weeks";
+import { THESE_WEEKS, WeeksButtons } from "./weeks";
 
 export function Sessions({
     sessions,
@@ -14,6 +18,8 @@ export function Sessions({
     chosen,
     onPick,
     waitlist,
+    weeks = THESE_WEEKS,
+    reach = null,
 }: {
     sessions: BookingStart[];
     more: boolean;
@@ -28,12 +34,22 @@ export function Sessions({
      * that a place is held for them. Absent: a full session is closed.
      */
     waitlist?: { placeOf: (startAt: string) => WaitlistPlace | undefined };
+    /** Which two weeks are on show, and the way to later ones. */
+    weeks?: Weeks;
+    /** A call and a message, offered when there is no class to book. */
+    reach?: BusinessReach | null;
 }) {
     if (sessions.length === 0) {
         return (
-            <p className="text-site-body text-sm">
-                No classes in the next two weeks.
-            </p>
+            <div>
+                <p className="text-site-body text-sm">
+                    {weeks.skip > 0
+                        ? "No classes in these two weeks."
+                        : "No classes in the next two weeks."}
+                </p>
+                <ReachLinks reach={reach} className="mt-1" />
+                <WeeksButtons weeks={weeks} className="mt-2" />
+            </div>
         );
     }
     return (
@@ -119,7 +135,9 @@ export function Sessions({
                 >
                     Show more classes
                 </button>
-            ) : null}
+            ) : (
+                <WeeksButtons weeks={weeks} className="mt-1" />
+            )}
         </div>
     );
 }

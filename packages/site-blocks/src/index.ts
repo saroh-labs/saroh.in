@@ -157,6 +157,8 @@ export { formatAmount } from "./lib/money";
 export { phoneText } from "./lib/phone";
 export { shopFactsLine } from "./lib/shop-facts";
 export type { ShopFactsInput } from "./lib/shop-facts";
+export { NO_REACH, ReachLinks, hasReach, reachOf } from "./reach-links";
+export type { BusinessReach } from "./reach-links";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.

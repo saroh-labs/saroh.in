@@ -392,9 +392,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         // Signed out, no credit is offered: paying is the only way.
         expect(
             screen.queryByRole("radio", { name: /Use 1 credit/ }),
@@ -444,9 +441,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
         );
@@ -488,9 +482,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
