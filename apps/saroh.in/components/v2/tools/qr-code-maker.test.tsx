@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { tooLightToScan } from "@saroh/ui/lib/qr-art";
 import {
     cleanup,
     fireEvent,
@@ -10,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 import type { QrUnlockResult } from "@/lib/qr-code-maker";
+import { QR_SWATCHES } from "@/lib/qr-code-maker";
 
 const files = vi.hoisted(() => ({
     saveFile: vi.fn(),
@@ -164,14 +166,10 @@ describe("the colour", () => {
         expect(screen.queryByRole("alert")).toBeNull();
     });
 
-    it("warns that a colour is too light to scan, until a darker one is picked", () => {
-        render(<QrCodeMaker />);
-        fireEvent.click(screen.getByRole("button", { name: "Saffron" }));
-        expect(screen.getByRole("alert").textContent).toBe(
-            "Too light to scan reliably. Pick a darker colour.",
-        );
-        fireEvent.click(screen.getByRole("button", { name: "Green" }));
-        expect(screen.queryByRole("alert")).toBeNull();
+    it("offers only colours that scan", () => {
+        for (const swatch of QR_SWATCHES) {
+            expect(tooLightToScan(swatch.hex), swatch.name).toBe(false);
+        }
     });
 });
 
@@ -382,9 +380,5 @@ describe("the downloads", () => {
 
         type(linkField(), "shop.example.com");
         expect(png.getAttribute("aria-disabled")).toBeNull();
-        fireEvent.click(screen.getByRole("button", { name: "Saffron" }));
-        expect(screen.getByText(copy.downloads.needColour)).toBeTruthy();
-        fireEvent.click(png);
-        expect(files.svgToPng).not.toHaveBeenCalled();
     });
 });

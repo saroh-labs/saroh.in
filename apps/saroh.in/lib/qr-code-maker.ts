@@ -10,15 +10,17 @@ import { SITE_URL } from "@/lib/seo";
 /**
  * The code colours the design offers, in its order. These are the code's
  * own ink, drawn into the SVG and the downloaded files, not page styling,
- * which is why they are hex values and not tokens. The last is too light
- * to scan on white and shows the page's warning, as the design draws it.
+ * which is why they are hex values and not tokens. Every one must scan:
+ * the design's fifth, Saffron (#F0A92B), is too light on white, so Amber
+ * stands in for it (owner, 10 Oct: where the design and working pull
+ * apart, working wins). A test holds the list to the scan rule.
  */
 export const QR_SWATCHES = [
     { hex: "#1C1C1A", name: "Ink" },
     { hex: "#5C2A48", name: "Plum" },
     { hex: "#1F4D3A", name: "Green" },
     { hex: "#1E3A5F", name: "Navy" },
-    { hex: "#F0A92B", name: "Saffron" },
+    { hex: "#91550C", name: "Amber" },
 ] as const;
 
 export const QR_DEFAULT_COLOUR = QR_SWATCHES[0].hex;

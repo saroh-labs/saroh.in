@@ -89,13 +89,15 @@ test.describe("QR code maker", () => {
         );
     });
 
-    test("says when a colour is too light to scan", async ({ page }) => {
-        await page.getByRole("button", { name: "Saffron" }).click();
-        await expect(page.locator("main").getByRole("alert")).toHaveText(
-            "Too light to scan reliably. Pick a darker colour.",
-        );
-        await page.getByRole("button", { name: "Navy" }).click();
-        await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+    test("every colour on offer draws the code with no warning", async ({
+        page,
+    }) => {
+        for (const name of ["Plum", "Green", "Navy", "Amber", "Ink"]) {
+            await page.getByRole("button", { name }).click();
+            await expect(page.locator("main").getByRole("alert")).toHaveCount(
+                0,
+            );
+        }
     });
 
     test("refuses an incomplete email, then unlocks the downloads with a real one", async ({

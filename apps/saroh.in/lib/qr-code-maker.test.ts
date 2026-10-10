@@ -66,21 +66,15 @@ describe("logoProblem", () => {
 });
 
 describe("the swatches", () => {
-    it("are the design's five, and only the last is too light to scan", () => {
+    it("are five, the design's four darks and Amber, and every one scans", () => {
         expect(QR_SWATCHES.map((s) => s.hex)).toEqual([
             "#1C1C1A",
             "#5C2A48",
             "#1F4D3A",
             "#1E3A5F",
-            "#F0A92B",
+            "#91550C",
         ]);
-        expect(QR_SWATCHES.map((s) => tooLightToScan(s.hex))).toEqual([
-            false,
-            false,
-            false,
-            false,
-            true,
-        ]);
+        expect(QR_SWATCHES.every((s) => !tooLightToScan(s.hex))).toBe(true);
     });
 });
 
