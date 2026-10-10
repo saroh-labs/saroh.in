@@ -82,6 +82,43 @@ describe("ListSearch", () => {
         expect(onKeyDown).toHaveBeenCalled();
     });
 
+    it("follows the address when it changes from outside, but never over typing", () => {
+        const { rerender } = render(
+            <ListSearch
+                placeholder="Search orders"
+                defaultValue="tea"
+                onSearch={noop}
+            />,
+        );
+        rerender(
+            <ListSearch
+                placeholder="Search orders"
+                defaultValue=""
+                onSearch={noop}
+            />,
+        );
+        expect(field()).toHaveValue("");
+
+        field().focus();
+        fireEvent.change(field(), { target: { value: "cof" } });
+        rerender(
+            <ListSearch
+                placeholder="Search orders"
+                defaultValue="co"
+                onSearch={noop}
+            />,
+        );
+        expect(field()).toHaveValue("cof");
+    });
+
+    it("trims the term it hands over", () => {
+        const onSearch = vi.fn();
+        render(<ListSearch placeholder="Search orders" onSearch={onSearch} />);
+        fireEvent.change(field(), { target: { value: "  tea " } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(onSearch).toHaveBeenLastCalledWith("tea");
+    });
+
     it('"/" focuses it from anywhere but another field', () => {
         render(
             <>
@@ -145,6 +182,9 @@ describe("ListSearch", () => {
                 onSearch={noop}
             />,
         );
+        // Nothing typed: the list is being read for another reason.
+        expect(screen.queryByRole("status")).toBeNull();
+        fireEvent.change(field(), { target: { value: "tea" } });
         expect(screen.getByRole("status")).toHaveTextContent("Searching…");
     });
 

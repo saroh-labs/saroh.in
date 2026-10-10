@@ -349,6 +349,7 @@ export function CatalogueScreen({
                             go={go}
                             storefronts={data.storefronts}
                             choices={choices}
+                            searching={navigating}
                         />
                     }
                     countLabel={() => countLabel}

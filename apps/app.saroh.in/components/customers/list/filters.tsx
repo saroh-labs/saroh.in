@@ -1,8 +1,6 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
-import { Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ListSearch } from "@saroh/ui/list-search";
 
 import { chipClass } from "@/components/shared/chip";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -27,33 +25,15 @@ export function Filters({
     query,
     page,
     go,
+    searching = false,
 }: {
+    /** The list is being read again. */
+    searching?: boolean;
     query: ListQuery;
     page: CustomersPage;
     /** Replace the address with `patch` applied. */
     go: (patch: Partial<ListQuery>) => void;
 }) {
-    const [text, setText] = useState(query.q);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const field = useRef<HTMLInputElement | null>(null);
-    // The address changed elsewhere (Clear search and filters, Back): say
-    // so — but never over what someone is still typing.
-    useEffect(() => {
-        if (document.activeElement !== field.current) setText(query.q);
-    }, [query.q]);
-    useEffect(
-        () => () => {
-            if (timer.current) clearTimeout(timer.current);
-        },
-        [],
-    );
-
-    function search(next: string) {
-        setText(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => go({ q: next.trim() }), 300);
-    }
-
     const storefronts = page.storefronts ?? [];
     const sorts = sortsFor(page);
     const chips = chipsFor(page);
@@ -61,27 +41,15 @@ export function Filters({
     return (
         <>
             <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                <div className="relative min-w-0 flex-[1_1_260px] sm:max-w-[420px]">
-                    <Search
-                        aria-hidden
-                        className="pointer-events-none absolute left-[11px] top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                        ref={field}
-                        type="search"
-                        value={text}
-                        onChange={(e) => search(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Escape" && text) {
-                                e.preventDefault();
-                                search("");
-                            }
-                        }}
-                        placeholder="Search by name, phone or email"
-                        aria-label="Search by name, phone or email"
-                        className="h-[34px] rounded-[9px] pl-8 text-[13px] coarse:h-11"
-                    />
-                </div>
+                <ListSearch
+                    placeholder="Search customers by name, phone or email"
+                    defaultValue={query.q}
+                    searching={searching}
+                    onSearch={(q) => {
+                        if (q !== query.q) go({ q });
+                    }}
+                    className="sm:max-w-[420px]"
+                />
                 {storefronts.length > 1 ? (
                     <OptionSelect
                         aria-label="Location"

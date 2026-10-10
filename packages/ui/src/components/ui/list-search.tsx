@@ -20,7 +20,11 @@ export interface ListSearchProps {
     placeholder: string;
     /** Called with the term once typing has paused, or at once on clear. */
     onSearch: (term: string) => void;
-    /** The term the list is showing now (from the address, say). */
+    /**
+     * The term the list is showing now (from the address, say). The field
+     * starts on it, and follows it when it changes from outside (Clear
+     * search, the back button), but never over what someone is typing.
+     */
     defaultValue?: string;
     /** True while the list is being read for the term: says "Searching…". */
     searching?: boolean;
@@ -70,8 +74,20 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
         forwarded,
     ) {
         const [text, setText] = React.useState(defaultValue);
-        const settle = useDebouncedCallback(onSearch, SEARCH_DEBOUNCE_MS);
+        const settle = useDebouncedCallback(
+            // Spaces at either end are never part of the term.
+            (term: string) => onSearch(term.trim()),
+            SEARCH_DEBOUNCE_MS,
+        );
         const input = React.useRef<HTMLInputElement | null>(null);
+
+        React.useEffect(() => {
+            if (document.activeElement !== input.current) {
+                // The address moved under a field nobody is typing in.
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setText(defaultValue);
+            }
+        }, [defaultValue]);
 
         React.useEffect(() => {
             if (!shortcut) return;
@@ -136,7 +152,7 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
                     // 16px under a thumb: iOS zooms the page on a smaller field.
                     className="flex h-[38px] w-full rounded-md border border-input bg-field py-2 pl-[34px] pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11 coarse:text-base [&::-webkit-search-cancel-button]:appearance-none"
                 />
-                {searching ? (
+                {searching && text !== "" ? (
                     <span
                         role="status"
                         className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 bg-field pl-2 text-xs text-muted-foreground"
