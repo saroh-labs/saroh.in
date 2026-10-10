@@ -222,7 +222,8 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(sendWelcomeEmail).toHaveBeenCalledWith("asha@example.com", {
                 businessName: "Acme",
                 goal: "WEBSITE",
-                openUrl: "https://app.saroh.in/open/org_1",
+                // The app's own address differs by environment.
+                openUrl: expect.stringMatching(/\/open\/org_1$/) as string,
                 address: "acme",
             });
         });
