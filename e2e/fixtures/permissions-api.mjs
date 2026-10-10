@@ -329,6 +329,10 @@ createServer((req, res) => {
                 name: "Permission tests",
                 slug: "permissions",
                 role: scenario === "REVIEWER" ? "REVIEWER" : "MEMBER",
+                // The API always sends the stored role's key. A denial names
+                // a built-in only when the key says it is one
+                // (`knownRoleName`); a made role's entry below overrides it.
+                roleKey: scenario === "REVIEWER" ? "REVIEWER" : "MEMBER",
                 ...(PRODUCT_ROLES[scenario] ??
                     (scenario === "REVIEWER" ? {} : MEMBER_DEFAULT)),
             },

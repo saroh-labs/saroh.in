@@ -373,7 +373,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await page.goto("/billing/subscriptions?tab=plans");
         await expect(
             page.getByRole("heading", {
-                name: /You do not have access to Payments|You can't open subscriptions|Only owners and admins see payments/,
+                name: /You can't open (Payments|Subscriptions)/,
             }),
         ).toBeVisible();
         await expect(page.getByRole("tab", { name: /^Plans/ })).toHaveCount(0);
@@ -387,7 +387,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await page.goto("/billing/plans/any-plan");
         await expect(
             page.getByRole("heading", {
-                name: /You do not have access to Payments|You can't open this plan|Only owners and admins see payments/,
+                name: /You can't open (Payments|Plans)/,
             }),
         ).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("₹");

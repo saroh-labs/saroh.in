@@ -93,6 +93,31 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
     - Required page reads must let `forbidden()` propagate. A catch that returns
       `null` swallows the interrupt and hides failures as missing data. Optional
       navigation reads may deliberately fall back without blocking the page.
+- **Current** (10 Oct 2026) — **One sentence for a denial, and it is asked
+  before the form.**
+    - The words are `whoCanChange()` (`lib/access/who-can-change.ts`,
+      re-exported beside `AccessDenied` and `ReadOnlyNote`): "You can't open
+      {thing}", "Your role in {business} is {role}. It doesn't include
+      {thing}.", "An owner or admin can change this in Settings › Team."
+      (owner-only: "Only the owner can change this."). `thing` is the menu's
+      name (Sell, Contacts), never the registry's. No screen words its own,
+      and none says "organization", how the person got there, an em dash or a
+      semicolon. `who-can-change.test.ts` scans for the old wordings.
+    - Every `new`, `edit` and `import` page under `app/(shell)` starts with
+      `requireCan(action, { thing })` (`lib/access/require-can.tsx`), with the
+      permission the API asks of the save. It denies only when the API said
+      what the person may do and it isn't there; unknown opens and the API
+      decides. A page the person may read but not change is drawn to read
+      (no inputs, no action buttons, `ReadOnlyNote` on top).
+      `guarded-pages.test.tsx` fails a new such page with no guard.
+    - A denial is `PermissionDeniedState`: never a hand-drawn dashed card
+      (that is "nothing here yet"), never `FailedState` (nothing broke).
+    - A write the API refused by role arrives with `details.code`
+      `ROLE_DENIED` and the permission. `toFailure` and `readError` say it
+      in `lib/api/role-denied.ts`'s words and mark the result `denied`;
+      `reportFailure` shows a denied result with `showInfo`, not the red
+      error. Gap: most screens still call `showError(res.error)` directly,
+      so they show the readable sentence in the error style.
 - **Current** — **Calm, recoverable copy**: it is usually temporary, and **Try
   again** calls `reset`. In accounts it never hints at whether an account or a
   password was right.

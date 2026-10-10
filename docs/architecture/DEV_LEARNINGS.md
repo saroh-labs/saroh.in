@@ -3821,3 +3821,27 @@ middleware's matcher and answered per host.
 `public/favicon.ico`; `app/[domain]/layout.test.ts` and
 `favicon.ico/route.test.ts` pin the three cases.
 **Category**: merchant sites · `apps/saroh.app/lib/site-icon.ts`
+
+## People met buttons they couldn't use, and refusals in a developer's words
+
+**Symptom**: a UX audit that walked every role (10 Oct 2026) found a Member
+with live Move, Cancel and outcome buttons on every booking, a Reviewer in the
+post editor with Save and Publish, create and edit pages that opened for
+anyone who typed the address and refused on Save, and refusals reaching the
+screen as `Role "MEMBER" may not perform "store:create"`.
+**Cause**: three habits. A page drew its write controls without asking the
+permission the API asks of the write, because the API refuses anyway.
+`authorize()` threw a sentence written for a developer, and the exception
+filter keeps a 4xx's message. And each screen worded its own denial, 28 ways.
+**Fix**: `requireCan(action, { thing })` (`lib/access/require-can.tsx`) is the
+first line of every `new`, `edit` and `import` page, and a page a role may
+read but not change is drawn to read. `authorize()` throws a readable 403 with
+`details: { code: "ROLE_DENIED", action }`, which the app says in
+`lib/api/role-denied.ts`'s words. Every denial reads `whoCanChange()`.
+**Check**: `lib/access/guarded-pages.test.tsx` fails a new create, edit or
+import page with no guard; `lib/access/who-can-change.test.ts` scans for the
+old wordings; `components/shared/quick-actions.test.ts` fails a command menu
+row that names no permission; `organization-policy.spec.ts` pins the refusal's
+shape.
+**Category**: access · `docs/patterns/frontend-error-feedback.md`,
+`docs/patterns/backend-auth-and-access.md`

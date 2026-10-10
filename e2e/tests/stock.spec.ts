@@ -242,7 +242,8 @@ test.describe("Stock screen", () => {
         await page.goto("/commerce/stock");
         await expect(
             page.getByRole("heading", {
-                name: "You do not have access to Commerce",
+                // The menu's name for it, never the registry's "Commerce".
+                name: "You can't open Sell",
             }),
         ).toBeVisible();
         await expect(

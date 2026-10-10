@@ -32,7 +32,7 @@ test("a stock-only role saves Stock, and nothing else", async ({
 
     await expect(
         page.getByText(
-            "You're viewing as Packer. You can read this product but not change it — an owner or admin can change your role in Team. Only the Stock section below can be changed.",
+            "You're viewing as Packer. You can read this product but not change it. An owner or admin can change this in Settings › Team. Only the Stock section below can be changed.",
         ),
     ).toBeVisible();
 
@@ -137,17 +137,17 @@ test("a role that can't see products is told so", async ({ page, context }) => {
     await page.goto(EDIT);
     await expect(
         page.getByRole("heading", {
-            name: "You can't open this product",
+            name: "You can't open Products",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "You're signed in as Front desk in Permission tests. That role doesn't include seeing products. An owner or admin can give you access in Team.",
+            "Your role in Permission tests is Front desk. It doesn't include Products.",
         ),
     ).toBeVisible();
     await expect(
-        page.getByRole("link", { name: "Go to Home", exact: true }),
+        page.getByRole("link", { name: "Back to Home", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
         0,
