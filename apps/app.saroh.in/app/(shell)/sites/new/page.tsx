@@ -87,7 +87,15 @@ export default async function NewSitePage({
         const name = existing.name.trim() || "Untitled site";
         return (
             <PageContainer width="form">
-                <PageHeader title="Create a site" />
+                <PageHeader
+                    breadcrumb={[
+                        <Link key="site" href="/sites">
+                            Website
+                        </Link>,
+                        "Create a site",
+                    ]}
+                    title="Create a site"
+                />
                 <EmptyState
                     icon={<Globe />}
                     title={`${name} is this business's website`}
@@ -117,6 +125,12 @@ export default async function NewSitePage({
     return (
         <PageContainer width="form">
             <PageHeader
+                breadcrumb={[
+                    <Link key="site" href="/sites">
+                        Website
+                    </Link>,
+                    "Create a site",
+                ]}
                 title="Create a site"
                 description="Name your new site, check its web address and pick a template."
             />

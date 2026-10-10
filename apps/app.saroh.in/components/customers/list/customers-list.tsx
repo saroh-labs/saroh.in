@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Plus, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useTransition } from "react";
@@ -75,16 +75,16 @@ export function CustomersList({
                 </Button>
             ) : null}
             <Button asChild>
-                <Link href={newCustomerHref()}>
-                    <Plus className="mr-1.5 size-4" />
-                    Add customer
-                </Link>
+                <Link href={newCustomerHref()}>New customer</Link>
             </Button>
         </>
     );
 
     const heading = (
-        <ListHeading count={customersText(page.everyone)} actions={actions} />
+        <ListHeading
+            count={page.everyone > 0 ? customersText(page.everyone) : null}
+            actions={actions}
+        />
     );
     const notice = (
         <UnlinkedNotice
@@ -98,7 +98,7 @@ export function CustomersList({
     // yet" is true. Unlinked paying customers still get their notice.
     if (page.everyone === 0 && !isNarrowed(query)) {
         return (
-            <div className="max-w-[1100px]">
+            <div>
                 {heading}
                 {notice}
                 <ListFirstRun
@@ -111,7 +111,7 @@ export function CustomersList({
 
     const pages = pageCount(page);
     return (
-        <div className="max-w-[1100px]">
+        <div>
             {heading}
             <Filters query={query} page={page} go={go} />
             {notice}

@@ -1,9 +1,11 @@
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
-import { PackCrumbs } from "./pack-crumbs";
+import { packCrumbs } from "./pack-crumbs";
 
 export type PackEditorStateKind =
     "missing" | "failed" | "forbidden" | "readOnly" | "archived";
@@ -30,16 +32,19 @@ export function PackEditorState({
     here?: string | null;
 }) {
     return (
-        <main className="w-full">
-            <PackCrumbs here={here} />
+        <PageContainer width="full">
+            <PageHeader
+                breadcrumb={packCrumbs(here)}
+                title={here ?? "Class pack"}
+            />
             {state === "missing" || state === "archived" ? (
-                <div className="px-6 py-10 max-[759px]:px-4">
+                <div>
                     <div className="max-w-[480px] rounded-[12px] border border-dashed border-border-strong px-5 py-8 text-center">
-                        <h1 className="m-0 text-[15px] font-semibold">
+                        <h2 className="m-0 text-[15px] font-semibold">
                             {state === "missing"
                                 ? "That pack isn't here"
                                 : "This pack is archived"}
-                        </h1>
+                        </h2>
                         {state === "archived" ? (
                             <p className="mx-auto mt-1.5 max-w-[46ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
                                 Nobody can buy it, and everyone holding one
@@ -56,7 +61,7 @@ export function PackEditorState({
                     </div>
                 </div>
             ) : (
-                <div className="px-[22px] py-[60px] max-[759px]:px-4">
+                <div>
                     {state === "failed" ? (
                         <FailedState
                             title="Couldn't load this pack"
@@ -102,6 +107,6 @@ export function PackEditorState({
                     )}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

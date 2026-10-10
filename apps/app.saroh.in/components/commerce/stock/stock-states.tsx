@@ -1,8 +1,8 @@
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { PageHeader } from "@saroh/ui/page-header";
 
-import { StockHeader } from "./stock-header";
 import { TurnOnTracking } from "./turn-on-tracking";
 
 /**
@@ -37,7 +37,7 @@ export function StockTrackingOff({
 }) {
     return (
         <PageContainer width="full">
-            <StockHeader subline={null} />
+            <PageHeader breadcrumb={["Sell", "Stock"]} title="Stock" />
             <div className="px-0 py-10 sm:py-[60px]">
                 <div className="mx-auto flex max-w-[560px] flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-9 text-center">
                     <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em]">

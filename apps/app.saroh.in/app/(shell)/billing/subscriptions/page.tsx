@@ -99,7 +99,7 @@ export default async function SubscriptionsPage({
         : null;
 
     return (
-        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
+        <PageContainer width="full">
             <SubscriptionsScreen
                 subscriptions={subscriptions}
                 truncated={truncated}

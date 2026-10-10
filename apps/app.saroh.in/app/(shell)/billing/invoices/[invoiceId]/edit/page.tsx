@@ -1,6 +1,7 @@
+import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { PageContainer } from "@/components/shared/page-container";
 import { requireCan } from "@/lib/access/require-can";
@@ -49,13 +50,18 @@ export default async function EditInvoicePage({
     return (
         <PageContainer width="full">
             <div>
-                <InvoiceCrumbs current="Draft" />
-                <h1 className="mb-1 font-display text-[28px] font-semibold tracking-[-0.02em]">
-                    Edit the draft
-                </h1>
-                <p className="mb-4 text-[12.5px] text-muted-foreground">
-                    It has no number yet, so everything on it can still change.
-                </p>
+                <PageHeader
+                    className="mb-4"
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="list" href="/billing/invoices">
+                            Invoices
+                        </Link>,
+                        "Draft",
+                    ]}
+                    title="Edit the draft"
+                    description="It has no number yet, so everything on it can still change."
+                />
                 <InvoiceForm
                     contacts={contacts}
                     defaultCurrency={invoice.currency}

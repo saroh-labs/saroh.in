@@ -1,6 +1,5 @@
-import { SettingsSkeleton } from "@/components/settings/settings-skeleton";
+import { SettingsLoading } from "@/components/settings/settings-loading";
 
-/** Settings → Team while it loads: the roster's shape, in the panel (F12). */
 export default function Loading() {
-    return <SettingsSkeleton variant="team" />;
+    return <SettingsLoading title="Team" width="full" rows={5} />;
 }

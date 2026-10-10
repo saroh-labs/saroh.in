@@ -1,4 +1,4 @@
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { ContactsView } from "@/components/contacts/contacts-view";
@@ -36,12 +36,15 @@ export default async function ContactsPage({
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     return (
-        // Wider than the old `max-w-7xl`: this is a table now, and a dashboard
-        // that reserves a third of a monitor for margin is wasting the density
-        // the merchant came for.
-        <PageContainer width="wide">
+        // A list takes the whole work area, as every list does.
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Contacts"]}
                 title="Contacts"
+                count={countLabel(contacts.length, {
+                    one: "contact",
+                    other: "contacts",
+                })}
                 description="Everyone who has enquired, booked or bought — and anyone you add."
                 actions={canAdd ? <AddContactDialog /> : undefined}
             />

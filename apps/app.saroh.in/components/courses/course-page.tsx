@@ -124,6 +124,7 @@ export function CoursePage({
             <PageHeader
                 className="mb-0"
                 breadcrumb={[
+                    "Bookings",
                     <Link
                         key="courses"
                         href="/courses"

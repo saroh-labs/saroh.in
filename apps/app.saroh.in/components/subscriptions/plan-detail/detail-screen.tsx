@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,14 +35,11 @@ import type {
 } from "@/lib/subscriptions/service";
 import { payRows } from "@/lib/subscriptions/view";
 
-import { PaymentsCrumbs } from "../payments-crumbs";
 import { Pill } from "../pill";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
 import { PlanAutopayTiming } from "./plan-autopay-timing";
 import { PlanSubscribers } from "./subscribers";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 
 /**
  * Payments → Plans → one plan (D4), after "Saroh Plan Detail": the header
@@ -181,61 +179,64 @@ export function PlanDetail({
 
     return (
         <>
-            <PaymentsCrumbs
-                here={plan.name}
-                trail={[{ href: PLANS_HREF, label: "Plans" }]}
-            />
-            <div className="flex flex-wrap items-start gap-3 px-6 pt-[18px]">
-                <div className="min-w-0 flex-[1_1_300px]">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <h1 className="font-display text-[26px] font-semibold tracking-[-0.03em]">
-                            {plan.name}
-                        </h1>
-                        <Pill tone={head.state.tone}>{head.state.label}</Pill>
-                        {head.unpublished ? (
-                            <Pill tone="accent">Unpublished changes</Pill>
-                        ) : null}
-                    </div>
-                    <p className="mt-1 text-[13.5px] text-foreground/75">
-                        {head.subline}
-                    </p>
-                </div>
-                {canWrite ? (
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            variant="outline"
-                            className={cn(BTN, "coarse:h-11")}
-                            disabled={busy}
-                            onClick={archive}
-                        >
-                            {head.archiveLabel}
-                        </Button>
-                        {subscribeTo ? (
-                            // From the plan itself (UX-080): the dialog,
-                            // opened on this plan.
-                            <Button
-                                asChild
-                                variant="outline"
-                                className={cn(BTN, "coarse:h-11")}
-                            >
-                                <Link href={subscribeTo}>
-                                    Subscribe someone
-                                </Link>
-                            </Button>
-                        ) : null}
-                        <Button asChild className={cn(BTN, "coarse:h-11")}>
-                            <Link href={editHref(plan.id)}>Edit plan</Link>
-                        </Button>
-                    </div>
-                ) : null}
+            <div className="px-4 pt-5 sm:px-[26px]">
+                <PageHeader
+                    className="mb-0"
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="plans" href={PLANS_HREF}>
+                            Plans
+                        </Link>,
+                        plan.name,
+                    ]}
+                    title={plan.name}
+                    badge={
+                        <>
+                            <Pill tone={head.state.tone}>
+                                {head.state.label}
+                            </Pill>
+                            {head.unpublished ? (
+                                <Pill tone="accent">Unpublished changes</Pill>
+                            ) : null}
+                        </>
+                    }
+                    description={head.subline}
+                    actions={
+                        canWrite ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={archive}
+                                >
+                                    {head.archiveLabel}
+                                </Button>
+                                {subscribeTo ? (
+                                    // From the plan itself (UX-080): the
+                                    // dialog, opened on this plan.
+                                    <Button asChild variant="outline">
+                                        <Link href={subscribeTo}>
+                                            Subscribe someone
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                <Button asChild>
+                                    <Link href={editHref(plan.id)}>
+                                        Edit plan
+                                    </Link>
+                                </Button>
+                            </>
+                        ) : undefined
+                    }
+                />
             </div>
             {head.banner ? (
-                <p className="mx-6 mt-3 rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground">
+                <p className="mx-4 mt-3 rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground sm:mx-[26px]">
                     {head.banner}
                 </p>
             ) : null}
             {!canWrite ? (
-                <ReadOnlyNote className="mx-6 mb-0 mt-3">
+                <ReadOnlyNote className="mx-4 mb-0 mt-3 sm:mx-[26px]">
                     Your role can see this plan but not change it.
                 </ReadOnlyNote>
             ) : null}
@@ -245,7 +246,7 @@ export function PlanDetail({
                 role="tablist"
                 aria-label="Plan"
                 onKeyDown={keys}
-                className="flex flex-wrap gap-0.5 border-b border-border px-6 pt-3.5"
+                className="flex flex-wrap gap-0.5 border-b border-border px-4 pt-3.5 sm:px-[26px]"
             >
                 {TABS.map((t) => {
                     const on = t.key === tab;
@@ -276,7 +277,7 @@ export function PlanDetail({
                 id="plan-panel"
                 role="tabpanel"
                 aria-labelledby={`plan-tab-${tab}`}
-                className="px-6 pb-7 pt-[18px]"
+                className="px-4 pb-7 pt-[18px] sm:px-[26px]"
             >
                 {tab === "overview" ? (
                     <PlanOverview

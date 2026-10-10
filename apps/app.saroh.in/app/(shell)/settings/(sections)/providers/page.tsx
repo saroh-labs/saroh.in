@@ -107,7 +107,6 @@ export default async function ProvidersSettingsPage() {
 
     return (
         <SettingsPanel
-            width="default"
             header={
                 <SettingsPanelHeader
                     title="Providers"

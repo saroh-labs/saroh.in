@@ -1,11 +1,23 @@
-import { ServiceEditorSkeleton } from "@/components/services/service-editor/editor-skeleton";
+import Link from "next/link";
 
-/**
- * Segment loading state. Without a `loading.tsx` this route has no Suspense
- * boundary, so the App Router holds the PREVIOUS page on screen until the
- * server render resolves — the click registers and nothing moves. The shape
- * is the Service Editor's, so nothing jumps when it lands.
- */
+import { PageLoading } from "@/components/shared/page-loading";
+
 export default function Loading() {
-    return <ServiceEditorSkeleton />;
+    return (
+        <PageLoading
+            shape="editor"
+            width="full"
+            breadcrumb={[
+                <Link key="0" href="/bookings">
+                    Bookings
+                </Link>,
+                <Link key="1" href="/services">
+                    Services
+                </Link>,
+                "New service",
+            ]}
+            title="New service"
+            label="Loading the service editor"
+        />
+    );
 }

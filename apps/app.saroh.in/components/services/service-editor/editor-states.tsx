@@ -1,5 +1,7 @@
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
@@ -21,33 +23,24 @@ export function ServiceEditorState({
     retryHref: string;
 }) {
     return (
-        <main className="w-full">
-            <nav
-                aria-label="Breadcrumb"
-                className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px] text-[12px]"
-            >
-                <Link
-                    href="/bookings"
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    Bookings
-                </Link>
-                <span aria-hidden className="text-muted-foreground">
-                    ›
-                </span>
-                <Link
-                    href="/services"
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    Services
-                </Link>
-            </nav>
+        <PageContainer width="full">
+            <PageHeader
+                breadcrumb={[
+                    <Link key="bookings" href="/bookings">
+                        Bookings
+                    </Link>,
+                    <Link key="services" href="/services">
+                        Services
+                    </Link>,
+                ]}
+                title="Service"
+            />
             {state === "missing" ? (
-                <div className="px-6 py-10 max-[759px]:px-4">
+                <div>
                     <div className="max-w-[480px] rounded-[12px] border border-border bg-card px-[18px] py-4">
-                        <h1 className="mb-2.5 font-display text-[16px] font-semibold tracking-[-0.01em]">
+                        <h2 className="mb-2.5 font-display text-[16px] font-semibold tracking-[-0.01em]">
                             That service isn&apos;t here
-                        </h1>
+                        </h2>
                         <Link
                             href="/services"
                             className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
@@ -57,7 +50,7 @@ export function ServiceEditorState({
                     </div>
                 </div>
             ) : (
-                <div className="px-[22px] py-[60px] max-[759px]:px-4">
+                <div>
                     {state === "failed" ? (
                         <FailedState
                             title="Couldn't load this service"
@@ -99,6 +92,6 @@ export function ServiceEditorState({
                     )}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

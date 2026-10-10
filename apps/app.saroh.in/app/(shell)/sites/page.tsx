@@ -68,7 +68,11 @@ export default async function SitesPage() {
     return (
         <PageContainer width="full">
             <div className="flex flex-col gap-6">
-                <PageHeader title="Website" className="mb-0" />
+                <PageHeader
+                    breadcrumb={["Website"]}
+                    title="Website"
+                    className="mb-0"
+                />
                 <EmptyState
                     icon={<Globe />}
                     title={nothingHere.title}

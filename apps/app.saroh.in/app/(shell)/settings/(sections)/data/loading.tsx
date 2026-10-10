@@ -1,6 +1,5 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import { SettingsLoading } from "@/components/settings/settings-loading";
 
-/** Loading skeleton for Settings → Your data: a card and a short list. */
 export default function Loading() {
-    return <ListSkeleton rows={3} />;
+    return <SettingsLoading title="Your data" rows={3} />;
 }

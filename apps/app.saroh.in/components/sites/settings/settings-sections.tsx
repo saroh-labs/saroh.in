@@ -4,6 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { SettingsColumns } from "@/components/shared/settings-columns";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SettingsSheet } from "@/lib/sites/settings-edit";
 import {
@@ -16,7 +17,11 @@ import type {
     ShareStep,
     ShareStepKey,
 } from "@/lib/sites/settings-page";
-import { groupOfStep, SETTINGS_TAB_PARAM } from "@/lib/sites/settings-page";
+import {
+    groupOfStep,
+    readinessCount,
+    SETTINGS_TAB_PARAM,
+} from "@/lib/sites/settings-page";
 
 import { ShareChecklist } from "./share-checklist";
 
@@ -154,8 +159,22 @@ export function SettingsSections({
         document.getElementById(`settings-tab-${ids[next]}`)?.focus();
     };
 
+    // The rows' measure and where the checklist sits are the one layout
+    // Sell › Location and Settings › Business use. Once everything is
+    // set the checklist is a line, which stays above the rows.
+    const count = readinessCount(steps);
+    const allSet = live && count.done === count.of;
+    const checklist = (
+        <ShareChecklist
+            steps={steps}
+            live={live}
+            canEdit={canEdit}
+            onJump={jump}
+        />
+    );
+
     return (
-        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1040px)]">
+        <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1fr)]">
             <div
                 role="tablist"
                 aria-label="Settings sections"
@@ -188,52 +207,52 @@ export function SettingsSections({
                 })}
             </div>
 
-            <div className="min-w-0 space-y-6">
-                <ShareChecklist
-                    steps={steps}
-                    live={live}
-                    canEdit={canEdit}
-                    onJump={jump}
-                />
-
-                {/* Below 1024px: the same choice, as a select. */}
-                <div className="flex items-center gap-3 lg:hidden">
-                    <label
-                        htmlFor={selectId}
-                        className="shrink-0 text-sm font-medium text-muted-foreground"
-                    >
-                        Section
-                    </label>
-                    <OptionSelect
-                        id={selectId}
-                        value={open}
-                        onValueChange={setOpen}
-                        options={groups.map((g) => ({
-                            value: g.id,
-                            label: g.label,
-                        }))}
-                        className="w-full max-w-xs"
-                    />
-                </div>
-
-                <div>
-                    {groups.map((g) => (
-                        <div
-                            key={g.id}
-                            id={`settings-panel-${g.id}`}
-                            role="tabpanel"
-                            aria-labelledby={`settings-tab-${g.id}`}
-                            hidden={g.id !== open}
-                            tabIndex={0}
-                            className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+            <SettingsColumns
+                beside
+                className="gap-6"
+                aside={allSet ? undefined : checklist}
+                before={allSet ? checklist : undefined}
+            >
+                <div className="flex min-w-0 flex-col gap-6">
+                    {/* Below 1024px: the same choice, as a select. */}
+                    <div className="flex items-center gap-3 lg:hidden">
+                        <label
+                            htmlFor={selectId}
+                            className="shrink-0 text-sm font-medium text-muted-foreground"
                         >
-                            {panels[g.id]}
-                        </div>
-                    ))}
-                </div>
+                            Section
+                        </label>
+                        <OptionSelect
+                            id={selectId}
+                            value={open}
+                            onValueChange={setOpen}
+                            options={groups.map((g) => ({
+                                value: g.id,
+                                label: g.label,
+                            }))}
+                            className="w-full max-w-xs"
+                        />
+                    </div>
 
-                {footer}
-            </div>
+                    <div>
+                        {groups.map((g) => (
+                            <div
+                                key={g.id}
+                                id={`settings-panel-${g.id}`}
+                                role="tabpanel"
+                                aria-labelledby={`settings-tab-${g.id}`}
+                                hidden={g.id !== open}
+                                tabIndex={0}
+                                className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+                            >
+                                {panels[g.id]}
+                            </div>
+                        ))}
+                    </div>
+
+                    {footer}
+                </div>
+            </SettingsColumns>
         </div>
     );
 }

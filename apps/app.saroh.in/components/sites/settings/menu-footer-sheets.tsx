@@ -1,5 +1,6 @@
 "use client";
 
+import { EditorLoading } from "@/components/sites/editor-loading";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -26,9 +27,7 @@ const RichTextEditor = dynamic(
         ),
     {
         ssr: false,
-        loading: () => (
-            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
-        ),
+        loading: () => <EditorLoading className="min-h-40" />,
     },
 );
 

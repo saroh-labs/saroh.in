@@ -69,7 +69,7 @@ async function openProviders(page: Page, b: OwnBusiness) {
     await page.goto(`/open/${b.id}`);
     await page.goto("/settings/providers");
     await expect(
-        page.getByRole("heading", { name: "Providers", level: 2 }),
+        page.getByRole("heading", { name: "Providers", level: 1 }),
     ).toBeVisible();
 }
 
