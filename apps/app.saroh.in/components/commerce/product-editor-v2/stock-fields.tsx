@@ -1,12 +1,12 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount } from "@/lib/products/editor-sections";
 
+import { Notice } from "@saroh/ui/notice";
 import { boxClass, FieldHelp } from "./fields";
 
 /**
@@ -220,18 +220,8 @@ export function VariantStockTable({
 /** At or under the warning level: said by name, in the warning's colours. */
 export function LowNote({ children }: { children: ReactNode }) {
     return (
-        <div
-            role="status"
-            className="mt-2.5 flex items-start gap-[9px] rounded-[9px] bg-brand-subtle px-3 py-2.5"
-        >
-            <TriangleAlert
-                aria-hidden
-                className="mt-px size-[15px] shrink-0 text-brand"
-                strokeWidth={1.9}
-            />
-            <span className="text-pretty text-[12px] leading-[1.5] text-brand-subtle-foreground">
-                {children}
-            </span>
-        </div>
+        <Notice tone="warning" className="mt-2.5">
+            {children}
+        </Notice>
     );
 }

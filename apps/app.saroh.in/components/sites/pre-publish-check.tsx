@@ -17,6 +17,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -199,22 +200,14 @@ export function PrePublishCheck({
                      * Publish here leaves behind, named before it happens.
                      */}
                     {needsApproval ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground"
-                        >
+                        <Notice tone="error" role="note" className="mb-6">
                             {canOverride
                                 ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
                                 : "This site goes live only from an approved test release. Make a test release and ask for a review."}
-                        </p>
+                        </Notice>
                     ) : null}
                     {scheduledWarning ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
-                        >
-                            {scheduledWarning}
-                        </p>
+                        <Notice className="mb-6">{scheduledWarning}</Notice>
                     ) : null}
                     {/*
                      * The approval, where the spec puts it: this is the last

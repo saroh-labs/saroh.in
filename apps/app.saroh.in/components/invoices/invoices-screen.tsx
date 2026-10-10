@@ -35,6 +35,7 @@ import {
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { withoutSince } from "@/lib/views/since";
+import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
 
 /** The business's GST standing, for the line under the title. */
@@ -243,23 +244,22 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
-                    <div
-                        role="alert"
-                        className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
-                    >
-                        <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                            {overdueCount} overdue · {sums(overdue)} — worked
-                            out from the due date.
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => pick("overdue")}
-                            className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px]"
-                        >
-                            Show them
-                        </Button>
-                    </div>
+                    <Notice tone="error" className="mb-3.5">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
+                                {overdueCount} overdue · {sums(overdue)} —
+                                worked out from the due date.
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => pick("overdue")}
+                                className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px]"
+                            >
+                                Show them
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : null}
 
                 {invoices.length === 0 && !scope ? (

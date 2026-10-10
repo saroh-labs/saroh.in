@@ -41,6 +41,7 @@ import {
     picksAllergen,
     toInput,
 } from "@/lib/customer-workspace/attention";
+import { Notice } from "@saroh/ui/notice";
 
 interface Choice {
     id: string;
@@ -377,39 +378,35 @@ export function AttentionSheet({
                     )}
 
                     {failed && unplaced ? (
-                        <p
-                            role="alert"
-                            className="rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                        >
+                        <Notice tone="error">
                             {failed.message} Nothing was saved; what you typed
                             is still here.
-                        </p>
+                        </Notice>
                     ) : null}
                 </form>
                 {asking ? (
-                    <div
-                        role="alert"
-                        className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5"
-                    >
-                        <span className="flex-[1_1_180px] text-[12.5px] text-brand-subtle-foreground">
-                            You have changes that are not saved.
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => close(true)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
-                        >
-                            Discard
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={() => setAsking(false)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
-                        >
-                            Keep editing
-                        </Button>
-                    </div>
+                    <Notice tone="warning" role="alert" layout="banner">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex-[1_1_180px] text-[12.5px] text-brand-subtle-foreground">
+                                You have changes that are not saved.
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => close(true)}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
+                            >
+                                Discard
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => setAsking(false)}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
+                            >
+                                Keep editing
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : null}
                 <div className="flex items-center gap-2 border-t border-border px-[18px] py-3">
                     <span className="flex-1 text-[12px] text-muted-foreground">

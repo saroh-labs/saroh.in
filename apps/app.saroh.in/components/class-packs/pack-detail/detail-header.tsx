@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { GUTTER } from "./detail-crumbs";
 
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
@@ -151,31 +152,31 @@ export function PackDetailHeader({
                 ) : null}
             </div>
             {head.note ? (
-                <div
+                <Notice
                     id="pack-detail-note"
-                    role="note"
-                    className={cn(
-                        "flex flex-wrap items-center gap-2.5 border-b border-border bg-muted py-[11px]",
-                        GUTTER,
-                    )}
+                    layout="banner"
+                    icon={false}
+                    className={GUTTER}
                 >
-                    <span className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
-                        <strong className="text-foreground">
-                            {head.note.head}
-                        </strong>{" "}
-                        {head.note.body}
-                    </span>
-                    {head.archived && canWrite ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={busy}
-                            onClick={onRestore}
-                        >
-                            Sell again
-                        </Button>
-                    ) : null}
-                </div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
+                            <strong className="text-foreground">
+                                {head.note.head}
+                            </strong>{" "}
+                            {head.note.body}
+                        </span>
+                        {head.archived && canWrite ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busy}
+                                onClick={onRestore}
+                            >
+                                Sell again
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ) : null}
         </>
     );

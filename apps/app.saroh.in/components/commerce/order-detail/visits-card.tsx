@@ -19,6 +19,7 @@ import {
 } from "@/lib/orders/visits";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel, PanelTitle } from "./parts";
 
 /*
@@ -98,17 +99,14 @@ export function VisitsCard({
                 ) : null}
             </div>
             {card?.entries.map((e) => (
-                <div
+                <Notice
                     key={e.id}
-                    role="alert"
-                    className={cn(
-                        "rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] leading-[1.45] text-destructive-subtle-foreground",
-                        e.sensitive && "print:hidden",
-                    )}
+                    tone="error"
+                    className={e.sensitive ? "print:hidden" : undefined}
                 >
                     <strong>{e.text}.</strong>
                     {details.get(e.id) ? ` ${details.get(e.id)}` : null}
-                </div>
+                </Notice>
             ))}
             {card?.hidden ? (
                 <p className="text-[12px] text-muted-foreground print:hidden">
@@ -116,15 +114,12 @@ export function VisitsCard({
                 </p>
             ) : null}
             {attention === null ? (
-                <p
-                    role="status"
-                    className="rounded-lg bg-muted px-2.5 py-2 text-[12.5px] leading-[1.45] text-muted-foreground"
-                >
+                <Notice role="status">
                     <span className="font-semibold text-foreground">
                         Needs attention: not available.
                     </span>{" "}
                     Check with {first} before the visit.
-                </p>
+                </Notice>
             ) : null}
             {visits ? (
                 <ol className="grid gap-2.5" aria-label="Visits">
@@ -148,13 +143,10 @@ export function VisitsCard({
                     ))}
                 </ol>
             ) : (
-                <p
-                    role="status"
-                    className="border-t border-foreground/10 pt-2.5 text-[12.5px] text-muted-foreground"
-                >
+                <Notice role="status" layout="banner">
                     The visits couldn&apos;t be read just now. Reload the page
                     to try again; nothing has changed.
-                </p>
+                </Notice>
             )}
         </Panel>
     );

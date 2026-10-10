@@ -12,6 +12,7 @@ import type { QrScreen } from "@/lib/qr/screen";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords, placeWords } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
 import { QrCodesList } from "./qr-codes-list";
 import type { DownloadEnv } from "./qr-download";
 import { QrMaker } from "./qr-maker";
@@ -116,11 +117,7 @@ export function QrShare({
             </div>
 
             {!view.live ? (
-                <p
-                    role="note"
-                    data-qr-not-live=""
-                    className="rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
+                <Notice data-qr-not-live="">
                     Your site isn&apos;t published yet. You can make codes now;
                     they open once it is.
                     {canChange ? (
@@ -134,7 +131,7 @@ export function QrShare({
                             </Link>
                         </>
                     ) : null}
-                </p>
+                </Notice>
             ) : null}
 
             {canChange ? (

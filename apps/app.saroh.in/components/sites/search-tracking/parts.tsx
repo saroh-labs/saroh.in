@@ -12,6 +12,7 @@ import { useTransition } from "react";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The pieces the "Search and tracking" section (DEC-108, U7) shares
@@ -101,10 +102,7 @@ export function SearchTrackingFailed() {
 /** Saroh staff switched this site's trackers off (#897). */
 export function SwitchedOffNotice() {
     return (
-        <div
-            role="status"
-            className="rounded-lg border bg-muted px-4 py-3 text-sm"
-        >
+        <Notice role="status">
             <p className="font-medium">{SWITCHED_OFF_LINE}</p>
             <p className="text-muted-foreground">
                 None of your trackers run, and none can be turned on. To ask
@@ -117,7 +115,7 @@ export function SwitchedOffNotice() {
                 </a>
                 .
             </p>
-        </div>
+        </Notice>
     );
 }
 

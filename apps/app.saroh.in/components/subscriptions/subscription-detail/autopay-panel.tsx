@@ -27,6 +27,7 @@ import type {
     AutopayMethod,
 } from "@/lib/subscriptions/service";
 import { dayText, money } from "@/lib/subscriptions/view";
+import { Notice } from "@saroh/ui/notice";
 
 const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 /** The Plan card's own small actions, 44px on touch. */
@@ -69,17 +70,13 @@ export function AutopayActions({
                 </div>
             ) : null}
             {panel.notice ? (
-                <p
+                <Notice
+                    tone={panel.notice.tone === "warn" ? "error" : "neutral"}
                     role={panel.notice.tone === "warn" ? "alert" : "status"}
-                    className={cn(
-                        "mt-2 rounded-[8px] px-2.5 py-2 text-[12.5px] font-semibold",
-                        panel.notice.tone === "warn"
-                            ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                            : "bg-muted text-foreground/80",
-                    )}
+                    className="mt-2"
                 >
                     {panel.notice.text}
-                </p>
+                </Notice>
             ) : null}
             {showsActions ? (
                 <div className="mt-2.5 flex flex-wrap gap-2">

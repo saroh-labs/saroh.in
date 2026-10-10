@@ -29,6 +29,7 @@ import {
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
+import { Notice } from "@saroh/ui/notice";
 
 const EYEBROW = "label";
 
@@ -204,10 +205,7 @@ function Body({
                 ) : null}
             </QuickLookCard>
             {tab === "failed" ? (
-                <div
-                    role="alert"
-                    className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px]"
-                >
+                <Notice tone="error">
                     <div className="text-[13px] font-bold text-destructive-subtle-foreground">
                         {failWhy(sub, now)}
                     </div>
@@ -215,7 +213,7 @@ function Body({
                         Saroh doesn&apos;t charge cards — open it to send a new
                         pay link, record a payment, pause or cancel.
                     </div>
-                </div>
+                </Notice>
             ) : null}
             {upcoming.length ? (
                 <QuickLookCard label="Next collections" className="pb-1.5 pt-3">

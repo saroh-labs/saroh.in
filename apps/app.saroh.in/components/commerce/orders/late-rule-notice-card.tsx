@@ -11,6 +11,7 @@ import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";
 import { dismissLateRuleNotice } from "@/lib/stores/storefront-actions";
 import type { LateRuleNotice } from "@/lib/stores/storefronts";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * One storefront's one-time notice on Orders (plan B, B17): pick-up orders
@@ -43,47 +44,46 @@ export function LateRuleNoticeCard({
     };
 
     return (
-        <div
-            role="note"
-            className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2 sm:gap-2.5 sm:py-2.5"
-        >
-            <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
-                <strong className="font-semibold">
-                    Pick-up orders at {notice.name} now count as late after{" "}
-                    {lateAfterWords(notice.pickupLateAfterMinutes)}.
-                </strong>{" "}
-                <span className="max-sm:hidden">
-                    Set it to what suits your counter.
+        <Notice tone="info" role="note" className="mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
+                    <strong className="font-semibold">
+                        Pick-up orders at {notice.name} now count as late after{" "}
+                        {lateAfterWords(notice.pickupLateAfterMinutes)}.
+                    </strong>{" "}
+                    <span className="max-sm:hidden">
+                        Set it to what suits your counter.
+                    </span>
                 </span>
-            </span>
-            {canChange ? (
-                <Button
-                    asChild
-                    variant="outline"
-                    className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
-                >
-                    <Link
-                        href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                {canChange ? (
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
                     >
-                        Change it
-                    </Link>
+                        <Link
+                            href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                        >
+                            Change it
+                        </Link>
+                    </Button>
+                ) : (
+                    <span className="text-[12px] text-muted-foreground">
+                        An owner or admin can change it in Locations.
+                    </span>
+                )}
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={pending}
+                    onClick={dismiss}
+                    aria-label={`Dismiss this notice for ${notice.name}`}
+                    className="size-[30px] text-brand-subtle-foreground coarse:size-11"
+                >
+                    <X aria-hidden className="size-4" />
                 </Button>
-            ) : (
-                <span className="text-[12px] text-muted-foreground">
-                    An owner or admin can change it in Locations.
-                </span>
-            )}
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={pending}
-                onClick={dismiss}
-                aria-label={`Dismiss this notice for ${notice.name}`}
-                className="size-[30px] text-brand-subtle-foreground coarse:size-11"
-            >
-                <X aria-hidden className="size-4" />
-            </Button>
-        </div>
+            </div>
+        </Notice>
     );
 }

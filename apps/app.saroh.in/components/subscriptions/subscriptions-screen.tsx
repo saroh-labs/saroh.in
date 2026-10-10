@@ -28,6 +28,7 @@ import {
     TAB_LABEL,
 } from "@/lib/subscriptions/view";
 
+import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
 import { PaymentsCrumbs } from "./payments-crumbs";
 import { PlansTab } from "./plans-tab";
@@ -251,26 +252,25 @@ export function SubscriptionsScreen({
                 ) : (
                     <>
                         {failed > 0 && tab !== "failed" ? (
-                            <div
-                                role="alert"
-                                className="mb-3.5 flex flex-wrap items-center gap-3 rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
-                            >
-                                <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                                    {failed}{" "}
-                                    {failed === 1
-                                        ? "renewal isn't"
-                                        : "renewals aren't"}{" "}
-                                    paid and {failed === 1 ? "needs" : "need"}{" "}
-                                    you.
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px] font-semibold coarse:h-11"
-                                    onClick={() => pick("failed")}
-                                >
-                                    Show them
-                                </Button>
-                            </div>
+                            <Notice tone="error" className="mb-3.5">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
+                                        {failed}{" "}
+                                        {failed === 1
+                                            ? "renewal isn't"
+                                            : "renewals aren't"}{" "}
+                                        paid and{" "}
+                                        {failed === 1 ? "needs" : "need"} you.
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px] font-semibold coarse:h-11"
+                                        onClick={() => pick("failed")}
+                                    >
+                                        Show them
+                                    </Button>
+                                </div>
+                            </Notice>
                         ) : null}
                         {subscriptions.length === 0 ? (
                             <EmptyState

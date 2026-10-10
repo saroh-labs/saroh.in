@@ -15,6 +15,7 @@ import { instantOpens, NOT_COUNTED, QR_SHARE_HREF } from "@/lib/qr/panel";
 import type { QrCodeView } from "@/lib/qr/types";
 import { linkWords, opensWords, refusalWords } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
 import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";
 
@@ -242,14 +243,7 @@ function Saved({
                     without reprinting.
                 </p>
                 {notLive}
-                {problem ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        {problem}
-                    </p>
-                ) : null}
+                {problem ? <Notice tone="error">{problem}</Notice> : null}
                 <div>
                     <Button
                         type="button"

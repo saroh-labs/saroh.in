@@ -33,6 +33,7 @@ import {
     goLiveWithRelease,
     scheduleGoLive,
 } from "@/lib/sites/test-releases-actions";
+import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
 
 /** A calendar day picked in the browser, as the API reads it. */
@@ -220,12 +221,9 @@ function Body({
             {/* A reviewer asked for changes here (UX-068): said before the
             press, not only in Versions afterwards. */}
             {changesAskedLine(release.standing) ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-warning-subtle px-3.5 py-3 text-[12.5px] leading-normal text-warning-subtle-foreground"
-                >
+                <Notice tone="warning" role="note">
                     {changesAskedLine(release.standing)}
-                </p>
+                </Notice>
             ) : null}
 
             {release.draftChangedSince ? (
@@ -236,19 +234,18 @@ function Body({
             ) : null}
 
             {override ? (
-                <div
-                    role="note"
-                    className="flex gap-2.5 rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
-                    <ShieldAlert
-                        aria-hidden
-                        className="mt-0.5 size-4 shrink-0"
-                    />
-                    <p>
-                        {gate.why} As an owner you can go live without it.{" "}
-                        {OVERRIDE_RECORD}
-                    </p>
-                </div>
+                <Notice tone="error" role="note">
+                    <div className="flex gap-2.5">
+                        <ShieldAlert
+                            aria-hidden
+                            className="mt-0.5 size-4 shrink-0"
+                        />
+                        <p>
+                            {gate.why} As an owner you can go live without it.{" "}
+                            {OVERRIDE_RECORD}
+                        </p>
+                    </div>
+                </Notice>
             ) : null}
             {blocked ? (
                 <p role="note" className="text-[12.5px] text-muted-foreground">

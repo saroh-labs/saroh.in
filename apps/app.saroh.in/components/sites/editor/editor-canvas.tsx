@@ -28,6 +28,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { Notice } from "@saroh/ui/notice";
 
 /** What the canvas draws around the blocks: the site's header and footer. */
 export interface CanvasChrome {
@@ -251,10 +252,7 @@ export function EditorCanvas({
              * one, so it is offered, never done automatically.
              */}
             {conflict ? (
-                <div
-                    role="alert"
-                    className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
-                >
+                <Notice tone="error" className="mx-auto mb-4 max-w-xl">
                     <p className="font-medium">
                         Someone else saved this page while you were editing.
                     </p>
@@ -273,7 +271,7 @@ export function EditorCanvas({
                     >
                         Reload the latest
                     </Button>
-                </div>
+                </Notice>
             ) : null}
 
             {/*

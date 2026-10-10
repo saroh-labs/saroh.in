@@ -39,6 +39,7 @@ import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -326,12 +327,7 @@ export function ServiceEditor({
                 )}
             </div>
             {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
-                <div
-                    role="alert"
-                    className="bg-destructive-subtle px-6 py-[9px] text-[12.5px] text-destructive-subtle-foreground max-[759px]:px-4"
-                >
-                    {problems.join(" ")}
-                </div>
+                <Notice tone="error">{problems.join(" ")}</Notice>
             ) : null}
 
             <fieldset

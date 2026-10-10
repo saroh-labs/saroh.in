@@ -9,6 +9,7 @@ import { useState } from "react";
 import { createPage } from "@/lib/sites/actions";
 import type { ModulePageOffer } from "@/lib/sites/page-menu";
 import type { CreatePageInput, SitePage } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
 
 /** A refusal, in the API's words, and the address it offers instead. */
 interface Refusal {
@@ -171,42 +172,41 @@ export function AddPagePanel({
             )}
 
             {refusal ? (
-                <div
-                    role="alert"
-                    className="grid gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-2 text-xs leading-relaxed text-destructive"
-                >
-                    <p>{refusal.message}</p>
-                    {refusal.suggestion ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 justify-self-start px-2 text-xs text-foreground"
-                            disabled={busy !== null}
-                            onClick={() => {
-                                const retry = refusal.retry;
-                                const suggestion = refusal.suggestion;
-                                if (
-                                    retry?.kind === undefined ||
-                                    retry.kind === "FREE"
-                                ) {
-                                    // A blank page: put the address in its
-                                    // field, so the merchant sees it before
-                                    // it is added.
-                                    if (suggestion) setPath(suggestion);
-                                    setRefusal(null);
-                                    return;
-                                }
-                                void add(retry, retry.kind);
-                            }}
-                        >
-                            {refusal.retry?.kind === undefined ||
-                            refusal.retry.kind === "FREE"
-                                ? `Use ${refusal.suggestion}`
-                                : `Add it at ${refusal.suggestion}`}
-                        </Button>
-                    ) : null}
-                </div>
+                <Notice tone="error">
+                    <div className="grid gap-1.5">
+                        <p>{refusal.message}</p>
+                        {refusal.suggestion ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 justify-self-start px-2 text-xs text-foreground"
+                                disabled={busy !== null}
+                                onClick={() => {
+                                    const retry = refusal.retry;
+                                    const suggestion = refusal.suggestion;
+                                    if (
+                                        retry?.kind === undefined ||
+                                        retry.kind === "FREE"
+                                    ) {
+                                        // A blank page: put the address in its
+                                        // field, so the merchant sees it before
+                                        // it is added.
+                                        if (suggestion) setPath(suggestion);
+                                        setRefusal(null);
+                                        return;
+                                    }
+                                    void add(retry, retry.kind);
+                                }}
+                            >
+                                {refusal.retry?.kind === undefined ||
+                                refusal.retry.kind === "FREE"
+                                    ? `Use ${refusal.suggestion}`
+                                    : `Add it at ${refusal.suggestion}`}
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ) : null}
         </div>
     );

@@ -15,6 +15,7 @@ import { useState } from "react";
 import { patchProduct } from "@/lib/products/actions";
 import type { ProductDetail, ProductStatus } from "@/lib/products/service";
 
+import { Notice } from "@saroh/ui/notice";
 import { useEditor, useSection } from "./editor-state";
 import { SectionCard } from "./section-card";
 
@@ -202,24 +203,13 @@ export function VisibilitySection({
                 </DropdownMenuContent>
             </DropdownMenu>
             {creating ? (
-                <div
-                    role="status"
-                    className={cn(
-                        "mt-2.5 flex items-start gap-[9px] rounded-[9px] px-3 py-2.5",
-                        status === "PUBLISHED"
-                            ? "bg-success-subtle text-success-subtle-foreground"
-                            : "bg-brand-subtle text-brand-subtle-foreground",
-                    )}
+                <Notice
+                    tone={status === "PUBLISHED" ? "success" : "info"}
+                    className="mt-2.5"
+                    icon={<Clock />}
                 >
-                    <Clock
-                        aria-hidden
-                        className="mt-px size-[15px] shrink-0"
-                        strokeWidth={1.9}
-                    />
-                    <span className="text-pretty text-[12px] leading-[1.5]">
-                        {pending}
-                    </span>
-                </div>
+                    {pending}
+                </Notice>
             ) : null}
         </SectionCard>
     );

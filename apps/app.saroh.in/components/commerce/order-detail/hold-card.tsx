@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useClock } from "@/lib/hooks/use-clock";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS } from "./parts";
 
 export interface Hold {
@@ -58,24 +59,9 @@ export function HoldCard({
 
     const refund = hold.kind === "refund";
     return (
-        <div
-            role="status"
-            className={cn(
-                "rounded-[10px] border px-[13px] py-[11px]",
-                refund
-                    ? "border-destructive-subtle-foreground bg-destructive-subtle"
-                    : "border-highlight-border bg-brand-subtle",
-            )}
-        >
+        <Notice tone={refund ? "error" : "info"} role="status" icon={false}>
             <div className="flex flex-wrap items-center gap-2.5">
-                <span
-                    className={cn(
-                        "flex-[1_1_220px] text-[13px] font-semibold tabular-nums",
-                        refund
-                            ? "text-destructive-subtle-foreground"
-                            : "text-brand-subtle-foreground",
-                    )}
-                >
+                <span className="flex-[1_1_220px] font-semibold tabular-nums">
                     {title(Math.ceil(left / 1000))}
                 </span>
                 <button
@@ -127,6 +113,6 @@ export function HoldCard({
                     style={{ width: `${(left / HOLD_MS) * 100}%` }}
                 />
             </div>
-        </div>
+        </Notice>
     );
 }

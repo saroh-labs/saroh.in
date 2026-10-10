@@ -13,6 +13,7 @@ import {
     ruleNote,
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The collection sheet's fields (#524), at the product page sheets' scale:
@@ -176,14 +177,7 @@ export function SheetNotices({
                     or admin can.
                 </p>
             ) : null}
-            {loadError ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] border border-destructive/40 px-3 py-2.5 text-[12.5px] text-destructive"
-                >
-                    {loadError}
-                </p>
-            ) : null}
+            {loadError ? <Notice tone="error">{loadError}</Notice> : null}
             {loading ? (
                 <p
                     role="status"
@@ -206,28 +200,27 @@ export function DiscardBar({
     onKeep: () => void;
 }) {
     return (
-        <div
-            role="alert"
-            className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5 text-[12.5px] text-brand-subtle-foreground"
-        >
-            <span className="flex-[1_1_180px]">
-                You have changes that are not saved.
-            </span>
-            <Button
-                type="button"
-                variant="outline"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
-                onClick={onDiscard}
-            >
-                Discard
-            </Button>
-            <Button
-                type="button"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                onClick={onKeep}
-            >
-                Keep editing
-            </Button>
-        </div>
+        <Notice tone="warning" role="alert" layout="banner">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="flex-[1_1_180px]">
+                    You have changes that are not saved.
+                </span>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
+                    onClick={onDiscard}
+                >
+                    Discard
+                </Button>
+                <Button
+                    type="button"
+                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
+                    onClick={onKeep}
+                >
+                    Keep editing
+                </Button>
+            </div>
+        </Notice>
     );
 }

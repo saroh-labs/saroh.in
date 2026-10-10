@@ -23,6 +23,7 @@ import {
 import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
 
+import { Notice } from "@saroh/ui/notice";
 import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 
 /** How long typing settles before the search runs. */
@@ -215,12 +216,9 @@ export function CustomerPicker({
                 className="mb-2 h-9 rounded-[9px] text-[13px]"
             />
             {attentionNote ? (
-                <div
-                    role="note"
-                    className="mb-2 rounded-lg bg-destructive-subtle px-2.5 py-[7px] text-[12.5px] leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note" className="mb-2">
                     {attentionNote}
-                </div>
+                </Notice>
             ) : null}
             {failed ? (
                 <p

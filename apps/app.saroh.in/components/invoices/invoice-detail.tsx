@@ -41,6 +41,7 @@ import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 import type { OnlineBlocker } from "@/lib/staff/types";
+import { Notice } from "@saroh/ui/notice";
 
 type Dialog =
     | "issue"
@@ -400,12 +401,9 @@ export function InvoiceDetail({
             ) : null}
 
             {late ? (
-                <div
-                    role="alert"
-                    className="mb-3.5 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3 text-[13px] font-semibold text-destructive-subtle-foreground print:hidden"
-                >
+                <Notice tone="error" className="mb-3.5 print:hidden">
                     {late}
-                </div>
+                </Notice>
             ) : null}
 
             <div className="flex flex-wrap items-start gap-4">

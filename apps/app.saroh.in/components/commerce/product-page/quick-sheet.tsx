@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import {
     Sheet,
     SheetContent,
@@ -105,32 +106,31 @@ export function QuickSheet({
                         {children}
                     </div>
                     {confirming ? (
-                        <div
-                            role="alert"
-                            className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5 text-[12.5px] text-brand-subtle-foreground"
-                        >
-                            <span className="flex-[1_1_180px]">
-                                You have changes that are not saved.
-                            </span>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
-                                onClick={() => {
-                                    setConfirming(false);
-                                    onOpenChange(false);
-                                }}
-                            >
-                                Discard
-                            </Button>
-                            <Button
-                                type="button"
-                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                                onClick={() => setConfirming(false)}
-                            >
-                                Keep editing
-                            </Button>
-                        </div>
+                        <Notice tone="warning" role="alert" layout="banner">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="flex-[1_1_180px]">
+                                    You have changes that are not saved.
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                        setConfirming(false);
+                                        onOpenChange(false);
+                                    }}
+                                >
+                                    Discard
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
+                                    onClick={() => setConfirming(false)}
+                                >
+                                    Keep editing
+                                </Button>
+                            </div>
+                        </Notice>
                     ) : null}
                     <SheetFooter className="flex flex-row flex-wrap items-center gap-2 border-t border-border px-[18px] py-3 sm:justify-start sm:space-x-0">
                         {fullEditorHref || moreLink ? (

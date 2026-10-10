@@ -15,6 +15,7 @@ import type { Kind } from "@/lib/customer-workspace/view";
 import { invoiceRow, isPayable, subRow } from "@/lib/customer-workspace/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { Empty, ROW_LINK } from "./parts";
 
 /**
@@ -104,12 +105,9 @@ export function InvoicesTab({
     return (
         <>
             {owed ? (
-                <div
-                    role="status"
-                    className="mb-2.5 rounded-xl border border-highlight bg-brand-subtle px-3.5 py-[11px] text-[13px] font-semibold text-brand-subtle-foreground"
-                >
+                <Notice tone="info" className="mb-2.5">
                     {owed}
-                </div>
+                </Notice>
             ) : null}
             {!rows.length ? <Empty>No invoices yet.</Empty> : null}
             <div className="flex flex-col gap-2">

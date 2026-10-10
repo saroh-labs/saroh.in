@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
 import type { ComposerGate } from "@/lib/messages/composer-gate";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * What the lead's "Send a message" shows in place of the composer when it
@@ -28,16 +29,20 @@ export function ComposerNotice({ gate }: { gate: ComposerGate }) {
         );
     }
     return (
-        <div
-            role="status"
-            className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-3 py-2.5"
-        >
-            <p className="min-w-0 flex-[1_1_220px] text-pretty text-sm">
-                {gate.title}
-            </p>
-            <Button asChild variant="outline" size="sm" className="wk-press">
-                <Link href={gate.href}>{gate.cta}</Link>
-            </Button>
-        </div>
+        <Notice role="status">
+            <div className="flex flex-wrap items-center gap-3">
+                <p className="min-w-0 flex-[1_1_220px] text-pretty text-sm">
+                    {gate.title}
+                </p>
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="wk-press"
+                >
+                    <Link href={gate.href}>{gate.cta}</Link>
+                </Button>
+            </div>
+        </Notice>
     );
 }

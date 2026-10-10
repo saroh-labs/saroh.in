@@ -6,6 +6,7 @@ import { useState } from "react";
 import { chipClass } from "@/components/shared/chip";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type { CatalogueView } from "@/lib/products/settings";
+import { Notice } from "@saroh/ui/notice";
 
 type Category = CatalogueView["categories"][number];
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
@@ -90,14 +91,11 @@ export function CategoryMergeSheet({
                     ))}
                 </div>
             </div>
-            <p
-                role="status"
-                className="text-pretty rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75"
-            >
+            <Notice role="status">
                 {into === null
                     ? "Pick where its products should go."
                     : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
-            </p>
+            </Notice>
         </SettingsSheetFrame>
     );
 }

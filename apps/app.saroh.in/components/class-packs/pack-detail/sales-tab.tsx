@@ -10,6 +10,7 @@ import type {
     PriceHistory,
     SaleRow,
 } from "@/lib/class-packs/pack-sales";
+import { Notice } from "@saroh/ui/notice";
 
 const CARD =
     "min-w-0 rounded-[12px] border border-border bg-card px-[18px] py-4";
@@ -122,13 +123,10 @@ export function SalesTab({
                             </div>
                         ))
                     ) : (
-                        <p
-                            role="alert"
-                            className="m-0 border-t border-border/70 py-2 text-[13px] text-foreground/80"
-                        >
+                        <Notice role="alert" layout="banner" className="m-0">
                             The price changes couldn&apos;t be loaded. Try again
                             in a minute.
-                        </p>
+                        </Notice>
                     )}
                     {history?.note ? (
                         <div className="mt-1.5 text-[12px] text-muted-foreground">

@@ -22,6 +22,7 @@ import {
 import { countStock, undoStock } from "@/lib/stock/screen-actions";
 import type { StockChecks, StockLevels, StockLog } from "@/lib/stock/service";
 
+import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
 import { ChecksList } from "./checks-list";
 import { CountBar } from "./count-bar";
@@ -266,18 +267,17 @@ export function StockScreen({
                 {tab === "levels" ? (
                     <>
                         {counting ? (
-                            <div
-                                role="note"
-                                className="flex flex-wrap items-baseline gap-2.5 rounded-[10px] bg-brand-subtle px-3.5 py-[11px] text-[13px] leading-normal text-brand-subtle-foreground"
-                            >
-                                <strong>Counting.</strong>
-                                <span className="flex-[1_1_280px] text-pretty">
-                                    Type what&apos;s on the shelf. Leave a box
-                                    empty to skip it. Saroh records the gap
-                                    between what the log expected and what you
-                                    counted.
-                                </span>
-                            </div>
+                            <Notice tone="info" role="note">
+                                <div className="flex flex-wrap items-baseline gap-2.5">
+                                    <strong>Counting.</strong>
+                                    <span className="flex-[1_1_280px] text-pretty">
+                                        Type what&apos;s on the shelf. Leave a
+                                        box empty to skip it. Saroh records the
+                                        gap between what the log expected and
+                                        what you counted.
+                                    </span>
+                                </div>
+                            </Notice>
                         ) : null}
                         <LevelsPanel
                             levels={levels}

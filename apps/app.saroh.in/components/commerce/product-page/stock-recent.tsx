@@ -11,6 +11,7 @@ import { orderRef } from "@/lib/products/overview-words";
 import { signed } from "@/lib/stock/levels";
 import { changeTone, weekLine } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
+import { Notice } from "@saroh/ui/notice";
 
 const noop = () => undefined;
 const subscribe = () => noop;
@@ -46,19 +47,17 @@ export function ProductChecks({ checks }: { checks: readonly StockCheck[] }) {
     return (
         <>
             {checks.map((c) => (
-                <div
-                    key={c.key}
-                    role="alert"
-                    className="mt-3 flex flex-wrap items-baseline gap-2.5 rounded-[10px] bg-destructive-subtle px-3.5 py-[11px] text-[13px] leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    <strong className="font-semibold">{c.title}</strong>
-                    <Link
-                        href={STOCK_CHECKS_HREF}
-                        className="ml-auto rounded-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
-                    >
-                        Open checks
-                    </Link>
-                </div>
+                <Notice tone="error" className="mt-3" key={c.key}>
+                    <div className="flex flex-wrap items-baseline gap-2.5">
+                        <strong className="font-semibold">{c.title}</strong>
+                        <Link
+                            href={STOCK_CHECKS_HREF}
+                            className="ml-auto rounded-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                        >
+                            Open checks
+                        </Link>
+                    </div>
+                </Notice>
             ))}
         </>
     );

@@ -6,6 +6,7 @@ import { swatchesWith } from "@/lib/qr/colours";
 import { targetAddress } from "@/lib/qr/targets";
 import { linkWords, placeWords } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
 import { QrCodeCard } from "./qr-code-card";
 import { QrLookControls } from "./qr-look-controls";
 import { QrPrintSlot } from "./qr-print-slot";
@@ -48,28 +49,27 @@ export function QrMaker({
     return (
         <div data-qr-maker={m.isChanging ? "change" : "make"}>
             {m.isChanging && bound ? (
-                <p
-                    role="status"
-                    className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                        Changing the code placed at{" "}
-                        <strong className="font-semibold">
-                            {placeWords(bound)}
-                        </strong>
-                        {bound.link ? (
-                            <>
-                                {" "}
-                                ·{" "}
-                                <span className="font-mono text-[12.5px]">
-                                    {linkWords(bound.link)}
-                                </span>
-                            </>
-                        ) : null}
-                        . Its link stays the same, so the printed one keeps
-                        working.
-                    </span>
-                </p>
+                <Notice role="status" className="mb-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            Changing the code placed at{" "}
+                            <strong className="font-semibold">
+                                {placeWords(bound)}
+                            </strong>
+                            {bound.link ? (
+                                <>
+                                    {" "}
+                                    ·{" "}
+                                    <span className="font-mono text-[12.5px]">
+                                        {linkWords(bound.link)}
+                                    </span>
+                                </>
+                            ) : null}
+                            . Its link stays the same, so the printed one keeps
+                            working.
+                        </span>
+                    </div>
+                </Notice>
             ) : null}
             <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))]">
                 <QrTargetPicker

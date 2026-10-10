@@ -20,6 +20,7 @@ import {
     removalBody,
 } from "@/lib/contacts/removal";
 import type { RemovalPreview } from "@/lib/contacts/service";
+import { Notice } from "@saroh/ui/notice";
 
 const SMALL_BTN =
     "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
@@ -109,25 +110,24 @@ export function RemoveDetailsDialog({
                 </AlertDialogDescription>
 
                 {readFailed ? (
-                    <div
-                        role="alert"
-                        className="mt-3.5 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
-                    >
-                        <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
-                            {readFailed} Nothing has changed.
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                                setReadFailed(null);
-                                setAttempt((n) => n + 1);
-                            }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
-                        >
-                            Try again
-                        </Button>
-                    </div>
+                    <Notice role="alert" className="mt-3.5">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
+                                {readFailed} Nothing has changed.
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setReadFailed(null);
+                                    setAttempt((n) => n + 1);
+                                }}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            >
+                                Try again
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : !preview ? (
                     <p
                         role="status"
@@ -136,14 +136,11 @@ export function RemoveDetailsDialog({
                         Checking what would go…
                     </p>
                 ) : refused.length ? (
-                    <div
-                        role="note"
-                        className="mt-3.5 rounded-[10px] bg-destructive-subtle px-[13px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
+                    <Notice tone="error" role="note" className="mt-3.5">
                         {refused.map((r) => (
                             <p key={r.message}>{asSentence(r.message)}</p>
                         ))}
-                    </div>
+                    </Notice>
                 ) : null}
 
                 <label

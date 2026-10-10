@@ -27,6 +27,7 @@ import {
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Settings → Modules ("Saroh Settings" design): one bordered list, a switch
@@ -334,51 +335,55 @@ function ModuleRow({
                     {noteOf(modules, module)}
                 </p>
                 {asking && (impact || refusal) ? (
-                    <div
+                    <Notice
+                        tone="warning"
                         role="alert"
+                        icon={false}
+                        className="mt-2.5"
                         onKeyDown={(e) => {
                             if (e.key === "Escape") keepOn();
                         }}
-                        className="mt-2.5 grid gap-2 rounded-[9px] border border-highlight-border bg-brand-subtle px-3 py-2.5"
                     >
-                        <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
-                            <strong>Turn off {label}?</strong>{" "}
-                            {refusal
-                                ? refusals.map(blockerSentence).join(" ")
-                                : impact}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                            {refusal ? (
-                                // Something refuses it (open orders): no
-                                // Turn off to press, only the way to clear it.
-                                refusalAction && refusal.actionHref ? (
-                                    <Button asChild size="sm">
-                                        <Link href={refusal.actionHref}>
-                                            {refusalAction}
-                                        </Link>
+                        <div className="grid gap-2">
+                            <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
+                                <strong>Turn off {label}?</strong>{" "}
+                                {refusal
+                                    ? refusals.map(blockerSentence).join(" ")
+                                    : impact}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {refusal ? (
+                                    // Something refuses it (open orders): no
+                                    // Turn off to press, only the way to clear it.
+                                    refusalAction && refusal.actionHref ? (
+                                        <Button asChild size="sm">
+                                            <Link href={refusal.actionHref}>
+                                                {refusalAction}
+                                            </Link>
+                                        </Button>
+                                    ) : null
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={turnOff}
+                                    >
+                                        Turn off
                                     </Button>
-                                ) : null
-                            ) : (
+                                )}
                                 <Button
+                                    ref={keepRef}
                                     type="button"
+                                    variant="outline"
                                     size="sm"
-                                    disabled={pending}
-                                    onClick={turnOff}
+                                    onClick={keepOn}
                                 >
-                                    Turn off
+                                    Keep it on
                                 </Button>
-                            )}
-                            <Button
-                                ref={keepRef}
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={keepOn}
-                            >
-                                Keep it on
-                            </Button>
+                            </div>
                         </div>
-                    </div>
+                    </Notice>
                 ) : null}
                 {blocked && module.canManage ? (
                     <Button

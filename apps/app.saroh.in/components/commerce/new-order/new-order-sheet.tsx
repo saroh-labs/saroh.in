@@ -22,6 +22,7 @@ import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
 
+import { Notice } from "@saroh/ui/notice";
 import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
@@ -270,17 +271,11 @@ function NewOrderBody({
                     attention={o.attentionNote}
                 />
                 {o.loading ? (
-                    <p
-                        role="status"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-muted-foreground"
-                    >
+                    <Notice role="status">
                         Reading what {storeName} sells…
-                    </p>
+                    </Notice>
                 ) : !o.data ? (
-                    <p
-                        role="alert"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-destructive-subtle-foreground"
-                    >
+                    <Notice tone="error">
                         Couldn&apos;t read what {storeName} sells.{" "}
                         <button
                             type="button"
@@ -292,7 +287,7 @@ function NewOrderBody({
                         >
                             Try again
                         </button>
-                    </p>
+                    </Notice>
                 ) : (
                     <LinesStep
                         products={o.data.products}

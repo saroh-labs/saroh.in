@@ -35,6 +35,7 @@ import type {
     RoleCatalogue,
 } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
+import { Notice } from "@saroh/ui/notice";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
@@ -743,14 +744,7 @@ function NewRoleDialog({
                             </p>
                         ) : null}
                     </fieldset>
-                    {error ? (
-                        <p
-                            role="alert"
-                            className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
-                        >
-                            {error}
-                        </p>
-                    ) : null}
+                    {error ? <Notice tone="error">{error}</Notice> : null}
                     <DialogFooter>
                         <Button
                             type="button"

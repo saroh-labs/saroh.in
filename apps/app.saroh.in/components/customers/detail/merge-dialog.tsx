@@ -38,6 +38,7 @@ import {
     pickable,
 } from "@/lib/customer-workspace/merge";
 
+import { Notice } from "@saroh/ui/notice";
 import { AccountBox, Choice } from "./merge-parts";
 import { MergeSearch } from "./merge-search";
 
@@ -202,24 +203,23 @@ export function MergeDialog({
                         }
                     />
                 ) : readFailed ? (
-                    <div
-                        role="alert"
-                        className="mt-3.5 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
-                    >
-                        <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
-                            {readFailed} Nothing has changed.
-                        </span>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setReadFailed(null);
-                                setAttempt((n) => n + 1);
-                            }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
-                        >
-                            Try again
-                        </Button>
-                    </div>
+                    <Notice role="alert" className="mt-3.5">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
+                                {readFailed} Nothing has changed.
+                            </span>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setReadFailed(null);
+                                    setAttempt((n) => n + 1);
+                                }}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            >
+                                Try again
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : !loaded || !preview || !names || !account ? (
                     <p
                         role="status"
@@ -323,14 +323,11 @@ export function MergeDialog({
                         ) : null}
 
                         {preview.refusals.length ? (
-                            <div
-                                role="note"
-                                className="mt-3 rounded-[10px] bg-destructive-subtle px-[13px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                            >
+                            <Notice tone="error" role="note" className="mt-3">
                                 {preview.refusals.map((r) => (
                                     <p key={r.message}>{r.message}.</p>
                                 ))}
-                            </div>
+                            </Notice>
                         ) : null}
                     </>
                 )}

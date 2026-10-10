@@ -27,6 +27,7 @@ import {
 } from "@/lib/customer-workspace/details";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 
+import { Notice } from "@saroh/ui/notice";
 import { AddressFields, TextField } from "./edit-fields";
 
 interface Refusal {
@@ -219,29 +220,28 @@ export function EditSheet({
                     <AddressFields {...common} errors={errors} />
                 </form>
                 {asking ? (
-                    <div
-                        role="alert"
-                        className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5"
-                    >
-                        <span className="flex-[1_1_180px] text-[12.5px] text-brand-subtle-foreground">
-                            You have changes that are not saved.
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => close(true)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
-                        >
-                            Discard
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={() => setAsking(false)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
-                        >
-                            Keep editing
-                        </Button>
-                    </div>
+                    <Notice tone="warning" role="alert" layout="banner">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex-[1_1_180px] text-[12.5px] text-brand-subtle-foreground">
+                                You have changes that are not saved.
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => close(true)}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
+                            >
+                                Discard
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => setAsking(false)}
+                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
+                            >
+                                Keep editing
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : null}
                 <div className="flex items-center gap-2 border-t border-border px-[18px] py-3">
                     <span className="flex-1 text-[12px] text-muted-foreground">

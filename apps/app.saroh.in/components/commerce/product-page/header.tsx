@@ -11,6 +11,7 @@ import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { priceLabel } from "@/lib/products/overview-rules";
 import { whereItSells } from "@/lib/products/overview-words";
+import { Notice } from "@saroh/ui/notice";
 
 export const STATUS_BADGE = {
     PUBLISHED: { label: "Live", variant: "success" },
@@ -281,12 +282,5 @@ export function ProductHeader({
 
 /** For anyone who can't change the product: what they can do, and who can. */
 export function AccessLine({ line }: { line: string }) {
-    return (
-        <p
-            role="note"
-            className="text-pretty border-b border-border bg-muted px-4 py-2.5 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground sm:px-[22px]"
-        >
-            {line}
-        </p>
-    );
+    return <Notice layout="banner">{line}</Notice>;
 }

@@ -19,6 +19,7 @@ import type {
 } from "@/lib/organizations/service";
 import { listOrganizations } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata: Metadata = {
     title: "Which business?",
@@ -103,12 +104,9 @@ export default async function ChoosePage({
                 You can change this whenever you like.
             </p>
             {notice ? (
-                <p
-                    role="status"
-                    className="sa-rise -mt-2.5 mb-[22px] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[13px] leading-[1.55] text-foreground"
-                >
+                <Notice role="status" className="sa-rise -mt-2.5 mb-[22px]">
                     {notice}
-                </p>
+                </Notice>
             ) : null}
 
             {owned.length > 0 ? (

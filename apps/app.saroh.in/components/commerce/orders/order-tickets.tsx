@@ -15,6 +15,7 @@ import {
     ticketsSummary,
     ticketWho,
 } from "@/lib/orders/tickets";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Several orders' tickets, one to a printed page (plan B, B6), from the
@@ -91,14 +92,11 @@ export function OrderTickets({
                 ) : null}
             </div>
             {orders.length === 0 ? (
-                <p
-                    role="status"
-                    className="rounded-[11px] border border-border bg-card px-4 py-3.5 text-[13px]"
-                >
+                <Notice role="status">
                     Nothing to print.{" "}
                     {summary.notes.join(" ") ||
                         "Pick orders on the list first."}
-                </p>
+                </Notice>
             ) : (
                 <ol
                     aria-label="Tickets"

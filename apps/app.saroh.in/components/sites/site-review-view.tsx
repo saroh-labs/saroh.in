@@ -26,6 +26,7 @@ import type {
     SiteDetail,
 } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The test releases waiting on a reviewer (DEC-071, T12): the ones that can
@@ -118,9 +119,8 @@ export function SiteReviewView({
             </p>
 
             {review.latestApproval ? (
-                <p
+                <Notice
                     role="status"
-                    className="rounded-lg border bg-muted px-4 py-3 text-sm"
                     title={exactDate(review.latestApproval.at, zone)}
                 >
                     {review.latestApproval.outcome === "REQUESTED"
@@ -139,7 +139,7 @@ export function SiteReviewView({
                     {open > 0
                         ? ` ${open === 1 ? "1 note is" : `${open} notes are`} open.`
                         : ""}
-                </p>
+                </Notice>
             ) : null}
 
             {site.pages.length > 1 ? (

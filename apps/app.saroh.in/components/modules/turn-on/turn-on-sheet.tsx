@@ -29,6 +29,7 @@ import {
 import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
+import { Notice } from "@saroh/ui/notice";
 import { BookingsFields } from "./bookings-fields";
 import { Section } from "./field";
 import { ConnectChoice, SellFields, WebsiteFields } from "./setup-fields";
@@ -191,12 +192,9 @@ function TurnOnBody({
                 ) : null}
 
                 {t.hidden.length > 0 ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px]"
-                    >
+                    <Notice role="alert">
                         {BLOCKER_COPY.ROLLOUT_DISABLED}
-                    </p>
+                    </Notice>
                 ) : !draft ? (
                     <div className="grid gap-3" aria-label="Loading">
                         <Skeleton className="h-4 w-32" />
@@ -289,14 +287,7 @@ function TurnOnBody({
                     </>
                 )}
 
-                {t.failure ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] border border-destructive-subtle-foreground/40 bg-destructive-subtle px-3 py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {t.failure}
-                    </p>
-                ) : null}
+                {t.failure ? <Notice tone="error">{t.failure}</Notice> : null}
             </form>
 
             <ActionBar>

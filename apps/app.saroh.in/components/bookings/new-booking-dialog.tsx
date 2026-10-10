@@ -52,6 +52,7 @@ import {
 } from "@/lib/services/booking-pay";
 import type { Slot } from "@/lib/services/service";
 import type { VisitToBook } from "@/lib/services/treatment";
+import { Notice } from "@saroh/ui/notice";
 
 const WINDOW_DAYS = 14;
 
@@ -597,12 +598,7 @@ export function NewBookingDialog({
                                 </div>
                             )}
                             {packRefusal ? (
-                                <p
-                                    role="alert"
-                                    className="rounded-[10px] border border-destructive/50 bg-destructive/10 px-3.5 py-3 text-[12.5px] leading-[1.55] text-destructive-subtle-foreground"
-                                >
-                                    {packRefusal}
-                                </p>
+                                <Notice tone="error">{packRefusal}</Notice>
                             ) : null}
                         </div>
 

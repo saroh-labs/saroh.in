@@ -24,6 +24,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<
     VersionBadgeTone,
@@ -311,12 +312,9 @@ function RestoreConfirm({
                     : null}
             </p>
             {gate.kind === "override" ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note">
                     {RESTORE_OVERRIDE_LINE}
-                </p>
+                </Notice>
             ) : null}
         </div>
     );

@@ -36,6 +36,7 @@ import {
 } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { PaymentsCrumbs } from "../payments-crumbs";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
@@ -347,10 +348,7 @@ export function SubscriptionDetail({
                 ) : null}
 
                 {tab === "failed" ? (
-                    <div
-                        role="alert"
-                        className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
-                    >
+                    <Notice tone="error">
                         <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                             {failWhy(sub, now)}
                         </div>
@@ -364,7 +362,7 @@ export function SubscriptionDetail({
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />
                         ) : null}
-                    </div>
+                    </Notice>
                 ) : null}
 
                 {pending && canWrite ? (

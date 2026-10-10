@@ -12,6 +12,7 @@ import { requireSession } from "@/lib/session";
 import { exactDate } from "@/lib/sites/format-date";
 import { releaseTitle } from "@/lib/sites/release-review";
 import { getPublication, getSite } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * One past version, as it was served (#283, #194).
@@ -86,10 +87,7 @@ export default async function PastVersionPage({
                 }
             />
 
-            <p
-                role="status"
-                className="rounded-lg border bg-muted px-4 py-3 text-sm"
-            >
+            <Notice role="status">
                 {isCurrent
                     ? "This is the version visitors see now."
                     : "A past version, as it was served. It is not what visitors see now, and nothing here can be edited."}
@@ -105,7 +103,7 @@ export default async function PastVersionPage({
                         .
                     </>
                 ) : null}
-            </p>
+            </Notice>
 
             {renderable ? null : (
                 <PartialNotice>

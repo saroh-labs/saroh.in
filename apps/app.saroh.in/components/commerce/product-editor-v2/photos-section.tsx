@@ -25,6 +25,7 @@ import {
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 
+import { Notice } from "@saroh/ui/notice";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { LibraryPanel } from "./photo-library-panel";
@@ -404,12 +405,9 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 </div>
             ) : null}
             {error ? (
-                <div
-                    role="alert"
-                    className="mt-[9px] text-pretty rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12px] leading-[1.5] text-destructive"
-                >
+                <Notice tone="error" className="mt-[9px]">
                     {error}
-                </div>
+                </Notice>
             ) : null}
             {canWrite && !full ? (
                 <button

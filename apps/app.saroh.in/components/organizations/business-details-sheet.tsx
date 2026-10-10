@@ -43,6 +43,7 @@ import {
     readBusinessDetails,
     saveOrganizationSettings,
 } from "@/lib/organizations/settings-actions";
+import { Notice } from "@saroh/ui/notice";
 
 const FIELDS = [
     "addressLine1",
@@ -302,12 +303,9 @@ function DetailsForm({
                     ) : null}
                 </div>
                 {refusal ? (
-                    <p
-                        role="alert"
-                        className="border-t border-border bg-destructive-subtle px-[18px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
+                    <Notice tone="error" layout="banner">
                         {refusal}
-                    </p>
+                    </Notice>
                 ) : null}
                 <div className="flex items-center justify-end gap-2 border-t border-border px-[18px] py-3">
                     <Button

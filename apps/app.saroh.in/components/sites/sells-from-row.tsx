@@ -22,6 +22,7 @@ import {
 } from "@/lib/sites/sells-from";
 import type { SellsFrom } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+import { Notice } from "@saroh/ui/notice";
 
 /** The question the sheet asks. */
 export const SELLS_FROM_QUESTION =
@@ -107,12 +108,9 @@ export function SellsFromRow({
                 }
             >
                 {waiting ? (
-                    <p
-                        role="note"
-                        className="bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground"
-                    >
+                    <Notice tone="warning" role="note">
                         {SHOP_AWAITS_SELLS_FROM}
-                    </p>
+                    </Notice>
                 ) : null}
                 <Row
                     label="Sells from"

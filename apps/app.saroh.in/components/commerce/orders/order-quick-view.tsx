@@ -27,6 +27,7 @@ import {
 } from "@/lib/orders/row-menu";
 import { quickVisitsText } from "@/lib/orders/visits";
 
+import { Notice } from "@saroh/ui/notice";
 import { useOrderStep } from "./use-order-step";
 
 type Read =
@@ -199,23 +200,22 @@ export function OrderQuickView({
             }
         >
             {read.state === "failed" ? (
-                <div
-                    role="alert"
-                    className="flex flex-wrap items-center gap-2.5 rounded-[11px] border border-destructive-subtle-foreground/40 bg-destructive-subtle px-3.5 py-3 text-[13px] text-destructive-subtle-foreground"
-                >
-                    <span className="min-w-0 flex-1">{read.error}</span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setRead({ state: "loading" });
-                            setAttempt((n) => n + 1);
-                        }}
-                    >
-                        Try again
-                    </Button>
-                </div>
+                <Notice tone="error">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="min-w-0 flex-1">{read.error}</span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setRead({ state: "loading" });
+                                setAttempt((n) => n + 1);
+                            }}
+                        >
+                            Try again
+                        </Button>
+                    </div>
+                </Notice>
             ) : order ? (
                 <QuickViewBody order={order} />
             ) : (
@@ -296,26 +296,19 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
 
             {/* Needs attention (B15): what the API let this viewer see. */}
             {attentionLines(order.attention).map((a) => (
-                <div
-                    key={a.id}
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-[11px] py-[9px] text-[13px] leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" key={a.id}>
                     <strong>{a.head}</strong>
                     {a.detail ? ` ${a.detail}` : null}
-                </div>
+                </Notice>
             ))}
             {order.attention === null ? (
-                <div
-                    role="status"
-                    className="rounded-[9px] bg-muted px-[11px] py-[9px] text-[13px] leading-[1.45] text-muted-foreground"
-                >
+                <Notice role="status">
                     <strong className="text-foreground">
                         Needs attention: not available.
                     </strong>{" "}
                     It couldn&apos;t be read, so check with the customer before
                     it goes out.
-                </div>
+                </Notice>
             ) : null}
 
             <section

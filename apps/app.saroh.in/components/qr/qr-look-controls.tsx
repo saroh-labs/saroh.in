@@ -10,6 +10,7 @@ import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -167,12 +168,7 @@ export function QrLookControls({
                     }
                 />
                 {colorProblem ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        {colorProblem}
-                    </p>
+                    <Notice tone="error">{colorProblem}</Notice>
                 ) : null}
             </div>
 

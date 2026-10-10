@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@saroh/ui/notice";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -13,19 +14,9 @@ import type { ReactNode } from "react";
 /** Under the header for someone who can't change (all of) the product. */
 export function ReadOnlyNote({ children }: { children: ReactNode }) {
     return (
-        <div
-            role="note"
-            className="flex items-start gap-[9px] border-b border-border bg-brand-subtle px-[18px] py-2.5"
-        >
-            <Lock
-                aria-hidden
-                className="mt-px size-[15px] shrink-0 text-brand"
-                strokeWidth={1.9}
-            />
-            <span className="text-pretty text-[12.5px] leading-[1.5] text-brand-subtle-foreground">
-                {children}
-            </span>
-        </div>
+        <Notice layout="banner" icon={<Lock />}>
+            {children}
+        </Notice>
     );
 }
 

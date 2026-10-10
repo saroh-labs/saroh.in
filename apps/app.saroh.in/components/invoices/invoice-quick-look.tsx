@@ -39,6 +39,7 @@ import {
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
+import { Notice } from "@saroh/ui/notice";
 
 type Read =
     | { state: "loading" }
@@ -259,17 +260,14 @@ export function InvoiceQuickLook({
             }
         >
             {i.standing === "OVERDUE" && i.dueAt ? (
-                <div
-                    role="alert"
-                    className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     {late.before} — due{" "}
                     <ViewerDate
                         iso={i.dueAt}
                         variant="dayMonth"
                         timeZone={timeZone}
                     />
-                </div>
+                </Notice>
             ) : null}
 
             <QuickLookCard label="Billed to">

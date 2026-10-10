@@ -13,6 +13,7 @@ import {
 } from "@/lib/qr/print";
 import type { QrCodeView } from "@/lib/qr/types";
 
+import { Notice } from "@saroh/ui/notice";
 import { QrPrintThumb } from "./qr-print-thumb";
 import type { QrStyleLock } from "./qr-style-lock";
 import { qrStyleLockOfRefusal } from "./qr-style-lock";
@@ -217,12 +218,7 @@ function PrintSection({
                                 </Button>
                             ) : null}
                             {failed ? (
-                                <p
-                                    role="alert"
-                                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                                >
-                                    {failed}
-                                </p>
+                                <Notice tone="error">{failed}</Notice>
                             ) : null}
                         </li>
                     );
@@ -230,13 +226,9 @@ function PrintSection({
             </ul>
 
             {initialsNote && state === "ready" ? (
-                <p
-                    role="status"
-                    data-qr-print-initials=""
-                    className="rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
+                <Notice role="status" data-qr-print-initials="">
                     {initialsNote}
-                </p>
+                </Notice>
             ) : null}
         </section>
     );

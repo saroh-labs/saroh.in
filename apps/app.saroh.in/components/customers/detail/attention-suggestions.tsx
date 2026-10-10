@@ -43,6 +43,7 @@ import {
 } from "@/lib/customer-workspace/attention";
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { Notice } from "@saroh/ui/notice";
 
 interface Choice {
     id: string;
@@ -374,13 +375,10 @@ function SuggestionCard({
                 </p>
             )}
             {unplaced ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     {failed.message} Nothing was added; your choices are still
                     here.
-                </p>
+                </Notice>
             ) : null}
             <div className="flex flex-wrap gap-2">
                 <Button
