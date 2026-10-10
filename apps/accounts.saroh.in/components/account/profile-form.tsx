@@ -1,5 +1,6 @@
 "use client";
 
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -28,10 +29,14 @@ export function ProfileForm({ initialName }: { initialName: string }) {
         setError(null);
         setSaved(false);
         setIsLoading(true);
-        const { error: err } = await authClient.updateUser({ name });
+        const { error: err } = await settle(() =>
+            authClient.updateUser({ name }),
+        );
         setIsLoading(false);
         if (err) {
-            setError(err.message ?? "Could not save your name.");
+            setError(
+                authFailureCopy(err, "Couldn't save your name. Try again."),
+            );
             return;
         }
         setSaved(true);

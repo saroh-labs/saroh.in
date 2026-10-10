@@ -156,9 +156,15 @@ export function AuthError({ children }: { children: React.ReactNode }) {
 /** The heading and its one line, at the top of every account page. */
 export function AuthHeading({
     title,
+    promise,
     blurb,
 }: {
     title: string;
+    /**
+     * What Saroh does, in one line, for a phone. The panel says it at desk
+     * width and is gone below 760px, so this line shows only there.
+     */
+    promise?: string;
     blurb?: React.ReactNode;
 }) {
     return (
@@ -166,6 +172,11 @@ export function AuthHeading({
             <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
                 {title}
             </h1>
+            {promise ? (
+                <p className="sa-rise text-foreground mt-[7px] text-pretty text-[13.5px] font-medium leading-[1.5] min-[760px]:hidden">
+                    {promise}
+                </p>
+            ) : null}
             {blurb ? (
                 <p className="sa-rise dark:text-muted-foreground mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600">
                     {blurb}

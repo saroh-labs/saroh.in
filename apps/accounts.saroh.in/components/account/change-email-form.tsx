@@ -1,5 +1,6 @@
 "use client";
 
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -39,14 +40,21 @@ export function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
         }
 
         setIsLoading(true);
-        const { error: err } = await authClient.changeEmail({
-            newEmail: newEmail.trim(),
-            callbackURL: "/account",
-        });
+        const { error: err } = await settle(() =>
+            authClient.changeEmail({
+                newEmail: newEmail.trim(),
+                callbackURL: "/account",
+            }),
+        );
         setIsLoading(false);
 
         if (err) {
-            setError(err.message ?? "Could not start the email change.");
+            setError(
+                authFailureCopy(
+                    err,
+                    "Couldn't start the email change. Try again.",
+                ),
+            );
             return;
         }
         setSent(true);

@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-    title: "Login | Saroh",
-    description:
-        "Login to saroh. A platform for managing your portfolios, marketing websites and more.",
+    title: "Sign in · Saroh",
+    description: "Sell, take bookings, bill and run your website in one place.",
 };
 
 /**

@@ -1,7 +1,7 @@
 /**
- * Whether sign-up or log-in ends at accepting a workspace invitation
- * (UX-029): then the pages speak to an invitee — the account joins someone
- * else's business ("that comes in a moment" was wrong for them) — and the
+ * Whether sign-up or sign-in ends at accepting a business's invitation
+ * (UX-029): then the pages speak to an invitee, whose account joins someone
+ * else's business ("that comes in a moment" was wrong for them), and the
  * address is the invitation's, since accepting refuses any other.
  */
 export { isJoinDestination as isJoining } from "@saroh/auth/origins";

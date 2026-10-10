@@ -12,7 +12,10 @@ import {
     AuthHeading,
     AuthSubmit,
 } from "@/components/auth/field";
+import { PROMISE } from "@/components/auth/panel-copy";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { getOnboardingUrl } from "@/lib/app-urls";
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { isJoining, withCarry } from "@/lib/joining";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
@@ -51,19 +54,24 @@ export function SignupForm({
         e.preventDefault();
         setError(null);
         setIsLoading(true);
-        const { error: err } = await signUp.email(
-            { name, email, password },
-            {
-                onError: (ctx) => setError(ctx.error.message),
-            },
+        const { error: err } = await settle(() =>
+            signUp.email({ name, email, password }),
         );
         setIsLoading(false);
-        if (err) return;
+        if (err) {
+            setError(authFailureCopy(err));
+            return;
+        }
 
-        // Signup deliberately issues NO session — the auth server requires a
+        // Signup deliberately issues NO session: the auth server requires a
         // verified email first, and it has already mailed a code. Sending the
         // user to a session-gated page here is what used to bounce them to
         // /login with "Email not verified" and no way to act on it.
+        //
+        // An address that already has an account gets this same answer and
+        // no code (the page must not say who is registered). The owner of
+        // that address is emailed "You already have a Saroh account", and
+        // the verify page offers Sign in under Resend.
         // Carried through verification, so an invitee lands on the
         // invitation they clicked rather than in their own onboarding (#276).
         router.push(withCarry("/verify-email", returnTo, email));
@@ -75,10 +83,11 @@ export function SignupForm({
                 title={
                     joining ? "Make your account to join" : "Make your account"
                 }
+                promise={joining ? undefined : PROMISE}
                 blurb={
                     joining
                         ? "Your own details. Once your email is confirmed, you join the business that invited you."
-                        : "Your details, not the business's — that comes in a moment."
+                        : "Your own details first. Next, you name your business."
                 }
             />
             <form onSubmit={handleSubmit} noValidate>
@@ -132,7 +141,10 @@ export function SignupForm({
 
             <SocialButtons
                 providers={providers}
-                callbackURL={returnTo ?? undefined}
+                // Google makes the account in one step, so it goes where
+                // the emailed code would have sent it: setup, unless this
+                // sign-up was on its way somewhere (an invitation, a plan).
+                callbackURL={returnTo ?? getOnboardingUrl()}
                 disabled={isLoading}
             />
 
@@ -146,7 +158,7 @@ export function SignupForm({
                     )}
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
-                    Log in
+                    Sign in
                 </Link>
             </AuthFooter>
         </div>

@@ -13,33 +13,38 @@ import {
     AuthSubmit,
 } from "@/components/auth/field";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { getAppUrl } from "@/lib/app-urls";
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { isJoining, withCarry } from "@/lib/joining";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
- * `returnTo` is where this sign-in should land (#222) — the page the visitor
+ * `returnTo` is where this sign-in should land (#222): the page the visitor
  * asked for before they were bounced here, already checked against the
  * trusted origins by the server component that renders this form. It is a
  * destination, never a claim: this component does not decide whether it is
- * safe, because it cannot.
+ * safe, because it cannot. With none, signing in lands on Saroh itself
+ * (`getAppUrl`), whose front door sorts out setup, Home or which business.
  *
  * `invitedEmail` fills the address in when the visitor arrived from an
  * invitation: that invitation can only be taken by the account it was sent to,
  * so the field starts on the right one rather than on whichever account they
- * happen to remember.
+ * happen to remember. The "You already have a Saroh account" email and the
+ * verify page's "Sign in" fill it the same way, without fixing it.
  */
 export function LoginForm({
-    returnTo = "/apps",
+    returnTo,
     invitedEmail,
     providers = [],
 }: {
-    returnTo?: string;
+    returnTo?: string | null;
     invitedEmail?: string;
     /** The social providers with keys set (`lib/sign-in-options.ts`). */
     providers?: SocialProvider[];
 } = {}) {
     const router = useRouter();
     const { signIn } = authClient;
+    const destination = returnTo ?? getAppUrl();
     const [email, setEmail] = useState(invitedEmail ?? "");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -53,44 +58,39 @@ export function LoginForm({
         e.preventDefault();
         setError(null);
         setIsLoading(true);
-        const { error: err } = await signIn.email(
-            { email, password, callbackURL: returnTo },
-            {
-                onError: (ctx) => {
-                    // Not a dead end: the server has just mailed a fresh code
-                    // (emailVerification.sendOnSignIn), so forward to the
-                    // screen that can consume it rather than showing "Email not
-                    // verified" with nowhere to go.
-                    if (ctx.error.code === "EMAIL_NOT_VERIFIED") return;
-                    setError(ctx.error.message);
-                },
-            },
+        const { error: err } = await settle(() =>
+            signIn.email({ email, password, callbackURL: destination }),
         );
         setIsLoading(false);
 
         if (err?.code === "EMAIL_NOT_VERIFIED") {
-            // Carry the destination through the detour: someone who has to
-            // verify first should still land where they were going, not at
-            // the launcher because they took an extra step.
+            // Not a dead end: the server has just mailed a fresh code
+            // (emailVerification.sendOnSignIn), so forward to the screen that
+            // can consume it rather than showing "Email not verified" with
+            // nowhere to go. The destination rides along: someone who has to
+            // verify first should still land where they were going.
             router.push(withCarry("/verify-email", returnTo, email));
             return;
         }
-        if (err) return;
+        if (err) {
+            setError(authFailureCopy(err));
+            return;
+        }
         // An absolute destination is another origin (app.saroh.in), which the
-        // client router cannot reach; a path is this app's own.
-        if (returnTo.startsWith("/")) {
-            router.push(returnTo);
+        // client router cannot reach. A path is this app's own.
+        if (destination.startsWith("/")) {
+            router.push(destination);
         } else {
-            window.location.href = returnTo;
+            window.location.href = destination;
         }
     }
 
     return (
         <div>
-            {/* The heading names the act, as the design does on every page;
-                the panel beside it says what logging in reaches. */}
+            {/* The heading names the act, as the design does on every page.
+                The panel beside it says what signing in reaches. */}
             <AuthHeading
-                title={joining ? "Log in to join" : "Log in"}
+                title={joining ? "Sign in to join" : "Sign in"}
                 blurb={
                     joining
                         ? "Then you join the business that invited you."
@@ -133,13 +133,13 @@ export function LoginForm({
                     disabled={isLoading}
                 />
                 <AuthSubmit disabled={isLoading}>
-                    {isLoading ? "Signing in…" : "Log in"}
+                    {isLoading ? "Signing in…" : "Sign in"}
                 </AuthSubmit>
             </form>
 
             <SocialButtons
                 providers={providers}
-                callbackURL={returnTo}
+                callbackURL={destination}
                 disabled={isLoading}
             />
 
