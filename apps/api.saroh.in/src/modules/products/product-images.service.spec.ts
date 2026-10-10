@@ -168,14 +168,14 @@ describe("ProductImagesService — 15 photos and 3 videos (#517)", () => {
 
     it("refuses a 16th photo", async () => {
         await expect(replace(photos(16))).rejects.toThrow(
-            "Already 15 photos — take one off first.",
+            "Already 15 photos. Take one off first.",
         );
         expect(tx.productImage.create).not.toHaveBeenCalled();
     });
 
     it("refuses a 4th video", async () => {
         await expect(replace([...photos(2), ...videos(4)])).rejects.toThrow(
-            "Already 3 videos — take one off first.",
+            "Already 3 videos. Take one off first.",
         );
         expect(tx.productImage.create).not.toHaveBeenCalled();
     });
@@ -193,7 +193,7 @@ describe("ProductImagesService — 15 photos and 3 videos (#517)", () => {
                 { id: "v3" },
                 { kind: "video", mediaId: "vid_4" },
             ]),
-        ).rejects.toThrow("Already 3 videos — take one off first.");
+        ).rejects.toThrow("Already 3 videos. Take one off first.");
     });
 
     it("refuses a video slot pointing at an image", async () => {

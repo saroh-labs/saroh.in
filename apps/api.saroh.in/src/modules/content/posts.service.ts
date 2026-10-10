@@ -107,7 +107,8 @@ export class PostsService {
         const slug = slugify(dto.slug ?? dto.title);
         if (!slug) {
             throw new BadRequestException({
-                message: "Could not derive a slug from the title",
+                message:
+                    "That title has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }

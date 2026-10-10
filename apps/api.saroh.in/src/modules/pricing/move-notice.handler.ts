@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
 import type { MoveNoticePayload } from "./moves.service";
@@ -29,14 +30,9 @@ function parsePayload(payload: unknown): MoveNoticePayload | null {
     };
 }
 
-/** "12 November 2026", in the business's own time zone. */
+/** "12 Nov 2026", in the business's own time zone. */
 export function moveDateWords(at: Date, zone: string): string {
-    return new Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: zone,
-    }).format(at);
+    return dayWords(at, zone, { year: true });
 }
 
 /**

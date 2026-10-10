@@ -107,7 +107,7 @@ export function retryMandateWords(first: string | null): Words {
 export function retryWords(first: string | null): Words {
     const whose = first ? `${first}'s` : "this";
     return {
-        label: "Retry by pay link",
+        label: "Try again by pay link",
         confirm: `This makes a new pay link for ${whose} renewal, and the link sent before stops working. Saroh doesn't send it: copy it and send it to ${first ?? "them"} yourself.`,
         yes: "Make a new link",
         done: "New pay link ready",

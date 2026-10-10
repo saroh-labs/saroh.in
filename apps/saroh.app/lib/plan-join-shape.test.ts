@@ -96,11 +96,9 @@ describe("starting to join (G20)", () => {
             reason: "error",
             message: already,
         });
-        expect(
-            joinStartAnswer(429, refused("Too many tries just now.")),
-        ).toMatchObject({
+        expect(joinStartAnswer(429, refused("Too many tries."))).toMatchObject({
             reason: "error",
-            message: "Too many tries just now.",
+            message: "Too many tries.",
         });
     });
 

@@ -844,7 +844,7 @@ describe("the header's bag", () => {
                 data: quoteOf({
                     pickup: {
                         address: "12 Hill Road, Bandra",
-                        hours: "Mon–Sat 10:00–19:00, Sun closed",
+                        hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
                     },
                 }),
             },
@@ -855,7 +855,7 @@ describe("the header's bag", () => {
         ).toBeInTheDocument();
         expect(screen.getByText("Pick-up from")).toBeInTheDocument();
         expect(
-            screen.getByText("Mon–Sat 10:00–19:00, Sun closed"),
+            screen.getByText("Mon to Sat 10:00 am to 7:00 pm, Sun closed"),
         ).toBeInTheDocument();
     });
 

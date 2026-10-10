@@ -107,7 +107,7 @@ export type QuoteDiscount =
 /** A place customers visit, to collect a pick-up from. */
 export interface PickupPlace {
     address: string;
-    /** "Mon–Sat 10:00–19:00, Sun closed"; null when not set. */
+    /** "Mon to Sat 10:00 am to 7:00 pm, Sun closed"; null when not set. */
     hours: string | null;
 }
 

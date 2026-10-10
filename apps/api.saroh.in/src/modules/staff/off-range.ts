@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 
+import { clockWords } from "../../common/words-format";
 import type { FieldRefusal } from "../bookings/booking-rules";
 import { formatMinute, isCalendarDate } from "./hours";
 
@@ -85,7 +86,7 @@ export function offRangeRefusal(range: OffRange): FieldRefusal | null {
         }
         if (endMinute <= startMinute) {
             return {
-                message: `The end (${formatMinute(endMinute)}) must be after the start (${formatMinute(startMinute)}).`,
+                message: `The end (${clockWords(formatMinute(endMinute))}) must be after the start (${clockWords(formatMinute(startMinute))}).`,
                 field: "endMinute",
             };
         }

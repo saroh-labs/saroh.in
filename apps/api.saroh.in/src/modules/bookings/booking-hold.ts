@@ -1,6 +1,6 @@
 import type { Prisma } from "@saroh/database";
-import { DateTime } from "luxon";
 
+import { whenWords } from "../../common/words-format";
 import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
@@ -106,9 +106,7 @@ export function holdLineDescription(
     startAt: Date,
     timezone: string,
 ): string {
-    const when = DateTime.fromJSDate(startAt, { zone: timezone })
-        .setLocale("en-US")
-        .toFormat("ccc d LLL yyyy, HH:mm");
+    const when = whenWords(startAt, timezone, { weekday: true, year: true });
     return `${serviceName} · ${when}`;
 }
 

@@ -118,7 +118,7 @@ describe("renewalTag", () => {
                 ],
                 NOW,
             ),
-        ).toBe("Autopay didn't charge — paying by link");
+        ).toBe("Autopay didn't charge, paying by link");
         expect(
             renewalTag(
                 invoice,

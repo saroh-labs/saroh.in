@@ -368,7 +368,7 @@ export async function createCheckoutOrder(
             }
             if (applied && isSerializationFailure(err)) {
                 throw new ConflictException({
-                    message: `${applied.code} was just used by another order. Try again, or remove it.`,
+                    message: `${applied.code} was used by another order a moment ago. Try again, or remove it.`,
                     details: { reason: "bag-changed", field: "discountCode" },
                 });
             }

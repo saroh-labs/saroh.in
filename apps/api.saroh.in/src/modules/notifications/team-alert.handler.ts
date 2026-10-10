@@ -5,8 +5,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { appBase } from "../../common/app-url";
 import type { TeamAlertMail } from "../../common/email";
 import { sendTeamAlertEmail } from "../../common/email";
-import { fromMinor } from "../../common/money";
-import { formatMoney } from "../invoices/invoice-send.service";
+import { moneyWords, moneyWordsMinor } from "../../common/words-format";
 import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
@@ -401,11 +400,11 @@ async function wordOrder(
         notificationId: null,
         ...noticeOf(ORDER_NEW_NOTIFICATION_TYPE, { orderId: order.id }),
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
-        body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+        body: `${moneyWords(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         // Not who it's from: a customer typed that.
         mail: {
             heading: `New order ${order.orderId}`,
-            body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+            body: `${moneyWords(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         },
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
@@ -459,7 +458,7 @@ async function wordFailed(
     // `||`, not `??`: an empty name falls through too.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const who = invoice.billToName?.trim() || contact || "The customer";
-    const amount = formatMoney(fromMinor(intent.amountCents), intent.currency);
+    const amount = moneyWordsMinor(intent.amountCents, intent.currency);
     return {
         event: "failed",
         eventKey: `team:failed:${p.paymentIntentId}`,
@@ -470,12 +469,12 @@ async function wordFailed(
         title: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
         // An autopay charge (D13) has no link they tried: the merchant retries.
         body: intent.viaMandateId
-            ? `${who}'s autopay charge of ${amount} didn't go through. Retry it, or send them a pay link.`
+            ? `${who}'s autopay charge of ${amount} didn't go through. Try it again, or send them a pay link.`
             : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
         mail: {
             heading: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
             body: intent.viaMandateId
-                ? `An autopay charge of ${amount} didn't go through. Retry it, or send the customer a pay link.`
+                ? `An autopay charge of ${amount} didn't go through. Try it again, or send the customer a pay link.`
                 : `A payment of ${amount} didn't go through. The customer can try again from the same link.`,
         },
         path: `/billing/invoices/${invoice.id}`,

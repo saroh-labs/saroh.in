@@ -81,7 +81,7 @@ export class OrganizationGuard implements CanActivate {
 
         const organizationId = resolveOrganizationId(request);
         if (!organizationId) {
-            throw new BadRequestException("Missing organization id");
+            throw new BadRequestException("Missing business id");
         }
 
         request.organizationContext = await this.organizations.resolve(

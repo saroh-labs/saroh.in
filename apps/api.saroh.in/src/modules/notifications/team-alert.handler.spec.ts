@@ -159,7 +159,7 @@ describe("a new order", () => {
             // The row opens the order.
             orderId: "ord_1",
             title: "New order ORD-012 from Asha Rao",
-            body: "₹1,240.00, paid online.",
+            body: "₹1,240, paid online.",
         });
         expect(tx.customerNotice.update.mock.calls[0][0].data).toEqual({
             notificationId: "ntf_1",
@@ -214,7 +214,7 @@ describe("a new order", () => {
             mail: {
                 subject: "Rye & Co: New order ORD-012",
                 heading: "New order ORD-012",
-                body: "₹1,240.00, at the counter.",
+                body: "₹1,240, at the counter.",
                 url: "https://app.saroh.localhost/commerce/orders/ord_1",
                 footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",
             },
@@ -285,7 +285,7 @@ describe("a new order", () => {
         });
         expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
             title: "New order ORD-012 from Ravi",
-            body: "₹1,240.00, at the counter.",
+            body: "₹1,240, at the counter.",
         });
     });
 
@@ -331,13 +331,13 @@ describe("a failed payment", () => {
             // The row opens the invoice.
             invoiceId: "inv_1",
             title: "Payment failed on invoice INV-0042",
-            body: "Meera Iyer's payment of ₹2,400.00 didn't go through. They can try again from the same link.",
+            body: "Meera Iyer's payment of ₹2,400 didn't go through. They can try again from the same link.",
         });
         expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
         // The bell names the customer; Saroh's email doesn't.
         expect(out.emails[0].mail).toMatchObject({
             heading: "Payment failed on invoice INV-0042",
-            body: "A payment of ₹2,400.00 didn't go through. The customer can try again from the same link.",
+            body: "A payment of ₹2,400 didn't go through. The customer can try again from the same link.",
         });
     });
 
@@ -801,7 +801,7 @@ describe("the email", () => {
                 event: "order",
                 mail: {
                     heading: "New order ORD-1",
-                    body: "₹10.00, paid online.",
+                    body: "₹10, paid online.",
                 },
                 path: "/commerce/orders/ord_1",
             },
@@ -810,7 +810,7 @@ describe("the email", () => {
         expect(mail).toEqual({
             subject: "Rye & Co: New order ORD-1",
             heading: "New order ORD-1",
-            body: "₹10.00, paid online.",
+            body: "₹10, paid online.",
             url: "https://app.saroh.localhost/commerce/orders/ord_1",
             footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",
         });
@@ -954,7 +954,7 @@ describe("a new website order (UX-042)", () => {
             mail: {
                 subject: "Rye & Co: New order ORD-012",
                 heading: "New order ORD-012",
-                body: "₹1,240.00, paid online.",
+                body: "₹1,240, paid online.",
                 url: "https://app.saroh.localhost/commerce/orders/ord_1",
                 cta: "Open the order",
                 footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",

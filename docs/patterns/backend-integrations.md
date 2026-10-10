@@ -63,6 +63,21 @@ a note saying so.
   from it rather than counting its own. The QR code maker's email
   (`tools/qr-maker-email.ts`) takes no input at all, because the API never
   receives what the visitor typed.
+- **Current** (10 Oct 2026) — **A sentence the API writes formats its
+  amount, day and time through `src/common/words-format.ts`**, the API's
+  twin of the app's `lib/format`: `moneyWords` and `moneyWordsMinor`
+  ("₹1,250", "₹1,250.50", Indian grouping, paise only when there are
+  some), `dayWords` ("12 Oct", "12 Oct 2025", "Mon 12 Oct"), `timeWords`
+  and `clockWords` ("9:30 am") and `whenWords` ("12 Oct, 9:30 am"). Every
+  caller passes its own time zone: the business's for its notices, India's
+  for Saroh's own billing mail. A notification, an email, a customer's
+  notice, a Home row or a refusal never calls `Intl`, `toLocale…` or
+  luxon's `toFormat` for words: `words-format.spec.ts` fails a file on the
+  email and notification paths that does. A printed invoice's own columns
+  (`paperMoney`, `paperDay`) are a document and stay with the paper, and a
+  field the app formats itself (Home's `time`, the timetable's "HH:mm")
+  stays a value. The words follow `saroh-product.md`: no long dash or
+  semicolon, business, location, a time (never a slot), Try again.
 - **Current** — **A stranger's host name is resolved off the thread pool.**
   Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
   visitor typed: use `dns.promises.Resolver` with a short timeout and one

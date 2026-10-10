@@ -407,7 +407,7 @@ describe("the Bookings tab (A6)", () => {
             api({
                 move: vi.fn().mockResolvedValue({
                     ok: false,
-                    message: "That time just went. Pick another one.",
+                    message: "That time has gone. Pick another one.",
                 }),
             }),
         );
@@ -427,7 +427,7 @@ describe("the Bookings tab (A6)", () => {
         );
         expect(
             await within(sheet).findByText(
-                "That time just went. Pick another one.",
+                "That time has gone. Pick another one.",
             ),
         ).toBeInTheDocument();
         await waitFor(() => expect(calls.moveTimes).toHaveBeenCalledTimes(2));

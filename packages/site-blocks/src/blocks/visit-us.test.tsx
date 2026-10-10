@@ -72,7 +72,7 @@ describe("visitUs (G8)", () => {
             screen.getByRole("heading", { name: "Come and see us" }),
         ).toBeTruthy();
         expect(screen.getByText(/22 Hill Road, Bandra West/)).toBeTruthy();
-        expect(screen.getByText("Tue–Sun 7am–7pm")).toBeTruthy();
+        expect(screen.getByText("Tue to Sun 7am to 7pm")).toBeTruthy();
         expect(screen.getByText("Open now · closes 7pm")).toBeTruthy();
         const call = screen.getByRole("link", {
             name: "Call +91 22 4000 0000",
@@ -139,7 +139,7 @@ describe("visitUs (G8)", () => {
                 now={FRIDAY_6PM}
             />,
         );
-        expect(container.textContent).not.toContain("Tue–Sun");
+        expect(container.textContent).not.toContain("Tue to Sun");
         expect(container.textContent).not.toContain("Open now");
         expect(
             screen.queryByRole("link", { name: "Get directions" }),
@@ -159,7 +159,7 @@ describe("visitUs (G8)", () => {
         expect(
             screen.queryByRole("link", { name: "Get directions" }),
         ).toBeNull();
-        expect(screen.getByText("Tue–Sun 7am–7pm")).toBeTruthy();
+        expect(screen.getByText("Tue to Sun 7am to 7pm")).toBeTruthy();
     });
 
     it("renders nothing when the place is gone, closed or online-only (404)", async () => {
@@ -223,7 +223,7 @@ describe("visitUs (G8)", () => {
             fireEvent.click(screen.getByRole("button", { name: "Try again" }));
             await Promise.resolve();
         });
-        expect(screen.getByText("Tue–Sun 7am–7pm")).toBeTruthy();
+        expect(screen.getByText("Tue to Sun 7am to 7pm")).toBeTruthy();
     });
 
     it("treats a wrong shape as an error, not a crash (#264)", async () => {

@@ -110,7 +110,7 @@ export async function startOrderPayment(
             return {
                 ok: false,
                 message:
-                    "This order can't be paid online just now. Reload the page to see why.",
+                    "This order can't be paid online right now. Reload the page to see why.",
                 settled: true,
             };
         case 429:

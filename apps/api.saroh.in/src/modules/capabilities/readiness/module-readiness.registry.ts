@@ -388,13 +388,13 @@ export class ModuleReadinessRegistry {
                     if (rows.length > 0 && rows.every(keysRefused))
                         return attention(
                             PAYMENTS_KEYS_REFUSED,
-                            "Your payment provider refused its keys — enter them again to take payments.",
+                            "Your payment provider refused its keys. Enter them again to take payments.",
                             "/settings/providers",
                         );
                     if (rows.length > 0 && rows.every(lacksWebhookSecret))
                         return attention(
                             PAYMENTS_WEBHOOK_SECRET_MISSING,
-                            "Payments can't be confirmed — add the webhook signing secret to your payment provider's connection.",
+                            "Payments can't be confirmed. Add the webhook signing secret to your payment provider's connection.",
                             "/settings/providers",
                         );
                     return active();
@@ -402,7 +402,7 @@ export class ModuleReadinessRegistry {
                 if (total > 0)
                     return attention(
                         "PAYMENTS_PROVIDER_DISABLED",
-                        "A connected provider is disabled — re-enable it to take payments.",
+                        "A connected provider is disabled. Re-enable it to take payments.",
                         "/settings/providers",
                     );
                 // On a plan without online payments (catalogue row
@@ -452,7 +452,7 @@ export class ModuleReadinessRegistry {
                     if (rows.length > 0 && rows.every(keysRefused))
                         return attention(
                             COMMUNICATIONS_KEYS_REFUSED,
-                            "Your messaging provider refused its keys — enter them again to send messages.",
+                            "Your messaging provider refused its keys. Enter them again to send messages.",
                             "/settings/providers",
                         );
                     return active();
@@ -460,7 +460,7 @@ export class ModuleReadinessRegistry {
                 if (total > 0)
                     return attention(
                         "COMMUNICATIONS_PROVIDER_DISABLED",
-                        "A connected provider is disabled — re-enable it to send messages.",
+                        "A connected provider is disabled. Re-enable it to send messages.",
                         "/settings/providers",
                     );
                 return setup(

@@ -74,7 +74,7 @@ describe("OrderConfirmation (P4)", () => {
                             pickup: {
                                 name: "Hill Road",
                                 address: "12 Hill Road, Bandra",
-                                hours: "Mon–Sat 10:00–19:00, Sun closed",
+                                hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
                             },
                         },
                     },
@@ -83,7 +83,7 @@ describe("OrderConfirmation (P4)", () => {
             />,
         );
         expect(
-            screen.getByText("Open Mon–Sat 10:00–19:00, Sun closed"),
+            screen.getByText("Open Mon to Sat 10:00 am to 7:00 pm, Sun closed"),
         ).toBeTruthy();
     });
 

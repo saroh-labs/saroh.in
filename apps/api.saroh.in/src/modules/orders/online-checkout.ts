@@ -71,9 +71,9 @@ export const CHECKOUT_OPEN_ALREADY =
 export const CHECKOUT_NOT_COMPLETED = "Checkout not completed";
 export const CHECKOUT_REPLACED = "Replaced by a newer checkout";
 export const CHECKOUT_SOLD_OUT =
-    "Sold out while the customer was paying — refunded automatically";
+    "Sold out while the customer was paying, refunded automatically";
 export const CHECKOUT_PAID_LATE =
-    "Paid after the checkout closed — refunded automatically";
+    "Paid after the checkout closed, refunded automatically";
 
 /**
  * Close an online order that was never paid: CANCELLED, with a STATUS step

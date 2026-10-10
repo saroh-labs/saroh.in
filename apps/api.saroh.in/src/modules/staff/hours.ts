@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 
+import { clockWords } from "../../common/words-format";
 import type { FieldRefusal } from "../bookings/booking-rules";
 
 /**
@@ -35,7 +36,7 @@ export function formatMinute(minute: number): string {
 }
 
 function describe(range: MinuteRange): string {
-    return `${formatMinute(range.startMinute)}–${formatMinute(range.endMinute)}`;
+    return `${clockWords(formatMinute(range.startMinute))} to ${clockWords(formatMinute(range.endMinute))}`;
 }
 
 /** Why one range cannot be, or null. `label` names the day it is on. */
@@ -58,7 +59,7 @@ export function rangeRefusal(
     }
     if (endMinute <= startMinute) {
         return {
-            message: `${label}: the end (${formatMinute(endMinute)}) must be after the start (${formatMinute(startMinute)}).`,
+            message: `${label}: the end (${clockWords(formatMinute(endMinute))}) must be after the start (${clockWords(formatMinute(startMinute))}).`,
             field,
         };
     }
@@ -93,7 +94,7 @@ export function weeklyHoursRefusal(
             range.dayOfWeek < 0 ||
             range.dayOfWeek > 6
         ) {
-            return { message: "A day of the week must be 0–6.", field };
+            return { message: "A day of the week must be 0 to 6.", field };
         }
         const refusal = rangeRefusal(range, DAY_NAMES[range.dayOfWeek], field);
         if (refusal) return refusal;

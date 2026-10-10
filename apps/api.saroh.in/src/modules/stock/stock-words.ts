@@ -167,8 +167,8 @@ export function sellLineName(product: string, variant?: string | null): string {
 }
 
 /**
- * Why an order can't take a line (#511): "Sourdough — Sold out", or
- * "Sourdough — Only 2 left at Hill Road". A storefront sells what is on hand
+ * Why an order can't take a line (#511): "Sourdough: Sold out", or
+ * "Sourdough: Only 2 left at Hill Road". A storefront sells what is on hand
  * and not promised.
  */
 export function sellRefusal(
@@ -176,7 +176,7 @@ export function sellRefusal(
     available: number,
     storefront: string,
 ): string {
-    return `${product} — ${
+    return `${product}: ${
         available > 0 ? onlyLeft(available, storefront) : SOLD_OUT
     }`;
 }
@@ -206,7 +206,7 @@ export const RETURNED_CANT_UNDO =
 export function putBackRefusal(returnable: number): string {
     return returnable > 0
         ? `Only ${returnable} of that line can go back in stock.`
-        : "None of that line can go back in stock — it wasn't handed over, or it's back already.";
+        : "None of that line can go back in stock. It wasn't handed over, or it's back already.";
 }
 
 /**
@@ -215,15 +215,15 @@ export function putBackRefusal(returnable: number): string {
  */
 export function putBackTogetherRefusal(returnable: number): string {
     return returnable > 0
-        ? `Only ${returnable} of these lines can go back in stock together — they came off the same shelf.`
-        : "None of these lines can go back in stock — they're back already.";
+        ? `Only ${returnable} of these lines can go back in stock together. They came off the same shelf.`
+        : "None of these lines can go back in stock. They're back already.";
 }
 
 /** Why a return recorded by hand can't bring back that many of an order. */
 export function orderReturnRefusal(returnable: number): string {
     return returnable > 0
         ? `Only ${returnable} of that order can come back to this shelf.`
-        : "Nothing from that order can come back to this shelf — none was sold from it, or it's back already.";
+        : "Nothing from that order can come back to this shelf. None was sold from it, or it's back already.";
 }
 
 /**
@@ -231,7 +231,7 @@ export function orderReturnRefusal(returnable: number): string {
  * is never edited). Archiving the product ("Not sold") keeps it all.
  */
 export function variantHasHistory(title: string): string {
-    return `${title} has been sold or its stock counted, so it can't be removed — that would erase its stock history. Set the product to Not sold (archive it) instead.`;
+    return `${title} has been sold or its stock counted, so it can't be removed. That would erase its stock history. Set the product to Not sold (archive it) instead.`;
 }
 
 /**
@@ -244,12 +244,12 @@ export function variantHasStock(
     units: number,
     storefront: string,
 ): string {
-    return `${title} has ${units} in stock at ${storefront}, so it can't be removed — those units would be lost. Set the product to Not sold (archive it) instead.`;
+    return `${title} has ${units} in stock at ${storefront}, so it can't be removed. Those units would be lost. Set the product to Not sold (archive it) instead.`;
 }
 
 /** Why a product whose stock was counted or moved can't be deleted. */
 export const PRODUCT_HAS_STOCK_HISTORY =
-    "This product has a stock history, so it can't be deleted — that would erase it. Set it to Not sold instead: it leaves the location and its stock log stays.";
+    "This product has a stock history, so it can't be deleted. That would erase it. Set it to Not sold instead: it leaves the location and its stock log stays.";
 
 export const CLOSED_STOREFRONT =
     "This location is closed, so its stock can't change.";
@@ -258,7 +258,7 @@ export const ALREADY_UNDONE = "This change has already been undone.";
 
 /** Track stock can't go off while open orders hold units (#515). */
 export function promisedRefusal(promised: number): string {
-    return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders — fulfil or cancel them first.`;
+    return `${promised} ${promised === 1 ? "is" : "are"} promised to open orders. Fulfil or cancel them first.`;
 }
 
 /** A product that doesn't track stock is counted only once it does (#515). */

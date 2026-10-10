@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 
+import { timeWords } from "../../common/words-format";
 import { NO_EMAIL_PLAN_SUB, NO_EMAIL_SUB } from "./home-email-setup";
 import type {
     HomeAction,
@@ -108,11 +109,13 @@ function wasDue(at: string | null, zone: string): string | null {
     return at ? `was due ${day(at, zone)}` : null;
 }
 
-/** "Placed today at 14:20", "Placed yesterday", "Placed 14 Sep". */
+/** "Placed today at 2:20 pm", "Placed yesterday", "Placed 14 Sep". */
 export function placedWords(at: string, now: Date, zone: string): string {
     const placed = DateTime.fromISO(at, { zone });
     const today = DateTime.fromJSDate(now, { zone }).startOf("day");
-    if (placed >= today) return `Placed today at ${placed.toFormat("HH:mm")}`;
+    if (placed >= today) {
+        return `Placed today at ${timeWords(placed.toJSDate(), zone)}`;
+    }
     if (placed >= today.minus({ days: 1 })) return "Placed yesterday";
     return `Placed ${placed.toFormat("d LLL")}`;
 }

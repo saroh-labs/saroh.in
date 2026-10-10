@@ -307,7 +307,7 @@ describe("holding at the storefront", () => {
         expect(lost).toHaveLength(1);
         expect(lost[0]).toBeInstanceOf(ConflictException);
         expect((lost[0] as ConflictException).message).toBe(
-            "Rye loaf — Sold out",
+            "Rye loaf: Sold out",
         );
         expect(await shelf(hill, loaf)).toMatchObject({
             onHand: 1,
@@ -325,7 +325,7 @@ describe("holding at the storefront", () => {
         });
         await expect(
             place(hill, [{ productId: bun, quantity: 1 }]),
-        ).rejects.toThrow("Bun — Sold out");
+        ).rejects.toThrow("Bun: Sold out");
 
         await orders.updateStatus(hill, first, ownerId, {
             status: "CANCELLED",
@@ -336,7 +336,7 @@ describe("holding at the storefront", () => {
         });
         await expect(
             place(hill, [{ productId: bun, quantity: 5 }]),
-        ).rejects.toThrow("Bun — Only 4 left at Hill Road");
+        ).rejects.toThrow("Bun: Only 4 left at Hill Road");
         // Holding and releasing are promises: the log has only the count.
         const row = await shelf(hill, bun);
         expect((await entriesOf(row.id)).map((e) => e.kind)).toEqual([
@@ -348,7 +348,7 @@ describe("holding at the storefront", () => {
         const jam = await product("Jam", { hill: 10, online: 0 });
         await expect(
             place(online, [{ productId: jam, quantity: 1 }]),
-        ).rejects.toThrow("Jam — Sold out");
+        ).rejects.toThrow("Jam: Sold out");
         await place(hill, [{ productId: jam, quantity: 2 }]);
         expect(await shelf(hill, jam)).toMatchObject({ promised: 2 });
         expect(await shelf(online, jam)).toMatchObject({ promised: 0 });
@@ -448,7 +448,7 @@ describe("editing an order before preparing", () => {
             kitchen.edit(owner, order, {
                 lines: [{ itemId: item, quantity: 6 }],
             }),
-        ).rejects.toThrow("Tee (S) — Only 1 left at Hill Road");
+        ).rejects.toThrow("Tee (S): Only 1 left at Hill Road");
         await kitchen.edit(owner, order, {
             lines: [{ itemId: item, quantity: 1 }],
         });
@@ -781,7 +781,7 @@ describe("refunds and the shelf", () => {
                 ],
             }),
         ).rejects.toThrow(
-            "Only 2 of these lines can go back in stock together — they came off the same shelf.",
+            "Only 2 of these lines can go back in stock together. They came off the same shelf.",
         );
         const refund = await payments.initiateRefund(owner, order, {
             lines: [

@@ -89,7 +89,7 @@ export class OrganizationOnboardingService {
         const slug = chosen ?? addressFromName(dto.name);
         if (!slug) {
             throw new BadRequestException(
-                "Organization name must contain at least one alphanumeric character",
+                "The name needs at least one letter or number.",
             );
         }
         const problem = addressProblem(slug);
@@ -100,7 +100,7 @@ export class OrganizationOnboardingService {
                 message:
                     chosen !== null
                         ? problem
-                        : `${problem} — choose an address below`,
+                        : `${problem}. Choose an address below.`,
                 details: { field: "address" },
             });
         }
@@ -118,7 +118,7 @@ export class OrganizationOnboardingService {
              */
             if (await addressTaken(tx, slug)) {
                 throw new ConflictException({
-                    message: `${slug}.saroh.app is taken — try another address`,
+                    message: `${slug}.saroh.app is taken. Try another address.`,
                     details: { field: "address" },
                 });
             }

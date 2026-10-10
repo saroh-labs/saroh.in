@@ -37,7 +37,7 @@ export interface TrackStep {
 export type TrackState = "open" | "done" | "refunded" | "cancelled";
 
 /** How long a refund takes to reach the customer (plan A, A7). */
-export const REFUND_LINE = "Money back in 5–7 days";
+export const REFUND_LINE = "Money back in 5 to 7 days";
 
 export interface TrackInput {
     number: string;

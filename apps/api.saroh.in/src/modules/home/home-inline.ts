@@ -1,11 +1,8 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { fromMinor } from "../../common/money";
-import {
-    formatMoney,
-    InvoiceSendService,
-} from "../invoices/invoice-send.service";
+import { moneyWordsMinor } from "../../common/words-format";
+import { InvoiceSendService } from "../invoices/invoice-send.service";
 import type { OrderStage } from "../orders/dto";
 import { nextStages } from "../orders/order-stage";
 import { chargesUnderWay } from "../payments/charge-under-way";
@@ -430,7 +427,7 @@ export class HomeInlineService {
                 kind: "REFUND",
                 ...refundMismatchWords(
                     person,
-                    formatMoney(fromMinor(owed.amountCents), owed.currency),
+                    moneyWordsMinor(owed.amountCents, owed.currency),
                     providerName(intent.provider),
                     intent.orderId
                         ? "order"

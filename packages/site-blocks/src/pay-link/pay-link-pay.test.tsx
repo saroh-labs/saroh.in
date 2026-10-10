@@ -347,7 +347,7 @@ describe("a page with a choice of its own before paying", () => {
                         onClick={paying.pay}
                         disabled={paying.busy}
                     >
-                        Just pay this invoice
+                        Pay this invoice only
                     </button>
                 )}
             />,
@@ -357,14 +357,14 @@ describe("a page with a choice of its own before paying", () => {
         );
         await act(async () => {
             fireEvent.click(
-                screen.getByRole("button", { name: "Just pay this invoice" }),
+                screen.getByRole("button", { name: "Pay this invoice only" }),
             );
             await Promise.resolve();
         });
         expect(start).toHaveBeenCalledTimes(1);
         expect(provider.openCheckout).toHaveBeenCalledTimes(1);
         expect(
-            screen.getByRole("button", { name: "Just pay this invoice" }),
+            screen.getByRole("button", { name: "Pay this invoice only" }),
         ).toBeDisabled();
     });
 });

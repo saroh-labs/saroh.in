@@ -440,7 +440,7 @@ export class PublicBookingsService {
             !isValidSlotStart(availService, rules, startAt)
         ) {
             throw new BadRequestException(
-                "startAt is not a bookable slot for this service",
+                "That isn't a time this service can be booked.",
             );
         }
         const refusal = bookingWindowRefusal(startAt, now, bookingRules);
@@ -552,7 +552,7 @@ export class PublicBookingsService {
             // next order number (P3): tried again, it books.
             onRace: credit
                 ? "That changed while you were booking. Try again."
-                : "This slot is fully booked",
+                : "That time is fully booked.",
             retryOnce: credit !== null || treatmentStore !== null,
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;

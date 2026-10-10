@@ -201,7 +201,7 @@ describe("the words", () => {
         expect(words.sends).toBe(false);
         expect(words.confirm).toContain("Saroh doesn't send it");
         expect(words.confirm).toContain("the link sent before stops working");
-        expect(words.label).toBe("Retry by pay link");
+        expect(words.label).toBe("Try again by pay link");
     });
 
     it("Send reminder names each channel D17's send flag names", () => {
@@ -233,21 +233,21 @@ describe("the words", () => {
 describe("refundMismatchWords (PAY-06)", () => {
     it("says how much goes back, how, and that the order stays unpaid", () => {
         expect(
-            refundMismatchWords("Farah", "₹450.00", "Razorpay", "order"),
+            refundMismatchWords("Farah", "₹450", "Razorpay", "order"),
         ).toEqual({
             label: "Refund",
             confirm:
-                "₹450.00 goes back to Farah through Razorpay, the way they paid. The order stays unpaid, as it is now. A refund can't be undone.",
-            yes: "Refund ₹450.00",
+                "₹450 goes back to Farah through Razorpay, the way they paid. The order stays unpaid, as it is now. A refund can't be undone.",
+            yes: "Refund ₹450",
             done: "Refund on its way to Farah",
             sends: false,
         });
     });
 
     it("speaks of the customer when the row names nobody", () => {
-        const words = refundMismatchWords(null, "₹1.00", "Cashfree", null);
+        const words = refundMismatchWords(null, "₹1", "Cashfree", null);
         expect(words.confirm).toBe(
-            "₹1.00 goes back to the customer through Cashfree, the way they paid. A refund can't be undone.",
+            "₹1 goes back to the customer through Cashfree, the way they paid. A refund can't be undone.",
         );
         expect(words.done).toBe("Refund on its way");
     });
@@ -308,7 +308,7 @@ describe("retryVia", () => {
         );
         expect(
             retryVia(
-                { at: ahead, tag: "Autopay didn't charge — paying by link" },
+                { at: ahead, tag: "Autopay didn't charge, paying by link" },
                 NOW,
             ),
         ).toBe("PAY_LINK");
@@ -393,7 +393,7 @@ describe("HomeInlineService.decorate", () => {
             kind: "REFUND",
             target: "att_1",
             person: "Farah",
-            yes: "Refund ₹450.00",
+            yes: "Refund ₹450",
             sends: false,
             undoable: false,
         });

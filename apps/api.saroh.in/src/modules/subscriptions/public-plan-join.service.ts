@@ -141,7 +141,7 @@ export class PublicPlanJoinService {
         const { organizationId, contactId } = customer;
         if (!this.startLimiter.take(customer.accountId)) {
             throw new HttpException(
-                "Too many tries just now. Wait a few minutes, then try again.",
+                "Too many tries. Wait a few minutes, then try again.",
                 429,
             );
         }

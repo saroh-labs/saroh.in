@@ -139,7 +139,7 @@ export class AddonsService {
             const planId = catalogPlanIdForKey(sub.plan.key);
             if (!catalog || !planId) {
                 throw new ConflictException(
-                    "Add-ons can't be bought just now. Try again later.",
+                    "Add-ons can't be bought right now. Try again later.",
                 );
             }
             const addon = catalog.addons.find((a) => a.id === addonId);

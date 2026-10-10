@@ -202,7 +202,7 @@ export function fixesFor(facts: LinkFacts): Fix[] {
             fixes.push({
                 key: "image-heavy",
                 title: "Make your picture lighter.",
-                body: `Yours is ${kb(image.bytes ?? 0)}. WhatsApp only shows a picture under 300 KB; save it as a JPEG at 1200 × 630.`,
+                body: `Yours is ${kb(image.bytes ?? 0)}. WhatsApp only shows a picture under 300 KB. Save it as a JPEG at 1200 × 630.`,
                 apps: ["whatsapp"],
             });
         }

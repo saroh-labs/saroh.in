@@ -125,7 +125,7 @@ describe("a time, said back", () => {
                 "Asia/Kolkata",
                 now,
             ),
-        ).toBe("3:10pm");
+        ).toBe("3:10 pm");
     });
 
     it("names the day on any other day", () => {
@@ -135,7 +135,7 @@ describe("a time, said back", () => {
                 "Asia/Kolkata",
                 now,
             ),
-        ).toBe("Fri 2 Oct, 6:00pm");
+        ).toBe("Fri 2 Oct, 6:00 pm");
     });
 });
 

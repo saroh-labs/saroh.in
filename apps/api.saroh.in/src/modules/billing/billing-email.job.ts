@@ -6,7 +6,7 @@ import { withGstPaise } from "@saroh/pricing-catalog";
 import { appBase } from "../../common/app-url";
 import type { EmailOutcome, SarohBillingEmail } from "../../common/email";
 import { sendSarohBillingEmail } from "../../common/email";
-import { paperDay, paperMoney } from "../invoices/invoice-paper-view";
+import { dayWords, moneyWordsMinor } from "../../common/words-format";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { BillingEmailPayload } from "./billing-email-payload";
 import { parseBillingEmailPayload } from "./billing-email-payload";
@@ -24,7 +24,7 @@ import { paidFirstMonth } from "./offers";
 import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
 import { composeRenewalReminder } from "./renewal-reminder";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
-import { paiseToRupees, SAROH_TIMEZONE } from "./saroh-invoice-terms";
+import { SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
 import { termEndingOf } from "./term-ending";
 
@@ -112,8 +112,8 @@ export async function billingRecipients(
     return [...new Set(to)];
 }
 
-const money = (paise: number) => paperMoney(paiseToRupees(paise), "INR");
-const day = (d: Date) => paperDay(d.toISOString(), SAROH_TIMEZONE);
+const money = (paise: number) => moneyWordsMinor(paise, "INR");
+const day = (d: Date) => dayWords(d, SAROH_TIMEZONE, { year: true });
 
 @Injectable()
 export class BillingEmailHandler {

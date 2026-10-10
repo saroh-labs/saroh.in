@@ -220,21 +220,21 @@ export default function ProductGridSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your products just now.
+                We couldn&apos;t load your products right now.
             </GridNote>
         );
     }
     if (state.kind === "off") {
         return (
             <GridNote title={title}>
-                Your site doesn&apos;t sell from a storefront yet, or Commerce
-                is off, so this section is left off your live site. Choose where
-                it sells from in the site&apos;s settings.
+                Your site doesn&apos;t sell from a location yet, or Sell is off,
+                so this section is left off your live site. Choose where it
+                sells from in the site&apos;s settings.
             </GridNote>
         );
     }
     if (state.products.length === 0) {
-        const where = state.storefront ?? "your storefront";
+        const where = state.storefront ?? "your location";
         return (
             <GridNote title={title}>
                 {content.source === "picked"

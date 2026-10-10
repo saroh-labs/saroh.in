@@ -206,7 +206,7 @@ export class PrivacyRemovalService {
             });
             if (booked > 0) {
                 throw new ConflictException(
-                    "A booking was just made for them. Try again.",
+                    "A booking was made for them a moment ago. Try again.",
                 );
             }
 

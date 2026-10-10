@@ -136,7 +136,7 @@ export function writeCollections(ctx: OrganizationContext): string {
 export function tooManyProducts(has: number): string {
     const room = Math.max(0, COLLECTION_PRODUCTS_MAX - has);
     return room > 0
-        ? `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products; this one has room for ${room} more.`
+        ? `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products. This one has room for ${room} more.`
         : `A collection holds up to ${COLLECTION_PRODUCTS_MAX} products, and this one is full.`;
 }
 
@@ -278,7 +278,7 @@ export class CollectionsService {
         if (dto.categoryId && productIds.length > 0) {
             throw new BadRequestException({
                 message:
-                    "An automatic collection fills itself from its category — pick products or a category, not both.",
+                    "An automatic collection fills itself from its category. Pick products or a category, not both.",
                 field: "productIds",
             });
         }

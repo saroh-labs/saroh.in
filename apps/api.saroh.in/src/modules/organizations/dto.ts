@@ -142,7 +142,7 @@ export class OnboardOrganizationDto {
     /** Human display name for the organization; also seeds the slug. */
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "An organization name is required" })
+    @MinLength(1, { message: "Enter the business's name." })
     @MaxLength(120)
     name!: string;
 
@@ -388,7 +388,7 @@ export class UpdateOrganizationDto {
     @IsOptional()
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "An organization name is required" })
+    @MinLength(1, { message: "Enter the business's name." })
     @MaxLength(120)
     name?: string;
 

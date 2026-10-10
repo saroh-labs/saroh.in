@@ -66,7 +66,7 @@ export class CategoriesService {
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
-                message: "Could not derive a slug from the name",
+                message: "That name has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }
@@ -356,7 +356,7 @@ export class CategoriesService {
         if (clash) {
             throw new ConflictException({
                 message: exceptId
-                    ? "That name is taken — use Merge to combine them."
+                    ? "That name is taken. Use Merge to combine them."
                     : `There is already a category called ${clash.name}.`,
                 field: "name",
             });

@@ -9,6 +9,7 @@ import {
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
 import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
+import { dayWords } from "./words-format";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -129,7 +130,7 @@ export function existingAccountEmail(to: string, base: string | null): string {
         : "<p>Open Saroh and choose Sign in. If you have forgotten your password, choose Forgot it? on that page.</p>";
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <h2>${esc(EXISTING_ACCOUNT_SUBJECT)}</h2>
-  <p>Someone, probably you, just tried to sign up for Saroh with this email address. It already has an account, so no new one was made.</p>
+  <p>Someone, probably you, tried to sign up for Saroh with this email address. It already has an account, so no new one was made.</p>
   <p>Sign in to carry on. If you have forgotten your password, reset it.</p>
   ${buttons}
   <p style="color:#666;font-size:12px">If this wasn't you, you can ignore this email. Nobody got into your account.</p>
@@ -308,7 +309,7 @@ export function sendChangeEmailConfirmationEmail(
         html: actionEmail(
             "Confirm your email change",
             `We received a request to change your Saroh sign-in email to ${newEmail}. ` +
-                "Confirm below if that was you. If it wasn't, ignore this email — nothing changes.",
+                "Confirm below if that was you. If it wasn't, ignore this email. Nothing changes.",
             confirmUrl,
             "Confirm change",
         ),
@@ -332,7 +333,7 @@ export function sendDeleteAccountEmail(
         html: actionEmail(
             "Confirm account deletion",
             "This permanently deletes your Saroh account and cannot be undone. " +
-                "If you didn't request this, ignore this email — nothing is deleted.",
+                "If you didn't request this, ignore this email. Nothing is deleted.",
             confirmUrl,
             "Delete my account",
         ),
@@ -450,12 +451,7 @@ export interface DataExportReadyMail {
 }
 
 function dayOf(date: Date): string {
-    return date.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "Asia/Kolkata",
-    });
+    return dayWords(date, "Asia/Kolkata", { year: true });
 }
 
 /**
@@ -561,7 +557,7 @@ export function sendSelfTestEmail(
     const bodyHtml = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <p style="background:#fffbe6;border:1px solid #f0d000;border-radius:6px;padding:8px 12px;color:#665500;font-size:13px;margin:0 0 16px">
     ${SAROH_TEST_LABEL} This is a Saroh preview email sent only to your own
-    verified account address. It is not a production message from any Organization.
+    verified account address. It is not a real message from any business.
   </p>
   ${html}
 </div>`;
@@ -628,7 +624,7 @@ export function sendOrganizationInvitationEmail(
         subject: `You've been invited to ${organizationName} on Saroh`,
         html: actionEmail(
             `Join ${organizationName}`,
-            `You've been invited to work on ${organizationName} in Saroh. Accept below to join — the link expires in a week.`,
+            `You've been invited to work on ${organizationName} in Saroh. Accept below to join. The link expires in a week.`,
             acceptUrl,
             "Accept invitation",
         ),
@@ -1022,7 +1018,7 @@ export function siteEmailChangedEmail(businessName: string): string {
     const name = esc(businessName);
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <h2>Your sign-in email changed</h2>
-  <p>The email you use to sign in on ${name}'s website was just changed to another address. This address won't sign you in there any more.</p>
+  <p>The email you use to sign in on ${name}'s website was changed to another address. This address won't sign you in there any more.</p>
   <p>If you didn't make this change, contact ${name} straight away.</p>
   <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice like this one if your sign-in email changes.</p>
 </div>`;

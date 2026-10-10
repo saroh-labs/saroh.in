@@ -1892,7 +1892,7 @@ describe("class packs on bookings (ADR-007)", () => {
                 startAt: START,
                 contactId: "contact_9",
             }),
-        ).rejects.toThrow("This slot is fully booked");
+        ).rejects.toThrow("That time is fully booked.");
     });
 
     it("needs the pack power as well as the booking power to book with a pack", async () => {

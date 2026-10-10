@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { dayWords, moneyWords } from "../../common/words-format";
 import type {
     AccountThreadPost,
     AccountThreadPoster,
 } from "../communications/account-thread";
 import { resolveContact } from "../customer-workspace/resolve-contact";
-import { formatDay, formatMoney } from "../invoices/invoice-send.service";
 import { isPastDue } from "../invoices/invoice-state";
 import { appendMessage } from "./thread-store";
 
@@ -94,12 +94,12 @@ export function invoiceSentence(
     now: Date,
 ): string {
     const what = `invoice ${invoice.number ?? ""}`.trim();
-    const amount = formatMoney(invoice.total, invoice.currency);
+    const amount = moneyWords(invoice.total, invoice.currency);
     const overdue = isPastDue(invoice, now);
     const due = invoice.dueAt
         ? overdue
-            ? ` It was due on ${formatDay(invoice.dueAt, timeZone)}.`
-            : ` It's due by ${formatDay(invoice.dueAt, timeZone)}.`
+            ? ` It was due on ${dayWords(invoice.dueAt, timeZone, { year: true })}.`
+            : ` It's due by ${dayWords(invoice.dueAt, timeZone, { year: true })}.`
         : "";
     const first =
         kind === "INVOICE_REMINDER"

@@ -54,14 +54,14 @@ describe("confirmationOf", () => {
                 pickup: {
                     name: "Hill Road",
                     address: "12 Hill Road",
-                    hours: "Mon–Sat 10:00–19:00, Sun closed",
+                    hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
                 },
             },
         };
         expect(confirmationOf(open)?.fulfilment.pickup).toEqual({
             name: "Hill Road",
             address: "12 Hill Road",
-            hours: "Mon–Sat 10:00–19:00, Sun closed",
+            hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
         });
     });
 

@@ -79,7 +79,7 @@ export function ShareCards({
                 <span className="font-medium">{name}</span>
                 {platform === "whatsapp" && image && !isWhatsappLarge(image) ? (
                     <span className="truncate text-muted-foreground">
-                        small thumbnail — see below
+                        small thumbnail, see below
                     </span>
                 ) : null}
             </figcaption>
@@ -151,8 +151,7 @@ export function ShareCards({
                 and only fetch a published address
                 {liveUrl ? (
                     <>
-                        {" "}
-                        — once you have changed the picture, ask{" "}
+                        . Once you have changed the picture, ask{" "}
                         {inspectorLinks(liveUrl).map((l, i) => (
                             <span key={l.href}>
                                 {i > 0 ? " or " : ""}

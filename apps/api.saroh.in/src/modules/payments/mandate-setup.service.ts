@@ -317,7 +317,7 @@ export class MandateSetupService {
                 );
             }
             throw new ServiceUnavailableException(
-                `${at} didn't answer. Nothing was set up; try again in a few minutes`,
+                `${at} didn't answer. Nothing was set up. Try again in a few minutes`,
             );
         }
     }
@@ -429,7 +429,7 @@ export class MandateSetupService {
                 );
             }
             throw new ServiceUnavailableException(
-                `${at} didn't answer. Nothing was set up; try again in a few minutes`,
+                `${at} didn't answer. Nothing was set up. Try again in a few minutes`,
             );
         }
     }

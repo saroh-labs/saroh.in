@@ -160,11 +160,9 @@ export class OrganizationContextService {
             select: { id: true },
         });
         if (!organization) {
-            throw new NotFoundException("Organization not found");
+            throw new NotFoundException("Business not found");
         }
-        throw new ForbiddenException(
-            "You are not a member of this organization",
-        );
+        throw new ForbiddenException("You aren't a member of this business.");
     }
 
     /** Organizations the user belongs to, with the caller's role, by name. */
@@ -289,7 +287,7 @@ export class OrganizationContextService {
             select: { id: true, name: true, slug: true, kind: true },
         });
         if (!organization) {
-            throw new NotFoundException("Organization not found");
+            throw new NotFoundException("Business not found");
         }
         return { ...organization, kind: kindRead(organization.kind) };
     }

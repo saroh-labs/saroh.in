@@ -530,7 +530,7 @@ export const MOVE_KINDS = [
     ["messages", "message", "messages"],
     ["leads", "lead", "leads"],
     ["submissions", "form entry", "form entries"],
-    ["links", "store record", "store records"],
+    ["links", "location record", "location records"],
 ] as const;
 
 export type MoveKind = (typeof MOVE_KINDS)[number][0];

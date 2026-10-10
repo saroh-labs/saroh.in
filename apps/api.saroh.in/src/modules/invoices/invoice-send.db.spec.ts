@@ -162,7 +162,7 @@ describe("sending an invoice (real database)", () => {
         });
         expect(message?.subject).toContain("Rye & Co.");
         expect(message?.body).toContain(SECRET_LINK_SLOT);
-        expect(message?.body).toContain("₹2,400.00");
+        expect(message?.body).toContain("₹2,400");
 
         const job = await jobFor(message!.id);
         const fake = new FakeCommsProvider("EMAIL");

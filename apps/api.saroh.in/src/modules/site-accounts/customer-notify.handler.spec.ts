@@ -455,7 +455,7 @@ describe("customer.notify — once, and only what still stands", () => {
             NOW,
         );
         expect(append.mock.calls[0][1].body).toBe(
-            "You moved your Check-up to Tue 6 Oct at 11:00.",
+            "You moved your Check-up to Tue 6 Oct at 11:00 am.",
         );
         expect(tx.customerNotice.update.mock.calls[0][0].data).toMatchObject({
             bookingId: "bk_1",

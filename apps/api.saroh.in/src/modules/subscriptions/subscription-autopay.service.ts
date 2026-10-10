@@ -12,6 +12,7 @@ import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { dayWords, moneyWords } from "../../common/words-format";
 import type { TransactionalRecipient } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
 import {
@@ -20,7 +21,6 @@ import {
     renderAutopaySetupLink,
 } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
-import { formatDay, formatMoney } from "../invoices/invoice-send.service";
 import { authorize } from "../organizations/organization-policy";
 import type { AutopayCheck } from "../payments/autopay.service";
 import { AutopayService } from "../payments/autopay.service";
@@ -252,7 +252,7 @@ export class SubscriptionAutopayService {
                 },
             });
             throw new ServiceUnavailableException(
-                `${providerName(started.provider)} didn't give a set-up page. Nothing was sent; try again in a few minutes`,
+                `${providerName(started.provider)} didn't give a set-up page. Nothing was sent. Try again in a few minutes`,
             );
         }
         const limit = fromMinor(started.maxAmountCents);
@@ -280,13 +280,14 @@ export class SubscriptionAutopayService {
                                 firstName: firstNameOf(sub.contact.firstName),
                                 plan: sub.plan.name,
                                 method: METHOD_WORDS[input.method],
-                                limit: formatMoney(limit, started.currency),
+                                limit: moneyWords(limit, started.currency),
                                 check: check
-                                    ? formatMoney(check.amount, check.currency)
+                                    ? moneyWords(check.amount, check.currency)
                                     : null,
-                                expiresOn: formatDay(
+                                expiresOn: dayWords(
                                     started.setupExpiresAt,
                                     sub.timezone,
+                                    { year: true },
                                 ),
                             }),
                             recipient,
