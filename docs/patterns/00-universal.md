@@ -161,16 +161,6 @@ each with why it stops there:
   geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
   chooses between it and the columns. The API's working hours are
   `calendar/working-hours.ts`, read beside the days off.
-- `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
-  F12) — one form holds
-  every Business card (profile, tax and invoices, address, number format)
-  and the cross-field rules that re-check them together; the number-format
-  editor already went to `invoice-number-fields.tsx`, the time zone picker
-  to `time-zone-select.tsx`, and the Hours card, which saves to the
-  storefronts, to `business-hours-section.tsx`. F12's Undo on a save kept
-  its rules out (`lib/organizations/settings-undo.ts`, and the hold and
-  toast in `use-settings-undo.ts`), adding only the calls. Less
-  means a card per file sharing one form context.
 - `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
   People tabs, the member drawer and the invite dialog share the screen's
   roster and role state. Each piece is its own function already; moving them
@@ -280,7 +270,14 @@ with why it stops there:
   note, next steps and leave dialog to `editor-parts.tsx`. A little over;
   what is left shares one component's state.
 
-Split rather than listed: `sites/site-editor.tsx` (2,160 before; under 300 since
+Split rather than listed: `organizations/organization-settings-form.tsx`
+(1,321 before; 219 now) when Settings › Business became rows with a sheet
+each (10 Oct): the page only composes. Its schema, draft and the patch a
+save sends are `business-form.ts`; the rows `business-detail-rows.tsx` and
+`business-tax-rows.tsx`; the sheet `business-field-sheet.tsx`, with its
+fields in `business-sheet-fields.tsx` and `business-tax-fields.tsx`; and
+which sheet is open `use-business-sheets.ts` over
+`lib/organizations/business-rows.ts`. And `sites/site-editor.tsx` (2,160 before; under 300 since
 round-2 G1, #260) along its hooks and panels into `sites/editor/`. Of what it
 became, `editor/use-editor-draft.ts` (409) is a little over: the sections,
 what the server last accepted, the save and its autosave share one set of
