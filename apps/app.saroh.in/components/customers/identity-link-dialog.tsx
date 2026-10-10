@@ -1,14 +1,7 @@
 "use client";
 
+import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@saroh/ui/dialog";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
@@ -55,7 +48,7 @@ export function IdentityLinkDialog({
         startTransition(async () => {
             const result = await linkCustomerAction(contactId, customerId);
             if (result.ok) {
-                showSuccess("Customer linked");
+                showSuccess("Customer linked.");
                 setOpen(false);
             } else {
                 showError(result.error);
@@ -64,116 +57,109 @@ export function IdentityLinkDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            {controlled === undefined ? (
-                <DialogTrigger asChild>
+        <FormDialog
+            open={open}
+            size="lg"
+            trigger={
+                controlled === undefined ? (
                     <Button variant="outline" size="sm">
                         Link commerce record
                         {suggestions.length > 0
                             ? ` (${suggestions.length})`
                             : ""}
                     </Button>
-                </DialogTrigger>
-            ) : null}
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Link a commerce customer</DialogTitle>
-                    <DialogDescription>
-                        These commerce customers match this contact&apos;s exact
-                        email or phone. Confirm only the ones that are the same
-                        person — Saroh never merges automatically, and you can
-                        unlink later.
-                    </DialogDescription>
-                </DialogHeader>
-
-                {suggestions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No matching commerce customers found.
-                    </p>
-                ) : (
-                    <ul className="divide-y rounded-xl border">
-                        {suggestions.map((s, index) => (
-                            <li
-                                key={s.customerId}
-                                style={
-                                    { "--wk-i": index } as React.CSSProperties
-                                }
-                                className="wk-item flex items-center justify-between gap-3 p-3"
-                            >
-                                {/* The name and address wrap, whole, so a
+                ) : undefined
+            }
+            title="Link a commerce customer"
+            description="These commerce customers match this contact's exact email or phone. Confirm only the ones that are the same person. Saroh never merges automatically, and you can unlink later."
+            pending={pending}
+            // Each row has its own Link, so the foot is only the way out.
+            doneOnly
+            onOpen={() => setOpen(true)}
+            onClose={() => setOpen(false)}
+        >
+            {suggestions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    No matching commerce customers found.
+                </p>
+            ) : (
+                <ul className="divide-y rounded-xl border">
+                    {suggestions.map((s, index) => (
+                        <li
+                            key={s.customerId}
+                            style={{ "--wk-i": index } as React.CSSProperties}
+                            className="wk-item flex items-center justify-between gap-3 p-3"
+                        >
+                            {/* The name and address wrap, whole, so a
                                     long email never pushes Link off a
                                     phone's screen. */}
+                            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                                <p className="text-sm font-medium">{s.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {s.email} · matched on{" "}
+                                    {s.matchedOn.join(" + ")}
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                className="wk-press shrink-0"
+                                disabled={pending}
+                                onClick={() => confirm(s.customerId)}
+                            >
+                                Link
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {duplicates.length > 0 ? (
+                <div className="grid gap-2">
+                    <p className="text-sm text-muted-foreground">
+                        These customer records look like the same person. Two
+                        customers aren&apos;t linked. They&apos;re merged into
+                        one.
+                    </p>
+                    <ul className="divide-y rounded-xl border">
+                        {duplicates.map((dup) => (
+                            <li
+                                key={dup.contactId}
+                                className="flex items-center justify-between gap-3 p-3"
+                            >
                                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                     <p className="text-sm font-medium">
-                                        {s.name}
+                                        {dup.name ??
+                                            dup.email ??
+                                            "Another record"}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {s.email} · matched on{" "}
-                                        {s.matchedOn.join(" + ")}
+                                        {dup.email ? `${dup.email} · ` : ""}
+                                        matched on {dup.matchedOn.join(" + ")}
                                     </p>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    className="wk-press shrink-0"
-                                    disabled={pending}
-                                    onClick={() => confirm(s.customerId)}
-                                >
-                                    Link
-                                </Button>
+                                {onMerge ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="shrink-0"
+                                        disabled={pending}
+                                        onClick={() => {
+                                            setOpen(false);
+                                            onMerge(dup);
+                                        }}
+                                    >
+                                        Merge…
+                                    </Button>
+                                ) : (
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        Your role can't merge them
+                                    </span>
+                                )}
                             </li>
                         ))}
                     </ul>
-                )}
-
-                {duplicates.length > 0 ? (
-                    <div className="grid gap-2">
-                        <p className="text-sm text-muted-foreground">
-                            These customer records look like the same person.
-                            Two customers aren&apos;t linked — they&apos;re
-                            merged into one.
-                        </p>
-                        <ul className="divide-y rounded-xl border">
-                            {duplicates.map((dup) => (
-                                <li
-                                    key={dup.contactId}
-                                    className="flex items-center justify-between gap-3 p-3"
-                                >
-                                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                                        <p className="text-sm font-medium">
-                                            {dup.name ??
-                                                dup.email ??
-                                                "Another record"}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {dup.email ? `${dup.email} · ` : ""}
-                                            matched on{" "}
-                                            {dup.matchedOn.join(" + ")}
-                                        </p>
-                                    </div>
-                                    {onMerge ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="shrink-0"
-                                            disabled={pending}
-                                            onClick={() => {
-                                                setOpen(false);
-                                                onMerge(dup);
-                                            }}
-                                        >
-                                            Merge…
-                                        </Button>
-                                    ) : (
-                                        <span className="shrink-0 text-xs text-muted-foreground">
-                                            Your role can't merge them
-                                        </span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ) : null}
-            </DialogContent>
-        </Dialog>
+                </div>
+            ) : null}
+        </FormDialog>
     );
 }

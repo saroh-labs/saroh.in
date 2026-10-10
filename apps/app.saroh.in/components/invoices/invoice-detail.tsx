@@ -20,7 +20,7 @@ import {
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
-import { SendDialog } from "@/components/invoices/send-dialog";
+import { useInvoiceSend } from "@/components/invoices/send-dialog";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
@@ -50,10 +50,7 @@ type Dialog =
     | "cancel"
     | "refund"
     | "newLink"
-    | "newViewLink"
-    | "send"
-    | "remind"
-    | "draftSend";
+    | "newViewLink";
 
 async function copy(text: string): Promise<boolean> {
     try {
@@ -170,6 +167,14 @@ export function InvoiceDetail({
     });
     // A view link just made (#833): shown until something replaces it.
     const [viewUrl, setViewUrl] = useState<string | null>(null);
+    // Sending tells a customer: held ten seconds with Undo, nothing asked,
+    // except from a draft, whose issuing is asked once (`useInvoiceSend`).
+    const sending = useInvoiceSend({
+        invoice,
+        send: canWrite && canSend(send) ? send : null,
+        // It went with a fresh link: the one shown is dead.
+        onSent: () => setViewUrl(null),
+    });
     // A pay link is kept outside React (UX-048); this redraws once it is.
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     const [busy, setBusy] = useState(false);
@@ -272,13 +277,13 @@ export function InvoiceDetail({
         DetailActionId,
         { onClick?: () => void; href?: string }
     > = {
-        draftSend: { onClick: () => setOpen("draftSend") },
+        draftSend: { onClick: sending.askDraft },
         issue: { onClick: () => setOpen("issue") },
         edit: { href: editHref },
         delete: { onClick: () => setOpen("delete") },
-        send: { onClick: () => setOpen("send") },
+        send: { onClick: () => sending.start(false) },
         // One a day: the Payment panel says when.
-        remind: { onClick: () => setOpen("remind") },
+        remind: { onClick: () => sending.start(true) },
         copyLink: { onClick: copyLink },
         copyViewLink: { onClick: copyViewLink },
         pay: { onClick: () => setOpen("pay") },
@@ -497,29 +502,7 @@ export function InvoiceDetail({
                 canSend={sendable}
                 payOnline={payOnline}
             />
-            {send && sendable ? (
-                <SendDialog
-                    open={
-                        open === "send" ||
-                        open === "remind" ||
-                        open === "draftSend"
-                    }
-                    onOpenChange={(v) => {
-                        if (!v) setOpen(null);
-                    }}
-                    invoice={invoice}
-                    send={send}
-                    // It went with a fresh link: the one shown is dead.
-                    onSent={() => setViewUrl(null)}
-                    mode={
-                        open === "remind"
-                            ? "reminder"
-                            : open === "draftSend"
-                              ? "draft"
-                              : "send"
-                    }
-                />
-            ) : null}
+            {sending.overlays}
             <DeleteDraftDialog
                 open={open === "delete"}
                 onOpenChange={dialog("delete")}

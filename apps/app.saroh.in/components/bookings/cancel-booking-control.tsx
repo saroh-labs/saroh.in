@@ -1,21 +1,13 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
-import { Button, buttonVariants } from "@saroh/ui/button";
+import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { FormDialog } from "@/components/shared/form-dialog";
+import { useHold } from "@/components/shared/use-hold";
 import { cancelBooking } from "@/lib/services/actions";
 import type { BookingMoney, CancelPlan } from "@/lib/services/booking-money";
 import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
@@ -26,12 +18,17 @@ import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
  * refreshes the server-rendered page on success. The api cancel is
  * idempotent, so a double click is harmless.
  *
+ * A cancel tells the customer and can't be taken back, so with no money in
+ * it nothing is asked: it waits ten seconds with Undo (`useHold`), as the
+ * calendar's cancel does, and nothing is written until then.
+ *
  * With money paid online for it (E8), it first says what the cancel does
  * with it: refunded before the free-cancel time fixed at booking, if the
  * business's refund policy says so (E30, DEC-058), and kept otherwise.
  * Someone who may refund payments can hand kept money back anyway; anyone
- * else is told who can. Afterwards the toast says what
- * happened, refund refused or still being confirmed included.
+ * else is told who can. That is a choice about money, so it is asked in a
+ * dialog and then made at once. Afterwards the toast says what happened,
+ * refund refused or still being confirmed included.
  */
 export function CancelBookingControl({
     bookingId,
@@ -53,9 +50,12 @@ export function CancelBookingControl({
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [plan, setPlan] = useState<CancelPlan | null>(null);
+    const { send, pending } = useHold();
+    const key = `cancel-booking:${bookingId}`;
+    const held = pending.includes(key);
 
+    /** Asked first, in the dialog: made at once, and said. */
     async function cancel(returnCredit: boolean) {
-        setPlan(null);
         setBusy(true);
         const res = await cancelBooking(
             bookingId,
@@ -66,10 +66,34 @@ export function CancelBookingControl({
             showError(res.error);
             return;
         }
+        setPlan(null);
         const said = cancelledMessage(res.data.money);
         if (said.tone === "error") showError(said.title, said.body);
         else showSuccess(said.title);
         router.refresh();
+    }
+
+    /** No money in it: held ten seconds with Undo, nothing asked. */
+    function cancelHeld() {
+        let sent = "Booking cancelled.";
+        send(key, {
+            soon: "Cancelling in 10 seconds",
+            description: "They're told once it is cancelled.",
+            run: async () => {
+                const res = await cancelBooking(bookingId, {});
+                if (!res.ok) return res;
+                const said = cancelledMessage(res.data.money);
+                router.refresh();
+                if (said.tone === "error") {
+                    showError(said.title, said.body);
+                    return { ok: false, error: "", said: true };
+                }
+                sent = said.title;
+                return { ok: true };
+            },
+            sent: () => sent,
+            failed: "The booking wasn't cancelled.",
+        });
     }
 
     function onCancel() {
@@ -82,7 +106,7 @@ export function CancelBookingControl({
             canRefund,
         });
         if (next) setPlan(next);
-        else void cancel(false);
+        else cancelHeld();
     }
 
     return (
@@ -92,66 +116,62 @@ export function CancelBookingControl({
                 variant="outline"
                 size="sm"
                 onClick={onCancel}
-                disabled={busy}
+                disabled={busy || held}
                 className="wk-press"
             >
-                {busy ? "Cancelling…" : "Cancel"}
+                {busy || held ? "Cancelling…" : "Cancel"}
             </Button>
-            <AlertDialog
+            <FormDialog
                 open={plan !== null}
-                onOpenChange={(open) => {
-                    if (!open) setPlan(null);
-                }}
-            >
-                <AlertDialogContent className="max-w-[420px] gap-0 overflow-hidden p-0 sm:rounded-xl">
-                    <AlertDialogHeader className="space-y-0 px-[22px] pb-1.5 pt-5 text-left">
-                        <AlertDialogTitle className="mb-1.5 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                            Cancel this booking?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-[13px] leading-[1.55] text-muted-foreground">
-                            {plan?.body}
-                            {plan?.treatmentOrderId && canReadOrder ? (
-                                <>
-                                    {" "}
-                                    <Link
-                                        href={`/commerce/orders/${encodeURIComponent(plan.treatmentOrderId)}`}
-                                        className="cursor-pointer font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
-                                    >
-                                        Open the order
-                                    </Link>
-                                </>
-                            ) : null}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="flex-wrap gap-2 px-[22px] py-[18px] sm:space-x-0">
-                        <AlertDialogCancel className="mt-0">
-                            Keep booking
-                        </AlertDialogCancel>
-                        {plan?.canOverride ? (
-                            <AlertDialogAction
-                                className={buttonVariants({
-                                    variant: "outline",
-                                })}
-                                onClick={() => void cancel(true)}
-                            >
-                                Cancel and refund {plan.amount}
-                            </AlertDialogAction>
+                size="sm"
+                title={
+                    plan?.treatmentOrderId ? "Cancel visit?" : "Cancel booking?"
+                }
+                description={
+                    <>
+                        {plan?.body} This cannot be undone.
+                        {plan?.treatmentOrderId && canReadOrder ? (
+                            <>
+                                {" "}
+                                <Link
+                                    href={`/commerce/orders/${encodeURIComponent(plan.treatmentOrderId)}`}
+                                    className="cursor-pointer font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
+                                >
+                                    Open the order
+                                </Link>
+                            </>
                         ) : null}
-                        <AlertDialogAction
-                            className={buttonVariants({
-                                variant: "destructive",
-                            })}
-                            onClick={() => void cancel(false)}
+                    </>
+                }
+                pending={busy}
+                tone="destructive"
+                cancelLabel="Keep booking"
+                saveLabel={
+                    plan?.treatmentOrderId
+                        ? "Cancel visit"
+                        : plan?.keeps
+                          ? `Cancel, keep the ${plan.what}`
+                          : "Cancel booking"
+                }
+                savingLabel="Cancelling…"
+                fieldsClassName="hidden"
+                extra={
+                    plan?.canOverride ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => void cancel(true)}
                         >
-                            {plan?.treatmentOrderId
-                                ? "Cancel visit"
-                                : plan?.keeps
-                                  ? `Cancel, keep the ${plan.what}`
-                                  : "Cancel booking"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            Cancel and refund {plan.amount}
+                        </Button>
+                    ) : null
+                }
+                onClose={() => setPlan(null)}
+                onSubmit={() => cancel(false)}
+            >
+                {null}
+            </FormDialog>
         </>
     );
 }

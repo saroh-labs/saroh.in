@@ -40,7 +40,7 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     ],
     [
         "a subscription",
-        "components/subscriptions/subscription-detail/action-sheets.tsx",
+        "components/subscriptions/subscription-detail/action-dialogs.tsx",
         '"Cancel subscription"',
         "Keep subscription",
     ],
