@@ -91,6 +91,19 @@ describe("admin permission policy", () => {
         );
     });
 
+    it("lets only a Platform Owner lift a legal hold, while placing one needs the lifecycle write (DEC-119)", () => {
+        const holders = (permission: AdminPermission) =>
+            Object.values(AdminRole)
+                .filter((role) => permissionsFor([role]).includes(permission))
+                .sort();
+        expect(holders(AdminPermission.OrganizationLegalHoldLift)).toEqual([
+            AdminRole.PlatformOwner,
+        ]);
+        expect(AdminPermission.OrganizationLegalHoldLift).toBe(
+            "organization:legal-hold:lift",
+        );
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,

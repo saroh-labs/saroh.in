@@ -17,6 +17,11 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
+import {
+    LEGAL_HOLD_CODE,
+    legalHoldRefusal,
+    onLegalHold,
+} from "../organizations/legal-hold";
 import { isOwner } from "../sites/publish-approval";
 import type { DataExportCounts } from "./data-export-build";
 import {
@@ -76,6 +81,11 @@ export function toDataExportView(row: DataExport): DataExportView {
  * permission until the matrix review). A Saroh operator's context is not an
  * owner. Open in every state the business's members may open it, a closing
  * or suspended one included (`@LifecycleWrite("takeout")`).
+ *
+ * **Refused while the business is on legal hold** (DEC-119): asking for an
+ * export and making a link both answer "This business's data is on hold.
+ * Write to contact@saroh.in.", and each refusal is on the business's audit
+ * trail as DENIED. The list still reads.
  */
 @Injectable()
 export class DataExportService {
@@ -110,6 +120,7 @@ export class DataExportService {
     ): Promise<{ export: DataExportView; already: boolean }> {
         assertOwner(ctx);
         const { organizationId } = ctx;
+        await this.refuseOnHold(ctx, AuditAction.DataExportRequested);
         const made = await prisma.$transaction(async (tx) => {
             const key = `data-export:${organizationId}`;
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
@@ -166,6 +177,7 @@ export class DataExportService {
             where: { id: exportId, organizationId: ctx.organizationId },
         });
         if (!row) throw new NotFoundException("Export not found");
+        await this.refuseOnHold(ctx, AuditAction.DataExportDownloaded, row.id);
         if (
             row.status !== DataExportStatus.Ready ||
             !row.storageKey ||
@@ -204,6 +216,26 @@ export class DataExportService {
             actorRoleKey: ctx.roleKey,
         });
         return { url: signed.url, expiresAt: signed.expiresAt };
+    }
+
+    /** On legal hold: refused in words, with the refusal on the trail. */
+    private async refuseOnHold(
+        ctx: OrganizationContext,
+        action: AuditAction,
+        exportId?: string,
+    ): Promise<void> {
+        if (!(await onLegalHold(prisma, ctx.organizationId))) return;
+        await this.audit.record({
+            action,
+            actorUserId: ctx.userId,
+            organizationId: ctx.organizationId,
+            targetType: "data-export",
+            targetId: exportId,
+            outcome: AuditOutcome.Denied,
+            metadata: { reason: LEGAL_HOLD_CODE },
+            actorRoleKey: ctx.roleKey,
+        });
+        throw legalHoldRefusal();
     }
 }
 

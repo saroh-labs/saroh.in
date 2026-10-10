@@ -26,6 +26,11 @@ export interface BusinessRow {
     name: string;
     slug: string;
     lifecycleStatus: LifecycleStatus;
+    /**
+     * On legal hold (DEC-119): its data is kept whatever is asked. Absent
+     * from an older API.
+     */
+    legalHold?: boolean;
     createdAt: string;
     members: number;
     enabledModules: string[];
@@ -52,6 +57,8 @@ export interface BusinessQuery {
     plan?: string;
     module?: string;
     health?: string;
+    /** `on`: only businesses on legal hold. */
+    legalHold?: string;
     cursor?: string;
 }
 
@@ -157,6 +164,14 @@ export interface BusinessView {
         suspensionReason: string | null;
         deletionScheduledAt: string | null;
         deletionReason: string | null;
+        /** Its legal hold (DEC-119): when, why and who; null when none. */
+        legalHold?: LegalHoldFacts | null;
+        /** When its deletion window ended and access was shut off. */
+        deletedRetainedAt?: string | null;
+        /** The day its files and personal data are erased (180 days on). */
+        dataKeptUntil?: string | null;
+        /** When the retention eraser finished with it. */
+        retentionErasedAt?: string | null;
         timezone: string | null;
         country: string | null;
         counts: {
@@ -236,6 +251,15 @@ export interface BusinessView {
     deletionRefunds?: Panel<DeletionRefundRow[]>;
 }
 
+/** A business's legal hold, as its page shows it (DEC-119). */
+export interface LegalHoldFacts {
+    at: string;
+    reason: string | null;
+    byUserId: string | null;
+    /** A name; an email only to an operator who may read personal data. */
+    by: string | null;
+}
+
 /** One step of a business's way out, from the admin ledger (#921). */
 export interface DeletionTrailRow {
     id: string;
@@ -250,8 +274,10 @@ export interface DeletionTrailRow {
         count: number;
         owedMinorByCurrency: Record<string, number>;
     } | null;
-    /** A clean-up run: each step and how it went. */
+    /** A clean-up or an erase run: each step and how it went. */
     steps: { step: string; result: string }[] | null;
+    /** An erase run that isn't finished: `more`, `failed` or `held`. */
+    state?: string | null;
 }
 
 /** A refund a deletion waits on (#921). */

@@ -65,6 +65,10 @@ export const AdminPermission = {
     // permission: Support takes the reports and closes them, and must not
     // need the lifecycle write that suspends a business to do it.
     ReportsResolve: "reports:resolve",
+    // Lift a legal hold on a business (DEC-119). Platform Owners only
+    // (owner, 10 Oct): no other role carries it. Placing one needs the
+    // lifecycle write that suspends.
+    OrganizationLegalHoldLift: "organization:legal-hold:lift",
 } as const;
 
 export type AdminPermission =

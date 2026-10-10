@@ -140,7 +140,8 @@ export type AdminPermission =
     | "pricing:override"
     | "organization:trackers:write"
     | "deployments:run"
-    | "reports:resolve";
+    | "reports:resolve"
+    | "organization:legal-hold:lift";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

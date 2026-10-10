@@ -1,6 +1,8 @@
 import { Panel } from "@/components/panel";
 import type { BusinessView } from "@/lib/businesses";
 import {
+    DATA_KEPT_MEANS,
+    dataKeptLine,
     formatMinor,
     refundStage,
     trailDetail,
@@ -13,6 +15,8 @@ import { providerName } from "@/lib/what-they-see";
  * A business's way out on its page (#921, owner 9 Oct): the refunds its
  * deletion waits on, and the deletion trail from the admin ledger. Each
  * shows only when there is something to show; neither offers a write.
+ * A deleted business's trail opens with how long its data is kept
+ * ("Data kept until ‹date›", DEC-119).
  */
 export function DeletionPanels({
     view,
@@ -30,9 +34,10 @@ export function DeletionPanels({
     const showRefunds =
         refunds !== undefined &&
         (refunds.status === "failed" || refunds.data.length > 0);
+    const kept = dataKeptLine(facts);
     const showTrail =
         trail !== undefined &&
-        (trail.status === "failed" || trail.data.length > 0);
+        (trail.status === "failed" || trail.data.length > 0 || kept !== null);
 
     return (
         <>
@@ -99,6 +104,19 @@ export function DeletionPanels({
                 >
                     {(rows) => (
                         <ol className="grid gap-3">
+                            {kept !== null && (
+                                <li
+                                    className="grid gap-0.5 rounded-lg border px-3 py-2"
+                                    data-testid="data-kept"
+                                >
+                                    <span className="text-sm font-medium">
+                                        {kept}
+                                    </span>
+                                    <p className="text-[13px] text-muted-foreground">
+                                        {DATA_KEPT_MEANS}
+                                    </p>
+                                </li>
+                            )}
                             {rows.map((row) => (
                                 <li key={row.id} className="grid gap-0.5">
                                     <div className="flex flex-wrap items-baseline justify-between gap-x-3">

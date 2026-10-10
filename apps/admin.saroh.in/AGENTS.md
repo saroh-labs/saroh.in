@@ -47,6 +47,17 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   audit trail for every start, and for every one refused for its
   environment, by the rate limit or by GitHub. A console deploy always
   builds; merges still deploy only what changed.
+- **A legal hold shows wherever a business does** (DEC-119): a "Legal
+  hold" badge on the directory (filter "On legal hold") and the summary
+  strip, and a notice at the top of the business page with who placed it,
+  when and why. Suspend carries the checkbox "Suspended for activity the
+  law prohibits — keep its data"; Place legal hold is offered on a business
+  already suspended, closing or deleted (`organization:lifecycle:write`),
+  and Lift legal hold only to `organization:legal-hold:lift`, which
+  Platform Owners alone hold. A held business is offered no Lift
+  suspension, Cancel deletion or Schedule deletion: the API refuses them. A
+  deleted business's deletion trail opens with "Data kept until ‹date›"
+  (180 days after it was deleted, `lib/deletion-words.ts`).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`) import `next/headers`; a client component takes types from them,

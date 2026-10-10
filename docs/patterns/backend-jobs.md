@@ -61,6 +61,14 @@
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
+- **Current** (DEC-119) — **A job that deletes asks about the legal hold.**
+  A business on legal hold (`organizations/legal-hold.ts`) keeps every row
+  and file. A sweep reads the held ids once a run (`heldOrganizationIds`)
+  and leaves them out of the read and of the delete; a job that erases one
+  business checks under the business's row lock (`onLegalHoldLocked`,
+  `inEraseTx`). `organizations/legal-hold.deletes.spec.ts` scans for jobs
+  that delete and fails a new one until it is listed as hold-aware or as
+  deleting nothing of a business's, with why.
 
 ### Advisory lock registry — **Current**
 
@@ -79,6 +87,15 @@ waits while holding one.
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
+
+Two row locks do the same work without an advisory key (DEC-119), both on
+the business's own `Organization` row, `FOR SHARE`, held to the end of the
+transaction:
+
+| Lock                            | Serialises                                                                                                                                                | Where                                                                                                                 |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Organization` row, `FOR SHARE` | A destructive write against placing a legal hold (which updates that row): the hold waits for the write under way, and every write after it sees the hold | `organizations/legal-hold.ts` (`onLegalHoldLocked`: the clean-up's keys, a privacy removal's last transaction)        |
+| `Organization` row, `FOR SHARE` | The same, for every write of the retention eraser, which also checks the business is still `DELETED_RETAINED`                                             | `admin/retention-erase-writes.ts` (`inEraseTx`); a contact is then locked `FOR UPDATE`, as a privacy removal locks it |
 
 ### Know what the warnings mean — **Current**
 
@@ -115,7 +132,8 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   that claims the job first wins and the cancel says so. A cancelled job is
   `CANCELLED`, terminal like `DONE`; nothing claims it again.
 - **Refused on purpose** (`CANCEL_REFUSED`): the self-rescheduling sweeps
-  (`ensureScheduled` would start the chain again), `subscription.charge`
+  (`ensureScheduled` would start the chain again; `organization.retention.erase`
+  and `security-logs.retention` among them), `subscription.charge`
   (its steps hand on to each other) and `site.go_live` (the release keeps
   its schedule; the business cancels it from its Website). A new chain or a
   job whose state lives elsewhere adds its type there.
@@ -134,7 +152,9 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
   `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
   last step (`admin-access.service.ts`) — and queues its clean-up on the
-  same transaction. **Not while its customers are owed a refund** (owner,
+  same transaction. **Never a business on legal hold** (DEC-119): it isn't
+  listed, the write is fenced on `legalHoldAt`, and it stays
+  `PENDING_DELETION` until a Platform Owner lifts the hold. **Not while its customers are owed a refund** (owner,
   9 Oct): `payments/refunds-outstanding.ts`, read inside that transaction,
   finds every refund owed, refused, being sent or unconfirmed by its
   provider (Home's and Order Detail's own definitions, and queued
@@ -148,18 +168,26 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   orders, invoices, credit notes, customers and the audit trails are
   records, ADR-008).
 - **`organization.deletion.cleanup`** (#921, one per business,
-  `admin/organization-deletion-cleanup.handler.ts`) clears what a deleted
-  business leaves behind, each step idempotent and tried whatever the others
-  did: its pending jobs cancelled (but the clean-up itself,
+  `admin/organization-deletion-cleanup.handler.ts`) shuts a deleted
+  business's access off, and **keeps its data and its files** (DEC-119:
+  until then it deleted the files on day one). Each step is idempotent and
+  tried whatever the others did: its pending jobs cancelled (but the clean-up itself,
   `billing.provider.cancel`, `subscription.charge`, which stands aside on
   its own, and `payments.send-refund` — a customer's money is never called
   off), Saroh's subscription cancelled at the provider and then recorded
   CANCELLED (provider first: no answer writes nothing), custom hostnames
-  deleted at Cloudflare and the claims released, media out of storage and
-  their rows deleted, the customers' active autopay mandates read and
+  deleted at Cloudflare and the claims released, the customers' active
+  autopay mandates read and
   logged per provider (deletion cancels none there), then the payment and
-  messaging keys deleted (`CommunicationProvider` too) — never while a
-  refund is still owed, which fails the step so it is retried. Every
+  messaging keys deleted (`CommunicationProvider` too) at once — they are
+  secrets, not records — never while a
+  refund is still owed, which fails the step so it is retried. **On legal
+  hold it removes nothing**: a run that finds the business held stands
+  aside whole, notes it on the ledger and ends without failing (so it is
+  neither retried nor flagged), a hold placed mid-run stops every
+  destructive step after it (`CLEANUP_DESTRUCTIVE_STEPS`, the keys under
+  the business's row lock), and lifting the hold queues the clean-up
+  again. Every
   provider call logs one `deletion_provider_call` line
   (`devops-observability.md`), and each run writes an
   `organization.deletion.cleanup` ledger row with every step's result: the
@@ -177,6 +205,59 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   ledger (`system:organization-deletion`, `organization.deleted`) and the
   business's own history in that transaction; the log line carries counts
   and ids only.
+
+## Retention — **Current** (DEC-119)
+
+How long things are kept is one file, `organizations/retention.ts`
+(`RETENTION_AFTER_DELETION_DAYS` 180, `SECURITY_LOG_RETENTION_DAYS` 365);
+the Privacy Policy states both.
+
+- **`organization.retention.erase`** is a daily self-rescheduling job
+  (`admin/organization-retention-erase.handler.ts`), one PENDING run at a
+  time (`Job_one_pending_organization_retention_erase`), restarted by the
+  admin module's six-hour check and at boot. It erases a business that has
+  been `DELETED_RETAINED` for 180 days (`deletedRetainedAt`; the
+  `RETENTION_AFTER_DELETION_DAYS` variable can lengthen that, never shorten
+  it) and isn't erased yet (`retentionErasedAt`), in the steps of
+  `admin/retention-erase-plan.ts`: its files (`MediaService
+.removeAllForDeletedBusiness`), class waitlists, every contact by the
+  privacy removal's own writes (`removeDetailsInTx`, each in its own
+  transaction), the store customers no contact reached, a business-wide
+  pass (orders' recipients and walk-ins, bookers, messages, reviews, the
+  CRM, the team's notices, invitations and diary names) and the detailed
+  analytics events. Then it stamps `retentionErasedAt` with the admin
+  ledger and the business's history in one transaction. **Never invoices,
+  credit notes or an order's tax facts** (ADR-008); `RETENTION_KEPT` lists
+  what stays. A new field a privacy removal keeps (`personal-data.ts`) or a
+  relation it keeps (`REMOVAL_RULES`) needs a decision in
+  `KEPT_FIELD_DECISIONS` / `KEPT_RELATION_DECISIONS`:
+  `retention-erase-plan.spec.ts` fails without one.
+- **Refused under legal hold, and while a refund is owed.** A held business
+  is never listed and is checked again before it starts; every write runs
+  in `inEraseTx`, under the business's row lock, and the files ask before
+  every batch, so a hold placed mid-run stops it within one small
+  transaction. A business that still owes a customer a refund waits, as
+  the clean-up's keys do.
+- **Resumable.** A failing step is logged by name, the business isn't
+  stamped, and the next run starts again; what is already gone isn't
+  found. At most 1,000 contacts a business a run, then back in a minute
+  rather than a day. Each unfinished run is one
+  `organization.retention.erase` ledger row a day per outcome; the
+  finished one names every step and count. It keeps its lease
+  (`keepJobLease`) and can't be cancelled (`CANCEL_REFUSED`). Counts and
+  ids only in the log.
+- **`security-logs.retention`** is the daily self-rescheduling sweep
+  (`admin/security-log-retention.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_security_logs_retention`). It deletes `Session` and
+  `CustomerSession` rows a year after they ended (`expiresAt`; a live
+  session is never touched), and `CustomerSignInCode`, `AuditLog` and
+  `SecretAccessLog` rows a year after they were made: 1,000 ids a
+  statement, at most 20 batches a table a run, back in a minute when a
+  table stops at its cap. Nothing pruned these before. **Never
+  `AuditEvent`, `AdminAuditEvent` or `AdminAccessSession`**: the audit
+  trails are records. A business on legal hold keeps its rows, and its
+  members their sign-in sessions. It logs counts per table.
+- **`analytics.retention`** (below) leaves a held business's events too.
 
 ## Data export — **Current** (DEC-117)
 
@@ -200,6 +281,10 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   export EXPIRED (storage first: a failed delete is retried with the key
   still on the row). The deletion clean-up never cancels it
   (`CLEANUP_KEEPS_JOB_TYPES`), so a deleted business's zip still goes.
+- **On legal hold no export is made** (DEC-119): asking and linking are
+  refused in the service, and a build queued before the hold marks its
+  export FAILED with the hold's sentence. `data-export.expire` still runs
+  for a held business: the zip is a copy, and the records stay.
 
 ## Insights rollups — **Current** (DEC-075)
 
@@ -223,7 +308,8 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   no stamp is kept. It **never deletes an aggregate**: the daily rollups
   outlive their events, and `analytics.aggregate` refuses to rebuild a day
   that starts before the 400-day cutoff (`pastRetention`), since what is
-  left of it would shrink its rollup. It logs counts only.
+  left of it would shrink its rollup. It logs counts only. A business
+  on legal hold keeps its events until the hold is lifted (DEC-119).
 
 ## Custom-domain re-check — **Current** (#860)
 

@@ -56,6 +56,14 @@ import {
     ORGANIZATION_DELETION_TYPE,
     OrganizationDeletionHandler,
 } from "./organization-deletion.handler";
+import {
+    ORGANIZATION_RETENTION_ERASE_TYPE,
+    OrganizationRetentionEraseHandler,
+} from "./organization-retention-erase.handler";
+import {
+    SECURITY_LOG_RETENTION_TYPE,
+    SecurityLogRetentionHandler,
+} from "./security-log-retention.handler";
 
 /** How often a stopped deletion chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
@@ -77,7 +85,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         PricingModule,
         WaitlistModule,
         JobsModule,
-        // A deleted business's files, removed by its clean-up (#921).
+        // A deleted business's files, erased when its retention ends
+        // (`organization.retention.erase`, DEC-119).
         MediaStorageModule,
     ],
     controllers: [
@@ -122,6 +131,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // and what a deleted business leaves behind (#921).
         OrganizationDeletionHandler,
         OrganizationDeletionCleanupHandler,
+        // 180 days after deletion: files and personal data erased (DEC-119).
+        OrganizationRetentionEraseHandler,
+        // Security logs kept one year (DEC-119).
+        SecurityLogRetentionHandler,
     ],
 })
 export class AdminModule implements OnModuleInit, OnModuleDestroy {
@@ -131,6 +144,8 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         private readonly registry: JobHandlerRegistry,
         private readonly deletion: OrganizationDeletionHandler,
         private readonly cleanup: OrganizationDeletionCleanupHandler,
+        private readonly retentionErase: OrganizationRetentionEraseHandler,
+        private readonly securityLogs: SecurityLogRetentionHandler,
     ) {}
 
     /**
@@ -147,10 +162,22 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
             ORGANIZATION_DELETION_CLEANUP_TYPE,
             this.cleanup.handle,
         );
+        this.registry.register(
+            ORGANIZATION_RETENTION_ERASE_TYPE,
+            this.retentionErase.handle,
+        );
+        this.registry.register(
+            SECURITY_LOG_RETENTION_TYPE,
+            this.securityLogs.handle,
+        );
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());
+        await this.retentionErase.schedule(new Date());
+        await this.securityLogs.schedule(new Date());
         this.chainCheck = setInterval(() => {
             void this.deletion.ensureScheduled();
+            void this.retentionErase.ensureScheduled();
+            void this.securityLogs.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

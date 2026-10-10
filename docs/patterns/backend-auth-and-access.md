@@ -487,6 +487,22 @@ orgId)` (`organizations/organization-kind.ts`).
   refusal names no state, and the site's shop, booking page, packs and plans
   read the lifecycle through `orders/checkout-paused.ts`
   (`takingNewActivity`) and say what a paused site says (#800).
+- **Current** (DEC-119) — **A legal hold keeps a business's data, in
+  every state.** `Organization.legalHoldAt`, read only through
+  `organizations/legal-hold.ts`. An operator places one with
+  `organization:lifecycle:write` — with the suspension, or on a business
+  already suspended, closing or deleted (`AdminLifecycleService
+.placeLegalHold`) — and only a Platform Owner lifts it
+  (`organization:legal-hold:lift`, which no other role carries), each with
+  a reason, on the admin ledger with it and on the business's history
+  without it. It is not a lifecycle state: `LEGAL_HOLD_DECISIONS` in
+  `organization-lifecycle.policy.ts` says, per state, whether a hold may be
+  placed and whether a held business may be moved there (never to active,
+  never towards deletion), and a new state is a compile error there too.
+  While held, a privacy removal and "Download your data" are refused with
+  `details.code` `LEGAL_HOLD` and the words "This business's data is on
+  hold. Write to contact@saroh.in.", each refusal audited DENIED; every
+  job that deletes leaves the business alone (`backend-jobs.md`).
 - **Current** (DEC-117) — **Download your data is the owner's, by role.**
   `data-export/`: `POST`/`GET organizations/:org/data-exports` and
   `POST …/:id/link`, `isOwner` in the service (no new permission, DEC-039),

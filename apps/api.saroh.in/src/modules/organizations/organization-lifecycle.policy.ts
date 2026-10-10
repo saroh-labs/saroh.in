@@ -29,6 +29,12 @@
  * until it has a row, and `organization-lifecycle.policy.spec.ts` checks the
  * database's CHECK constraint names no state this table lacks and that each
  * consumer still asks it.
+ *
+ * **A legal hold is not a state** (DEC-119, `legal-hold.ts`): a held
+ * business keeps the row it is in. What the hold adds is decided here too,
+ * per state, in {@link LEGAL_HOLD_DECISIONS}: whether a hold may be placed
+ * on a business in that state, and whether a held business may be moved
+ * *to* it. A new state is a compile error there as well.
  */
 export const OrganizationLifecycleStatus = {
     Active: "ACTIVE",
@@ -87,6 +93,54 @@ export const LIFECYCLE_DECISIONS: Readonly<
 export const ORGANIZATION_LIFECYCLE_STATES = Object.keys(
     LIFECYCLE_DECISIONS,
 ) as OrganizationLifecycleStatus[];
+
+export interface LegalHoldDecision {
+    /** May an operator place a hold on a business in this state? */
+    place: boolean;
+    /** May a business on legal hold be moved to this state? */
+    enter: boolean;
+}
+
+/**
+ * What a legal hold means for each state (DEC-119, owner 10 Oct). The hold
+ * keeps a business's data "even if deletion was requested", so a held
+ * business never moves towards deletion; and it is never active, so its
+ * workspace takes no write that could delete a record.
+ */
+export const LEGAL_HOLD_DECISIONS: Readonly<
+    Record<OrganizationLifecycleStatus, LegalHoldDecision>
+> = {
+    // An active business is suspended with the hold, never held as it is;
+    // and a held one isn't reinstated until the hold is lifted.
+    ACTIVE: { place: false, enter: false },
+    // Where a hold normally sits: suspended for what the law prohibits.
+    SUSPENDED: { place: true, enter: true },
+    // A hold may land on a business already closing (the sweep then leaves
+    // it); a held business's deletion can't be scheduled.
+    PENDING_DELETION: { place: true, enter: false },
+    // A hold may land on a deleted business inside its 180 days (the
+    // clean-up and the eraser then leave it); the sweep never deletes a
+    // held one.
+    DELETED_RETAINED: { place: true, enter: false },
+};
+
+/** May a hold be placed on a business in this state? Unknown: no. */
+export function legalHoldMayBePlaced(status: string): boolean {
+    return (
+        (LEGAL_HOLD_DECISIONS as Partial<Record<string, LegalHoldDecision>>)[
+            status
+        ]?.place ?? false
+    );
+}
+
+/** May a business on legal hold be moved to this state? Unknown: no. */
+export function legalHoldAllowsMoveTo(status: string): boolean {
+    return (
+        (LEGAL_HOLD_DECISIONS as Partial<Record<string, LegalHoldDecision>>)[
+            status
+        ]?.enter ?? false
+    );
+}
 
 /**
  * The row for a stored state. A value the table doesn't know (the column is
