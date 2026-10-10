@@ -20,6 +20,7 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { chipClass } from "@/components/shared/chip";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -417,14 +418,6 @@ export function InvoiceForm({
         );
     }
 
-    const chip = (on: boolean) =>
-        cn(
-            "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
-            on
-                ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
-        );
-
     return (
         <>
             {details.step}
@@ -744,7 +737,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === "kept"}
                                     onClick={() => form.setValue("due", "kept")}
-                                    className={chip(due === "kept")}
+                                    className={chipClass(due === "kept")}
                                 >
                                     <ViewerDate
                                         iso={draft.dueAt}
@@ -759,7 +752,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === d.days}
                                     onClick={() => form.setValue("due", d.days)}
-                                    className={chip(due === d.days)}
+                                    className={chipClass(due === d.days)}
                                 >
                                     {d.label}
                                 </button>

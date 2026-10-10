@@ -92,7 +92,6 @@ export function DepositField({
                     <Chip
                         key={value}
                         on={deposit === value}
-                        className="h-[34px] text-[13px]"
                         // Locked: off, or the deposit it already has.
                         disabled={
                             lock !== null && value !== "NONE" && value !== saved

@@ -11,12 +11,10 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { cn } from "@saroh/ui/lib/utils";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { ArrowDown, ArrowUp, Check, Lock } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
 import { OptionSelect } from "@/components/shared/option-select";
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type {
     NumberFormat,
     NumberPart,
@@ -38,6 +36,7 @@ import {
     RESTART_LABEL,
     SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
+import { Segmented } from "@saroh/ui/segmented";
 
 /** The four form values the editor writes. */
 export interface NumberFieldValues {
@@ -249,37 +248,32 @@ export function InvoiceNumberFields({
                     <FormItem {...at("160px", false)}>
                         <FormLabel>Separator</FormLabel>
                         <FormControl>
-                            <ToggleGroup
-                                type="single"
+                            <Segmented
+                                label="Separator"
                                 value={
                                     field.value === ""
                                         ? NO_SEPARATOR
                                         : field.value
                                 }
-                                onValueChange={(v) => {
-                                    if (v) {
-                                        field.onChange(
-                                            v === NO_SEPARATOR ? "" : v,
-                                        );
-                                    }
-                                }}
-                                aria-label="Separator"
-                                className={SEGMENTED}
-                            >
-                                {NUMBER_SEPARATORS.map((s) => (
-                                    <ToggleGroupItem
-                                        key={s || NO_SEPARATOR}
-                                        value={s || NO_SEPARATOR}
-                                        aria-label={SEPARATOR_NAME[s]}
-                                        className={cn(
-                                            SEGMENT,
-                                            s !== "" && "font-mono",
-                                        )}
-                                    >
-                                        {SEPARATOR_LABEL[s]}
-                                    </ToggleGroupItem>
-                                ))}
-                            </ToggleGroup>
+                                onValueChange={(v) =>
+                                    field.onChange(v === NO_SEPARATOR ? "" : v)
+                                }
+                                options={NUMBER_SEPARATORS.map((s) => ({
+                                    value: s || NO_SEPARATOR,
+                                    name: SEPARATOR_NAME[s],
+                                    label: (
+                                        <span
+                                            className={
+                                                s !== ""
+                                                    ? "font-mono"
+                                                    : undefined
+                                            }
+                                        >
+                                            {SEPARATOR_LABEL[s]}
+                                        </span>
+                                    ),
+                                }))}
+                            />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -310,28 +304,19 @@ export function InvoiceNumberFields({
                     <FormItem {...at("100%")}>
                         <FormLabel>Numbers restart</FormLabel>
                         <FormControl>
-                            <ToggleGroup
-                                type="single"
+                            <Segmented
+                                label="Numbers restart"
                                 value={field.value}
-                                onValueChange={(v) => {
-                                    if (v) field.onChange(v);
-                                }}
-                                aria-label="Numbers restart"
-                                className={SEGMENTED}
-                            >
-                                {restarts.map((r) => (
-                                    <ToggleGroupItem
-                                        key={r}
-                                        value={r}
-                                        disabled={r === "MONTH" && !hasMonth}
-                                        className={SEGMENT}
-                                    >
-                                        {r === "NEVER"
+                                onValueChange={field.onChange}
+                                options={restarts.map((r) => ({
+                                    value: r,
+                                    label:
+                                        r === "NEVER"
                                             ? "Never"
-                                            : RESTART_LABEL[r]}
-                                    </ToggleGroupItem>
-                                ))}
-                            </ToggleGroup>
+                                            : RESTART_LABEL[r],
+                                    disabled: r === "MONTH" && !hasMonth,
+                                }))}
+                            />
                         </FormControl>
                         <FormDescription>
                             {needsFinancialYear

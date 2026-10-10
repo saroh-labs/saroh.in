@@ -14,13 +14,12 @@ import {
 } from "@saroh/ui/select";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { Textarea } from "@saroh/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type { GridCatalogueLoad } from "@/components/sites/use-grid-catalogue";
 import { useGridCatalogue } from "@/components/sites/use-grid-catalogue";
 import type { ProductGridContent } from "@/lib/sites/service";
 
+import { Segmented } from "@saroh/ui/segmented";
 import {
     DisplayOptions,
     hiddenFlag,
@@ -78,8 +77,8 @@ export function ProductGridFieldsView({
             </Field>
 
             <Field label="Show">
-                <ToggleGroup
-                    type="single"
+                <Segmented
+                    label="Which products show"
                     value={source}
                     onValueChange={(v) => {
                         // Newest is the default, so it is stored as absent.
@@ -102,19 +101,12 @@ export function ProductGridFieldsView({
                             });
                         }
                     }}
-                    aria-label="Which products show"
-                    className={SEGMENTED}
-                >
-                    <ToggleGroupItem value="newest" className={SEGMENT}>
-                        Newest
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="collection" className={SEGMENT}>
-                        A collection
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="picked" className={SEGMENT}>
-                        Picked
-                    </ToggleGroupItem>
-                </ToggleGroup>
+                    options={[
+                        { value: "newest", label: "Newest" },
+                        { value: "collection", label: "A collection" },
+                        { value: "picked", label: "Picked" },
+                    ]}
+                />
             </Field>
             {source === "newest" ? (
                 <p className="-mt-1.5 text-xs text-muted-foreground">
@@ -140,8 +132,8 @@ export function ProductGridFieldsView({
             ) : null}
 
             <Field label="How many">
-                <ToggleGroup
-                    type="single"
+                <Segmented
+                    label="How many products show"
                     value={String(c.count ?? 4)}
                     onValueChange={(v) => {
                         const n = Number(v);
@@ -151,19 +143,11 @@ export function ProductGridFieldsView({
                         // Four is the default, so it is stored as absent.
                         patch({ count: n === 4 ? undefined : n });
                     }}
-                    aria-label="How many products show"
-                    className={SEGMENTED}
-                >
-                    {COUNTS.map((n) => (
-                        <ToggleGroupItem
-                            key={n}
-                            value={String(n)}
-                            className={SEGMENT}
-                        >
-                            {`Up to ${n}`}
-                        </ToggleGroupItem>
-                    ))}
-                </ToggleGroup>
+                    options={COUNTS.map((n) => ({
+                        value: String(n),
+                        label: `Up to ${n}`,
+                    }))}
+                />
             </Field>
 
             <DisplayOptions

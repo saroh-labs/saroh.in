@@ -6,6 +6,7 @@ import Link from "next/link";
 import { OptionSelect } from "@/components/shared/option-select";
 import { productSettingsHref } from "@/lib/products/links";
 
+import { chipClass } from "@/components/shared/chip";
 import { boxClass, MoneyBox } from "./fields";
 
 /**
@@ -160,12 +161,7 @@ export function OptionChoice({
                             onClick={() => {
                                 if (!on) onPick(o);
                             }}
-                            className={cn(
-                                "h-7 rounded-full border px-2.5 text-[12px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {o.name}
                         </button>

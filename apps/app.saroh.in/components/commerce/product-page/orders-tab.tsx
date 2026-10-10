@@ -13,6 +13,7 @@ import type { ProductOverview } from "@/lib/products/overview";
 import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     PanelFailed,
     PanelForbidden,
@@ -84,12 +85,7 @@ export function ProductOrdersTab({
                             href={f === "open" ? here : `${here}&orders=recent`}
                             scroll={false}
                             aria-current={f === filter ? "true" : undefined}
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-3 text-[12.5px] coarse:h-11",
-                                f === filter
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-                            )}
+                            className={chipClass(f === filter)}
                         >
                             {f === "open"
                                 ? `Open · ${data.openCount}`

@@ -12,6 +12,7 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
+import { chipClass } from "@/components/shared/chip";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
@@ -157,12 +158,7 @@ function PauseBody({
                             role="radio"
                             aria-checked={on}
                             onClick={() => setKey(o.key)}
-                            className={cn(
-                                "h-[34px] rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:border-border-strong active:bg-accent-active",
-                            )}
+                            className={chipClass(on)}
                         >
                             {o.label}
                         </button>

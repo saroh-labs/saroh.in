@@ -16,6 +16,8 @@ export interface SegmentedOption<V extends string = string> {
     /** The option's accessible name, when the label is an icon alone. */
     name?: string;
     disabled?: boolean;
+    /** On this option alone: hiding one below a width, say. */
+    className?: string;
 }
 
 export interface SegmentedProps<V extends string = string> {
@@ -37,7 +39,7 @@ export interface SegmentedProps<V extends string = string> {
 }
 
 const TRACK =
-    "inline-flex max-w-full items-stretch gap-0.5 rounded-lg border border-border bg-muted p-0.5";
+    "inline-flex max-w-full flex-wrap items-stretch gap-0.5 rounded-lg border border-border bg-muted p-0.5";
 const SEGMENT =
     "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 font-medium transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background coarse:h-11 coarse:px-3.5 [&_svg]:size-4 [&_svg]:shrink-0";
 const SIZE = { sm: "h-7 text-[13px]", md: "h-[32px] text-sm" } as const;
@@ -54,9 +56,9 @@ const DISABLED =
  * Percentage · Amount off. A grey track with the chosen option in Ink.
  *
  * In button mode it is a radio group: one tab stop, arrows move and choose.
- * In link mode (`href` on every option) each option is a link and the
- * chosen one says `aria-current="true"`: it changes what the page shows,
- * it is not the page (that marker is the menu's).
+ * In link mode (`href` on every option) it is a `nav` of links, each view
+ * an address of its own, and the open one says `aria-current="page"`, as a
+ * tab strip's links do.
  */
 export function Segmented<V extends string = string>({
     label,
@@ -105,8 +107,8 @@ export function Segmented<V extends string = string>({
             )}
         </>
     );
-    const cls = (on: boolean) =>
-        cn(SEGMENT, SIZE[size], block && "flex-1", on ? ON : OFF);
+    const cls = (on: boolean, own?: string) =>
+        cn(SEGMENT, SIZE[size], block && "flex-1", on ? ON : OFF, own);
     // With nothing chosen yet, the first option holds the tab stop.
     const chosen = options.some((o) => o.value === value);
 
@@ -117,9 +119,8 @@ export function Segmented<V extends string = string>({
 
     if (links) {
         return (
-            <div
+            <nav
                 id={id}
-                role="group"
                 data-segmented=""
                 {...naming}
                 aria-describedby={aria["aria-describedby"]}
@@ -132,15 +133,16 @@ export function Segmented<V extends string = string>({
                             key={o.value}
                             href={o.href ?? "#"}
                             scroll={false}
-                            aria-current={on ? "true" : undefined}
+                            aria-current={on ? "page" : undefined}
+                            data-state={on ? "on" : "off"}
                             aria-label={o.name}
-                            className={cls(on)}
+                            className={cls(on, o.className)}
                         >
                             {inner(o)}
                         </Link>
                     );
                 })}
-            </div>
+            </nav>
         );
     }
 
@@ -167,11 +169,12 @@ export function Segmented<V extends string = string>({
                         type="button"
                         role="radio"
                         aria-checked={on}
+                        data-state={on ? "on" : "off"}
                         aria-label={o.name}
                         tabIndex={on || (!chosen && i === 0) ? 0 : -1}
                         disabled={disabled || o.disabled}
                         onClick={() => onValueChange?.(o.value)}
-                        className={cn(cls(on), DISABLED)}
+                        className={cn(cls(on, o.className), DISABLED)}
                     >
                         {inner(o)}
                     </button>

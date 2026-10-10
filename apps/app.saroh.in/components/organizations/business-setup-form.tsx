@@ -41,6 +41,7 @@ import {
     takeLaunchOfferAfterOnboarding,
 } from "@/lib/saroh-billing/checkout-actions";
 
+import { chipClass } from "@/components/shared/chip";
 import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
@@ -499,12 +500,7 @@ export function BusinessSetupForm({
                                         setOtherCountry(false);
                                         form.setValue("country", c.code);
                                     }}
-                                    className={cn(
-                                        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        on
-                                            ? "border-foreground bg-foreground text-background"
-                                            : "border-input hover:bg-muted active:bg-accent-active",
-                                    )}
+                                    className={chipClass(on)}
                                 >
                                     <span className="font-mono text-[11px] opacity-70">
                                         {c.code}
@@ -518,12 +514,7 @@ export function BusinessSetupForm({
                             role="radio"
                             aria-checked={otherCountry}
                             onClick={() => setOtherCountry(true)}
-                            className={cn(
-                                "inline-flex h-8 items-center rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                otherCountry
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-input hover:bg-muted active:bg-accent-active",
-                            )}
+                            className={chipClass(otherCountry)}
                         >
                             Another country
                         </button>

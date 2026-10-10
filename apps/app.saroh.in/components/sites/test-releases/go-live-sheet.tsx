@@ -11,7 +11,6 @@ import {
     DialogTitle,
 } from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError } from "@saroh/ui/toast";
 import { ShieldAlert } from "lucide-react";
@@ -34,6 +33,7 @@ import {
     goLiveWithRelease,
     scheduleGoLive,
 } from "@/lib/sites/test-releases-actions";
+import { Segmented } from "@saroh/ui/segmented";
 
 /** A calendar day picked in the browser, as the API reads it. */
 function dayOf(date: Date): string {
@@ -173,34 +173,15 @@ function Body({
                 </DialogDescription>
             </DialogHeader>
 
-            <div
-                role="radiogroup"
-                aria-label="When it goes live"
-                className="flex w-fit rounded-lg border p-0.5"
-            >
-                {(
-                    [
-                        ["now", "Now"],
-                        ["schedule", "At a date and time"],
-                    ] as const
-                ).map(([key, text]) => (
-                    <button
-                        key={key}
-                        type="button"
-                        role="radio"
-                        aria-checked={mode === key}
-                        onClick={() => setMode(key)}
-                        className={cn(
-                            "min-h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                            mode === key
-                                ? "bg-foreground text-background"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active",
-                        )}
-                    >
-                        {text}
-                    </button>
-                ))}
-            </div>
+            <Segmented
+                label="When it goes live"
+                value={mode}
+                onValueChange={setMode}
+                options={[
+                    { value: "now", label: "Now" },
+                    { value: "schedule", label: "At a date and time" },
+                ]}
+            />
 
             {now ? (
                 <p className="text-sm">{replacesLine(livePublishedAt, zone)}</p>

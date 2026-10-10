@@ -10,6 +10,7 @@ import type { ProductImage } from "@/lib/products/service";
 import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 
+import { chipClass } from "@/components/shared/chip";
 import { boxClass, FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
@@ -304,12 +305,7 @@ function SellItAt({
                                         : [...chosen, s.id],
                                 )
                             }
-                            className={cn(
-                                "h-[30px] rounded-full border px-3 text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {s.name}
                         </button>

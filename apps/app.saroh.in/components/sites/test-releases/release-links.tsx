@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
@@ -20,6 +19,7 @@ import {
     createTestReleaseLink,
     revokeTestReleaseLink,
 } from "@/lib/sites/test-releases-actions";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * A release's shared links (KTD-6): each one's expiry and when it was last
@@ -111,29 +111,20 @@ export function ReleaseLinks({
             )}
             {canShare ? (
                 <div className="flex flex-wrap items-center gap-2">
-                    <div
-                        role="radiogroup"
-                        aria-label="How long the new link works"
-                        className="flex rounded-md border p-0.5"
-                    >
-                        {LINK_DAY_CHOICES.map((c) => (
-                            <button
-                                key={c.days}
-                                type="button"
-                                role="radio"
-                                aria-checked={days === c.days}
-                                onClick={() => setDays(c.days)}
-                                className={cn(
-                                    "min-h-7 rounded px-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    days === c.days
-                                        ? "bg-foreground text-background"
-                                        : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active",
-                                )}
-                            >
-                                {c.label}
-                            </button>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="How long the new link works"
+                        value={String(days)}
+                        onValueChange={(v) => {
+                            const to = LINK_DAY_CHOICES.find(
+                                (c) => String(c.days) === v,
+                            );
+                            if (to) setDays(to.days);
+                        }}
+                        options={LINK_DAY_CHOICES.map((c) => ({
+                            value: String(c.days),
+                            label: c.label,
+                        }))}
+                    />
                     <Button
                         type="button"
                         size="sm"

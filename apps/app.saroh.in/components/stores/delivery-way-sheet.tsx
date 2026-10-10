@@ -5,7 +5,6 @@ import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import {
     checkoutLine,
@@ -22,6 +21,7 @@ import type { StorefrontFulfilmentType } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { LateAfterField, MoneyField } from "./delivery-fields";
 import type { Saver } from "./location-save";
 
@@ -133,22 +133,17 @@ export function DeliveryWaySheet({
                         What customers pay
                     </legend>
                     <div className="flex flex-wrap items-center gap-3">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label={`What customers pay for ${label.toLowerCase()}`}
                             value={draft.charge ? "charge" : "free"}
-                            onValueChange={(v) => {
-                                if (v) set({ charge: v === "charge" });
-                            }}
-                            aria-label={`What customers pay for ${label.toLowerCase()}`}
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="free" className={SEGMENT}>
-                                Free
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="charge" className={SEGMENT}>
-                                Charge
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            onValueChange={(v) =>
+                                set({ charge: v === "charge" })
+                            }
+                            options={[
+                                { value: "free", label: "Free" },
+                                { value: "charge", label: "Charge" },
+                            ]}
+                        />
                         {draft.charge ? (
                             <div className="w-32">
                                 <Label

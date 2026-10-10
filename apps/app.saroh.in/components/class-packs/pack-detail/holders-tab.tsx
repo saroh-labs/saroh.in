@@ -14,6 +14,7 @@ import { useId, useState } from "react";
 import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
+import { Segmented } from "@saroh/ui/segmented";
 
 const BAR = {
     ok: "bg-success",
@@ -134,34 +135,18 @@ export function HoldersTab({
     return (
         <>
             {head}
-            <div
-                role="tablist"
-                aria-label="Who has it"
-                className="mt-2.5 flex max-w-[420px] gap-0.5 rounded-[9px] bg-muted p-[3px]"
-            >
-                {segments.map((s) => {
-                    const on = which === s.key;
-                    return (
-                        <button
-                            key={s.key}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            aria-controls={panelId}
-                            onClick={() => setWhich(s.key)}
-                            className={cn(
-                                "flex-1 cursor-pointer rounded-[7px] px-2.5 py-[7px] text-[13px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "bg-card text-foreground shadow-xs"
-                                    : "text-muted-foreground hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {s.label}
-                        </button>
-                    );
-                })}
-            </div>
-            <div id={panelId} role="tabpanel">
+            <Segmented
+                label="Who has it"
+                block
+                className="mt-2.5 max-w-[420px]"
+                value={which}
+                onValueChange={setWhich}
+                options={segments.map((s) => ({
+                    value: s.key,
+                    label: s.label,
+                }))}
+            />
+            <div id={panelId}>
                 {list.length === 0 ? (
                     <p className="pb-1 pt-3.5 text-[13px] text-muted-foreground">
                         {which === "live" ? emptyLive : "Nothing finished yet."}

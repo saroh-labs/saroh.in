@@ -1,5 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 
+import { chipClass } from "@/components/shared/chip";
 import { Pill } from "@/components/subscriptions/pill";
 import type { Tone } from "@/lib/customer-workspace/view";
 
@@ -107,13 +108,7 @@ export function Chips<K extends string>({
                         type="button"
                         aria-pressed={on}
                         onClick={() => onChange(c.key)}
-                        className={cn(
-                            "rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                            height === 30 ? "h-[30px]" : "h-8",
-                            on
-                                ? "border-primary bg-primary font-semibold text-primary-foreground"
-                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-                        )}
+                        className={chipClass(on)}
                     >
                         {c.label}
                     </button>

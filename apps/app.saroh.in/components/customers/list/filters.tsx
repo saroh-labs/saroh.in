@@ -1,10 +1,10 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { chipClass } from "@/components/shared/chip";
 import { OptionSelect } from "@/components/shared/option-select";
 import type {
     CustomerChip,
@@ -150,12 +150,7 @@ function ChipButton({
             type="button"
             aria-pressed={on}
             onClick={() => onPick(chip)}
-            className={cn(
-                "h-[30px] shrink-0 whitespace-nowrap rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                on
-                    ? "border-primary bg-primary font-semibold text-primary-foreground"
-                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-            )}
+            className={chipClass(on)}
         >
             {label}
             <span className="ml-1.5 tabular-nums opacity-70">

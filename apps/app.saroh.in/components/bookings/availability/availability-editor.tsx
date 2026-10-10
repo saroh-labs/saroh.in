@@ -43,6 +43,7 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 
+import { chipClass } from "@/components/shared/chip";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
@@ -427,12 +428,7 @@ export function AvailabilityEditor({
                             role="radio"
                             aria-checked={on}
                             onClick={() => setWho(p.id)}
-                            className={cn(
-                                "inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                                on
-                                    ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                    : "border-border bg-card font-medium hover:border-border-strong",
-                            )}
+                            className={chipClass(on)}
                         >
                             <span
                                 aria-hidden

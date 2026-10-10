@@ -51,6 +51,7 @@ import {
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
@@ -524,37 +525,34 @@ export function CalendarScreen({
         <>
             <BookingsTopBar page="Calendar">
                 <BookingsViewSwitch current="calendar" />
-                <div
-                    role="radiogroup"
-                    aria-label="Layout"
-                    className="ml-auto flex gap-0.5 rounded-[9px] bg-primary p-[3px]"
-                >
-                    {(
+                <Segmented
+                    label="Layout"
+                    className="ml-auto"
+                    value={layout}
+                    onValueChange={(id) => go(id, date)}
+                    options={(
                         [
                             ["day", "Day by person", "Day"],
                             ["week", "Week", "Week"],
                             ["agenda", "Agenda", "Agenda"],
                         ] as const
-                    ).map(([id, label, short]) => (
-                        <button
-                            key={id}
-                            type="button"
-                            role="radio"
-                            aria-checked={layout === id}
-                            onClick={() => go(id, date)}
-                            className={cn(
-                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
-                                layout === id
-                                    ? "bg-card text-foreground"
-                                    : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
-                                id === "week" && "max-[759px]:hidden",
-                            )}
-                        >
-                            <span className="max-[759px]:hidden">{label}</span>
-                            <span className="min-[760px]:hidden">{short}</span>
-                        </button>
-                    ))}
-                </div>
+                    ).map(([id, label, short]) => ({
+                        value: id,
+                        label: (
+                            <>
+                                <span className="max-[759px]:hidden">
+                                    {label}
+                                </span>
+                                <span className="min-[760px]:hidden">
+                                    {short}
+                                </span>
+                            </>
+                        ),
+                        // A phone has no week grid.
+                        className:
+                            id === "week" ? "max-[759px]:hidden" : undefined,
+                    }))}
+                />
             </BookingsTopBar>
             <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
@@ -624,35 +622,18 @@ export function CalendarScreen({
                 {layout === "day" ? (
                     <>
                         {columns.length > 1 ? (
-                            <div
-                                role="radiogroup"
-                                aria-label="Whose day"
-                                className="mb-2.5 flex gap-0.5 overflow-x-auto rounded-[10px] bg-muted p-[3px] min-[760px]:hidden"
-                            >
-                                {columns.map((c) => {
-                                    const on = c.key === phoneKey;
-                                    const n = c.blocks.filter(isLive).length;
-                                    return (
-                                        <button
-                                            key={c.key}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={on}
-                                            onClick={() =>
-                                                setPhonePerson(c.key)
-                                            }
-                                            className={cn(
-                                                "h-10 min-w-fit flex-1 whitespace-nowrap rounded-[8px] px-2.5 text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                on
-                                                    ? "bg-card text-foreground shadow-sm"
-                                                    : "text-muted-foreground hover:text-foreground active:bg-card/60",
-                                            )}
-                                        >
-                                            {callName(c.name)} · {n}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <Segmented
+                                label="Whose day"
+                                block
+                                className="mb-2.5 flex-nowrap overflow-x-auto min-[760px]:hidden"
+                                value={phoneKey}
+                                onValueChange={setPhonePerson}
+                                options={columns.map((c) => ({
+                                    value: c.key,
+                                    label: callName(c.name),
+                                    count: c.blocks.filter(isLive).length,
+                                }))}
+                            />
                         ) : null}
                         {columns.length ? (
                             <DayByPerson

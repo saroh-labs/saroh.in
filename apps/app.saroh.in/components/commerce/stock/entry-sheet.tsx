@@ -30,7 +30,7 @@ import {
 } from "@/lib/stock/screen";
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 
-import { chipClass } from "./tones";
+import { Chip } from "@/components/shared/chip";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**
@@ -157,16 +157,13 @@ export function EntrySheet({
                     className="flex flex-wrap gap-2"
                 >
                     {ENTRY_KINDS.map((k) => (
-                        <button
+                        <Chip
                             key={k.kind}
-                            type="button"
-                            role="radio"
-                            aria-checked={kind === k.kind}
-                            className={chipClass(kind === k.kind)}
+                            on={kind === k.kind}
                             onClick={() => change(setKind)(k.kind)}
                         >
                             {k.label}
-                        </button>
+                        </Chip>
                     ))}
                 </div>
                 <div className="grid gap-[5px]">

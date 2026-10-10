@@ -25,7 +25,8 @@ import {
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 
-import { chipClass, pillClass, TEXT_TONE } from "./tones";
+import { chipClass } from "@/components/shared/chip";
+import { pillClass, TEXT_TONE } from "./tones";
 
 /**
  * A log entry on a phone: a wrapping row whose `order`s put the time, the

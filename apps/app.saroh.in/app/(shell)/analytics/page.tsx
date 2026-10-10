@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics/service";
 import { ApiError } from "@/lib/api/errors";
 import { requireSession } from "@/lib/session";
+import { Segmented } from "@saroh/ui/segmented";
 
 /** Supported quick date ranges (label → days back from today). */
 const RANGES: { key: string; label: string; days: number }[] = [
@@ -115,31 +116,17 @@ export default async function AnalyticsPage({
                             paid orders. Updated every hour.
                         </p>
                     </div>
-                    <div className="flex items-center gap-1">
-                        {RANGES.map((r) => (
-                            <Button
-                                key={r.key}
-                                asChild
-                                size="sm"
-                                variant={
-                                    r.key === range.key ? "default" : "outline"
-                                }
-                            >
-                                <Link
-                                    href={`/analytics?range=${r.key}${
-                                        params.siteId
-                                            ? `&siteId=${params.siteId}`
-                                            : ""
-                                    }`}
-                                    aria-current={
-                                        r.key === range.key ? "true" : undefined
-                                    }
-                                >
-                                    {r.label}
-                                </Link>
-                            </Button>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="Days shown"
+                        value={range.key}
+                        options={RANGES.map((r) => ({
+                            value: r.key,
+                            label: r.label,
+                            href: `/analytics?range=${r.key}${
+                                params.siteId ? `&siteId=${params.siteId}` : ""
+                            }`,
+                        }))}
+                    />
                 </div>
                 {traffic.status === "ok" ? (
                     <AnalyticsDashboard

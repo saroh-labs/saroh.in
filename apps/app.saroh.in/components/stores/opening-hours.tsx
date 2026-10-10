@@ -7,7 +7,6 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { HOURS_FIELD_ID } from "@/lib/stores/location-readiness";
 import {
     hoursBackwards,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/stores/opening-hours-summary";
 import type { OpeningHoursDay, Weekday } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { Note } from "./storefront-section";
 
 const DAYS: { key: Weekday; label: string }[] = [
@@ -188,11 +188,11 @@ export function OpeningHoursFields({
                             chips only appear for Custom, so the common
                             answer is one click and the rare one is still
                             there. */}
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Open days"
+                            aria-labelledby="storefront-open-days"
                             value={daysChoice}
                             onValueChange={(v) => {
-                                if (!v) return;
                                 if (v === "CUSTOM") {
                                     setCustom(true);
                                     return;
@@ -203,22 +203,14 @@ export function OpeningHoursFields({
                                     setOpenDays(next.days);
                                 }
                             }}
-                            aria-labelledby="storefront-open-days"
-                            className={SEGMENTED}
-                        >
-                            {PRESETS.map((p) => (
-                                <ToggleGroupItem
-                                    key={p.label}
-                                    value={p.label}
-                                    className={SEGMENT}
-                                >
-                                    {p.label}
-                                </ToggleGroupItem>
-                            ))}
-                            <ToggleGroupItem value="CUSTOM" className={SEGMENT}>
-                                Custom
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            options={[
+                                ...PRESETS.map((p) => ({
+                                    value: p.label,
+                                    label: p.label,
+                                })),
+                                { value: "CUSTOM", label: "Custom" },
+                            ]}
+                        />
                         {daysChoice === "CUSTOM" ? (
                             <ToggleGroup
                                 type="multiple"

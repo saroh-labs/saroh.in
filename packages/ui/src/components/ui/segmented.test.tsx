@@ -135,7 +135,7 @@ describe("Segmented, button mode", () => {
 });
 
 describe("Segmented, link mode", () => {
-    it("is a named group of links, the chosen one current but not the page", () => {
+    it("is a named nav of links, the open one marked as the current page", () => {
         render(
             <Segmented
                 label="Bookings view"
@@ -150,9 +150,11 @@ describe("Segmented, link mode", () => {
                 ]}
             />,
         );
-        const group = screen.getByRole("group", { name: "Bookings view" });
+        const group = screen.getByRole("navigation", {
+            name: "Bookings view",
+        });
         const links = within(group).getAllByRole("link");
-        expect(links[1]).toHaveAttribute("aria-current", "true");
+        expect(links[1]).toHaveAttribute("aria-current", "page");
         expect(links[0]).not.toHaveAttribute("aria-current");
         expect(links[0]).toHaveAttribute("href", "/bookings");
         expect(screen.queryByRole("radio")).toBeNull();

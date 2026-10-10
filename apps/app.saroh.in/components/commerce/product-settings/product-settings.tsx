@@ -135,10 +135,3 @@ export const bigBtn =
     "inline-flex h-9 shrink-0 items-center rounded-[8px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground coarse:h-11";
 export const textBox =
     "h-9 min-w-0 rounded-[8px] border bg-card px-2.5 text-[13px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/50 coarse:h-11";
-export const chipBtn = (on: boolean) =>
-    cn(
-        "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-        on
-            ? "border-foreground bg-foreground font-semibold text-background"
-            : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-    );

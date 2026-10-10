@@ -19,10 +19,10 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
+import { chipClass } from "@/components/shared/chip";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import {
-    chipBtn,
     primaryBtn,
     smallBtn,
     TabIntro,
@@ -247,7 +247,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                         returns: o.choice,
                                                     })
                                                 }
-                                                className={chipBtn(
+                                                className={chipClass(
                                                     r.returns === o.choice,
                                                 )}
                                             >

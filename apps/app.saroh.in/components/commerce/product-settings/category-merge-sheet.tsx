@@ -3,10 +3,9 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { chipClass } from "@/components/shared/chip";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type { CatalogueView } from "@/lib/products/settings";
-
-import { chipBtn } from "./product-settings";
 
 type Category = CatalogueView["categories"][number];
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
@@ -84,7 +83,7 @@ export function CategoryMergeSheet({
                             aria-checked={to === t.id}
                             disabled={busy}
                             onClick={() => setTo(t.id)}
-                            className={chipBtn(to === t.id)}
+                            className={chipClass(to === t.id)}
                         >
                             {t.name}
                         </button>

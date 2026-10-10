@@ -1,7 +1,6 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
@@ -16,6 +15,7 @@ import {
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
 
+import { chipClass } from "@/components/shared/chip";
 import { ProductFilter } from "./product-filter";
 
 const SELECT =
@@ -212,12 +212,7 @@ function Toggle({
             type="button"
             aria-pressed={on}
             onClick={onFlip}
-            className={cn(
-                "h-[34px] shrink-0 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                on
-                    ? "border-foreground bg-foreground font-semibold text-background hover:bg-foreground/90 active:bg-foreground/80"
-                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted active:bg-foreground/[0.08]",
-            )}
+            className={chipClass(on)}
         >
             {label}
         </button>

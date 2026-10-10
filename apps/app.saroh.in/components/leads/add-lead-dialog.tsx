@@ -25,6 +25,7 @@ import {
     useDraftChanged,
 } from "@/components/shared/use-draft-changed";
 import { createLead } from "@/lib/leads/actions";
+import { Segmented } from "@saroh/ui/segmented";
 
 export interface LeadContactOption {
     id: string;
@@ -192,37 +193,19 @@ export function AddLeadDialog({
                             Who are they?
                         </legend>
                         {contacts.length > 0 ? (
-                            <div
-                                role="radiogroup"
-                                aria-label="Who are they?"
-                                className="grid grid-cols-2 gap-[5px]"
-                            >
-                                {(
-                                    [
-                                        ["known", "Someone you know"],
-                                        ["new", "Someone new"],
-                                    ] as const
-                                ).map(([key, text]) => (
-                                    <label
-                                        key={key}
-                                        className={cn(
-                                            "flex cursor-pointer items-center justify-center rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                                            who === key
-                                                ? "border-border-strong bg-foreground/[0.03] font-semibold"
-                                                : "border-muted font-medium hover:border-border-strong",
-                                        )}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="lead-who"
-                                            className="sr-only"
-                                            checked={who === key}
-                                            onChange={() => setWho(key)}
-                                        />
-                                        {text}
-                                    </label>
-                                ))}
-                            </div>
+                            <Segmented
+                                label="Who are they?"
+                                block
+                                value={who}
+                                onValueChange={setWho}
+                                options={[
+                                    {
+                                        value: "known",
+                                        label: "Someone you know",
+                                    },
+                                    { value: "new", label: "Someone new" },
+                                ]}
+                            />
                         ) : null}
                         {who === "known" ? (
                             <div className="grid gap-1.5">

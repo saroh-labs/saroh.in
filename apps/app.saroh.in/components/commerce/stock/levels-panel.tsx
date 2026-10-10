@@ -11,8 +11,8 @@ import { noRowsWords, untrackedLine } from "@/lib/stock/screen";
 import { loadLevelsPage } from "@/lib/stock/screen-actions";
 import type { StockLevels } from "@/lib/stock/service";
 
+import { chipClass } from "@/components/shared/chip";
 import { LevelsTable } from "./levels-table";
-import { chipClass } from "./tones";
 
 /**
  * Levels (#527): the chips (All, Needs you, a storefront), the search, the
