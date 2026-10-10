@@ -84,7 +84,6 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
         React.useEffect(() => {
             if (document.activeElement !== input.current) {
                 // The address moved under a field nobody is typing in.
-                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setText(defaultValue);
             }
         }, [defaultValue]);
