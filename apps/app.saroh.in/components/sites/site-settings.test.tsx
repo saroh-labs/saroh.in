@@ -324,7 +324,7 @@ describe("Before you share your site (the audit)", () => {
             <SiteSettings site={site} address={address} />,
         );
         const text = words(html);
-        expect(text).toContain("Before you share your site 1 of 3");
+        expect(text).toContain("Before you share your site 1 of 3 done");
         expect(text).toContain("Done: Search title · using Rye");
         expect(html).toContain('href="#settings-description"');
         expect(html).toContain('href="#settings-share-image"');
@@ -340,8 +340,11 @@ describe("Before you share your site (the audit)", () => {
         const html = renderToStaticMarkup(
             <SiteSettings site={ready} address={address} />,
         );
-        expect(html).toContain("data-share-ready");
-        expect(html).not.toContain("data-share-checklist");
+        expect(html).toContain(
+            'data-setup-checklist="share" data-state="folded"',
+        );
+        expect(html).toContain("Your site is ready to share.");
+        expect(html).not.toContain('data-state="open"');
     });
 });
 

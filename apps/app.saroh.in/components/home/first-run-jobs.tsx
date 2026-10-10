@@ -125,6 +125,7 @@ export function FirstRunJobs({
             </p>
             <TurnOnSheet
                 picked={picked}
+                firstRun
                 modules={modules}
                 onOpenChange={(open) => {
                     if (!open) setPicked(null);

@@ -659,34 +659,74 @@ export function takesMoney(
 }
 
 /**
- * The checklist's heading follows its counted steps, never the kind
- * (DEC-070), and is the same on Home and Settings › Business (UX-019): "Get
- * ready to take money" while a money step is in the list. Without one, a
- * list that publishes the site is "Get your site live", and anything else
- * "Finish setting up". Settings' "Make it yours" never changes it.
+ * The checklist on Home and Settings › Business has ONE name, wherever it
+ * is referred to (UX audit, 10 Oct): the card's heading, the Turn on
+ * sheet's "Anything else waits in Finish setup" and the toast after it.
+ * It was headed "Get ready to take money", "Get your site live" or "Finish
+ * setting up", so nothing called "Finish setup" could be found.
  */
-export function checklistHeading(
+export const FINISH_SETUP = "Finish setup";
+
+/** What a checklist's steps are for. */
+export type ChecklistSubject = "money" | "site" | "setup";
+
+/**
+ * What the steps are about, from the counted steps and never the kind
+ * (DEC-070), the same on Home and Settings › Business (UX-019): money while
+ * a money step is in the list. Without one, a list that publishes the site
+ * is about the site. Settings' "Make it yours" never changes it.
+ */
+export function checklistSubject(
     list: Pick<ReadyChecklist, "steps"> &
         Partial<Pick<ReadyChecklist, "outside">>,
-): string {
-    if (takesMoney(list)) return "Get ready to take money";
-    return list.steps.some((s) => s.key === "site")
-        ? "Get your site live"
-        : "Finish setting up";
+): ChecklistSubject {
+    if (takesMoney(list)) return "money";
+    return list.steps.some((s) => s.key === "site") ? "site" : "setup";
+}
+
+const CHECKLIST_WORDS: Record<
+    ChecklistSubject,
+    { lead: string; doneTitle: string }
+> = {
+    money: {
+        lead: "What is left before you take money.",
+        doneTitle: "You're ready to take money.",
+    },
+    site: {
+        lead: "What is left before your site is live.",
+        doneTitle: "Your site is live.",
+    },
+    setup: {
+        lead: "A few things left to set up.",
+        doneTitle: "Setup is finished.",
+    },
+};
+
+/**
+ * The card's words: one title, a line saying what its steps are for, and
+ * the true thing to say once they are done.
+ */
+export function checklistWords(
+    list: Pick<ReadyChecklist, "steps"> &
+        Partial<Pick<ReadyChecklist, "outside">>,
+): { title: string; lead: string; doneTitle: string } {
+    return { title: FINISH_SETUP, ...CHECKLIST_WORDS[checklistSubject(list)] };
 }
 
 /**
  * Where Home puts the checklist: first while fewer than half the steps are
  * done, lower down once more are, and only a "Show setup" link while hidden.
- * Nothing once every step is done, or when none could be checked.
+ * Finished, it is back at the top for its last tick (`done`), where the
+ * card says so once and then folds. Nothing when none could be checked.
  */
-export type TakeMoneyPlace = "first" | "late" | "hidden" | null;
+export type TakeMoneyPlace = "first" | "late" | "hidden" | "done" | null;
 
 export function takeMoneyPlace(
     list: Pick<ReadyChecklist, "done" | "total">,
     hidden: boolean,
 ): TakeMoneyPlace {
-    if (list.total === 0 || list.done >= list.total) return null;
+    if (list.total === 0) return null;
+    if (list.done >= list.total) return "done";
     if (hidden) return "hidden";
     return list.done < list.total / 2 ? "first" : "late";
 }

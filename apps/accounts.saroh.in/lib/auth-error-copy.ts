@@ -111,7 +111,7 @@ export function socialErrorCopy(
 ): string {
     return authErrorCode(failure) === NETWORK_ERROR
         ? `Couldn't reach ${label}. Check your connection and try again.`
-        : `Couldn't open ${label}. Try again, or use your email and password.`;
+        : `Couldn't open ${label}. Try again, or ask for a code by email.`;
 }
 
 /**

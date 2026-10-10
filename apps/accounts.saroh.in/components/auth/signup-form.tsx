@@ -1,10 +1,9 @@
 "use client";
 
-import { authClient } from "@/lib/auth.client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { CodeStep } from "@/components/auth/code-step";
 import {
     AuthError,
     AuthField,
@@ -12,15 +11,26 @@ import {
     AuthHeading,
     AuthSubmit,
 } from "@/components/auth/field";
-import { PROMISE } from "@/components/auth/panel-copy";
+import { codeNext, doneLine, PROMISE } from "@/components/auth/panel-copy";
 import { SocialButtons } from "@/components/auth/social-buttons";
-import { getOnboardingUrl } from "@/lib/app-urls";
-import { authFailureCopy, settle } from "@/lib/auth-error-copy";
+import { getAppUrl, getOnboardingUrl } from "@/lib/app-urls";
+import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
+import type { CodeClient } from "@/lib/sign-in-code";
+import { sendCode } from "@/lib/sign-in-code";
 import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
- * Creating the account.
+ * Making the account: an email address, then the code sent to it (owner,
+ * 10 Oct 2026). No password and no name. A password is optional and is set
+ * later from the account page, and the name is asked in setup, beside the
+ * business's.
+ *
+ * Someone joining a business through an invitation never sees setup, so
+ * this is where they are asked their name: it is what the team sees.
+ *
+ * An address that already has an account gets the same screen and the same
+ * email, and the code signs it in. Nothing here says which it was.
  *
  * `returnTo` is where sign-up should eventually land (#276), already vetted by
  * the server component above. `invitedEmail` is the address an invitation was
@@ -32,19 +42,21 @@ export function SignupForm({
     returnTo,
     invitedEmail,
     providers = [],
+    client = codeClient,
 }: {
     returnTo?: string | null;
     invitedEmail?: string;
     /** The social providers with keys set (`lib/sign-in-options.ts`). */
     providers?: SocialProvider[];
+    client?: CodeClient;
 }) {
-    const router = useRouter();
-    const { signUp } = authClient;
     const [name, setName] = useState("");
     const [email, setEmail] = useState(invitedEmail ?? "");
-    const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // The wait before Resend that the send came back with: set, the code
+    // step is showing.
+    const [sent, setSent] = useState<number | null>(null);
     // Joining someone's business through their invitation (UX-029).
     const joining = isJoining(returnTo);
     // The invitation's address, which the accept insists on: fixed.
@@ -53,28 +65,39 @@ export function SignupForm({
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError(null);
-        setIsLoading(true);
-        const { error: err } = await settle(() =>
-            signUp.email({ name, email, password }),
-        );
-        setIsLoading(false);
-        if (err) {
-            setError(authFailureCopy(err));
+        if (joining && !name.trim()) {
+            setError("Enter your name. It is what the team sees.");
             return;
         }
+        setIsLoading(true);
+        const result = await sendCode(client, { email });
+        setIsLoading(false);
+        if (!result.ok) {
+            setError(result.message);
+            return;
+        }
+        setSent(result.resendAfterSeconds);
+    }
 
-        // Signup deliberately issues NO session: the auth server requires a
-        // verified email first, and it has already mailed a code. Sending the
-        // user to a session-gated page here is what used to bounce them to
-        // /login with "Email not verified" and no way to act on it.
-        //
-        // An address that already has an account gets this same answer and
-        // no code (the page must not say who is registered). The owner of
-        // that address is emailed "You already have a Saroh account", and
-        // the verify page offers Sign in under Resend.
-        // Carried through verification, so an invitee lands on the
-        // invitation they clicked rather than in their own onboarding (#276).
-        router.push(withCarry("/verify-email", returnTo, email));
+    if (sent !== null) {
+        return (
+            <CodeStep
+                email={email.trim()}
+                name={joining ? name : undefined}
+                next={codeNext(returnTo, "sign-up")}
+                doneLine={doneLine(returnTo, "sign-up")}
+                resendAfterSeconds={sent}
+                onChangeEmail={() => setSent(null)}
+                onDone={() => {
+                    // A new account has no business, and the app's front
+                    // door sends it to setup. So does it sort out someone
+                    // who already had an account and signed up again: they
+                    // land in their business, not in setup for another.
+                    window.location.href = returnTo ?? getAppUrl();
+                }}
+                client={client}
+            />
+        );
     }
 
     return (
@@ -86,34 +109,36 @@ export function SignupForm({
                 promise={joining ? undefined : PROMISE}
                 blurb={
                     joining
-                        ? "Your own details. Once your email is confirmed, you join the business that invited you."
-                        : "Your own details first. Next, you name your business."
+                        ? "No password. We email you a code, and then you join the business that invited you."
+                        : "No password. We email you a code, and then you name your business."
                 }
             />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
-                <AuthField
-                    label="Your name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="Your name"
-                    note="What your team sees when you invite them."
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={isLoading}
-                />
+                {joining ? (
+                    <AuthField
+                        label="Your name"
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        note="What the team sees."
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        disabled={isLoading}
+                    />
+                ) : null}
                 <AuthField
                     label="Email"
                     name="email"
                     type="email"
+                    inputMode="email"
                     autoComplete="email"
                     placeholder="you@example.com"
                     note={
                         invitedEmail
                             ? "The invitation was sent to this address, so the account has to use it."
-                            : "The verification code goes here, so use one you can open now."
+                            : "The code goes here, so use one you can open now."
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -122,20 +147,8 @@ export function SignupForm({
                     required
                     disabled={isLoading}
                 />
-                <AuthField
-                    label="Password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    note="Eight characters or more."
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    disabled={isLoading}
-                />
                 <AuthSubmit disabled={isLoading}>
-                    {isLoading ? "Sending the code…" : "Send the code"}
+                    {isLoading ? "Sending…" : "Email me a code"}
                 </AuthSubmit>
             </form>
 

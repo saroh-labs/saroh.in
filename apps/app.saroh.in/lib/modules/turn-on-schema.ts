@@ -203,4 +203,11 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
 export const enableResponseSchema = z.object({
     data: moduleViewSchema.optional(),
     alreadyEnabled: z.boolean().optional(),
+    // What turning it on made or reused. Only the site's id is read, so a
+    // first run can open that site. Lenient: an answer without it is fine.
+    created: z
+        .object({ siteId: z.string().min(1).optional() })
+        .passthrough()
+        .optional()
+        .catch(undefined),
 });

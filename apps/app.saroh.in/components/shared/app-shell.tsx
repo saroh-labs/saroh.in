@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { JoinedNotice } from "@/components/shared/joined-notice";
 import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
@@ -323,6 +324,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                             <PlanEndingBanner ending={billing?.planEnding} />
                             {/* What a lower plan paused, or will (#800). */}
                             <PausedBanner view={paused} />
+                            {/* Just accepted an invitation: which business
+                                this is and what their role opens, once. */}
+                            <JoinedNotice />
                             {children}
                         </BusinessZoneProvider>
                     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import * as React from "react";
@@ -22,19 +23,18 @@ import * as React from "react";
  */
 
 /*
- * The design fills a field with the SURFACE it sits on (#FFFFFF light,
- * #1F1F1C dark) and lets the border do the work of separating it. This screen
- * used to say that locally with `bg-card`, because dark `--field` was Sunken
- * (#0E0E0D) and read as a black hole cut into the form. The token layer says
- * it now, so `bg-field` is the surface in both themes and the workaround is
- * gone — along with the same hole in every select, textarea and OTP cell.
+ * The field is the shared `Input` (UX audit, 10 Oct), so its height, border,
+ * fill, focus ring, disabled and invalid looks are the token layer's and a
+ * change there reaches these pages. That also gives it the touch size: 44px
+ * on a coarse pointer, where this file's own 38px field had none.
  *
- * The BORDER deliberately stays `--input` rather than the design's `--border`:
- * #D9D6CC on white is about 1.5:1, and a control boundary needs 3:1. That
- * departure is older than this screen and is recorded in the token layer.
+ * What stays local is small. The design's 9px radius and 11px inset. 16px
+ * type on a touch screen, because iOS Safari zooms the page when a smaller
+ * field takes focus and leaves it zoomed. And the read-only look, for an
+ * invitation's fixed address.
  */
 const FIELD =
-    "h-[38px] w-full rounded-[9px] border border-input bg-field px-[11px] text-[13.5px] text-foreground ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground read-only:bg-muted read-only:text-muted-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle";
+    "rounded-[9px] px-[11px] text-[13.5px] text-foreground coarse:text-base read-only:bg-muted read-only:text-muted-foreground";
 
 export interface AuthFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label: string;
@@ -87,7 +87,7 @@ export const AuthField = React.forwardRef<HTMLInputElement, AuthFieldProps>(
                         </Link>
                     ) : null}
                 </div>
-                <input
+                <Input
                     ref={ref}
                     id={fieldId}
                     className={cn("sa-input", FIELD, className)}
@@ -114,7 +114,7 @@ export function AuthSubmit({
         <Button
             type="submit"
             className={cn(
-                "sa-cta sa-rise mt-1 h-10 w-full rounded-[9px] text-[13.5px] font-semibold",
+                "sa-cta sa-rise coarse:h-11 mt-1 h-10 w-full rounded-[9px] text-[13.5px] font-semibold",
                 className,
             )}
             {...props}
@@ -183,6 +183,28 @@ export function AuthHeading({
                 </p>
             ) : null}
         </>
+    );
+}
+
+/**
+ * A second way to do what the page does, as a quiet button under the main
+ * one: "Use a password instead", "Resend code", "Change email". Text with an
+ * underline rather than a second filled button, so the page keeps one
+ * primary. 44px tall on a touch screen.
+ */
+export function AuthAlt({
+    className,
+    ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+    return (
+        <button
+            type="button"
+            className={cn(
+                "sa-press text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-background disabled:text-muted-foreground coarse:h-11 mt-2 block h-9 w-full rounded-[9px] text-[12.5px] font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-default disabled:no-underline",
+                className,
+            )}
+            {...props}
+        />
     );
 }
 

@@ -82,9 +82,21 @@ describe("dateLine", () => {
         );
     });
 
-    it("tells a new business what's first", () => {
-        expect(dateLine(day({ fresh: true }), "Kettle & Co.")).toBe(
+    it("tells a new business what's first, from what Finish setup is about", () => {
+        const fresh = day({ fresh: true });
+        // No checklist to follow (nothing is on yet): only what is true.
+        expect(dateLine(fresh, "Kettle & Co.")).toBe(
+            "Let's get Kettle & Co. set up.",
+        );
+        expect(dateLine(fresh, "Kettle & Co.", null, "BUSINESS", "money")).toBe(
             "Let's get Kettle & Co. ready to take money.",
+        );
+        // A business with only its site to publish is not told about money.
+        expect(dateLine(fresh, "Kettle & Co.", null, "BUSINESS", "site")).toBe(
+            "Let's get Kettle & Co. online.",
+        );
+        expect(dateLine(fresh, "Asha Rao", null, "SOLO", "money")).toBe(
+            "Let's get Asha Rao ready for clients.",
         );
     });
 

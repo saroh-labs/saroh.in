@@ -329,6 +329,7 @@ function StorefrontDetail({
                         readiness={readiness}
                         canEdit={canEdit}
                         onJump={goTo}
+                        storeId={store.id}
                     />
                 ) : undefined
             }

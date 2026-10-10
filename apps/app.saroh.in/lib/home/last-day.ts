@@ -52,10 +52,12 @@ export function dateLine(
     businessName: string,
     only: string | null = null,
     kind: unknown = "BUSINESS",
+    /** What "Finish setup" is about on this Home, when it shows one. */
+    subject: "money" | "site" | "setup" | null = null,
 ): string {
     const where = only ? `${businessName} · ${only}` : businessName;
     if (!lastDay) return where;
-    if (lastDay.fresh) return firstRunLine(businessName, kind);
+    if (lastDay.fresh) return firstRunLine(businessName, kind, subject);
     // The date is already the business's; read it as a calendar day.
     const day = new Intl.DateTimeFormat("en-GB", {
         timeZone: "UTC",
@@ -70,15 +72,32 @@ export function dateLine(
     return `${day} · ${where}`;
 }
 
-/** What a new business, person or site is getting ready for. */
-function firstRunLine(name: string, kind: unknown): string {
-    switch (kindOf(kind)) {
+/**
+ * What a new business, person or site is getting ready for. It follows
+ * what "Finish setup" is actually about (UX audit, 10 Oct): a business
+ * with only a website to publish was told "ready to take money" above a
+ * checklist about its site. With no checklist to follow (nothing is on
+ * yet), it promises only what is true of every kind.
+ */
+function firstRunLine(
+    name: string,
+    kind: unknown,
+    subject: "money" | "site" | "setup" | null,
+): string {
+    if (subject === "site") return `Let's get ${name} online.`;
+    const of = kindOf(kind);
+    if (subject === "money") {
+        return of === "SOLO"
+            ? `Let's get ${name} ready for clients.`
+            : `Let's get ${name} ready to take money.`;
+    }
+    switch (of) {
         case "WORK":
             return `Let's get ${name} online.`;
         case "SOLO":
             return `Let's get ${name} ready for clients.`;
         default:
-            return `Let's get ${name} ready to take money.`;
+            return `Let's get ${name} set up.`;
     }
 }
 

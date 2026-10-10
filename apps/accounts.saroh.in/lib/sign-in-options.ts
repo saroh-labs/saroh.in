@@ -31,7 +31,7 @@ export function knownProviders(value: unknown): SocialProvider[] {
  * drawn when it can sign someone in (owner, 9 Oct: a provider without keys
  * failed at the round-trip on the live sign-in page). Setting a provider's
  * keys brings its button back within a few minutes. The API unreachable, or
- * any doubt: none — email and password always work.
+ * any doubt: none. The emailed code always works.
  */
 export async function signInProviders(): Promise<SocialProvider[]> {
     try {
