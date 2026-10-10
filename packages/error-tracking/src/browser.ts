@@ -175,7 +175,25 @@ const stars = (text: string) => text.replace(/\S/gu, "*");
  * can't be read ("Take ₹***", "Step * of *").
  */
 export function hideFigures(text: string): string {
-    return text.replace(/\S*@\S*/gu, stars).replace(/\p{Nd}/gu, "*");
+    // Word by word, not with one pattern around the `@`: `\S*@\S*` backtracks
+    // polynomially on a long run without one (CodeQL js/polynomial-redos),
+    // and this runs on every text node of a recording.
+    let out = "";
+    let word = "";
+    const flush = () => {
+        if (word) out += word.includes("@") ? stars(word) : word;
+        word = "";
+    };
+    for (const ch of text) {
+        if (/\s/u.test(ch)) {
+            flush();
+            out += ch;
+        } else {
+            word += ch;
+        }
+    }
+    flush();
+    return out.replace(/\p{Nd}/gu, "*");
 }
 
 /** The workspace's `maskTextFn`: called by the recorder for every text node. */

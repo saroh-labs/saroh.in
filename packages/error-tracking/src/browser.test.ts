@@ -526,6 +526,18 @@ describe("what a workspace recording can read (DEC-125, 10 Oct)", () => {
         expect(hideFigures("₹१२३")).toBe("₹***");
     });
 
+    // CodeQL js/polynomial-redos (PR #927): this ran on every text node as
+    // one pattern around the `@`, which backtracked on a long run without one.
+    it("stays fast on a long run of text with no @ in it", () => {
+        const hostile = "!".repeat(200_000);
+        const started = performance.now();
+        expect(hideFigures(hostile)).toBe(hostile);
+        expect(performance.now() - started).toBeLessThan(500);
+        expect(hideFigures("mail a@b.co\tnow\nok")).toBe(
+            "mail ******\tnow\nok",
+        );
+    });
+
     it("keeps whitespace, so the page keeps its shape", () => {
         expect(maskWorkspaceText("  a b\n c ", under())).toBe("  * *\n * ");
     });

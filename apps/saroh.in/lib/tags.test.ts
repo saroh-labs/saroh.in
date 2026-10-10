@@ -36,10 +36,18 @@ const PAGE = `${window.location.origin}/`;
 
 const scripts = () =>
     Array.from(document.querySelectorAll("script")).map((s) => s.src);
+/** A script's host, exactly: a prefix test would also pass a look-alike host. */
+const hostOf = (src: string) => {
+    try {
+        return new URL(src).hostname;
+    } catch {
+        return "";
+    }
+};
 const googleScript = () =>
-    scripts().filter((s) => s.startsWith("https://www.googletagmanager.com"));
+    scripts().filter((s) => hostOf(s) === "www.googletagmanager.com");
 const metaScript = () =>
-    scripts().filter((s) => s.startsWith("https://connect.facebook.net"));
+    scripts().filter((s) => hostOf(s) === "connect.facebook.net");
 /** Everything pushed to Google's tag, as plain arrays. */
 const layer = () =>
     (window.dataLayer ?? []).map((entry) =>

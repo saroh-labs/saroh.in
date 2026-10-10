@@ -110,10 +110,18 @@ const EVERYTHING: TagConfig = { ...WITH_ADS, recording: true };
 
 const scripts = () =>
     Array.from(document.querySelectorAll("script")).map((s) => s.src);
+/** A script's host, exactly: a prefix test would also pass a look-alike host. */
+const hostOf = (src: string) => {
+    try {
+        return new URL(src).hostname;
+    } catch {
+        return "";
+    }
+};
 const gtagScript = () =>
-    scripts().find((s) => s.startsWith("https://www.googletagmanager.com"));
+    scripts().find((s) => hostOf(s) === "www.googletagmanager.com");
 const pixelScript = () =>
-    scripts().find((s) => s.startsWith("https://connect.facebook.net"));
+    scripts().find((s) => hostOf(s) === "connect.facebook.net");
 const notice = () => screen.queryByRole("region", { name: "Cookies" });
 const press = (name: string) =>
     act(() => {
