@@ -524,6 +524,124 @@ describe("the header's bag", () => {
         expect(openCheckout).toHaveBeenCalledTimes(2);
     });
 
+    it("shows each line's photo, what one costs and a Subtotal", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            image: {
+                                url: "https://img.test/loaf.jpg",
+                                alt: "A loaf",
+                            },
+                        },
+                    ],
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                    delivery: "60.00",
+                    total: "560.00",
+                }),
+            },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        const photo = sheet.querySelector("img");
+        expect(photo).toHaveAttribute("src", "https://img.test/loaf.jpg");
+        expect(photo).toHaveAttribute("width", "56");
+        expect(photo).toHaveAttribute("height", "56");
+        expect(screen.getByText("₹250 each")).toBeVisible();
+        expect(screen.getByText("Subtotal").parentElement).toHaveTextContent(
+            "Subtotal₹500",
+        );
+        expect(screen.getByText("Total").parentElement).toHaveTextContent(
+            "Total₹560",
+        );
+    });
+
+    it("stops − at one: the last one never leaves by a slip of the thumb", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [{ ...quoteOf().lines[0], quantity: 1 }],
+                }),
+            },
+        });
+        await openTheBag();
+        const fewer = screen.getByRole("button", {
+            name: "One fewer Sourdough",
+        });
+        expect(fewer).toBeDisabled();
+        fireEvent.click(fewer);
+        expect(readBag(SITE)).toHaveLength(1);
+    });
+
+    it("takes a line out only on Remove, and puts it back on Undo", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Remove Sourdough" }),
+        );
+        expect(readBag(SITE)).toEqual([]);
+        // The bag is empty now, and still offers the line back.
+        expect(
+            screen.getByText("Your bag is empty. Add something from the shop."),
+        ).toBeVisible();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Sourdough removed.",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: null, quantity: 2 },
+        ]);
+        await screen.findByText("Sourdough");
+        expect(screen.queryByText("Sourdough removed.")).toBeNull();
+    });
+
+    it("says the returns rule again above the button, where a product has one", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            returns: "Exchange within 7 days, tags on",
+                        },
+                    ],
+                }),
+            },
+        });
+        await openTheBag();
+        const rule = screen.getByText(
+            "Returns: Exchange within 7 days, tags on",
+        );
+        expect(rule.className).toContain("text-site-body");
+        expect(rule.className).not.toContain("text-site-muted");
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(
+            rule.compareDocumentPosition(place) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+    });
+
+    it("says nothing about returns when no product in the bag has a rule", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        expect(screen.queryByText(/^Returns/)).toBeNull();
+    });
+
     it("holds the button while a line can't be sold, and says why", async () => {
         setup({
             signedIn: true,

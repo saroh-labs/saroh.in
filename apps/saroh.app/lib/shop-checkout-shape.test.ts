@@ -238,6 +238,60 @@ describe("the API's answers", () => {
     });
 });
 
+describe("the facts a product page says before the bag", () => {
+    const options = {
+        canOrder: true,
+        storefront: { name: "Hill Road" },
+        currency: "INR",
+        ways: [
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: "60.00" },
+        ],
+    };
+
+    it("takes the location's free delivery amount, absent from an older API", () => {
+        expect(isCheckoutOptions(options)).toBe(true);
+        expect(
+            isCheckoutOptions({ ...options, freeDeliveryOver: "999.00" }),
+        ).toBe(true);
+        expect(isCheckoutOptions({ ...options, freeDeliveryOver: null })).toBe(
+            true,
+        );
+        expect(isCheckoutOptions({ ...options, freeDeliveryOver: 999 })).toBe(
+            false,
+        );
+    });
+
+    it("takes a line's returns rule, absent from an older API", () => {
+        const line = {
+            listingId: "l1",
+            variantId: null,
+            slug: "sourdough",
+            name: "Sourdough",
+            variantTitle: null,
+            image: null,
+            unitPrice: "250.00",
+            quantity: 1,
+            amount: "250.00",
+            state: "ok",
+            available: null,
+        };
+        const quote = (returns?: unknown) => ({
+            currency: "INR",
+            lines: [returns === undefined ? line : { ...line, returns }],
+            ways: [],
+            fulfilment: null,
+            subtotal: "250.00",
+            delivery: "0.00",
+            total: "250.00",
+            ready: false,
+        });
+        expect(isQuote(quote())).toBe(true);
+        expect(isQuote(quote("Exchange within 7 days"))).toBe(true);
+        expect(isQuote(quote(null))).toBe(true);
+        expect(isQuote(quote(7))).toBe(false);
+    });
+});
+
 describe("a returning customer's last delivery", () => {
     it("is rebuilt field by field, and null when they have had none", () => {
         expect(savedAddressOf({ address: null })).toEqual({ address: null });

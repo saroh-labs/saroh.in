@@ -26,10 +26,20 @@ import {
     SavedAddress,
     trimmed,
 } from "./bag-address";
+import type { RemovedLine } from "./bag-lines";
+import {
+    BagLines,
+    lineKey,
+    lineNote,
+    RemovedNotice,
+    returnsLines,
+} from "./bag-lines";
 import type { BagItem } from "./bag-store";
-import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
+import { addToBag, setQuantity } from "./bag-store";
 import { cleanCode, CodeField, codeSettled } from "./code-field";
 import { sheetButton, SheetFrame } from "./sheet-frame";
+
+export { lineNote };
 
 /**
  * "Your bag" (round-2 G13), as the Customer Site design's cart sheet draws
@@ -56,16 +66,6 @@ type Load =
     | { kind: "ready"; quote: CheckoutQuote }
     | { kind: "error"; message: string };
 
-/** What a line says under its name when it can't be sold as asked. */
-export function lineNote(line: QuoteLine): string | null {
-    if (line.state === "gone") return "No longer sold here. Take it out.";
-    if (line.state === "sold-out") return "Sold out";
-    if (line.state === "short") {
-        return `Only ${line.available ?? 0} left`;
-    }
-    return null;
-}
-
 /**
  * The small line under the bag's delivery row for the location's "Free
  * delivery over" (the server's `freeDelivery`): how much more makes
@@ -91,10 +91,6 @@ export function freeDeliveryNote(
         ? `Free delivery on orders of ${formatAmount(free.over, quote.currency)} or more.`
         : null;
 }
-
-/** A bag line's key: its listing and variant. */
-const lineKey = (l: Pick<QuoteLine, "listingId" | "variantId">) =>
-    `${l.listingId}:${l.variantId ?? ""}`;
 
 /**
  * The lines asking for more than is left, and how many each can have
@@ -169,11 +165,6 @@ export function holdReason(input: {
         return "This can't be paid for this way. Choose another.";
     return null;
 }
-
-const stepper = cn(
-    "border-site-border bg-site-bg text-site-fg size-[30px] cursor-pointer rounded-lg border text-base leading-none hover:opacity-80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
-    focusRing,
-);
 
 /**
  * What the customer chose in the bag, kept by the header's bag (`ShopBag`)
@@ -265,6 +256,17 @@ export function BagSheet({
     // (UX-058): "+" stops there, and the bag says why.
     const [caps, setCaps] = useState<Readonly<Record<string, number>>>({});
     const [notice, setNotice] = useState<string | null>(null);
+    // The line just taken out, for "Undo".
+    const [removed, setRemoved] = useState<RemovedLine | null>(null);
+    const undoRemove = () => {
+        if (!removed) return;
+        addToBag(site, {
+            listingId: removed.listingId,
+            variantId: removed.variantId,
+            quantity: removed.quantity,
+        });
+        setRemoved(null);
+    };
 
     // Asking for more than is left: set the bag to what is, and say so.
     function capOverStock(lines: readonly QuoteLine[]) {
@@ -367,6 +369,9 @@ export function BagSheet({
                 <p className="text-site-body mt-3 text-sm">
                     Your bag is empty. Add something from the shop.
                 </p>
+                {removed ? (
+                    <RemovedNotice removed={removed} onUndo={undoRemove} />
+                ) : null}
                 <button type="button" disabled className={sheetButton(true)}>
                     Your bag is empty
                 </button>
@@ -407,6 +412,8 @@ export function BagSheet({
               payable: pay !== null,
           });
     const pickup = way === "PICKUP" ? (quote?.pickup ?? null) : null;
+    // The returns rule of what is in the bag, said again before paying.
+    const returns = quote ? returnsLines(quote.lines) : [];
 
     function place() {
         if (!canPlace || !way) return;
@@ -495,80 +502,21 @@ export function BagSheet({
 
             {quote ? (
                 <div className="mt-3">
-                    {quote.lines.map((line) => {
-                        const note = lineNote(line);
-                        const name = line.variantTitle
-                            ? `${line.name} · ${line.variantTitle}`
-                            : line.name;
-                        const change = (q: number) =>
-                            setQuantity(
-                                site,
-                                {
-                                    listingId: line.listingId,
-                                    variantId: line.variantId,
-                                },
-                                q,
-                            );
-                        return (
-                            <div
-                                key={`${line.listingId}:${line.variantId ?? ""}`}
-                                className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm"
-                            >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate">
-                                        {name}
-                                    </span>
-                                    {note ? (
-                                        <span className="text-site-fg block text-xs font-semibold">
-                                            {note}
-                                        </span>
-                                    ) : null}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            change(line.quantity - 1)
-                                        }
-                                        aria-label={`One fewer ${name}`}
-                                        className={stepper}
-                                    >
-                                        −
-                                    </button>
-                                    {/* Words a screen reader reads: an
-                                        aria-label on a plain span is not
-                                        (UX-082). */}
-                                    <span className="min-w-5 text-center font-semibold tabular-nums">
-                                        <span aria-hidden>{line.quantity}</span>
-                                        <span className="sr-only">
-                                            {`${line.quantity} of ${name}`}
-                                        </span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            change(line.quantity + 1)
-                                        }
-                                        disabled={
-                                            line.state !== "ok" ||
-                                            line.quantity >=
-                                                MAX_ITEM_QUANTITY ||
-                                            line.quantity >=
-                                                (caps[lineKey(line)] ??
-                                                    Infinity)
-                                        }
-                                        aria-label={`One more ${name}`}
-                                        className={stepper}
-                                    >
-                                        +
-                                    </button>
-                                </span>
-                                <span className="font-semibold tabular-nums">
-                                    {formatAmount(line.amount, quote.currency)}
-                                </span>
-                            </div>
-                        );
-                    })}
+                    <BagLines
+                        site={site}
+                        quote={quote}
+                        caps={caps}
+                        onRemoved={setRemoved}
+                    />
+                    {removed ? (
+                        <RemovedNotice removed={removed} onUndo={undoRemove} />
+                    ) : null}
+                    <div className="border-site-border mt-3 flex gap-2.5 border-t py-2.5 text-sm">
+                        <span className="flex-1">Subtotal</span>
+                        <span className="font-semibold tabular-nums">
+                            {formatAmount(quote.subtotal, quote.currency)}
+                        </span>
+                    </div>
                     <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
                         <span className="flex-1">
                             {chosen?.label ?? "Pick-up or delivery"}
@@ -582,7 +530,7 @@ export function BagSheet({
                         </span>
                     </div>
                     {freeNote ? (
-                        <p className="text-site-muted -mt-1 pb-2 text-[12.5px]">
+                        <p className="text-site-body -mt-1 pb-2 text-sm">
                             {freeNote}
                         </p>
                     ) : null}
@@ -596,7 +544,7 @@ export function BagSheet({
                                 onClick={removeCode}
                                 aria-label={`Remove code ${discount.code}`}
                                 className={cn(
-                                    "text-site-muted cursor-pointer text-[12.5px] underline",
+                                    "text-site-fg coarse:min-h-11 cursor-pointer text-sm underline underline-offset-2",
                                     focusRing,
                                 )}
                             >
@@ -657,7 +605,7 @@ export function BagSheet({
                                             <span className="text-[14.5px] font-semibold">
                                                 {w.label}
                                             </span>
-                                            <span className="text-site-muted text-[12.5px]">
+                                            <span className="text-site-body text-sm">
                                                 {w.fee
                                                     ? formatAmount(
                                                           w.fee,
@@ -711,13 +659,13 @@ export function BagSheet({
                     ) : null}
 
                     {pickup ? (
-                        <p className="text-site-body mt-2.5 text-[13.5px] leading-normal">
-                            <span className="font-semibold">Collect from</span>{" "}
+                        <p className="text-site-body mt-2.5 text-sm leading-normal">
+                            <span className="text-site-fg font-semibold">
+                                Collect from
+                            </span>{" "}
                             {pickup.address}
                             {pickup.hours ? (
-                                <span className="text-site-muted block text-[12.5px]">
-                                    {pickup.hours}
-                                </span>
+                                <span className="block">{pickup.hours}</span>
                             ) : null}
                         </p>
                     ) : null}
@@ -774,16 +722,24 @@ export function BagSheet({
             {held && !problem ? (
                 <p
                     id={`${site}-held`}
-                    className="text-site-body mt-2.5 text-[13px] leading-normal"
+                    className="text-site-body mt-2.5 text-sm leading-normal"
                 >
                     {held}
                 </p>
             ) : null}
             {payNote ? (
-                <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
+                <p className="text-site-body mt-2.5 text-sm leading-normal">
                     {payNote}
                 </p>
             ) : null}
+            {returns.map((rule) => (
+                <p
+                    key={rule}
+                    className="text-site-body mt-1.5 text-sm leading-normal [overflow-wrap:anywhere]"
+                >
+                    {rule}
+                </p>
+            ))}
             <button
                 type="button"
                 onClick={place}

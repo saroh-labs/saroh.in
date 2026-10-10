@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CheckoutQuote, QuoteLine } from "./api";
+import { returnsLines } from "./bag-lines";
 import {
     freeDeliveryNote,
     holdReason,
@@ -279,5 +280,45 @@ describe("placeLabel", () => {
                 );
             }
         }
+    });
+});
+
+/** The returns rule above the bag's button: what the product pages say. */
+describe("returnsLines", () => {
+    it("says one rule once when every line shares it", () => {
+        expect(
+            returnsLines([
+                line({ returns: "Exchange within 7 days" }),
+                line({
+                    listingId: "l-2",
+                    name: "Cotton scarf",
+                    returns: " Exchange within 7 days ",
+                }),
+            ]),
+        ).toEqual(["Returns: Exchange within 7 days"]);
+    });
+
+    it("names the products a rule covers when the bag holds more than one, or some have none", () => {
+        expect(
+            returnsLines([
+                line({ returns: "Exchange within 7 days" }),
+                line({
+                    listingId: "l-2",
+                    name: "Cotton scarf",
+                    returns: "No returns on sale items",
+                }),
+                line({ listingId: "l-3", name: "Tote bag", returns: null }),
+            ]),
+        ).toEqual([
+            "Returns for Linen kurta: Exchange within 7 days",
+            "Returns for Cotton scarf: No returns on sale items",
+        ]);
+    });
+
+    it("says nothing with no rule, and nothing for a line no longer sold", () => {
+        expect(returnsLines([line(), line({ returns: " " })])).toEqual([]);
+        expect(
+            returnsLines([line({ state: "gone", returns: "Old rule" })]),
+        ).toEqual([]);
     });
 });

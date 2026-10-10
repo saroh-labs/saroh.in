@@ -38,7 +38,7 @@ import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
 import { shopPause } from "./checkout-paused";
 import type { BagLine, CheckoutQuote, CheckoutWay } from "./checkout-quote";
-import { feeCents } from "./checkout-quote";
+import { feeCents, freeOverCents } from "./checkout-quote";
 import type {
     CheckoutPayment,
     CheckoutPayOption,
@@ -111,6 +111,12 @@ export interface CheckoutOptions {
      * hours, the business's public details. Null when Pick-up isn't offered.
      */
     pickup: PickupPlace | null;
+    /**
+     * The location's "Free delivery over", "999.00", when a delivery it
+     * offers has a fee for it to waive; else null. The product page says
+     * it under the price. Absent from an older API.
+     */
+    freeDeliveryOver?: string | null;
     /**
      * True when a move to a lower plan stopped this website or its location
      * taking orders (#800): the site says "This business isn't taking
@@ -221,6 +227,7 @@ export class PublicCheckoutService {
                       };
                   })
                 : [];
+            const over = freeOverCents(settings.fees);
             if (scope.takingOrders === false) {
                 return {
                     canOrder: false,
@@ -244,6 +251,10 @@ export class PublicCheckoutService {
                 pickup: ways.some((w) => w.type === "PICKUP")
                     ? settings.pickup
                     : null,
+                freeDeliveryOver:
+                    over !== null && ways.some((w) => w.fee !== null)
+                        ? fromCents(over)
+                        : null,
             };
         });
     }

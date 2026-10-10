@@ -28,6 +28,11 @@ export interface QuoteLine {
     amount: string;
     state: QuoteLineState;
     available: number | null;
+    /**
+     * The returns rule the product's page shows, repeated above the bag's
+     * button; null for none. Absent from an older API.
+     */
+    returns?: string | null;
 }
 
 /** A way the order can leave, with what it adds. */

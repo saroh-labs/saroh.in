@@ -257,6 +257,7 @@ export default function ProductPage({
     preview = true,
     locale = "en-IN",
     action,
+    facts = null,
 }: {
     product: ProductPageData;
     /** Staff notes' numbered badges: the workspace preview only. */
@@ -266,6 +267,12 @@ export default function ProductPage({
     locale?: string;
     /** The live page's action (G13 fills it); ignored in preview. */
     action?: ReactNode;
+    /**
+     * What an order costs to receive, under the price: "Pick-up free ·
+     * Local delivery ₹60" (`shopFactsLine`, from the location's checkout).
+     * Null says nothing: a shop that isn't taking orders, or the preview.
+     */
+    facts?: string | null;
 }) {
     // The live page never draws staff notes, whatever it is handed.
     const markers = preview && markersAsked;
@@ -446,9 +453,14 @@ export default function ProductPage({
                             </>
                         ) : null}
                     </div>
-                    {mrp ? (
-                        <p className="text-site-muted mt-1 text-xs">
-                            Inclusive of all taxes
+                    {/* Every price includes its taxes (ADR-008), MRP or not,
+                        so it is said under every price. */}
+                    <p className="text-site-body mt-1 text-sm">
+                        Inclusive of all taxes
+                    </p>
+                    {facts ? (
+                        <p className="text-site-body mt-1 text-sm [overflow-wrap:anywhere]">
+                            {facts}
                         </p>
                     ) : null}
 

@@ -393,7 +393,60 @@ describe("the site's checkout options and quote (G13)", () => {
             ],
             // Where a pick-up is collected (UX-025).
             pickup: { address: "12 Hill Road, Bandra", hours: null },
+            // No "Free delivery over" set at this location.
+            freeDeliveryOver: null,
         });
+    });
+
+    it("says the location's free delivery amount only where a delivery has a fee to waive", async () => {
+        const s = await shop();
+        const options = async () =>
+            (
+                await call(
+                    "GET",
+                    `/public/sites/${s.siteId}/checkout/options`,
+                    { host: s.host },
+                )
+            ).body;
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { freeShippingThreshold: "999.00" },
+        });
+        expect(await options()).toMatchObject({ freeDeliveryOver: "999.00" });
+        // Delivery costs nothing here: there is nothing to waive.
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { localDeliveryFee: null },
+        });
+        expect(await options()).toMatchObject({ freeDeliveryOver: null });
+    });
+
+    it("carries a product's own returns rule on its bag line, while its page shows one", async () => {
+        const s = await shop();
+        const returnsOf = async () =>
+            (
+                (
+                    await quote(s, {
+                        lines: [{ listingId: s.listingId, quantity: 1 }],
+                    })
+                ).body.lines as { returns: string | null }[]
+            )[0]?.returns;
+        // The location's rule (the default): nothing of the product's own.
+        expect(await returnsOf()).toBeNull();
+        await prisma.product.update({
+            where: { id: s.productId },
+            data: {
+                returnsMode: "OWN",
+                returnsText: "Exchange within 7 days, tags on",
+            },
+        });
+        expect(await returnsOf()).toBe("Exchange within 7 days, tags on");
+        // Switched to team only: off the shop, so off the bag.
+        await prisma.product.update({
+            where: { id: s.productId },
+            data: { shopFields: { returns: false } },
+        });
+        expect(await returnsOf()).toBeNull();
     });
 
     it("offers no Pick-up from a place with no address (UX-025)", async () => {

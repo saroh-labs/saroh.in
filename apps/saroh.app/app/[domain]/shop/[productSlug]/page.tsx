@@ -7,6 +7,7 @@ import {
     AskAboutOrdering,
     NotTakingOrders,
     ProductPage,
+    shopFactsLine,
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
@@ -152,7 +153,18 @@ export default async function ShopProductPage({
                     }),
                 }}
             />
-            <ProductPage product={product} preview={false} action={action} />
+            <ProductPage
+                product={product}
+                preview={false}
+                action={action}
+                // What it costs to receive, before the bag: only what this
+                // location's checkout offers now.
+                facts={
+                    checkout?.canOrder && product.listingId
+                        ? shopFactsLine(checkout)
+                        : null
+                }
+            />
         </main>
     );
 }

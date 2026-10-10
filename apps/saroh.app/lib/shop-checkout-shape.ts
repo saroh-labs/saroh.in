@@ -30,6 +30,12 @@ export interface CheckoutOptions {
     /** How it can be paid; absent from an API before offline payment. */
     payments?: { online: boolean; onHandover: boolean };
     /**
+     * The location's "Free delivery over", "999.00", when a delivery here
+     * has a fee for it to waive; the product page says it under the price.
+     * Null for none; absent from an older API.
+     */
+    freeDeliveryOver?: string | null;
+    /**
      * True when the business stopped taking orders on this site for now
      * (#800): the shop says so instead of offering a bag or an enquiry.
      * Absent from an older API.
@@ -82,7 +88,8 @@ export function isCheckoutOptions(v: unknown): v is CheckoutOptions {
         isString(v.storefront.name) &&
         isString(v.currency) &&
         Array.isArray(v.ways) &&
-        v.ways.every(isWay)
+        v.ways.every(isWay) &&
+        (v.freeDeliveryOver === undefined || isStringOrNull(v.freeDeliveryOver))
     );
 }
 
@@ -109,7 +116,9 @@ function isLine(v: unknown): boolean {
         isString(v.amount) &&
         isString(v.state) &&
         LINE_STATES.has(v.state) &&
-        (v.available === null || typeof v.available === "number")
+        (v.available === null || typeof v.available === "number") &&
+        // The product's returns rule; absent from an older API.
+        (v.returns === undefined || isStringOrNull(v.returns))
     );
 }
 

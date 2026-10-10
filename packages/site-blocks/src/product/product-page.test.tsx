@@ -260,3 +260,39 @@ describe("ProductPage on the live site (G11)", () => {
         expect(screen.getByTestId("probe")).toHaveTextContent("outside");
     });
 });
+
+describe("the facts under the price", () => {
+    it("says every price includes its taxes, with an MRP or without", () => {
+        const { unmount } = render(<ProductPage product={dress} />);
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+        unmount();
+        render(
+            <ProductPage
+                product={{ ...dress, mrp: null, variants: [] }}
+                preview={false}
+            />,
+        );
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+    });
+
+    it("says what it costs to receive, in the body colour, when the shop takes orders", () => {
+        render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                facts="Pick-up free · Local delivery ₹40 · Free delivery from ₹999"
+            />,
+        );
+        const line = screen.getByText(
+            "Pick-up free · Local delivery ₹40 · Free delivery from ₹999",
+        );
+        expect(line.className).toContain("text-site-body");
+        expect(line.className).toContain("text-sm");
+        expect(line.className).not.toContain("text-site-muted");
+    });
+
+    it("says nothing about delivery when the page was given nothing", () => {
+        render(<ProductPage product={dress} preview={false} />);
+        expect(screen.queryByText(/Pick-up|delivery/i)).toBeNull();
+    });
+});
