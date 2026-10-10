@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as plainTile } from "../site-icon.svg/route";
 import { GET } from "./route";
 
-const site = vi.hoisted(() => ({ resolved: null as unknown }));
+const site = vi.hoisted((): { resolved: unknown } => ({ resolved: null }));
 
 vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),

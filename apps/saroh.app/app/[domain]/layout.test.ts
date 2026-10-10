@@ -9,7 +9,7 @@ import { generateMetadata } from "./layout";
  * alike. The data layer is mocked; what is under test is what the layout
  * declares from the one public read.
  */
-const site = vi.hoisted(() => ({ resolved: null as unknown }));
+const site = vi.hoisted((): { resolved: unknown } => ({ resolved: null }));
 
 vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),
