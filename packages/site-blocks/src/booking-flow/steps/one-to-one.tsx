@@ -129,7 +129,7 @@ export function OneToOne({
                 </span>
                 {firstDay && lastDay ? (
                     <span className="text-site-muted text-[12.5px]">
-                        {dateText(firstDay.date)} – {dateText(lastDay.date)}
+                        {dateText(firstDay.date)} to {dateText(lastDay.date)}
                     </span>
                 ) : null}
             </div>

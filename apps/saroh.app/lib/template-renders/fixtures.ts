@@ -461,7 +461,7 @@ const gym: TemplateFixture = {
             id: "gym-off-peak",
             name: "Off-peak",
             description:
-                "Weekdays before 16:00, all classes in that window, and open gym whenever it is staffed.",
+                "Weekdays before 4 pm, all classes in that window, and open gym whenever it is staffed.",
             price: "2400.00",
             currency: "INR",
             interval: "MONTH",

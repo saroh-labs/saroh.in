@@ -70,7 +70,7 @@ describe("the footer's contact group (DEC-125)", () => {
             screen.getByText("12th Main, Indiranagar, Bengaluru"),
         ).toBeInTheDocument();
         expect(screen.queryByText(/Indiranagar:/)).toBeNull();
-        expect(screen.getByText("Mon–Tue 6am–9pm")).toBeInTheDocument();
+        expect(screen.getByText("Mon to Tue 6am to 9pm")).toBeInTheDocument();
         const directions = screen.getByRole("link", { name: "Get directions" });
         expect(directions).toHaveAttribute(
             "href",

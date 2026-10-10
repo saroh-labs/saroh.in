@@ -96,7 +96,7 @@ export function Sessions({
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block text-[15px] font-semibold">
-                                {timeIn(s.startAt, zone)} – {end} ·{" "}
+                                {timeIn(s.startAt, zone)} to {end} ·{" "}
                                 {dateText(date)}
                             </span>
                             {s.staffName ? (

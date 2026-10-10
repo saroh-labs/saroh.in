@@ -236,7 +236,7 @@ const WORDS: Record<ShopProblem, string> = {
     "signed-out": "Sign in to place your order.",
     "bag-changed":
         "Something in your bag has changed. Check it, then place your order.",
-    busy: "Too many tries just now. Wait a minute, then try again.",
+    busy: "Too many tries. Wait a minute, then try again.",
     "cant-order":
         "This shop isn't taking orders online right now. Ask them about ordering instead.",
     "payments-down":

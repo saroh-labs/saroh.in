@@ -420,7 +420,7 @@ describe("the booking page (U19)", () => {
             url.endsWith("/days")
                 ? json(ONE_DAYS)
                 : json(
-                      { error: { message: "This slot is fully booked" } },
+                      { error: { message: "That time is fully booked." } },
                       409,
                   ),
         );
@@ -430,7 +430,7 @@ describe("the booking page (U19)", () => {
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
         expect(
-            await screen.findByText("This slot is fully booked"),
+            await screen.findByText("That time is fully booked."),
         ).toBeInTheDocument();
         await waitFor(() =>
             expect(calls.filter((c) => c.url.endsWith("/days"))).toHaveLength(
@@ -1375,7 +1375,7 @@ describe("opening on a time from On today (G18)", () => {
         ).toHaveAttribute("aria-checked", "true");
         // Straight on to who they are.
         expect(screen.getByText(/Booking as/)).toBeInTheDocument();
-        expect(screen.queryByText(/just gone/)).toBeNull();
+        expect(screen.queryByText(/has gone/)).toBeNull();
     });
 
     it("opens on the day and says so when the time has just gone", async () => {
@@ -1391,9 +1391,7 @@ describe("opening on a time from On today (G18)", () => {
             />,
         );
         expect(
-            await screen.findByText(
-                "That time has just gone. Here's what's left.",
-            ),
+            await screen.findByText("That time has gone. Here's what's left."),
         ).toBeInTheDocument();
         expect(
             screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
@@ -1438,9 +1436,7 @@ describe("opening on a time from On today (G18)", () => {
             />,
         );
         expect(
-            await screen.findByText(
-                "That time has just gone. Here's what's left.",
-            ),
+            await screen.findByText("That time has gone. Here's what's left."),
         ).toBeInTheDocument();
     });
 
@@ -1462,7 +1458,7 @@ describe("opening on a time from On today (G18)", () => {
         expect(
             screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "false");
-        expect(screen.queryByText(/just gone/)).toBeNull();
+        expect(screen.queryByText(/has gone/)).toBeNull();
     });
 });
 
@@ -1821,7 +1817,7 @@ describe("sign-in at the last step (A9)", () => {
                 );
             }
             return json(
-                { error: { message: "This slot is fully booked" } },
+                { error: { message: "That time is fully booked." } },
                 409,
             );
         });
@@ -1841,7 +1837,7 @@ describe("sign-in at the last step (A9)", () => {
 
         expect(
             await screen.findByText(
-                "That time has just gone. We've chosen the next free one: Sun 20 Sep at 08:00.",
+                "That time has gone. We've chosen the next free one: Sun 20 Sep at 08:00.",
             ),
         ).toBeInTheDocument();
         expect(
@@ -2334,7 +2330,7 @@ describe("the header's facts (E6)", () => {
         ).toBeInTheDocument();
         expect(
             screen.getByText(
-                "12th Main, Indiranagar, Bengaluru 560038 · Open Mon–Sat 9am–7pm, Sun 9am–1pm",
+                "12th Main, Indiranagar, Bengaluru 560038 · Open Mon to Sat 9am to 7pm, Sun 9am to 1pm",
             ),
         ).toBeInTheDocument();
         const call = screen.getByRole("link", { name: "+91 80409 92210" });

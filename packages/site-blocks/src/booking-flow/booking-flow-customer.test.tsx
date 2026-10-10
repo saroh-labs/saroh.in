@@ -523,7 +523,7 @@ describe("the booking through a reload", () => {
         );
         expect(
             screen.getAllByText(
-                "That time has just gone. We've chosen the next free one: Sun 20 Sep at 09:00.",
+                "That time has gone. We've chosen the next free one: Sun 20 Sep at 09:00.",
             ).length,
         ).toBeGreaterThan(0);
     });

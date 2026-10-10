@@ -20,7 +20,7 @@ import type { PayAutopay } from "@/lib/invoice-pay-shape";
 
 /**
  * Autopay on an invoice's pay link (round-2 D12): "Pay and turn on autopay",
- * the default, beside "Just pay this invoice", and how autopay pays — every
+ * the default, beside "Pay this invoice only", and how autopay pays — every
  * method the business's provider offers, by its plain name (DEC-059).
  *
  * UPI and card: one provider window pays the invoice and authorises. eMandate:
@@ -53,7 +53,7 @@ export function InvoiceAutopay({
     /** The invoice can still be paid; false: it is paid already. */
     payable: boolean;
     /**
-     * The page's own Pay, for "Just pay this invoice", and what its button
+     * The page's own Pay, for "Pay this invoice only", and what its button
      * reads now. Absent where nothing is owed (`payable` false).
      */
     onJustPay?: () => void;
@@ -185,7 +185,7 @@ export function InvoiceAutopay({
                     />
                     <PayOption
                         on={!autopayOn}
-                        label="Just pay this invoice"
+                        label="Pay this invoice only"
                         sub="Each renewal comes with a link to pay, as this one did."
                         onPick={() => setAutopayOn(false)}
                     />
