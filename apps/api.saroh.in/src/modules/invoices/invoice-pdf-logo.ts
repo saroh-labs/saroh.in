@@ -118,13 +118,29 @@ export type LogoSkipReason =
     | "timed_out"
     | "undecodable";
 
+/**
+ * Which paper went out without the logo: the log line's event name and its
+ * sentence. The invoice PDF unless a caller says otherwise; a QR print file
+ * (`sites/qr-print.ts`) reads the same logo the same way and names itself.
+ */
+export interface LogoPaper {
+    event: string;
+    what: string;
+}
+
+export const INVOICE_LOGO_PAPER: LogoPaper = {
+    event: "invoice_pdf_logo_skipped",
+    what: "the invoice PDF went out without the business logo",
+};
+
 export function warnLogoSkipped(
     logger: Pick<Logger, "warn">,
     organizationId: string,
     reason: LogoSkipReason,
+    paper: LogoPaper = INVOICE_LOGO_PAPER,
 ): void {
     logger.warn(
-        `invoice_pdf_logo_skipped: the invoice PDF went out without the business logo (organization ${organizationId}, reason ${reason})`,
+        `${paper.event}: ${paper.what} (organization ${organizationId}, reason ${reason})`,
     );
 }
 
@@ -140,10 +156,11 @@ export async function loadInvoiceLogo(
     profile: { logoUrl: string | null; logoMediaId: string | null } | null,
     logger: Pick<Logger, "warn">,
     timeoutMs = LOGO_READ_TIMEOUT_MS,
+    paper: LogoPaper = INVOICE_LOGO_PAPER,
 ): Promise<Buffer | null> {
     if (!profile?.logoUrl) return null;
     const skip = (reason: LogoSkipReason) => {
-        warnLogoSkipped(logger, organizationId, reason);
+        warnLogoSkipped(logger, organizationId, reason, paper);
         return null;
     };
     if (!profile.logoMediaId) return skip("no_library_object");
