@@ -18,7 +18,7 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import { ChipGroup } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { Segmented } from "@saroh/ui/segmented";
@@ -265,10 +265,10 @@ export function FieldSheet({
                         {categories.map((c) => {
                             const on = categoryIds.includes(c.id);
                             return (
-                                <button
+                                <Chip
                                     key={c.id}
-                                    type="button"
-                                    aria-pressed={on}
+                                    as="toggle"
+                                    on={on}
                                     disabled={busy}
                                     onClick={() =>
                                         setCategoryIds(
@@ -279,10 +279,9 @@ export function FieldSheet({
                                                 : [...categoryIds, c.id],
                                         )
                                     }
-                                    className={chipClass(on)}
                                 >
                                     {c.name}
-                                </button>
+                                </Chip>
                             );
                         })}
                     </div>

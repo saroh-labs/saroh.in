@@ -88,6 +88,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
@@ -1021,57 +1022,61 @@ function MemberDrawer({
                         <p className="label mb-2.5">
                             Role in {organizationName}
                         </p>
-                        <div
-                            role="radiogroup"
-                            aria-label="Role"
+                        <ChoiceGroup
+                            label="Role"
                             className="flex flex-col gap-[5px]"
-                        >
-                            {book.all.map(({ key: r }) => {
+                            value={role}
+                            onChange={setDraft}
+                            disabled={locked}
+                            choices={book.all.map(({ key: r }) => {
                                 const on = r === role;
                                 const beyond = !book.withinReach(r);
-                                return (
-                                    <button
-                                        key={r}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={on}
-                                        disabled={locked || beyond}
-                                        onClick={() => setDraft(r)}
-                                        className={cn(
-                                            "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
-                                            on
-                                                ? "border-border-strong bg-foreground/[0.03]"
-                                                : "border-muted hover:border-border-strong active:bg-accent-active",
-                                        )}
-                                    >
-                                        <RoleDot role={r} />
-                                        <span className="min-w-0 flex-1">
-                                            <span
-                                                className={cn(
-                                                    "block text-[13px]",
-                                                    on
-                                                        ? "font-semibold"
-                                                        : "font-medium",
-                                                )}
-                                            >
-                                                {book.labelOf(r)}
+                                return {
+                                    value: r,
+                                    disabled: beyond,
+                                    label: (
+                                        <>
+                                            <RoleDot role={r} />
+                                            <span className="min-w-0 flex-1">
+                                                <span
+                                                    className={cn(
+                                                        "block text-[13px]",
+                                                        on
+                                                            ? "font-semibold"
+                                                            : "font-medium",
+                                                    )}
+                                                >
+                                                    {book.labelOf(r)}
+                                                </span>
+                                                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                                                    {beyond
+                                                        ? "Can do more than you can"
+                                                        : book.plainOf(r)}
+                                                </span>
                                             </span>
-                                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                                {beyond
-                                                    ? "Can do more than you can"
-                                                    : book.plainOf(r)}
-                                            </span>
-                                        </span>
-                                        {on ? (
-                                            <Check
-                                                aria-hidden
-                                                className="size-4 shrink-0"
-                                            />
-                                        ) : null}
-                                    </button>
-                                );
+                                            {on ? (
+                                                <Check
+                                                    aria-hidden
+                                                    className="size-4 shrink-0"
+                                                />
+                                            ) : null}
+                                        </>
+                                    ),
+                                };
                             })}
-                        </div>
+                            itemClassName={(on, choice) =>
+                                cn(
+                                    "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left coarse:min-h-11",
+                                    on
+                                        ? "border-border-strong bg-foreground/[0.03]"
+                                        : cn(
+                                              "border-muted",
+                                              !choice.disabled &&
+                                                  "hover:border-border-strong active:bg-accent-active",
+                                          ),
+                                )
+                            }
+                        />
 
                         <ExtraPermissions
                             roleLabel={book.labelOf(role)}

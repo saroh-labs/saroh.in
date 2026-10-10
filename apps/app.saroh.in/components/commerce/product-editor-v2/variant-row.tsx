@@ -12,7 +12,7 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
@@ -282,10 +282,10 @@ function SellItAt({
                 {stores.map((s) => {
                     const on = chosen.includes(s.id);
                     return (
-                        <button
+                        <Chip
                             key={s.id}
-                            type="button"
-                            aria-pressed={on}
+                            as="toggle"
+                            on={on}
                             disabled={locked}
                             onClick={() =>
                                 onChange(
@@ -294,10 +294,9 @@ function SellItAt({
                                         : [...chosen, s.id],
                                 )
                             }
-                            className={chipClass(on)}
                         >
                             {s.name}
-                        </button>
+                        </Chip>
                     );
                 })}
             </div>

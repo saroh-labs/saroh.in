@@ -55,6 +55,7 @@ export function SetupGoalChoice({
                 const on = choice.key === value;
                 return {
                     value: choice.key,
+                    data: { "data-goal": choice.key },
                     label: (
                         <>
                             <span className="min-w-0 flex-1">

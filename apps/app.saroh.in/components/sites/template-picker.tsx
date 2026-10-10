@@ -11,6 +11,7 @@ import type { ModuleStates } from "@/lib/sites/template-picker";
 import { moduleNote, shapeWord, usesLine } from "@/lib/sites/template-picker";
 import type { TemplateThumbnailImage } from "@/lib/sites/template-thumbnails";
 import { templateThumbnail } from "@/lib/sites/template-thumbnails";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * The template picker (industry templates plan, U12): a grid of cards, one
@@ -71,33 +72,15 @@ export function TemplatePicker({
                     Template
                 </span>
                 {narrowed ? (
-                    <div
-                        role="group"
-                        aria-label="Templates shown"
-                        className="inline-flex rounded-md border border-border p-0.5"
-                    >
-                        {(
-                            [
-                                ["suggested", "Suggested"],
-                                ["all", `All ${templates.length}`],
-                            ] as const
-                        ).map(([key, label]) => (
-                            <button
-                                key={key}
-                                type="button"
-                                aria-pressed={show === key}
-                                onClick={() => setShow(key)}
-                                className={cn(
-                                    "cursor-pointer rounded-sm px-2.5 py-1 text-xs font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    show === key
-                                        ? "bg-foreground text-background"
-                                        : "text-muted-foreground hover:bg-muted active:bg-accent-active",
-                                )}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="Templates shown"
+                        value={show}
+                        onValueChange={setShow}
+                        options={[
+                            { value: "suggested", label: "Suggested" },
+                            { value: "all", label: `All ${templates.length}` },
+                        ]}
+                    />
                 ) : null}
             </div>
             <RadioGroupPrimitive.Root

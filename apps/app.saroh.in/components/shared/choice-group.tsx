@@ -36,6 +36,8 @@ export interface Choice<T extends string> {
     /** Shown on hover and focus: why it is off, or a swatch's name. */
     tip?: string;
     style?: React.CSSProperties;
+    /** `data-*` attributes for the choice's button. */
+    data?: Record<`data-${string}`, string>;
 }
 
 const STEP: Record<string, number> = {
@@ -149,6 +151,7 @@ export function ChoiceGroup<T extends string>({
                         disabled={disabled}
                         tabIndex={choice.value === stop?.value ? 0 : -1}
                         style={choice.style}
+                        {...choice.data}
                         onMouseDown={
                             keepFocus ? (e) => e.preventDefault() : undefined
                         }
