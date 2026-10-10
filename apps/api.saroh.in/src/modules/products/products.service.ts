@@ -389,7 +389,7 @@ export class ProductsService {
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
-                message: "Could not derive a slug from the name",
+                message: "That name has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }
