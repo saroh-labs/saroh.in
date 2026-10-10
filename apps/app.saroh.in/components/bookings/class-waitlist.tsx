@@ -1,6 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import {
@@ -8,6 +9,7 @@ import {
     joinedText,
     WAITLIST_NOTE,
 } from "@/lib/services/class-waitlist-words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * A class's waitlist on its booking (round-2 A12; the Course Detail
@@ -44,14 +46,13 @@ export function ClassWaitlist({
                 {WAITLIST_NOTE}
             </p>
             {rows === null ? (
-                <p className="mt-3 text-sm text-destructive">
-                    We couldn&apos;t load the waitlist. Refresh the page to try
-                    again.
-                </p>
+                <FailedRead things="the waitlist" className="mt-3" />
             ) : rows.length === 0 ? (
-                <p className="mt-3 text-sm text-muted-foreground">
-                    Nobody waiting.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="mt-3"
+                    title="No one is waiting."
+                />
             ) : (
                 <ol className="mt-2">
                     {rows.map((row, i) => (

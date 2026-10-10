@@ -167,7 +167,7 @@ export function ReviewsView({
                 emptyState={{
                     icon: <MessageSquareQuote />,
                     title: "No reviews yet",
-                    note: "Reviews appear here once a customer leaves one. You can invite reviews from a past order.",
+                    note: "They show here once a customer leaves one, and you can invite one from a past order.",
                     action:
                         canWrite && invitable.length > 0 ? (
                             <Button onClick={() => setInviting(true)}>

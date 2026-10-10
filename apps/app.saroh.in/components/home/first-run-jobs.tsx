@@ -117,7 +117,7 @@ export function FirstRunJobs({
             </div>
 
             <p className="mt-4 text-[12.5px] text-muted-foreground">
-                Other capabilities build on these.{" "}
+                Other modules build on these.{" "}
                 <Link
                     href="/onboarding/modules"
                     className="font-medium text-brand underline-offset-4 hover:underline"

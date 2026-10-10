@@ -22,11 +22,10 @@ export default function Error({
     return (
         <SectionError
             error={error}
-            reset={retry}
-            title="Website could not be loaded"
-            description="Saroh couldn't read it just now. Your published site is unaffected."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Website"
+            things="your website"
+            reassurance="Your published site is unaffected."
         />
     );
 }

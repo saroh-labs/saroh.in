@@ -156,12 +156,10 @@ export function DiscountsScreen({
                 emptyState={{
                     icon: <TicketPercent />,
                     title: "No discount codes yet",
-                    note: "A code takes money off an order — from everything, or just the locations, categories or products you choose.",
+                    note: "A code takes money off an order: everything, or only the products you choose.",
                     action: canWrite ? (
                         <Button asChild>
-                            <Link href="/commerce/discounts/new">
-                                Make a code
-                            </Link>
+                            <Link href="/commerce/discounts/new">New code</Link>
                         </Button>
                     ) : undefined,
                 }}

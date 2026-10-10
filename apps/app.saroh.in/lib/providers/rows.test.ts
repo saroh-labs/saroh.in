@@ -563,7 +563,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
             );
             expect(b.own).toBe("unread");
             expect(b.body).toMatch(
-                /We couldn't read whether your plan lets you connect your own email\./,
+                /Couldn't load whether your plan lets you connect your own email\./,
             );
         });
 
@@ -585,7 +585,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
             view.bookingEmails?.kind === "unread"
                 ? view.bookingEmails.text
                 : "";
-        expect(text).toMatch(/^Booking emails: we couldn't read/);
+        expect(text).toMatch(/^Couldn't load booking emails/);
         expect(text).not.toMatch(/\b0 of\b/);
     });
 

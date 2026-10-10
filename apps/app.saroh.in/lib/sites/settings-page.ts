@@ -3,6 +3,7 @@ import {
     pendingChangeCount,
 } from "@/lib/sites/pending";
 import type { SiteDetail, SitePage } from "@/lib/sites/service";
+import { notPublished } from "@saroh/ui/lib/state-copy";
 
 /**
  * The words and rules of a site's Settings tab (Website › Settings audit,
@@ -203,7 +204,7 @@ export function publishWaiting(
 ): PublishWaiting | null {
     if (!site.currentPublication) {
         return {
-            line: "Your site isn't published yet. Nobody can reach it until you publish.",
+            line: `${notPublished.line} Nobody can reach it until you publish.`,
         };
     }
     const count = pendingChangeCount(

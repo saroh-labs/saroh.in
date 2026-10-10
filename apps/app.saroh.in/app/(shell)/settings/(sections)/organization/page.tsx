@@ -1,4 +1,5 @@
-import { EmptyState } from "@saroh/ui/empty-state";
+import { FailedState } from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
 import { WebAddressSection } from "@/components/organizations/web-address-section";
@@ -114,9 +115,9 @@ export default async function OrganizationSettingsPage() {
                     }
                 />
             ) : (
-                <EmptyState
-                    title="Not available"
-                    description="Choose a business to view its settings."
+                <FailedState
+                    title={couldntLoad("your business details")}
+                    retryHref="/settings/organization"
                 />
             )}
         </SettingsPanel>

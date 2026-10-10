@@ -11,9 +11,12 @@ export default function NotFoundPage() {
             <div className="px-6 py-10 max-[759px]:px-4">
                 <NotFound
                     variant="card"
-                    title="That pack isn't here"
+                    title="Class pack not found"
                     description="The link may be old, or the draft was deleted."
-                    primary={{ href: "/class-packs", label: "Back to packs" }}
+                    primary={{
+                        href: "/class-packs",
+                        label: "Back to Class packs",
+                    }}
                 />
             </div>
         </PageContainer>

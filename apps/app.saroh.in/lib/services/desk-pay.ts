@@ -10,6 +10,7 @@
 import type { CashChange } from "@/lib/orders/new-order";
 import { cashChange, centsOf } from "@/lib/orders/new-order";
 import { METHOD_WORD, methodLabel } from "@/lib/payments/method-words";
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How the desk takes it, as the API records it. */
 export type DeskMethod = "CASH" | "UPI" | "CARD";
@@ -86,7 +87,7 @@ export function deskChoices(input: {
                       off: !input.take.byLink
                           ? "A pay link bills the whole booking, so take the rest here"
                           : !input.canLink
-                            ? "Connect a payment provider to send a link"
+                            ? providerDisconnected.title("payment")
                             : null,
                   },
               ]),

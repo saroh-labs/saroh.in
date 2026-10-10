@@ -1,4 +1,4 @@
-import { EmptyState } from "@saroh/ui/data-state";
+import { ModuleOffState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { CalendarDays } from "lucide-react";
 
@@ -16,10 +16,12 @@ export function CalendarNothing() {
     return (
         <>
             <PageHeader breadcrumb={["Home", "Overview"]} title="Overview" />
-            <EmptyState
-                icon={<CalendarDays aria-hidden />}
-                title="Nothing dated to show here"
-                description="The calendar lays out orders, subscription renewals, invoices and bookings by day. None of them is turned on for this business, or open to your role."
+            <ModuleOffState
+                icon={<CalendarDays />}
+                name="Calendar"
+                title="Nothing dated is turned on"
+                description="The calendar lays out orders, renewals, invoices and bookings by day."
+                canTurnOn={false}
             />
         </>
     );

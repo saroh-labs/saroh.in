@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
+import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -50,6 +50,7 @@ import {
 } from "@/lib/services/diary";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
+import { Users } from "lucide-react";
 
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingsViewSwitch } from "../bookings-view-switch";
@@ -874,22 +875,19 @@ function NoOneYet({
     onAdd: () => void;
 }) {
     return (
-        <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-            <p className="text-[14px] font-semibold">
-                Nobody is on the diary yet
-            </p>
-            <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                Add the people who take bookings and their hours, and each gets
-                a column here with their free times to book.
-            </p>
-            {canHours ? (
-                <Button
-                    className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onAdd}
-                >
-                    Add someone
-                </Button>
-            ) : null}
-        </div>
+        <EmptyState
+            icon={<Users />}
+            title="No one on the diary yet"
+            description={
+                canHours
+                    ? "Add the people who take bookings and their hours, and each gets a column here."
+                    : "The people who take bookings each get a column here."
+            }
+            action={
+                canHours ? (
+                    <Button onClick={onAdd}>Add someone</Button>
+                ) : undefined
+            }
+        />
     );
 }

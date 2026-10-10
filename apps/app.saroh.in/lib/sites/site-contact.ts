@@ -27,9 +27,8 @@ export const CONTACT_OWNER_ONLY =
 
 /** Said when what the site shows couldn't be read. */
 export const CONTACT_UNREAD = {
-    title: "Your contact details couldn't be loaded",
-    description:
-        "Your website still shows them. Reload this page to see them here.",
+    title: "Couldn't load your contact details",
+    description: "Nothing has been changed. Your website still shows them.",
 };
 
 /** An address on one line. */

@@ -42,6 +42,8 @@ import type {
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Users } from "lucide-react";
 
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
@@ -333,26 +335,23 @@ export function AvailabilityEditor({
                     </ReadOnlyNote>
                 )}
                 <div className="flex flex-wrap items-start gap-4">
-                    <div className="min-w-0 flex-[3_1_320px] rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                        <p className="text-[14px] font-semibold">
-                            Nobody takes bookings yet
-                        </p>
-                        <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                            Add the people who can be booked. Each gets weekly
-                            hours, time off and a column on the calendar.
-                        </p>
-                        {canEdit ? (
-                            <Button
-                                className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                                onClick={() => setAdding(true)}
-                            >
-                                Add someone
-                            </Button>
-                        ) : null}
-                        <p className="mx-auto mt-2 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                            Until then, customers book each service in its own
-                            weekly hours, set on the service.
-                        </p>
+                    <div className="min-w-0 flex-[3_1_320px]">
+                        <EmptyState
+                            icon={<Users />}
+                            title="No one takes bookings yet"
+                            description={
+                                canEdit
+                                    ? "Add the people who can be booked, and until then customers book each service in its own weekly hours."
+                                    : "Until someone is added, customers book each service in its own weekly hours."
+                            }
+                            action={
+                                canEdit ? (
+                                    <Button onClick={() => setAdding(true)}>
+                                        Add someone
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
                         <AddPersonDialog
                             open={adding}
                             onOpenChange={setAdding}

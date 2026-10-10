@@ -2,6 +2,7 @@ import { Badge } from "@saroh/ui/badge";
 
 import { messageStatusWords } from "@/lib/messages/message-status";
 import type { LeadMessage } from "@/lib/messages/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * Message history for a lead (S6-002), newest first. Each row shows the channel,
@@ -40,9 +41,7 @@ function displayStatus(message: LeadMessage): { status: string; at: string } {
 
 export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
     if (messages.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">No messages yet.</p>
-        );
+        return <EmptyState size="inline" title="No messages yet." />;
     }
 
     return (

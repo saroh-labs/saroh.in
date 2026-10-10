@@ -30,6 +30,7 @@ import type {
     StorefrontSettings,
     StorefrontSummary,
 } from "@/lib/stores/storefronts";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { ClosingSection } from "./closing-section";
 import { FulfilmentSection } from "./fulfilment-section";
@@ -134,13 +135,13 @@ export function StorefrontsScreen({
             <>
                 {header}
                 <EmptyState
-                    title="No location yet"
-                    description={`${businessName} has Sell turned on but nowhere to sell from. A location is a place you sell from, like a shop counter, a studio or a market stall, and your online shop sells from one of them.`}
+                    title="No locations yet"
+                    description="A location is a place you sell from, like a shop counter, a studio or a market stall."
                     action={
                         canCreate ? (
                             <Button asChild variant="brand">
                                 <Link href={newStorefrontHref}>
-                                    Add a location
+                                    New location
                                 </Link>
                             </Button>
                         ) : undefined
@@ -183,16 +184,8 @@ export function StorefrontsScreen({
                     ) : (
                         <div className="min-w-0 max-w-[760px] flex-1">
                             <FailedState
-                                title="This location could not be loaded"
-                                description="Its settings could not be read, so none are shown rather than guessed. Nothing has been changed."
-                                action={
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => router.refresh()}
-                                    >
-                                        Try again
-                                    </Button>
-                                }
+                                title={couldntLoad("this location")}
+                                onRetry={() => router.refresh()}
                             />
                         </div>
                     )}

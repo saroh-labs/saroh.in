@@ -271,7 +271,7 @@ describe("Take ₹X at the desk", () => {
         openTake({ canLink: false });
         expect(chip("Send a pay link").disabled).toBe(true);
         expect(chip("Send a pay link").title).toContain(
-            "Connect a payment provider",
+            "No payment provider connected",
         );
     });
 });

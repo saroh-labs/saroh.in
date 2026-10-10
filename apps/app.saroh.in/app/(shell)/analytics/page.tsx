@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics/service";
 import { ApiError } from "@/lib/api/errors";
 import { requireSession } from "@/lib/session";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /** Supported quick date ranges (label → days back from today). */
 const RANGES: { key: string; label: string; days: number }[] = [
@@ -152,12 +153,9 @@ export default async function AnalyticsPage({
                     />
                 ) : (
                     <FailedState
-                        title="Your website's figures could not be loaded"
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href="/analytics">Try again</Link>
-                            </Button>
-                        }
+                        size="panel"
+                        title={couldntLoad("your website's figures")}
+                        retryHref="/analytics"
                     />
                 )}
             </section>

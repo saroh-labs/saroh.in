@@ -21,6 +21,7 @@ import {
     mediaCounts,
     mediaFileProblem,
 } from "@/lib/products/editor-sections";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * A product's photos and videos, in the order customers see them (the
@@ -175,10 +176,11 @@ export function PhotosField({
                     })}
                 </ol>
             ) : (
-                <div className="rounded-[10px] border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No photos yet. Add up to {LIMITS.photos} photos and{" "}
-                    {LIMITS.videos} videos.
-                </div>
+                <EmptyState
+                    size="panel"
+                    title="No photos yet"
+                    description={`Add up to ${LIMITS.photos} photos and ${LIMITS.videos} videos.`}
+                />
             )}
 
             {allFull ? (

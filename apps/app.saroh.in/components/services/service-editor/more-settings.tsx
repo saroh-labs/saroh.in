@@ -14,6 +14,7 @@ import { GST_RATE_OPTIONS } from "@/lib/invoices/gst";
 import type { AvailabilityRule } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
 
 /**
@@ -136,11 +137,10 @@ export function MoreSettings({
                             it books in their free time instead.
                         </p>
                     ) : rules === null ? (
-                        <p role="alert" className={HELP}>
-                            Its weekly hours couldn&apos;t be loaded, so they
-                            can&apos;t be changed right now. Nothing has changed
-                            — reload to try again.
-                        </p>
+                        <FailedRead
+                            things="its weekly hours"
+                            reassurance="They can't be changed right now."
+                        />
                     ) : (
                         <>
                             <p className={cn(HELP, "mb-2.5")}>

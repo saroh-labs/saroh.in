@@ -20,6 +20,7 @@ import { listLeads } from "@/lib/leads/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listPipelines } from "@/lib/pipelines/service";
 import { requireSession } from "@/lib/session";
+import { Inbox } from "lucide-react";
 
 /**
  * Pipeline board for the active organization (S3-005) — the acceptance
@@ -58,6 +59,7 @@ export default async function PipelinePage() {
             <PageContainer width="wide">
                 <Header />
                 <EmptyState
+                    icon={<Inbox />}
                     title="No leads yet"
                     description={
                         addLead

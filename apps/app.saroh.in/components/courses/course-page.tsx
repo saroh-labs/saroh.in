@@ -294,6 +294,7 @@ function Sessions({
             </div>
             {empty ? (
                 <EmptyState
+                    size="panel"
                     title="No sessions yet"
                     description={
                         canAdd
@@ -422,9 +423,11 @@ function Roster({
                 </Badge>
             </header>
             {active.length === 0 ? (
-                <p className="px-4 py-5 text-[13px] text-muted-foreground">
-                    Nobody is on this course yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="px-4 py-5"
+                    title="No one is on this course yet."
+                />
             ) : (
                 <ul className="divide-y">
                     {active.map((e) => (

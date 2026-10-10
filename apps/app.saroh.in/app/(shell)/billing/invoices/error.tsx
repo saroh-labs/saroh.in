@@ -8,19 +8,18 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Invoices could not be loaded"
-            description="This screen could not read them. Nothing has been changed — every invoice that was issued is still there, with its number and its payments."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Invoices"
+            things="invoices"
+            reassurance="Every invoice that was issued is still there, with its number and its payments."
         />
     );
 }

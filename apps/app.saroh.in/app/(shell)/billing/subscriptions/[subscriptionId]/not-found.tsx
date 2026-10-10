@@ -17,11 +17,11 @@ export default function NotFoundPage() {
             <div className="px-4 py-10 sm:px-6">
                 <NotFound
                     variant="card"
-                    title="No subscription here"
+                    title="Subscription not found"
                     description="It may have been removed, or the link is wrong."
                     primary={{
                         href: "/billing/subscriptions",
-                        label: "Back to subscriptions",
+                        label: "Back to Subscriptions",
                     }}
                 />
             </div>

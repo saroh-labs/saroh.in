@@ -42,7 +42,7 @@ export function ProductOrdersTab({
             <PanelFailed
                 what="orders"
                 retryHref={here}
-                note="The rest of the product loaded; only the order list did not. Stock figures are still right — they come from the product."
+                reassurance="Stock figures are still right. They come from the product."
                 elsewhere={{ href: "/commerce/orders", label: "Open Orders" }}
             />
         );

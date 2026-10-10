@@ -8,19 +8,20 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Stock couldn't be loaded"
-            description="Nothing has changed on your shelves — Saroh just couldn't read them. Try again in a moment."
+            retry={retry}
+            heading="Stock"
+            things="stock"
+            reassurance="Nothing has changed on your shelves."
             backHref="/commerce/products"
-            backLabel="Back to Products"
+            place="Products"
         />
     );
 }

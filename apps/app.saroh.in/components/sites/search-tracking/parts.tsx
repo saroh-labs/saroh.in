@@ -12,6 +12,7 @@ import { useTransition } from "react";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 /**
  * The pieces the "Search and tracking" section (DEC-108, U7) shares
@@ -82,18 +83,13 @@ export function SearchTrackingFailed() {
     const [pending, startTransition] = useTransition();
     return (
         <FailedState
-            title="Tracking couldn't be loaded"
-            description="Your codes and trackers are unchanged. Try again in a moment."
-            action={
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => startTransition(() => router.refresh())}
-                >
-                    {pending ? "Trying…" : "Retry"}
-                </Button>
-            }
+            size="panel"
+            title={couldntLoad("tracking")}
+            description={nothingChanged(
+                "Your codes and trackers are as they were.",
+            )}
+            onRetry={() => startTransition(() => router.refresh())}
+            retrying={pending}
         />
     );
 }

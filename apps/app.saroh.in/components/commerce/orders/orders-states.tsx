@@ -7,6 +7,7 @@ import {
     PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Skeleton } from "@saroh/ui/skeleton";
@@ -156,28 +157,16 @@ export function OrdersFailed({
             <OrdersHeading />
             <FailedState
                 className="my-6"
-                title="Couldn't load orders"
-                description="Something went wrong on our side, so this is not the whole picture. Orders that were placed are still there and nothing has been changed — this screen simply could not read them."
+                title={couldntLoad("orders")}
+                description={nothingChanged(
+                    "Orders that were placed are still there.",
+                )}
+                onRetry={onRetry}
+                reference={reference}
                 action={
-                    <div className="mt-1.5 flex flex-col items-center gap-3">
-                        <div className="flex flex-wrap justify-center gap-2">
-                            <Button onClick={onRetry} className="wk-press">
-                                Try again
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="wk-press"
-                            >
-                                <Link href="/">Back to Home</Link>
-                            </Button>
-                        </div>
-                        {reference ? (
-                            <p className="font-mono text-xs text-muted-foreground">
-                                Reference: {reference}
-                            </p>
-                        ) : null}
-                    </div>
+                    <Button asChild variant="ghost" className="wk-press">
+                        <Link href="/">{backTo("Home")}</Link>
+                    </Button>
                 }
             />
         </>

@@ -30,7 +30,7 @@ describe("OrdersFailed", () => {
         expect(html).toContain('role="alert"');
         expect(html).toContain("Couldn&#x27;t load orders");
         expect(html).toContain("Try again");
-        expect(html).toContain("nothing has been changed");
+        expect(html).toContain("Nothing has been changed.");
         expect(html).toContain("Reference: d1g3st");
     });
 
@@ -111,7 +111,9 @@ describe("OrdersEmpty", () => {
     it("says No orders yet only for a business with none", () => {
         const html = empty({}, "Hill Road");
         expect(html).toContain("No orders yet");
-        expect(html).toContain("The first order in Hill Road");
+        expect(html).toContain(
+            "Orders from your website and counter show here.",
+        );
         expect(html).not.toContain('role="alert"');
     });
 

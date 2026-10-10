@@ -5,6 +5,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { listDataExports } from "@/lib/data-export/service";
 import { dataExportLine } from "@/lib/data-export/words";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -34,9 +35,10 @@ export default async function DataPage() {
         return (
             <SettingsPanel header={header}>
                 <PermissionDeniedState
-                    title="Downloading the business's data is kept to its owner"
-                    description="The file holds every customer's details, so only an owner can make or download it."
-                    note="Ask an owner if you need something from it."
+                    {...whoCanChange({
+                        thing: "the business's data",
+                        ownerOnly: true,
+                    })}
                 />
             </SettingsPanel>
         );

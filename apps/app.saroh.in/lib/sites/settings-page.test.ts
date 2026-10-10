@@ -132,7 +132,7 @@ describe("what waits for the next publish", () => {
                 pendingSiteChanges: null,
             })?.line,
         ).toBe(
-            "Your site isn't published yet. Nobody can reach it until you publish.",
+            "Your website isn't live yet. Nobody can reach it until you publish.",
         );
     });
 

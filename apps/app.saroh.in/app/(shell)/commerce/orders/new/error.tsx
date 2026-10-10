@@ -8,19 +8,20 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't open a new order"
-            description="Something went wrong on our side. Nothing has been taken or saved."
+            retry={retry}
+            heading="New order"
+            things="the new order form"
+            reassurance="Nothing has been taken or saved."
             backHref="/commerce/orders"
-            backLabel="Back to orders"
+            place="Orders"
         />
     );
 }

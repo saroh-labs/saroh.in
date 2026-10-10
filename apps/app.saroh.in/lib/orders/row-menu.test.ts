@@ -254,7 +254,7 @@ describe("rowMenu", () => {
                     rowMenu(row(owed), { ...OWNER, payOnline: false }),
                     "pay-link",
                 )?.disabled,
-            ).toBe("Connect a payment provider first.");
+            ).toBe("No payment provider connected.");
         });
 
         it("isn't drawn on a plan without online payments, and is on one with them (R33)", () => {

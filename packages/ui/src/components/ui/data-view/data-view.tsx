@@ -14,6 +14,7 @@ import { useDebouncedCallback } from "use-debounce";
 import { cn } from "../../../lib/utils";
 import { Button } from "../button";
 import { Checkbox } from "../checkbox";
+import { EmptyState } from "../data-state";
 import { Input } from "../input";
 import { ScrollX } from "../scroll-x";
 import { Skeleton } from "../skeleton";
@@ -814,48 +815,40 @@ export function DataView<TRow>({
                    value would announce "No products match zzz" while the
                    previous results were still sitting underneath it. */
                 search.trim() ? (
-                    <EmptyPanel
-                        icon={<Search />}
-                        title={`No ${noun.other} match “${search.trim()}”`}
-                        note="Clear the search to see everything in this view."
-                        action={
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={clearSearch}
-                            >
-                                Clear search
-                            </Button>
-                        }
+                    <EmptyState
+                        kind="no-results"
+                        things={noun.other}
+                        cause="search"
+                        query={search}
+                        onClear={clearSearch}
                     />
                 ) : activeFilter?.predicate && rows.length > 0 ? (
-                    <EmptyPanel
-                        title={`Nothing in “${activeFilter.label}”`}
-                        note={`${count(rows.length)} in total.`}
-                        action={
-                            firstFilter ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => chooseFilter(firstFilter.id)}
-                                >
-                                    Show {firstFilter.label.toLowerCase()}
-                                </Button>
-                            ) : null
+                    <EmptyState
+                        kind="no-results"
+                        things={noun.other}
+                        cause="view"
+                        title={`No ${noun.other} in “${activeFilter.label}”`}
+                        description={`${count(rows.length)} in total.`}
+                        onClear={
+                            firstFilter
+                                ? () => chooseFilter(firstFilter.id)
+                                : undefined
                         }
                     />
                 ) : emptyState ? (
-                    <EmptyPanel {...emptyState} />
+                    <EmptyState
+                        icon={emptyState.icon}
+                        title={emptyState.title}
+                        description={emptyState.note}
+                        action={emptyState.action}
+                    />
+                ) : typeof empty === "string" || empty == null ? (
+                    <EmptyState
+                        size="panel"
+                        title={empty ?? `No ${noun.other} yet`}
+                    />
                 ) : (
-                    <EmptyPanel
-                        title={
-                            typeof empty === "string"
-                                ? empty
-                                : "Nothing here yet."
-                        }
-                    >
-                        {typeof empty === "string" ? null : empty}
-                    </EmptyPanel>
+                    <>{empty}</>
                 )
             ) : (
                 <div>
@@ -934,48 +927,6 @@ export function DataView<TRow>({
                     {count(rows.length)}
                 </p>
             ) : null}
-        </div>
-    );
-}
-
-/**
- * An empty, no-match or failed region, drawn as the brand file draws it
- * (§14): a dashed Ink 300 edge, an icon, the title in Space Grotesk, one line
- * saying what to do, and the action that does it.
- */
-function EmptyPanel({
-    icon,
-    title,
-    note,
-    action,
-    children,
-}: {
-    icon?: React.ReactNode;
-    title: string;
-    note?: string;
-    action?: React.ReactNode;
-    children?: React.ReactNode;
-}) {
-    return (
-        <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
-            {icon ? (
-                <div
-                    aria-hidden
-                    className="text-muted-foreground [&_svg]:size-8 [&_svg]:stroke-[1.7]"
-                >
-                    {icon}
-                </div>
-            ) : null}
-            <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                {title}
-            </p>
-            {note ? (
-                <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                    {note}
-                </p>
-            ) : null}
-            {children}
-            {action ? <div className="mt-1">{action}</div> : null}
         </div>
     );
 }

@@ -8,6 +8,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronDown, Plus, Store } from "lucide-react";
 import Link from "next/link";
@@ -98,9 +99,7 @@ export function CatalogueHeader({
                         {beside.upgrade ? (
                             <Button asChild variant="outline">
                                 <Link href={meter.href}>
-                                    {meter.upgradeTo
-                                        ? `Upgrade to ${meter.upgradeTo}`
-                                        : "See plans"}
+                                    {planLabel(meter.upgradeTo)}
                                 </Link>
                             </Button>
                         ) : null}

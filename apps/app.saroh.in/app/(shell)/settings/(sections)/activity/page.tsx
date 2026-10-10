@@ -6,6 +6,7 @@ import {
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { navCan } from "@/components/shared/nav-items";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
@@ -14,6 +15,7 @@ import { requireSession } from "@/lib/session";
 import { activityLine } from "@/lib/settings/activity";
 import { activityDetail } from "@/lib/settings/activity-detail";
 import { listSettingsActivity } from "@/lib/settings/activity-service";
+import { History } from "lucide-react";
 
 /**
  * Settings → Activity: who changed the business's settings and team, and
@@ -31,11 +33,7 @@ import { listSettingsActivity } from "@/lib/settings/activity-service";
 export const metadata = { title: "Activity" };
 
 const DENIED = (
-    <PermissionDeniedState
-        title="Activity is kept to owners and admins"
-        description="It names who changed what in this business, so it is kept to the roles that manage it."
-        note="Ask an owner or admin if you need to know who changed a setting."
-    />
+    <PermissionDeniedState {...whoCanChange({ thing: "Activity" })} />
 );
 
 export default async function ActivityPage() {
@@ -81,6 +79,7 @@ export default async function ActivityPage() {
             {entries.length === 0 ? (
                 <div className="max-w-[760px]">
                     <EmptyState
+                        icon={<History />}
                         title="No changes yet"
                         description="When someone changes a setting, it shows here."
                     />

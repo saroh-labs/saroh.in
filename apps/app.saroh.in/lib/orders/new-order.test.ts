@@ -73,9 +73,7 @@ describe("the payment chips", () => {
         expect(off(known)).toBeNull();
         expect(off(walkIn("+91 90000 11111"))).toBeNull();
         expect(off(walkIn())).toBe("Needs a customer with a phone or email");
-        expect(off(known, false)).toBe(
-            "Connect a payment provider to send a link",
-        );
+        expect(off(known, false)).toBe("No payment provider connected");
     });
 
     it("turns pay on collection off for a delivery", () => {

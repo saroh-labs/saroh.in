@@ -1,3 +1,5 @@
+import { planLabel } from "@saroh/ui/lib/state-copy";
+
 /**
  * A business's messages to its customers — invoices, booking and order
  * updates, review invitations — go only through its own connected email
@@ -81,7 +83,7 @@ export function emailPrompt(
             kind: "plans",
             title: EMAIL_PROMPT_TITLE,
             text: `${EMAIL_PROMPT_MISSED} ${EMAIL_PROMPT_PLAN}`,
-            action: { href: SEE_PLANS_HREF, label: "See plans" },
+            action: { href: SEE_PLANS_HREF, label: planLabel() },
         };
     }
     if (!may.connect || !connectHref) return null;
@@ -109,7 +111,7 @@ export function emailRefusalNote(
         return {
             text: words.plans,
             action: may.plans
-                ? { href: SEE_PLANS_HREF, label: "See plans" }
+                ? { href: SEE_PLANS_HREF, label: planLabel() }
                 : null,
         };
     }

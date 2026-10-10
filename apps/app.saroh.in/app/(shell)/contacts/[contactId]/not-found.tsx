@@ -9,7 +9,7 @@ export default function NotFoundPage() {
             <div className="px-4 pb-10 pt-[50px] sm:px-[26px]">
                 <NotFound
                     variant="card"
-                    title="This person isn't here"
+                    title="Contact not found"
                     description="They may have been removed, or the link is wrong. Their past orders and bookings are still on record."
                     primary={{ href: "/contacts", label: "Back to Contacts" }}
                 />

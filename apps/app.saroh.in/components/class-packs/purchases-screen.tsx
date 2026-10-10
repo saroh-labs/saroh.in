@@ -183,7 +183,7 @@ export function PurchasesScreen({
                 searchableColumnIds={["who", "pack"]}
                 emptyState={{
                     icon: <Ticket />,
-                    title: "Nobody holds a pack yet",
+                    title: "No packs sold yet",
                     note: "Sell someone a pack and it shows here with the classes they have left and when it runs out.",
                     action: canWrite ? (
                         <Button onClick={() => setSelling(true)}>

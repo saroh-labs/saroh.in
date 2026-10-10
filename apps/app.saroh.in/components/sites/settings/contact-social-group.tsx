@@ -31,6 +31,7 @@ import {
 } from "@/lib/sites/site-contact";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { EditAction } from "./edit-actions";
 import { SiteAddressSheet } from "./site-address-sheet";
 import type { SettingsSave } from "./use-settings-save";
@@ -93,8 +94,10 @@ export function ContactSocialGroup({
         return (
             <Group id="contact" title="Contact and social">
                 <FailedState
+                    size="panel"
                     title={CONTACT_UNREAD.title}
                     description={CONTACT_UNREAD.description}
+                    onRetry={() => router.refresh()}
                 />
             </Group>
         );
@@ -201,9 +204,7 @@ export function ContactSocialGroup({
                     }
                 >
                     {!view ? (
-                        <Absent>
-                            Couldn&apos;t be loaded. Reload to see it.
-                        </Absent>
+                        <FailedRead things="your address" />
                     ) : lines.length > 0 ? (
                         <span className="grid gap-0.5">
                             {lines.map((line) => (

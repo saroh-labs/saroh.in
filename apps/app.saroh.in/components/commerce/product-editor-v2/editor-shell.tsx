@@ -1,5 +1,6 @@
 "use client";
 
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
@@ -315,7 +316,7 @@ function EditorBody({
                             href={PLAN_AND_BILLING_HREF}
                             className="font-medium underline underline-offset-2"
                         >
-                            See Plan and billing
+                            {planLabel()}
                         </Link>
                     </ReadOnlyNote>
                 ) : !canWrite ? (

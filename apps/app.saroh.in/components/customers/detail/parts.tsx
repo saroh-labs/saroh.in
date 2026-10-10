@@ -1,7 +1,9 @@
 import { cn } from "@saroh/ui/lib/utils";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Pill } from "@/components/subscriptions/pill";
 import type { Tone } from "@/lib/customer-workspace/view";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /** The design's white card: border-first, 12px corners, 14px by 16px. */
 export const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
@@ -31,48 +33,49 @@ export function RowPill({
     );
 }
 
-/** A tab whose part of the read failed: said so, never an empty tab. */
+/**
+ * A tab whose part of the read failed: the failed card, an alert with Try
+ * again. Never an empty tab, which would read as "this customer has none".
+ */
 export function Failed({ what }: { what: string }) {
     return (
-        <Empty title={`${what} couldn't be read`}>
-            The connection dropped while we were fetching them. Nothing has
-            changed — try again in a minute.
-        </Empty>
+        <FailedRead
+            size="panel"
+            things={what.charAt(0).toLowerCase() + what.slice(1)}
+        />
     );
 }
 
-/** The dashed empty state: a title and a line, or just a line. */
+/**
+ * A tab with nothing in it: the shared empty card at panel size when it has
+ * a title, and one line when a sentence is all there is to say.
+ */
 export function Empty({
     title,
     children,
+    action,
     className,
 }: {
     title?: string;
     children: React.ReactNode;
+    action?: React.ReactNode;
     className?: string;
 }) {
-    return (
-        <div
-            className={cn(
-                "rounded-xl border border-dashed border-border-strong text-center",
-                title ? "px-[22px] py-[34px]" : "px-5 py-[30px]",
-                className,
-            )}
-        >
-            {title ? (
-                <div className="font-display text-[17px] font-semibold">
-                    {title}
-                </div>
-            ) : null}
-            <div
-                className={cn(
-                    "text-pretty text-[13px] leading-[1.55] text-muted-foreground",
-                    title && "mx-auto mt-1.5 max-w-[46ch]",
-                )}
-            >
-                {children}
-            </div>
-        </div>
+    return title ? (
+        <EmptyState
+            size="panel"
+            className={className}
+            title={title}
+            description={children}
+            action={action}
+        />
+    ) : (
+        <EmptyState
+            size="inline"
+            className={className}
+            title={children}
+            action={action}
+        />
     );
 }
 

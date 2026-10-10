@@ -14,6 +14,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { CouponCheck } from "@/lib/saroh-billing/billing-actions";
 import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
 import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
@@ -156,10 +157,11 @@ export function PlanChooser({
                 </div>
                 {rows === null ? (
                     <FailedState
-                        title="Saroh's plans couldn't be loaded"
-                        description="Your plan hasn't changed. Try again in a moment to see the others."
+                        size="panel"
+                        title={couldntLoad("Saroh's plans")}
+                        description={nothingChanged("Your plan is as it was.")}
                         action={<RefreshButton />}
-                        className="rounded-none border-0 py-8 sm:py-8"
+                        className="rounded-none border-0"
                     />
                 ) : (
                     shown.map((row, i) => (

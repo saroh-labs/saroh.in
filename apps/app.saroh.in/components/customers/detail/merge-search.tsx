@@ -7,6 +7,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { findCustomers } from "@/lib/customers/actions";
 import type { CustomerSearch } from "@/lib/customers/picker";
 import { resultLabel } from "@/lib/customers/picker";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /** How long typing settles before the search runs. */
 const SETTLE_MS = 200;
@@ -61,7 +62,7 @@ export function MergeSearch({
         status = read.forbidden
             ? "Your role can't search customers."
             : "Couldn't search just now. Try again in a moment.";
-    else if (results.length === 0) status = `No other customer matches “${q}”.`;
+    else if (results.length === 0) status = noMatchLine("other customers", q);
 
     return (
         <div className="mt-3.5 grid gap-1.5">
