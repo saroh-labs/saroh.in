@@ -108,7 +108,11 @@ export type NavAction =
     | "course:read"
     | "pack:read"
     | "pack:sell"
-    | "pack:write";
+    | "pack:write"
+    // "New service" and "New location" in the command menu make one too:
+    // the API asks these of the write, so the palette asks them of the row.
+    | "service:write"
+    | "store:create";
 
 /**
  * Role → what it may reach here.
@@ -146,6 +150,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:write",
         "pack:sell",
         "pack:write",
+        "service:write",
+        "store:create",
         "lead:read",
         "pipeline:read",
     ],
@@ -175,6 +181,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:write",
         "pack:sell",
         "pack:write",
+        "service:write",
+        "store:create",
         "lead:read",
         "pipeline:read",
     ],
@@ -689,7 +697,15 @@ export function navGroupsWithSites(
     groups: readonly NavGroup[],
     sites: readonly { id: string; name: string }[],
     role: NavRole | null = null,
+    /**
+     * The permissions the API resolved for this person. A role the business
+     * made is judged by what was ticked for it, never by the built-in it maps
+     * to: one ticked `site:create` is offered "New site", and one without it
+     * is not offered a row that ends in a refusal.
+     */
+    actions: readonly string[] | null = null,
 ): NavGroup[] {
+    const actor = { role, actions };
     /*
      * What a site holds depends on what this person came to do with it.
      *
@@ -700,7 +716,7 @@ export function navGroupsWithSites(
      * not a dead link: it opens, and then says they cannot change anything. A
      * rail that lists it promises otherwise.
      */
-    const mayAuthor = navRoleCan(role, "section:write");
+    const mayAuthor = navCan(actor, "section:write");
     const rowsFor = (siteId: string): NavChild[] =>
         mayAuthor
             ? [
@@ -739,7 +755,7 @@ export function navGroupsWithSites(
                     // merchant going to the list page to find the button. Only
                     // for a role that may actually make one, and only while
                     // the business has no website yet (ADR-006).
-                    ...(navRoleCan(role, "site:create") &&
+                    ...(navCan(actor, "site:create") &&
                     mayAddWebsite(sites.length)
                         ? [
                               {
@@ -957,7 +973,9 @@ export function navFor({
 }): NavGroup[] {
     const tracked = filterNavGroupsByRole(
         filterNavGroups(
-            sites ? navGroupsWithSites(NAV_GROUPS, sites, role) : NAV_GROUPS,
+            sites
+                ? navGroupsWithSites(NAV_GROUPS, sites, role, actions)
+                : NAV_GROUPS,
             moduleKeys,
         ),
         role,
