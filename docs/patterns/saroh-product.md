@@ -311,6 +311,21 @@ organizations/:org/customers`: everyone who has paid (an order through a
   `robots.txt`), only after consent unless cookieless, and customer-data forms
   carry `NO_CAPTURE_ATTRS`/`NO_CAPTURE_CLASS` (`site-blocks/consent-events.ts`).
   A new form that takes a customer's details carries them too.
+- **Current** (DEC-125) — **How to reach the business is read live, and is
+  the business's, not the site's.** The footer's phone, contact email,
+  address and social links come from `GET /public/sites/:siteId/contact`
+  (`organizations/business-contact.ts`, an allow-list), so a save shows with
+  no publish and none of them is a "Next publish" row. Anything new that
+  says how to reach the business reads that one read. A social link is only
+  ever a fixed network's own address (`@saroh/block-contract`
+  `social-links.ts`): never add a free link field beside it. The address
+  shown is where customers come (locations that say customers visit); the
+  registered address only by the owner's choice, and a location with no
+  counter never. Google Maps is not a social link: it is an address's own
+  optional map link (`StoreSettings.mapUrl`, the registered address's
+  `registeredAddressMapUrl`), which "Get directions" opens, else a search
+  for the address. The icons are drawn in the page's own text colour
+  (`SocialLinkRow`), with nothing fetched from a network.
 - **Current** — `draft → publish → immutable snapshot` (ADR-002). Drafts are
   private; the public renderer reads only `Publication` snapshots; rollback
   repoints `Site.currentPublicationId`. Rich fields are sanitised at publish, so

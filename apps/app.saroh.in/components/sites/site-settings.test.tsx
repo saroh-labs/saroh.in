@@ -19,6 +19,13 @@ vi.mock("@/lib/sites/actions", () => ({
 }));
 // Each reads on its own once mounted; the words around them are what is
 // under test here.
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: vi.fn(),
+}));
+// The business's own sheets open from Contact and social (DEC-125).
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));
@@ -365,6 +372,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             ["Address", "true"],
             ["Search and sharing", "false"],
             ["Menu and footer", "false"],
+            ["Contact and social", "false"],
             ["Shop", "false"],
             ["Tracking", "false"],
             ["Advanced", "false"],
@@ -382,7 +390,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             ["address", "shown"],
         ]);
         // Every panel stays mounted, so a half-edited row survives a tab.
-        expect(panels).toHaveLength(6);
+        expect(panels).toHaveLength(7);
         const ids = Array.from(
             html.matchAll(/data-settings-group="([a-z-]+)"/g),
             (m: RegExpMatchArray) => m[1],
@@ -391,6 +399,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             "address",
             "search-and-sharing",
             "menu-and-footer",
+            "contact",
             "shop",
             "tracking",
             "advanced",
@@ -410,6 +419,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             "Address",
             "Search and sharing",
             "Menu and footer",
+            "Contact and social",
             "Tracking",
         ]);
     });

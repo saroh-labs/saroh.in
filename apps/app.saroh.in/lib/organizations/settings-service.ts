@@ -1,3 +1,5 @@
+import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
+
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type {
@@ -133,6 +135,56 @@ export interface OrganizationSettings {
      * from an API older than it: none set.
      */
     payInstructions?: PayInstructionsSettings;
+    /**
+     * The business's social links (DEC-125): one address per network that
+     * is set, on that network's own host. Absent from an older API: none.
+     */
+    socialLinks?: SocialLinks;
+    /**
+     * Its website shows the registered address as where to find it
+     * (DEC-125), while no location customers visit has one. Absent from an
+     * older API: no.
+     */
+    siteShowsRegisteredAddress?: boolean;
+    /**
+     * The registered address's place on Google Maps (DEC-125), which Get
+     * directions opens while the website shows that address. Absent from
+     * an older API: none.
+     */
+    registeredAddressMapUrl?: string | null;
+}
+
+/**
+ * What the business's website shows of how to reach it (DEC-125): the same
+ * read the site's footer draws, so a row here never says something the
+ * site doesn't.
+ */
+export interface SiteContact {
+    /** E.164, or null: no Call link. */
+    phone: string | null;
+    email: string | null;
+    /** Where customers come. Empty: no address is shown. */
+    places: SiteContactPlace[];
+    social: { network: SocialNetwork; url: string }[];
+}
+
+export interface SiteContactPlace {
+    /** A location customers visit, or the registered address by choice. */
+    source: "location" | "registered";
+    name: string | null;
+    /** Lines joined by "\n". */
+    address: string;
+    /**
+     * The address's place on Google Maps, which Get directions opens; null
+     * or absent: a search for the address.
+     */
+    mapUrl?: string | null;
+}
+
+export interface SiteContactView {
+    contact: SiteContact;
+    /** The owner chose to show the registered address. */
+    registeredAddressChosen: boolean;
 }
 
 export interface BusinessLogo {
@@ -165,6 +217,15 @@ export interface OrganizationSettingsInput {
     >;
     /** How to pay us (R32): only the fields changed; "" clears one. */
     payInstructions?: Partial<PayValues>;
+    /**
+     * Social links (DEC-125): only the networks changed, each a handle or a
+     * link as typed; "" clears one.
+     */
+    socialLinks?: Partial<Record<SocialNetwork, string>>;
+    /** Show the registered address on the website (DEC-125). */
+    siteShowsRegisteredAddress?: boolean;
+    /** Its Google Maps link, as typed; "" clears it. */
+    registeredAddressMapUrl?: string;
 }
 
 /** A refusal names the field it is about when the API says which. */
@@ -204,6 +265,28 @@ export async function readOrganizationSettings(): Promise<
         };
     }
     return { ok: true, data: data as OrganizationSettings };
+}
+
+/**
+ * What the business's website shows of how to reach it (DEC-125), for the
+ * "Contact and social" rows of Website settings. A read that fails is
+ * `null`, which the rows say as "couldn't be loaded", never as "none set".
+ */
+export async function readSiteContact(): Promise<SiteContactView | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/site-contact`);
+        if (!res.ok) return null;
+        const data = (await res
+            .json()
+            .catch(() => null)) as SiteContactView | null;
+        return data && typeof data === "object" && "contact" in data
+            ? data
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 /**

@@ -54,6 +54,7 @@ export function SettingsSheetFrame({
     footNote,
     dirty,
     onOpen,
+    doneOnly = false,
     onClose,
     onSubmit,
     children,
@@ -88,6 +89,11 @@ export function SettingsSheetFrame({
     dirty?: boolean;
     /** With a `trigger`: it was pressed. */
     onOpen?: () => void;
+    /**
+     * The sheet holds nothing of its own to save (a list whose rows each
+     * open their own edit): its foot is one Done, which closes it.
+     */
+    doneOnly?: boolean;
     onClose: () => void;
     onSubmit: FormEventHandler<HTMLFormElement>;
     children: ReactNode;
@@ -174,14 +180,24 @@ export function SettingsSheetFrame({
                         )}
                     >
                         {footNote}
-                        <Buttons
-                            wrapped={Boolean(footNote)}
-                            pending={pending}
-                            saveOff={saveOff}
-                            saveLabel={saveLabel}
-                            savingLabel={savingLabel}
-                            onClose={onClose}
-                        />
+                        {doneOnly ? (
+                            <Button
+                                type="button"
+                                variant="brand"
+                                onClick={onClose}
+                            >
+                                Done
+                            </Button>
+                        ) : (
+                            <Buttons
+                                wrapped={Boolean(footNote)}
+                                pending={pending}
+                                saveOff={saveOff}
+                                saveLabel={saveLabel}
+                                savingLabel={savingLabel}
+                                onClose={onClose}
+                            />
+                        )}
                     </SheetFooter>
                 </form>
             </SheetContent>

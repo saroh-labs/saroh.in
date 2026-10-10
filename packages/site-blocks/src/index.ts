@@ -121,8 +121,23 @@ export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
 export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
 // Server-safe (not in the "use client" block): saroh.app reads it for the
 // booking page's header on the server (E6).
+export {
+    NO_CONTACT,
+    hasContact,
+    isSocialLink,
+    publicContactOf,
+} from "./lib/public-contact";
+export type {
+    PublicContact,
+    PublicContactPlace,
+    PublicSocialLink,
+} from "./lib/public-contact";
+// A business's social links as icons, and the footer's contact group
+// (DEC-125).
 export { isPublicVisit } from "./lib/public-visit";
 export type { PublicVisit } from "./lib/public-visit";
+export { addressDirectionsHref, shownContact } from "./site-footer-contact";
+export { SocialIcon, SocialLinkRow } from "./social-icons";
 
 // The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
 // the booking page's header (E6) all say it through this.
@@ -453,6 +468,7 @@ export type {
     FooterLayout,
     ModulePageStates,
     SiteContact,
+    SiteContactPlace,
     SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";

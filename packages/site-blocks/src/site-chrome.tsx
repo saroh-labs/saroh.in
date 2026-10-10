@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
 import { CookieChoicesButton } from "./consent-banner";
-import { phoneText } from "./lib/phone";
+import type { SiteContact } from "./site-footer-contact";
+import { FOOTER_LINK, FooterContact } from "./site-footer-contact";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
 import type { SiteSeller } from "./sold-by";
@@ -62,21 +63,7 @@ export function footerLine(
     return { kind: "html", value: inner };
 }
 
-/** A trimmed string, or null when there is nothing in it. */
-function nonBlank(value: string | null | undefined): string | null {
-    const trimmed = value?.trim() ?? "";
-    return trimmed === "" ? null : trimmed;
-}
-
-/**
- * The business's public phone and place (UX-038), and its contact email
- * when it has added one (DEC-101), for the footer.
- */
-export interface SiteContact {
-    phone: string | null;
-    address: string | null;
-    email?: string | null;
-}
+export type { SiteContact, SiteContactPlace } from "./site-footer-contact";
 
 /**
  * The Saroh credit a Free site's footer carries (DEC-102): "Made with
@@ -111,7 +98,10 @@ export function madeWithSarohHref(referralCode: string): string {
  * read the Visit us block and the booking header show (`/visit`, G8, DEC-053),
  * where Settings › Business calls the number "Phone on your website". Its
  * `email` is the business's contact email, shown when the business has added
- * one (DEC-101); Settings › Business says the site shows it.
+ * one (DEC-101); Settings › Business says the site shows it. Its `places`
+ * and `social` are where customers come and the business's social links
+ * (DEC-125), from the public contact read; the group is `FooterContact`,
+ * drawn by both layouts, and nothing is drawn for what isn't set.
  *
  * The link is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -155,9 +145,6 @@ export function SiteFooter({
      */
     seller?: SiteSeller | null;
 }) {
-    const phone = nonBlank(contact?.phone);
-    const email = nonBlank(contact?.email);
-    const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
     const left = footer?.layout === "left";
     const owner = seller ? (
@@ -177,6 +164,7 @@ export function SiteFooter({
             <LeftFooter
                 written={written}
                 name={name}
+                contact={contact}
                 credit={credit}
                 cookieChoices={cookieChoices}
                 owner={owner}
@@ -208,26 +196,7 @@ export function SiteFooter({
                         </p>
                     )
                 ) : null}
-                {phone || email || address ? (
-                    <p className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]">
-                        {phone ? (
-                            <a
-                                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-                                className={FOOTER_LINK}
-                            >
-                                {/* "+91 98450 12345", as Visit us
-                                    writes it (DEC-053, #874). */}
-                                Call {phoneText(phone)}
-                            </a>
-                        ) : null}
-                        {email ? (
-                            <a href={`mailto:${email}`} className={FOOTER_LINK}>
-                                {email}
-                            </a>
-                        ) : null}
-                        {address ? <span>{address}</span> : null}
-                    </p>
-                ) : null}
+                <FooterContact contact={contact} align="centre" />
                 {hasLine || credit || cookieChoices ? (
                     <p>
                         {line && hasLine ? (
@@ -259,10 +228,6 @@ export function SiteFooter({
         </footer>
     );
 }
-
-/** A link in the footer, in the footer's own colours. */
-const FOOTER_LINK =
-    "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2";
 
 /**
  * "Made with Saroh" (DEC-102), in the footer's own colours and type, never
@@ -317,12 +282,14 @@ function ReportLink({ href }: { href: string }) {
 function LeftFooter({
     written,
     name,
+    contact,
     credit,
     cookieChoices,
     owner,
 }: {
     written: SiteFooterContent | null;
     name: string;
+    contact: SiteContact | null;
     credit: SiteCredit | null;
     cookieChoices: boolean;
     /** "Sold by ‹legal name›", under the row (DEC-121); null draws none. */
@@ -348,6 +315,7 @@ function LeftFooter({
                         </p>
                     )
                 ) : null}
+                <FooterContact contact={contact} align="left" />
                 <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[13.5px]">
                     <span className="font-site-heading text-base font-semibold tracking-[-0.02em]">
                         {name.trim()}

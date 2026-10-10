@@ -467,6 +467,63 @@ describe("the Address sheet", () => {
         expect(says("address")).toBe("7 Linking Road, Khar");
     });
 
+    const link = () => field("storefront-map-link");
+
+    it("takes an optional Google Maps link, and says where Get directions opens", async () => {
+        draw();
+        await press(edit("Edit address"));
+        expect(link()?.value).toBe("");
+        expect(link()?.placeholder).toBe(
+            "maps.app.goo.gl/… or g.page/yourname",
+        );
+        expect(sheet()?.textContent).toContain(
+            "Optional. Get directions on your website opens it. Without one, it searches for the address.",
+        );
+        type(link(), "https://www.google.co.in/maps/place/Hill+Road");
+        expect(sheet()?.textContent).toContain(
+            "Get directions opens google.com/maps/place/Hill+Road",
+        );
+        update.mockResolvedValue({
+            ok: true,
+            data: {
+                ...hill,
+                mapUrl: "https://www.google.com/maps/place/Hill+Road",
+            },
+        });
+        await press(item("Save"));
+        // Only the link changed, sent as typed for the API to keep.
+        expect(update).toHaveBeenCalledWith(hill.id, {
+            mapUrl: "https://www.google.co.in/maps/place/Hill+Road",
+        });
+        expect(sheet()).toBeNull();
+        expect(
+            host.querySelector('[data-testid="location-map-link-summary"]')
+                ?.textContent,
+        ).toBe("Get directions opens your Google Maps link");
+    });
+
+    it("holds Save on a link that isn't Google Maps, and sends nothing", async () => {
+        draw();
+        await press(edit("Edit address"));
+        type(link(), "https://evil.example/maps");
+        await press(item("Save"));
+        expect(update).not.toHaveBeenCalled();
+        expect(sheetName()).toBe("Address");
+        expect(sheet()?.textContent).toContain(
+            "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.",
+        );
+        expect(link()?.getAttribute("aria-invalid")).toBe("true");
+    });
+
+    it("clears a saved link left empty", async () => {
+        draw({ mapUrl: "https://g.page/hill-road" });
+        await press(edit("Edit address"));
+        expect(link()?.value).toBe("g.page/hill-road");
+        type(link(), "");
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledWith(hill.id, { mapUrl: null });
+    });
+
     it("with none saved the row says so and offers Add address", async () => {
         draw({ address: null });
         expect(says("address")).toBe("No address yet");
@@ -498,7 +555,9 @@ describe("the Address sheet", () => {
         expect(box()?.value).toBe("12 Hill Road\nBandra");
         type(box(), "7 Linking Road");
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        // Said in the sheet, which stays open.
+        expect(sheet()?.textContent).toContain("Could not save that.");
+        expect(showError).not.toHaveBeenCalled();
         expect(sheetName()).toBe("Address");
         expect(box()?.value).toBe("7 Linking Road");
     });

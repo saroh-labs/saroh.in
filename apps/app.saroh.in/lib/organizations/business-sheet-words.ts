@@ -73,6 +73,11 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
                 title: "Website",
                 description: "A site you have outside Saroh, if any.",
             };
+        case "social":
+            return {
+                title: "Social links",
+                description: `Where ${words.people} can find you. Your website shows the ones you add.`,
+            };
         case "gst":
             return {
                 title: "GST registration",

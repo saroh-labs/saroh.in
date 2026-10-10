@@ -115,6 +115,18 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Contact email", "contact"),
     business("Phone on your website", "contact"),
     business("Website", "contact"),
+    {
+        ...business("Social links", "contact"),
+        words: [
+            "Instagram",
+            "Facebook",
+            "WhatsApp",
+            "YouTube",
+            "LinkedIn",
+            "Pinterest",
+            "Telegram",
+        ],
+    },
     business("GST registration", "tax"),
     business("GSTIN or tax ID", "tax"),
     business("Invoice prefix and numbers", "tax"),

@@ -99,6 +99,18 @@ export class OrganizationsController {
     }
 
     /**
+     * What the business's website shows of how to reach it (DEC-125): its
+     * public phone, contact email, where customers come and its social
+     * links, for the "Contact and social" rows of Website settings. Every
+     * value is already public on the site; `site:read`.
+     */
+    @Get(":organizationId/site-contact")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    siteContact(@OrgContext() ctx: OrganizationContext) {
+        return this.settings.siteContact(ctx);
+    }
+
+    /**
      * Edit the org's name and/or business profile (OWNER/ADMIN). The slug is
      * immutable — see {@link UpdateOrganizationDto}.
      */

@@ -9,6 +9,7 @@ import {
     Row,
     Section,
 } from "@/components/sites/settings-rows";
+import type { SiteContactView } from "@/lib/organizations/settings-service";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
 import { publishApprovalLine } from "@/lib/sites/publish-approval";
 import type { SiteDetail } from "@/lib/sites/service";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/sites/site-icon";
 
 import { AddressGroup } from "./settings/address-group";
+import { ContactSocialGroup } from "./settings/contact-social-group";
 import { PublishBar } from "./settings/publish-bar";
 import { SettingsSections } from "./settings/settings-sections";
 import { SiteIconSummary } from "./settings/site-icon-summary";
@@ -48,8 +50,11 @@ export function SiteSettingsRead({
     address,
     approval = null,
     tracking = null,
+    contact = null,
 }: {
     site: SiteDetail;
+    /** What the website shows of how to reach the business (DEC-125). */
+    contact?: SiteContactView | null;
     /** Where the site is reached (`siteAddressOf`); null without an address. */
     address: SiteAddress | null;
     /** "Publishing needs approval" (DEC-071, T13); null leaves it out. */
@@ -223,6 +228,14 @@ export function SiteSettingsRead({
                                 </Row>
                             </Section>
                         </Group>
+                    ),
+                    // Read-only: what the site shows, and no Edit.
+                    contact: (
+                        <ContactSocialGroup
+                            view={contact}
+                            business={null}
+                            state={null}
+                        />
                     ),
                     shop: site.sellsFrom ? (
                         <Group id="shop" title="Shop">

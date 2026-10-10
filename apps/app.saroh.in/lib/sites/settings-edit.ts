@@ -20,6 +20,10 @@ export const SETTINGS_SHEETS = [
     "menu",
     "footer",
     "posts-path",
+    "contact-phone",
+    "contact-email",
+    "contact-address",
+    "contact-social",
     "sells-from",
 ] as const;
 
@@ -48,6 +52,10 @@ export const SETTINGS_ROW_ID: Record<SettingsSheet, string> = {
     menu: ROW_ANCHORS.menu,
     footer: "settings-footer",
     "posts-path": "settings-posts-path",
+    "contact-phone": "settings-contact-phone",
+    "contact-email": "settings-contact-email",
+    "contact-address": "settings-contact-address",
+    "contact-social": "settings-contact-social",
     "sells-from": SELLS_FROM_ANCHOR,
 };
 
@@ -69,6 +77,11 @@ export function groupOfSheet(sheet: SettingsSheet): SettingsGroupId {
         case "footer":
         case "posts-path":
             return "menu-and-footer";
+        case "contact-phone":
+        case "contact-email":
+        case "contact-address":
+        case "contact-social":
+            return "contact";
         case "sells-from":
             return "shop";
     }

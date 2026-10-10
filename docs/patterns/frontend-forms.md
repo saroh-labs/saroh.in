@@ -120,7 +120,17 @@ and problem type and `useSheetControl`), and its links are
 `settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
 is done inside its sheet or dialog (the share image and the site icon are
 uploaded there, Add domain shows its DNS records there); an Edit never
-sends the merchant to another page to finish.
+sends the merchant to another page to finish. Where the value belongs to
+another screen, that screen's own sheet opens here: Contact and social
+(DEC-125) opens the business's phone, email and social links sheets
+(`BusinessFieldSheet`, `SocialLinksSheet`) in place, so there is one
+implementation of each, and its Address sheet edits each visited
+location's address inside the open sheet with the location's own fields
+(`LocationAddressFields`) and save. A sheet that only lists things with
+their own Edits ends in one Done (`doneOnly`), never a Save with nothing
+to save. A sheet built to be opened elsewhere takes only
+what it needs (the saved value, `returnTo`, `onSaved`), not the page's
+state.
 
 the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`,
 `lib/organizations/business-rows.ts`; build a Business link with

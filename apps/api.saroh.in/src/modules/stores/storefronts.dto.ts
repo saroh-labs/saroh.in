@@ -17,6 +17,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { MAP_LINK_MAX } from "@saroh/block-contract";
+
 import type { StorefrontFulfilmentType } from "../orders/fulfilment";
 import { STOREFRONT_FULFILMENT_TYPES } from "../orders/fulfilment";
 import {
@@ -158,6 +160,18 @@ export class UpdateStorefrontDto {
     @IsString()
     @MaxLength(500)
     address?: string | null;
+
+    /**
+     * The location's place on Google Maps (DEC-125): what "Get directions"
+     * opens on the business's website. `null` or "" clears it. Only
+     * Google's own map links are kept; the save checks it and names the
+     * field.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(MAP_LINK_MAX, { message: "That link is too long." })
+    mapUrl?: string | null;
 
     /** The whole week, Monday first — a week is saved, never one day. */
     @IsOptional()

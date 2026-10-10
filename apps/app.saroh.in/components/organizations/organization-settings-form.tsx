@@ -21,6 +21,7 @@ import {
     PAY_SECTION,
     PayInstructionsSection,
 } from "@/components/organizations/pay-instructions-section";
+import { SocialLinksSheet } from "@/components/organizations/social-links-sheet";
 import { useBusinessSheets } from "@/components/organizations/use-business-sheets";
 import {
     cardUndo,
@@ -193,6 +194,22 @@ export function OrganizationSettingsForm({
                             logoCardUndo(settings, next, setSettings),
                         );
                         setSettings(next);
+                    }}
+                />
+            ) : editing?.which === "social" ? (
+                <SocialLinksSheet
+                    key={editing.opened}
+                    links={settings.socialLinks}
+                    phone={settings.profile?.phone}
+                    kind={settings.kind}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onSaved={(next, said) => {
+                        // No Undo: the sheet is the way back, and a link
+                        // typed again is the same link.
+                        undo.offer(said, null);
+                        applySaved(next);
                     }}
                 />
             ) : editing &&

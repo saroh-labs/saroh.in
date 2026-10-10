@@ -6,6 +6,10 @@ import { CustomDomain } from "@/components/sites/custom-domain";
 import { PublishApprovalSection } from "@/components/sites/publish-approval-row";
 import { SellsFromRow } from "@/components/sites/sells-from-row";
 import { Group } from "@/components/sites/settings-rows";
+import type {
+    OrganizationSettings,
+    SiteContactView,
+} from "@/lib/organizations/settings-service";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
 import type { SiteDetail } from "@/lib/sites/service";
 import { groupOfSheet } from "@/lib/sites/settings-edit";
@@ -15,8 +19,10 @@ import {
     shareReadiness,
 } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import type { VisitedLocation } from "@/lib/stores/storefronts";
 
 import { AddressGroup } from "./settings/address-group";
+import { ContactSocialGroup } from "./settings/contact-social-group";
 import { MenuFooterGroup } from "./settings/menu-footer-group";
 import { PublishBar } from "./settings/publish-bar";
 import { SearchSharingGroup } from "./settings/search-sharing-group";
@@ -48,8 +54,29 @@ export function SiteSettings({
     approval = null,
     canChangeAddress = false,
     tracking = null,
+    contact = null,
+    business = null,
+    locations = null,
+    canEditLocations = false,
 }: {
+    /**
+     * The locations customers visit, for the Address sheet to edit in
+     * place; null when they couldn't be read.
+     */
+    locations?: VisitedLocation[] | null;
+    /** May change a location (`store:write`). */
+    canEditLocations?: boolean;
     site: SiteDetail;
+    /**
+     * What the website shows of how to reach the business (DEC-125); null
+     * when it couldn't be read.
+     */
+    contact?: SiteContactView | null;
+    /**
+     * The business's settings, for someone who may change them: the
+     * Contact and social rows then edit in place. Null: read-only rows.
+     */
+    business?: OrganizationSettings | null;
     /**
      * Where the site is reached (`siteAddressOf`, DEC-069 L8): its verified
      * domain when the business has one, and its web address on Saroh beside
@@ -113,6 +140,15 @@ export function SiteSettings({
                         site={site}
                         address={address}
                         state={state}
+                    />
+                ),
+                contact: (
+                    <ContactSocialGroup
+                        view={contact}
+                        business={business}
+                        state={state}
+                        locations={locations}
+                        canEditLocations={canEditLocations}
                     />
                 ),
                 // Where the shop sells from (G11): only while it is open.

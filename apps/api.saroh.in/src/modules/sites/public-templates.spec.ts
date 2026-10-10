@@ -32,6 +32,7 @@ describe("GET /public/sites/templates", () => {
         {} as unknown as PublicVisitService,
         {} as unknown as PublicFooterService,
         {} as unknown as PublicHeadService,
+        {} as never,
     );
 
     it("returns every registered template", () => {

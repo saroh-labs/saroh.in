@@ -27,7 +27,9 @@ import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "../orders/fulfilment";
 import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
+import { mapLinkRead, mapLinkWrite } from "../organizations/map-link";
 import { lockStockLevels } from "../products/stock-levels";
+import { enqueueBusinessSitesRevalidation } from "../sites/page-cache-revalidate";
 import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
 import type { LateRuleNotice } from "./storefront-fulfilment";
@@ -89,6 +91,11 @@ export interface StorefrontSettings extends StorefrontSummary {
     stock: { onHand: number; promised: number };
     /** Only a SHOP has these; an ONLINE store keeps them but shows none. */
     address: string | null;
+    /**
+     * Its place on Google Maps (DEC-125), which "Get directions" opens on
+     * the business's website; null: a search for the address.
+     */
+    mapUrl: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
     /**
@@ -278,6 +285,7 @@ export class StorefrontsService {
             },
             kind: settings?.kind === "SHOP" ? "SHOP" : "ONLINE",
             address: settings?.address ?? null,
+            mapUrl: mapLinkRead(settings?.mapUrl),
             openingHours:
                 (settings?.openingHours as OpeningHoursDay[] | null) ?? null,
             collectionEnabled: settings?.collectionEnabled ?? false,
@@ -373,8 +381,20 @@ export class StorefrontsService {
             }
         }
 
+        // The location's Google Maps link (DEC-125): Google's own map
+        // pages only, refused on its field otherwise.
+        const map = mapLinkWrite(dto.mapUrl);
+        if ("problem" in map) {
+            throw new BadRequestException({
+                message: map.problem,
+                field: "mapUrl",
+                details: { field: "mapUrl" },
+            });
+        }
+
         const settings = {
             ...(dto.currency !== undefined ? { currency: dto.currency } : {}),
+            ...("url" in map ? { mapUrl: map.url } : {}),
             ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
             ...(dto.address !== undefined
                 ? { address: dto.address === "" ? null : dto.address }
@@ -510,6 +530,22 @@ export class StorefrontsService {
                     },
                     update: settings,
                 });
+            }
+            // A location's name, address, hours and whether customers
+            // visit are what its business's website shows as where to come
+            // (DEC-125), read live: tell the pages the sites keep.
+            if (
+                dto.name !== undefined ||
+                dto.kind !== undefined ||
+                dto.address !== undefined ||
+                dto.mapUrl !== undefined ||
+                dto.openingHours !== undefined
+            ) {
+                await enqueueBusinessSitesRevalidation(
+                    tx,
+                    organizationId,
+                    "contact",
+                );
             }
         });
 

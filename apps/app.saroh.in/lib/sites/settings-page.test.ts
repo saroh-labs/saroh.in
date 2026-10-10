@@ -42,14 +42,15 @@ const bare = {
     pages: [home, about],
 };
 
-describe("the six groups", () => {
-    it("draws all six with the shop open and approval to show", () => {
+describe("the seven groups", () => {
+    it("draws all seven with the shop open and approval to show", () => {
         expect(
             settingsGroups({ shop: true, advanced: true }).map((g) => g.label),
         ).toEqual([
             "Address",
             "Search and sharing",
             "Menu and footer",
+            "Contact and social",
             "Shop",
             "Tracking",
             "Advanced",
@@ -63,6 +64,7 @@ describe("the six groups", () => {
             "address",
             "search-and-sharing",
             "menu-and-footer",
+            "contact",
             "tracking",
         ]);
     });

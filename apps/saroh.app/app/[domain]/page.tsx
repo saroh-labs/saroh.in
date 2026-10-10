@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PublishedPage } from "@/components/published-page";
+import { businessJsonLdScript } from "@/lib/business-json-ld";
 import { findHomePage, getSiteForHost } from "@/lib/publication";
+import { getSiteContact } from "@/lib/site-contact";
 
 /**
  * Tenant site home (S2-006).
@@ -30,11 +32,30 @@ export default async function SiteHomePage({
         notFound();
     }
 
+    // Who the business is and how to reach it, for search engines
+    // (DEC-125): the same live read the footer draws, shared within the
+    // request, and only what is set. Nothing set: no script.
+    const jsonLd = resolved.siteId
+        ? businessJsonLdScript({
+              name: resolved.snapshot.site.name,
+              origin: `https://${domain}`,
+              contact: await getSiteContact(resolved.siteId),
+          })
+        : null;
+
     return (
-        <PublishedPage
-            page={home}
-            snapshot={resolved.snapshot}
-            siteId={resolved.siteId}
-        />
+        <>
+            {jsonLd ? (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: jsonLd }}
+                />
+            ) : null}
+            <PublishedPage
+                page={home}
+                snapshot={resolved.snapshot}
+                siteId={resolved.siteId}
+            />
+        </>
     );
 }
