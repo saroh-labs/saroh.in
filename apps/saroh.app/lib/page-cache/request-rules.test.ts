@@ -45,6 +45,20 @@ describe("which requests the page cache may answer (#863)", () => {
         }
     });
 
+    it("never a QR code's short link, so every scan reaches the server", () => {
+        for (const path of ["/q/h7c", "/q/h7c?utm=x", "/q"]) {
+            expect(reason(req(`https://rye.saroh.app${path}`))).toBe(
+                "private path",
+            );
+            expect(reason(req(`https://www.ryebakery.in${path}`))).toBe(
+                "private path",
+            );
+        }
+        // A page that merely starts with the letter is an ordinary page.
+        expect(reason(req("https://rye.saroh.app/quotes"))).toBe("cacheable");
+        expect(reason(req("https://rye.saroh.app/qr-menu"))).toBe("cacheable");
+    });
+
     it("never a preview, a review link or the renderer's own routes", () => {
         for (const path of [
             "/preview/tok",
