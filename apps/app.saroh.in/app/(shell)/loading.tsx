@@ -1,12 +1,5 @@
-import { PageLoading } from "@/components/shared/page-loading";
+import { ShellLoading } from "@/components/shared/shell-loading";
 
 export default function Loading() {
-    return (
-        <PageLoading
-            shape="dashboard"
-            width="full"
-            breadcrumb={["Home"]}
-            label="Loading Home"
-        />
-    );
+    return <ShellLoading />;
 }
