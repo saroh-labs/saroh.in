@@ -58,11 +58,12 @@ interface Screen {
 const h1 = (name: string | RegExp) => (page: Page) =>
     page.getByRole("heading", { level: 1, name });
 /**
- * A Settings page's own title. The layout's tabs draw before the page does,
- * so they say nothing about whether the page has arrived.
+ * A Settings page's own title: the page header's, as on every screen. The
+ * layout's tabs draw before the page does, so they say nothing about
+ * whether the page has arrived.
  */
 const h2 = (name: string) => (page: Page) =>
-    page.getByRole("heading", { level: 2, name, exact: true });
+    page.getByRole("heading", { level: 1, name, exact: true });
 
 const SCREENS: Screen[] = [
     {

@@ -106,7 +106,7 @@ async function openHome(page: Page, org: string) {
 async function openProviders(page: Page) {
     await page.goto("/settings/providers");
     await expect(
-        page.getByRole("heading", { name: "Providers", level: 2 }),
+        page.getByRole("heading", { name: "Providers", level: 1 }),
     ).toBeVisible();
 }
 
