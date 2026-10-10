@@ -37,7 +37,7 @@ export interface ResourcePage {
     children?: readonly string[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, Templates, Link preview tool. */
+/** In the plan's order: Help, Integrations, Changelog, Templates, then the free tools (Link preview, QR code maker). */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -81,6 +81,14 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         href: "/tools/link-preview",
         publishOn: "2026-10-05",
     },
+    {
+        id: "qr-code-maker",
+        name: "QR code maker",
+        line: "A QR code for your link, with your logo and colour. Free.",
+        href: "/tools/qr-code-maker",
+        // With early access, as Help and Templates (QR codes plan U9).
+        publishOn: "2026-10-17",
+    },
 ];
 
 /**
@@ -95,7 +103,9 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         href: "/privacy",
         // 8 Oct: merchants' own trackers (DEC-108). 9 Oct: Vercel removed
         // from the processors; Cloudflare serves every site (DEC-107).
-        publishOn: "2026-10-09",
+        // 10 Oct: the QR code maker's email and how long it is kept (QR
+        // codes plan U9).
+        publishOn: "2026-10-10",
     },
     {
         id: "terms",

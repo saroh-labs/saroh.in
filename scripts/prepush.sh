@@ -326,7 +326,7 @@ e2e_stack() {
     # and Privacy specs skip themselves and test nothing.
     export RESOURCES_PREVIEW=1
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
@@ -655,7 +655,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is

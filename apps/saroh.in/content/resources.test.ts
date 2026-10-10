@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resourceItems } from "@/components/v2/nav-items";
+import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
 import { indexedPaths } from "@/lib/site-pages";
 
 import { galleryTemplates } from "./templates";
@@ -39,6 +40,7 @@ const ALL_ROUTES = [
     "/templates/[slug]",
     "/terms",
     "/tools/link-preview",
+    "/tools/qr-code-maker",
     "/waitlist",
 ];
 
@@ -97,9 +99,11 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         const refundsAfter = at("2026-10-04T18:31:00Z");
         // The Terms' date moved to 8 Oct with merchants' own trackers
         // (DEC-108), and Privacy's to 9 Oct when Vercel left its processors
-        // (DEC-107): until those days only the Refunds page shows.
+        // (DEC-107), then to 10 Oct when it named the QR code maker's
+        // email (QR codes plan U9): until those days only the Refunds
+        // page shows.
         const termsAfter = at("2026-10-07T18:31:00Z");
-        const privacyAfter = at("2026-10-08T18:31:00Z");
+        const privacyAfter = at("2026-10-09T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
@@ -152,6 +156,33 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
                 p.startsWith("/templates/"),
             ),
         ).toBe(false);
+    });
+
+    it("the QR code maker joins the nav, footer and sitemap on 17 Oct, beside the link preview tool", () => {
+        const names = (ctx: PublishContext) =>
+            resourceItems(shownResources(ctx)).map((i) => i.name);
+        expect(names(before)).not.toContain("QR code maker");
+        expect(indexedPaths("waitlist", before)).not.toContain(
+            "/tools/qr-code-maker",
+        );
+        expect(qrCodeMakerLive(before)).toBe(false);
+        // The tools sit together, last in the menu.
+        expect(names(after).slice(-2)).toEqual([
+            "Link preview tool",
+            "QR code maker",
+        ]);
+        expect(indexedPaths("waitlist", after)).toContain(
+            "/tools/qr-code-maker",
+        );
+        expect(qrCodeMakerLive(after)).toBe(true);
+        // A preview shows it early; a build without its route never does.
+        expect(qrCodeMakerLive({ ...before, preview: true })).toBe(true);
+        const unbuilt = at(
+            "2026-10-16T18:31:00Z",
+            ALL_ROUTES.filter((r) => r !== "/tools/qr-code-maker"),
+        );
+        expect(qrCodeMakerLive(unbuilt)).toBe(false);
+        expect(names(unbuilt)).not.toContain("QR code maker");
     });
 
     it("the launch entry joins the sitemap on its day", () => {
