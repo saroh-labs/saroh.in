@@ -105,7 +105,13 @@ the same classes until the two are lifted into one, and its links are
 `settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
 is done inside its sheet or dialog (the share image and the site icon are
 uploaded there, Add domain shows its DNS records there); an Edit never
-sends the merchant to another page to finish.
+sends the merchant to another page to finish. Where the value belongs to
+another screen, that screen's own sheet opens here: Contact and social
+(DEC-125) opens the business's phone, email and social links sheets
+(`BusinessFieldSheet`, `SocialLinksSheet`) in place, so there is one
+implementation of each. A sheet built to be opened elsewhere takes only
+what it needs (the saved value, `returnTo`, `onSaved`), not the page's
+state.
 
 the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`,
 `lib/organizations/business-rows.ts`; build a Business link with
