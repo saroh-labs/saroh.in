@@ -154,10 +154,8 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             });
             await expect(dialog).toBeVisible();
             const save = dialog.getByRole("button", {
-                name: "Extend",
-                exact: true,
+                name: "Extend pack",
             });
-            await expect(save).toBeDisabled();
             await dialog.getByRole("radio", { name: "+7 days" }).click();
             await dialog.getByLabel("Reason").fill("E2E: away for a week");
             await save.click();

@@ -285,14 +285,14 @@ test.describe("bookings calendar", () => {
         await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
         await page.keyboard.press("Escape");
 
-        // Past the hold (use-held.ts, HOLD_MS 8s), the booking is still
+        // Past the hold (use-hold.ts, ten seconds), the booking is still
         // booked and nothing was sent. Running the page's clock on fires
         // whatever timer is still held, at once.
         const sent: string[] = [];
         page.on("request", (r) => {
             if (r.method() !== "GET") sent.push(r.url());
         });
-        await page.clock.runFor(9_000);
+        await page.clock.runFor(11_000);
         expect(sent).toEqual([]);
         const after = (await diaries(page.request, from, to))
             .flatMap((d) => d.bookings)
@@ -346,7 +346,7 @@ test.describe("bookings calendar", () => {
                         "",
                 )?.[1];
                 const open = dialog.getByRole("button", {
-                    name: "Open for bookings",
+                    name: "Open time",
                 });
                 await expect(open).toBeEnabled();
                 await open.click();
@@ -412,7 +412,9 @@ test.describe("bookings calendar", () => {
                 await book
                     .getByRole("radio", { name: "Pays at the session" })
                     .click();
-                await book.getByRole("button", { name: "Book it" }).click();
+                await book
+                    .getByRole("button", { name: "Create booking" })
+                    .click();
                 await expect(
                     page
                         .getByText(new RegExp(`^Booked ${customer} with`))
@@ -498,9 +500,8 @@ test.describe("New booking finds the customer (E4)", () => {
         await expect(chip).toBeVisible();
         await chip.click();
         await expect(chip).toBeChecked();
-        // Nothing is written until "Book it". The footer's Close and the
-        // corner's both read "Close"; the footer's comes first.
-        await book.getByRole("button", { name: "Close" }).first().click();
+        // Nothing is written until "Create booking": Cancel drops it.
+        await book.getByRole("button", { name: "Cancel" }).click();
         await expect(book).toBeHidden();
     });
 });

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -26,14 +25,7 @@ import { FOCUS } from "./parts";
 export interface CancelChoice {
     reason: string | null;
     tell: boolean;
-}
-
-/** The reasons a refund can give, behind "Choose a reason". */
-const WHY: { value: RefundReason | ""; label: string }[] = [
-    { value: "", label: "Choose a reason" },
-    ...REFUND_REASONS,
-];
-/**
+} /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
  * refund sheet with every line ticked (the design's option B): a cancel
  * refunds what is left on the order, so there is no "another amount" and
@@ -126,11 +118,13 @@ function CancelDraft({
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
-                        <OptionSelect
+                        <OptionSelect<RefundReason | "">
                             size="sm"
                             value={reason}
                             onValueChange={setReason}
-                            options={WHY}
+                            placeholder="Choose a reason"
+                            options={REFUND_REASONS}
+                            className="w-full min-w-[150px]"
                         />
                     </label>
                     {reason === "other" ? (
@@ -159,7 +153,7 @@ function CancelDraft({
                     </label>
                 ) : (
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        Nothing is sent to {first} — let them know by email or
+                        Nothing is sent to {first}. Let them know by email or
                         phone.
                     </p>
                 )}
@@ -167,7 +161,10 @@ function CancelDraft({
             <OrderSheetFoot
                 // Its button cancels the order, so the way out says what
                 // it keeps: never "Cancel" beside "Cancel order".
-                dismiss="Keep order"
+                cancelLabel="Keep order"
+                tone="destructive"
+                saveLabel={confirm}
+                savingLabel="Cancelling…"
                 note={
                     <p
                         id={`${ids}-how`}
@@ -176,21 +173,13 @@ function CancelDraft({
                         {says}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    variant="destructive"
-                    aria-describedby={`${ids}-how`}
-                    onClick={() =>
-                        onConfirm({
-                            reason: reasonText(reason, other),
-                            tell: canTell && tell,
-                        })
-                    }
-                >
-                    {confirm}
-                </Button>
-            </OrderSheetFoot>
+                onSubmit={() =>
+                    onConfirm({
+                        reason: reasonText(reason, other),
+                        tell: canTell && tell,
+                    })
+                }
+            />
         </>
     );
 }

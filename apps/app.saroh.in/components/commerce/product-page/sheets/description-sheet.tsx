@@ -115,12 +115,10 @@ export function DescriptionSheet({
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Description saved.", () => {
-            void patchProduct(storeId, product.id, before).then((undo) => {
-                if (!undo.ok)
-                    showError("Couldn't undo. The saved description stays.");
-                router.refresh();
-            });
+        showUndo("Description saved.", async () => {
+            const undo = await patchProduct(storeId, product.id, before);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -136,8 +134,8 @@ export function DescriptionSheet({
             fullEditorHref={productEditHref(storeId, product.id, "description")}
             dirty={isDirty}
             saving={isSubmitting}
-            note={firstError ?? (isDirty ? undefined : "No changes yet")}
-            onSave={() => void form.handleSubmit(save)()}
+            note={firstError}
+            onSave={() => form.handleSubmit(save)()}
         >
             <Form {...form}>
                 <div className="flex flex-col gap-4">

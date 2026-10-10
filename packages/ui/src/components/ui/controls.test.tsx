@@ -495,11 +495,7 @@ describe("44px on a touch pointer, in every control that lacked it", () => {
                 </DialogContent>
             </Dialog>,
         );
-        has(
-            screen.getByRole("button", { name: "Close" }),
-            "coarse:after:absolute",
-            "coarse:after:-inset-2.5",
-        );
+        has(screen.getByRole("button", { name: "Close" }), "coarse:size-11");
     });
 
     it("a toast's Undo, cancel and close, and a toast fits 320px", () => {

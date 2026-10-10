@@ -1,5 +1,6 @@
 "use client";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -7,12 +8,7 @@ import {
     LoadingState,
     PartialNotice,
 } from "@saroh/ui/data-state";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
 import Link from "next/link";
@@ -26,7 +22,6 @@ import { loadUnlinkedCustomers } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
 import type { UnlinkedCustomer, UnlinkedPage } from "@/lib/customers/list";
 import { rowName, unlinkedText } from "@/lib/customers/list";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * "12 paying customers aren't linked to a contact yet · Review" (C4).
@@ -131,71 +126,16 @@ function UnlinkedSheet({
             : 1;
 
     return (
-        <Sheet
+        <FormSheet
+            wide
             open={open}
-            onOpenChange={(o) => {
-                onOpenChange(o);
-                if (!o) {
-                    setPage(1);
-                    setRead({ state: "loading" });
-                    setLinked({});
-                }
-            }}
-        >
-            <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-[480px]">
-                <div>
-                    <SheetTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                        Paying customers to link
-                    </SheetTitle>
-                    <SheetDescription className="mt-1 text-pretty text-[13px] leading-[1.5] text-muted-foreground">
-                        Each paid at a location with an email a contact already
-                        has. Link them if they&apos;re the same person and their
-                        orders join that customer. Saroh never links anyone on
-                        its own.
-                    </SheetDescription>
-                </div>
-
-                {read.state === "loading" ? (
-                    <LoadingState
-                        variant="list"
-                        rows={4}
-                        label="Loading paying customers"
-                    />
-                ) : read.state === "failed" ? (
-                    <FailedState
-                        size="panel"
-                        title={couldntLoad("these customers")}
-                        onRetry={() => goTo(page)}
-                    />
-                ) : read.data.rows.length === 0 ? (
-                    <EmptyState
-                        size="inline"
-                        title="Every paying customer is linked."
-                    />
-                ) : (
-                    <ul className="flex flex-col gap-2">
-                        {read.data.rows.map((c) => (
-                            <UnlinkedItem
-                                key={c.customerId}
-                                customer={c}
-                                canLink={canLink}
-                                linkedTo={linked[c.customerId] ?? null}
-                                onLinked={(name) => {
-                                    setLinked((m) => ({
-                                        ...m,
-                                        [c.customerId]: name,
-                                    }));
-                                    // The count, the notice and the rows
-                                    // are read again behind the sheet.
-                                    router.refresh();
-                                }}
-                            />
-                        ))}
-                    </ul>
-                )}
-
-                {read.state === "ready" && pages > 1 ? (
-                    <div className="mt-auto flex items-center gap-2 pt-1 text-[12.5px] text-muted-foreground">
+            title="Paying customers to link"
+            description="Each paid at a location with an email a contact already has. Link them if they're the same person and their orders join that customer. Saroh never links anyone on its own."
+            doneOnly
+            fieldsClassName="gap-4"
+            footNote={
+                read.state === "ready" && pages > 1 ? (
+                    <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                         <span className="flex-1 tabular-nums">
                             Page {page} of {pages}
                         </span>
@@ -218,9 +158,54 @@ function UnlinkedSheet({
                             Next
                         </Button>
                     </div>
-                ) : null}
-            </SheetContent>
-        </Sheet>
+                ) : null
+            }
+            onClose={() => {
+                onOpenChange(false);
+                setPage(1);
+                setRead({ state: "loading" });
+                setLinked({});
+            }}
+        >
+            {read.state === "loading" ? (
+                <LoadingState
+                    variant="list"
+                    rows={4}
+                    label="Loading paying customers"
+                />
+            ) : read.state === "failed" ? (
+                <FailedState
+                    size="panel"
+                    title={couldntLoad("these customers")}
+                    onRetry={() => goTo(page)}
+                />
+            ) : read.data.rows.length === 0 ? (
+                <EmptyState
+                    size="inline"
+                    title="Every paying customer is linked."
+                />
+            ) : (
+                <ul className="flex flex-col gap-2">
+                    {read.data.rows.map((c) => (
+                        <UnlinkedItem
+                            key={c.customerId}
+                            customer={c}
+                            canLink={canLink}
+                            linkedTo={linked[c.customerId] ?? null}
+                            onLinked={(name) => {
+                                setLinked((m) => ({
+                                    ...m,
+                                    [c.customerId]: name,
+                                }));
+                                // The count, the notice and the rows
+                                // are read again behind the sheet.
+                                router.refresh();
+                            }}
+                        />
+                    ))}
+                </ul>
+            )}
+        </FormSheet>
     );
 }
 
@@ -248,7 +233,7 @@ function UnlinkedItem({
                 c.customerId,
             );
             if (res.ok) {
-                showSuccess(`Linked to ${holderName}`);
+                showSuccess(`Linked to ${holderName}.`);
                 onLinked(holderName);
             } else {
                 showError("Couldn't link them", res.error);
@@ -285,13 +270,14 @@ function UnlinkedItem({
                     </p>
                 </div>
                 {c.storefront ? (
-                    <Button asChild variant="ghost" size="sm">
-                        <Link
-                            href={customerHref(c.storefront.id, c.customerId)}
-                        >
-                            Open their record
-                        </Link>
-                    </Button>
+                    // A way to compare the two before linking, so it is quiet:
+                    // the link, not the row's action.
+                    <Link
+                        href={customerHref(c.storefront.id, c.customerId)}
+                        className="shrink-0 rounded-sm text-[12.5px] text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:flex coarse:min-h-11 coarse:items-center"
+                    >
+                        Open their record
+                    </Link>
                 ) : null}
             </div>
             <div className="mt-2.5 border-t border-border/60 pt-2.5 text-[12.5px]">
@@ -306,7 +292,7 @@ function UnlinkedItem({
                             Their email belongs to{" "}
                             <Link
                                 href={personHref(holder.contactId)}
-                                className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:decoration-2 active:text-muted-foreground"
                             >
                                 {holderName}
                             </Link>

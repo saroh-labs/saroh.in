@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { StatePill } from "@/components/bookings/calendar/parts";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
@@ -215,16 +216,15 @@ export function ServiceEditor({
         router.replace(`/services/${res.data.id}`);
     }
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!service) return;
         setSaving(true);
         const res = await archiveService(service.id);
         if (!res.ok) {
             setSaving(false);
-            showError(res.error);
-            return;
+            return { ok: false, error: res.error };
         }
-        showSuccess(`${service.name} deleted`);
+        showSuccess("Service deleted.");
         router.push(SERVICES_HREF);
     }
 
@@ -384,9 +384,10 @@ export function ServiceEditor({
                     open={confirmDelete}
                     onOpenChange={setConfirmDelete}
                     title={`Delete ${service.name}?`}
-                    description="It leaves your services and can no longer be booked. Bookings already made keep it. This cannot be undone — to stop bookings for now, choose Stop taking bookings instead."
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, choose Stop taking bookings instead. This cannot be undone."
                     confirmLabel="Delete service"
-                    onConfirm={() => void remove()}
+                    keepLabel="Keep service"
+                    onConfirm={remove}
                 />
             ) : null}
         </main>

@@ -42,8 +42,6 @@ export const RAW_ALLOWED = {
     "components/bookings/new-booking-dialog.tsx": ["button", "label"],
     // label: a label that wraps its control
     "components/bookings/pay-link-panel.tsx": ["label"],
-    // button: a row or card that is one button
-    "components/bookings/reschedule-booking.tsx": ["button"],
     // label: a label that wraps its control
     "components/bookings/take-payment.tsx": ["label"],
     // button: a pressed-or-not toggle or filter chip
@@ -237,7 +235,7 @@ export const RAW_ALLOWED = {
     // button: a pressed-or-not toggle or filter chip, one of a segmented choice (radio); input: a native radio inside its own label, a native tick inside its own label; label: a label that wraps its control
     "components/organizations/team-screen.tsx": ["button", "input", "label"],
     // input: a native radio inside its own label; label: a label that wraps its control
-    "components/providers/provider-setup-dialog.tsx": ["input", "label"],
+    "components/providers/provider-setup-sheet.tsx": ["input", "label"],
     // button: one of a segmented choice (radio)
     "components/qr/choice-group.tsx": ["button"],
     // button: a control styled by its screen's own helper
@@ -333,7 +331,7 @@ export const RAW_ALLOWED = {
     // button: a pressed-or-not toggle or filter chip; label: a label that wraps its control
     "components/sites/template-picker.tsx": ["button", "label"],
     // button: one of a segmented choice (radio)
-    "components/sites/test-releases/go-live-sheet.tsx": ["button"],
+    "components/sites/test-releases/go-live-dialog.tsx": ["button"],
     // button: one of a segmented choice (radio)
     "components/sites/test-releases/release-links.tsx": ["button"],
     // label: a label that wraps its control
@@ -364,7 +362,7 @@ export const RAW_ALLOWED = {
         "label",
     ],
     // button: one of a segmented choice (radio)
-    "components/subscriptions/subscription-detail/action-sheets.tsx": [
+    "components/subscriptions/subscription-detail/action-dialogs.tsx": [
         "button",
     ],
     // button: one of a segmented choice (radio)

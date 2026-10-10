@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
 import {
     Form,
@@ -9,20 +8,16 @@ import {
     FormField,
     FormItem,
     FormLabel,
+    FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import {
-    ACTION_SHEET_BODY,
-    ACTION_SHEET_FORM,
-    ActionSheetFooter,
-} from "@/components/shared/action-sheet";
+import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
 import { createTask } from "@/lib/leads/actions";
 
 /**
@@ -41,7 +36,7 @@ import { createTask } from "@/lib/leads/actions";
  */
 
 const formSchema = z.object({
-    body: z.string().trim().min(1),
+    body: z.string().trim().min(1, "Say what to do."),
     dueDate: z.date().optional(),
     dueTime: z.string(),
 });
@@ -59,13 +54,10 @@ type FormValues = z.infer<typeof formSchema>;
 export function TaskForm({
     leadId,
     onDone,
-    onDirtyChange,
 }: {
     leadId: string;
     /** The follow-up was saved: close the sheet. */
     onDone: () => void;
-    /** Something is filled in, so a stray press outside must not close it. */
-    onDirtyChange?: (dirty: boolean) => void;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
@@ -77,17 +69,10 @@ export function TaskForm({
         },
     });
     const { isSubmitting } = form.formState;
-    const body = form.watch("body");
-    const dueDate = form.watch("dueDate");
-    const dirty = body.trim() !== "" || dueDate !== undefined;
-
-    useEffect(() => {
-        onDirtyChange?.(dirty);
-    }, [dirty, onDirtyChange]);
 
     async function onSubmit(values: FormValues) {
         if (!values.dueDate) {
-            showError("Pick a due date");
+            form.setError("dueDate", { message: "Pick a due date." });
             return;
         }
         const parsed = joinDue(values.dueDate, values.dueTime);
@@ -99,18 +84,15 @@ export function TaskForm({
             showError(res.error);
             return;
         }
-        showSuccess("Follow-up scheduled");
+        showSuccess("Follow-up added.");
         onDone();
         router.refresh();
     }
 
     return (
         <Form {...form}>
-            <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className={ACTION_SHEET_FORM}
-            >
-                <div className={ACTION_SHEET_BODY}>
+            <>
+                <FormSheetBody className="gap-4">
                     <FormField
                         control={form.control}
                         name="body"
@@ -124,6 +106,7 @@ export function TaskForm({
                                         {...field}
                                     />
                                 </FormControl>
+                                <FormMessage />
                             </FormItem>
                         )}
                     />
@@ -144,6 +127,7 @@ export function TaskForm({
                                             }}
                                         />
                                     </FormControl>
+                                    <FormMessage />
                                 </FormItem>
                             )}
                         />
@@ -164,19 +148,14 @@ export function TaskForm({
                             )}
                         />
                     </div>
-                </div>
-                <ActionSheetFooter busy={isSubmitting}>
-                    <Button
-                        type="submit"
-                        className="wk-press"
-                        disabled={!body.trim() || !dueDate}
-                        busy={isSubmitting}
-                        busyLabel="Scheduling…"
-                    >
-                        Add follow-up
-                    </Button>
-                </ActionSheetFooter>
-            </form>
+                </FormSheetBody>
+                <FormSheetFoot
+                    saveLabel="Add follow-up"
+                    savingLabel="Adding…"
+                    pending={isSubmitting}
+                    onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
+                />
+            </>
         </Form>
     );
 }

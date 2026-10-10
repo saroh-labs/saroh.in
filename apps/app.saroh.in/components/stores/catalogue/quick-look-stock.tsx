@@ -93,13 +93,13 @@ export function StockBlock({
                             Add at
                             <OptionSelect
                                 size="sm"
-                                className="w-auto"
                                 value={addAt ?? ""}
                                 onValueChange={setAddAt}
                                 options={where.map((p) => ({
                                     value: p.storeId,
                                     label: p.storeName,
                                 }))}
+                                className="w-auto min-w-[140px]"
                             />
                         </label>
                     ) : null}

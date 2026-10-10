@@ -214,8 +214,8 @@ export function StockSheet({
             dirty={dirty}
             saving={saving}
             saveDisabled={Boolean(problem)}
-            note={problem ?? (dirty ? undefined : "No changes yet")}
-            onSave={() => void save()}
+            note={problem ?? undefined}
+            onSave={save}
         >
             <div
                 aria-hidden

@@ -55,15 +55,17 @@ test(
             await expect(dialog.getByText(/uses no extra seat/)).toBeVisible();
 
             await dialog.getByRole("button", { name: "Send invite" }).click();
-            await expect(
-                shown(page, /they join as Calendar only/),
-            ).toBeVisible();
+            // An invite waits ten seconds with Undo, saying who joins as
+            // what, and is sent when the hold ends.
+            await expect(shown(page, /joins as Calendar only/)).toBeVisible();
 
             const waiting = page
                 .getByRole("region", { name: "Invited, not joined yet" })
                 .getByRole("listitem")
                 .filter({ hasText: email });
-            await expect(waiting).toContainText(`for ${name} on the diary`);
+            await expect(waiting).toContainText(`for ${name} on the diary`, {
+                timeout: 25_000,
+            });
             await expect(waiting).toContainText("Calendar only");
         } finally {
             const invites =

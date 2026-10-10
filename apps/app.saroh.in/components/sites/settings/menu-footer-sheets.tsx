@@ -8,7 +8,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type {
     SiteFooter,
     SiteNavigationItem,
@@ -60,7 +60,7 @@ export function MenuSheet({
 }) {
     const [menu, setMenu] = useState(saved);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
             wide
             returnFocusTo={settingsEditId("menu")}
@@ -77,7 +77,7 @@ export function MenuSheet({
                 A page left with no label goes by its own title. Save with no
                 pages to remove the menu.
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -96,7 +96,7 @@ export function FooterSheet({
         saved?.format ?? "html",
     );
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
             wide
             returnFocusTo={settingsEditId("footer")}
@@ -156,7 +156,7 @@ export function FooterSheet({
                 Clear the box to remove the footer. Links and basic formatting
                 are kept.
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -175,7 +175,7 @@ export function PostsPathSheet({
 }) {
     const [path, setPath] = useState(saved);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
             returnFocusTo={settingsEditId("posts-path")}
             title="Posts path"
@@ -200,6 +200,6 @@ export function PostsPathSheet({
             <p id="settings-posts-path-note" className={NOTE}>
                 Posts will live at {host ?? ""}/{path || "blog"}/…
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

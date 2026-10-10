@@ -186,7 +186,7 @@ export const UNSEEN_LINK = {
     action: "Make a new link",
     confirmTitle: "Make a new pay link?",
     confirmLabel: "Make a new link",
-    cancelLabel: "Keep the old one",
+    keepLabel: "Keep the old link",
 } as const;
 
 /**

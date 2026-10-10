@@ -2,18 +2,15 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FormDialog } from "@/components/shared/form-dialog";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";
 import {
@@ -103,40 +100,25 @@ export function AutopayActions({
                     ) : null}
                 </div>
             ) : null}
-            <Dialog
-                open={open !== null}
-                onOpenChange={(o) => (!o ? setOpen(null) : null)}
-            >
-                <DialogContent className="w-[calc(100%-40px)] max-w-[440px] gap-0 rounded-[14px] border-0 px-5 py-[18px] sm:rounded-[14px] [&>button:last-child]:hidden">
-                    {open === "send" && card ? (
-                        <SendLinkBody
-                            subscriptionId={subscriptionId}
-                            card={card}
-                            firstName={firstName}
-                            timeZone={timeZone}
-                            now={now}
-                            onClose={() => setOpen(null)}
-                        />
-                    ) : open === "cancel" ? (
-                        <CancelBody
-                            subscriptionId={subscriptionId}
-                            firstName={firstName}
-                            provider={card?.provider ?? null}
-                            emailTo={card?.emailTo ?? null}
-                            onClose={() => setOpen(null)}
-                        />
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+            {open === "send" && card ? (
+                <SendLinkDialog
+                    subscriptionId={subscriptionId}
+                    card={card}
+                    firstName={firstName}
+                    timeZone={timeZone}
+                    now={now}
+                    onClose={() => setOpen(null)}
+                />
+            ) : null}
+            <CancelAutopay
+                open={open === "cancel"}
+                subscriptionId={subscriptionId}
+                firstName={firstName}
+                provider={card?.provider ?? null}
+                emailTo={card?.emailTo ?? null}
+                onClose={() => setOpen(null)}
+            />
         </>
-    );
-}
-
-function Footer({ children }: { children: React.ReactNode }) {
-    return (
-        <div className="mt-3.5 flex flex-wrap justify-end gap-2">
-            {children}
-        </div>
     );
 }
 
@@ -144,7 +126,7 @@ function Footer({ children }: { children: React.ReactNode }) {
  * Pick the method — the provider's page is for one — and whether Saroh
  * emails it; then the link, shown once, to copy.
  */
-function SendLinkBody({
+function SendLinkDialog({
     subscriptionId,
     card,
     firstName,
@@ -166,10 +148,12 @@ function SendLinkBody({
     );
     const [email, setEmail] = useState(card.emailTo !== null);
     const [busy, setBusy] = useState(false);
+    const [tried, setTried] = useState(false);
     const [made, setMade] = useState<AutopayLink | null>(null);
     const provider = card.provider ?? "your payment provider";
 
     async function make() {
+        setTried(true);
         if (!method) return;
         setBusy(true);
         const res = await sendAutopayLink(
@@ -178,7 +162,7 @@ function SendLinkBody({
             email && card.emailTo !== null,
         ).catch((): { ok: false; error: string } => ({
             ok: false,
-            error: "Saroh couldn't be reached. Nothing was sent — try again.",
+            error: "Saroh couldn't be reached. Nothing was sent. Try again.",
         }));
         setBusy(false);
         if (!res.ok) {
@@ -192,49 +176,53 @@ function SendLinkBody({
 
     if (made) {
         return (
-            <>
-                <DialogTitle className="mb-2.5 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                    Set-up link ready
-                </DialogTitle>
-                <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                    {made.emailed?.status === "QUEUED"
+            <FormDialog
+                open
+                size="md"
+                title="Set-up link ready"
+                description={`${
+                    made.emailed?.status === "QUEUED"
                         ? `Emailed to ${made.emailed.to}. You can copy it too.`
                         : made.emailed?.status === "SUPPRESSED"
                           ? `${firstName} has turned off email, so it wasn't sent. Copy it and send it to them yourself.`
-                          : `Copy it and send it to ${firstName} yourself.`}{" "}
-                    It covers renewals up to {money(made.limit, made.currency)}{" "}
-                    and works until {dayText(made.expiresAt, timeZone, now)}.
-                </DialogDescription>
+                          : `Copy it and send it to ${firstName} yourself.`
+                } It covers renewals up to ${money(made.limit, made.currency)} and works until ${dayText(made.expiresAt, timeZone, now)}.`}
+                doneOnly
+                fieldsClassName="gap-0"
+                onClose={onClose}
+            >
                 {made.emailProblem ? (
                     <p className="mt-2 text-[12.5px] text-muted-foreground">
                         Not emailed: {made.emailProblem}
                     </p>
                 ) : null}
                 <LinkBox url={made.url} />
-                <Footer>
-                    <Button onClick={onClose}>Done</Button>
-                </Footer>
-            </>
+            </FormDialog>
         );
     }
 
     const limitLow = card.limitLow;
     return (
-        <>
-            <DialogTitle className="mb-2.5 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                Send a set-up link
-            </DialogTitle>
-            <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                {firstName} approves autopay on {provider}&apos;s page. The link
-                is for one way to pay — pick the one they&apos;ll use.
-                {limitLow
-                    ? ` Its limit covers this renewal of ${money(limitLow.amount, limitLow.currency)}; once they approve it, it replaces their current autopay.`
-                    : ""}
-            </DialogDescription>
+        <FormDialog
+            open
+            size="md"
+            title="Send a set-up link"
+            description={`${firstName} approves autopay on ${provider}'s page. The link is for one way to pay. Pick the one they'll use.${
+                limitLow
+                    ? ` Its limit covers this renewal of ${money(limitLow.amount, limitLow.currency)}. Once they approve it, it replaces their current autopay.`
+                    : ""
+            }`}
+            pending={busy}
+            saveLabel="Make link"
+            savingLabel="Making…"
+            fieldsClassName="gap-0"
+            onClose={onClose}
+            onSubmit={make}
+        >
             <div
                 role="radiogroup"
                 aria-label="Way to pay"
-                className="mt-3 flex flex-col gap-1.5"
+                className="flex flex-col gap-1.5"
             >
                 {card.methods.map((m) => {
                     const on = method === m;
@@ -260,6 +248,14 @@ function SendLinkBody({
                     );
                 })}
             </div>
+            {tried && !method ? (
+                <p
+                    role="alert"
+                    className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
+                >
+                    Pick the way they&apos;ll pay.
+                </p>
+            ) : null}
             {card.emailTo ? (
                 <div className="mt-3 flex items-start gap-2.5">
                     <Checkbox
@@ -284,20 +280,7 @@ function SendLinkBody({
                     yourself.
                 </p>
             )}
-            <Footer>
-                <Button variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button
-                    disabled={!method}
-                    onClick={() => void make()}
-                    busy={busy}
-                    busyLabel="Making…"
-                >
-                    Make the link
-                </Button>
-            </Footer>
-        </>
+        </FormDialog>
     );
 }
 
@@ -317,7 +300,7 @@ function LinkBox({ url }: { url: string }) {
                         () => setCopied(true),
                         () =>
                             showError(
-                                "Couldn't copy it — select the link and copy it by hand.",
+                                "Couldn't copy it. Select the link and copy it by hand.",
                             ),
                     );
                 }}
@@ -325,20 +308,26 @@ function LinkBox({ url }: { url: string }) {
                 {copied ? "Copied" : "Copy link"}
             </Button>
             <span className="basis-full text-[12px] text-muted-foreground">
-                Shown once — Saroh doesn&apos;t keep it. Make another if
+                Shown once. Saroh doesn&apos;t keep it. Make another if
                 it&apos;s lost.
             </span>
         </div>
     );
 }
 
-function CancelBody({
+/**
+ * Cancelling autopay can't be taken back: their bank is told, and they
+ * would have to approve it again. So the one confirm asks first.
+ */
+function CancelAutopay({
+    open,
     subscriptionId,
     firstName,
     provider,
     emailTo,
     onClose,
 }: {
+    open: boolean;
     subscriptionId: string;
     firstName: string;
     provider: string | null;
@@ -347,55 +336,37 @@ function CancelBody({
     onClose: () => void;
 }) {
     const router = useRouter();
-    const [busy, setBusy] = useState(false);
     const at = provider ?? "your payment provider";
 
-    async function go() {
-        setBusy(true);
+    async function go(): Promise<ConfirmResult> {
         const res = await cancelAutopay(subscriptionId).catch(
             (): { ok: false; error: string } => ({
                 ok: false,
-                error: "Saroh couldn't be reached. Nothing changed — try again.",
+                error: "Saroh couldn't be reached. Nothing changed. Try again.",
             }),
         );
-        setBusy(false);
         if (!res.ok) {
-            showError(res.error);
             router.refresh();
-            return;
+            return { ok: false, error: res.error };
         }
         const said = cancelledText(res.data, firstName);
         showSuccess(said.title, said.detail);
-        onClose();
         router.refresh();
     }
 
     return (
-        <>
-            <DialogTitle className="mb-2.5 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                Cancel autopay
-            </DialogTitle>
-            <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                {firstName}&apos;s autopay stops now and {at} is asked to cancel
-                it. The subscription carries on: the next renewal is invoiced
-                with a pay link.
-                {emailTo
+        <ConfirmDialog
+            open={open}
+            onOpenChange={(o) => (o ? null : onClose())}
+            title="Cancel autopay?"
+            description={`${firstName}'s autopay stops now and ${at} is asked to cancel it. The subscription carries on: the next renewal is invoiced with a pay link.${
+                emailTo
                     ? ` Saroh emails ${firstName} at ${emailTo} to say so.`
-                    : ""}
-            </DialogDescription>
-            <Footer>
-                <Button variant="outline" onClick={onClose}>
-                    Keep autopay
-                </Button>
-                <Button
-                    variant="destructive"
-                    onClick={() => void go()}
-                    busy={busy}
-                    busyLabel="Cancelling…"
-                >
-                    Cancel autopay
-                </Button>
-            </Footer>
-        </>
+                    : ""
+            } This cannot be undone.`}
+            confirmLabel="Cancel autopay"
+            keepLabel="Keep autopay"
+            onConfirm={go}
+        />
     );
 }

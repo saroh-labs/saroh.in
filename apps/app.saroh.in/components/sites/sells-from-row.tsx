@@ -7,7 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import {
@@ -185,7 +185,7 @@ function SellsFromSheet({
     const [picked, setPicked] = useState(current);
     const [tried, setTried] = useState(false);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("sells-from")}
             title="Sells from"
             description="The location whose products your online shop lists at /shop. It applies as soon as you save."
@@ -242,6 +242,6 @@ function SellsFromSheet({
                     Choose a location
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

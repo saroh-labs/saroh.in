@@ -405,7 +405,7 @@ test.describe("shipping on order detail", () => {
         await expect(panel.getByText(/^To 14 Lake View Road/)).toBeVisible();
         await panel.getByRole("radio", { name: "Blue Dart" }).click();
         await panel.getByLabel("Tracking number").fill("BD 9920 1140");
-        await panel.getByRole("button", { name: "Handed over" }).click();
+        await panel.getByRole("button", { name: "Mark handed over" }).click();
         await expect(panel).toBeHidden();
 
         await expect(
@@ -435,7 +435,9 @@ test.describe("shipping on order detail", () => {
         const handover = page.getByRole("dialog", {
             name: "Hand to courier",
         });
-        await handover.getByRole("button", { name: "Handed over" }).click();
+        await handover
+            .getByRole("button", { name: "Mark handed over" })
+            .click();
         await expect(handover).toBeHidden();
         await expect(shown(page, /^Handed to Delhivery\./)).toBeVisible();
 
@@ -481,11 +483,11 @@ test.describe("shipping on order detail", () => {
         await expect(name).toBeFocused();
         // No name yet: nothing to hand over to.
         await expect(
-            panel.getByRole("button", { name: "Handed over" }),
+            panel.getByRole("button", { name: "Mark handed over" }),
         ).toBeDisabled();
         await name.fill("DTDC");
         await panel.getByLabel("Tracking number").fill("D 4410 2291");
-        await panel.getByRole("button", { name: "Handed over" }).click();
+        await panel.getByRole("button", { name: "Mark handed over" }).click();
         await expect(panel).toBeHidden();
 
         await expect(

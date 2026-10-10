@@ -11,6 +11,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogTitle,
 } from "./dialog";
 
@@ -77,5 +78,79 @@ describe("AlertDialogContent on a phone", () => {
         );
         const dialog = screen.getByRole("alertdialog");
         for (const rule of RULES) expect(dialog).toHaveClass(rule);
+    });
+});
+
+/**
+ * What every dialog and sheet shares, baked into the primitives so no
+ * caller patches it: three widths by the size of the task, the display
+ * title, a close target that is 44px on touch, and a footer whose buttons
+ * never touch when they stack on a phone.
+ */
+describe("the dialog's sizes, title, close target and footer", () => {
+    const open = (size?: "sm" | "md" | "lg") => {
+        render(
+            <Dialog open>
+                <DialogContent size={size}>
+                    <DialogTitle>Rename category</DialogTitle>
+                    <DialogDescription>Its products keep it.</DialogDescription>
+                    <DialogFooter>
+                        <button type="button">Cancel</button>
+                        <button type="button">Save</button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>,
+        );
+        return screen.getByRole("dialog");
+    };
+
+    it.each([
+        ["sm", "max-w-[420px]"],
+        ["md", "max-w-[460px]"],
+        ["lg", "max-w-[560px]"],
+    ] as const)("%s is %s", (size, width) => {
+        expect(open(size)).toHaveClass(width);
+    });
+
+    it("keeps the width it had with no size", () => {
+        expect(open()).toHaveClass("max-w-lg");
+    });
+
+    it("sets the title in the display face at 18px", () => {
+        open("sm");
+        const title = screen.getByRole("heading", { name: "Rename category" });
+        expect(title).toHaveClass("font-display");
+        expect(title).toHaveClass("text-lg");
+    });
+
+    it("gives Close a real target, 44px on a touch pointer", () => {
+        open("sm");
+        const close = screen.getByRole("button", { name: "Close" });
+        expect(close).toHaveClass("size-[30px]");
+        expect(close).toHaveClass("coarse:size-11");
+    });
+
+    it("stacks the footer on a phone with a gap, the dialog's button on top", () => {
+        open("sm");
+        const footer = screen.getByRole("button", {
+            name: "Save",
+        }).parentElement;
+        expect(footer).toHaveClass("flex-col-reverse");
+        expect(footer).toHaveClass("gap-2");
+        expect(footer).toHaveClass("sm:flex-row");
+        expect(footer).toHaveClass("sm:justify-end");
+        expect(footer?.className).not.toContain("space-x");
+    });
+
+    it("can go without Close where only its buttons may close it", () => {
+        render(
+            <Dialog open>
+                <DialogContent closeButton={false}>
+                    <DialogTitle>Working</DialogTitle>
+                    <DialogDescription>A moment.</DialogDescription>
+                </DialogContent>
+            </Dialog>,
+        );
+        expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     });
 });

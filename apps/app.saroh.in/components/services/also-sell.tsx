@@ -44,11 +44,12 @@ export function AlsoSell({
                 return;
             }
             router.refresh();
-            showUndo(alsoSellToast(f.label, false), () => {
-                void set(f.key, true).then((back) => {
-                    if (!back.ok) showError(refusalSentence(back));
-                    router.refresh();
-                });
+            showUndo(alsoSellToast(f.label, false), async () => {
+                const back = await set(f.key, true);
+                router.refresh();
+                return back.ok
+                    ? true
+                    : { ok: false, error: refusalSentence(back) };
             });
         });
     };

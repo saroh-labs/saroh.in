@@ -1,3 +1,4 @@
+import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { StepTone } from "@/lib/orders/list-row";
 import { rowProgress } from "@/lib/orders/list-row";
 import type {
@@ -82,8 +83,12 @@ export function canCancel(status: OrderStatus): boolean {
  * The API decides what may happen next (`next`); these only say it.
  * --------------------------------------------------------------------- */
 
-/** How long a Ready step or a refund is held before it is recorded. */
-export const HOLD_MS = 10_000;
+/**
+ * How long a Ready step or a refund is held before it is recorded: the
+ * app's one ten seconds (`lib/hold-undo.ts`), under the name this screen
+ * has always used.
+ */
+export const HOLD_MS = HOLD_UNDO_MS;
 
 export const STAGE_LABEL: Record<KitchenStage, string> = {
     NEW: "New",

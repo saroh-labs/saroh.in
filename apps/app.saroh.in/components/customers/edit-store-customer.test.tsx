@@ -60,7 +60,7 @@ const field = (name: string) =>
 /** Presses the form's own button and lets react-hook-form settle. */
 async function save() {
     await act(async () => {
-        s.button("Save changes", s.sheet())?.click();
+        s.button("Save", s.sheet())?.click();
         for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
     });
 }
@@ -95,7 +95,7 @@ describe("Edit details on a location's customer", () => {
             ["zipCode", "560001"],
         ])
             expect(field(name)?.value).toBe(value);
-        expect(s.button("Save changes", s.sheet())).toBeDefined();
+        expect(s.button("Save", s.sheet())).toBeDefined();
         expect(s.button("Cancel", s.sheet())).toBeDefined();
     });
 
@@ -115,7 +115,7 @@ describe("Edit details on a location's customer", () => {
         );
         expect(s.sheet()).toBe(null);
         expect(refresh).toHaveBeenCalled();
-        expect(showSuccess).toHaveBeenCalledWith("Saved");
+        expect(showSuccess).toHaveBeenCalledWith("Details saved.");
     });
 
     it("stays open with what was typed when the email is refused", async () => {

@@ -138,7 +138,7 @@ function EditDraft({
     const money = (n: number) => (format ? format(n) : "");
 
     const note = empty
-        ? "Nothing left — cancel the order with a full refund instead."
+        ? "Nothing left. Cancel the order with a full refund instead."
         : addressMissing
           ? "An address needs its first line, town, state and PIN code."
           : diff > 0
@@ -237,17 +237,16 @@ function EditDraft({
                         Add an item
                         <OptionSelect
                             size="sm"
-                            className="mt-1 font-normal"
+                            // Picking adds a line and the box empties again.
                             value=""
                             onValueChange={pick}
-                            options={[
-                                { value: "", label: "Choose a product…" },
-                                ...addable.map((s) => ({
-                                    value: s.key,
-                                    label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
-                                    disabled: s.soldOut,
-                                })),
-                            ]}
+                            placeholder="Choose a product…"
+                            className="mt-1 w-full min-w-[150px]"
+                            options={addable.map((s) => ({
+                                value: s.key,
+                                label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
+                                disabled: s.soldOut,
+                            }))}
                         />
                     </label>
                 ) : null}
@@ -310,7 +309,40 @@ function EditDraft({
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    diff > 0
+                        ? `Save (${money(diff)} more due)`
+                        : diff < 0
+                          ? `Save and refund ${money(-diff)}`
+                          : "Save"
+                }
+                saveOff={off}
+                onSubmit={() =>
+                    onSave({
+                        ...(changed.length
+                            ? {
+                                  lines: changed.map((l) => ({
+                                      itemId: l.id,
+                                      quantity: qty[l.id] ?? 0,
+                                  })),
+                              }
+                            : {}),
+                        ...(added.length ? { add: addedLines(added) } : {}),
+                        ...(addressChanged
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                    })
+                }
                 note={
                     <p
                         aria-live="polite"
@@ -326,44 +358,7 @@ function EditDraft({
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() =>
-                        onSave({
-                            ...(changed.length
-                                ? {
-                                      lines: changed.map((l) => ({
-                                          itemId: l.id,
-                                          quantity: qty[l.id] ?? 0,
-                                      })),
-                                  }
-                                : {}),
-                            ...(added.length ? { add: addedLines(added) } : {}),
-                            ...(addressChanged
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                        })
-                    }
-                >
-                    {diff > 0
-                        ? `Save — ${money(diff)} more due`
-                        : diff < 0
-                          ? `Save and refund ${money(-diff)}`
-                          : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

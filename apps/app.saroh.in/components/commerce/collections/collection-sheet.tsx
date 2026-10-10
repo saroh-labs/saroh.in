@@ -1,19 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { PickableProduct } from "@/lib/collections/actions";
 import {
     loadCollection,
@@ -33,7 +27,6 @@ import type { CollectionDetail } from "@/lib/collections/service";
 import {
     CategoryField,
     DescriptionField,
-    DiscardBar,
     NameField,
     SheetNotices,
 } from "./collection-fields";
@@ -95,7 +88,6 @@ export function CollectionSheet({
     const [known, setKnown] = useState(new Map<string, PickableProduct>());
     const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
     const [saving, setSaving] = useState(false);
-    const [confirming, setConfirming] = useState(false);
     const [askDelete, setAskDelete] = useState(false);
 
     // Each opening starts from what is saved: blank, or the collection read
@@ -109,7 +101,6 @@ export function CollectionSheet({
         setShown({ open, id: collectionId });
         if (open) {
             setErrors({});
-            setConfirming(false);
             setAskDelete(false);
             setLoadError(null);
             setDetail(null);
@@ -164,16 +155,6 @@ export function CollectionSheet({
         setErrors((e) => ({ ...e, [key]: undefined }));
     }
 
-    function requestClose(next: boolean) {
-        if (next) return onOpenChange(true);
-        if (saving) return;
-        if (dirty && canWrite) {
-            setConfirming(true);
-            return;
-        }
-        onOpenChange(false);
-    }
-
     function done(message: string) {
         showSuccess(message);
         onOpenChange(false);
@@ -211,22 +192,14 @@ export function CollectionSheet({
             }
             return;
         }
-        done(
-            editing
-                ? `${values.name.trim()} saved.`
-                : `${values.name.trim()} created.`,
-        );
+        done(editing ? "Collection saved." : "Collection created.");
     }
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!collectionId) return;
-        setAskDelete(false);
         const res = await removeCollection(collectionId);
-        if (!res.ok) {
-            showError("The collection wasn't deleted.", res.error);
-            return;
-        }
-        done(`${before.name} deleted. Its products are as they were.`);
+        if (!res.ok) return { ok: false, error: res.error };
+        done("Collection deleted.");
     }
 
     const title = !editing
@@ -238,162 +211,111 @@ export function CollectionSheet({
 
     return (
         <>
-            <Sheet open={open} onOpenChange={requestClose}>
-                <SheetContent
-                    className="flex w-full flex-col gap-0 p-0 outline-none sm:max-w-[460px]"
-                    onOpenAutoFocus={(e) => {
-                        e.preventDefault();
-                        (e.currentTarget as HTMLElement | null)?.focus();
-                    }}
-                >
-                    <SheetHeader className="space-y-0 border-b border-border py-3.5 pl-[18px] pr-14 text-left">
-                        <p className="text-[11.5px] text-muted-foreground">
-                            Collection
-                        </p>
-                        <SheetTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                            {title}
-                        </SheetTitle>
-                        <SheetDescription className="sr-only">
-                            A collection groups products into a set people
-                            browse.
-                        </SheetDescription>
-                    </SheetHeader>
-                    <form
-                        className="flex min-h-0 flex-1 flex-col"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            void save();
-                        }}
-                    >
-                        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-[18px] pb-5 pt-4">
-                            <SheetNotices
-                                canWrite={canWrite}
-                                loading={loading}
-                                loadError={loadError}
+            <FormSheet
+                open={open}
+                eyebrow="Collection"
+                title={title}
+                description={
+                    canWrite
+                        ? "A collection groups products into a set people browse."
+                        : "A set of products people browse together."
+                }
+                pending={saving}
+                dirty={canWrite ? dirty : false}
+                fieldsClassName="gap-5"
+                saveLabel={editing ? "Save" : "Create collection"}
+                savingLabel={editing ? "Saving…" : "Creating…"}
+                saveOff={loading || !!loadError}
+                doneOnly={!canWrite}
+                doneLabel="Close"
+                extra={
+                    editing && canWrite && detail ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setAskDelete(true)}
+                            disabled={saving}
+                        >
+                            Delete
+                        </Button>
+                    ) : null
+                }
+                onClose={() => onOpenChange(false)}
+                onSubmit={() => save()}
+            >
+                <SheetNotices
+                    canWrite={canWrite}
+                    loading={loading}
+                    loadError={loadError}
+                />
+                {loading || loadError ? null : (
+                    <>
+                        <NameField
+                            value={values.name}
+                            onChange={(v) => set("name", v)}
+                            disabled={readOnly}
+                            error={errors.name}
+                        />
+                        <DescriptionField
+                            value={values.description}
+                            onChange={(v) => set("description", v)}
+                            disabled={readOnly}
+                            error={errors.description}
+                        />
+
+                        <KindChoice
+                            value={values.kind}
+                            onChange={(k) => set("kind", k)}
+                            locked={editing}
+                            disabled={readOnly}
+                        />
+
+                        {values.kind === "AUTOMATIC" ? (
+                            <CategoryField
+                                categories={categories}
+                                value={values.categoryId}
+                                onChange={(v) => set("categoryId", v)}
+                                disabled={readOnly}
+                                error={errors.categoryId}
                             />
-                            {loading || loadError ? null : (
-                                <>
-                                    <NameField
-                                        value={values.name}
-                                        onChange={(v) => set("name", v)}
-                                        disabled={readOnly}
-                                        error={errors.name}
-                                    />
-                                    <DescriptionField
-                                        value={values.description}
-                                        onChange={(v) => set("description", v)}
-                                        disabled={readOnly}
-                                        error={errors.description}
-                                    />
-
-                                    <KindChoice
-                                        value={values.kind}
-                                        onChange={(k) => set("kind", k)}
-                                        locked={editing}
-                                        disabled={readOnly}
-                                    />
-
-                                    {values.kind === "AUTOMATIC" ? (
-                                        <CategoryField
-                                            categories={categories}
-                                            value={values.categoryId}
-                                            onChange={(v) =>
-                                                set("categoryId", v)
-                                            }
-                                            disabled={readOnly}
-                                            error={errors.categoryId}
-                                        />
-                                    ) : (
-                                        <ProductsPicker
-                                            picked={values.productIds}
-                                            known={known}
-                                            onKnow={(p) =>
-                                                setKnown((m) =>
-                                                    new Map(m).set(p.id, p),
-                                                )
-                                            }
-                                            onChange={(next) =>
-                                                set("productIds", next)
-                                            }
-                                            hiddenCount={
-                                                detail?.hiddenCount ?? 0
-                                            }
-                                            disabled={readOnly}
-                                            error={errors.productIds}
-                                        />
-                                    )}
-
-                                    {web ? (
-                                        <div className="space-y-1">
-                                            <p className="text-[12.5px] font-medium">
-                                                Shown on the website
-                                            </p>
-                                            <p className="text-[12px] text-muted-foreground">
-                                                {web}
-                                            </p>
-                                        </div>
-                                    ) : null}
-                                </>
-                            )}
-                        </div>
-
-                        {confirming ? (
-                            <DiscardBar
-                                onDiscard={() => {
-                                    setConfirming(false);
-                                    onOpenChange(false);
-                                }}
-                                onKeep={() => setConfirming(false)}
+                        ) : (
+                            <ProductsPicker
+                                picked={values.productIds}
+                                known={known}
+                                onKnow={(p) =>
+                                    setKnown((m) => new Map(m).set(p.id, p))
+                                }
+                                onChange={(next) => set("productIds", next)}
+                                hiddenCount={detail?.hiddenCount ?? 0}
+                                disabled={readOnly}
+                                error={errors.productIds}
                             />
+                        )}
+
+                        {web ? (
+                            <div className="space-y-1">
+                                <p className="text-[12.5px] font-medium">
+                                    Shown on the website
+                                </p>
+                                <p className="text-[12px] text-muted-foreground">
+                                    {web}
+                                </p>
+                            </div>
                         ) : null}
-                        <SheetFooter className="flex flex-row flex-wrap items-center gap-2 border-t border-border px-[18px] py-3 sm:justify-start sm:space-x-0">
-                            <span className="flex-[1_1_120px]">
-                                {editing && canWrite && detail ? (
-                                    <Button
-                                        size="sm"
-                                        type="button"
-                                        variant="ghost"
-                                        className="text-destructive hover:text-destructive"
-                                        onClick={() => setAskDelete(true)}
-                                        disabled={saving}
-                                    >
-                                        Delete
-                                    </Button>
-                                ) : null}
-                            </span>
-                            <Button
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                onClick={() => requestClose(false)}
-                                disabled={saving}
-                            >
-                                {canWrite ? "Cancel" : "Close"}
-                            </Button>
-                            {canWrite ? (
-                                <Button
-                                    size="sm"
-                                    type="submit"
-                                    disabled={readOnly || !dirty}
-                                    busy={saving}
-                                    busyLabel="Saving…"
-                                >
-                                    {editing ? "Save" : "Create collection"}
-                                </Button>
-                            ) : null}
-                        </SheetFooter>
-                    </form>
-                </SheetContent>
-            </Sheet>
+                    </>
+                )}
+            </FormSheet>
             <ConfirmDialog
                 open={askDelete && open}
                 onOpenChange={(o) => {
                     if (!o) setAskDelete(false);
                 }}
-                title={`Delete “${before.name}”?`}
+                title={`Delete ${before.name || "this collection"}?`}
                 description="The collection goes. Its products stay as they are, on sale where they were. This cannot be undone."
                 confirmLabel="Delete collection"
-                onConfirm={() => void remove()}
+                keepLabel="Keep collection"
+                onConfirm={remove}
             />
         </>
     );

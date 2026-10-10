@@ -1,11 +1,6 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
+import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useState } from "react";
@@ -20,6 +15,7 @@ import {
     removalBody,
 } from "@/lib/contacts/removal";
 import type { RemovalPreview } from "@/lib/contacts/service";
+
 /**
  * "Remove their details (privacy request)…" (DEC-042, C11), after the
  * dialog in Saroh Customer Detail: what goes, that their orders stay, and
@@ -49,6 +45,7 @@ export function RemoveDetailsDialog({
     const [typed, setTyped] = useState("");
     const [removing, setRemoving] = useState(false);
     const [failure, setFailure] = useState<string | null>(null);
+    const [tried, setTried] = useState(false);
 
     // Read on opening (the screen mounts the dialog when it opens), and
     // again on Try again.
@@ -74,6 +71,7 @@ export function RemoveDetailsDialog({
     const canRemove = !!preview && refused.length === 0 && matches;
 
     async function remove() {
+        setTried(true);
         if (!canRemove || removing) return;
         setRemoving(true);
         setFailure(null);
@@ -87,117 +85,98 @@ export function RemoveDetailsDialog({
     }
 
     return (
-        <AlertDialog
+        <FormDialog
             open={open}
-            onOpenChange={(o) => {
-                if (removing) return;
-                onOpenChange(o);
-            }}
+            size="md"
+            title={`Remove ${name}'s details?`}
+            description={
+                preview
+                    ? removalBody(preview)
+                    : "Their name, email, phone and address are removed. This cannot be undone."
+            }
+            pending={removing}
+            tone="destructive"
+            cancelLabel="Keep details"
+            saveLabel="Remove details"
+            savingLabel="Removing…"
+            saveOff={!preview || refused.length > 0}
+            fieldsClassName="block"
+            onClose={() => onOpenChange(false)}
+            onSubmit={remove}
         >
-            <AlertDialogContent className="block max-w-[440px] gap-0 rounded-[14px] px-[22px] py-5 sm:rounded-[14px]">
-                <AlertDialogTitle className="font-display text-[18px] font-semibold">
-                    Remove {name}&apos;s details?
-                </AlertDialogTitle>
-                <AlertDialogDescription className="mt-[7px] text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                    {preview
-                        ? removalBody(preview)
-                        : "Their name, email, phone and address are removed and cannot be brought back."}
-                </AlertDialogDescription>
-
-                {readFailed ? (
-                    <div
-                        role="alert"
-                        className="mt-3.5 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
-                    >
-                        <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
-                            {readFailed} Nothing has changed.
-                        </span>
-                        <Button
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                                setReadFailed(null);
-                                setAttempt((n) => n + 1);
-                            }}
-                        >
-                            Try again
-                        </Button>
-                    </div>
-                ) : !preview ? (
-                    <p
-                        role="status"
-                        className="mt-3.5 text-[12.5px] text-muted-foreground"
-                    >
-                        Checking what would go…
-                    </p>
-                ) : refused.length ? (
-                    <div
-                        role="note"
-                        className="mt-3.5 rounded-[10px] bg-destructive-subtle px-[13px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {refused.map((r) => (
-                            <p key={r.message}>{asSentence(r.message)}</p>
-                        ))}
-                    </div>
-                ) : null}
-
-                <label
-                    htmlFor={inputId}
-                    className="mt-3.5 block text-[12.5px] font-medium"
+            {readFailed ? (
+                <div
+                    role="alert"
+                    className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
                 >
-                    Type {name} to confirm
-                </label>
-                <Input
-                    id={inputId}
-                    type="text"
-                    value={typed}
-                    onChange={(e) => setTyped(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                            e.preventDefault();
-                            void remove();
-                        }
-                    }}
-                    aria-label="Type the customer's name to confirm"
-                    autoComplete="off"
-                    spellCheck={false}
-                    disabled={removing || refused.length > 0}
-                    className="mt-1.5 px-2.5"
-                />
-
-                {failure ? (
-                    <p
-                        role="alert"
-                        className="mt-3 text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {failure}
-                    </p>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
+                        {readFailed} Nothing has changed.
+                    </span>
                     <Button
                         size="sm"
                         type="button"
                         variant="outline"
-                        disabled={removing}
-                        onClick={() => onOpenChange(false)}
+                        onClick={() => {
+                            setReadFailed(null);
+                            setAttempt((n) => n + 1);
+                        }}
                     >
-                        Keep them
-                    </Button>
-                    <Button
-                        size="sm"
-                        type="button"
-                        variant="destructive"
-                        disabled={!canRemove}
-                        onClick={() => void remove()}
-                        busy={removing}
-                        busyLabel="Removing…"
-                    >
-                        Remove details
+                        Try again
                     </Button>
                 </div>
-            </AlertDialogContent>
-        </AlertDialog>
+            ) : !preview ? (
+                <p
+                    role="status"
+                    className="mt-3.5 text-[12.5px] text-muted-foreground"
+                >
+                    Checking what would go…
+                </p>
+            ) : refused.length ? (
+                <div
+                    role="note"
+                    className="mt-3.5 rounded-[10px] bg-destructive-subtle px-[13px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
+                >
+                    {refused.map((r) => (
+                        <p key={r.message}>{asSentence(r.message)}</p>
+                    ))}
+                </div>
+            ) : null}
+
+            <label
+                htmlFor={inputId}
+                className="mt-3.5 block text-[12.5px] font-medium"
+            >
+                Type {name} to confirm
+            </label>
+            <Input
+                id={inputId}
+                type="text"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                aria-invalid={(tried && !matches) || undefined}
+                aria-label="Type the customer's name to confirm"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={removing || refused.length > 0}
+                className="mt-1.5 px-2.5"
+            />
+
+            {tried && !matches && refused.length === 0 ? (
+                <p
+                    role="alert"
+                    className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
+                >
+                    Type {name} exactly to confirm.
+                </p>
+            ) : null}
+            {failure ? (
+                <p
+                    role="alert"
+                    className="mt-3 text-[12.5px] text-destructive-subtle-foreground"
+                >
+                    {failure}
+                </p>
+            ) : null}
+        </FormDialog>
     );
 }

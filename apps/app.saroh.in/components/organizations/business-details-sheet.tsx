@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
 import {
     Form,
     FormControl,
@@ -12,20 +11,19 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { Switch } from "@saroh/ui/switch";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { RegisteredAddressFields } from "@/components/organizations/registered-address-fields";
 import { registeredAddressShape } from "@/components/organizations/registered-address-shape";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
     BusinessDetail,
@@ -99,28 +97,20 @@ export function BusinessDetailsSheet({
     // reads in a business's words.
     const kind = onFile?.state === "ready" ? onFile.kind : undefined;
     return (
-        <Sheet
+        <FormSheet
             open={onFile !== null}
-            onOpenChange={(o) => (o ? null : onDone(false))}
+            title={detailsTitle(kind)}
+            description={detailsWhy(missing, then, kind)}
+            onClose={() => onDone(false)}
         >
-            <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-[440px]">
-                <div className="border-b border-border px-[18px] py-3.5">
-                    <SheetTitle className="font-display text-[18px] font-semibold">
-                        {detailsTitle(kind)}
-                    </SheetTitle>
-                    <SheetDescription className="mt-1 text-[12.5px] text-muted-foreground">
-                        {detailsWhy(missing, then, kind)}
-                    </SheetDescription>
-                </div>
-                {onFile ? (
-                    <DetailsBody
-                        onFile={onFile}
-                        continueLabel={continueLabel}
-                        onDone={onDone}
-                    />
-                ) : null}
-            </SheetContent>
-        </Sheet>
+            {onFile ? (
+                <DetailsBody
+                    onFile={onFile}
+                    continueLabel={continueLabel}
+                    onDone={onDone}
+                />
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -148,23 +138,16 @@ function DetailsBody({
         );
     }
     return (
-        <div className="flex flex-1 flex-col gap-3 px-[18px] py-4 text-[13px]">
-            <p role="alert" className="text-foreground">
-                {onFile.forbidden
-                    ? "Only an owner or an admin can add these. Ask one of them to add your business's registered address in Settings › Business."
-                    : onFile.message}
-            </p>
-            <div className="mt-auto flex justify-end border-t border-border pt-3">
-                <Button
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onDone(false)}
-                >
-                    Close
-                </Button>
-            </div>
-        </div>
+        <>
+            <FormSheetBody>
+                <p role="alert" className="text-[13px] text-foreground">
+                    {onFile.forbidden
+                        ? "Only an owner or an admin can add these. Ask one of them to add your business's registered address in Settings › Business."
+                        : onFile.message}
+                </p>
+            </FormSheetBody>
+            <FormSheetFoot doneOnly doneLabel="Close" />
+        </>
     );
 }
 
@@ -179,7 +162,6 @@ function DetailsForm({
     continueLabel: string;
     onDone: (saved: boolean) => void;
 }) {
-    const id = useId();
     const [refusal, setRefusal] = useState<string | null>(null);
     const schema = z
         .object({
@@ -225,18 +207,8 @@ function DetailsForm({
 
     return (
         <Form {...form}>
-            <form
-                id={id}
-                noValidate
-                onSubmit={(e) => {
-                    // Portalled, but React still bubbles a submit up its
-                    // tree: never into the form that opened the step.
-                    e.stopPropagation();
-                    void form.handleSubmit(onSubmit)(e);
-                }}
-                className="flex min-h-0 flex-1 flex-col"
-            >
-                <div className="flex flex-1 flex-wrap content-start gap-x-3 gap-y-3.5 overflow-y-auto px-[18px] py-4">
+            <>
+                <FormSheetBody className="flex flex-wrap content-start gap-x-3 gap-y-3.5">
                     <RegisteredAddressFields
                         control={form.control}
                         registered={registered}
@@ -300,34 +272,23 @@ function DetailsForm({
                             )}
                         />
                     ) : null}
-                </div>
-                {refusal ? (
-                    <p
-                        role="alert"
-                        className="border-t border-border bg-destructive-subtle px-[18px] py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {refusal}
-                    </p>
-                ) : null}
-                <div className="flex items-center justify-end gap-2 border-t border-border px-[18px] py-3">
-                    <Button
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={() => onDone(false)}
-                    >
-                        Not now
-                    </Button>
-                    <Button
-                        size="sm"
-                        type="submit"
-                        busy={saving}
-                        busyLabel="Saving…"
-                    >
-                        {continueLabel}
-                    </Button>
-                </div>
-            </form>
+                </FormSheetBody>
+                <FormSheetFoot
+                    saveLabel={continueLabel}
+                    pending={saving}
+                    note={
+                        refusal ? (
+                            <p
+                                role="alert"
+                                className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
+                            >
+                                {refusal}
+                            </p>
+                        ) : null
+                    }
+                    onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
+                />
+            </>
         </Form>
     );
 }

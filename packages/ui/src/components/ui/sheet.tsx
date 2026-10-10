@@ -114,7 +114,8 @@ function SheetHeader({
     return (
         <div
             className={cn(
-                "flex flex-col space-y-2 text-center sm:text-left",
+                // Clear of the close button, on a phone too.
+                "flex flex-col space-y-2 pr-8 text-left",
                 className,
             )}
             {...props}
@@ -123,6 +124,7 @@ function SheetHeader({
 }
 SheetHeader.displayName = "SheetHeader";
 
+/** As `DialogFooter`: the way out, then the sheet's button, with a gap. */
 function SheetFooter({
     className,
     ...props
@@ -130,7 +132,7 @@ function SheetFooter({
     return (
         <div
             className={cn(
-                "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+                "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
                 className,
             )}
             {...props}
@@ -145,7 +147,10 @@ const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <SheetPrimitive.Title
         ref={ref}
-        className={cn("text-lg font-semibold text-foreground", className)}
+        className={cn(
+            "font-display text-lg font-semibold leading-tight tracking-[-0.02em] text-foreground",
+            className,
+        )}
         {...props}
     />
 ));

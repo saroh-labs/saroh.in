@@ -306,8 +306,7 @@ test.describe("phone reflow: Customer Detail", () => {
             name: "Merge with a duplicate",
         });
         const merge = dialog.getByRole("button", {
-            name: "Merge",
-            exact: true,
+            name: "Merge records",
         });
         await expect(merge).toBeEnabled();
         await fitsAtPhoneWidths(
@@ -512,7 +511,7 @@ test.describe("phone reflow: New order", () => {
 });
 
 test.describe("phone reflow: invoices", () => {
-    test("the send confirm keeps Send it and Not now on the screen with a long email", async ({
+    test("the send confirm keeps Issue and send and Keep draft on the screen with a long email", async ({
         page,
     }, testInfo) => {
         await signIn(page);
@@ -549,12 +548,12 @@ test.describe("phone reflow: invoices", () => {
                 page,
                 confirm,
                 [
-                    confirm.getByRole("button", { name: "Send it" }),
-                    confirm.getByRole("button", { name: "Not now" }),
+                    confirm.getByRole("button", { name: "Issue and send" }),
+                    confirm.getByRole("button", { name: "Keep draft" }),
                 ],
                 "Send invoice",
             );
-            await confirm.getByRole("button", { name: "Not now" }).click();
+            await confirm.getByRole("button", { name: "Keep draft" }).click();
             await expect(confirm).toHaveCount(0);
         } finally {
             // A draft has no number: deleting it leaves nothing behind.

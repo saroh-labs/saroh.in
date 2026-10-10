@@ -6,6 +6,7 @@ import { PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { setProductStockTracking } from "@/lib/products/actions";
 import type { TrackingControl } from "@/lib/products/tracking";
@@ -47,24 +48,29 @@ export function TrackStockSwitch({
     const locked = control === "locked";
     const confirm = stopTrackingConfirm(productName);
 
-    function flip(next: boolean) {
+    function turnOn() {
         start(async () => {
-            const res = await setProductStockTracking(productId, next);
+            const res = await setProductStockTracking(productId, true);
             if (!res.ok) {
-                if (next) showError(res.error);
-                // "3 are promised to open orders — fulfil or cancel them
-                // first." The API counts every storefront.
-                else showError(TRACKING_STILL_ON, res.error);
+                showError(res.error);
                 return;
             }
-            if (next) {
-                showSuccess(TRACKING_ON_SAID, TRACKING_ON_NEXT);
-            } else {
-                onTurnedOff();
-                showSuccess(TRACKING_OFF_SAID);
-            }
+            showSuccess(TRACKING_ON_SAID, TRACKING_ON_NEXT);
             router.refresh();
         });
+    }
+
+    /** Asked first; a refusal stays in the confirm, with the reason. */
+    async function turnOff(): Promise<ConfirmResult> {
+        const res = await setProductStockTracking(productId, false);
+        if (!res.ok) {
+            // "3 are promised to open orders. Fulfil or cancel them
+            // first." The API counts every storefront.
+            return { ok: false, error: `${TRACKING_STILL_ON}. ${res.error}` };
+        }
+        onTurnedOff();
+        showSuccess(TRACKING_OFF_SAID);
+        router.refresh();
     }
 
     return (
@@ -78,7 +84,7 @@ export function TrackStockSwitch({
                 aria-label="Track stock for this product"
                 aria-busy={pending}
                 disabled={locked || pending}
-                onCheckedChange={(on) => (on ? flip(true) : setAsking(true))}
+                onCheckedChange={(on) => (on ? turnOn() : setAsking(true))}
             />
             <ConfirmDialog
                 open={asking}
@@ -87,10 +93,8 @@ export function TrackStockSwitch({
                 title={confirm.title}
                 description={confirm.description}
                 confirmLabel={confirm.confirmLabel}
-                onConfirm={() => {
-                    setAsking(false);
-                    flip(false);
-                }}
+                keepLabel={confirm.keepLabel}
+                onConfirm={turnOff}
             />
         </>
     );

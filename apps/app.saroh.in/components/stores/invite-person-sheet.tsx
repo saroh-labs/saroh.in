@@ -1,5 +1,6 @@
 "use client";
 
+import { useHold } from "@/components/shared/use-hold";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Form,
@@ -10,12 +11,11 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel } from "@/lib/stores/people";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -42,10 +42,12 @@ const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
  * Location team unless they're on it already (DEC-048, F16), which the
  * sheet says in a line.
  *
- * A refusal keeps the sheet open with what was typed: under the email when
- * the API names it, else in a toast. Sent, it closes and the page reads the
- * roster again, so the invitation shows under Invited. It is drawn in the
- * app's one sheet frame (`components/shared/settings-sheet-frame.tsx`): it
+ * An invite tells someone, so it waits ten seconds with Undo (`useHold`):
+ * the sheet closes, keeping what was typed, and a refusal or an Undo opens
+ * it again with that, the refusal under the email when the API names it.
+ * Sent, the page reads the roster again, so the invitation shows under
+ * Invited. It is drawn in the
+ * app's one sheet frame (`components/shared/form-sheet.tsx`): it
  * can't be dismissed while it is sending, Cancel, Escape and the close
  * button drop what was typed, and a press outside does nothing once an
  * email is typed.
@@ -67,32 +69,51 @@ export function InvitePersonSheet({
         defaultValues: { email: "", role: "VIEWER" },
     });
     const { isSubmitting } = form.formState;
+    const { send } = useHold();
 
     const close = () => {
         form.reset();
         onOpenChange(false);
     };
 
-    async function onSubmit(values: FormValues) {
-        const res = await inviteMember(storeId, values.email, values.role);
-        if (!res.ok) {
-            if (res.field === "email") {
-                form.setError("email", { message: res.error });
-            } else {
-                showError(res.error);
-            }
-            return;
-        }
-        showSuccess(
-            "Invitation sent. When they accept, they're also added to your team, as Location team.",
-        );
-        close();
-        router.refresh();
+    function onSubmit(values: FormValues) {
+        // What the API said about the address, for when it opens again.
+        let onEmail: string | null = null;
+        // Closed with what was typed kept: a refusal or an Undo needs it.
+        onOpenChange(false);
+        send(`location-invite:${storeId}:${values.email}`, {
+            description: `${values.email} is invited to ${locationName}.`,
+            run: async () => {
+                const res = await inviteMember(
+                    storeId,
+                    values.email,
+                    values.role,
+                );
+                if (res.ok) return { ok: true };
+                if (res.field === "email") onEmail = res.error;
+                return {
+                    ok: false,
+                    error: res.error,
+                    said: res.field === "email",
+                };
+            },
+            sent: `Sent to ${values.email}.`,
+            sentDescription:
+                "When they accept, they're also added to your team, as Location team.",
+            onSent: () => {
+                form.reset();
+                router.refresh();
+            },
+            onBack: () => {
+                onOpenChange(true);
+                if (onEmail) form.setError("email", { message: onEmail });
+            },
+        });
     }
 
     return (
         <Form {...form}>
-            <SettingsSheetFrame
+            <FormSheet
                 id="invite-person"
                 // Back to the button that opened it.
                 returnFocusTo="invite-someone"
@@ -147,7 +168,7 @@ export function InvitePersonSheet({
                     They also join your team as Location team, unless they are
                     on it already.
                 </p>
-            </SettingsSheetFrame>
+            </FormSheet>
         </Form>
     );
 }

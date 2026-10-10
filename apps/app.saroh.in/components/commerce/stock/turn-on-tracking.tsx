@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
 import { PackageCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
@@ -17,15 +17,12 @@ import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
 export function TurnOnTracking() {
     const router = useRouter();
     const [asking, setAsking] = useState(false);
-    const [pending, start] = useTransition();
     return (
         <>
             <Button
                 type="button"
                 className="mt-1.5"
                 onClick={() => setAsking(true)}
-                busy={pending}
-                busyLabel="Turning on…"
             >
                 Turn on Track stock
             </Button>
@@ -33,23 +30,20 @@ export function TurnOnTracking() {
                 open={asking}
                 onOpenChange={setAsking}
                 icon={PackageCheck}
-                title="Start counting stock?"
+                tone="neutral"
+                title="Turn on Track stock?"
                 description="Every product starts at 0 on every shelf, so it reads Sold out until you count it. Count stock straight after, from this screen."
                 confirmLabel="Turn on Track stock"
-                onConfirm={() =>
-                    start(async () => {
-                        const res = await setBusinessStockTracking(true);
-                        if (!res.ok) {
-                            showError(res.error);
-                            return;
-                        }
-                        showSuccess(
-                            "Saroh is counting stock now.",
-                            "Every shelf starts at 0 — count them to start selling.",
-                        );
-                        router.refresh();
-                    })
-                }
+                keepLabel="Keep it off"
+                onConfirm={async () => {
+                    const res = await setBusinessStockTracking(true);
+                    if (!res.ok) return { ok: false, error: res.error };
+                    showSuccess(
+                        "Track stock turned on.",
+                        "Every shelf starts at 0. Count them to start selling.",
+                    );
+                    router.refresh();
+                }}
             />
         </>
     );

@@ -224,22 +224,30 @@ export function CatalogueScreen({
                 : one
                   ? `${one.name} is on sale.`
                   : `${targets.length} products published.`;
-        showUndo(said, () => {
-            void Promise.all(
+        showUndo(said, async () => {
+            const back = await Promise.all(
                 before.map((r) => setProductStatus(r.id, r.was)),
-            ).then(() => reload());
+            );
+            await reload();
+            return back.every((r) => r.ok);
         });
     }
 
+    /** From its confirm, which waits for it. */
     async function confirmDelete() {
         const targets = pendingDelete ?? [];
-        setPendingDelete(null);
         const results = await Promise.all(
             targets.map((r) => deleteProduct(r.id)),
         );
         const failed = results.filter((r) => !r.ok).length;
+        const gone = targets.length - failed;
         if (failed > 0) {
             showError(`${failed} of ${targets.length} could not be deleted.`);
+        }
+        if (gone > 0) {
+            showSuccess(
+                gone === 1 ? "Product deleted." : `${gone} products deleted.`,
+            );
         }
         setOpenId(null);
         await reload();
@@ -434,7 +442,7 @@ export function CatalogueScreen({
                 }}
                 title={
                     pendingDelete?.length === 1
-                        ? `Delete “${pendingDelete[0]?.name ?? "this product"}”?`
+                        ? `Delete ${pendingDelete[0]?.name ?? "this product"}?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
                 description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
@@ -443,7 +451,12 @@ export function CatalogueScreen({
                         ? "Delete product"
                         : `Delete ${pendingDelete?.length ?? 0} products`
                 }
-                onConfirm={() => void confirmDelete()}
+                keepLabel={
+                    pendingDelete?.length === 1
+                        ? "Keep product"
+                        : "Keep products"
+                }
+                onConfirm={confirmDelete}
             />
         </div>
     );

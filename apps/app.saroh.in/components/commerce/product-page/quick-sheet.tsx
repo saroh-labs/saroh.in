@@ -1,31 +1,27 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+
+import { FormSheet } from "@/components/shared/form-sheet";
 
 /**
  * A quick edit over the product page: one section's fields, saved on their
- * own. Cancel discards at once; closing any other way — the X, the backdrop,
- * Escape — asks first when something changed, because those are the easy
- * ones to do by accident. "More in the full editor" opens the same section
- * with everything else around it.
+ * own. The app's one `FormSheet`, named by the product it belongs to: it
+ * closes, saves and hands the keyboard back by that frame's rules, so a
+ * stray press outside never drops what was typed and Cancel, Escape and
+ * the close button do, unasked.
+ *
+ * "More in the full editor" is the one link out. It stays because the
+ * rest of a product is a page of its own, not something a sheet can hold,
+ * and it is drawn as the quiet action at the far side of the foot.
  */
 export function QuickSheet({
     open,
     onOpenChange,
     productName,
     title,
+    description = "One part of this product. Nothing changes until you save.",
     fullEditorHref,
     moreLink,
     dirty,
@@ -39,6 +35,8 @@ export function QuickSheet({
     onOpenChange: (open: boolean) => void;
     productName: string;
     title: string;
+    /** One sentence: what saving changes. */
+    description?: string;
     /** "More in the full editor"; left out where the editor has no more. */
     fullEditorHref?: string;
     /** In its place, a link on to where the rest is managed. */
@@ -47,134 +45,47 @@ export function QuickSheet({
     saving: boolean;
     /** Why Save is off, or what saving will do — written, never a tooltip. */
     note?: ReactNode;
-    onSave: () => void;
+    onSave: () => void | Promise<void>;
+    /** Save waits on something in the sheet, such as an upload. */
     saveDisabled?: boolean;
     children: ReactNode;
 }) {
-    const [confirming, setConfirming] = useState(false);
-
-    function requestClose(next: boolean) {
-        if (next) return onOpenChange(true);
-        if (saving) return;
-        if (dirty) {
-            setConfirming(true);
-            return;
-        }
-        onOpenChange(false);
-    }
-
     return (
-        <Sheet open={open} onOpenChange={requestClose}>
-            <SheetContent
-                className="flex w-full flex-col gap-0 p-0 outline-none sm:max-w-[460px]"
-                // Focus lands on the sheet, not its first control, so
-                // nothing opens already ringed; Tab moves in from there.
-                onOpenAutoFocus={(e) => {
-                    e.preventDefault();
-                    (e.currentTarget as HTMLElement | null)?.focus();
-                }}
-            >
-                <SheetHeader className="space-y-0 border-b border-border py-3.5 pl-[18px] pr-14 text-left">
-                    <p className="text-[11.5px] text-muted-foreground">
-                        {productName}
-                    </p>
-                    <SheetTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                        {title}
-                    </SheetTitle>
-                    <SheetDescription className="sr-only">
-                        Changes here save on their own when you press Save.
-                    </SheetDescription>
-                </SheetHeader>
-                <form
-                    className="flex min-h-0 flex-1 flex-col"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        onSave();
-                    }}
-                >
-                    <div
-                        className={cn(
-                            "min-h-0 flex-1 overflow-y-auto px-[18px] pb-5 pt-4",
-                            // The sheet's own scale, a step under a page form:
-                            // 12.5px labels, 11.5px help, 36px fields.
-                            "[&_label]:text-[12.5px] [&_label]:font-medium [&_legend]:text-[12.5px] [&_legend]:font-medium",
-                            "[&_[id$=-form-item-description]]:text-[11.5px] [&_[id$=-form-item-description]]:leading-[1.5]",
-                            "[&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-[8px] [&_button[role=combobox]]:text-[13px] [&_input:not([type=checkbox]):not([type=radio])]:h-9 [&_input]:rounded-[8px] [&_input]:text-[13px] [&_textarea]:rounded-[8px] [&_textarea]:text-[13px] [&_textarea]:leading-[1.55]",
-                        )}
+        <FormSheet
+            open={open}
+            eyebrow={productName}
+            title={title}
+            description={description}
+            pending={saving}
+            dirty={dirty}
+            saveOff={saveDisabled ?? false}
+            fieldsClassName="block"
+            footNote={
+                note ? (
+                    <p
+                        role="status"
+                        className="text-[12.5px] text-muted-foreground"
                     >
-                        {children}
-                    </div>
-                    {confirming ? (
-                        <div
-                            role="alert"
-                            className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5 text-[12.5px] text-brand-subtle-foreground"
-                        >
-                            <span className="flex-[1_1_180px]">
-                                You have changes that are not saved.
-                            </span>
-                            <Button
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => {
-                                    setConfirming(false);
-                                    onOpenChange(false);
-                                }}
-                            >
-                                Discard
-                            </Button>
-                            <Button
-                                size="sm"
-                                type="button"
-                                onClick={() => setConfirming(false)}
-                            >
-                                Keep editing
-                            </Button>
-                        </div>
-                    ) : null}
-                    <SheetFooter className="flex flex-row flex-wrap items-center gap-2 border-t border-border px-[18px] py-3 sm:justify-start sm:space-x-0">
-                        {fullEditorHref || moreLink ? (
-                            <Link
-                                href={fullEditorHref ?? moreLink?.href ?? ""}
-                                className="flex-[1_1_150px] text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                            >
-                                {fullEditorHref
-                                    ? "More in the full editor"
-                                    : moreLink?.label}
-                            </Link>
-                        ) : (
-                            <span className="flex-[1_1_150px]" />
-                        )}
-                        {note ? (
-                            <span
-                                role="status"
-                                className="text-[12px] text-muted-foreground"
-                            >
-                                {note}
-                            </span>
-                        ) : null}
-                        <Button
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            disabled={saving}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            size="sm"
-                            type="submit"
-                            disabled={(saveDisabled ?? false) || !dirty}
-                            busy={saving}
-                            busyLabel="Saving…"
-                        >
-                            Save
-                        </Button>
-                    </SheetFooter>
-                </form>
-            </SheetContent>
-        </Sheet>
+                        {note}
+                    </p>
+                ) : null
+            }
+            extra={
+                fullEditorHref || moreLink ? (
+                    <Link
+                        href={fullEditorHref ?? moreLink?.href ?? ""}
+                        className="text-[12.5px] text-foreground underline underline-offset-4 transition-colors hover:decoration-2 active:text-muted-foreground coarse:flex coarse:min-h-11 coarse:items-center"
+                    >
+                        {fullEditorHref
+                            ? "More in the full editor"
+                            : moreLink?.label}
+                    </Link>
+                ) : null
+            }
+            onClose={() => onOpenChange(false)}
+            onSubmit={() => onSave()}
+        >
+            {children}
+        </FormSheet>
     );
 }

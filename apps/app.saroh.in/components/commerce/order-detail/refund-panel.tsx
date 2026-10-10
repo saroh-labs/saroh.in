@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -41,20 +40,7 @@ export interface RefundChoice {
      * line, so nothing comes back to the shelf. Null: the lines decide.
      */
     goodwill: string | null;
-}
-
-/** The reasons a refund can give, behind "Choose a reason". */
-const WHY: { value: RefundReason | ""; label: string }[] = [
-    { value: "", label: "Choose a reason" },
-    ...REFUND_REASONS,
-];
-
-/** What happens to the units that come back. */
-const STOCK: { value: "back" | "off"; label: string }[] = [
-    { value: "back", label: "Put back in stock" },
-    { value: "off", label: "Write off" },
-];
-/**
+} /**
  * "What are you refunding?" — tick lines; every line refunds the order in
  * full, delivery too. Each line refunds what is left of it. Or type another
  * amount — late, a goodwill gesture — which refunds just that, needs a
@@ -182,15 +168,17 @@ function RefundDraft({
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
-                        <OptionSelect
+                        <OptionSelect<RefundReason | "">
                             size="sm"
                             value={reason}
                             onValueChange={setReason}
-                            options={WHY}
+                            placeholder="Choose a reason"
+                            options={REFUND_REASONS}
                             aria-invalid={needsWhy || undefined}
                             aria-describedby={
                                 needsWhy ? `${ids}-why-help` : undefined
                             }
+                            className="w-full min-w-[150px]"
                         />
                     </label>
                     {reason === "other" ? (
@@ -230,17 +218,46 @@ function RefundDraft({
                     {putBackUnits > 0 ? (
                         <label className="grid gap-1 text-[12px] font-medium">
                             Stock
-                            <OptionSelect
+                            <OptionSelect<"back" | "off">
                                 size="sm"
                                 value={stock}
                                 onValueChange={setStock}
-                                options={STOCK}
+                                options={[
+                                    {
+                                        value: "back",
+                                        label: "Put back in stock",
+                                    },
+                                    { value: "off", label: "Write off" },
+                                ]}
+                                className="w-full min-w-[150px]"
                             />
                         </label>
                     ) : null}
                 </div>
             </OrderSheetBody>
             <OrderSheetFoot
+                tone="destructive"
+                saveLabel={`Refund ${format(amount)}`}
+                savingLabel="Refunding…"
+                saveOff={off}
+                onSubmit={() =>
+                    onRefund({
+                        lines: goodwill
+                            ? null
+                            : all
+                              ? null
+                              : open
+                                    .filter((l) => picked[l.id])
+                                    .map((l) => ({
+                                        itemId: l.id,
+                                        quantity: refundableQuantity(l),
+                                    })),
+                        putBack: stock === "back" ? canPutBack : [],
+                        amount,
+                        reason: why,
+                        goodwill: goodwill ? goodwill.money : null,
+                    })
+                }
                 note={
                     <>
                         {typedAmount.kind === "bad" ? (
@@ -262,7 +279,7 @@ function RefundDraft({
                         <p className="text-[12px] text-muted-foreground">
                             {how}
                             {goodwill
-                                ? " Only this amount goes back; the items stay sold."
+                                ? " Only this amount goes back. The items stay sold."
                                 : shipping > 0
                                   ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
                                   : ""}
@@ -272,33 +289,7 @@ function RefundDraft({
                         </p>
                     </>
                 }
-            >
-                <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={off}
-                    onClick={() =>
-                        onRefund({
-                            lines: goodwill
-                                ? null
-                                : all
-                                  ? null
-                                  : open
-                                        .filter((l) => picked[l.id])
-                                        .map((l) => ({
-                                            itemId: l.id,
-                                            quantity: refundableQuantity(l),
-                                        })),
-                            putBack: stock === "back" ? canPutBack : [],
-                            amount,
-                            reason: why,
-                            goodwill: goodwill ? goodwill.money : null,
-                        })
-                    }
-                >
-                    Refund {format(amount)}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

@@ -227,9 +227,9 @@ export function ChangePlanDialog({
                     }
                 }}
             >
-                <DialogContent className="max-w-[480px]">
-                    <DialogHeader className="text-left">
-                        <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                <DialogContent size="md">
+                    <DialogHeader>
+                        <DialogTitle>
                             {still
                                 ? "Razorpay hasn't told us yet"
                                 : "Confirming your payment…"}
@@ -254,7 +254,7 @@ export function ChangePlanDialog({
                         </div>
                     )}
                     {still ? (
-                        <DialogFooter className="gap-2 sm:space-x-0">
+                        <DialogFooter>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -286,9 +286,9 @@ export function ChangePlanDialog({
                 if (!open && !pending) onClose();
             }}
         >
-            <DialogContent className="max-w-[480px]">
-                <DialogHeader className="text-left">
-                    <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+            <DialogContent size="md">
+                <DialogHeader>
+                    <DialogTitle>
                         {summary?.title ?? `Change to ${picked?.name ?? ""}`}
                     </DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
@@ -398,7 +398,7 @@ export function ChangePlanDialog({
                     </details>
                 ) : null}
 
-                <DialogFooter className="gap-2 sm:space-x-0">
+                <DialogFooter>
                     <Button
                         type="button"
                         variant="outline"

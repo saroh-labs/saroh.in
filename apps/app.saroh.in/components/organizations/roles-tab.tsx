@@ -1,28 +1,22 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
 import { Info, Lock, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { FailedRead } from "@/components/shared/failed-read";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
@@ -92,7 +86,7 @@ export function RolesTab({
     builtInPlain: Record<string, string>;
     /**
      * The plan leaves roles of your own off (UX-030): the way up stands
-     * where New role would, rather than a dialog the API refuses.
+     * where New role would, rather than a sheet the API refuses.
      */
     rolesLock?: RolesLock | null;
 }) {
@@ -197,7 +191,7 @@ export function RolesTab({
             />
 
             {canEdit && !rolesLock ? (
-                <NewRoleDialog
+                <NewRoleSheet
                     open={creating}
                     onOpenChange={setCreating}
                     roles={roles}
@@ -298,12 +292,11 @@ function RoleRow({
 }
 
 /**
- * One role, and what it may do.
+ * One role, and what it may do: read here, changed in a side sheet.
  *
- * The draft lives here and only here: the tab remounts this per role, so
- * switching roles mid-edit discards the draft rather than carrying ticks from
- * one role onto another. That is also why "Undo" is enough — there is never
- * more than one role's worth of unsaved change on screen.
+ * The panel shows the role as it is saved. "Edit role" opens `RoleSheet`
+ * with its name and its ticks, and nothing changes until its Save, so
+ * switching roles never carries a half-made change along.
  */
 function RoleDetail({
     role,
@@ -331,75 +324,23 @@ function RoleDetail({
         return c ? [c.label] : [];
     });
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
-    const [label, setLabel] = useState(role.label);
-    const [granted, setGranted] = useState<ReadonlySet<string>>(
-        () => new Set(role.actions),
-    );
+    // Which opening of the sheet this is: each one is a fresh draft.
+    const [editing, setEditing] = useState(0);
+    const [sheetOpen, setSheetOpen] = useState(false);
     const [confirmRemove, setConfirmRemove] = useState(false);
-
     const saved = useMemo(() => new Set(role.actions), [role.actions]);
-    const labelChanged = label.trim() !== role.label;
-    const actionsChanged =
-        granted.size !== saved.size ||
-        Array.from(granted).some((a) => !saved.has(a));
-    const dirty = canEdit && (labelChanged || actionsChanged);
 
-    const byGroup = useMemo(() => {
-        const groups = new Map<string, Capability[]>();
-        for (const c of catalogue?.capabilities ?? []) {
-            const list = groups.get(c.group) ?? [];
-            list.push(c);
-            groups.set(c.group, list);
-        }
-        return (catalogue?.groups ?? []).flatMap((g) => {
-            const capabilities = groups.get(g);
-            return capabilities ? [{ group: g, capabilities }] : [];
-        });
-    }, [catalogue]);
-
-    const toggle = (action: string, on: boolean) =>
-        setGranted((prev) => {
-            const next = new Set(prev);
-            if (on) next.add(action);
-            else next.delete(action);
-            return next;
-        });
-
-    const save = () =>
-        startTransition(async () => {
-            const res = await updateRole(role.key, {
-                ...(labelChanged ? { label: label.trim() } : {}),
-                ...(actionsChanged ? { actions: Array.from(granted) } : {}),
-            });
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            showSuccess(`${res.data.label} saved`);
-            router.refresh();
-        });
-
-    const remove = () =>
-        startTransition(async () => {
-            const res = await deleteRole(role.key);
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            showSuccess(`${role.label} removed`);
-            setConfirmRemove(false);
-            onRemoved();
-            router.refresh();
-        });
+    async function remove(): Promise<ConfirmResult> {
+        const res = await deleteRole(role.key);
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess("Role removed.");
+        onRemoved();
+        router.refresh();
+    }
 
     const held = role.members;
 
     return (
-        /* `overflow-clip`, not `overflow-hidden`: both clip the rounded
-           corners, but `hidden` also makes this a scroll container, and a
-           sticky footer inside a scroll container sticks to IT — which never
-           scrolls — so the save bar would sit at the very end of the list. */
         <div className="min-w-0 flex-[1_1_420px] overflow-clip rounded-xl border border-border">
             <div className="border-b border-muted px-4 py-3.5">
                 <div className="flex flex-wrap items-center gap-[11px]">
@@ -420,18 +361,6 @@ function RoleDetail({
                 <p className="mt-[9px] text-[12.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
                     {blurb}
                 </p>
-                {canEdit ? (
-                    <div className="mt-3 grid max-w-[340px] gap-1.5">
-                        <Label htmlFor={`role-name-${role.key}`}>Name</Label>
-                        <Input
-                            id={`role-name-${role.key}`}
-                            value={label}
-                            onChange={(e) => setLabel(e.target.value)}
-                            maxLength={40}
-                            disabled={pending}
-                        />
-                    </div>
-                ) : null}
             </div>
 
             {catalogue === null ? (
@@ -442,85 +371,15 @@ function RoleDetail({
                 />
             ) : (
                 <div className="px-4 pb-3.5 pt-1.5">
-                    {byGroup.map(({ group, capabilities }) => {
-                        const on = capabilities.filter((c) =>
-                            granted.has(c.action),
-                        ).length;
-                        return (
-                            <section key={group} className="pt-3">
-                                <div className="flex items-baseline justify-between pb-1.5">
-                                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                        {GROUP_LABEL[group] ?? group}
-                                    </h3>
-                                    <span className="text-[11px] tabular-nums text-muted-foreground">
-                                        {on} of {capabilities.length}
-                                    </span>
-                                </div>
-                                {capabilities.map((c) => {
-                                    const checked = granted.has(c.action);
-                                    const id = `perm-${role.key}-${c.action}`;
-                                    // Only on a role the viewer may edit: on
-                                    // any other every switch is locked, and
-                                    // the footer says why.
-                                    const notYours =
-                                        canEdit && !holds(c.action);
-                                    return (
-                                        <div
-                                            key={c.action}
-                                            className="flex items-center gap-3 border-t border-border py-[9px]"
-                                        >
-                                            <label
-                                                htmlFor={id}
-                                                className="min-w-0 flex-1"
-                                            >
-                                                <span className="block text-[13px]">
-                                                    {c.label}
-                                                </span>
-                                                {c.note ? (
-                                                    <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted-foreground">
-                                                        {c.note}
-                                                    </span>
-                                                ) : null}
-                                                {notYours ? (
-                                                    <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted-foreground">
-                                                        {NOT_YOURS_TO_GIVE}
-                                                    </span>
-                                                ) : null}
-                                            </label>
-                                            <Switch
-                                                id={id}
-                                                checked={checked}
-                                                disabled={
-                                                    !canEdit ||
-                                                    notYours ||
-                                                    pending
-                                                }
-                                                onCheckedChange={(v) =>
-                                                    toggle(c.action, v)
-                                                }
-                                                aria-label={`${c.label}, ${checked ? "allowed" : "not allowed"}`}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            </section>
-                        );
-                    })}
+                    <Permissions
+                        idPrefix={`perm-${role.key}`}
+                        catalogue={catalogue}
+                        granted={saved}
+                    />
                 </div>
             )}
 
-            {/* Sticky while the role can be edited: with fifty-odd permissions
-                in one column, "Save changes" was a long scroll away from the
-                tick that made it appear. Not sticky for a built-in, where the
-                footer is only an explanation and would just cover the list. */}
-            <div
-                className={cn(
-                    "flex flex-wrap items-center gap-3 border-t border-muted px-4 py-[13px]",
-                    canEdit && !role.system
-                        ? "sticky bottom-[var(--tab-bar-inset)] z-10 bg-card shadow-[0_-1px_0_hsl(var(--border)),0_-8px_16px_-12px_hsl(var(--foreground)/0.18)]"
-                        : "bg-foreground/[0.03]",
-                )}
-            >
+            <div className="flex flex-wrap items-center gap-3 border-t border-muted bg-foreground/[0.03] px-4 py-[13px]">
                 {role.system || !canEdit ? (
                     <>
                         <Info
@@ -541,13 +400,8 @@ function RoleDetail({
                             type="button"
                             variant="ghost"
                             className="text-destructive hover:text-destructive"
-                            disabled={pending || held > 0}
+                            disabled={held > 0}
                             onClick={() => setConfirmRemove(true)}
-                            title={
-                                held > 0
-                                    ? "Move the people who hold it to another role first."
-                                    : undefined
-                            }
                         >
                             Remove role
                         </Button>
@@ -558,49 +412,262 @@ function RoleDetail({
                                     : `Move the ${held} people who hold it first.`}
                             </span>
                         ) : null}
-                        <span className="ml-auto flex items-center gap-2">
-                            {dirty ? (
-                                <>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        disabled={pending}
-                                        onClick={() => {
-                                            setLabel(role.label);
-                                            setGranted(new Set(role.actions));
-                                        }}
-                                    >
-                                        Undo
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        disabled={label.trim().length === 0}
-                                        onClick={save}
-                                        busy={pending}
-                                        busyLabel="Saving…"
-                                    >
-                                        Save changes
-                                    </Button>
-                                </>
-                            ) : (
-                                <span className="text-[12.5px] text-muted-foreground">
-                                    No changes yet
-                                </span>
-                            )}
-                        </span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="ml-auto"
+                            disabled={catalogue === null}
+                            onClick={() => {
+                                setEditing((n) => n + 1);
+                                setSheetOpen(true);
+                            }}
+                        >
+                            Edit role
+                        </Button>
                     </>
                 )}
             </div>
 
+            {canEdit && catalogue && editing > 0 ? (
+                <RoleSheet
+                    key={editing}
+                    open={sheetOpen}
+                    role={role}
+                    catalogue={catalogue}
+                    holds={holds}
+                    onClose={() => setSheetOpen(false)}
+                />
+            ) : null}
             <ConfirmDialog
                 open={confirmRemove}
                 onOpenChange={setConfirmRemove}
                 title={`Remove ${role.label}?`}
-                description="Nobody holds it, so nobody loses anything. It can be made again later, but its ticks will not come back."
+                description="Nobody holds it, so nobody loses anything. It can be made again later, but its ticks will not come back. This cannot be undone."
                 confirmLabel="Remove role"
+                keepLabel="Keep role"
                 onConfirm={remove}
             />
         </div>
+    );
+}
+
+/**
+ * A role's permissions by group, each with its switch. Read-only without
+ * `onToggle` (the panel); in the sheet a permission the viewer lacks is
+ * locked with the reason beside it.
+ */
+function Permissions({
+    idPrefix,
+    catalogue,
+    granted,
+    holds,
+    pending = false,
+    onToggle,
+}: {
+    idPrefix: string;
+    catalogue: RoleCatalogue;
+    granted: ReadonlySet<string>;
+    holds?: (action: string) => boolean;
+    pending?: boolean;
+    onToggle?: (action: string, on: boolean) => void;
+}) {
+    const byGroup = useMemo(() => {
+        const groups = new Map<string, Capability[]>();
+        for (const c of catalogue.capabilities) {
+            const list = groups.get(c.group) ?? [];
+            list.push(c);
+            groups.set(c.group, list);
+        }
+        return catalogue.groups.flatMap((g) => {
+            const capabilities = groups.get(g);
+            return capabilities ? [{ group: g, capabilities }] : [];
+        });
+    }, [catalogue]);
+
+    return (
+        <>
+            {byGroup.map(({ group, capabilities }) => {
+                const on = capabilities.filter((c) =>
+                    granted.has(c.action),
+                ).length;
+                return (
+                    <section key={group} className="pt-3">
+                        <div className="flex items-baseline justify-between pb-1.5">
+                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                {GROUP_LABEL[group] ?? group}
+                            </h3>
+                            <span className="text-[11px] tabular-nums text-muted-foreground">
+                                {on} of {capabilities.length}
+                            </span>
+                        </div>
+                        {capabilities.map((c) => {
+                            const checked = granted.has(c.action);
+                            const id = `${idPrefix}-${c.action}`;
+                            const notYours =
+                                Boolean(onToggle) &&
+                                holds?.(c.action) === false;
+                            return (
+                                <div
+                                    key={c.action}
+                                    className="flex items-center gap-3 border-t border-border py-[9px]"
+                                >
+                                    <label
+                                        htmlFor={id}
+                                        className="min-w-0 flex-1"
+                                    >
+                                        <span className="block text-[13px]">
+                                            {c.label}
+                                        </span>
+                                        {c.note ? (
+                                            <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted-foreground">
+                                                {c.note}
+                                            </span>
+                                        ) : null}
+                                        {notYours ? (
+                                            <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted-foreground">
+                                                {NOT_YOURS_TO_GIVE}
+                                            </span>
+                                        ) : null}
+                                    </label>
+                                    <Switch
+                                        id={id}
+                                        checked={checked}
+                                        disabled={
+                                            !onToggle || notYours || pending
+                                        }
+                                        onCheckedChange={(v) =>
+                                            onToggle?.(c.action, v)
+                                        }
+                                        aria-label={`${c.label}, ${checked ? "allowed" : "not allowed"}`}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </section>
+                );
+            })}
+        </>
+    );
+}
+
+/**
+ * Edit a role of the business's own: its name and its ticks, in the one
+ * side sheet (`FormSheet`). Each opening is a fresh draft (a `key`), and
+ * nothing is saved until Save. A refusal stays in the sheet.
+ */
+function RoleSheet({
+    open,
+    role,
+    catalogue,
+    holds,
+    onClose,
+}: {
+    open: boolean;
+    role: Role;
+    catalogue: RoleCatalogue;
+    holds: (action: string) => boolean;
+    onClose: () => void;
+}) {
+    const router = useRouter();
+    const [pending, setPending] = useState(false);
+    const [label, setLabel] = useState(role.label);
+    const [tried, setTried] = useState(false);
+    const [refusal, setRefusal] = useState<string | null>(null);
+    const [granted, setGranted] = useState<ReadonlySet<string>>(
+        () => new Set(role.actions),
+    );
+    const saved = useMemo(() => new Set(role.actions), [role.actions]);
+    const labelChanged = label.trim() !== role.label;
+    const actionsChanged =
+        granted.size !== saved.size ||
+        Array.from(granted).some((a) => !saved.has(a));
+    const nameless = tried && label.trim().length === 0;
+
+    const toggle = (action: string, on: boolean) =>
+        setGranted((prev) => {
+            const next = new Set(prev);
+            if (on) next.add(action);
+            else next.delete(action);
+            return next;
+        });
+
+    async function save() {
+        setTried(true);
+        if (label.trim().length === 0) return;
+        setPending(true);
+        setRefusal(null);
+        const res = await updateRole(role.key, {
+            ...(labelChanged ? { label: label.trim() } : {}),
+            ...(actionsChanged ? { actions: Array.from(granted) } : {}),
+        });
+        setPending(false);
+        if (!res.ok) {
+            setRefusal(
+                res.error.trim()
+                    ? res.error
+                    : "The role couldn't be saved. Try again.",
+            );
+            return;
+        }
+        showSuccess("Role saved.");
+        onClose();
+        router.refresh();
+    }
+
+    return (
+        <FormSheet
+            wide
+            open={open}
+            title={`Edit ${role.label}`}
+            description="Its name, and what whoever holds it may do. It applies as soon as you save."
+            pending={pending}
+            dirty={labelChanged || actionsChanged}
+            fieldsClassName="gap-3"
+            onClose={onClose}
+            onSubmit={save}
+        >
+            <div className="grid gap-1.5">
+                <Label htmlFor={`role-name-${role.key}`}>Name</Label>
+                <Input
+                    id={`role-name-${role.key}`}
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    maxLength={40}
+                    disabled={pending}
+                    aria-invalid={nameless || undefined}
+                    aria-describedby={
+                        nameless ? `role-name-${role.key}-problem` : undefined
+                    }
+                />
+                {nameless ? (
+                    <p
+                        id={`role-name-${role.key}-problem`}
+                        role="alert"
+                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                    >
+                        A role needs a name.
+                    </p>
+                ) : null}
+            </div>
+            <div>
+                <Permissions
+                    idPrefix={`edit-perm-${role.key}`}
+                    catalogue={catalogue}
+                    granted={granted}
+                    holds={holds}
+                    pending={pending}
+                    onToggle={toggle}
+                />
+            </div>
+            {refusal ? (
+                <p
+                    role="alert"
+                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
+                >
+                    {refusal}
+                </p>
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -612,7 +679,7 @@ function RoleDetail({
  * Owner is not offered, because the one thing Owner has that nothing else may
  * — closing the business — is exactly what an invented role cannot be given.
  */
-function NewRoleDialog({
+function NewRoleSheet({
     open,
     onOpenChange,
     roles,
@@ -628,17 +695,24 @@ function NewRoleDialog({
     onCreated: (key: string) => void;
 }) {
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
+    const [pending, setPending] = useState(false);
     const [label, setLabel] = useState("");
     const [from, setFrom] = useState<string>("");
-    // Said in the dialog, always (UX-030): a refusal behind an open modal
+    const [tried, setTried] = useState(false);
+    // Said in the sheet, always (UX-030): a refusal behind an open overlay
     // read as nothing happening.
     const [error, setError] = useState<string | null>(null);
+    const nameless = tried && label.trim().length === 0;
 
     const reset = () => {
         setLabel("");
         setFrom("");
+        setTried(false);
         setError(null);
+    };
+    const close = () => {
+        onOpenChange(false);
+        reset();
     };
 
     // What the copy takes from the role it starts from: what may be granted
@@ -652,129 +726,111 @@ function NewRoleDialog({
     const actions = copyable.filter(holds);
     const leftOff = copyable.length - actions.length;
 
-    const create = () =>
-        startTransition(async () => {
-            setError(null);
-            const res = await createRole({ label: label.trim(), actions });
-            if (!res.ok) {
-                // Custom roles aren't in the plan (U13): the way up, from
-                // its own notice once this dialog is out of the way.
-                if (res.plan) {
-                    onOpenChange(false);
-                    reset();
-                    showPlanRefusal(res.plan);
-                    return;
-                }
-                setError(
-                    res.error.trim()
-                        ? res.error
-                        : "The role couldn't be created. Try again.",
-                );
+    async function create() {
+        setTried(true);
+        if (label.trim().length === 0) return;
+        setPending(true);
+        setError(null);
+        const res = await createRole({ label: label.trim(), actions });
+        setPending(false);
+        if (!res.ok) {
+            // Custom roles aren't in the plan (U13): the way up, from
+            // its own notice once this sheet is out of the way.
+            if (res.plan) {
+                close();
+                showPlanRefusal(res.plan);
                 return;
             }
-            showSuccess(`${res.data.label} created`);
-            onCreated(res.data.key);
-            onOpenChange(false);
-            reset();
-            router.refresh();
-        });
+            setError(
+                res.error.trim()
+                    ? res.error
+                    : "The role couldn't be created. Try again.",
+            );
+            return;
+        }
+        showSuccess("Role created.");
+        onCreated(res.data.key);
+        close();
+        router.refresh();
+    }
 
     return (
-        <Dialog
+        <FormSheet
             open={open}
-            onOpenChange={(next) => {
-                onOpenChange(next);
-                if (!next) reset();
-            }}
+            title="New role"
+            description="Name it for the job, then tick what it may do. Nobody holds it until you give it to someone."
+            pending={pending}
+            saveLabel="Create role"
+            savingLabel="Creating…"
+            fieldsClassName="gap-4"
+            onClose={close}
+            onSubmit={create}
         >
-            <DialogContent className="sm:max-w-[440px]">
-                <DialogHeader>
-                    <DialogTitle>New role</DialogTitle>
-                    <DialogDescription>
-                        Name it for the job, then tick what it may do. Nobody
-                        holds it until you give it to someone.
-                    </DialogDescription>
-                </DialogHeader>
-                <form
-                    className="grid gap-4"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        if (label.trim()) create();
-                    }}
-                >
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="new-role-name">Name</Label>
-                        <Input
-                            id="new-role-name"
-                            value={label}
-                            onChange={(e) => setLabel(e.target.value)}
-                            placeholder="Stock clerk"
-                            maxLength={40}
-                            autoFocus
+            <div className="grid gap-1.5">
+                <Label htmlFor="new-role-name">Name</Label>
+                <Input
+                    id="new-role-name"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder="Stock clerk"
+                    maxLength={40}
+                    disabled={pending}
+                    aria-invalid={nameless || undefined}
+                    aria-describedby={
+                        nameless ? "new-role-name-problem" : undefined
+                    }
+                />
+                {nameless ? (
+                    <p
+                        id="new-role-name-problem"
+                        role="alert"
+                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                    >
+                        A role needs a name.
+                    </p>
+                ) : null}
+            </div>
+            <fieldset className="grid gap-2">
+                <legend className="mb-1.5 text-sm font-medium">
+                    Start from
+                </legend>
+                {START_FROM.map((option) => (
+                    <label
+                        key={option.key || "blank"}
+                        className="flex cursor-pointer items-start gap-2.5 text-[13px] coarse:min-h-11 coarse:items-center"
+                    >
+                        <input
+                            type="radio"
+                            name="start-from"
+                            value={option.key}
+                            checked={from === option.key}
+                            onChange={() => setFrom(option.key)}
                             disabled={pending}
+                            className="mt-[3px] accent-foreground coarse:mt-0"
                         />
-                    </div>
-                    <fieldset className="grid gap-2">
-                        <legend className="mb-1.5 text-sm font-medium">
-                            Start from
-                        </legend>
-                        {START_FROM.map((option) => (
-                            <label
-                                key={option.key || "blank"}
-                                className="flex cursor-pointer items-start gap-2.5 text-[13px]"
-                            >
-                                <input
-                                    type="radio"
-                                    name="start-from"
-                                    value={option.key}
-                                    checked={from === option.key}
-                                    onChange={() => setFrom(option.key)}
-                                    disabled={pending}
-                                    className="mt-[3px] accent-foreground"
-                                />
-                                <span>{option.label}</span>
-                            </label>
-                        ))}
-                        <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
-                            A copy, not a link — changing this role later does
-                            not change the one it started from.
-                        </p>
-                        {leftOff > 0 ? (
-                            <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
-                                {leftOff === 1
-                                    ? "1 of its permissions is one you don't have, so it is left off."
-                                    : `${leftOff} of its permissions are ones you don't have, so they are left off.`}
-                            </p>
-                        ) : null}
-                    </fieldset>
-                    {error ? (
-                        <p
-                            role="alert"
-                            className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
-                        >
-                            {error}
-                        </p>
-                    ) : null}
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            disabled={pending}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={label.trim().length === 0}
-                            busy={pending}
-                            busyLabel="Creating…"
-                        >
-                            Create role
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
+                        <span>{option.label}</span>
+                    </label>
+                ))}
+                <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                    A copy, not a link. Changing this role later does not change
+                    the one it started from.
+                </p>
+                {leftOff > 0 ? (
+                    <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                        {leftOff === 1
+                            ? "1 of its permissions is one you don't have, so it is left off."
+                            : `${leftOff} of its permissions are ones you don't have, so they are left off.`}
+                    </p>
+                ) : null}
+            </fieldset>
+            {error ? (
+                <p
+                    role="alert"
+                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
+                >
+                    {error}
+                </p>
+            ) : null}
+        </FormSheet>
     );
 }
