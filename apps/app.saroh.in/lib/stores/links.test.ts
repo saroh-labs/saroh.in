@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import StorefrontDetailsPage from "@/app/(shell)/commerce/locations/[storeId]/details/page";
 
 import {
     storefrontDetailsHref,
@@ -6,6 +8,9 @@ import {
     storefrontPeopleHref,
 } from "./links";
 import { LOCATION_TABS } from "./location-readiness";
+
+const redirect = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ redirect }));
 
 /** Where a location's own screens live. Made-up ids only. */
 describe("a location's links", () => {
@@ -44,9 +49,21 @@ describe("a location's links", () => {
         ]);
     });
 
-    it("its description and logo keep their own page", () => {
+    it("its description and logo are a sheet on The place, opened by the address", () => {
         expect(storefrontDetailsHref("st_1")).toBe(
-            "/commerce/locations/st_1/details",
+            "/commerce/locations?storefront=st_1&edit=details",
+        );
+        expect(storefrontDetailsHref("a b")).toBe(
+            "/commerce/locations?storefront=a%20b&edit=details",
+        );
+    });
+
+    it("the old details page sends every link to it there", async () => {
+        await StorefrontDetailsPage({
+            params: Promise.resolve({ storeId: "st_1" }),
+        });
+        expect(redirect).toHaveBeenCalledWith(
+            "/commerce/locations?storefront=st_1&edit=details",
         );
     });
 });

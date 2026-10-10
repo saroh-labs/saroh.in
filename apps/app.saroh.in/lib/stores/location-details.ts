@@ -1,8 +1,8 @@
 /**
  * A location's description and logo, as The place says them in one row
  * ("Description and logo · Description added, no logo yet · Edit"). They
- * are edited on their own page (`storefrontDetailsHref`); the row only
- * says what is saved. Pure.
+ * are edited in the row's sheet (`storefrontDetailsHref` opens it); the
+ * row only says what is saved. Pure.
  */
 export interface LocationDetails {
     description: string | null;

@@ -24,6 +24,7 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: vi.fn(),
 }));
+vi.mock("@/lib/stores/actions", () => ({ updateStore: vi.fn() }));
 vi.mock("@/lib/members/actions", () => ({
     inviteMember: vi.fn(),
     removeMember: vi.fn(),
@@ -177,7 +178,7 @@ describe("StorefrontsScreen as a location's own page", () => {
         );
         const t = text(html);
         // Only the open tab is drawn.
-        expect(t).toContain("Location name");
+        expect(t).toContain("Customers come here");
         expect(t).not.toContain("Online payments");
         expect(t).not.toContain("Behaviour");
         expect(t).not.toContain("How orders leave");
@@ -212,22 +213,79 @@ describe("StorefrontsScreen as a location's own page", () => {
         }
     });
 
-    it("asks Do customers come here?, answered Yes or No", () => {
-        const t = text(screen());
-        expect(t).toContain("Do customers come here?");
-        expect(t).toContain("Yes, they visit");
-        expect(t).toContain("No, online only");
-        expect(t).toContain("Location address");
-        expect(t).toContain("Opening hours");
-        expect(t).toContain("Name the place, like “Hill Road”.");
+    it("The place reads first: a row for each thing saved, with no open field", () => {
+        const html = screen({
+            selected: {
+                ...hill,
+                openingHours: [
+                    "MON",
+                    "TUE",
+                    "WED",
+                    "THU",
+                    "FRI",
+                    "SAT",
+                    "SUN",
+                ].map((day) => ({
+                    day: day as "MON",
+                    open: "09:00",
+                    close: "18:00",
+                    closed: day === "SUN",
+                })),
+            },
+            details: { description: null, logo: null },
+        });
+        const t = text(panel(html));
+        expect(t).toContain("Name Hill Road Edit");
+        expect(t).toContain(
+            "Customers come here Yes, they visit It has an address and opening hours, and can offer pick-up. Change",
+        );
+        expect(t).toContain("Address 12 Hill Road, Bandra Edit");
+        expect(t).toContain("Opening hours Mon–Sat · 9:00 AM – 6:00 PM Edit");
+        expect(t).toContain(
+            "Description and logo No description or logo yet Edit",
+        );
+        // Nothing to type in until a row's Edit opens its sheet.
+        expect(panel(html)).not.toContain("<input");
+        expect(panel(html)).not.toContain("<textarea");
+        expect(panel(html)).not.toContain("<form");
+        expect(t).not.toContain("Save");
+        expect(t).not.toContain("Do customers come here?");
+        // Each Edit says what it edits, and that it opens a dialog.
+        for (const name of [
+            "Edit name",
+            "Change whether customers come here",
+            "Edit address",
+            "Edit opening hours",
+            "Edit description and logo",
+        ]) {
+            expect(panel(html)).toMatch(
+                new RegExp(
+                    `<button[^>]*aria-haspopup="dialog"[^>]*aria-label="${name}"`,
+                ),
+            );
+        }
     });
 
-    it("a No counter location asks no address or hours", () => {
-        const t = text(
-            screen({ storefronts: [summary(online)], selected: online }),
+    it("an address or hours still to add say so, and their button says what to do", () => {
+        const html = screen({ selected: { ...hill, address: null } });
+        const t = text(panel(html));
+        expect(t).toContain("Address No address yet Add address");
+        expect(t).toContain("Opening hours Not set yet Set hours");
+    });
+
+    it("a No counter location has no address or hours row", () => {
+        const html = screen({
+            storefronts: [summary(online)],
+            selected: online,
+        });
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Customers come here No, online only Its address and opening hours aren't shown, and it can't offer pick-up. Change",
         );
-        expect(t).not.toContain("Location address");
-        expect(t).not.toContain("Opening hours");
+        expect(html).not.toContain('id="location-address"');
+        expect(html).not.toContain('id="location-hours"');
+        expect(t).not.toContain("Opening hours ");
+        expect(t).not.toContain("No address yet");
     });
 
     it("no counter with Pick-up still on: offers turning it off right there", () => {
@@ -302,7 +360,7 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(html).toMatch(/aria-label="Breadcrumb"[^]*Locations/);
     });
 
-    it("The place says what is saved of the description and logo, with Edit to their page", () => {
+    it("The place says what is saved of the description and logo, with Edit to their sheet", () => {
         const html = screen({
             details: { description: "Sourdough since 2019", logo: null },
         });
@@ -310,8 +368,11 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(t).toContain(
             "Description and logo Description added, no logo yet Edit",
         );
-        expect(html).toContain('href="/commerce/locations/st_hill/details"');
-        expect(html).toContain('aria-label="Edit description and logo"');
+        // A button that opens a sheet, not a link away to a page.
+        expect(html).not.toContain("/details");
+        expect(html).toMatch(
+            /<button[^>]*id="location-details-edit"[^>]*aria-label="Edit description and logo"/,
+        );
         expect(t).not.toContain("Web address");
         expect(
             text(panel(screen({ details: { description: null, logo: null } }))),
@@ -330,8 +391,8 @@ describe("StorefrontsScreen as a location's own page", () => {
         });
         expect(text(html)).not.toContain("People who work here");
         expect(html).not.toContain("/people");
-        // One link to the details page: the row's Edit.
-        expect(html.match(/\/details"/g)).toHaveLength(1);
+        // Nor a link to a details page: the row's Edit is a sheet.
+        expect(panel(html)).not.toContain("<a ");
     });
 
     it("no location yet: says so, and offers Add a location", () => {
@@ -406,7 +467,7 @@ describe("the People tab", () => {
         expect(t).toContain("Try again");
         expect(panel(html)).toContain('role="alert"');
         // The other tabs are untouched by it.
-        expect(text(screen({ people: null }))).toContain("Location name");
+        expect(text(screen({ people: null }))).toContain("Customers come here");
     });
 });
 
@@ -658,13 +719,10 @@ describe("Delivery", () => {
         expect(text(html)).not.toContain("Add an address");
     });
 
-    it("the other Location tabs draw no card or visible title", () => {
-        for (const section of [
-            null,
-            "payments",
-            "customers",
-            "pause-or-close",
-        ]) {
+    it("the tabs without rows draw no card, and none a visible title", () => {
+        // The place, as Delivery, is one card of rows.
+        expect(panel(screen())).toMatch(/<h2[^>]*class="sr-only"/);
+        for (const section of ["payments", "customers", "pause-or-close"]) {
             const html = screen({}, section);
             expect(panel(html)).not.toMatch(/rounded-xl/);
             expect(html).toMatch(/<h2[^>]*class="sr-only"/);
@@ -673,13 +731,24 @@ describe("Delivery", () => {
 });
 
 describe("roles", () => {
-    it("read-only: says so, and offers no Save, Pause or in-page fixes", () => {
-        const html = screen({ canEdit: false, canClose: false });
+    it("read-only: says so, and offers no Edit, Pause or in-page fixes", () => {
+        const html = screen({
+            canEdit: false,
+            canClose: false,
+            selected: { ...hill, address: null },
+            details: { description: null, logo: null },
+        });
         const t = text(html);
         expect(t).toContain(
             "Your role can read these settings but not change them.",
         );
-        expect(t).not.toContain("Save hours");
+        // The rows, saying what is saved, with nothing to press.
+        expect(t).toContain("Name Hill Road");
+        expect(t).toContain("Address No address yet");
+        expect(t).toContain("Opening hours Not set yet");
+        expect(t).toContain("Description and logo No description or logo yet");
+        expect(panel(html)).not.toContain("<button");
+        expect(t).not.toContain("Add address");
         expect(t).not.toContain("Set hours");
         expect(tabsOf(html).names).not.toContain("Pause or close");
     });

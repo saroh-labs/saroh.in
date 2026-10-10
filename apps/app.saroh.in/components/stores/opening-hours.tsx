@@ -2,12 +2,19 @@
 
 import { Button } from "@saroh/ui/button";
 import { Switch } from "@saroh/ui/switch";
-import { formatTime, TimeSelect } from "@saroh/ui/time-select";
+import { TimeSelect } from "@saroh/ui/time-select";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
+import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { HOURS_FIELD_ID } from "@/lib/stores/location-readiness";
+import {
+    hoursBackwards,
+    isUniform,
+    SHORT_DAY,
+    weekSummary,
+} from "@/lib/stores/opening-hours-summary";
 import type { OpeningHoursDay, Weekday } from "@/lib/stores/storefronts";
 
 import { Note } from "./storefront-section";
@@ -23,22 +30,12 @@ const DAYS: { key: Weekday; label: string }[] = [
 ];
 
 /** A week to start from when a shop has never saved one. */
-const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
+export const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
     day: key,
     open: "09:00",
     close: "18:00",
     closed: key === "SUN",
 }));
-
-const SHORT: Record<Weekday, string> = {
-    MON: "Mon",
-    TUE: "Tue",
-    WED: "Wed",
-    THU: "Thu",
-    FRI: "Fri",
-    SAT: "Sat",
-    SUN: "Sun",
-};
 
 const PRESETS: { label: string; days: Weekday[] }[] = [
     { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
@@ -46,67 +43,28 @@ const PRESETS: { label: string; days: Weekday[] }[] = [
     { label: "Every day", days: DAYS.map((d) => d.key) },
 ];
 
-const sameHours = (a: OpeningHoursDay, b: OpeningHoursDay) =>
-    a.closed === b.closed &&
-    (a.closed || (a.open === b.open && a.close === b.close));
-
-/**
- * "Mon–Sat 9:00 AM – 6:00 PM · Sun closed": runs of neighbouring days with
- * the same hours, the way a shop writes them on its door.
- */
-function summarise(week: OpeningHoursDay[]): string {
-    const runs: { from: number; to: number; day: OpeningHoursDay }[] = [];
-    week.forEach((day, i) => {
-        const last = runs.at(-1);
-        if (last?.to === i - 1 && sameHours(last.day, day)) {
-            last.to = i;
-        } else {
-            runs.push({ from: i, to: i, day });
-        }
-    });
-    return runs
-        .map(({ from, to, day }) => {
-            const a = SHORT[week[from]?.day ?? "MON"];
-            const b = SHORT[week[to]?.day ?? "MON"];
-            const days = from === to ? a : `${a}–${b}`;
-            return day.closed
-                ? `${days} closed`
-                : `${days} ${formatTime(day.open)} – ${formatTime(day.close)}`;
-        })
-        .join(" · ");
-}
-
-/** Every open day on the same hours — the case for almost every shop. */
-function isUniform(week: OpeningHoursDay[]): boolean {
-    const open = week.filter((d) => !d.closed);
-    return open.every(
-        (d) => d.open === open[0]?.open && d.close === open[0]?.close,
-    );
-}
-
 /**
  * A shop's week, set the way a shop thinks about it: which days it opens and
  * the hours it keeps, once. Only a shop whose Saturday (say) runs short opens
  * the day-by-day list — and it starts there if its saved week already does.
  * Either way what is saved is the full seven days, so the receipt reads the
  * same.
+ *
+ * The fields alone: the week is the caller's draft and so is its Save (the
+ * "Opening hours" sheet's footer, in The place).
  */
-export function OpeningHours({
+export function OpeningHoursFields({
+    week,
+    setWeek,
     saved,
-    canEdit,
-    pending,
-    onSave,
 }: {
-    saved: OpeningHoursDay[] | null;
-    canEdit: boolean;
-    pending: boolean;
-    onSave: (week: OpeningHoursDay[]) => void;
+    week: OpeningHoursDay[];
+    setWeek: Dispatch<SetStateAction<OpeningHoursDay[]>>;
+    /** Whether a week has ever been saved, for the note under the fields. */
+    saved: boolean;
 }) {
-    const initial = saved ?? DEFAULT_WEEK;
-    const [week, setWeek] = useState<OpeningHoursDay[]>(initial);
-    const [eachDay, setEachDay] = useState(!isUniform(initial));
-    const dirty = JSON.stringify(week) !== JSON.stringify(initial);
-    const backwards = week.some((d) => !d.closed && d.open >= d.close);
+    const [eachDay, setEachDay] = useState(() => !isUniform(week));
+    const backwards = hoursBackwards(week);
 
     const openDays = week.filter((d) => !d.closed).map((d) => d.day);
     const preset = PRESETS.find(
@@ -146,34 +104,21 @@ export function OpeningHours({
     };
 
     return (
-        <form
-            id={HOURS_FIELD_ID}
-            className="grid scroll-mt-20 gap-3"
-            onSubmit={(e) => {
-                e.preventDefault();
-                if (!backwards) onSave(week);
-            }}
-        >
-            <div>
-                <p id="storefront-hours-label" className="text-sm font-medium">
-                    Opening hours
+        <div id={HOURS_FIELD_ID} className="grid gap-3">
+            {/* The controls already say it in the simple case; the line
+                earns its place when the week is day-by-day. */}
+            {eachDay ? (
+                <p className="text-[12.5px] tabular-nums text-muted-foreground">
+                    {openDays.length === 0
+                        ? "Closed every day"
+                        : weekSummary(week)}
                 </p>
-                {/* The controls already say it in the simple case; the line
-                    earns its place when the week is day-by-day, or when it
-                    is all a viewer who cannot edit gets to see. */}
-                {eachDay || !canEdit ? (
-                    <p className="mt-0.5 text-[12.5px] tabular-nums text-muted-foreground">
-                        {openDays.length === 0
-                            ? "Closed every day"
-                            : summarise(week)}
-                    </p>
-                ) : null}
-            </div>
+            ) : null}
 
             {eachDay ? (
                 <div
                     role="group"
-                    aria-labelledby="storefront-hours-label"
+                    aria-label="Opening hours, day by day"
                     className="overflow-hidden rounded-lg border border-border"
                 >
                     {week.map((d, i) => {
@@ -190,7 +135,6 @@ export function OpeningHours({
                                 <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                                     <Switch
                                         checked={!d.closed}
-                                        disabled={!canEdit}
                                         onCheckedChange={(isOpen) => {
                                             setDay(i, { closed: !isOpen });
                                         }}
@@ -204,7 +148,6 @@ export function OpeningHours({
                                     <span className="flex items-center gap-1.5">
                                         <TimeSelect
                                             value={d.open}
-                                            disabled={!canEdit}
                                             aria-label={`${label} opens`}
                                             aria-invalid={wrong || undefined}
                                             onValueChange={(open) => {
@@ -219,7 +162,6 @@ export function OpeningHours({
                                         </span>
                                         <TimeSelect
                                             value={d.close}
-                                            disabled={!canEdit}
                                             aria-label={`${label} closes`}
                                             aria-invalid={wrong || undefined}
                                             onValueChange={(close) => {
@@ -240,11 +182,12 @@ export function OpeningHours({
                     >
                         Days
                     </span>
-                    <div className="grid gap-2">
+                    <div className="grid min-w-0 gap-2">
                         {/* One control for "which days" — the same segmented
-                            style as Customers visit / No counter. The chips only
-                            appear for Custom, so the common answer is one
-                            click and the rare one is still there. */}
+                            style as Yes, they visit / No, online only. The
+                            chips only appear for Custom, so the common
+                            answer is one click and the rare one is still
+                            there. */}
                         <ToggleGroup
                             type="single"
                             value={daysChoice}
@@ -260,7 +203,6 @@ export function OpeningHours({
                                     setOpenDays(next.days);
                                 }
                             }}
-                            disabled={!canEdit}
                             aria-labelledby="storefront-open-days"
                             className={SEGMENTED}
                         >
@@ -282,7 +224,6 @@ export function OpeningHours({
                                 type="multiple"
                                 value={openDays}
                                 onValueChange={setOpenDays}
-                                disabled={!canEdit}
                                 aria-label="Open days"
                                 className="w-fit flex-wrap justify-start gap-1"
                             >
@@ -293,7 +234,7 @@ export function OpeningHours({
                                         aria-label={d.label}
                                         className="h-8 w-11 rounded-md border border-border text-[12.5px] font-medium text-muted-foreground data-[state=on]:border-foreground/50 data-[state=on]:bg-muted data-[state=on]:text-foreground coarse:h-11"
                                     >
-                                        {SHORT[d.key]}
+                                        {SHORT_DAY[d.key]}
                                     </ToggleGroupItem>
                                 ))}
                             </ToggleGroup>
@@ -307,7 +248,6 @@ export function OpeningHours({
                         <div className="flex flex-wrap items-center gap-1.5">
                             <TimeSelect
                                 value={shared.open}
-                                disabled={!canEdit}
                                 aria-label="Opens"
                                 aria-invalid={backwards || undefined}
                                 onValueChange={(open) => {
@@ -319,7 +259,6 @@ export function OpeningHours({
                             </span>
                             <TimeSelect
                                 value={shared.close}
-                                disabled={!canEdit}
                                 aria-label="Closes"
                                 aria-invalid={backwards || undefined}
                                 onValueChange={(close) => {
@@ -335,47 +274,41 @@ export function OpeningHours({
                 </div>
             )}
 
-            {canEdit ? (
-                <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto w-fit p-0 text-[12.5px] font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
-                    onClick={() => {
-                        if (eachDay) {
-                            // Back to one set of hours: every open day takes
-                            // the first open day's.
-                            setSharedHours({
-                                open: shared.open,
-                                close: shared.close,
-                            });
-                        }
-                        setEachDay(!eachDay);
-                    }}
-                >
-                    {eachDay
-                        ? "Use the same hours for every open day"
-                        : "Some days have different hours"}
-                </Button>
-            ) : null}
+            <Button
+                type="button"
+                variant="link"
+                className="h-auto w-fit p-0 text-[12.5px] font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
+                onClick={() => {
+                    if (eachDay) {
+                        // Back to one set of hours: every open day takes
+                        // the first open day's.
+                        setSharedHours({
+                            open: shared.open,
+                            close: shared.close,
+                        });
+                    }
+                    setEachDay(!eachDay);
+                }}
+            >
+                {eachDay
+                    ? "Use the same hours for every open day"
+                    : "Some days have different hours"}
+            </Button>
 
-            <Note>
-                {backwards
-                    ? "A day has to close after it opens."
-                    : saved
-                      ? "Shown on the receipt, in the location's own time."
-                      : canEdit
-                        ? "Not saved yet: a starting week. Save it to show it on receipts."
-                        : "Not saved yet, so receipts show no hours."}
-            </Note>
-            {canEdit && (dirty || !saved) ? (
-                <Button
-                    type="submit"
-                    disabled={pending || backwards}
-                    className="w-fit"
+            {backwards ? (
+                <p
+                    role="alert"
+                    className="text-pretty text-[12.5px] leading-[1.5] text-destructive"
                 >
-                    Save hours
-                </Button>
-            ) : null}
-        </form>
+                    A day has to close after it opens.
+                </p>
+            ) : (
+                <Note>
+                    {saved
+                        ? "Shown on the receipt, in the location's own time."
+                        : "Not saved yet: a starting week. Save it to show it on receipts."}
+                </Note>
+            )}
+        </div>
     );
 }

@@ -4,19 +4,19 @@ import { describe, expect, it, vi } from "vitest";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 
 import { CreateStoreForm } from "./create-store-form";
-import { StoreSettingsForm } from "./store-settings-form";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/lib/stores/actions", () => ({
     createStore: vi.fn(),
-    updateStore: vi.fn(),
 }));
 
 /**
  * A location has no "Web address" of its own (DEC-069, L14): the storefront
- * slug went nowhere. The business's web address is its website's.
+ * slug went nowhere. The business's web address is its website's. Its
+ * description and logo are a sheet on The place, checked for the same in
+ * `place-rows.test.tsx`.
  */
 
 const text = (html: string) =>
@@ -26,25 +26,6 @@ const text = (html: string) =>
         .replace(/\s+/g, " ");
 
 describe("the location forms have no Web address (L14)", () => {
-    it("the details form: name, description and logo only", () => {
-        const html = renderToStaticMarkup(
-            <StoreSettingsForm
-                store={{
-                    id: "st_hill",
-                    name: "Hill Road",
-                    description: null,
-                    logo: null,
-                }}
-            />,
-        );
-        const t = text(html);
-        expect(t).toContain("Name");
-        expect(t).toContain("Description");
-        expect(t).toContain("Logo address");
-        expect(t).not.toContain("Web address");
-        expect(html).not.toContain('name="slug"');
-    });
-
     it("the new-location form: a name and a description", () => {
         const html = renderToStaticMarkup(<CreateStoreForm />);
         const t = text(html);

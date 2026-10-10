@@ -1,3 +1,5 @@
+import { PLACE_EDIT_PARAM } from "./place-rows";
+
 /**
  * Where a storefront's own screens live, now that everything a storefront
  * holds is in Sell. One place, so a link cannot drift back to `/stores`.
@@ -18,9 +20,12 @@ export function storefrontHref(storeId: string, section?: string): string {
     return `/commerce/locations${q(storeId)}${tab}`;
 }
 
-/** Its description and logo. */
+/**
+ * Its description and logo: their Edit sheet, open on The place (a page of
+ * their own until 10 Oct; that address still lands here).
+ */
 export function storefrontDetailsHref(storeId: string): string {
-    return `/commerce/locations/${encodeURIComponent(storeId)}/details`;
+    return `${storefrontHref(storeId)}&${PLACE_EDIT_PARAM}=details`;
 }
 
 /**
