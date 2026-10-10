@@ -1,4 +1,4 @@
-import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
+import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { HomeModel } from "@/lib/home/service";
 import type { OrderListPage, OrderRow } from "@/lib/orders/business-service";
@@ -120,7 +120,11 @@ export function firstBookingMoment(
     const booking = bookings[0];
     if (booking.status !== "CONFIRMED") return null;
     if (!fresh(booking.createdAt, now)) return null;
-    const when = `${formatDayHeading(booking.startAt, booking.timezone, now)}, ${formatTimeRange(booking.startAt, booking.endAt, booking.timezone)}`;
+    const when = formatDateTime(booking.startAt, booking.timezone, {
+        now,
+        weekday: "short",
+        relative: true,
+    });
     const fact = [bookedBy(booking), booking.service?.name.trim(), when]
         .filter(Boolean)
         .join(" · ");

@@ -152,9 +152,7 @@ describe("the first booking", () => {
             title: "Your first booking",
             action: { label: "Open booking", href: "/bookings/b1" },
         });
-        expect(moment?.fact).toMatch(
-            /^Asha Rao · Haircut · Mon, 12 Oct 2026, 9:30\s?am – 10:00\s?am\.$/i,
-        );
+        expect(moment?.fact).toBe("Asha Rao · Haircut · Mon 12 Oct, 9:30 am.");
     });
 
     it("is not said for the second booking, or with none", () => {
@@ -191,7 +189,7 @@ describe("the first booking", () => {
             ],
             READS,
         );
-        expect(moment?.fact).toMatch(/^Farah Khan · Haircut · Today, 5:00/);
+        expect(moment?.fact).toBe("Farah Khan · Haircut · Today, 5:00 pm.");
     });
 
     it("is over after a week", () => {
@@ -305,11 +303,13 @@ describe("shown once", () => {
 
     it("is shown while the business hasn't seen it", () => {
         expect(unseen(moment, new Set())).toBe(moment);
-        expect(unseen(moment, new Set(["first-booking"]))).toBe(moment);
+        expect(unseen(moment, new Set(["first-booking"] as const))).toBe(
+            moment,
+        );
     });
 
     it("is not shown once anyone has put it away", () => {
-        expect(unseen(moment, new Set(["first-order"]))).toBeNull();
+        expect(unseen(moment, new Set(["first-order"] as const))).toBeNull();
     });
 
     it("is not shown when what was seen can't be read", () => {
