@@ -96,6 +96,22 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
 - **Current** — **Calm, recoverable copy**: it is usually temporary, and **Try
   again** calls `reset`. In accounts it never hints at whether an account or a
   password was right.
+- **Current** — **Accounts never shows the auth library's message.** Every
+  failed `authClient` call goes through `authErrorCopy(code)`
+  (`apps/accounts.saroh.in/lib/auth-error-copy.ts`): a sentence for a wrong
+  email or password, too many tries, no connection, a weak password, and one
+  fallback ("That didn't work. Try again."). Wrap the call in `settle`, since
+  the client rejects when the request never leaves the browser. Sentences end
+  with a full stop. `lib/copy.test.ts` reads the app's source and fails on
+  "Log in", "workspace", "organization", "storefront", an em dash or a
+  semicolon in anything a person reads.
+- **Current** — **An API that did not answer has not said no.** An invitation
+  page tells four states apart (`apps/app.saroh.in/lib/invitations/outcome.ts`,
+  and `lib/invitations.ts` in accounts): couldn't check (Try again), can no
+  longer be used (one title on all three pages), for someone else ("Sign out
+  and use {email}", "Go to Home"), and refused in the API's words. Keep the
+  status when a read or an accept fails. Without it every failure reads as
+  the worst one.
 - **Current** — **Merchant pages** (`apps/saroh.app`) draw boundaries from
   `--site-*`, never Saroh's brand. A throw inside `[domain]/layout.tsx` lands in
   the _root_ boundary, where the merchant's palette never loaded, so that

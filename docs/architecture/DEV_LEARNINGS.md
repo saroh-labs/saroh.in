@@ -12,6 +12,30 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Accounts — signing in opened a list of Saroh's own hosts, and four more dead ends
+
+**Symptom**: a UX audit (10 Oct 2026) signed in as a shop owner and landed
+on "Your apps": Application, "Admin: Platform control plane", "UI: The
+design system". Signing up with an address that already had an account
+said "Check your email" and no code ever came. A failed sign-in showed
+"Invalid email or password" or the browser's "Failed to fetch". An
+invitation opened while the API was restarting said "This invitation is no
+longer valid".
+**Cause**: four separate ones. `DEFAULT_DESTINATION = "/apps"` was every
+caller's fallback. Better Auth answers a duplicate sign-up with a fake
+success on purpose and sends nothing. The forms passed
+`ctx.error.message` to the screen. And `getInvitation` returned `null` for
+a network failure and for a 404 alike, so the page could only say one thing.
+**Fix**: the default is the app (`lib/return-to.ts`) and `/apps` is staff
+only. `onExistingUserSignUp` emails the address's owner, and the verify page
+offers Sign in. One `authErrorCopy` map. Reads and accepts keep their
+status, so "couldn't check" is its own state with a retry.
+**Check**: `apps/accounts.saroh.in` has a vitest suite now (it had no
+runner): `lib/return-to.test.ts`, `lib/auth-error-copy.test.ts`,
+`lib/invitations.test.ts` and `lib/copy.test.ts`, which reads the app's
+source for "Log in", banned words, em dashes and semicolons. The rules are
+in `backend-auth-and-access.md` and `frontend-error-feedback.md`.
+
 ## Seed — the dev environment's businesses claimed providers they couldn't use
 
 **Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
