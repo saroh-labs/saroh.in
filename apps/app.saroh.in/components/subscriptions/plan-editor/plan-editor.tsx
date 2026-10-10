@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { EditorShell } from "@/components/editor-shell/editor-shell";
@@ -26,7 +27,6 @@ import {
 } from "@/lib/subscriptions/plan-editor";
 import { planEditorAdapter } from "@/lib/subscriptions/plan-editor-adapter";
 
-import { PaymentsCrumbs } from "../payments-crumbs";
 import { PlanAside } from "./at-a-glance";
 import { ClassesSection } from "./classes-section";
 import { DetailsSection } from "./details-section";
@@ -110,12 +110,13 @@ export function PlanEditor({
             emptyValues={EMPTY_PLAN}
             canEdit={canEdit}
             readOnlyText={readOnlyText}
-            crumbs={
-                <PaymentsCrumbs
-                    here={first ? planTitle(first.values, true) : "New plan"}
-                    trail={[{ href: PLANS_HREF, label: "Plans" }]}
-                />
-            }
+            breadcrumb={[
+                "Payments",
+                <Link key="plans" href={PLANS_HREF}>
+                    Plans
+                </Link>,
+                first ? planTitle(first.values, true) : "New plan",
+            ]}
             titleOf={(v, r) => planTitle(v, r !== null)}
             problemsOf={(v) => planProblems(v, ctx)}
             blockerOf={(v) => planBlocker(v, ctx)}

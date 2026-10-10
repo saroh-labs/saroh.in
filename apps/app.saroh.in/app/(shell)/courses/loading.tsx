@@ -1,5 +1,13 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import { PageLoading } from "@/components/shared/page-loading";
 
 export default function Loading() {
-    return <ListSkeleton />;
+    return (
+        <PageLoading
+            shape="list"
+            width="full"
+            breadcrumb={["Bookings", "Courses"]}
+            title="Courses"
+            label="Loading courses"
+        />
+    );
 }

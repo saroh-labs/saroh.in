@@ -47,7 +47,7 @@ export function ProviderList({
     const showConnected = view.connected.length > 0 || view.unread.length === 0;
 
     return (
-        <div className="max-w-[720px] space-y-5">
+        <div className="space-y-5">
             {view.unread.length > 0 ? (
                 <PartialNotice>
                     Your {view.unread.map((k) => UNREAD[k]).join(" and ")} could

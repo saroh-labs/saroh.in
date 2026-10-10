@@ -56,7 +56,7 @@ export function ProductSettings({
             <div
                 role="tablist"
                 aria-label="Product settings"
-                className="flex flex-wrap gap-0.5 border-b border-border max-[760px]:flex-nowrap max-[760px]:overflow-x-auto"
+                className="flex flex-wrap gap-0.5 border-b border-border max-desk:flex-nowrap max-desk:overflow-x-auto"
             >
                 {tabs.map(({ key, count }) => {
                     const on = key === tab;

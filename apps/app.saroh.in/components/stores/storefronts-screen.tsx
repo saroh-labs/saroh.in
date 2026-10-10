@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -11,6 +10,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { SettingsColumns } from "@/components/shared/settings-columns";
 import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
@@ -121,7 +121,7 @@ export function StorefrontsScreen({
             description={selected ? locationSubtitle(selected) : undefined}
             actions={
                 canCreate && storefronts.length > 0 ? (
-                    <Button asChild variant="brand">
+                    <Button asChild>
                         <Link href={newStorefrontHref}>New location</Link>
                     </Button>
                 ) : undefined
@@ -318,98 +318,72 @@ function StorefrontDetail({
     const shared = { store, canEdit, pending, save, setStore, goTo };
 
     const readiness = locationReadiness(store, site, { notTakingOrders });
-    const wide = beside ? WIDE_BESIDE_LIST : WIDE_ALONE;
 
     // One column: notes, what's left to do, the tabs. On a wide screen the
     // "what's left" card moves to the right of the tabs and stays in view
-    // while a tab is worked through, so the page uses its width (owner,
-    // 10 Oct 2026). It stays first for the keyboard either way.
+    // while a tab is worked through (`SettingsColumns`, the layout Website ›
+    // Settings and Settings › Business share).
     return (
-        <div
-            className={cn(
-                "flex min-w-0 max-w-[760px] flex-1 flex-col gap-4",
-                wide.frame,
-            )}
-        >
-            {readiness.total > 0 ? (
-                <div className={cn("order-2 min-w-0", wide.aside)}>
+        <SettingsColumns
+            beside={beside}
+            aside={
+                readiness.total > 0 ? (
                     <LocationReadinessCard
                         readiness={readiness}
                         canEdit={canEdit}
                         onJump={goTo}
                     />
-                </div>
-            ) : null}
-            <div className={cn("contents", wide.main)}>
-                {notTakingOrders ? (
-                    <div className="order-1">
-                        <PausedNote>{pausedWords("location")}</PausedNote>
-                    </div>
-                ) : null}
-                {!canEdit ? (
-                    <div className="order-1">
-                        <ReadOnlyNote className="mb-0" />
-                    </div>
-                ) : null}
-                <div className="order-3 min-w-0">
-                    <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
-                </div>
-                <div
-                    id={LOCATION_PANEL_ID}
-                    role="tabpanel"
-                    aria-labelledby={locationTabId(tab)}
-                    className="order-4 min-w-0 outline-none"
-                >
-                    {tab === "the-place" ? (
-                        <PlaceSection
-                            {...shared}
-                            details={details}
-                            sheets={sheets}
-                        />
-                    ) : null}
-                    {tab === "payments" ? (
-                        <PaymentsSection {...shared} />
-                    ) : null}
-                    {tab === "delivery" ? (
-                        <FulfilmentSection {...shared} />
-                    ) : null}
-                    {tab === "customers" ? (
-                        <SameEmailSection
-                            store={store}
-                            canEdit={canLinkCustomers}
-                            pending={pending}
-                            save={save}
-                            setStore={setStore}
-                        />
-                    ) : null}
-                    {tab === "people" ? (
-                        <PeopleSection store={store} people={people} />
-                    ) : null}
-                    {tab === "pause-or-close" && closes ? (
-                        <ClosingSection
-                            {...shared}
-                            businessName={businessName}
-                            canClose={canClose}
-                        />
-                    ) : null}
-                </div>
+                ) : undefined
+            }
+            before={
+                notTakingOrders || !canEdit ? (
+                    <>
+                        {notTakingOrders ? (
+                            <PausedNote>{pausedWords("location")}</PausedNote>
+                        ) : null}
+                        {!canEdit ? <ReadOnlyNote className="mb-0" /> : null}
+                    </>
+                ) : undefined
+            }
+        >
+            <div className="min-w-0">
+                <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
             </div>
-        </div>
+            <div
+                id={LOCATION_PANEL_ID}
+                role="tabpanel"
+                aria-labelledby={locationTabId(tab)}
+                className="min-w-0 outline-none"
+            >
+                {tab === "the-place" ? (
+                    <PlaceSection
+                        {...shared}
+                        details={details}
+                        sheets={sheets}
+                    />
+                ) : null}
+                {tab === "payments" ? <PaymentsSection {...shared} /> : null}
+                {tab === "delivery" ? <FulfilmentSection {...shared} /> : null}
+                {tab === "customers" ? (
+                    <SameEmailSection
+                        store={store}
+                        canEdit={canLinkCustomers}
+                        pending={pending}
+                        save={save}
+                        setStore={setStore}
+                    />
+                ) : null}
+                {tab === "people" ? (
+                    <PeopleSection store={store} people={people} />
+                ) : null}
+                {tab === "pause-or-close" && closes ? (
+                    <ClosingSection
+                        {...shared}
+                        businessName={businessName}
+                        canClose={canClose}
+                    />
+                ) : null}
+            </div>
+        </SettingsColumns>
     );
 }
-
-/**
- * Where the "what's left" card sits beside the tabs: from 1440px when the
- * location has the page to itself, and from 1760px when the list of
- * locations is beside it. Whole class names, so Tailwind finds them.
- */
-const WIDE_ALONE = {
-    frame: "min-[1440px]:max-w-none min-[1440px]:flex-row min-[1440px]:items-start min-[1440px]:gap-8",
-    main: "min-[1440px]:flex min-[1440px]:min-w-0 min-[1440px]:max-w-[1040px] min-[1440px]:flex-1 min-[1440px]:flex-col min-[1440px]:gap-4",
-    aside: "min-[1440px]:sticky min-[1440px]:top-6 min-[1440px]:order-last min-[1440px]:w-[400px] min-[1440px]:shrink-0",
-};
-const WIDE_BESIDE_LIST = {
-    frame: "min-[1760px]:max-w-none min-[1760px]:flex-row min-[1760px]:items-start min-[1760px]:gap-8",
-    main: "min-[1760px]:flex min-[1760px]:min-w-0 min-[1760px]:max-w-[1040px] min-[1760px]:flex-1 min-[1760px]:flex-col min-[1760px]:gap-4",
-    aside: "min-[1760px]:sticky min-[1760px]:top-6 min-[1760px]:order-last min-[1760px]:w-[400px] min-[1760px]:shrink-0",
-};

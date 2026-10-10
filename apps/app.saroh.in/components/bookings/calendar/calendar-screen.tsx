@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -60,7 +61,6 @@ import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
-import { BookingsTopBar } from "./parts";
 import type { QuickLookActions } from "./quick-look-types";
 import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
@@ -521,47 +521,58 @@ export function CalendarScreen({
     );
 
     return (
-        <>
-            <BookingsTopBar page="Calendar">
-                <BookingsViewSwitch current="calendar" />
-                <div
-                    role="radiogroup"
-                    aria-label="Layout"
-                    className="ml-auto flex gap-0.5 rounded-[9px] bg-primary p-[3px]"
-                >
-                    {(
-                        [
-                            ["day", "Day by person", "Day"],
-                            ["week", "Week", "Week"],
-                            ["agenda", "Agenda", "Agenda"],
-                        ] as const
-                    ).map(([id, label, short]) => (
-                        <button
-                            key={id}
-                            type="button"
-                            role="radio"
-                            aria-checked={layout === id}
-                            onClick={() => go(id, date)}
-                            className={cn(
-                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
-                                layout === id
-                                    ? "bg-card text-foreground"
-                                    : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
-                                id === "week" && "max-[759px]:hidden",
-                            )}
+        <div>
+            {/* The date is the page's title; the two view switches sit
+                before New booking. */}
+            <PageHeader
+                className="mb-3"
+                breadcrumb={["Bookings", "Calendar"]}
+                title={heading}
+                actions={newBooking}
+                meta={
+                    <>
+                        <BookingsViewSwitch current="calendar" />
+                        <div
+                            role="radiogroup"
+                            aria-label="Layout"
+                            className="ml-auto flex gap-0.5 rounded-[9px] bg-primary p-[3px]"
                         >
-                            <span className="max-[759px]:hidden">{label}</span>
-                            <span className="min-[760px]:hidden">{short}</span>
-                        </button>
-                    ))}
-                </div>
-            </BookingsTopBar>
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+                            {(
+                                [
+                                    ["day", "Day by person", "Day"],
+                                    ["week", "Week", "Week"],
+                                    ["agenda", "Agenda", "Agenda"],
+                                ] as const
+                            ).map(([id, label, short]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={layout === id}
+                                    onClick={() => go(id, date)}
+                                    className={cn(
+                                        "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
+                                        layout === id
+                                            ? "bg-card text-foreground"
+                                            : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
+                                        id === "week" && "max-[759px]:hidden",
+                                    )}
+                                >
+                                    <span className="max-[759px]:hidden">
+                                        {label}
+                                    </span>
+                                    <span className="min-[760px]:hidden">
+                                        {short}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                }
+            />
+            <div>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                        {heading}
-                    </h1>
                     <div className="flex gap-1">
                         <NavLink
                             href={calendarHref(layout, addDays(date, -step))}
@@ -593,7 +604,6 @@ export function CalendarScreen({
                     >
                         {summary}
                     </span>
-                    {newBooking}
                 </div>
                 <Legend classes={hasClasses} />
                 {staff === null ? (
@@ -757,7 +767,7 @@ export function CalendarScreen({
                     hoursHint="Set their hours in Availability."
                 />
             ) : null}
-        </>
+        </div>
     );
 }
 

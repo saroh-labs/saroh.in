@@ -1,4 +1,4 @@
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FollowUpsList } from "@/components/leads/follow-ups-list";
@@ -50,15 +50,18 @@ export default async function LeadsPage({
     const tab = params.tab === "follow-ups" ? "follow-ups" : "leads";
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Leads"]}
                 title="Leads"
+                count={countLabel(leads.length, {
+                    one: "lead",
+                    other: "leads",
+                })}
                 description="Opportunities in your pipeline: what they're worth, and how long they've waited."
+                meta={<LeadsViewSwitch current="list" />}
                 actions={
-                    <>
-                        <LeadsViewSwitch current="list" />
-                        {addLead ? <AddLeadDialog {...addLead} /> : null}
-                    </>
+                    addLead ? <AddLeadDialog {...addLead} header /> : undefined
                 }
             />
             <div className="mt-6 flex flex-col gap-5">

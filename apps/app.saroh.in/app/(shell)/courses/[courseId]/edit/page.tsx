@@ -39,6 +39,7 @@ export default async function EditCoursePage({
                 <PageHeader
                     className="mb-0"
                     breadcrumb={[
+                        "Bookings",
                         <Link
                             key="courses"
                             href="/courses"

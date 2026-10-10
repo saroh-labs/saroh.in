@@ -291,6 +291,8 @@ export function ContactsView({
             rowHref={(c) => personHref(c.id)}
             modes={["table", "grid", "list"]}
             defaultMode="table"
+            noun={{ one: "contact", other: "contacts" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView}
             searchableColumnIds={["name", "email", "company", "source"]}

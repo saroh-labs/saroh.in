@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Repeat, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -28,7 +29,6 @@ import {
     TAB_LABEL,
 } from "@/lib/subscriptions/view";
 
-import { PaymentsCrumbs } from "./payments-crumbs";
 import { PlansTab } from "./plans-tab";
 import { SubscribeDialog } from "./subscribe-dialog";
 import { SubscriptionQuickLook } from "./subscription-quick-look";
@@ -153,25 +153,32 @@ export function SubscriptionsScreen({
 
     return (
         <>
-            <PaymentsCrumbs here="Subscriptions" />
-            <div className="px-6 pt-5">
-                <div className="mb-1.5 flex flex-wrap items-center gap-3">
-                    <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
-                        Subscriptions
-                    </h1>
-                    <span className="ml-auto text-[12.5px] text-muted-foreground">
-                        {running.length} active
-                        {monthly ? ` · about ${monthly} a month` : ""}
-                    </span>
-                    {canSubscribe ? (
-                        <Button
-                            className="h-[38px] rounded-[9px] px-4 text-[14px] font-semibold"
-                            onClick={() => setSubscribing(true)}
-                        >
-                            Subscribe someone
-                        </Button>
-                    ) : null}
-                </div>
+            <div>
+                <PageHeader
+                    className="mb-1.5"
+                    breadcrumb={["Payments", "Subscriptions"]}
+                    title="Subscriptions"
+                    count={countLabel(subscriptions.length, {
+                        one: "subscription",
+                        other: "subscriptions",
+                    })}
+                    // A summary, not a count of the list: before the button.
+                    meta={
+                        subscriptions.length > 0 ? (
+                            <span>
+                                {running.length} active
+                                {monthly ? ` · about ${monthly} a month` : ""}
+                            </span>
+                        ) : undefined
+                    }
+                    actions={
+                        canSubscribe ? (
+                            <Button onClick={() => setSubscribing(true)}>
+                                Subscribe someone
+                            </Button>
+                        ) : undefined
+                    }
+                />
                 {/* The Plans tab says its own lock, in its own words. */}
                 {newLocked && !(onPlans && plansLocked) ? (
                     <LimitNoticeBlock
@@ -276,7 +283,7 @@ export function SubscriptionsScreen({
                 id="subscriptions-panel"
                 role="tabpanel"
                 aria-labelledby={`tab-${tab}`}
-                className="px-6 pb-[26px] pt-4"
+                className="pt-4"
             >
                 {tab === "plans" ? (
                     <PlansTab

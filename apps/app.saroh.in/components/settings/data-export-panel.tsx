@@ -65,7 +65,7 @@ export function DataExportPanel({
     };
 
     return (
-        <div className="grid max-w-[760px] gap-5">
+        <div className="grid gap-5">
             <section
                 aria-labelledby="data-export-what"
                 className="grid gap-3 rounded-lg border border-border bg-card p-4"

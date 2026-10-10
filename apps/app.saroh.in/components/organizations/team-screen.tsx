@@ -42,7 +42,7 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
-import { Check, Info, Mail, Plus, Users } from "lucide-react";
+import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -364,13 +364,11 @@ export function TeamScreen({
                     actions={
                         // On People, where the person invited will appear.
                         canManage && tab === "people" ? (
-                            <Button onClick={openInvite}>
-                                <Plus className="mr-1.5 size-4" />
-                                {invite.label}
-                            </Button>
+                            <Button onClick={openInvite}>{invite.label}</Button>
                         ) : undefined
                     }
                     readOnlyNote={readOnlyNote}
+                    className="mb-0"
                 />
                 <div className="flex items-end gap-3 border-b border-border">
                     <div

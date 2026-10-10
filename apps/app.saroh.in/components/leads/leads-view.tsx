@@ -156,6 +156,8 @@ export function LeadsView({
             rowHref={(l) => `/leads/${l.id}`}
             modes={["table", "list"]}
             defaultMode="table"
+            noun={{ one: "lead", other: "leads" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView}
             // Leads | Follow-ups is the page's tab row; status narrows the list.

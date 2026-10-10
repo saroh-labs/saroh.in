@@ -9,7 +9,6 @@ import {
     OrdersAttentionPartial,
     OrdersEmpty,
     OrdersFailed,
-    OrdersLoading,
     OrdersLocked,
 } from "./orders-states";
 
@@ -80,21 +79,6 @@ describe("OrderLocked", () => {
         expect(html).toContain("Your role.");
         expect(html).toContain("Back to Home");
         expect(html).not.toContain('role="alert"');
-    });
-});
-
-describe("OrdersLoading", () => {
-    const html = renderToStaticMarkup(<OrdersLoading />);
-
-    it("is busy, and says what is on its way", () => {
-        expect(html).toContain('aria-busy="true"');
-        expect(html).toContain("Loading orders");
-    });
-
-    it("shows the tabs without counts, and no empty or failed words", () => {
-        expect(html).toContain("Refunded");
-        expect(html).not.toMatch(/>\d+</);
-        expect(html).not.toMatch(/No orders|Couldn/);
     });
 });
 

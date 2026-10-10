@@ -45,7 +45,7 @@ import {
 import { AttentionSuggestions } from "./attention-suggestions";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
-import { Crumbs, Header, Tabs } from "./header";
+import { Header, Tabs } from "./header";
 import { MessagesTab } from "./messages-tab";
 import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
@@ -339,11 +339,8 @@ export function CustomerDetailScreen({
     return (
         <>
             <div className="px-[26px] pt-5">
-                <Crumbs
-                    here={name}
-                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
-                />
                 <Header
+                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
                     name={name}
                     initials={initials(name)}
                     tag={tagFor(d)}
