@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
+
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { PublishApprovalSection } from "@/components/sites/publish-approval-row";
 import { SellsFromRow } from "@/components/sites/sells-from-row";
 import { Group } from "@/components/sites/settings-rows";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
 import type { SiteDetail } from "@/lib/sites/service";
+import { groupOfSheet } from "@/lib/sites/settings-edit";
 import {
     publishWaiting,
     settingsGroups,
@@ -26,6 +29,12 @@ import { useSettingsSave } from "./settings/use-settings-save";
  * footer, Shop, Tracking, Advanced) chosen from a side list, or a select
  * on a phone, with what's left before the site is worth sharing at the
  * top of the content (`settings-sections.tsx`).
+ *
+ * Read first (owner, 10 Oct): every row says what is saved, and its Edit
+ * opens that row's own sheet with one Save, one sheet at a time
+ * (`useSettingsSave`). Nothing is edited in the row, and nothing sends the
+ * merchant to another page to finish: a checklist step, a link with
+ * `?edit=` and the readiness step's `#sells-from` all open the sheet here.
  *
  * Saving is per row; there is no page-level Save, because a settings form
  * that saves everything at once lets a stale tab overwrite a field someone
@@ -54,7 +63,15 @@ export function SiteSettings({
     /** The Tracking group's content: its own read, in a Suspense boundary. */
     tracking?: React.ReactNode;
 }) {
-    const state = useSettingsSave();
+    // A link can't open a sheet with nothing in it: no shop to choose a
+    // location for, or no location that sells anything yet.
+    const state = useSettingsSave((which) =>
+        which === "sells-from" && !site.sellsFrom?.choices.length
+            ? null
+            : which,
+    );
+    // The sheet a link opened on arrival; its group is the one shown.
+    const [arrivedAt] = useState(state.editing?.which ?? null);
     const live = Boolean(site.currentPublication);
     const shop = Boolean(site.sellsFrom);
     const groups = settingsGroups({ shop, advanced: approval !== null });
@@ -65,7 +82,9 @@ export function SiteSettings({
             steps={shareReadiness(site)}
             live={live}
             canEdit
-            onJump={(key) => state.setEditing(key === "image" ? "social" : key)}
+            onJump={state.open}
+            startOn={arrivedAt ? groupOfSheet(arrivedAt) : null}
+            onArrive={state.open}
             panels={{
                 address: (
                     <AddressGroup
@@ -73,7 +92,12 @@ export function SiteSettings({
                         address={address}
                         live={live}
                         canChangeAddress={canChangeAddress}
-                        domain={<CustomDomain siteId={site.id} />}
+                        domain={
+                            <CustomDomain
+                                siteId={site.id}
+                                sheet={state.control("domain")}
+                            />
+                        }
                     />
                 ),
                 "search-and-sharing": (
@@ -99,6 +123,7 @@ export function SiteSettings({
                             sellsFrom={site.sellsFrom}
                             canChange={site.can.manageSettings}
                             awaiting={site.shopAwaitsSellsFrom === true}
+                            sheet={state.control("sells-from")}
                         />
                     </Group>
                 ) : null,

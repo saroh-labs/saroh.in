@@ -83,6 +83,14 @@ a button that only needs a name or a choice opens its dialog there
 (the calendar's "Add someone") instead of sending the merchant to another
 page.
 
+Website › Settings follows it (`components/sites/settings/`): its frame is
+`SettingsSheetFrame` in `settings-sheet.tsx`, a copy of The place's with
+the same classes until the two are lifted into one, and its links are
+`settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
+is done inside its sheet or dialog (the share image is uploaded there, Add
+domain shows its DNS records there); an Edit never sends the merchant to
+another page to finish.
+
 ## Rules
 
 - **Current** — **Schema first.** A `z.object` at the top defines validation and

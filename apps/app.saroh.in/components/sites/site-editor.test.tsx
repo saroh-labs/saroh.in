@@ -1328,9 +1328,12 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(host.textContent).toContain(
             "Your footer is more than one line of plain text",
         );
-        expect($(`a[href='/sites/${siteId}/settings']`)?.textContent).toBe(
-            "Open Website settings",
-        );
+        // The link lands on the Footer row with its sheet open.
+        expect(
+            $(
+                `a[href='/sites/${siteId}/settings?section=menu-and-footer&edit=footer']`,
+            )?.textContent,
+        ).toBe("Open Website settings");
     });
 
     it("shows both read-only, with who can change them, without site:update", async () => {
