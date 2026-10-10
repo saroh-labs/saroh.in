@@ -114,12 +114,12 @@ describe("Moment", () => {
     it("comes back and says why when putting it away is refused", async () => {
         markMomentSeen.mockResolvedValue({
             ok: false,
-            error: "Could not put that away.",
+            error: "Couldn't put that away.",
         });
         render();
         await press(dismissButton());
         expect(card()).not.toBeNull();
-        expect(showError).toHaveBeenCalledWith("Could not put that away.");
+        expect(showError).toHaveBeenCalledWith("Couldn't put that away.");
     });
 
     it("comes back when the request never got there", async () => {

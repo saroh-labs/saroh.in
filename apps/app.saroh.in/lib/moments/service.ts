@@ -41,6 +41,6 @@ export async function markMomentSeen(
         `/moments/${encodeURIComponent(key)}/seen`,
         "POST",
         {},
-        "Could not put that away.",
+        "Couldn't put that away.",
     );
 }

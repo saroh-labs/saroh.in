@@ -13,7 +13,7 @@ import { markMomentSeen as markMomentSeenApi } from "./service";
 export async function markMomentSeen(key: MomentKey) {
     // A server action is a public endpoint: the key is checked here too.
     if (!(MOMENT_KEYS as readonly string[]).includes(key)) {
-        return { ok: false as const, error: "Could not put that away." };
+        return { ok: false as const, error: "Couldn't put that away." };
     }
     return markMomentSeenApi(key);
 }
