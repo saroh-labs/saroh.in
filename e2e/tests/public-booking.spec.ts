@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { asNewVisitor, signInOnSheet } from "./site-codes";
+import { asNewVisitor, expectNoZoomOnFocus, signInOnSheet } from "./site-codes";
 
 /**
  * The customer's booking page on a merchant's site, end to end (U19):
@@ -102,6 +102,10 @@ async function details(page: Page) {
     await expect(page.getByLabel(/Phone/)).toHaveAccessibleName(
         "Phone (optional)",
     );
+    // A phone doesn't zoom into either, and offers the right keyboard.
+    await expectNoZoomOnFocus(page.getByLabel("Name"));
+    await expectNoZoomOnFocus(page.getByLabel(/Phone/));
+    await expect(page.getByLabel(/Phone/)).toHaveAttribute("inputmode", "tel");
     await page.getByLabel("Name").fill("Asha Rao");
 }
 

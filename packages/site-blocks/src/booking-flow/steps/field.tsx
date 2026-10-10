@@ -9,6 +9,7 @@ export function Field({
     error,
     type = "text",
     autoComplete,
+    inputMode,
     placeholder,
 }: {
     id: string;
@@ -18,6 +19,7 @@ export function Field({
     error: string | null;
     type?: string;
     autoComplete?: string;
+    inputMode?: "text" | "tel" | "email" | "numeric";
     placeholder?: string;
 }) {
     return (
@@ -32,13 +34,14 @@ export function Field({
                 id={id}
                 type={type}
                 autoComplete={autoComplete}
+                inputMode={inputMode}
                 placeholder={placeholder}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? `${id}-error` : undefined}
                 className={cn(
-                    "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block h-[45px] w-full rounded-[calc(var(--site-radius)+7px)] border px-3.5 text-[15px]",
+                    "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block h-[45px] w-full rounded-[calc(var(--site-radius)+7px)] border px-3.5 text-base",
                     inputFill,
                     focusRing,
                 )}
