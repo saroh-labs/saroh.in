@@ -35,17 +35,24 @@ export class LocationLogoService {
 
     /**
      * The location (as `getForUser` gives it, 404 the same) with its own
-     * logo, the business's, and the one to show, so the app asks once.
+     * logo, the business's, and the one to show, so the app asks once. And
+     * what the caller may do here (`abilities`), from the guards' own
+     * functions: a location role's reach is per location, so the business
+     * role's permissions can't say it.
      */
     async read(userId: string, storeId: string) {
         const store = await this.stores.getForUser(storeId, userId);
-        const profile = await prisma.businessProfile.findUnique({
-            where: { organizationId: store.organizationId },
-            select: { logoUrl: true },
-        });
+        const [profile, abilities] = await Promise.all([
+            prisma.businessProfile.findUnique({
+                where: { organizationId: store.organizationId },
+                select: { logoUrl: true },
+            }),
+            this.stores.abilities(storeId, userId),
+        ]);
         return {
             ...store,
             ...locationLogos(store, profile?.logoUrl ?? null),
+            abilities,
         };
     }
 

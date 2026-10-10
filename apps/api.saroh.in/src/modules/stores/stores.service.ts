@@ -29,6 +29,24 @@ import type { LogoPatch } from "./location-logo";
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
 
 /**
+ * What the caller may do at one location, as its read says it (UX audit,
+ * 10 Oct 2026). The app showed all four location roles the same read-only
+ * screens because it had no way to ask. Each answer is the guard's own
+ * (`StoresService.abilities`), so a screen never offers what the write
+ * would refuse, nor hides what it would take.
+ */
+export interface LocationAbilities {
+    /** Rename it, describe it, change its logo (`PUT stores/:id`). */
+    edit: boolean;
+    /** Take a new order here, with nothing paid yet. */
+    takeOrders: boolean;
+    /** Take the money with a new order: the permissions' alone (DEC-106). */
+    takePayments: boolean;
+    /** Change an order's status here, never its payment. */
+    changeOrders: boolean;
+}
+
+/**
  * Store data layer — the single place the DB is touched for stores. Every
  * method takes an explicit `userId` (resolved from the Better Auth session by
  * the controller, never client input).
@@ -205,6 +223,39 @@ export class StoresService {
             return writable;
         }
         return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
+    }
+
+    /**
+     * What the caller may do at this location, for its read to say.
+     *
+     * Not a second policy: each answer is asked of the very function the
+     * write's guard asks (`canWrite` for `PUT stores/:id`,
+     * `orderWriteOrganization` for the store-scoped order writes, with
+     * `money` as `OrdersService.create` passes it). A rule changed there
+     * changes here in the same commit, and the two cannot disagree.
+     */
+    async abilities(
+        storeId: string,
+        userId: string,
+    ): Promise<LocationAbilities> {
+        const may = async (
+            action: OrgAction,
+            options?: { money?: boolean },
+        ): Promise<boolean> =>
+            (await this.orderWriteOrganization(
+                storeId,
+                userId,
+                action,
+                options,
+            )) !== null;
+        const [edit, takeOrders, takePayments, changeOrders] =
+            await Promise.all([
+                this.canWrite(storeId, userId),
+                may("order:create"),
+                may("order:create", { money: true }),
+                may("order:edit"),
+            ]);
+        return { edit, takeOrders, takePayments, changeOrders };
     }
 
     /**

@@ -99,11 +99,13 @@ describe("LocationLogoService", () => {
     const writableOrganization = jest.fn();
     const updateForUser = jest.fn();
     const readyObject = jest.fn();
+    const abilities = jest.fn();
     const service = new LocationLogoService(
         {
             getForUser,
             writableOrganization,
             updateForUser,
+            abilities,
         } as unknown as StoresService,
         { readyObject } as unknown as MediaService,
     );
@@ -146,6 +148,28 @@ describe("LocationLogoService", () => {
                 businessLogo: { url: BUSINESS },
                 effectiveLogo: { url: BUSINESS, from: "business" },
             });
+        });
+
+        it("says what the caller may do there, as the location's guards answer it", async () => {
+            getForUser.mockResolvedValue({
+                id: "store_1",
+                organizationId: "org_1",
+                logo: null,
+                logoMediaId: null,
+            });
+            profileFindUnique.mockResolvedValue(null);
+            const may = {
+                edit: true,
+                takeOrders: true,
+                takePayments: false,
+                changeOrders: true,
+            };
+            abilities.mockResolvedValue(may);
+
+            const read = await service.read("user_1", "store_1");
+
+            expect(abilities).toHaveBeenCalledWith("store_1", "user_1");
+            expect(read.abilities).toEqual(may);
         });
 
         it("a business with no profile yet has no logo to lend", async () => {
