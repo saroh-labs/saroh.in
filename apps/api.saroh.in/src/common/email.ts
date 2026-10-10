@@ -170,6 +170,22 @@ function codeEmail(
 </div>`;
 }
 
+export const SIGN_IN_CODE_SUBJECT = "Your Saroh sign-in code";
+
+/** A code email's subject and body, for one kind of code. */
+export function verificationOtpEmail(
+    type: VerificationOtpType,
+    otp: string,
+    expiresInSeconds: number,
+): { subject: string; html: string } {
+    const copy = OTP_COPY[type];
+    const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
+    return {
+        subject: copy.subject,
+        html: codeEmail(copy.heading, copy.body, otp, minutes),
+    };
+}
+
 const OTP_COPY: Record<
     VerificationOtpType,
     { subject: string; heading: string; body: string }
@@ -179,15 +195,20 @@ const OTP_COPY: Record<
         heading: "Verify your email",
         body: "Enter this code to finish setting up your Saroh account.",
     },
+    // Signing up and signing in (owner, 10 Oct 2026): one email for both,
+    // because asking for a code must not say whether the address has an
+    // account. The heading is the subject, and the body names the screen
+    // the person is looking at ("Check your email").
     "sign-in": {
-        subject: "Your Saroh sign-in code",
-        heading: "Sign in to Saroh",
-        body: "Enter this code to sign in.",
+        subject: SIGN_IN_CODE_SUBJECT,
+        heading: SIGN_IN_CODE_SUBJECT,
+        body: "Enter this code on the Saroh page that says Check your email. New to Saroh? The same code creates your account.",
     },
+    // Also what sets a first password from the account page.
     "forget-password": {
-        subject: "Your Saroh password reset code",
-        heading: "Reset your password",
-        body: "Enter this code to choose a new password.",
+        subject: "Your Saroh password code",
+        heading: "Your Saroh password code",
+        body: "Enter this code to set a new password.",
     },
     "change-email": {
         subject: "Your Saroh email change code",
@@ -216,10 +237,9 @@ export function sendVerificationOtpEmail(
     type: VerificationOtpType,
     expiresInSeconds: number,
 ): Promise<void> {
-    const copy = OTP_COPY[type];
-    const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
+    const mail = verificationOtpEmail(type, otp, expiresInSeconds);
     if (!transporter) {
-        console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
+        console.info(`[${mail.subject}] (no SMTP) ${to}: code ${otp}`);
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
             writeSiteCodeOutbox(to, otp);
         }
@@ -228,8 +248,8 @@ export function sendVerificationOtpEmail(
     void transporter.sendMail({
         from: FROM,
         to,
-        subject: copy.subject,
-        html: codeEmail(copy.heading, copy.body, otp, minutes),
+        subject: mail.subject,
+        html: mail.html,
     });
     return Promise.resolve();
 }
