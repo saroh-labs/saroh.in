@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
 
 import { MediaService } from "./media.service";
-import { objectStorageProvider } from "./object-storage.provider";
+import {
+    OBJECT_STORAGE,
+    objectStorageProvider,
+} from "./object-storage.provider";
 
 /**
  * The media library's service and its storage, without the controller —
@@ -12,6 +15,7 @@ import { objectStorageProvider } from "./object-storage.provider";
  */
 @Module({
     providers: [MediaService, objectStorageProvider],
-    exports: [MediaService],
+    // The storage port too: a data export writes its zip through it (DEC-117).
+    exports: [MediaService, OBJECT_STORAGE],
 })
 export class MediaStorageModule {}

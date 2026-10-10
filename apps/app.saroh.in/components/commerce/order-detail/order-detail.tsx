@@ -80,6 +80,13 @@ export interface OrderPermissions {
      * (B11, DEC-054). Making one also takes `payLink`.
      */
     payOnline?: boolean;
+    /**
+     * Saroh can still send a refund online: a payment provider is
+     * connected (DEC-117). False, Refund isn't offered on an order paid
+     * online, and says where to refund it instead. Unknown reads as true:
+     * the API refuses a refund it can't send either way.
+     */
+    refundOnline?: boolean;
     /** May connect a provider in Settings (`payment:manage`). */
     manageProviders?: boolean;
     /**
@@ -335,9 +342,11 @@ export function OrderDetail({
             ? "Nothing has been paid to refund."
             : money.recordedByHand
               ? "Paid by hand — hand it back by hand, then record it from the menu."
-              : hold?.kind === "refund"
-                ? "A refund is on its way."
-                : null;
+              : can.refundOnline === false
+                ? "Your payment provider isn't connected, so Saroh can't send this refund. Refund it in your provider's dashboard, then record it as refunded."
+                : hold?.kind === "refund"
+                  ? "A refund is on its way."
+                  : null;
 
     useArrival(
         arrival,

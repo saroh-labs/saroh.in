@@ -132,7 +132,9 @@ describe("createMemoryStorage", () => {
             contentLength: 3,
         });
         const chunks: Uint8Array[] = [];
-        for await (const c of (await storage.readObject(key))!) chunks.push(c);
+        for await (const c of (await storage.readObject(key)) ?? []) {
+            chunks.push(c);
+        }
         expect(Buffer.concat(chunks).toString()).toBe("abc");
         await storage.deleteObject(key);
         expect(await storage.readObject(key)).toBeNull();

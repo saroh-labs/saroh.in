@@ -17,6 +17,9 @@ jest.mock("@saroh/database", () => ({
 
 import "reflect-metadata";
 
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { ExecutionContext } from "@nestjs/common";
 import { ForbiddenException, RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA } from "@nestjs/common/constants";
@@ -381,4 +384,34 @@ describe("StoreLifecycleGuard (DEC-117)", () => {
         ).resolves.toBe(true);
         expect(findUnique).not.toHaveBeenCalled();
     });
+});
+
+/**
+ * The miss this closes (DEV_LEARNINGS, "store-scoped writes never asked the
+ * lifecycle"): a controller under `stores/…` runs no `OrganizationGuard`,
+ * so it must carry the store guard, or a suspended or closing business
+ * takes its writes.
+ */
+describe("every store-scoped controller asks the lifecycle (DEC-117)", () => {
+    const MODULES = join(__dirname, "..");
+    const files = readdirSync(MODULES, { recursive: true, encoding: "utf8" })
+        .map((f) => f.split("\\").join("/"))
+        .filter((f) => f.endsWith(".controller.ts"))
+        .map((f) => ({ f, text: readFileSync(join(MODULES, f), "utf8") }))
+        .filter(({ text }) =>
+            /@Controller\("stores|@(Post|Put|Patch|Delete)\("stores\//.test(
+                text,
+            ),
+        );
+
+    it("finds the store-scoped controllers", () => {
+        expect(files.length).toBeGreaterThanOrEqual(8);
+    });
+
+    it.each(files.map(({ f, text }) => [f, text] as const))(
+        "%s carries StoreLifecycleGuard",
+        (_file, text) => {
+            expect(text).toMatch(/\b[Ss]toreLifecycleGuard\b/);
+        },
+    );
 });

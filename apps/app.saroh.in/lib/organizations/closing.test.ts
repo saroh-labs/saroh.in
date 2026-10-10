@@ -47,6 +47,32 @@ describe("closingBanner (#921)", () => {
         expect(b?.memberships).toBeNull();
     });
 
+    it("says it winds down: what is finished, never started (DEC-117)", () => {
+        const b = closingBanner(view(), NOW);
+        expect(b?.body).toMatch(/finish, cancel and refund/);
+        // An older API, or anyone but an owner: no data link, no warning.
+        expect(b?.data).toBeNull();
+        expect(b?.refundInDashboard).toBeNull();
+    });
+
+    it("offers an owner their data, and says where to refund once the keys are gone", () => {
+        const b = closingBanner(
+            view({ canDownloadData: true, refundsOnline: false }),
+            NOW,
+        );
+        expect(b?.data).toEqual({
+            label: "Download your data",
+            href: "/settings/data",
+        });
+        expect(b?.refundInDashboard).toMatch(
+            /Refund each customer in your provider's dashboard/,
+        );
+        expect(
+            closingBanner(view({ refundsOnline: true }), NOW)
+                ?.refundInDashboard,
+        ).toBeNull();
+    });
+
     it("lists the refunds in the owner's words, each linked, with its reference", () => {
         const b = closingBanner(
             view({

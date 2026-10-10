@@ -686,7 +686,7 @@ model DataExport {
   expiresAt DateTime?
   updatedAt DateTime  @updatedAt
 
-  @@unique([organizationId], map: "DataExport_one_running_per_org", where: raw("status IN ('QUEUED', 'RUNNING')"))
+  @@unique([organizationId], map: "DataExport_one_running_per_org", where: raw("status = 'QUEUED' OR status = 'RUNNING'"))
   @@index([organizationId, createdAt])
 }
 

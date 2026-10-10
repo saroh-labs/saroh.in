@@ -21,6 +21,7 @@ import { ContentModule } from "./modules/content/content.module";
 import { CoursesModule } from "./modules/courses/courses.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DataExportModule } from "./modules/data-export/data-export.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
@@ -93,6 +94,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProviderHealthModule,
         SavedViewsModule,
         OrganizationsModule,
+        DataExportModule,
         ProjectsModule,
         AuditModule,
         StoresModule,

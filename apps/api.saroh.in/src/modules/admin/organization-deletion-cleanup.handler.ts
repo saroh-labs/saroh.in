@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { DeletedBusinessBilling } from "../billing/business-closing";
 import { BILLING_PROVIDER_CANCEL_TYPE } from "../billing/provider-cancel.job";
+import { DATA_EXPORT_EXPIRE_TYPE } from "../data-export/data-export-types";
 import { DomainsService } from "../domains/domains.service";
 import { MediaService } from "../media/media.service";
 import { logDeletionProviderCall } from "../organizations/deletion-provider-log";
@@ -60,6 +61,9 @@ export const CLEANUP_KEEPS_JOB_TYPES: readonly string[] = [
     BILLING_PROVIDER_CANCEL_TYPE,
     SUBSCRIPTION_CHARGE_TYPE,
     SEND_REFUND_TYPE,
+    // A data export's zip is deleted on its day whatever became of the
+    // business (DEC-117): called off, the file would never go.
+    DATA_EXPORT_EXPIRE_TYPE,
 ];
 
 /**

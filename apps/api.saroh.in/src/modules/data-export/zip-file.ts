@@ -45,7 +45,8 @@ export class ZipFile {
      */
     async add(
         name: string,
-        chunks: AsyncIterable<Uint8Array | string>,
+        chunks:
+            AsyncIterable<Uint8Array | string> | Iterable<Uint8Array | string>,
         options: { compress: boolean; modified?: Date },
     ): Promise<number> {
         const entry = options.compress

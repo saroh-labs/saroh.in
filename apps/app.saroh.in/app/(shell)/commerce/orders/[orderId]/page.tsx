@@ -22,6 +22,7 @@ import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { refundsOnlineOrUnknown } from "@/lib/payments/refunds-online";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
 import { listProducts } from "@/lib/products/service";
@@ -94,7 +95,7 @@ export default async function OrderPage({
     // reaches the kitchen too; an API before B15 sends none, and the
     // contact's Needs attention is read instead (Z2a: never the notes).
     const fromOrder = allergyNotesOf(order.attention);
-    const [notes, payments, reviewState, canPayOnline, addable] =
+    const [notes, payments, reviewState, canPayOnline, addable, refundOnline] =
         await Promise.all([
             fromOrder !== undefined
                 ? Promise.resolve(fromOrder)
@@ -132,6 +133,11 @@ export default async function OrderPage({
                       )
                       .catch(() => "unavailable" as const)
                 : Promise.resolve(null),
+            // Whether a refund can still go back online (DEC-117): asked
+            // only of someone who may refund an order that shows money.
+            powers.refund && order.money
+                ? refundsOnlineOrUnknown()
+                : Promise.resolve(undefined),
         ]);
 
     return (
@@ -145,6 +151,7 @@ export default async function OrderPage({
                 payLink: linkable && (canPayOnline || connectable),
                 refund: powers.refund,
                 payOnline: canPayOnline,
+                refundOnline,
                 manageProviders: may("payment:manage"),
                 contact: may("contact:read"),
                 // A treatment's visits (B14): open one, book the next.

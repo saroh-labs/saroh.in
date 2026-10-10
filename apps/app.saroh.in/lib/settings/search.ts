@@ -163,6 +163,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         page: "/settings/providers",
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },
+    { label: "Download your data", page: "/settings/data" },
     {
         label: "Payment provider",
         page: "/settings/providers",

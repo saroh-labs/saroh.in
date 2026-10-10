@@ -130,7 +130,15 @@ function csvValue(value: unknown): string {
             ? value.toString()
             : JSON.stringify(value);
     }
-    return String(value as string | number | boolean | bigint);
+    if (typeof value === "string") return value;
+    if (
+        typeof value === "number" ||
+        typeof value === "boolean" ||
+        typeof value === "bigint"
+    ) {
+        return String(value);
+    }
+    return "";
 }
 
 export function csvLine(values: string[]): string {

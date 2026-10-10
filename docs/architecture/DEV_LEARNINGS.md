@@ -3560,6 +3560,7 @@ database were changed by hand.
 **Check**: the seed throws before writing anything to a database that isn't
 on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
 **Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`
+
 ## Insights — the orders figure read 0 because nothing wrote order.paid (#867)
 
 **Symptom**: Insights' orders figure was always empty for a real business,
@@ -3578,6 +3579,7 @@ subtracts it. An order paid before the change is never taken off.
 **Check**: `analytics/event-contract.spec.ts` → "every declared type is used"
 fails for any `*_TYPE` the contract exports that no other source file names.
 **Category**: analytics · `apps/api.saroh.in/src/modules/analytics/order-events.ts`
+
 ## Flaky tests — a timestamp, a real popover and a lost click (#846, #847, #854)
 
 **Symptom**: three tests failed now and then and passed on a re-run. (1)
@@ -3611,6 +3613,7 @@ serialized read only after stripping the timestamps.
 **Category**: tests · `e2e/tests/business-settings.spec.ts`,
 `apps/app.saroh.in/components/sites/site-editor.test.tsx`,
 `apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`
+
 ## A module switched off would have hidden its own history
 
 **Symptom**: the #117 audit found `@RequireModule("COMMERCE")` on the
@@ -3631,6 +3634,7 @@ those controllers as a history read or a gated route and runs the real guard
 on each; `module-annotations.spec.ts` (now in the unit project) lists them as
 method-level, so a class-level gate fails it.
 **Category**: access · `apps/api.saroh.in/src/modules/capabilities/module-enforcement.guard.ts`
+
 ## Lifecycle — "deleted" changed only a label (#921)
 
 **Symptom**: found 9 Oct 2026 building the deletion runner (#907). A
@@ -3666,3 +3670,24 @@ still ask the table; every `@Controller("public/sites")` must carry
 ask `assertMembersMayOpen`. A new state, site controller or member door fails
 it until it is decided.
 **Category**: lifecycle · `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.policy.ts`
+
+## Lifecycle — store-scoped writes never asked the lifecycle (DEC-117)
+
+**Symptom**: found 9 Oct 2026 building the deletion window's wind-down. A
+suspended business, or one scheduled for deletion, was documented as taking
+no workspace writes, and still took a New order, a product, a category, an
+import and a storefront invite.
+**Cause**: the lifecycle gate lived only in `OrganizationGuard`. Every
+`stores/:storeId/…` controller (orders, products, product details, the
+catalogue, categories, customers, imports, storefront members, `PUT
+stores/:id`) resolves its business in the service and never runs that guard,
+so nothing asked. The gate's own spec tested the guard, not the routes that
+skip it.
+**Fix**: `StoreLifecycleGuard` (`common/guards/store-lifecycle.guard.ts`)
+finds the store's business and asks the same question, with the route's
+`@LifecycleWrite` class, on every store-scoped controller.
+**Check**: `organizations/lifecycle-wind-down.spec.ts` scans every
+controller with a `stores` route and fails one without the guard; the same
+spec names every write route of the order, booking, payment, invoice,
+membership, class pack and course controllers as wind-down or refused.
+**Category**: lifecycle · `apps/api.saroh.in/src/common/guards/store-lifecycle.guard.ts`

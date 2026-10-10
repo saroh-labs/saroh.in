@@ -42,8 +42,30 @@ export interface ClosingView {
             byProvider: { provider: string; active: number }[];
             rows: ClosingMembershipRow[];
         } | null;
+        /**
+         * False when customers paid online and no payment provider is
+         * connected now (DEC-117): Saroh can't send a refund. Absent from
+         * an API before it, which reads as true.
+         */
+        refundsOnline?: boolean;
+        /** The reader is an owner: offer "Download your data". */
+        canDownloadData?: boolean;
     };
 }
+
+/** Settings › Your data, where the banner sends an owner. */
+export const DATA_EXPORT_HREF = "/settings/data";
+
+/**
+ * What still works while the business winds down (owner, 9 Oct, DEC-117).
+ * One sentence, the same for everyone; what a role may do is the API's.
+ */
+export const CLOSING_BODY =
+    "Until then nothing new can start: no new orders, bookings, memberships, products or settings changes. You can still finish, cancel and refund what's already been made, and take payment for it. Its orders, invoices and customers are kept as records.";
+
+/** Said when online refunds can't be sent from Saroh any more. */
+export const CLOSING_REFUND_IN_DASHBOARD =
+    "Your payment provider isn't connected, so Saroh can't send refunds online. Refund each customer in your provider's dashboard, then record it on the order.";
 
 /** One refund's line, in the order a merchant reads it. */
 export interface ClosingRefundLine {
@@ -73,6 +95,10 @@ export interface ClosingBannerWords {
         warnings: string[];
         lines: { key: string; label: string; href: string }[];
     } | null;
+    /** Refund in the provider's dashboard: its keys are gone (DEC-117). */
+    refundInDashboard: string | null;
+    /** "Download your data", for an owner. */
+    data: { label: string; href: string } | null;
 }
 
 const STAGE: Record<ClosingRefundStage, string> = {
@@ -139,9 +165,16 @@ export function closingBanner(
             : owesRefunds
               ? "This business will be deleted once its customers' refunds are finished"
               : "This business is being deleted",
-        body: "Until then you can read everything here, but nothing new can start. Its orders, invoices and customers are kept as records.",
+        body: CLOSING_BODY,
         refunds: shownRefunds,
         memberships: shownMemberships,
+        refundInDashboard:
+            closing.refundsOnline === false
+                ? CLOSING_REFUND_IN_DASHBOARD
+                : null,
+        data: closing.canDownloadData
+            ? { label: "Download your data", href: DATA_EXPORT_HREF }
+            : null,
     };
 }
 

@@ -273,6 +273,10 @@ const NEVER: Record<string, string> = {
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":
         "saroh.in's public link preview tool, not a tenant surface",
+    // DEC-117: an owner takes the business's data whatever it has switched
+    // off, and while it is closing or suspended.
+    "data-export/data-export.controller.ts":
+        "the owner's download of the business's own data — no module holds it",
 };
 
 /** Controllers with a test of their own below, not a row above. */

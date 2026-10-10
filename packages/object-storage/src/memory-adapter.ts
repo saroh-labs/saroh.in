@@ -178,11 +178,20 @@ export function createMemoryStorage(
         readObject(key: string): Promise<AsyncIterable<Uint8Array> | null> {
             const bytes = bytesByKey.get(key);
             if (!bytes) return Promise.resolve(null);
-            return Promise.resolve(
-                (async function* chunks() {
-                    yield bytes.slice();
-                })(),
-            );
+            return Promise.resolve({
+                [Symbol.asyncIterator]() {
+                    let sent = false;
+                    return {
+                        next: () => {
+                            const step: IteratorResult<Uint8Array> = sent
+                                ? { done: true, value: undefined }
+                                : { done: false, value: bytes.slice() };
+                            sent = true;
+                            return Promise.resolve(step);
+                        },
+                    };
+                },
+            });
         },
 
         putBytes(key: string, bytes: Uint8Array): void {

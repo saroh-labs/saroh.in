@@ -27,7 +27,7 @@ CREATE INDEX "DataExport_organizationId_createdAt_idx" ON "DataExport"("organiza
 
 -- One being made at a time per business.
 -- CreateIndex
-CREATE UNIQUE INDEX "DataExport_one_running_per_org" ON "DataExport"("organizationId") WHERE (status IN ('QUEUED', 'RUNNING'));
+CREATE UNIQUE INDEX "DataExport_one_running_per_org" ON "DataExport"("organizationId") WHERE (status = 'QUEUED' OR status = 'RUNNING');
 
 -- AddForeignKey
 ALTER TABLE "DataExport" ADD CONSTRAINT "DataExport_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -70,6 +70,7 @@ waits while holding one.
 
 | Key                                       | Serialises                                                                                                                                                  | Where                                                                                                                                           |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-117), with the partial unique index behind it                                   | `data-export/data-export.service.ts` (`request`)                                                                                                |
 | `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
 | `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
 | `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                           | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
@@ -176,6 +177,29 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   ledger (`system:organization-deletion`, `organization.deleted`) and the
   business's own history in that transaction; the log line carries counts
   and ids only.
+
+## Data export — **Current** (DEC-117)
+
+- **`data-export.build`** (one per ask, `data-export/data-export.handler.ts`)
+  builds a business's zip: each table's CSV read 500 rows at a time by id
+  (`data-export-tables.ts`), each media file streamed from storage, all
+  written to a temp file as it goes (`zip-file.ts`) and uploaded from it
+  through `ObjectStorage.putObject`; the file is removed whatever happens.
+  It marks the `DataExport` READY with its 7-day end, queues
+  `data-export.expire` for that moment on the same transaction, and emails
+  the owner a signed link (best-effort; the workspace shows it either way).
+  Three tries; the last failure marks the export FAILED in words.
+  Idempotent: an export no longer being made is left alone, and a retry
+  writes the same key.
+- **A handler that can outlive `JOB_VISIBILITY_MS` keeps its lease**:
+  `keepJobLease(job)` (`jobs/job-lease.ts`) moves `lockedAt` on every
+  minute, fenced on the lease, until the returned stop is called. The
+  export is the first; the worker still runs one job at a time, so a long
+  one delays the rest on that worker.
+- **`data-export.expire`** deletes the zip from storage, then marks the
+  export EXPIRED (storage first: a failed delete is retried with the key
+  still on the row). The deletion clean-up never cancels it
+  (`CLEANUP_KEEPS_JOB_TYPES`), so a deleted business's zip still goes.
 
 ## Insights rollups — **Current** (DEC-075)
 
