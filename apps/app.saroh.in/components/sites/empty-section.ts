@@ -63,7 +63,7 @@ export function emptySection(type: SectionType): Section {
                 content: {
                     title: "Get in touch",
                     submitLabel: "Send",
-                    successMessage: "Thanks — we'll be in touch soon.",
+                    successMessage: "Thanks, we'll be in touch soon.",
                     // Name, email and a message (UX-081): what an enquiry
                     // needs to be answered. The email is what the contract
                     // and the backing Form require; `name` and `message` are

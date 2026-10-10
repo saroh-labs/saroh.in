@@ -13,7 +13,7 @@ import type { Prisma } from "@saroh/database";
  * payment that loses the last unit, or arrives after the close, closes it
  * too and is refunded automatically (DEC-032).
  *
- * An order the customer chose to pay on handover ("Pay when you collect",
+ * An order the customer chose to pay on handover ("Pay at pick-up",
  * "Pay on delivery", `payOnHandover`) is none of this: it is a real order
  * from the start, as a staff pay-later order is — it promises its units
  * when it is made, is never closed by the job, and is marked paid by staff.

@@ -125,7 +125,7 @@ describe("the Plan tab's words", () => {
                 renewsAt: null,
                 pausedUntil: "2026-10-25T18:30:00.000Z",
             }),
-        ).toBe("Paused until 26 Oct 2026 — nothing is charged till then");
+        ).toBe("Paused until 26 Oct 2026. Nothing is charged till then");
         // Without a zone (an API before A8), UTC as before.
         expect(accountDate("2026-10-17T18:30:00.000Z")).toBe("17 Oct 2026");
     });

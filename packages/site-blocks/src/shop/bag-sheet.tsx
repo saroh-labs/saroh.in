@@ -717,7 +717,7 @@ export function BagSheet({
                     {pickup ? (
                         <p className="text-site-body mt-2.5 text-sm leading-normal">
                             <span className="text-site-fg font-semibold">
-                                Collect from
+                                Pick-up from
                             </span>{" "}
                             {pickup.address}
                             {pickup.hours ? (
@@ -869,7 +869,7 @@ export function payWords(
     if (pay.type === "ON_HANDOVER") {
         return pay.label === "Pay on delivery"
             ? "You'll pay when your order is delivered. Your order is placed now."
-            : "You'll pay when you collect your order. Your order is placed now.";
+            : "You'll pay at pick-up. Your order is placed now.";
     }
     return "You pay online in a secure window. Your order is placed once the payment goes through.";
 }

@@ -39,7 +39,7 @@ describe("OrderConfirmation (P4)", () => {
             <OrderConfirmation
                 lookup={{
                     ok: true,
-                    order: { ...ORDER, toPay: "Pay when you collect" },
+                    order: { ...ORDER, toPay: "Pay at pick-up" },
                 }}
                 businessName="Rye & Co."
             />,
@@ -52,11 +52,11 @@ describe("OrderConfirmation (P4)", () => {
         ).toBeTruthy();
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Rye & Co. will be in touch when it's ready.",
+                "You'll pay at pick-up. Rye & Co. will be in touch when it's ready.",
             ),
         ).toBeTruthy();
         expect(
-            screen.getByText("To pay when you collect").nextElementSibling
+            screen.getByText("To pay at pick-up").nextElementSibling
                 ?.textContent,
         ).toBe("₹680");
         expect(screen.queryByText("Paid")).toBeNull();
@@ -108,7 +108,7 @@ describe("OrderConfirmation (P4)", () => {
             "₹680",
         );
         expect(
-            screen.getByRole("heading", { name: "Pick up from" }),
+            screen.getByRole("heading", { name: "Pick-up from" }),
         ).toBeTruthy();
         expect(screen.getByText("12 Hill Road, Bandra")).toBeTruthy();
         // No receipt email is sent when a site order is placed.

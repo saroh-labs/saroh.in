@@ -47,7 +47,7 @@ export interface OrderNoticeVars {
     /** The order's number as the business shows it ("ORD-1019"). */
     number: string;
     stage: NoticeStage;
-    /** Collected by the customer: Ready means "ready to collect". */
+    /** Collected by the customer: Ready means "ready for pick-up". */
     pickup: boolean;
     courier: string | null;
     trackingNumber: string | null;
@@ -175,13 +175,13 @@ function placedSentence(p: PlacedOrderVars): string {
         p.fulfilment === "LOCAL_DELIVERY" || p.fulfilment === "SHIPPING";
     // Only the steps they are told about are promised (`orderNoticeKind`).
     const next = pickup
-        ? " We'll tell you when it's ready to collect."
+        ? " We'll tell you when it's ready for pick-up."
         : delivered
           ? " We'll tell you when it's on its way."
           : "";
     if (p.payOnHandover) {
         const pay = pickup
-            ? "You pay when you collect it."
+            ? "You pay at pick-up."
             : delivered
               ? "You pay when it's delivered."
               : "You pay when you get it.";
@@ -196,7 +196,7 @@ function orderSentence(
 ): string {
     if (kind === "ORDER_READY") {
         return o.pickup
-            ? `Your order ${o.number} is ready to collect.`
+            ? `Your order ${o.number} is ready for pick-up.`
             : `Your order ${o.number} is packed and ready to go.`;
     }
     if (o.stage === "OUT_FOR_DELIVERY") {
@@ -222,7 +222,7 @@ function noticeSubject(vars: NoticeVars): string {
             return `Your order ${vars.placed.number} from ${vars.placed.business}`;
         case "ORDER_READY":
             return vars.order.pickup
-                ? `Your order ${vars.order.number} from ${vars.order.business} is ready to collect`
+                ? `Your order ${vars.order.number} from ${vars.order.business} is ready for pick-up`
                 : `Your order ${vars.order.number} from ${vars.order.business} is ready`;
         case "ORDER_HANDED_OVER":
             return `Your order ${vars.order.number} from ${vars.order.business} is on its way`;

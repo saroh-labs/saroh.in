@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { focusRing } from "../booking-flow/styles";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
-import { allInBagWords, roomInBag } from "../shop/add-to-bag";
+import { ADDED_SHOWN_MS, allInBagWords, roomInBag } from "../shop/add-to-bag";
 import { addToBag, openBag, useBag } from "../shop/bag-store";
 import { chooseLabel, optionSummary } from "./option-summary";
 import { formatAmount, percentOff } from "./product-page";
@@ -90,6 +90,16 @@ export default function ShopListing({
 }) {
     const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
     const [notice, setNotice] = useState<string | null>(null);
+    // "‹Product› added to your bag." goes by itself after four seconds: it
+    // has said what happened, and it sits over the page. Each add says it
+    // afresh (`said` counts them). "Your bag is full" stays until the next
+    // thing happens: it is why nothing was added.
+    const [said, setSaid] = useState(0);
+    useEffect(() => {
+        if (said === 0) return;
+        const timer = setTimeout(() => setNotice(null), ADDED_SHOWN_MS);
+        return () => clearTimeout(timer);
+    }, [said]);
     const bag = useBag(bagSite ?? "");
 
     /** How many of the card's option the bag holds now. */
@@ -122,6 +132,7 @@ export default function ShopListing({
         }
         setAdded((was) => new Set(was).add(p.slug));
         setNotice(`${p.name} added to your bag.`);
+        setSaid((n) => n + 1);
     }
 
     return (

@@ -460,13 +460,13 @@ export function creditUsedText(credit: OfferedCredit): string {
     const left = Math.max(0, credit.left - 1);
     const from = creditSource(credit).toLowerCase();
     if (credit.kind === "PACK") {
-        return `Used 1 credit from your ${from} — ${left} left, use by ${dateText(credit.useBy)}.`;
+        return `Used 1 credit from your ${from}. ${left} left, use by ${dateText(credit.useBy)}.`;
     }
     const month = new Intl.DateTimeFormat("en-GB", {
         month: "long",
         timeZone: "UTC",
     }).format(new Date(civil(credit.resetsOn).getTime() - 86_400_000));
-    return `Used 1 credit from your ${from} — ${left} left in ${month}.`;
+    return `Used 1 credit from your ${from}. ${left} left in ${month}.`;
 }
 
 /**
@@ -501,13 +501,14 @@ export function payChoices(
         label: isClass
             ? `Pay ${price} for this class`
             : `Pay ${price}${forAll} now`,
-        sub: "Online — booked straight away",
+        sub: "Online, booked straight away",
         amount: price,
     };
+    const words = laterWords(service, business);
     const desk: PayChoice = {
         pay: "DESK",
-        label: "Pay at the desk",
-        sub: "Held for you; pay when you arrive",
+        label: words.label,
+        sub: words.sub,
         amount: price,
     };
     const deposit = service.depositCents ?? null;
@@ -533,6 +534,54 @@ export function payChoices(
         ];
     }
     return [...(online ? [payNow] : []), ...(atDesk ? [desk] : [])];
+}
+
+/**
+ * The words for paying after booking, by where the service happens. A
+ * service customers attend in person is paid "at the desk", when they
+ * arrive. One that is online only has no desk to pay at: it is paid
+ * "later", to the business directly. (A service offered either way keeps
+ * the desk's words: the page doesn't know, when it offers the choice,
+ * which way this booking will be had.)
+ */
+export interface LaterWords {
+    /** The pay step's choice, and the summary's line: "Pay at the desk". */
+    label: string;
+    /** Under the choice. */
+    sub: string;
+    /** The button: "Book and pay at the desk". */
+    confirm: string;
+}
+
+export function laterWords(
+    service: Pick<BookingService, "online"> | null | undefined,
+    business: string,
+): LaterWords {
+    return service?.online
+        ? {
+              label: "Pay later",
+              sub: `Held for you. Pay ${business} directly.`,
+              confirm: "Book and pay later",
+          }
+        : {
+              label: "Pay at the desk",
+              sub: "Held for you. Pay when you arrive.",
+              confirm: "Book and pay at the desk",
+          };
+}
+
+/**
+ * What the booked card says is still to pay: at the front desk for a visit
+ * in person, to the business directly for one held online.
+ */
+export function payLaterText(
+    price: string,
+    online: boolean,
+    business: string,
+): string {
+    return online
+        ? `Pay ${price} to ${business} directly.`
+        : `Pay ${price} at the front desk when you arrive.`;
 }
 
 /**

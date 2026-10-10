@@ -30,7 +30,7 @@ export function Sessions({
     onPick: (start: BookingStart) => void;
     /**
      * A full class's waitlist (A12): a full session can be chosen, to join
-     * its line, and says "Full — join waitlist", their place in line, or
+     * its line, and says "Full. Join the waitlist", their place in line, or
      * that a place is held for them. Absent: a full session is closed.
      */
     waitlist?: { placeOf: (startAt: string) => WaitlistPlace | undefined };

@@ -29,10 +29,8 @@ describe("payWords", () => {
     });
 
     it("says at the handover once the quote offers only that", () => {
-        expect(
-            payWords({ type: "ON_HANDOVER", label: "Pay when you collect" }),
-        ).toBe(
-            "You'll pay when you collect your order. Your order is placed now.",
+        expect(payWords({ type: "ON_HANDOVER", label: "Pay at pick-up" })).toBe(
+            "You'll pay at pick-up. Your order is placed now.",
         );
     });
 });

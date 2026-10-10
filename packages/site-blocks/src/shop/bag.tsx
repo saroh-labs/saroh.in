@@ -220,7 +220,7 @@ export function ShopBag({
                     started,
                     toPay:
                         request.fulfilment === "PICKUP"
-                            ? "Pay when you collect"
+                            ? "Pay at pick-up"
                             : "Pay on delivery",
                 });
                 return;

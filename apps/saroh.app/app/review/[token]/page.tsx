@@ -34,11 +34,11 @@ const GONE: Record<
     },
     expired: {
         title: "This link has ended",
-        body: "It may have expired, or the shop may have sent you a newer one — look for a more recent email from them.",
+        body: "It may have expired, or the shop may have sent you a newer one. Look for a more recent email from them.",
     },
     missing: {
         title: "This link has ended",
-        body: "It may have expired, or the shop may have sent you a newer one — look for a more recent email from them.",
+        body: "It may have expired, or the shop may have sent you a newer one. Look for a more recent email from them.",
     },
     unavailable: {
         title: "We couldn't open your review",

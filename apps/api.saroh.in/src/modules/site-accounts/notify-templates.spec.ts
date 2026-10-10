@@ -94,7 +94,7 @@ describe("notice words (A14)", () => {
 
     it("tells an order's Ready by how it leaves, and its handover with the courier", () => {
         expect(noticeSentence({ kind: "ORDER_READY", order: order() })).toBe(
-            "Your order ORD-1019 is ready to collect.",
+            "Your order ORD-1019 is ready for pick-up.",
         );
         expect(
             noticeSentence({
@@ -183,7 +183,7 @@ describe("the notice email (A14)", () => {
         });
         expect(mail.body.startsWith("<p>Hello,</p>")).toBe(true);
         expect(mail.subject).toBe(
-            "Your order ORD-1019 from Rye & Co. is ready to collect",
+            "Your order ORD-1019 from Rye & Co. is ready for pick-up",
         );
     });
 
@@ -315,7 +315,7 @@ describe("a website order placed (UX-042)", () => {
 
     it("says it's in, how it's paid, and only the steps they will hear of", () => {
         expect(noticeSentence(placed())).toBe(
-            "We have your order ORD-1019. You pay when you collect it. We'll tell you when it's ready to collect.",
+            "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
         );
         expect(noticeSentence(placed({ fulfilment: "LOCAL_DELIVERY" }))).toBe(
             "We have your order ORD-1019. You pay when it's delivered. We'll tell you when it's on its way.",

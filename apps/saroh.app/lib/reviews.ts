@@ -95,7 +95,7 @@ export async function postReview(
         case 409:
             return {
                 ok: false,
-                message: "You've already reviewed this one — thank you.",
+                message: "You've already reviewed this one. Thank you.",
             };
         case 410:
         case 404:

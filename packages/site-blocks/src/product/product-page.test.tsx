@@ -111,13 +111,13 @@ describe("ProductPage", () => {
 
     it("a sold-out variant can be looked at but not bought", () => {
         render(<ProductPage product={dress} />);
-        fireEvent.click(screen.getByRole("button", { name: "S — sold out" }));
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
         expect(screen.getByRole("button", { name: "Sold out" })).toBeDisabled();
     });
 
     it("in preview, the basket says nothing was added", () => {
         render(<ProductPage product={dress} action={<p>Never shown</p>} />);
-        fireEvent.click(screen.getByRole("button", { name: "Add to basket" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
         expect(screen.getByRole("status")).toHaveTextContent(/preview/);
         // The action slot belongs to the live page only.
         expect(screen.queryByText("Never shown")).not.toBeInTheDocument();
@@ -224,7 +224,7 @@ describe("ProductPage on the live site (G11)", () => {
         render(<ProductPage product={dress} preview={false} markers />);
         expect(screen.queryByLabelText("Note 1")).not.toBeInTheDocument();
         expect(
-            screen.queryByRole("button", { name: "Add to basket" }),
+            screen.queryByRole("button", { name: "Add to bag" }),
         ).not.toBeInTheDocument();
         // The product itself is all there.
         expect(screen.getByText("Linen Wrap Dress")).toBeInTheDocument();
@@ -250,7 +250,7 @@ describe("ProductPage on the live site (G11)", () => {
         expect(screen.getByTestId("probe")).toHaveTextContent("m 2499.00 on");
         fireEvent.click(screen.getByRole("button", { name: "L" }));
         expect(screen.getByTestId("probe")).toHaveTextContent("l 2699.00 on");
-        fireEvent.click(screen.getByRole("button", { name: "S — sold out" }));
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
         expect(screen.getByTestId("probe")).toHaveTextContent("s 2499.00 off");
         expect(screen.getByText("Sold out")).toBeInTheDocument();
     });

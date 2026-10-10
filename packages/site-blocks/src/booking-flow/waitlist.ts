@@ -128,7 +128,7 @@ export function fullSessionText(
     if (place?.placeInLine) {
         return `On the waitlist · ${ordinal(place.placeInLine)}`;
     }
-    return "Full — join waitlist";
+    return "Full. Join the waitlist";
 }
 
 /** How a place is held, said once where the waitlist is explained. */

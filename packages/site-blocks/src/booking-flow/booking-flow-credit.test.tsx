@@ -251,7 +251,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your 5 classes pack — 3 left, use by 12 Nov.",
+                "Used 1 credit from your 5 classes pack. 3 left, use by 12 Nov.",
             ),
         ).toBeInTheDocument();
         const [body] = bookBodies();
@@ -285,7 +285,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your membership — 2 left in October.",
+                "Used 1 credit from your membership. 2 left in October.",
             ),
         ).toBeInTheDocument();
         expect(bookBodies()[0]).toMatchObject({
@@ -307,7 +307,7 @@ describe("a class credit online (A10)", () => {
         await screen.findByRole("radio", { name: /Use 1 credit/ });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });

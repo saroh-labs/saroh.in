@@ -17,7 +17,7 @@ import { cn } from "../lib/utils";
  * everything as props: no fetching, no API shapes.
  *
  * Picking a variant changes the price, the MRP and saving, the stock word and
- * the photo — the way a customer tries sizes. In `preview` mode the basket
+ * the photo — the way a customer tries sizes. In `preview` mode the bag
  * button is shown but does nothing, and says so.
  *
  * Public mode (`preview={false}`, round-2 G11) is the merchant's live
@@ -312,10 +312,14 @@ export default function ProductPage({
         }
     }
 
-    function addToBasket() {
+    function addToBag() {
         if (soldOut) return;
-        setNotice("This is a preview — nothing is added to a basket.");
+        setNotice("This is a preview. Nothing is added to a bag.");
     }
+
+    // The rating, only while there are reviews to show under it.
+    const reviewed = product.reviews.length > 0 ? product.rating : null;
+    const hasReviews = reviewed !== null;
 
     const details: { label: string; value: string }[] = [
         ...(product.materials
@@ -515,7 +519,7 @@ export default function ProductPage({
                                         {v.stock === "SOLD_OUT" ? (
                                             <span className="sr-only">
                                                 {" "}
-                                                — sold out
+                                                (sold out)
                                             </span>
                                         ) : null}
                                     </button>
@@ -544,11 +548,11 @@ export default function ProductPage({
                         <>
                             <button
                                 type="button"
-                                onClick={addToBasket}
+                                onClick={addToBag}
                                 disabled={soldOut}
                                 className="bg-site-accent text-site-accent-fg mt-5 min-h-11 w-full rounded-[var(--site-radius,2px)] px-5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                             >
-                                {soldOut ? "Sold out" : "Add to basket"}
+                                {soldOut ? "Sold out" : "Add to bag"}
                             </button>
                             {notice ? (
                                 <p
@@ -631,62 +635,69 @@ export default function ProductPage({
                 </div>
             </div>
 
-            {/* 6 — reviews */}
-            <section className="border-site-border border-t px-4 py-6 sm:px-6">
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <Marker n={6} show={markers} />
-                    Reviews
-                </h2>
-                {product.rating && product.reviews.length > 0 ? (
-                    <>
-                        <p className="text-site-body mt-1 text-sm">
-                            {product.rating.average.toFixed(1)} out of 5, from{" "}
-                            {product.rating.count} verified{" "}
-                            {product.rating.count === 1 ? "buyer" : "buyers"}
-                        </p>
-                        <ul className="mt-4 grid gap-4 md:grid-cols-2">
-                            {product.reviews.map((r) => (
-                                <li
-                                    key={r.id}
-                                    className="border-site-border bg-site-surface min-w-0 rounded-[var(--site-radius,2px)] border p-4"
-                                >
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                                        <Stars rating={r.rating} />
-                                        <span className="font-medium">
-                                            {r.displayName}
-                                        </span>
-                                        <span className="text-site-muted">
-                                            · {r.dateLabel}
-                                        </span>
-                                    </div>
-                                    {r.variantTitle ? (
-                                        <p className="text-site-muted mt-1 text-xs">
-                                            Bought {r.variantTitle}
-                                        </p>
-                                    ) : null}
-                                    {r.body ? (
-                                        <p className="text-site-body mt-2 break-words text-sm">
-                                            {r.body}
-                                        </p>
-                                    ) : null}
-                                    {r.reply ? (
-                                        <p className="border-site-border text-site-body mt-3 border-l-2 pl-3 text-sm">
-                                            <span className="text-site-fg font-medium">
-                                                Reply from the shop:{" "}
+            {/* 6 — reviews. A product nobody has reviewed says nothing
+                about reviews on its live page: an empty heading and "No
+                reviews yet" only tell a shopper nobody has bought it. The
+                merchant's preview keeps the note, which says who can
+                review. */}
+            {hasReviews || preview ? (
+                <section className="border-site-border border-t px-4 py-6 sm:px-6">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                        <Marker n={6} show={markers} />
+                        Reviews
+                    </h2>
+                    {hasReviews ? (
+                        <>
+                            <p className="text-site-body mt-1 text-sm">
+                                {reviewed.average.toFixed(1)} out of 5, from{" "}
+                                {reviewed.count} verified{" "}
+                                {reviewed.count === 1 ? "buyer" : "buyers"}
+                            </p>
+                            <ul className="mt-4 grid gap-4 md:grid-cols-2">
+                                {product.reviews.map((r) => (
+                                    <li
+                                        key={r.id}
+                                        className="border-site-border bg-site-surface min-w-0 rounded-[var(--site-radius,2px)] border p-4"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                                            <Stars rating={r.rating} />
+                                            <span className="font-medium">
+                                                {r.displayName}
                                             </span>
-                                            {r.reply}
-                                        </p>
-                                    ) : null}
-                                </li>
-                            ))}
-                        </ul>
-                    </>
-                ) : (
-                    <p className="text-site-muted mt-1 text-sm">
-                        No reviews yet. Only people who bought it can review it.
-                    </p>
-                )}
-            </section>
+                                            <span className="text-site-muted">
+                                                · {r.dateLabel}
+                                            </span>
+                                        </div>
+                                        {r.variantTitle ? (
+                                            <p className="text-site-muted mt-1 text-xs">
+                                                Bought {r.variantTitle}
+                                            </p>
+                                        ) : null}
+                                        {r.body ? (
+                                            <p className="text-site-body mt-2 break-words text-sm">
+                                                {r.body}
+                                            </p>
+                                        ) : null}
+                                        {r.reply ? (
+                                            <p className="border-site-border text-site-body mt-3 border-l-2 pl-3 text-sm">
+                                                <span className="text-site-fg font-medium">
+                                                    Reply from the shop:{" "}
+                                                </span>
+                                                {r.reply}
+                                            </p>
+                                        ) : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    ) : (
+                        <p className="text-site-muted mt-1 text-sm">
+                            No reviews yet. Only people who bought it can review
+                            it.
+                        </p>
+                    )}
+                </section>
+            ) : null}
         </article>
     );
 }

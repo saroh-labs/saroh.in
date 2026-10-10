@@ -187,7 +187,7 @@ function Handover({ order }: { order: OrderConfirmationData }) {
                 id="order-handover"
                 className="font-site-heading text-site-fg text-lg font-semibold"
             >
-                {pickup ? "Pick up from" : `${label} to`}
+                {pickup ? "Pick-up from" : `${label} to`}
             </h2>
             {pickup ? (
                 <address className="text-site-body mt-1.5 text-sm not-italic">
@@ -322,18 +322,18 @@ export function OrderConfirmation({
     );
 }
 
-/** "You'll pay when you collect your order.", said where it is placed. */
+/** "You'll pay at pick-up.", said where it is placed. */
 export function toPayLead(toPay: string): string {
     return toPay === "Pay on delivery"
         ? "You'll pay when your order is delivered."
-        : "You'll pay when you collect your order.";
+        : "You'll pay at pick-up.";
 }
 
 /** The total's label on an order still to be paid at the handover. */
 function toPayTotal(toPay: string): string {
     return toPay === "Pay on delivery"
         ? "To pay on delivery"
-        : "To pay when you collect";
+        : "To pay at pick-up";
 }
 
 /** Where a placed order's confirmation lives, on the business's site. */

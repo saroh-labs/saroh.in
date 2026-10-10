@@ -66,6 +66,7 @@ import {
     dateText,
     formatMoney,
     laterSkip,
+    laterWords,
     payChoices,
     restAfterDeposit,
     rulesText,
@@ -115,7 +116,7 @@ import { heldForYouText, LEFT_WAITLIST, waitlistTerms } from "./waitlist";
  * which (`useCredit`), and the booking spends it at once.
  *
  * A full class offers its waitlist (A12): the session can still be chosen,
- * says "Full — join waitlist", and the last step joins the line instead of
+ * says "Full. Join the waitlist", and the last step joins the line instead of
  * booking — nothing to pay. A place held for them reads "Held for you
  * until ‹time›" and is booked the normal way; one they are waiting for can
  * be left (`useWaitlist`).
@@ -543,6 +544,8 @@ export default function BookingFlow({
           }`
         : "";
 
+    // "At the desk" for a visit in person, "later" for one held online.
+    const later = laterWords(service, page.businessName);
     // Nothing it can take: no payment line at all (#822).
     const dueLabel = unpayable
         ? ""
@@ -555,7 +558,7 @@ export default function BookingFlow({
               : pay === "NOW"
                 ? "To pay now"
                 : price
-                  ? "Pay at the desk"
+                  ? later.label
                   : "To pay";
     const due = unpayable
         ? ""
@@ -580,7 +583,7 @@ export default function BookingFlow({
                 : pay === "NOW"
                   ? `Pay ${price ?? ""} and book`
                   : price && !unpayable
-                    ? "Book — pay at the desk"
+                    ? later.confirm
                     : "Book";
     const barLabel = !customer
         ? "Continue to sign in"

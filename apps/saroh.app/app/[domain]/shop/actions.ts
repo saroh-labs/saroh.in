@@ -61,8 +61,7 @@ const INVALID: Refusal = {
 const OFFLINE: Refusal = {
     ok: false,
     reason: "error",
-    message:
-        "We couldn't reach the shop — check your connection and try again.",
+    message: "We couldn't reach the shop. Check your connection and try again.",
 };
 const SIGNED_OUT: Refusal = {
     ok: false,

@@ -73,7 +73,7 @@ export function EnquiryFields({
                 <Input
                     value={c.successMessage ?? ""}
                     onChange={(e) => patch({ successMessage: e.target.value })}
-                    placeholder="Thanks — we'll be in touch soon."
+                    placeholder="Thanks, we'll be in touch soon."
                 />
             </Field>
             <div className="grid gap-2">

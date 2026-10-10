@@ -46,7 +46,7 @@ export function fileNameFrom(
 export function pdfFailure(status: number): string {
     if (status === 401) return "Sign in again to download your receipt.";
     if (status === 404) {
-        return "This invoice's PDF isn't available. The business may have sent you a newer link — ask them for the latest one.";
+        return "This invoice's PDF isn't available. The business may have sent you a newer link. Ask them for the latest one.";
     }
     if (status === 429)
         return "Too many downloads at once. Wait a minute, then try again.";

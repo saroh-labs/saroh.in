@@ -13,6 +13,7 @@ import {
     firstVisitText,
     googleCalendarHref,
     MOVE_OR_CANCEL,
+    payLaterText,
 } from "../model";
 import { card, focusRing } from "../styles";
 
@@ -71,7 +72,7 @@ export function DoneCard({
             ? `Paid a ${phase.price ?? ""} deposit. The rest (${phase.rest}) is paid at ${business}.`
             : `Paid ${phase.price ?? ""} online.`
         : phase.price
-          ? `Pay ${phase.price} at the front desk when you arrive.`
+          ? payLaterText(phase.price, booking.online, business)
           : "Nothing to pay in advance.";
     // Paid with a class credit (A10): what it came from and what is left.
     const payText = phase.creditText ?? paidText;

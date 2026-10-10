@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { focusRing } from "../booking-flow/styles";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useProductSelection } from "../product/product-page";
 import { addToBag, openBag, useBag } from "./bag-store";
+
+/** How long "added to your bag" stays before it goes by itself. */
+export const ADDED_SHOWN_MS = 4_000;
 
 /**
  * Whether one more can go in the bag (UX-058): not past what the page says
@@ -70,6 +73,16 @@ export function AddToBag({
     const selection = useProductSelection();
     const [added, setAdded] = useState<string | null>(null);
     const [full, setFull] = useState(false);
+    // "‹Product› added to your bag." goes by itself: it has said what
+    // happened, and on a phone it sits over the page. Each add says it
+    // afresh (`said` counts them). The button still reads "Add another".
+    const [said, setSaid] = useState(0);
+    const [showAdded, setShowAdded] = useState(false);
+    useEffect(() => {
+        if (said === 0) return;
+        const timer = setTimeout(() => setShowAdded(false), ADDED_SHOWN_MS);
+        return () => clearTimeout(timer);
+    }, [said]);
     const bag = useBag(site);
     if (!selection) return null;
     const inBag =
@@ -99,6 +112,8 @@ export function AddToBag({
         );
         setFull(!inBag);
         setAdded(inBag ? what : null);
+        setShowAdded(inBag);
+        if (inBag) setSaid((n) => n + 1);
     }
 
     // What one more costs, on the button itself.
@@ -144,7 +159,7 @@ export function AddToBag({
                     </button>
                 </p>
             ) : null}
-            {added ? (
+            {added && showAdded ? (
                 <p
                     role="status"
                     className="text-site-body mt-2 flex flex-wrap items-center gap-x-2 text-sm max-[699px]:mt-0"

@@ -172,7 +172,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(sent).toHaveLength(1);
@@ -227,7 +227,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]).not.toHaveProperty("source");
@@ -241,7 +241,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]).not.toHaveProperty("source");
@@ -255,7 +255,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
 
@@ -275,7 +275,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(2));
         expect(sent[1]).not.toHaveProperty("source");

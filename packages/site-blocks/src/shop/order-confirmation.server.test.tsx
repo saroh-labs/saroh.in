@@ -87,7 +87,7 @@ describe("OrderConfirmation rendered on the server (UX-001)", () => {
                         ...ORDER,
                         delivery: null,
                         total: "241.00",
-                        toPay: "Pay when you collect",
+                        toPay: "Pay at pick-up",
                         fulfilment: {
                             type: "PICKUP",
                             label: "Pick-up",
@@ -99,7 +99,7 @@ describe("OrderConfirmation rendered on the server (UX-001)", () => {
                 businessName="Test Bakery"
             />,
         );
-        expect(html).toContain("To pay when you collect");
+        expect(html).toContain("To pay at pick-up");
         expect(html).toContain("Front counter");
     });
 });

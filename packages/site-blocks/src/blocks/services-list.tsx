@@ -207,8 +207,8 @@ export default function ServicesListSection({
             ) : state.kind === "error" ? (
                 <div className="mt-8">
                     <p role="alert" className={destructiveAlertClasses}>
-                        We couldn&apos;t load our services right now — please
-                        try again shortly.
+                        We couldn&apos;t load our services right now. Please try
+                        again shortly.
                     </p>
                     <button
                         type="button"
@@ -449,7 +449,7 @@ function PriceCardSection({
         ) : state.kind === "error" ? (
             <div>
                 <p role="alert" className={destructiveAlertClasses}>
-                    We couldn&apos;t load this right now — please try again
+                    We couldn&apos;t load this right now. Please try again
                     shortly.
                 </p>
                 <button

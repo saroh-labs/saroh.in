@@ -45,7 +45,7 @@ export interface QuoteWay {
 
 /**
  * How an order is paid: online in the provider's window, or at the
- * handover — "Pay when you collect", "Pay on delivery".
+ * handover — "Pay at pick-up", "Pay on delivery".
  */
 export type ShopPayment = "ONLINE" | "ON_HANDOVER";
 
@@ -213,7 +213,7 @@ export interface ShopCheckoutApi {
 
 /** The sentence when the server can't be reached at all. */
 export const SHOP_OFFLINE =
-    "We couldn't reach the shop — check your connection and try again.";
+    "We couldn't reach the shop. Check your connection and try again.";
 
 /** A key for one checkout: letters, digits, - and _ only. */
 export function checkoutKey(): string {

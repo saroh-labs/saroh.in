@@ -6,6 +6,7 @@ import { useId, useState, useTransition } from "react";
 
 import { submitReview } from "@/app/review/[token]/actions";
 import type { ReviewInvitation, ReviewLine } from "@/lib/reviews";
+import { siteImage } from "@saroh/site-blocks";
 
 const STARS = [1, 2, 3, 4, 5] as const;
 
@@ -110,6 +111,9 @@ function LineCard({
                 <img
                     src={line.image}
                     alt=""
+                    width={48}
+                    height={48}
+                    {...siteImage()}
                     className="size-12 shrink-0 rounded-md border border-site-border object-cover"
                 />
             ) : null}
@@ -122,7 +126,7 @@ function LineCard({
             <div className="rounded-xl border border-site-border bg-site-surface p-5">
                 {header}
                 <p className="mt-2 text-sm text-site-muted">
-                    Posted — thank you.
+                    Posted. Thank you.
                 </p>
             </div>
         );

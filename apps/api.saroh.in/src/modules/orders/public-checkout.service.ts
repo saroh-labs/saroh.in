@@ -71,7 +71,7 @@ import { fromCents } from "./order-pricing";
  *   quantities; prices, GST (DEC-023), the ways an order can leave and "can
  *   sell" are re-read here (`checkout-quote.ts`).
  * - **Offered only when it can be paid.** Online needs a plan with online
- *   payments and a provider; paying on handover ("Pay when you collect",
+ *   payments and a provider; paying on handover ("Pay at pick-up",
  *   "Pay on delivery") is always open on a plan without them, and on a plan
  *   with them only when the storefront turns it on (`checkout-readiness.ts`).
  *   A storefront that is paused, or that neither way can pay for, has no

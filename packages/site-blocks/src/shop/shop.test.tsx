@@ -520,7 +520,7 @@ describe("the header's bag", () => {
                     total: "500.00",
                     currency: "INR",
                     message:
-                        "Sorry, it sold out while you were paying — your money is on its way back",
+                        "Sorry, it sold out while you were paying. Your money is on its way back",
                 },
             },
         });
@@ -853,7 +853,7 @@ describe("the header's bag", () => {
         expect(
             screen.getByText("12 Hill Road, Bandra", { exact: false }),
         ).toBeInTheDocument();
-        expect(screen.getByText("Collect from")).toBeInTheDocument();
+        expect(screen.getByText("Pick-up from")).toBeInTheDocument();
         expect(
             screen.getByText("Mon–Sat 10:00–19:00, Sun closed"),
         ).toBeInTheDocument();
@@ -1349,7 +1349,7 @@ describe("the bag on a test release (DEC-071, T6)", () => {
 describe("paying at the handover (2026-10-06: Free takes money offline)", () => {
     const COLLECT = {
         type: "ON_HANDOVER" as const,
-        label: "Pay when you collect",
+        label: "Pay at pick-up",
     };
     const ONLINE = { type: "ONLINE" as const, label: "Pay online" };
     const PLACED_TO_PAY: CheckoutStarted = {
@@ -1396,9 +1396,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         expect(
             screen.getByRole("button", { name: "Sign in and pay · ₹500" }),
         ).toBeEnabled();
-        fireEvent.click(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
-        );
+        fireEvent.click(screen.getByRole("radio", { name: "Pay at pick-up" }));
         expect(
             screen.getByRole("button", {
                 name: "Sign in and place order · ₹500",
@@ -1406,7 +1404,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         ).toBeEnabled();
     });
 
-    it("offers only paying when they collect, places it with nothing to pay, and says it's unpaid", async () => {
+    it("offers only paying at pick-up, places it with nothing to pay, and says it's unpaid", async () => {
         const { start, openCheckout } = setup({
             signedIn: true,
             quote: { ok: true, data: quoteOf({ payments: [COLLECT] }) },
@@ -1415,7 +1413,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         await openTheBag();
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Your order is placed now.",
+                "You'll pay at pick-up. Your order is placed now.",
             ),
         ).toBeInTheDocument();
         // One way to pay: nothing to choose.
@@ -1425,9 +1423,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
             screen.getByRole("button", { name: /^Place order · / }),
         );
         await screen.findByRole("heading", { name: "Order placed" });
-        expect(
-            screen.getByText(/You'll pay when you collect your order\./),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/You'll pay at pick-up\./)).toBeInTheDocument();
         expect(
             screen.getByRole("link", { name: "See your order" }),
         ).toHaveAttribute("href", `/shop/order/${STARTED.orderId}`);
@@ -1453,15 +1449,13 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
             screen.getByText(/You pay online in a secure window/),
         ).toBeInTheDocument();
 
-        fireEvent.click(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
-        );
+        fireEvent.click(screen.getByRole("radio", { name: "Pay at pick-up" }));
         expect(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
+            screen.getByRole("radio", { name: "Pay at pick-up" }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Your order is placed now.",
+                "You'll pay at pick-up. Your order is placed now.",
             ),
         ).toBeInTheDocument();
         fireEvent.click(
@@ -1613,7 +1607,7 @@ describe("the QR code an order came from", () => {
                 payments: [
                     {
                         type: "ON_HANDOVER" as const,
-                        label: "Pay when you collect",
+                        label: "Pay at pick-up",
                     },
                 ],
             }),

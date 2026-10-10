@@ -462,7 +462,7 @@ export class PublicBookingsService {
             const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
+                    "Too many booking attempts. Please slow down and try again shortly",
                     429,
                 );
             }

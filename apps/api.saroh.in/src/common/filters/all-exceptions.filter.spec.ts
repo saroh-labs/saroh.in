@@ -204,7 +204,7 @@ describe("AllExceptionsFilter", () => {
         filter.catch(
             new ServiceUnavailableException({
                 message:
-                    "We couldn't send your code — try again in a few minutes",
+                    "We couldn't send your code. Try again in a few minutes",
                 details: { reason: "unavailable" },
             }),
             makeHost(res),
@@ -213,7 +213,7 @@ describe("AllExceptionsFilter", () => {
         expect(err.statusCode).toBe(503);
         expect(err.code).toBe("SERVICE_UNAVAILABLE");
         expect(err.message).toBe(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         expect(err.details).toEqual({ reason: "unavailable" });
     });

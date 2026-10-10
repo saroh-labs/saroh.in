@@ -473,9 +473,7 @@ describe("paying at the handover (2026-10-06)", () => {
         expect(
             isQuote({
                 ...quote,
-                payments: [
-                    { type: "ON_HANDOVER", label: "Pay when you collect" },
-                ],
+                payments: [{ type: "ON_HANDOVER", label: "Pay at pick-up" }],
             }),
         ).toBe(true);
         expect(

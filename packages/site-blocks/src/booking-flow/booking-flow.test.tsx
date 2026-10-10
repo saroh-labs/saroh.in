@@ -265,7 +265,7 @@ describe("the booking page (U19)", () => {
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         expect(
@@ -311,7 +311,7 @@ describe("the booking page (U19)", () => {
         });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         const post = calls.find((c) => c.url.endsWith("/book"));
@@ -359,7 +359,7 @@ describe("the booking page (U19)", () => {
                 name: "Pay ₹1,200 to confirm your place",
             }),
         ).toBeInTheDocument();
-        await screen.findByText("Pay online in the Razorpay window");
+        await screen.findByText("Pay online in the payment window");
         const intent = calls.find((c) => c.url.endsWith("/payment-intent"));
         expect(intent?.url).toBe(`${API}/public/invoices/tok_1/payment-intent`);
         expect(JSON.parse(intent?.init?.body as string)).not.toHaveProperty(
@@ -541,7 +541,7 @@ describe("the booking page (U19)", () => {
 
         // Trying again sends the same key.
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         expect(
             await screen.findByRole("heading", {
@@ -695,12 +695,12 @@ describe("the booking page (U19)", () => {
         await tryIt("Pay ₹1,200 and book");
         // Paying at the desk instead: a new key.
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
-        await tryIt("Book — pay at the desk");
+        await tryIt("Book and pay at the desk");
         // Another time: a new key.
         fireEvent.click(
             screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
         );
-        await tryIt("Book — pay at the desk");
+        await tryIt("Book and pay at the desk");
 
         const [first, same, desk, later] = keys();
         expect(same).toBe(first);
@@ -739,7 +739,7 @@ describe("the booking page (U19)", () => {
         );
         expect(screen.queryByRole("radio", { name: /Pay ₹1,200/ })).toBeNull();
         expect(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         ).toBeInTheDocument();
     });
 
@@ -867,7 +867,7 @@ describe("Where and anything we should know (E7)", () => {
         });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
@@ -924,7 +924,7 @@ describe("Where and anything we should know (E7)", () => {
 
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
@@ -948,7 +948,7 @@ describe("Where and anything we should know (E7)", () => {
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
@@ -972,7 +972,7 @@ describe("Where and anything we should know (E7)", () => {
         ).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(
@@ -1031,7 +1031,7 @@ describe("Where and anything we should know (E7)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay online in the Razorpay window");
+        await screen.findByText("Pay online in the payment window");
         expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
 
         holdState = "CONFIRMED";
@@ -1086,7 +1086,7 @@ describe("online checkout (E11)", () => {
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
         );
-        await screen.findByText("Pay online in the Razorpay window");
+        await screen.findByText("Pay online in the payment window");
         // The card can draw before the effect that opens the window runs; on a
         // slow runner the test answered a window not yet made (CI, #687).
         await waitFor(() => expect(checkouts.opened.length).toBeGreaterThan(0));
@@ -1113,12 +1113,12 @@ describe("online checkout (E11)", () => {
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹1,200 now Online — booked straight away",
+                name: "Pay ₹1,200 now Online, booked straight away",
             }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByRole("radio", {
-                name: "Pay at the desk Held for you; pay when you arrive",
+                name: "Pay at the desk Held for you. Pay when you arrive.",
             }),
         ).toBeInTheDocument();
 
@@ -1128,7 +1128,7 @@ describe("online checkout (E11)", () => {
         );
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹500 for this class Online — booked straight away",
+                name: "Pay ₹500 for this class Online, booked straight away",
             }),
         ).toBeInTheDocument();
         // Saroh can't vouch for the account's methods, so it names none.
@@ -1159,7 +1159,7 @@ describe("online checkout (E11)", () => {
         await answer("paid");
         expect(screen.getByText("Paying…")).toBeInTheDocument();
         expect(
-            screen.getByText(/Razorpay is confirming your payment/),
+            screen.getByText(/We're confirming your payment/),
         ).toBeInTheDocument();
         // Paid, so letting the hold go is no longer offered.
         expect(
@@ -1211,7 +1211,7 @@ describe("online checkout (E11)", () => {
         await answer("failed");
 
         expect(screen.getByRole("alert")).toHaveTextContent(
-            "The payment didn't go through — try again.",
+            "The payment didn't go through. Try again.",
         );
         expect(calls.some((c) => c.url.endsWith("/release"))).toBe(false);
         expect(
@@ -1392,7 +1392,7 @@ describe("opening on a time from On today (G18)", () => {
         );
         expect(
             await screen.findByText(
-                "That time has just gone — here's what's left.",
+                "That time has just gone. Here's what's left.",
             ),
         ).toBeInTheDocument();
         expect(
@@ -1439,7 +1439,7 @@ describe("opening on a time from On today (G18)", () => {
         );
         expect(
             await screen.findByText(
-                "That time has just gone — here's what's left.",
+                "That time has just gone. Here's what's left.",
             ),
         ).toBeInTheDocument();
     });
@@ -1642,7 +1642,7 @@ describe("sign-in at the last step (A9)", () => {
 
         fireEvent.change(nameField, { target: { value: "Meera Shah" } });
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         expect(
             await screen.findByRole("heading", {
@@ -1684,7 +1684,7 @@ describe("sign-in at the last step (A9)", () => {
         );
         expect(screen.queryByLabelText("Name")).toBeNull();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         expect(
@@ -1718,7 +1718,7 @@ describe("sign-in at the last step (A9)", () => {
         });
         payAtDesk();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Neha." });
@@ -1785,7 +1785,7 @@ describe("sign-in at the last step (A9)", () => {
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await pickSeven();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         expect(
@@ -1849,7 +1849,7 @@ describe("sign-in at the last step (A9)", () => {
         ).toHaveAttribute("aria-checked", "true");
         // Signed in now: booking the next one needs no code.
         expect(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         ).toBeInTheDocument();
     });
 
@@ -1877,7 +1877,7 @@ describe("sign-in at the last step (A9)", () => {
 
         const alert = await within(sheet).findByRole("alert");
         expect(alert).toHaveTextContent(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         expect(alert).toHaveTextContent(
             "Or call Pulse Fitness on +91 80 4120 8800",
@@ -1917,7 +1917,7 @@ describe("sign-in at the last step (A9)", () => {
 
         const alert = await within(sheet).findByRole("alert");
         expect(alert).toHaveTextContent(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         expect(alert).not.toHaveTextContent(/Or call/);
         expect(bookCalls()).toHaveLength(0);
@@ -1940,7 +1940,7 @@ describe("sign-in at the last step (A9)", () => {
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await pickSeven();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         expect(
@@ -2130,7 +2130,7 @@ describe("a deposit at booking (E8)", () => {
         expect(document.body.textContent).not.toMatch(/deposit/i);
         fireEvent.click(
             within(aside).getByRole("button", {
-                name: "Book — pay at the desk",
+                name: "Book and pay at the desk",
             }),
         );
         expect(
@@ -2197,7 +2197,7 @@ describe("how the business takes payment (DEC-088)", () => {
         expect(ways).toHaveLength(1);
         expect(ways[0]).toMatch(/^Pay at the desk/);
         expect(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         ).toBeInTheDocument();
     });
 
@@ -2247,7 +2247,7 @@ describe("how the business takes payment (DEC-088)", () => {
         expect(document.body.textContent).not.toMatch(/Get in touch/);
         fireEvent.click(
             within(aside).getByRole("button", {
-                name: "Book — pay at the desk",
+                name: "Book and pay at the desk",
             }),
         );
         await screen.findByText(
@@ -2398,7 +2398,7 @@ describe("the header's facts (E6)", () => {
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         expect(
             await screen.findByRole("heading", {
@@ -2461,7 +2461,7 @@ describe("a treatment of several visits (E10)", () => {
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         expect(
             await screen.findByText(
@@ -2572,7 +2572,7 @@ describe("the booking page on a test release (DEC-071, T6)", () => {
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
             screen.getAllByRole("button", {
-                name: "Book — pay at the desk",
+                name: "Book and pay at the desk",
             })[0],
         );
         expect(
