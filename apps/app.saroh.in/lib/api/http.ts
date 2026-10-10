@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
+import { roleDeniedMessage } from "@/lib/api/role-denied";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { pickActive } from "@/lib/organizations/choose";
@@ -47,6 +48,8 @@ export type CrmResult<T> =
           missing?: BusinessDetail[];
           /** Its plan refused it (U13); shown as the notice (`reportFailure`). */
           plan?: PlanRefusal;
+          /** Refused by role (`role-denied.ts`): a notice, not an error. */
+          denied?: true;
       };
 
 /**
@@ -130,6 +133,9 @@ export async function apiFetch(
  * `{ error: { code, message, ... } }` (see AllExceptionsFilter). The last one
  * used to fall through and return the error OBJECT from a `string`-typed
  * function, so callers rendered "[object Object]" instead of the reason.
+ *
+ * A refusal by role (`details.code: "ROLE_DENIED"`) reads in
+ * `role-denied.ts`'s words, the closer sentence for the permission it names.
  */
 export function readError(
     data: {
@@ -138,6 +144,8 @@ export function readError(
     } | null,
     fallback: string,
 ): string {
+    const denied = roleDeniedMessage(data);
+    if (denied) return denied;
     if (typeof data?.message === "string") return data.message;
     const error = data?.error;
     if (typeof error === "string") return error;
@@ -208,12 +216,13 @@ export async function mutate<T>(
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
-    const { missing, plan } = toFailure(data, fallback);
+    const { missing, plan, denied } = toFailure(data, fallback);
     return {
         ok: false,
         error: readError(data, fallback),
         ...(missing ? { missing } : {}),
         ...(plan ? { plan } : {}),
+        ...(denied ? { denied } : {}),
     };
 }
 
@@ -235,5 +244,10 @@ export async function destroy<T>(
     const data = (await res.json().catch(() => null)) as
         (T & { message?: string }) | null;
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    return { ok: false, error: readError(data, fallback) };
+    const { denied } = toFailure(data, fallback);
+    return {
+        ok: false,
+        error: readError(data, fallback),
+        ...(denied ? { denied } : {}),
+    };
 }

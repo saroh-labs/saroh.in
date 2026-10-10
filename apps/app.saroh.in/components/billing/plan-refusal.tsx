@@ -9,7 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { showError } from "@saroh/ui/toast";
+import { showError, showInfo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -38,18 +38,25 @@ export function showPlanRefusal(refusal: PlanRefusal): void {
 /**
  * The failure of a write, said: the plan's notice when its plan refused it,
  * else the API's guarded message (or `fallback`) as a toast.
+ *
+ * A refusal by the person's role (`denied`, `lib/api/role-denied.ts`) is a
+ * notice, not an error: nothing broke, and red tells someone to try again
+ * at a thing that will only be refused again. It uses the toast module's
+ * neutral style (`showInfo`), which leaves after its usual few seconds.
  */
 export function reportFailure(
-    res: { error: string; plan?: PlanRefusal },
+    res: { error: string; plan?: PlanRefusal; denied?: boolean },
     fallback?: string,
 ): void {
-    if (res.plan) showPlanRefusal(res.plan);
-    else
-        showError(
-            res.error.trim()
-                ? res.error
-                : (fallback ?? "That didn't work. Try again."),
-        );
+    if (res.plan) {
+        showPlanRefusal(res.plan);
+        return;
+    }
+    const said = res.error.trim()
+        ? res.error
+        : (fallback ?? "That didn't work. Try again.");
+    if (res.denied) showInfo(said);
+    else showError(said);
 }
 
 export function PlanRefusalHost() {
