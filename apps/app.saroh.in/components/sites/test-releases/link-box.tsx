@@ -1,18 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { copyText } from "@saroh/ui/copy-button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, ExternalLink } from "lucide-react";
 
 /** Copy a link; false when the browser refused. */
-export async function copyLink(url: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(url);
-        return true;
-    } catch {
-        return false;
-    }
-}
+export const copyLink = copyText;
 
 /**
  * A test release link, shown the one time its address exists (#284): the API

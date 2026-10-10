@@ -27,6 +27,7 @@ import type {
     AutopayMethod,
 } from "@/lib/subscriptions/service";
 import { dayText, money } from "@/lib/subscriptions/view";
+import { ShareLink } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 
 const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
@@ -308,27 +309,12 @@ function SendLinkBody({
 
 /** The link, shown once: Saroh keeps no copy of it. */
 function LinkBox({ url }: { url: string }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-[1_1_220px] truncate rounded-[8px] border border-border bg-card px-2.5 py-1.5 font-mono text-[12px]">
                 {url}
             </span>
-            <Button
-                variant="outline"
-                className={SMALL}
-                onClick={() => {
-                    void navigator.clipboard.writeText(url).then(
-                        () => setCopied(true),
-                        () =>
-                            showError(
-                                "Couldn't copy it — select the link and copy it by hand.",
-                            ),
-                    );
-                }}
-            >
-                {copied ? "Copied" : "Copy link"}
-            </Button>
+            <ShareLink value={url} text="Your link to pay" />
             <span className="basis-full text-[12px] text-muted-foreground">
                 Shown once — Saroh doesn&apos;t keep it. Make another if
                 it&apos;s lost.

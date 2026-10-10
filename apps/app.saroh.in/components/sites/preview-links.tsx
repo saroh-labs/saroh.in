@@ -14,6 +14,7 @@ import {
 } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
+import { copyText } from "@saroh/ui/copy-button";
 import { Segmented } from "@saroh/ui/segmented";
 
 /**
@@ -58,15 +59,6 @@ function dayOf(iso: string): string {
     }).format(new Date(iso));
 }
 
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 export function PreviewLinks({ siteId }: { siteId: string }) {
     const zone = useBusinessZone();
     const [links, setLinks] = useState<SitePreviewLinkView[] | null>(null);
@@ -98,7 +90,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
         }
         setLinks((prev) => [res.data, ...(prev ?? [])]);
         setSecrets((prev) => ({ ...prev, [res.data.id]: res.data.token }));
-        const copied = await copy(previewUrl(res.data.token));
+        const copied = await copyText(previewUrl(res.data.token));
         showSuccess(
             copied
                 ? `Link copied. It stops working on ${dayOf(res.data.expiresAt)}.`
@@ -146,7 +138,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                         size="sm"
                                         className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
                                         onClick={() =>
-                                            void copy(
+                                            void copyText(
                                                 previewUrl(secrets[link.id]),
                                             ).then((ok) =>
                                                 ok

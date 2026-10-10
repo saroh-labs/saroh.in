@@ -14,16 +14,8 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
+import { copyText } from "@saroh/ui/copy-button";
 import { actionClass } from "./parts";
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 /**
  * An order's pay link (B11), as the invoice's: the address is shown once,
@@ -63,7 +55,7 @@ export function usePayLink({
             }
             setUrl(res.data.url);
             showSuccess(
-                (await copy(res.data.url))
+                (await copyText(res.data.url))
                     ? `Pay link copied. Send it to ${first}.`
                     : `Pay link ready. Copy it from ${shownIn}.`,
                 "Nothing is sent by Saroh — the order shows paid once they pay.",
@@ -77,7 +69,7 @@ export function usePayLink({
         if (madeAt && !url) setConfirming(true);
         else if (!url) make();
         else
-            void copy(url).then((ok) =>
+            void copyText(url).then((ok) =>
                 ok
                     ? showSuccess("Pay link copied.")
                     : showError("Couldn't copy. Select the link and copy it."),

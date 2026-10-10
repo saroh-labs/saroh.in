@@ -8,6 +8,7 @@ import { targetAddress } from "@/lib/qr/targets";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords } from "@/lib/qr/words";
 
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { QrCodeCard } from "./qr-code-card";
 import type { DownloadEnv, QrFormat, QrLogoChoice } from "./qr-download";
 import { BROWSER, downloadQr, qrFile } from "./qr-download";
@@ -47,16 +48,12 @@ export function QrViewer({
 
     async function copy() {
         if (!code.link) return;
-        try {
-            await navigator.clipboard.writeText(code.link);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                code.link,
-            );
+        if (!(await copyText(code.link))) {
+            showError(copyFailedMessage(), code.link);
+            return;
         }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
     }
 
     return (

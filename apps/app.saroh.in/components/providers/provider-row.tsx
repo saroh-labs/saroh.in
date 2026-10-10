@@ -26,6 +26,7 @@ import type {
 
 import type { StatusTone } from "@/components/shared/status-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { CopyButton } from "@saroh/ui/copy-button";
 import { ProviderSetupDialog } from "./provider-setup-dialog";
 
 /*
@@ -345,21 +346,13 @@ function RefLine({ label, code }: ProviderRef) {
             <code className="break-all rounded-md bg-muted px-[7px] py-0.5 font-mono text-[12px] text-foreground">
                 {code}
             </code>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-[12px]"
+            <CopyButton
+                value={code}
+                label="Copy"
+                thing={label.toLowerCase()}
+                icon={false}
                 aria-label={`Copy ${label.toLowerCase()}`}
-                onClick={() => {
-                    navigator.clipboard.writeText(code).then(
-                        () => showSuccess(`Copied ${code}`),
-                        () => showError("Could not copy — select it instead."),
-                    );
-                }}
-            >
-                Copy
-            </Button>
+            />
         </div>
     );
 }

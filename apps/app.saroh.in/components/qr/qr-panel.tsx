@@ -15,6 +15,7 @@ import { instantOpens, NOT_COUNTED, QR_SHARE_HREF } from "@/lib/qr/panel";
 import type { QrCodeView } from "@/lib/qr/types";
 import { linkWords, opensWords, refusalWords } from "@/lib/qr/words";
 
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";
@@ -340,16 +341,12 @@ function Drawn({
     }
 
     async function copy() {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                text,
-            );
+        if (!(await copyText(text))) {
+            showError(copyFailedMessage(), text);
+            return;
         }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
     }
 
     return (

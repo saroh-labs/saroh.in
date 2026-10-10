@@ -1,8 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -10,6 +8,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
+import { ShareLink } from "@saroh/ui/copy-button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -258,27 +257,12 @@ export function PlanCard({
 
 /** A failed charge's new pay link, shown once: the API keeps only its hash. */
 export function PayLinkRow({ url, name }: { url: string; name: string }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-[1_1_220px] truncate rounded-[8px] border border-border bg-card px-2.5 py-1.5 font-mono text-[12px]">
                 {url}
             </span>
-            <Button
-                variant="outline"
-                className="h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11"
-                onClick={() => {
-                    void navigator.clipboard.writeText(url).then(
-                        () => setCopied(true),
-                        () =>
-                            showError(
-                                "Couldn't copy it — select the link and copy it by hand.",
-                            ),
-                    );
-                }}
-            >
-                {copied ? "Copied" : "Copy link"}
-            </Button>
+            <ShareLink value={url} text="Your link to pay" />
             <span className="basis-full text-[12px] text-muted-foreground">
                 Send it to {name} yourself — Saroh doesn&apos;t send it. It
                 works until it&apos;s paid or you make another.

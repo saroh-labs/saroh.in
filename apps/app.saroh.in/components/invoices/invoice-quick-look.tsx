@@ -40,6 +40,10 @@ import {
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
+import {
+    copyFailedMessage,
+    copyText as writeClipboard,
+} from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 
 type Read =
@@ -160,16 +164,14 @@ export function InvoiceQuickLook({
         linkSight({ linkOut, held: remembered !== null }) === "unseen";
 
     async function copyText(url: string, made: boolean) {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess(
-                made
-                    ? `Pay link copied. Send it to ${who.name}.`
-                    : "Pay link copied.",
-            );
-        } catch {
-            showError("Couldn't copy it. Select the link below and copy it.");
+        if (!(await writeClipboard(url))) {
+            showError(copyFailedMessage());
+            return;
         }
+        // A toast only when the link was also just made: it says who to
+        // send it to. A plain copy is acknowledged by the button.
+        if (made) showSuccess(`Pay link copied. Send it to ${who.name}.`);
+        else showSuccess("Pay link copied.");
     }
 
     async function copyLink() {

@@ -1,8 +1,7 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { ShareLink as ShareButton } from "@saroh/ui/copy-button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
 
 import { QrButton } from "@/components/qr/qr-button";
 import type { ShareKind, ShareLink } from "@/lib/sites/share-links";
@@ -31,17 +30,6 @@ export function ShareLinkButton({
     link: ShareLink;
     className?: string;
 }) {
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(link.url);
-            showSuccess(link.copied, link.url);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                link.url,
-            );
-        }
-    };
     return (
         <span
             className={cn(
@@ -49,14 +37,13 @@ export function ShareLinkButton({
                 className,
             )}
         >
-            <Button
-                type="button"
-                variant="outline"
-                className="wk-press"
-                onClick={() => void copy()}
-            >
-                {link.label}
-            </Button>
+            <ShareButton
+                value={link.url}
+                label={link.label}
+                shareLabel={link.label}
+                size="default"
+                icon={false}
+            />
             <QrButton
                 compact="phone"
                 className="h-[38px] coarse:h-11"

@@ -46,6 +46,7 @@ import {
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { copyText } from "@saroh/ui/copy-button";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -121,15 +122,6 @@ function dueFrom(days: number): string {
         59,
         59,
     ).toISOString();
-}
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 /**
@@ -359,7 +351,7 @@ export function InvoiceForm({
                     `${number} issued, but no pay link was made: ${link.error}`,
                 );
             }
-        } else if (await copy(link.data.url)) {
+        } else if (await copyText(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
             );

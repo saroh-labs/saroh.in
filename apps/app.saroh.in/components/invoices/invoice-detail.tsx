@@ -41,6 +41,7 @@ import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 import type { OnlineBlocker } from "@/lib/staff/types";
+import { copyText } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 
 type Dialog =
@@ -54,15 +55,6 @@ type Dialog =
     | "send"
     | "remind"
     | "draftSend";
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 /**
  * One invoice, after "Saroh Invoice Detail": its number and status with
@@ -209,7 +201,7 @@ export function InvoiceDetail({
         setViewUrl(null);
         redraw();
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? `Pay link copied. Send it to ${invoice.who}.`
                 : "Pay link ready. Copy it from the Payment panel.",
         );
@@ -225,7 +217,7 @@ export function InvoiceDetail({
         if (!res.ok) return reportFailure(res);
         setViewUrl(res.data.url);
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? s === "PAID"
                     ? `Link copied. Send it to ${invoice.who}: it shows the invoice, paid.`
                     : `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
@@ -235,7 +227,7 @@ export function InvoiceDetail({
 
     function copyShown() {
         if (!url) return;
-        void copy(url).then((ok) =>
+        void copyText(url).then((ok) =>
             ok
                 ? showSuccess(
                       urlKind === "view" ? "Link copied." : "Pay link copied.",

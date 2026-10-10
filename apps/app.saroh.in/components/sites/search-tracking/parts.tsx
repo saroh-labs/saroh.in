@@ -3,8 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { FailedState } from "@saroh/ui/data-state";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -12,6 +10,7 @@ import { useTransition } from "react";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { CopyButton } from "@saroh/ui/copy-button";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { Notice } from "@saroh/ui/notice";
 
@@ -130,28 +129,17 @@ export function LockNotice({ lock }: { lock: TrackersLock }) {
     );
 }
 
-/** Copy a value, with a toast once it's on the clipboard. */
+/** Copy a value: the button says "Copied" itself. */
 export function CopyValue({ value, label }: { value: string; label: string }) {
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(value);
-            showSuccess(`${label} copied`);
-        } catch {
-            showError(`Couldn't copy. Select it and copy it yourself.`);
-        }
-    }
     return (
-        <Button
-            type="button"
+        <CopyButton
+            value={value}
+            label="Copy"
+            thing={label.toLowerCase()}
             variant="ghost"
-            size="sm"
-            onClick={() => void copy()}
             aria-label={`Copy ${label.toLowerCase()}`}
             className="shrink-0"
-        >
-            <Copy aria-hidden className="size-4" />
-            Copy
-        </Button>
+        />
     );
 }
 
