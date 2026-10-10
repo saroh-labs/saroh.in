@@ -19,8 +19,8 @@ export const metadata = { title: "Reports" };
  * What customers reported about businesses at saroh.in/customers (Terms rev
  * 46): newest first, open unless asked otherwise, each with the business the
  * address is a Saroh site of. The reporter's email shows only to staff who
- * may read personal data. Marking a report done needs lifecycle write, the
- * permission a suspension would.
+ * may read personal data. Marking a report done needs `reports:resolve`,
+ * which Support holds.
  */
 export default async function ReportsPage({
     searchParams,
@@ -36,7 +36,7 @@ export default async function ReportsPage({
     const page = await listBusinessReports({ status, cursor }).catch(
         () => undefined,
     );
-    const canClose = can(staff, "organization:lifecycle:write");
+    const canClose = can(staff, "reports:resolve");
     const seesEmail = can(staff, "organization:pii:read");
 
     return (

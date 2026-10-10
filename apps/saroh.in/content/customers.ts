@@ -1,8 +1,9 @@
 /**
  * /customers: for someone who bought from, or booked with, a business that
  * uses Saroh (Terms rev 46, 9 Oct: "Your customers and your business").
- * Every merchant site's footer links here with "Report this business"
- * (`?site=<its address>`, which fills the form in).
+ * A Free site's footer links here with "Report", beside "Made with Saroh"
+ * (`?site=<its address>`, which fills the form in; DEC-118); a paid site
+ * carries no Saroh link, so saroh.in's own footer links here too.
  *
  * The body is in the small Markdown of `lib/legal-markdown.ts`, so it reads
  * like the legal pages beside it. Plain words: Saroh makes the software, the
@@ -11,6 +12,8 @@
 export const CUSTOMERS = {
     title: "Bought from a business that uses Saroh?",
     href: "/customers",
+    /** The link in saroh.in's footer, beside Privacy and Terms. */
+    footerLabel: "Bought from a business on Saroh?",
     description:
         "Saroh makes the software. The business you bought from runs its own shop, takes the payment and is responsible for your order or booking. How to reach them, and how to report a business to us.",
     body: `Saroh makes software that businesses use to run their shop, bookings and website. We don't sell anything on those websites ourselves.

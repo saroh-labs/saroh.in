@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SAROH_CONTACT_EMAIL } from "@/content/contact";
+import { CUSTOMERS } from "@/content/customers";
 import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
@@ -21,7 +22,8 @@ const LINK =
  * code), in columns that wrap at 150px (180px before Resources made six). Under them, who makes Saroh and the
  * legal pages that are published (R6): Privacy from its date, and "Cookie
  * choices" where the cookie notice can appear. No Terms until they're
- * published.
+ * published. Before them, always, "Bought from a business on Saroh?" to
+ * /customers (DEC-118).
  *
  * `resources` and `legal` are the pages the server says are live and built
  * (`content/resources.ts`).
@@ -106,8 +108,13 @@ export function SiteFooter({
             </Column>
             <div className="col-[1/-1] flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-6 text-[13.5px]">
                 <span>{MADE_BY}</span>
-                {legal.length > 0 || cookieChoices ? (
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    {/* For a business's customers (DEC-118): always here,
+                        since a paid merchant site links to Saroh nowhere. */}
+                    <Link href={CUSTOMERS.href} className={LINK}>
+                        {CUSTOMERS.footerLabel}
+                    </Link>
+                    <>
                         {legal.map((page) => (
                             <Link
                                 key={page.href}
@@ -120,8 +127,8 @@ export function SiteFooter({
                         {cookieChoices ? (
                             <CookieChoicesButton className={LINK} />
                         ) : null}
-                    </div>
-                ) : null}
+                    </>
+                </div>
             </div>
         </footer>
     );

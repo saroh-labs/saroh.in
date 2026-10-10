@@ -123,7 +123,7 @@ describe("AdminBusinessReportsService.markDone", () => {
         });
         await expect(
             service.markDone(
-                staffWith(AdminPermission.OrganizationLifecycleWrite),
+                staffWith(AdminPermission.ReportsResolve),
                 "r1",
                 " Spoke to the business ",
             ),
@@ -136,7 +136,7 @@ describe("AdminBusinessReportsService.markDone", () => {
             prisma,
             expect.objectContaining({
                 action: "business-report.done",
-                permission: AdminPermission.OrganizationLifecycleWrite,
+                permission: AdminPermission.ReportsResolve,
                 organizationId: "org_1",
                 reason: "Spoke to the business",
             }),

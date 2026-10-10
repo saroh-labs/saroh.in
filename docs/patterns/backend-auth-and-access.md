@@ -435,6 +435,11 @@ orgId)` (`organizations/organization-kind.ts`).
   returns what decides whether to act — never a business's customers, orders
   or messages — and reads personal data only behind `organization:pii:read`.
   A tenant path never calls one.
+- **Current** (DEC-118) — **Customers' reports about a business** are read
+  with `organization:read` (the reporter's email only with
+  `organization:pii:read`) and marked done with `reports:resolve`, which
+  Platform Owners and Support hold. Closing a report changes nothing for
+  the business, so it never asks for `organization:lifecycle:write`.
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

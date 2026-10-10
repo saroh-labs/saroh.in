@@ -184,6 +184,8 @@ export interface BookingFlowProps {
     /** With it, a day and time to choose (`?date=&start=`, On today, G18). */
     initialDate?: string | null;
     initialStart?: string | null;
+    /** "Run by ‹legal name›" on the confirmation (DEC-118); null draws none. */
+    soldBy?: string | null;
 }
 
 export default function BookingFlow({
@@ -194,6 +196,7 @@ export default function BookingFlow({
     initialServiceId = null,
     initialDate = null,
     initialStart = null,
+    soldBy = null,
 }: BookingFlowProps) {
     const phone = usePhone();
     const ids = useId();
@@ -1085,6 +1088,7 @@ export default function BookingFlow({
                     ) : phase.kind === "done" ? (
                         <DoneCard
                             phase={phase}
+                            soldBy={soldBy}
                             headingRef={headingRef}
                             business={page.businessName}
                             where={

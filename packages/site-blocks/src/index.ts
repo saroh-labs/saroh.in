@@ -438,14 +438,16 @@ export type {
     SiteContact,
     SiteCredit,
     SiteFooterContent,
-    SiteResponsibility,
 } from "./site-chrome";
-// Who runs a merchant's site and is responsible for its sales (Terms rev 46).
+// Who a customer is buying from, in the business's own details (DEC-118).
 export {
-    BusinessResponsibility,
+    SoldByBlock,
+    SoldByLine,
     reportBusinessHref,
-    responsibilityLine,
-} from "./business-responsibility";
+    sellerLead,
+    soldByLine,
+} from "./sold-by";
+export type { SellerLead, SiteSeller } from "./sold-by";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
 // A module page's title and lead (DEC-073 #9).

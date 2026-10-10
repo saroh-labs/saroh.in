@@ -204,18 +204,18 @@ describe("OrderConfirmation (P4)", () => {
         ).toHaveAttribute("href", "/shop");
     });
 
-    it("says who is responsible for a placed order (Terms rev 46)", () => {
+    it("says who sold a placed order, in the business's legal name (DEC-118)", () => {
         render(
             <OrderConfirmation
                 lookup={{ ok: true, order: ORDER }}
                 businessName="Rye & Co."
+                soldBy="Sold by Rye Foods LLP"
             />,
         );
-        expect(
-            screen.getByText(
-                "Rye & Co. runs this website and is responsible for its orders and bookings.",
-            ),
-        ).toHaveClass("text-site-muted");
+        expect(screen.getByText("Sold by Rye Foods LLP")).toHaveClass(
+            "text-site-muted",
+        );
+        expect(document.body.textContent).not.toMatch(/responsible/);
     });
 
     it("keeps the customer on the business's own site", () => {

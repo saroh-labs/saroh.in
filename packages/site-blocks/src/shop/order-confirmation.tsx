@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
-import { BusinessResponsibility } from "../business-responsibility";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
+import { SoldByLine } from "../sold-by";
 
 /**
  * The order confirmation on a merchant's site (round-2 P4), at
@@ -218,11 +218,14 @@ function Handover({ order }: { order: OrderConfirmationData }) {
 export function OrderConfirmation({
     lookup,
     businessName,
+    soldBy = null,
     shopHref = "/shop",
     ordersHref = null,
 }: {
     lookup: OrderConfirmationLookup;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    soldBy?: string | null;
     /** Back to the shop. */
     shopHref?: string;
     /** The account's Orders, only while the account area serves. */
@@ -289,11 +292,8 @@ export function OrderConfirmation({
                     </Link>
                 ) : null}
             </div>
-            {/* Who is responsible for the order (Terms rev 46). */}
-            <BusinessResponsibility
-                businessName={businessName}
-                className="text-site-muted mt-6"
-            />
+            {/* Who sold it, in the business's own name (DEC-118). */}
+            <SoldByLine line={soldBy} className="text-site-muted mt-6" />
         </Frame>
     );
 }

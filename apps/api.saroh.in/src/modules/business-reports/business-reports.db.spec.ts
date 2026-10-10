@@ -119,7 +119,7 @@ describe("business reports", () => {
             await admin.list(staff(AdminPermission.OrganizationRead), {})
         ).items;
         if (!report) throw new Error("no report");
-        const who = staff(AdminPermission.OrganizationLifecycleWrite);
+        const who = staff(AdminPermission.ReportsResolve);
         await admin.markDone(who, report.id, "Looked into it");
         await admin.markDone(who, report.id, "Looked into it");
 

@@ -7262,7 +7262,7 @@ model SarohInvoiceSequence {
 // they left one. `organizationId` is set when the address is a Saroh site,
 // else null. Staff read it in the admin console (organization:read; the
 // reporter's email only with organization:pii:read) and mark it done
-// (organization:lifecycle:write). Kept when the business is deleted.
+// (reports:resolve). Kept when the business is deleted.
 model BusinessReport {
   id             String               @id @default(cuid())
   organizationId String?

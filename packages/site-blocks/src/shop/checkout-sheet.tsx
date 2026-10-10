@@ -8,9 +8,9 @@ import { destructiveAlertClasses } from "../alert";
 import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
-import { BusinessResponsibility } from "../business-responsibility";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
+import { SoldByLine } from "../sold-by";
 import type {
     CheckoutStanding,
     CheckoutStarted,
@@ -54,11 +54,14 @@ export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
 export function OrderPlacedToPay({
     started,
     businessName,
+    soldBy = null,
     toPay,
     onClose,
 }: {
     started: CheckoutStarted;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    soldBy?: string | null;
     /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
     toPay: string;
     onClose: () => void;
@@ -83,7 +86,10 @@ export function OrderPlacedToPay({
             <button type="button" onClick={onClose} className={sheetAltButton}>
                 Done
             </button>
-            <PlacedOwner businessName={businessName} />
+            <SoldByLine
+                line={soldBy}
+                className="text-site-muted mt-3 text-center"
+            />
         </SheetFrame>
     );
 }
@@ -92,6 +98,7 @@ export function CheckoutPay({
     started,
     api,
     businessName,
+    soldBy = null,
     customer,
     delivery,
     onPlaced,
@@ -105,6 +112,8 @@ export function CheckoutPay({
     started: OnlineStarted;
     api: ShopCheckoutApi;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    soldBy?: string | null;
     customer: SignedInCustomer;
     /**
      * Where it goes, as typed in the bag: its name and phone fill the
@@ -233,7 +242,10 @@ export function CheckoutPay({
                     >
                         Done
                     </button>
-                    <PlacedOwner businessName={businessName} />
+                    <SoldByLine
+                        line={soldBy}
+                        className="text-site-muted mt-3 text-center"
+                    />
                 </SheetFrame>
             );
         }
@@ -328,15 +340,5 @@ export function CheckoutPay({
                 Back to your bag
             </button>
         </SheetFrame>
-    );
-}
-
-/** Who is responsible for a placed order (Terms rev 46): one quiet line. */
-function PlacedOwner({ businessName }: { businessName: string }) {
-    return (
-        <BusinessResponsibility
-            businessName={businessName}
-            className="text-site-muted mt-3 text-center"
-        />
     );
 }

@@ -12,6 +12,9 @@ import {
     FREE_PLAN_ID,
 } from "../billing/catalogue-access.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { stateName } from "../invoices/gst-states";
+import { formatSellerAddress } from "../invoices/order-invoice";
+import { publicPhone } from "../organizations/business-phone";
 import { newRefCode } from "../waitlist/waitlist-keys";
 
 /**
@@ -23,11 +26,22 @@ import { newRefCode } from "../waitlist/waitlist-keys";
  * - `credit`: "Made with Saroh" with the business's referral code (#812),
  *   on Free only. Paid plans show no Saroh credit (DEC-102).
  *
- * The phone and the place stay the Visit us read's (`/visit`, UX-038).
+ * - `seller`: who a customer is buying from, in the business's own details
+ *   (DEC-118): its legal name (null when it has set none; the site then says
+ *   its own name), its registered address on one line as its invoices print
+ *   it, and its public phone (DEC-053). Never the GSTIN, the business type
+ *   or anything else Settings › Business holds.
+ *
+ * The place stays the Visit us read's (`/visit`, UX-038).
  */
 export interface PublicFooter {
     email: string | null;
     credit: { referralCode: string } | null;
+    seller: {
+        legalName: string | null;
+        address: string | null;
+        phone: string | null;
+    };
 }
 
 /** Page views per visitor per minute, as the Visit us read allows. */
@@ -96,7 +110,16 @@ export class PublicFooterService {
             runInOrgContext(organizationId, () =>
                 prisma.businessProfile.findUnique({
                     where: { organizationId },
-                    select: { contactEmail: true },
+                    select: {
+                        contactEmail: true,
+                        legalName: true,
+                        addressLine1: true,
+                        addressLine2: true,
+                        city: true,
+                        postalCode: true,
+                        gstState: true,
+                        phone: true,
+                    },
                 }),
             ),
             this.access.resolve(organizationId),
@@ -109,6 +132,16 @@ export class PublicFooterService {
         return {
             email: said(profile?.contactEmail),
             credit: referralCode ? { referralCode } : null,
+            seller: {
+                legalName: said(profile?.legalName),
+                address: profile
+                    ? formatSellerAddress({
+                          ...profile,
+                          stateName: stateName(profile.gstState),
+                      })
+                    : null,
+                phone: publicPhone(profile?.phone),
+            },
         };
     }
 

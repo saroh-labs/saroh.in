@@ -109,13 +109,42 @@ describe("the confirmation's way to change it (UX-055)", () => {
     });
 });
 
-describe("who is responsible for the booking (Terms rev 46)", () => {
-    it("says the business runs the site, in one quiet line", () => {
-        done();
-        expect(
-            screen.getByText(
-                "Rye runs this website and is responsible for its orders and bookings.",
-            ),
-        ).toHaveClass("text-site-muted");
+describe("who the booking is with (DEC-118)", () => {
+    const phase = {
+        kind: "done" as const,
+        booking: BOOKING,
+        paid: false,
+        price: "₹600",
+        when: "Mon 12 Oct, 10:00",
+        first: "Asha",
+    };
+    const card = (soldBy?: string) =>
+        render(
+            <DoneCard
+                phase={phase}
+                headingRef={createRef()}
+                business="Rye"
+                where={null}
+                rules={{
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: null,
+                }}
+                soldBy={soldBy}
+                onAgain={() => undefined}
+            />,
+        );
+
+    it("names the business's legal name, in one quiet line", () => {
+        card("Run by Rye Studio LLP");
+        expect(screen.getByText("Run by Rye Studio LLP")).toHaveClass(
+            "text-site-muted",
+        );
+    });
+
+    it("draws no line without one, and never Saroh's sentence", () => {
+        const { container } = card();
+        expect(container.querySelector("[data-sold-by]")).toBeNull();
+        expect(container.textContent).not.toMatch(/responsible/);
     });
 });

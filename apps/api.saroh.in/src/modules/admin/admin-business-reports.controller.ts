@@ -13,9 +13,10 @@ import { ListBusinessReportsDto, MarkBusinessReportDoneDto } from "./dto";
  * Customers' reports about a business (Terms rev 46; the public side is
  * `POST /public/business-reports`). Reading them is `organization:read`,
  * the reporter's email additionally `organization:pii:read` (decided in the
- * service, per caller). Marking one done is a lifecycle decision: the
- * report is what a suspension would follow from, so it needs
- * `organization:lifecycle:write`.
+ * service, per caller). Marking one done needs `reports:resolve`, which
+ * Support holds (DEC-118, amended 10 Oct): closing a report changes nothing
+ * for the business, so it never needed the lifecycle write a suspension
+ * does.
  */
 @AdminRoutes()
 export class AdminBusinessReportsController {
@@ -36,7 +37,7 @@ export class AdminBusinessReportsController {
     @Post("business-reports/:id/done")
     @RequireAdminPermission(
         AdminPermission.OrganizationRead,
-        AdminPermission.OrganizationLifecycleWrite,
+        AdminPermission.ReportsResolve,
     )
     markBusinessReportDone(
         @PlatformAdminContext() staff: PlatformAdminInfo,

@@ -28,7 +28,7 @@ import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
-import { getFooterFacts } from "@/lib/site-footer";
+import { getFooterFacts, siteSeller, soldByFor } from "@/lib/site-footer";
 import { getSiteHead, NO_HEAD } from "@/lib/site-head";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { relayFor } from "@/lib/site-relay";
@@ -261,6 +261,7 @@ export default async function SiteLayout({
             <ShopBag
                 site={siteId}
                 businessName={snapshot.site.name}
+                soldBy={soldByFor(footerFacts, snapshot.site.name, true)}
                 api={{
                     quote: quoteBag,
                     start: startCheckout,
@@ -377,14 +378,27 @@ export default async function SiteLayout({
                                 email: footerFacts?.email ?? null,
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
-                            credit={footerFacts?.credit ?? null}
+                            // "Report" rides with it: no Saroh link on a
+                            // paid site (DEC-118).
+                            credit={
+                                footerFacts?.credit
+                                    ? {
+                                          ...footerFacts.credit,
+                                          reportHref: reportBusinessHref(
+                                              test.host,
+                                          ),
+                                      }
+                                    : null
+                            }
                             // "Cookie choices" while a tracker asks (DEC-108).
                             cookieChoices={asksConsent}
-                            // Who runs this site, on every plan, with a link
-                            // to report the business (Terms rev 46).
-                            responsibility={{
-                                reportHref: reportBusinessHref(test.host),
-                            }}
+                            // "Sold by ‹legal name›" in the business's own
+                            // details, on every plan (DEC-118).
+                            seller={siteSeller(
+                                footerFacts,
+                                snapshot.site.name,
+                                shopServes,
+                            )}
                         />
                     }
                 >

@@ -35,7 +35,7 @@ const INPUT =
 /**
  * Report a business (/customers, Terms rev 46): the site's address, what
  * happened, and an email only if they want a reply. Posts to
- * `/api/business-reports`. A merchant site's "Report this business" link
+ * `/api/business-reports`. A Free merchant site's "Report" link
  * fills the address in from `?site=`, read in the browser so the page stays
  * static. The answer is the same whether or not the address is a Saroh
  * site.

@@ -270,10 +270,10 @@ describe("Business report permissions", () => {
         ]);
     });
 
-    it("needs Organization read and lifecycle write to mark one done", () => {
+    it("needs Organization read and reports resolve to mark one done", () => {
         expect(perms("markBusinessReportDone")).toEqual([
             AdminPermission.OrganizationRead,
-            AdminPermission.OrganizationLifecycleWrite,
+            AdminPermission.ReportsResolve,
         ]);
     });
 });

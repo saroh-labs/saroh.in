@@ -3,11 +3,12 @@ import type { ReactNode } from "react";
 
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
-import { BusinessResponsibility } from "./business-responsibility";
 import { CookieChoicesButton } from "./consent-banner";
 import { phoneText } from "./lib/phone";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
+import type { SiteSeller } from "./sold-by";
+import { SoldByBlock } from "./sold-by";
 import { trimTrailingSlashes } from "./url-path";
 
 /**
@@ -84,14 +85,12 @@ export interface SiteContact {
  */
 export interface SiteCredit {
     href: string;
-}
-
-/**
- * Who runs the site, as the footer says it (Terms rev 46): the business,
- * with a link for a customer to report it to Saroh (`reportBusinessHref`).
- */
-export interface SiteResponsibility {
-    reportHref: string | null;
+    /**
+     * "Report", beside the credit (DEC-118): where a customer reports the
+     * business to Saroh (`reportBusinessHref`). Free only, as the credit is:
+     * a paid site carries no Saroh link at all.
+     */
+    reportHref?: string | null;
 }
 
 /** Where "Made with Saroh" links: saroh.in with the business's code. */
@@ -133,7 +132,7 @@ export function SiteFooter({
     contact = null,
     credit = null,
     cookieChoices = false,
-    responsibility = null,
+    seller = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
@@ -148,22 +147,28 @@ export function SiteFooter({
      */
     cookieChoices?: boolean;
     /**
-     * "‹Name› runs this website and is responsible for its orders and
-     * bookings." with "Report this business" (Terms rev 46), on every plan.
-     * The renderer passes it for a published site; null draws none (the
-     * editor's canvas, the catalog).
+     * "Sold by ‹legal name›" with the registered address (DEC-118), on
+     * every plan, in the business's own details. The renderer passes it for
+     * a published site; null draws none (the editor's canvas, the catalog).
+     * Its email and phone are drawn only in the `left` layout, which has no
+     * contact row of its own.
      */
-    responsibility?: SiteResponsibility | null;
+    seller?: SiteSeller | null;
 }) {
     const phone = nonBlank(contact?.phone);
     const email = nonBlank(contact?.email);
     const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
-    const owner = responsibility ? (
-        <BusinessResponsibility
-            businessName={name}
-            reportHref={responsibility.reportHref}
-            className={footer?.layout === "left" ? "mt-3 text-left" : "mt-2"}
+    const left = footer?.layout === "left";
+    const owner = seller ? (
+        <SoldByBlock
+            seller={
+                left
+                    ? seller
+                    : // The contact row above already shows these.
+                      { ...seller, email: null, phone: null }
+            }
+            className={left ? "mt-3 text-left" : "mt-2"}
             linkClassName={FOOTER_LINK}
         />
     ) : null;
@@ -239,6 +244,12 @@ export function SiteFooter({
                         ) : null}
                         {hasLine && credit ? " · " : null}
                         {credit ? <MadeWithSaroh credit={credit} /> : null}
+                        {credit?.reportHref ? (
+                            <>
+                                {" · "}
+                                <ReportLink href={credit.reportHref} />
+                            </>
+                        ) : null}
                         {(hasLine || credit) && cookieChoices ? " · " : null}
                         {cookieChoices ? <CookieChoicesButton /> : null}
                     </p>
@@ -277,6 +288,24 @@ function MadeWithSaroh({
 }
 
 /**
+ * "Report" (DEC-118), beside the credit on Free: a customer's way to tell
+ * Saroh about the business. In the footer's own colours, as the credit is.
+ */
+function ReportLink({ href }: { href: string }) {
+    return (
+        <a
+            href={href}
+            target="_blank"
+            rel="noopener"
+            aria-label="Report this business to Saroh"
+            className={FOOTER_LINK}
+        >
+            Report
+        </a>
+    );
+}
+
+/**
  * The `left` footer — the designs' row (Bakery, Ceramics, Blogs): one row
  * on the page's column, its margins inside the column so it lines up with
  * the header and the sections, wrapping on a phone —
@@ -296,7 +325,7 @@ function LeftFooter({
     name: string;
     credit: SiteCredit | null;
     cookieChoices: boolean;
-    /** Who runs the site, under the row (Terms rev 46); null draws none. */
+    /** "Sold by ‹legal name›", under the row (DEC-118); null draws none. */
     owner: ReactNode;
 }) {
     const line = written ? footerLine(written) : null;
@@ -341,6 +370,9 @@ function LeftFooter({
                             credit={credit}
                             className={cookieChoices ? "" : "ml-auto"}
                         />
+                    ) : null}
+                    {credit?.reportHref ? (
+                        <ReportLink href={credit.reportHref} />
                     ) : null}
                 </div>
                 {owner}

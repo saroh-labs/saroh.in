@@ -154,6 +154,46 @@ describe("the footer's email (DEC-101)", () => {
     });
 });
 
+describe("who the customer is buying from (DEC-118)", () => {
+    it("is the legal name, the registered address and the public phone, on any plan", async () => {
+        site(null);
+        profileFind.mockResolvedValue({
+            contactEmail: null,
+            legalName: " Rye Foods LLP ",
+            addressLine1: "12 Hill Road",
+            addressLine2: null,
+            city: "Bengaluru",
+            postalCode: "560001",
+            gstState: "29",
+            phone: "+919845012345",
+            // Never asked for, so never sent.
+            taxId: "29ABCDE1234F1Z5",
+        });
+        const footer = await service(onPlan("paid-plan")).read("site_1", "v");
+        expect(footer.seller).toEqual({
+            legalName: "Rye Foods LLP",
+            address: "12 Hill Road, Bengaluru 560001, Karnataka",
+            phone: "+919845012345",
+        });
+        expect(JSON.stringify(footer)).not.toContain("29ABCDE1234F1Z5");
+        const select = (
+            profileFind.mock.calls[0] as [{ select: Record<string, boolean> }]
+        )[0].select;
+        expect(select.taxId).toBeUndefined();
+    });
+
+    it("is all null for a business that has set none of it", async () => {
+        site(null);
+        profileFind.mockResolvedValueOnce(null);
+        const footer = await service(onPlan("paid-plan")).read("site_1", "v");
+        expect(footer.seller).toEqual({
+            legalName: null,
+            address: null,
+            phone: null,
+        });
+    });
+});
+
 describe("what it refuses", () => {
     it("is a 404 for a site that isn't there", async () => {
         siteFind.mockResolvedValue(null);

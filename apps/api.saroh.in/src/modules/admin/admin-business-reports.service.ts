@@ -37,8 +37,8 @@ export interface BusinessReportPage {
  * whether to act: the address, the business it resolved to and the
  * customer's words. The reporter's email is personal data and comes back
  * only to staff holding `organization:pii:read`; others see that one was
- * left. Closing a report is a lifecycle decision (`organization:lifecycle:write`)
- * and is audited.
+ * left. Closing a report needs `reports:resolve` (Support and Platform
+ * Owners) and is audited.
  */
 @Injectable()
 export class AdminBusinessReportsService {
@@ -118,7 +118,7 @@ export class AdminBusinessReportsService {
                 });
                 await this.audit.write(tx, {
                     actorUserId: staff.userId,
-                    permission: AdminPermission.OrganizationLifecycleWrite,
+                    permission: AdminPermission.ReportsResolve,
                     action: "business-report.done",
                     targetType: "business-report",
                     targetId: id,
