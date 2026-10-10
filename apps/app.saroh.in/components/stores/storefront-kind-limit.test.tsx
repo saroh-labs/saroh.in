@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * Sell → Locations: a change of kind the plan refuses (the places customers
- * visit, UX-036) is said by the radio it stopped, not in a toast, and the
- * radio stays where it was. Made-up words and numbers only.
+ * visit, UX-036) is said by the choice it stopped, in its sheet, not in a
+ * toast, and the row stays where it was. Made-up words and numbers only.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -27,6 +27,7 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: (...args: unknown[]) => update(...args) as unknown,
 }));
+vi.mock("@/lib/stores/actions", () => ({ updateStore: vi.fn() }));
 vi.mock("@/lib/members/actions", () => ({
     inviteMember: vi.fn(),
     removeMember: vi.fn(),
@@ -171,20 +172,35 @@ function type(field: HTMLInputElement | null, value: string) {
     });
 }
 
-describe("the location limit, by the radio (UX-036)", () => {
-    it("says the refusal beside the kind, and keeps it on No, online only", async () => {
+/** What the "Customers come here" row says is saved. */
+const kindSays = () =>
+    host.querySelector('[data-testid="location-kind-summary"]')?.textContent;
+
+describe("the location limit, by the choice (UX-036)", () => {
+    it("says the refusal beside the kind, in its sheet, and the row stays on No, online only", async () => {
         update.mockResolvedValue({
             ok: false,
             error: "You've reached your 2 places customers visit on this plan.",
         });
         draw();
+        await press(item("Change"));
+        expect(sheetName()).toBe("Do customers come here?");
         await press(item("Yes, they visit"));
-        const alert = host.querySelector("#location-kind-error");
+        // Nothing is sent until Save.
+        expect(update).not.toHaveBeenCalled();
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledWith(online.id, { kind: "SHOP" });
+        const alert = document.querySelector("#location-kind-error");
         expect(alert?.textContent).toBe(
             "You've reached your 2 places customers visit on this plan.",
         );
+        expect(alert?.getAttribute("role")).toBe("alert");
         expect(showError).not.toHaveBeenCalled();
-        expect(item("No, online only")?.getAttribute("data-state")).toBe("on");
+        // The sheet stays open on what was picked; the row on what is saved.
+        expect(sheetName()).toBe("Do customers come here?");
+        expect(item("Yes, they visit")?.getAttribute("data-state")).toBe("on");
+        expect(kindSays()).toBe("No, online only");
+        expect(host.querySelector("#location-address")).toBeNull();
     });
 
     it("becoming a place customers visit asks for its address next", async () => {
@@ -192,8 +208,16 @@ describe("the location limit, by the radio (UX-036)", () => {
             Promise.resolve({ ok: true, data: { ...online, ...input } }),
         );
         draw();
+        await press(item("Change"));
         await press(item("Yes, they visit"));
+        await press(item("Save"));
         expect(update).toHaveBeenCalledWith(online.id, { kind: "SHOP" });
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Customers visit this location now",
+        );
+        expect(kindSays()).toBe("Yes, they visit");
+        // The address's own sheet, with the keyboard in its field.
+        expect(sheetName()).toBe("Address");
         expect(document.activeElement?.id).toBe("storefront-address");
     });
 
@@ -277,8 +301,17 @@ describe("Pick-up needs a counter (UX-025)", () => {
             ),
         );
         expect(item("Turn Pick-up off")).toBeUndefined();
+        await press(item("Change"));
         await press(item("No, online only"));
+        expect(sheet()?.textContent).toContain(
+            "Its address and opening hours aren't shown, and it can't offer pick-up. The saved address and hours are kept.",
+        );
+        await press(item("Save"));
         expect(update).toHaveBeenCalledWith(shop.id, { kind: "ONLINE" });
+        expect(showSuccess).toHaveBeenCalledWith(
+            "This location has no counter now",
+        );
+        expect(sheet()).toBeNull();
         // Going online didn't touch the ways: it offers, it doesn't decide.
         expect(update).toHaveBeenCalledTimes(1);
         expect(item("Turn Pick-up off")).toBeDefined();
@@ -297,7 +330,7 @@ describe("the tabs", () => {
         expect(tab("Delivery")?.getAttribute("aria-selected")).toBe("true");
         expect(window.location.search).toBe("?section=delivery");
         expect(host.querySelector("#delivery-pickup")).not.toBeNull();
-        expect(host.querySelector("#storefront-name")).toBeNull();
+        expect(host.querySelector("#location-name")).toBeNull();
         // Back to The place: the page's own address, with no section.
         await press(tab("The place"));
         expect(window.location.search).toBe("");
@@ -352,7 +385,7 @@ describe("the tabs", () => {
         ).toBe(true);
     });
 
-    it("Add an address on Delivery opens The place on its address field", async () => {
+    it("Add an address on Delivery opens The place with its Address sheet", async () => {
         address.section = "delivery";
         act(() =>
             root.render(
@@ -380,7 +413,40 @@ describe("the tabs", () => {
         );
         await press(item("Add an address"));
         expect(tab("The place")?.getAttribute("aria-selected")).toBe("true");
+        expect(sheetName()).toBe("Address");
         expect(document.activeElement?.id).toBe("storefront-address");
+    });
+
+    it("Add an address where nobody visits asks whether customers come here", async () => {
+        address.section = "delivery";
+        act(() =>
+            root.render(
+                <StorefrontsScreen
+                    businessName="Rye & Co."
+                    storefronts={[
+                        {
+                            id: online.id,
+                            name: online.name,
+                            orderCount: 0,
+                            kind: "ONLINE",
+                            paused: false,
+                        },
+                    ]}
+                    selected={{ ...online, fulfilmentTypes: [] }}
+                    canCreate
+                    canEdit
+                    canClose
+                />,
+            ),
+        );
+        await press(item("Add an address"));
+        expect(tab("The place")?.getAttribute("aria-selected")).toBe("true");
+        expect(sheetName()).toBe("Do customers come here?");
+        expect(
+            document
+                .getElementById("location-kind")
+                ?.contains(document.activeElement),
+        ).toBe(true);
     });
 });
 

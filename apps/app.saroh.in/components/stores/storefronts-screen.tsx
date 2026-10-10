@@ -1,9 +1,7 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -15,7 +13,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
-import { newStorefrontHref, storefrontHref } from "@/lib/stores/links";
+import { newStorefrontHref } from "@/lib/stores/links";
 import type { LocationDetails } from "@/lib/stores/location-details";
 import type { LocationTab } from "@/lib/stores/location-readiness";
 import {
@@ -25,9 +23,9 @@ import {
     locationSubtitle,
 } from "@/lib/stores/location-readiness";
 import type { LocationPeople } from "@/lib/stores/people";
+import { placeSheetFor, placeSheetToOpen } from "@/lib/stores/place-rows";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
-    StorefrontKind,
     StorefrontSettings,
     StorefrontSummary,
 } from "@/lib/stores/storefronts";
@@ -46,18 +44,8 @@ import { PaymentsSection } from "./payments-section";
 import { PeopleSection } from "./people-section";
 import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
-
-/**
- * The two kinds of location (DEC-069, KTD-12): the `SHOP` and `ONLINE` kinds
- * in the data, named for what they mean to the merchant.
- */
-const KIND_LABEL: Record<StorefrontKind, string> = {
-    SHOP: "Customers visit",
-    ONLINE: "No counter",
-};
-
-const ordersLabel = (n: number) =>
-    n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
+import { StorefrontList } from "./storefront-list";
+import { usePlaceSheets } from "./use-place-sheets";
 
 /**
  * Sell › Location: one location's own page, titled with its name, with what
@@ -67,8 +55,8 @@ const ordersLabel = (n: number) =>
  * each one is the same page. A location is a storefront in code and in the
  * API (DEC-069 renamed the words, not the identifiers).
  *
- * Every control saves on its own (a switch when it is flipped, a field when
- * its Save is pressed), so there is no page-wide save to forget.
+ * Every control saves on its own (a switch when it is flipped, a row's
+ * sheet when its Save is pressed), so there is no page-wide save to forget.
  */
 export function StorefrontsScreen({
     businessName,
@@ -212,78 +200,6 @@ export function StorefrontsScreen({
     );
 }
 
-function StorefrontList({
-    storefronts,
-    selectedId,
-    notTakingOrders,
-}: {
-    storefronts: StorefrontSummary[];
-    selectedId: string | null;
-    notTakingOrders: string[];
-}) {
-    return (
-        <nav
-            aria-label="Locations"
-            className="min-w-0 max-w-[280px] flex-[0_1_236px] overflow-hidden rounded-xl border border-border bg-card max-sm:max-w-none max-sm:flex-[1_1_100%]"
-        >
-            <p className="border-b border-border px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {storefronts.length === 1
-                    ? "1 location"
-                    : `${storefronts.length} locations`}
-            </p>
-            <ul className="flex flex-col gap-0.5 p-1.5">
-                {storefronts.map((s) => {
-                    const on = s.id === selectedId;
-                    return (
-                        <li key={s.id}>
-                            <Link
-                                href={storefrontHref(s.id)}
-                                scroll={false}
-                                aria-current={on ? "page" : undefined}
-                                className={cn(
-                                    "flex min-h-11 items-center gap-[9px] rounded-lg px-[9px] py-[7px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    on
-                                        ? "bg-muted"
-                                        : "hover:bg-muted/60 active:bg-muted",
-                                )}
-                            >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[13.5px] font-medium">
-                                        {s.name}
-                                    </span>
-                                    <span className="block text-[12px] text-muted-foreground">
-                                        {ordersLabel(s.orderCount)}
-                                    </span>
-                                </span>
-                                {notTakingOrders.includes(s.id) ? (
-                                    // Past the plan's locations limit (#800).
-                                    <Badge
-                                        variant="warning"
-                                        className="shrink-0"
-                                    >
-                                        Not taking orders
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        variant={
-                                            s.paused ? "warning" : "neutral"
-                                        }
-                                        className="shrink-0"
-                                    >
-                                        {s.paused
-                                            ? "Paused"
-                                            : KIND_LABEL[s.kind]}
-                                    </Badge>
-                                )}
-                            </Link>
-                        </li>
-                    );
-                })}
-            </ul>
-        </nav>
-    );
-}
-
 function StorefrontDetail({
     store: initial,
     details,
@@ -360,6 +276,17 @@ function StorefrontDetail({
         "the-place",
         { history: "push" },
     );
+    // The place's Edit sheets: which one is open is kept here, so the
+    // readiness card and Delivery can open one from outside its tab.
+    const sheets = usePlaceSheets(
+        (which) =>
+            placeSheetToOpen(which, {
+                canEdit,
+                kind: store.kind,
+                hasDetails: Boolean(details),
+            }),
+        tab === "the-place",
+    );
     // A field to put the keyboard on once its tab has drawn.
     const focusNext = useRef<string | null>(null);
     const [jumps, setJumps] = useState(0);
@@ -370,6 +297,14 @@ function StorefrontDetail({
         jumpTo(id);
     }, [jumps, tab]);
     const goTo = (to: LocationTab, focus?: string) => {
+        // One of The place's fields ("Add address", "Set hours"): its
+        // sheet opens there, and the keyboard starts in it.
+        const sheet = to === "the-place" ? placeSheetFor(focus) : null;
+        if (sheet) {
+            setTab(to);
+            sheets.open(sheet);
+            return;
+        }
         focusNext.current = focus ?? LOCATION_PANEL_ID;
         setTab(to);
         setJumps((n) => n + 1);
@@ -398,7 +333,11 @@ function StorefrontDetail({
                 className="min-w-0 outline-none"
             >
                 {tab === "the-place" ? (
-                    <PlaceSection {...shared} details={details} />
+                    <PlaceSection
+                        {...shared}
+                        details={details}
+                        sheets={sheets}
+                    />
                 ) : null}
                 {tab === "payments" ? <PaymentsSection {...shared} /> : null}
                 {tab === "delivery" ? <FulfilmentSection {...shared} /> : null}

@@ -39,7 +39,8 @@ const LINK =
  * see the rows without Edit.
  *
  * Pick-up needs a door (UX-025): where customers can't visit it reads "Not
- * offered" with the way to a counter ("Add an address" opens The place).
+ * offered" with the way to a counter ("Add an address" opens the sheet
+ * for it on The place).
  * One already on there (saved before) says so and offers turning it off;
  * nothing changes on render.
  *
