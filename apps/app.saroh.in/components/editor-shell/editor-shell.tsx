@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import {
     isSettled,
     joinAnd,
@@ -25,7 +26,6 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
-import { LeaveDialog, useEditorLeaveGuard } from "./leave-guard";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
 
@@ -180,15 +180,17 @@ export function EditorShell<V extends Record<string, unknown>>(
     if (refused) errors[refused.field] = refused.message;
 
     const settled = isSettled(save);
-    const guard = useEditorLeaveGuard({
-        unsettled: canEdit && !settled,
+    // It saves by itself, so a way out saves what is waiting first and
+    // asks only when that save fails (or the record is in a conflict).
+    const guard = useLeaveGuard({
+        dirty: canEdit && !settled,
+        lost: leaveCopy({
+            save,
+            fields: unsavedFields(editor.lastSaved(), values, fieldLabels),
+            created: record !== null,
+            noun: copy.noun,
+        }),
         flush: editor.flush,
-    });
-    const leave = leaveCopy({
-        save,
-        fields: unsavedFields(editor.lastSaved(), values, fieldLabels),
-        created: record !== null,
-        noun: copy.noun,
     });
 
     const set = (patch: Partial<V>) => {
@@ -355,13 +357,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 cancelLabel="Keep draft"
                 onConfirm={() => void remove()}
             />
-            <LeaveDialog
-                open={guard.leaveTo !== null}
-                title={leave.title}
-                body={leave.body}
-                onStay={guard.stay}
-                onLeave={guard.leave}
-            />
+            {guard.dialog}
         </main>
     );
 }

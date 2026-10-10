@@ -1,23 +1,16 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { joinAnd } from "@/lib/products/editor-sections";
 import type { ProductStatus } from "@/lib/products/service";
 
 /*
  * The editor shell's smaller pieces, after the Editor design: the saved
- * status beside the name, the read-only note, what opens once a new product
- * exists, and the question before leaving with unsaved changes.
+ * status beside the name, the read-only note and what opens once a new
+ * product exists. Leaving with unsaved changes asks through the app's one
+ * guard (`components/shared/use-leave-guard.tsx`).
  */
 
 /** A fact about what customers can see, so it follows the SAVED status. */
@@ -65,54 +58,6 @@ export function ReadOnlyNote({ children }: { children: ReactNode }) {
                 {children}
             </span>
         </div>
-    );
-}
-
-/** Leaving with unsaved changes: names the sections, and Stay is the default. */
-export function LeaveDialog({
-    open,
-    onOpenChange,
-    href,
-    creating,
-    sections,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    href: string;
-    creating: boolean;
-    sections: string[];
-}) {
-    return (
-        <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent className="max-w-[380px] rounded-[14px] px-[22px] py-5">
-                <AlertDialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                    {creating
-                        ? "Leave without creating it?"
-                        : "Leave with unsaved changes?"}
-                </AlertDialogTitle>
-                <AlertDialogDescription className="mt-[7px] text-pretty text-[13px] leading-[1.55] text-foreground/75">
-                    {creating
-                        ? "Nothing you have entered is kept."
-                        : `Unsaved changes in ${joinAnd(sections)} will be lost.`}
-                </AlertDialogDescription>
-                <div className="mt-[18px] flex flex-wrap justify-end gap-2">
-                    <Link
-                        href={href}
-                        className="inline-flex h-[38px] items-center rounded-[9px] border border-border px-4 text-[12.5px] font-semibold text-destructive hover:bg-destructive-subtle"
-                    >
-                        Leave without saving
-                    </Link>
-                    <button
-                        type="button"
-                        autoFocus
-                        onClick={() => onOpenChange(false)}
-                        className="h-[38px] rounded-[9px] bg-foreground px-4 text-[12.5px] font-semibold text-background hover:bg-foreground/90"
-                    >
-                        Stay
-                    </button>
-                </div>
-            </AlertDialogContent>
-        </AlertDialog>
     );
 }
 

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { countSaved } from "@/lib/stock/levels";
 import type { LogKindId } from "@/lib/stock/log";
 import {
@@ -30,6 +31,7 @@ import { LevelsPanel } from "./levels-panel";
 import { LogList } from "./log-list";
 import { MoveDialog } from "./move-dialog";
 import { StockHeader } from "./stock-header";
+import { useCountMode } from "./use-count-mode";
 
 type Tab = "levels" | "log" | "checks";
 
@@ -68,9 +70,6 @@ export function StockScreen({
     pageSizes: { levels: number; log: number; checks: number };
 }) {
     const router = useRouter();
-    const [counting, setCounting] = useState(false);
-    const [values, setValues] = useState<Record<string, string>>({});
-    const [logSays, setLogSays] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState(false);
     const [moving, setMoving] = useState(false);
     const [recording, setRecording] = useState(false);
@@ -99,19 +98,25 @@ export function StockScreen({
         [tab, show, q, kind, store, product],
     );
 
+    // Cancel offers Undo, which puts the typed numbers back (`useCountMode`).
+    const count = useCountMode({
+        onBack: () => {
+            if (tab !== "levels") router.push(href({ tab: undefined }));
+        },
+    });
+    const { counting, values, logSays, onValue } = count;
     const draft = countDraft(values, logSays);
+    // The tabs, filters and pages are this screen at another address and
+    // keep the count; any other way out would lose it.
+    const guard = useLeaveGuard({
+        dirty: counting && count.typed > 0 && !saving,
+        lost: "The count isn't saved yet, so the numbers you've typed will be lost.",
+        keeps: (to) => to.pathname === "/commerce/stock",
+    });
 
     const startCount = () => {
-        setValues({});
-        setLogSays({});
         attempt.current = null;
-        setCounting(true);
-        if (tab !== "levels") router.push(href({ tab: undefined }));
-    };
-    const cancelCount = () => {
-        setCounting(false);
-        setValues({});
-        setLogSays({});
+        count.start();
     };
 
     const saveCount = async () => {
@@ -152,7 +157,7 @@ export function StockScreen({
                 ? `${mismatched} didn't match — the shelf moved while you counted. See Checks.`
                 : null,
         ].filter(Boolean);
-        cancelCount();
+        count.clear();
         attempt.current = null;
         dismissToasts();
         showUndo(
@@ -174,11 +179,6 @@ export function StockScreen({
         );
         router.refresh();
     };
-
-    const onValue = useCallback((key: string, raw: string, said: number) => {
-        setValues((v) => ({ ...v, [key]: raw }));
-        setLogSays((l) => (l[key] === said ? l : { ...l, [key]: said }));
-    }, []);
 
     const checkCount =
         checks === "failed"
@@ -341,10 +341,11 @@ export function StockScreen({
                     status={draft.status}
                     canSave={draft.entered.length > 0 && !draft.bad}
                     saving={saving}
-                    onCancel={cancelCount}
+                    onCancel={count.cancel}
                     onSave={() => void saveCount()}
                 />
             ) : null}
+            {guard.dialog}
 
             {canWrite ? (
                 <>

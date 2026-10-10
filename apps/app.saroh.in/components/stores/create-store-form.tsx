@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { trimmedOr } from "@/lib/forms/values";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
@@ -36,8 +37,9 @@ export function CreateStoreForm() {
             description: "",
         },
     });
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
     const name = form.watch("name");
+    const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("location") });
 
     async function onSubmit(values: FormValues) {
         const res = await createStore({
@@ -99,6 +101,7 @@ export function CreateStoreForm() {
                     {isSubmitting ? "Creating…" : "Create location"}
                 </Button>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

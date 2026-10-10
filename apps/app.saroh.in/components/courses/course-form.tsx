@@ -25,6 +25,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import {
+    lostChanges,
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/use-leave-guard";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
@@ -104,13 +109,18 @@ export function CourseForm({
     // New courses gather their sessions here.
     const [sessions, setSessions] = useState<string[]>([]);
 
-    async function save(values: Values, open: boolean) {
+    /** True once saved. `leaving` is on its way elsewhere, so doesn't open it. */
+    async function save(
+        values: Values,
+        open: boolean,
+        leaving = false,
+    ): Promise<boolean> {
         const seats = Number(values.seats);
         if (service && seats > service.capacity) {
             form.setError("seats", {
                 message: `${service.name} takes ${service.capacity} at a time, so at most ${service.capacity}.`,
             });
-            return;
+            return false;
         }
         setBusy(true);
         const input = {
@@ -137,7 +147,7 @@ export function CourseForm({
             } else {
                 showError(res.error);
             }
-            return;
+            return false;
         }
         showSuccess(
             course
@@ -146,13 +156,35 @@ export function CourseForm({
                   ? `${values.name} is open for enrolment`
                   : `${values.name} saved as a draft`,
         );
-        router.push(`/courses/${res.data.id}`);
+        if (!leaving) router.push(`/courses/${res.data.id}`);
+        return true;
     }
+
+    // A new course can be kept as a draft on the way out; its sessions
+    // are picked beside the form, so they count as typed work too.
+    const guard = useLeaveGuard({
+        dirty: form.formState.isDirty || sessions.length > 0,
+        lost: course ? lostChanges("this course") : lostNew("course"),
+        ...(course
+            ? {}
+            : {
+                  save: async () => {
+                      let kept = false;
+                      await form.handleSubmit(async (v) => {
+                          kept = await save(v, false, true);
+                      })();
+                      return kept;
+                  },
+              }),
+    });
 
     return (
         <Form {...form}>
             <form
-                onSubmit={form.handleSubmit((v) => save(v, false))}
+                // Enter runs the form's first button: Save for a course
+                // being changed, Save and open for a new one (which waits
+                // for a session, so Enter does nothing until there is one).
+                onSubmit={form.handleSubmit((v) => save(v, !course))}
                 className="grid max-w-[720px] gap-6"
             >
                 <FormField
@@ -314,18 +346,18 @@ export function CourseForm({
                     ) : (
                         <>
                             <Button
-                                type="button"
+                                type="submit"
                                 disabled={busy || sessions.length === 0}
-                                onClick={form.handleSubmit((v) =>
-                                    save(v, true),
-                                )}
                             >
                                 {busy ? "Saving…" : "Save and open"}
                             </Button>
                             <Button
-                                type="submit"
+                                type="button"
                                 variant="outline"
                                 disabled={busy}
+                                onClick={form.handleSubmit((v) =>
+                                    save(v, false),
+                                )}
                             >
                                 Save as draft
                             </Button>
@@ -340,6 +372,7 @@ export function CourseForm({
                     </Button>
                 </div>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

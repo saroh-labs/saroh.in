@@ -20,6 +20,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
 import {
     cleanAddressInput,
     MAX_ADDRESS_LENGTH,
@@ -118,7 +119,8 @@ export function CreateSiteForm({
         },
     });
     const [suggestion, setSuggestion] = useState<string | null>(null);
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
+    const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("site") });
     const name = form.watch("name");
     const address = form.watch("subdomain");
 
@@ -273,6 +275,7 @@ export function CreateSiteForm({
                     {isSubmitting ? "Creating…" : "Create site"}
                 </Button>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

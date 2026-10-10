@@ -1,17 +1,11 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";
 
@@ -51,8 +45,11 @@ export function ProductSettings({
     children: ReactNode;
 }) {
     const [dirty, setDirty] = useState(false);
-    const [leaveTo, setLeaveTo] = useState<string | null>(null);
-    useLeaveGuard(dirty);
+    // Another tab is another address, so the guard catches the tabs too.
+    const guard = useLeaveGuard({
+        dirty,
+        lost: "Your changes to the defaults or the SKU pattern will be lost.",
+    });
 
     return (
         <UnsavedContext.Provider value={{ setDirty }}>
@@ -71,12 +68,6 @@ export function ProductSettings({
                             role="tab"
                             aria-selected={on}
                             scroll={false}
-                            onClick={(e) => {
-                                if (dirty && !on) {
-                                    e.preventDefault();
-                                    setLeaveTo(href);
-                                }
-                            }}
                             className={cn(
                                 "inline-flex shrink-0 items-center whitespace-nowrap px-3.5 py-2.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
                                 on
@@ -96,43 +87,7 @@ export function ProductSettings({
             </div>
             <div className="pt-5">{children}</div>
 
-            <AlertDialog
-                open={leaveTo !== null}
-                onOpenChange={(o) => {
-                    if (!o) setLeaveTo(null);
-                }}
-            >
-                <AlertDialogContent className="max-w-[380px] rounded-[14px] px-[22px] py-5">
-                    <AlertDialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        Leave with unsaved changes?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="mt-[7px] text-[13px] leading-[1.55] text-foreground/75">
-                        Your changes to the defaults or the SKU pattern will be
-                        lost.
-                    </AlertDialogDescription>
-                    <div className="mt-[18px] flex flex-wrap justify-end gap-2">
-                        <Link
-                            href={leaveTo ?? "#"}
-                            scroll={false}
-                            onClick={() => {
-                                setDirty(false);
-                                setLeaveTo(null);
-                            }}
-                            className="inline-flex h-[34px] items-center rounded-[9px] border border-border px-[13px] text-[12.5px] font-semibold text-destructive hover:bg-destructive-subtle"
-                        >
-                            Leave without saving
-                        </Link>
-                        <button
-                            type="button"
-                            autoFocus
-                            onClick={() => setLeaveTo(null)}
-                            className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90"
-                        >
-                            Stay
-                        </button>
-                    </div>
-                </AlertDialogContent>
-            </AlertDialog>
+            {guard.dialog}
         </UnsavedContext.Provider>
     );
 }

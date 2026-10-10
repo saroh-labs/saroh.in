@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
 import { applyImport, previewImport } from "@/lib/imports/actions";
@@ -135,6 +136,11 @@ export function CsvImport({
     const [error, setError] = useState<string | null>(null);
     const [fileIssues, setFileIssues] = useState<RowIssue[]>([]);
     const [pending, startTransition] = useTransition();
+    // A file checked and its columns matched, and nothing written yet.
+    const guard = useLeaveGuard({
+        dirty: phase === "review",
+        lost: `Nothing from ${fileName || "the file"} is imported yet, and the columns you matched will be lost.`,
+    });
 
     const runPreview = useCallback(
         (
@@ -581,6 +587,7 @@ export function CsvImport({
                     </Card>
                 </>
             ) : null}
+            {guard.dialog}
         </div>
     );
 }

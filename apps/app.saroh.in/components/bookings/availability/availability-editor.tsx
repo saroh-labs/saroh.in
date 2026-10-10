@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type {
     AvailabilityDraft,
     KeptBooking,
@@ -284,6 +285,13 @@ export function AvailabilityEditor({
         }
     }
 
+    // Hours, time off and rules wait for "Save changes": a way off the
+    // page asks first.
+    const guard = useLeaveGuard({
+        dirty: canEdit && dirty && !saving,
+        lost: "Your changes to hours, time off or booking rules aren't saved, and will be lost.",
+    });
+
     const saveBar = dirty ? (
         <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
             <span
@@ -361,6 +369,7 @@ export function AvailabilityEditor({
                     </div>
                 </div>
                 {saveBar}
+                {guard.dialog}
             </>
         );
     }

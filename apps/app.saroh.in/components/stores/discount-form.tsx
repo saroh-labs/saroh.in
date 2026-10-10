@@ -25,6 +25,11 @@ import type { MultiOption } from "@/components/shared/multi-select";
 import { MultiSelect } from "@/components/shared/multi-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
+import {
+    lostChanges,
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/use-leave-guard";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
 import {
@@ -162,7 +167,13 @@ export function DiscountForm({
         },
     });
     const kind = form.watch("kind");
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
+    // What it applies to is kept beside the form, so it is compared too.
+    const [reachAtFirst] = useState(() => JSON.stringify([mode, picks]));
+    const guard = useLeaveGuard({
+        dirty: isDirty || JSON.stringify([mode, picks]) !== reachAtFirst,
+        lost: discount ? lostChanges("this code") : lostNew("code"),
+    });
 
     async function onSubmit(values: FormValues) {
         setTargetsError(null);
@@ -569,6 +580,7 @@ export function DiscountForm({
                     ) : null}
                 </div>
             </form>
+            {guard.dialog}
         </Form>
     );
 }
