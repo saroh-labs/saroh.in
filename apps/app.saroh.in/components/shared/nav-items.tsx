@@ -12,6 +12,7 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
+    QrCode,
     ReceiptText,
     SlidersHorizontal,
     Store,
@@ -1129,8 +1130,10 @@ export interface SettingsPage {
 
 /**
  * The settings screen's tabs, in the design's order (2026-09-25): the
- * business, who is on it, what it runs, what Saroh costs it, you, who
- * changed what, and the services behind it. The settings layout draws them as vertical tabs and the
+ * business, who is on it, what it runs, what Saroh costs it, you, what
+ * it hands customers to scan (Share, 2026-10-10: after Your profile, so
+ * `/settings` still opens Your profile for someone who reaches nothing else
+ * of the business's), who changed what, and the services behind it. The settings layout draws them as vertical tabs and the
  * command menu lists them, each only for an actor who may open it.
  */
 export const SETTINGS_PAGES = [
@@ -1168,6 +1171,15 @@ export const SETTINGS_PAGES = [
         label: "Your profile",
         description: "Your login and the alerts you get",
         icon: UserRound,
+    },
+    {
+        href: "/settings/share",
+        label: "Share",
+        description: "QR codes for the counter and your cards",
+        icon: QrCode,
+        // Whoever may see the website may see its codes; making and
+        // changing one is `site:update`, which the page and the API judge.
+        action: "site:read",
     },
     {
         href: "/settings/activity",

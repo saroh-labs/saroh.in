@@ -182,6 +182,7 @@ describe("what each role is offered", () => {
             "/settings/modules",
             "/settings/billing",
             "/settings/profile",
+            "/settings/share",
             "/settings/activity",
             "/settings/providers",
         ]);
@@ -309,6 +310,8 @@ describe("what each role is offered", () => {
             "/settings/people",
             "/settings/modules",
             "/settings/profile",
+            // They read the website, so its QR codes too: to see, not change.
+            "/settings/share",
         ]);
         expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
@@ -1239,7 +1242,13 @@ describe("settings tabs — owner only, and everyone's", () => {
         for (const role of ROLES) {
             expect(tabsFor({ role })).toContain("/settings/profile");
         }
-        expect(tabsFor({ role: "REVIEWER" })).toEqual(["/settings/profile"]);
+        // A reviewer may see the website, so its QR codes too (Share), to
+        // look at and download; Your profile still comes first, so that is
+        // where `/settings` opens for them.
+        expect(tabsFor({ role: "REVIEWER" })).toEqual([
+            "/settings/profile",
+            "/settings/share",
+        ]);
         // An invented role granted nothing of the business still has itself.
         expect(tabsFor({ role: "MEMBER", actions: [] })).toEqual([
             "/settings/profile",
@@ -1253,9 +1262,22 @@ describe("settings tabs — owner only, and everyone's", () => {
             "Modules",
             "Plan and billing",
             "Your profile",
+            "Share",
             "Activity",
             "Providers",
         ]);
+    });
+
+    it("offers Share to whoever may see the website", () => {
+        for (const role of ROLES) {
+            expect(tabsFor({ role })).toContain("/settings/share");
+        }
+        expect(tabsFor({ role: "MEMBER", actions: ["site:read"] })).toContain(
+            "/settings/share",
+        );
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["order:read"] }),
+        ).not.toContain("/settings/share");
     });
 
     it("offers Activity to whoever the API lets read the audit stream", () => {
