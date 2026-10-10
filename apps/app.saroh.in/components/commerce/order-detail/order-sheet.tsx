@@ -12,7 +12,7 @@ import {
 } from "@/components/shared/action-sheet";
 
 import { CHANGE_BUTTON_ID } from "./change-panels";
-import type { Panel } from "./use-kitchen";
+import type { Panel } from "./panel";
 
 type OpenPanel = Exclude<Panel, null>;
 

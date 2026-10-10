@@ -31,6 +31,7 @@ import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
 import type { Hold } from "./hold-card";
+import type { Panel } from "./panel";
 import type { RefundChoice } from "./refund-panel";
 
 export type PendingHold = Hold & {
@@ -50,13 +51,7 @@ export type PendingHold = Hold & {
     };
 };
 
-/**
- * Order Detail's side sheets, one open at a time: `courier` hands the
- * order over; `tracking` fills in its details after; `fulfilment` and
- * `cancel` are B9's.
- */
-export type Panel =
-    null | "refund" | "edit" | "courier" | "tracking" | "fulfilment" | "cancel";
+export type { Panel };
 
 /**
  * What Order Detail does, apart from how it looks: stage moves with their
