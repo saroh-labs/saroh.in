@@ -6,6 +6,7 @@ import { HomeDashboard } from "@/components/home/home-dashboard";
 import { HomeHeader } from "@/components/home/home-header";
 import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
@@ -13,6 +14,7 @@ import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
 import { hasAnyInvoice } from "@/lib/invoices/service";
 import { listModules } from "@/lib/modules/service";
+import { homeMoment } from "@/lib/moments/read";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import type { Organization } from "@/lib/organizations/service";
@@ -97,6 +99,8 @@ export default async function Home() {
     const invoicing = home.hasAnyModule
         ? undefined
         : await loadInvoicing(business, kind);
+    // The first order or booking, in its first day (wave G), said once.
+    const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -111,6 +115,7 @@ export default async function Home() {
                 businessName={business?.name ?? "This business"}
                 kind={kind}
             />
+            {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
                 <HomeDashboard
                     home={home}
