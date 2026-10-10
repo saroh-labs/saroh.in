@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -214,7 +215,7 @@ export function useTurnOn({
                 );
                 setFailure(
                     onAlready.length > 0
-                        ? `${listWords(onAlready)} ${onAlready.length === 1 ? "is" : "are"} on, but ${moduleName(key, modules)} isn't yet.${why ? ` ${why}` : ""}`
+                        ? `${listWords(onAlready)} ${plural(onAlready.length, "is", "are")} on, but ${moduleName(key, modules)} isn't yet.${why ? ` ${why}` : ""}`
                         : why,
                 );
                 // What did turn on shows behind the sheet.

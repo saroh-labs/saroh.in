@@ -178,11 +178,7 @@ export function BulkBar({
                 onChange: (state) => {
                     if (state.status === "held") return;
                     if (state.status === "failed") {
-                        showError(
-                            state.error instanceof Error
-                                ? state.error.message
-                                : "That didn't go through. Try again.",
-                        );
+                        showError("That didn't go through. Try again.");
                     }
                     if (
                         state.status !== "committing" &&

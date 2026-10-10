@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format/money";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -14,7 +15,6 @@ import {
     pageTitle,
     tickEvery,
 } from "@/lib/analytics/website-words";
-import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { EmptyState } from "@saroh/ui/data-state";
 
 import type { ReadoutBar } from "./readout-bars";
@@ -52,7 +52,7 @@ function Tile({
                 ) : null}
             </span>
             <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground sm:text-[22px]">
-                {value.toLocaleString(NUMBER_LOCALE)}
+                {formatNumber(value)}
             </span>
         </>
     );
@@ -143,7 +143,7 @@ function TopPages({ pages }: { pages: TopPage[] }) {
                                 </span>
                             </span>
                             <span className="shrink-0 text-sm font-medium tabular-nums">
-                                {p.views.toLocaleString(NUMBER_LOCALE)}
+                                {formatNumber(p.views)}
                                 <span className="sr-only"> visits</span>
                             </span>
                         </li>

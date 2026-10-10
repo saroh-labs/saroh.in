@@ -1,3 +1,4 @@
+import { formatClock } from "@/lib/format/datetime";
 import type { HomeToday, HomeTodayItem } from "./service";
 
 /**
@@ -23,7 +24,7 @@ export const CHECK_IN_EARLY_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export interface TodayRow extends HomeTodayItem {
-    /** The words on the right: "Next", "Arrived 09:32", "Not here yet"… */
+    /** The words on the right: "Next", "Arrived 9:32 am", "Not here yet"… */
     state: string;
     /** Offer Arrived: a booking nobody has marked, from an hour before. */
     canArrive: boolean;
@@ -41,9 +42,9 @@ export interface TodayView {
     empty: boolean;
 }
 
-/** "Arrived 09:32", or "Arrived" when the time wasn't sent. */
+/** "Arrived 9:32 am", or "Arrived" when the time ("09:32") wasn't sent. */
 export function arrivedLabel(time: string | null): string {
-    return time ? `Arrived ${time}` : "Arrived";
+    return time ? `Arrived ${formatClock(time)}` : "Arrived";
 }
 
 function stateOf(item: HomeTodayItem, started: boolean, next: boolean): string {
@@ -103,14 +104,4 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
         visible: today.bookings || rows.length > 0,
         empty: today.bookings && rows.length === 0,
     };
-}
-
-/** "09:32" now, in the business's zone: the time an Arrived is said. */
-export function clockNow(now: Date, zone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone: zone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(now);
 }

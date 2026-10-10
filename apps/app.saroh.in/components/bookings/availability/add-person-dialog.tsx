@@ -83,7 +83,7 @@ export function AddPersonDialog({
         <FormDialog
             open={open}
             size="sm"
-            title="Add someone who takes bookings"
+            title="New person who takes bookings"
             description="They don't need a login, but they use a team seat, as everyone who takes bookings does. Their hours start empty, so nobody can book them until you add some."
             pending={saving}
             saveLabel="Add person"

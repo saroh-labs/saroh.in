@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -104,7 +105,7 @@ export function CollectionsPanel({
                     className="flex-1 text-[12.5px] font-semibold"
                 >
                     {collections.length}{" "}
-                    {collections.length === 1 ? "collection" : "collections"}
+                    {plural(collections.length, "collection")}
                 </h2>
                 {canWrite ? (
                     <Button

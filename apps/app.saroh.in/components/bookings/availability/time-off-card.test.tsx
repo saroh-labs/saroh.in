@@ -218,7 +218,7 @@ describe("Add time off", () => {
     it("opens a sheet of that name, which says it isn't saved until Save changes", async () => {
         draw();
         await press(button("Add time off", host));
-        expect(sheetName()).toBe("Add time off");
+        expect(sheetName()).toBe("New time off");
         expect(sheet()?.textContent).toContain("until you press Save changes");
         expect(button("Add day off", sheet() ?? undefined)).toBeDefined();
         expect(button("Cancel", sheet() ?? undefined)).toBeDefined();
@@ -273,7 +273,7 @@ describe("Add time off", () => {
                 );
         });
         expect(onAdd).not.toHaveBeenCalled();
-        expect(sheetName()).toBe("Add time off");
+        expect(sheetName()).toBe("New time off");
         expect(labelled("Reason")?.value).toBe("Dentist");
 
         // Put right, it adds part of the day.

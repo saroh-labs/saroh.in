@@ -6,6 +6,7 @@
  * `activity-detail.ts` the sheet.
  */
 
+import { plural } from "@/lib/format/plural";
 import { moduleName as railName } from "@/lib/modules/turn-on";
 import { businessTypeLabel } from "@/lib/organizations/business-types";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
@@ -167,10 +168,6 @@ export const countOf = (value: unknown): number | null =>
         ? value
         : null;
 
-/** "1 storefront", "2 storefronts", with Indian digit grouping. */
-export const counted = (n: number, one: string, many = `${one}s`): string =>
-    `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
-
 /** A value as recorded: plain, or nothing. */
 export type ChangeValue = string | number | boolean | null;
 
@@ -312,7 +309,7 @@ export function profileChange(
     }
     const named = phrases.slice(0, 2);
     const extra = phrases.length - named.length + unknown;
-    const others = `${extra} other ${extra === 1 ? "detail" : "details"}`;
+    const others = `${extra} other ${plural(extra, "detail")}`;
     return { what: `updated ${named.join(", ")} and ${others}`, tab };
 }
 

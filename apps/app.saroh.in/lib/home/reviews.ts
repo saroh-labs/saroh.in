@@ -1,4 +1,5 @@
-import { localDateKey } from "@/lib/format/datetime";
+import { formatDate, localDateKey, zoneParts } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 import type { HomeReviewSite } from "./service";
 
@@ -30,7 +31,7 @@ const MS_PER_DAY = 86_400_000;
 /** "2 notes open"; nothing when none are. */
 export function notesOpen(n: number): string | null {
     if (n <= 0) return null;
-    return n === 1 ? "1 note open" : `${n} notes open`;
+    return count(n, "note open", "notes open");
 }
 
 /**
@@ -40,13 +41,7 @@ export function notesOpen(n: number): string | null {
 export function sentWhen(iso: string, zone: string, now: Date): string {
     const key = localDateKey(iso, zone);
     if (key === localDateKey(now, zone)) {
-        const hour = Number(
-            new Intl.DateTimeFormat("en-GB", {
-                timeZone: zone,
-                hour: "2-digit",
-                hour12: false,
-            }).format(new Date(iso)),
-        );
+        const hour = zoneParts(iso, zone).hour;
         // The greeting's parts of the day (`home-last-day.ts`).
         const part =
             hour >= 5 && hour < 12
@@ -59,14 +54,7 @@ export function sentWhen(iso: string, zone: string, now: Date): string {
     if (key === localDateKey(new Date(now.getTime() - MS_PER_DAY), zone)) {
         return "sent yesterday";
     }
-    const day = new Intl.DateTimeFormat("en-GB", {
-        timeZone: zone,
-        day: "numeric",
-        month: "short",
-    })
-        .format(new Date(iso))
-        // ICU writes "Sept"; the designs write three letters every month.
-        .replace("Sept", "Sep");
+    const day = formatDate(iso, zone, { now });
     return `sent ${day}`;
 }
 
@@ -127,7 +115,7 @@ export function reviewRows(
         if (more > 0) {
             rows.push({
                 key: `${site.id}:more`,
-                title: `${more} more page${more === 1 ? "" : "s"}`,
+                title: count(more, "more page"),
                 sub: site.name,
                 href: site.href,
             });

@@ -161,7 +161,7 @@ test.describe("calendar week, hour grid", () => {
         await page.goto("/calendar?view=week");
         const grid = page.locator("#calendar-week");
         await expect(grid.getByText("All day")).toBeVisible();
-        await expect(grid.getByText("07:00", { exact: true })).toBeVisible();
+        await expect(grid.getByText("7 am", { exact: true })).toBeVisible();
         await expect(grid.locator("button[data-day]")).toHaveCount(7);
         // Every block and chip opens its record.
         const links = grid.locator("a[href]");

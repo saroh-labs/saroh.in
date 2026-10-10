@@ -1,7 +1,10 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { plural } from "@/lib/format/plural";
 import type { PackStanding } from "./balance";
 import type { PackKind } from "./pack-cards";
-import { money, unitWord } from "./pack-cards";
-import { day, RUNNING_OUT_DAYS } from "./pack-detail";
+import { unitWord } from "./pack-cards";
+import { RUNNING_OUT_DAYS } from "./pack-detail";
 
 /**
  * The lines under a pack card's figures, after "Saroh Packs" (E15):
@@ -58,14 +61,14 @@ export function cardNotes(
         .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
     for (const p of soon.slice(0, NAMED_RUNNING_OUT)) {
         notes.push({
-            text: `${p.contact.name}: ${p.left} ${unitWord(pack.kind, p.left)} ${p.left === 1 ? "runs" : "run"} out ${day(p.expiresAt, timeZone)}`,
+            text: `${p.contact.name}: ${p.left} ${unitWord(pack.kind, p.left)} ${plural(p.left, "runs", "run")} out ${formatDate(p.expiresAt, timeZone)}`,
             tone: "accent",
         });
     }
     const more = soon.length - NAMED_RUNNING_OUT;
     if (more > 0) {
         notes.push({
-            text: `${more} more ${more === 1 ? "runs" : "run"} out within ${RUNNING_OUT_DAYS} days`,
+            text: `${more} more ${plural(more, "runs", "run")} out within ${RUNNING_OUT_DAYS} days`,
             tone: "accent",
         });
     }
@@ -84,7 +87,7 @@ export function cardNotes(
     }
     for (const [price, { n, currency }] of Array.from(older.entries())) {
         notes.push({
-            text: `${n} bought at ${money(price, currency)} — they keep it`,
+            text: `${n} bought at ${formatMoneyMajor(price, currency)} — they keep it`,
             tone: "quiet",
         });
     }

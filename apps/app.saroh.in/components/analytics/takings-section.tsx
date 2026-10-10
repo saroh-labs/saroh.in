@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -13,7 +14,6 @@ import { takingsFigures } from "@/lib/analytics/takings-figures";
 import type { RowsLink } from "@/lib/analytics/takings-words";
 import {
     chartLabel,
-    dayMonth,
     HOW_TAKINGS_ARE_COUNTED,
     ordersHref,
     otherCurrencyNote,
@@ -226,7 +226,9 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                 href: ordersHref(bar.start, bar.end),
                 label: "Orders placed that week",
             },
-            ...(i === 0 ? { tick: dayMonth(bar.start) } : {}),
+            ...(i === 0
+                ? { tick: formatDay(bar.start, { year: "never" }) }
+                : {}),
         })),
         {
             key: "so-far",

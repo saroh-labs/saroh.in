@@ -45,8 +45,8 @@ export function ConsentToggle({
         }
         showSuccess(
             next === "GRANTED"
-                ? `${CHANNEL_LABEL[channel]} consent granted`
-                : `${CHANNEL_LABEL[channel]} consent revoked`,
+                ? `${CHANNEL_LABEL[channel]} consent granted.`
+                : `${CHANNEL_LABEL[channel]} consent revoked.`,
         );
         router.refresh();
     }

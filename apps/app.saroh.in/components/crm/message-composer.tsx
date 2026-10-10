@@ -126,7 +126,7 @@ export function MessageComposer({
                 if (res.data.status === "SUPPRESSED") {
                     // Recorded, not delivered: said as it is, never "sent".
                     suppressed = true;
-                    showWarning("Message suppressed: consent is revoked");
+                    showWarning("Message not sent. Their consent is revoked.");
                     onDraft(BLANK_MESSAGE);
                     router.refresh();
                     return { ok: false, error: "", said: true };

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
@@ -8,7 +9,6 @@ import {
     chargingText,
     classesText,
     collectionRows,
-    dayText,
     failWhy,
     gstNote,
     headline,
@@ -303,7 +303,7 @@ describe("ranLine", () => {
                 TZ,
                 NOW,
             ),
-        ).toEqual({ text: "Renewals last ran Today, 06:00.", late: false });
+        ).toEqual({ text: "Renewals last ran Today, 6:00 am.", late: false });
     });
 
     it("warns when the next run is late, or none has run", () => {
@@ -317,7 +317,7 @@ describe("ranLine", () => {
             NOW,
         );
         expect(late.late).toBe(true);
-        expect(late.text).toMatch(/^Renewals last ran 16 Sep, 06:00 — later/);
+        expect(late.text).toMatch(/^Renewals last ran 16 Sep, 6:00 am — later/);
         expect(
             ranLine(
                 { lastCheckedAt: null, nextCheckAt: null, issuedToday: 0 },
@@ -330,7 +330,9 @@ describe("ranLine", () => {
 
 describe("dayText", () => {
     it("adds the year only when it is not this one", () => {
-        expect(dayText("2027-01-02", TZ, NOW, true)).toBe("Sat 2 Jan 2027");
+        expect(
+            formatDate("2027-01-02", TZ, { now: NOW, weekday: "short" }),
+        ).toBe("Sat 2 Jan 2027");
     });
 });
 

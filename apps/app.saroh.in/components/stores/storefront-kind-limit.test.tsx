@@ -255,7 +255,7 @@ describe("Pick-up needs a counter (UX-025)", () => {
         expect(update).toHaveBeenCalledWith(online.id, {
             fulfilmentTypes: [],
         });
-        expect(showSuccess).toHaveBeenCalledWith("Pick-up turned off");
+        expect(showSuccess).toHaveBeenCalledWith("Pick-up turned off.");
         // Off now, and with no counter it can't come back on.
         expect(pickupSays()).toBe("Not offered");
         expect(item("Add an address")).toBeDefined();
@@ -566,7 +566,7 @@ describe("a way's Edit sheet", () => {
             freeShippingThreshold: "999",
             lateAfterMinutes: { LOCAL_DELIVERY: 240 },
         });
-        expect(showSuccess).toHaveBeenCalledWith("Local delivery saved");
+        expect(showSuccess).toHaveBeenCalledWith("Local delivery saved.");
         // Saved: the sheet closes.
         expect(sheet()).toBeNull();
     });
@@ -584,7 +584,7 @@ describe("a way's Edit sheet", () => {
         expect(update).toHaveBeenCalledWith(shop.id, {
             fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
         });
-        expect(showSuccess).toHaveBeenCalledWith("Shipping turned on");
+        expect(showSuccess).toHaveBeenCalledWith("Shipping turned on.");
     });
 
     it("a late time alone keeps its own words", async () => {
@@ -598,7 +598,7 @@ describe("a way's Edit sheet", () => {
             lateAfterMinutes: { PICKUP: 180 },
         });
         expect(showSuccess).toHaveBeenCalledWith(
-            "Pick-up orders now count as late after 3 hours",
+            "Pick-up orders now count as late after 3 hours.",
         );
     });
 
@@ -674,12 +674,12 @@ describe("a way's Edit sheet", () => {
     });
 
     it("a refusal keeps the sheet open with what was typed", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         drawShop();
         await press(labelled("Edit local delivery"));
         await press(chip("8 h"));
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Local delivery");
         expect(chip("8 h")?.getAttribute("data-state")).toBe("on");
     });
@@ -762,7 +762,7 @@ describe("the tax rate, read first (Payments)", () => {
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
         expect(update).toHaveBeenCalledWith(taxed.id, { taxRate: "12.5" });
-        expect(showSuccess).toHaveBeenCalledWith("Tax rate set to 12.5%");
+        expect(showSuccess).toHaveBeenCalledWith("Tax rate set to 12.5%.");
         expect(sheet()).toBeNull();
         expect(says()).toBe("12.5% of each order's items, before delivery");
     });
@@ -794,12 +794,12 @@ describe("the tax rate, read first (Payments)", () => {
     });
 
     it("a refusal keeps the sheet open with what was typed", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         drawTaxed();
         await press(edit());
         type(rate(), "5");
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Tax rate");
         expect(rate()?.value).toBe("5");
     });

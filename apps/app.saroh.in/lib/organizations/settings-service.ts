@@ -309,7 +309,7 @@ export async function updateOrganizationSettings(
         .catch(() => null)) as OrganizationSettings | null;
 
     if (!res.ok || !data) {
-        return toFailure(data, "Could not save your organization.");
+        return toFailure(data, "Couldn't save your organization.");
     }
     return { ok: true, data };
 }
@@ -337,7 +337,7 @@ export async function updateBusinessLogo(
     if (!res.ok || !data) {
         return toFailure(
             data,
-            mediaId ? "Could not save the logo." : "Could not remove the logo.",
+            mediaId ? "Couldn't save the logo." : "Couldn't remove the logo.",
         );
     }
     return { ok: true, data };

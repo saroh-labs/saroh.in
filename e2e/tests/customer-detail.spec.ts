@@ -195,7 +195,7 @@ test.describe("customer detail", () => {
         const text = `E2E note ${s}`;
         // The tab is the list; the field opens in a side sheet.
         await page.getByRole("button", { name: "Add note" }).click();
-        const sheet = page.getByRole("dialog", { name: "Add note" });
+        const sheet = page.getByRole("dialog", { name: "New note" });
         await sheet.getByLabel("Note", { exact: true }).fill(text);
         // Allergies live on Needs attention, not on a note (Z2a).
         await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(

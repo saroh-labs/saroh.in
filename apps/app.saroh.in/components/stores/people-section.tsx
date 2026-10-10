@@ -128,7 +128,7 @@ export function PeopleSection({
             showError(res.error);
             return;
         }
-        showSuccess("Role updated");
+        showSuccess("Role saved.");
         router.refresh();
     }
 

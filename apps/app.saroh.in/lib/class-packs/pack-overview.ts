@@ -1,13 +1,14 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { invoiceHref, invoicesHref } from "@/lib/invoices/links";
 
-import { money, packKind, unitWord } from "./pack-cards";
+import { packKind, unitWord } from "./pack-cards";
 import type { PackDetailTab } from "./pack-detail";
 import {
     DAY_MS,
     MAX_EXTEND_DAYS,
     RUNNING_OUT_DAYS,
-    count,
-    day,
     detailHeader,
     each,
     people,
@@ -116,7 +117,7 @@ export function coverLines(
         const cents = d?.priceCents;
         const currency = d?.currency;
         return typeof cents === "number" && currency
-            ? `${s.name} · drop-in ${money(cents / 100, currency)}`
+            ? `${s.name} · drop-in ${formatMoneyMajor(cents / 100, currency)}`
             : s.name;
     });
 }
@@ -157,7 +158,7 @@ export function linkedCards(
                 : "Nobody right now",
         lines: [
             ...soon.map((h) => ({
-                text: `${h.contact.name}: ${h.left} run out ${day(h.expiresAt, opts.timeZone)}`,
+                text: `${h.contact.name}: ${h.left} run out ${formatDate(h.expiresAt, opts.timeZone)}`,
             })),
             ...(o.lostToExpiry > 0
                 ? [
@@ -185,7 +186,7 @@ export function linkedCards(
             lines:
                 issued.length > 0
                     ? issued.slice(0, 2).map((r) => ({
-                          text: `${r.contact.name} · ${day(r.createdAt, opts.timeZone)}`,
+                          text: `${r.contact.name} · ${formatDate(r.createdAt, opts.timeZone)}`,
                           href: invoiceHref(r.invoiceId ?? ""),
                       }))
                     : [
@@ -240,7 +241,10 @@ export function aboutRows(
 ): AboutRow[][] {
     const kind = packKind(pack);
     const unit = unitWord(kind, 1);
-    const price = [money(pack.price, pack.currency), each(pack, kind)]
+    const price = [
+        formatMoneyMajor(pack.price, pack.currency),
+        each(pack, kind),
+    ]
         .filter(Boolean)
         .join(" · ");
     const first: AboutRow[] = [
@@ -269,7 +273,7 @@ export function aboutRows(
             k: "Who can buy it",
             v: pack.firstPackOnly ? "First pack only (intro offer)" : "Anyone",
         },
-        { k: "Created", v: day(pack.createdAt, opts.timeZone) },
+        { k: "Created", v: formatDate(pack.createdAt, opts.timeZone) },
         ...(opts.priceHistory
             ? [{ k: "Price history", v: opts.priceHistory }]
             : []),
@@ -303,10 +307,10 @@ export function customerPreview(
         line: [
             `${pack.credits} ${unitWord(kind, pack.credits)}`,
             each(pack, kind),
-            `use by ${day(useBy.toISOString(), timeZone)}`,
+            `use by ${formatDate(useBy.toISOString(), timeZone)}`,
         ]
             .filter(Boolean)
             .join(" · "),
-        price: money(pack.price, pack.currency),
+        price: formatMoneyMajor(pack.price, pack.currency),
     };
 }

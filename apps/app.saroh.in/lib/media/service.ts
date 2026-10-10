@@ -79,7 +79,7 @@ export async function createUpload(input: {
     }
     return {
         ok: false,
-        error: messageOf(data, "Could not start the upload."),
+        error: messageOf(data, "Couldn't start the upload."),
     };
 }
 
@@ -97,7 +97,7 @@ export async function completeUpload(
     }
     return {
         ok: false,
-        error: messageOf(data, "Could not confirm the upload."),
+        error: messageOf(data, "Couldn't confirm the upload."),
     };
 }
 

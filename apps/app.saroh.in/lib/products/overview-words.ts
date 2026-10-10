@@ -1,4 +1,6 @@
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+import { formatMonth, viewerTimeZone } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 /**
  * The product page's Overview in words (#522), after "Saroh Product Detail":
  * the availability card, the "Linked to this product" cards, the Details
@@ -7,7 +9,7 @@ import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
  */
 
 import type { OverviewOrder, ProductPlacement } from "./overview-rules";
-import { ORDER_STATUS_LABEL, plural } from "./overview-rules";
+import { ORDER_STATUS_LABEL } from "./overview-rules";
 
 // ---- Availability ----
 
@@ -86,26 +88,11 @@ export function heldByLine(
         .filter((s) => s.promised > 0)
         .map((s) => `${s.title} ${s.promised}`)
         .join(", ");
-    const held = `${promised} held by ${plural(openOrders, "open order")}`;
+    const held = `${promised} held by ${count(openOrders, "open order")}`;
     return sizes ? `${held} — ${sizes}` : held;
 }
 
 // ---- Linked to this product ----
-
-const MONTHS = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
 
 /** "3 open · 41 in September". */
 export function ordersSummary(
@@ -113,7 +100,8 @@ export function ordersSummary(
     thisMonth: number,
     now: Date,
 ): string {
-    return `${openCount} open · ${thisMonth} in ${MONTHS[now.getMonth()]}`;
+    // The month where the page is open, as `now` is read there.
+    return `${openCount} open · ${thisMonth} in ${formatMonth(now, viewerTimeZone(), { year: "never" })}`;
 }
 
 /** An order's reference as people say it: "#1020"; "ORD-507" as it is. */
@@ -157,7 +145,7 @@ export function collectionsSummary(placement: ProductPlacement): {
         count:
             shown.length === 0
                 ? "In no collection"
-                : `In ${plural(shown.length, "collection")}`,
+                : `In ${count(shown.length, "collection")}`,
         names: shown.map((c) => c.name).join(", ") || "—",
     };
 }
@@ -196,7 +184,7 @@ export function websiteSummary(
                   lines: ["No other page of the website shows it."],
               }
             : {
-                  headline: `On the online shop and ${plural(pages.length, "page")}`,
+                  headline: `On the online shop and ${count(pages.length, "page")}`,
                   lines: pages.map((p) => p.title || p.path),
               };
     }
@@ -213,7 +201,7 @@ export function websiteSummary(
         };
     }
     return {
-        headline: `Shown on ${plural(pages.length, "page")}`,
+        headline: `Shown on ${count(pages.length, "page")}`,
         lines: pages.map((p) => p.title || p.path),
     };
 }

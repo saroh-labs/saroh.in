@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { takingsFigures } from "./takings-figures";
 import {
     chartLabel,
-    dayMonth,
     ordersHref,
     otherCurrencyNote,
     soFarReadout,
@@ -13,7 +12,6 @@ import {
     takingsAnswers,
     takingsSubtitle,
     takingsTiles,
-    weekdayDayMonth,
     weekReadout,
 } from "./takings-words";
 import { takingsRead } from "./takings.fixture";
@@ -405,7 +403,6 @@ describe("labels", () => {
                 },
             ]),
         ).toBe("Hill Road 66 per cent, online 34 per cent.");
-        expect(dayMonth("2026-09-14")).toBe("14 Sep");
         expect(takingsSubtitle(f)).toBe(
             "This week so far, and the twelve whole weeks 6 Jul – 27 Sep.",
         );
@@ -429,7 +426,6 @@ describe("labels", () => {
         expect(sourceLine(f)).toBe(
             "From 47 payments in the last four weeks: 47 paid orders and 0 paid invoices, less refunds.",
         );
-        expect(weekdayDayMonth("2026-10-04")).toBe("Sunday 4 Oct");
         expect(ordersHref("2026-09-28", "2026-10-04")).toBe(
             "/commerce/orders?date=custom&from=2026-09-28&to=2026-10-04&payment=paid",
         );

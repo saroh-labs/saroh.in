@@ -92,7 +92,7 @@ export function loadPlanDraft(id: string) {
         `${plan(id)}/draft`,
         "GET",
         undefined,
-        "Could not load that plan.",
+        "Couldn't load that plan.",
     );
 }
 
@@ -102,7 +102,7 @@ export function createPlanDraft(values: Partial<PlanValues>) {
         `${plans}/drafts`,
         "POST",
         values,
-        "Could not save that plan.",
+        "Couldn't save that plan.",
     );
 }
 
@@ -116,7 +116,7 @@ export function savePlanDraft(
         `${plan(id)}/draft`,
         "PATCH",
         { ...values, revision },
-        "Could not save that plan.",
+        "Couldn't save that plan.",
     );
 }
 
@@ -126,7 +126,7 @@ export function publishPlan(id: string, revision: number) {
         `${plan(id)}/publish`,
         "POST",
         { revision },
-        "Could not publish that plan.",
+        "Couldn't publish that plan.",
     );
 }
 
@@ -136,7 +136,7 @@ export function discardPlanChanges(id: string, revision: number) {
         `${plan(id)}/discard`,
         "POST",
         { revision },
-        "Could not discard those changes.",
+        "Couldn't discard those changes.",
     );
 }
 
@@ -146,6 +146,6 @@ export function deletePlanDraft(id: string, revision: number) {
         `${plan(id)}?revision=${encodeURIComponent(String(revision))}`,
         "DELETE",
         undefined,
-        "Could not delete that draft.",
+        "Couldn't delete that draft.",
     );
 }

@@ -67,7 +67,7 @@ export function InvoicePaper({
     // Its dates in the business's zone, as the customer's copy prints them
     // (#836), never the viewer's.
     const zone = invoiceZone(business);
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const who = billedTo(i);
     const gst = i.gst ?? null;
     // GST charged on it: a tax invoice's columns, which a bill of supply

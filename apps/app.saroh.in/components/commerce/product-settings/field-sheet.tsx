@@ -163,7 +163,7 @@ export function FieldSheet({
             }}
             onClose={() => setOpen(false)}
             fieldsClassName="gap-4"
-            title={field ? "Edit field" : "Add field"}
+            title={field ? "Edit field" : "New field"}
             description={
                 field
                     ? "Change its name, who sees it and which products ask for it."

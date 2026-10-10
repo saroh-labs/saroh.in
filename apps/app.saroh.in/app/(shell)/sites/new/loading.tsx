@@ -11,9 +11,9 @@ export default function Loading() {
                 <Link key="0" href="/sites">
                     Website
                 </Link>,
-                "Create a site",
+                "New site",
             ]}
-            title="Create a site"
+            title="New site"
             label="Loading the site form"
         />
     );

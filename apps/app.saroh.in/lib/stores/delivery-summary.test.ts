@@ -299,16 +299,16 @@ describe("waySaved and checkoutLine", () => {
             waySaved("SHIPPING", {
                 fulfilmentTypes: ["PICKUP", "SHIPPING"],
             }),
-        ).toBe("Shipping turned on");
+        ).toBe("Shipping turned on.");
         expect(waySaved("PICKUP", { lateAfterMinutes: { PICKUP: 180 } })).toBe(
-            "Pick-up orders now count as late after 3 hours",
+            "Pick-up orders now count as late after 3 hours.",
         );
         expect(
             waySaved("LOCAL_DELIVERY", {
                 localDeliveryFee: "40",
                 lateAfterMinutes: { LOCAL_DELIVERY: 240 },
             }),
-        ).toBe("Local delivery saved");
+        ).toBe("Local delivery saved.");
     });
 
     it("shows what a customer will see, as it is typed", () => {

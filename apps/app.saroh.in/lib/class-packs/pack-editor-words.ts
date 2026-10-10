@@ -1,4 +1,5 @@
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { PackKind, PackServiceOption, PackValues } from "./pack-editor";
 import {
@@ -56,7 +57,7 @@ export function packChanges(
         [...values.serviceIds].sort().join()
     ) {
         out.push(
-            `good for ${values.serviceIds.length} ${values.serviceIds.length === 1 ? unitOf(values.kind) : units}`,
+            `good for ${count(values.serviceIds.length, unitOf(values.kind), units)}`,
         );
     }
     if (published.firstPackOnly !== values.firstPackOnly) {
@@ -124,8 +125,7 @@ export function eachNote(
 ): string {
     const each = perCredit(values);
     if (each === null) return "";
-    const m = (n: number) =>
-        formatMoneyMajor(Math.round(n), values.currency) ?? "";
+    const m = (n: number) => formatMoneyMajor(Math.round(n), values.currency);
     const drops = dropIns(values, services);
     let text = `${m(each)} a ${unitOf(values.kind)}`;
     if (drops.length) {
@@ -156,7 +156,7 @@ export function glance(
             `Per ${unitOf(values.kind)}`,
             each === null
                 ? "—"
-                : (formatMoneyMajor(Math.round(each), values.currency) ?? "—"),
+                : formatMoneyMajor(Math.round(each), values.currency),
         ],
         ["Saving vs drop-in", saving],
         ["Sold so far", sold === null ? "—" : String(sold)],

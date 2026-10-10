@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { currencySymbol } from "@/lib/format/money";
+import { moneySign } from "@/lib/format/money";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import type { SheetSize, SheetValues } from "@/lib/products/stock-sheet";
@@ -117,7 +117,7 @@ export function StockSheet({
         started ||
         overview.stock.mode === "variant" ||
         overview.stock.product !== null;
-    const symbol = currencySymbol(product.currency);
+    const symbol = moneySign(product.currency);
     const split = counts && (stock?.split ?? false);
     const problem = sheetProblem(draft);
     const dirty =
@@ -163,7 +163,7 @@ export function StockSheet({
                 plan,
             );
             if (stopped !== null) {
-                showError("Nothing was saved", stopped);
+                showError("Nothing was saved.", stopped);
                 return;
             }
             router.refresh();

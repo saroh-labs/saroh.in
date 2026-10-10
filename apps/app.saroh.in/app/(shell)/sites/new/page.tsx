@@ -92,9 +92,9 @@ export default async function NewSitePage({
                         <Link key="site" href="/sites">
                             Website
                         </Link>,
-                        "Create a site",
+                        "New site",
                     ]}
-                    title="Create a site"
+                    title="New site"
                 />
                 <LimitReachedState
                     icon={<Globe />}
@@ -129,9 +129,9 @@ export default async function NewSitePage({
                     <Link key="site" href="/sites">
                         Website
                     </Link>,
-                    "Create a site",
+                    "New site",
                 ]}
-                title="Create a site"
+                title="New site"
                 description="Name your new site, check its web address and pick a template."
             />
             <CreateSiteForm

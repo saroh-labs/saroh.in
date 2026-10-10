@@ -1,5 +1,5 @@
-import { NUMBER_LOCALE } from "@/lib/format/locale";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, formatNumber } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 /**
  * The Customers list (DEC-041, round 2 C4): its address, what the API
@@ -285,14 +285,14 @@ export function sortsFor(page: CustomersPage): CustomerSort[] {
 
 /** "1 customer", "1,204 customers". */
 export function customersText(n: number): string {
-    return `${n.toLocaleString(NUMBER_LOCALE)} ${n === 1 ? "customer" : "customers"}`;
+    return count(n, "customer");
 }
 
 /** "Showing 51–100 of 120". */
 export function pageText(page: CustomersPage): string {
     const from = (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.total, page.page * page.pageSize);
-    const f = (n: number) => n.toLocaleString(NUMBER_LOCALE);
+    const f = formatNumber;
     return `Showing ${f(from)}–${f(to)} of ${f(page.total)}`;
 }
 
@@ -366,7 +366,7 @@ export function lastSub(
     const o = row.orders;
     if (o && o.open > 0) {
         return {
-            text: o.open === 1 ? "1 open" : `${o.open} open`,
+            text: `${formatNumber(o.open)} open`,
             open: true,
         };
     }
@@ -393,9 +393,7 @@ export function noOrderText(row: CustomerRow): string {
  */
 export function spentText(spent: MoneyTotal[]): string {
     if (spent.length === 0) return "—";
-    return spent
-        .map((m) => formatMoneyMajor(m.amount, m.currency) ?? m.amount)
-        .join(" + ");
+    return spent.map((m) => formatMoneyMajor(m.amount, m.currency)).join(" + ");
 }
 
 /**
@@ -405,7 +403,7 @@ export function spentText(spent: MoneyTotal[]): string {
 export function unlinkedText(n: number): string {
     return n === 1
         ? "1 paying customer isn't linked to a contact yet"
-        : `${n.toLocaleString(NUMBER_LOCALE)} paying customers aren't linked to a contact yet`;
+        : `${formatNumber(n)} paying customers aren't linked to a contact yet`;
 }
 
 /** What a list with no rows says, and whether Clear is the way out. */

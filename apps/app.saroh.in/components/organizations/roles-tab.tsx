@@ -1,6 +1,7 @@
 "use client";
 
 import { FailedRead } from "@/components/shared/failed-read";
+import { count } from "@/lib/format/plural";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -262,7 +263,7 @@ function RoleRow({
     on: boolean;
     onPick: () => void;
 }) {
-    const people = role.members === 1 ? "1 person" : `${role.members} people`;
+    const people = count(role.members, "person", "people");
     return (
         <button
             type="button"

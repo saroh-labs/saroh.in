@@ -182,7 +182,7 @@ function Tax({ store, canEdit, pending, save, setStore }: SectionProps) {
                     setStore((s) => ({ ...s, taxEnabled }));
                     save(
                         { taxEnabled },
-                        taxEnabled ? "Tax turned on" : "Tax turned off",
+                        taxEnabled ? "Tax turned on." : "Tax turned off.",
                         () => {
                             setStore((s) => ({
                                 ...s,
@@ -261,7 +261,7 @@ function Currency({ store, canEdit, pending, save, setStore }: SectionProps) {
                         setStore((s) => ({ ...s, currency }));
                         save(
                             { currency },
-                            `Currency set to ${currency}`,
+                            `Currency set to ${currency}.`,
                             () => {
                                 setStore((s) => ({ ...s, currency: before }));
                             },

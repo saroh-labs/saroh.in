@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
     cardLines,
@@ -615,7 +616,7 @@ export function addonRows(view: AddonsView): AddonRow[] {
                     ? `${price} a month`
                     : a.mode === "unit"
                       ? `${price} a month per ${one}`
-                      : `+${a.qty} ${a.qty === 1 ? one : many} for ${price} a month`,
+                      : `+${count(a.qty, one, many)} for ${price} a month`,
                 total:
                     a.quantity > 0
                         ? `${isModule ? "Added" : `${a.quantity} ×`} · ${formatInr(a.heldPaise)} a month`

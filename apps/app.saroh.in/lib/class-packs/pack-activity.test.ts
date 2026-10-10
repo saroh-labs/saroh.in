@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     activityRow,
     activityText,
@@ -13,6 +14,8 @@ import type {
     PackUse,
 } from "./pack-detail-data";
 import { priceHistory, saleRow, salesByMonth } from "./pack-sales";
+
+pinClock();
 
 /**
  * Pack Detail's Used this week, Sales and Activity in words (round-2 E17).
@@ -87,9 +90,9 @@ describe("Used this week", () => {
             ZONE,
         );
         expect(rows.map((r) => r.when)).toEqual([
-            "Thu 1 Oct 18:00",
-            "Tue 29 Sep 07:00",
-            "Tue 29 Sep 07:00",
+            "Thu 1 Oct, 6:00 pm",
+            "Tue 29 Sep, 7:00 am",
+            "Tue 29 Sep, 7:00 am",
         ]);
         expect(rows[0]).toMatchObject({
             what: "HIIT",

@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -17,7 +18,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { canOrUnknown } from "@/lib/access/require-can";
 import { personHref } from "@/lib/contacts/person-href";
-import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
+import { contactName, LEAD_STATUS } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
 import { composerGate } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
@@ -85,7 +86,7 @@ export default async function LeadDetailPage({
     const canConsent = canOrUnknown(organization, "consent:write");
 
     const stages = lead.pipeline?.stages ?? [];
-    const amount = formatValue(lead.value);
+    const amount = formatMoney(lead.value, null, { decimals: "always" });
     // Timeline newest-first for reading; the API returns it oldest-first.
     const timeline = [...lead.activities].reverse();
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
@@ -19,7 +20,6 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
-import { invoiceMoney } from "@/lib/invoices/money";
 
 const BADGE: Record<CourseTab, "success" | "warning" | "neutral" | "info"> = {
     OPEN: "success",
@@ -98,7 +98,8 @@ export function CoursesScreen({
             numeric: true,
             money: true,
             sortValue: (c) => Number(c.price),
-            cell: (c) => invoiceMoney(c.price, c.currency),
+            cell: (c) =>
+                formatMoneyMajor(c.price, c.currency, { decimals: "always" }),
         },
         {
             id: "status",

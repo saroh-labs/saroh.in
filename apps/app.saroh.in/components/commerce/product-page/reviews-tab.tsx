@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import { Card } from "@saroh/ui/card";
 import { Star } from "lucide-react";
 
@@ -61,9 +62,8 @@ export function ProductReviewsTab({
                     ) : null}
                 </p>
                 <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                    From {summary.count}{" "}
-                    {summary.count === 1 ? "customer" : "customers"} who ordered
-                    it
+                    From {summary.count} {plural(summary.count, "customer")} who
+                    ordered it
                     {hiddenCount > 0
                         ? ` · ${hiddenCount} hidden from the shop`
                         : ""}

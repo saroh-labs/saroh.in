@@ -1,4 +1,5 @@
-import { currencySymbol, formatMoneyMajor } from "@/lib/format/money";
+import { formatMoneyMajor, moneySign } from "@/lib/format/money";
+import { plural } from "@/lib/format/plural";
 
 import type { CalendarMonth, LayerKey, MoneyEntry } from "./types";
 
@@ -22,12 +23,12 @@ export function toMajor(amount: string): number {
 
 /** "₹29,180" — the full amount, for the summary and the day panel. */
 export function wholeMoney(amount: number, currency: string): string {
-    return formatMoneyMajor(Math.round(amount), currency) ?? "";
+    return formatMoneyMajor(Math.round(amount), currency);
 }
 
 /** "₹3.8k", "₹960" — a day cell's takings, as the design writes them. */
 export function shortMoney(amount: number, currency: string): string {
-    const sign = currencySymbol(currency);
+    const sign = moneySign(currency);
     if (amount >= 1000) return `${sign}${Math.round(amount / 100) / 10}k`;
     return `${sign}${Math.round(amount)}`;
 }
@@ -305,8 +306,8 @@ export function dayMoney(
     const refunds = count("refund");
     const fees = count("fee");
     const whys = [
-        refunds ? (refunds === 1 ? "a refund" : "refunds") : null,
-        fees ? (fees === 1 ? "a fee" : "fees") : null,
+        refunds ? plural(refunds, "a refund", "refunds") : null,
+        fees ? plural(fees, "a fee", "fees") : null,
     ].filter(Boolean);
     return {
         in: minorMoney(sum.in, currency),

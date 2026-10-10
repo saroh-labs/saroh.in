@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
@@ -332,7 +333,7 @@ export function StockSection({
                     {low
                         .map((l) => `${l.title} has ${l.quantity} left`)
                         .join(", ")}{" "}
-                    — at or under {low.length === 1 ? "its" : "their"} warning
+                    — at or under {plural(low.length, "its", "their")} warning
                     level.
                 </LowNote>
             ) : null}

@@ -126,7 +126,7 @@ export function createLead(
         "/leads",
         "POST",
         input,
-        "Could not create the lead",
+        "Couldn't create the lead.",
     );
 }
 
@@ -135,7 +135,7 @@ export function createLead(
 export function deleteLead(
     leadId: string,
 ): Promise<CrmResult<{ id: string; deleted: true }>> {
-    return destroy(`/leads/${leadId}`, "Could not delete the lead");
+    return destroy(`/leads/${leadId}`, "Couldn't delete the lead.");
 }
 
 export function updateLead(
@@ -146,7 +146,7 @@ export function updateLead(
         `/leads/${leadId}`,
         "PATCH",
         input,
-        "Could not update the lead",
+        "Couldn't update the lead.",
     );
 }
 
@@ -159,7 +159,7 @@ export function moveLead(
         `/leads/${leadId}/move`,
         "POST",
         { stageId },
-        "Could not move the lead",
+        "Couldn't move the lead.",
     );
 }
 
@@ -172,7 +172,7 @@ export function logActivity(
         `/leads/${leadId}/activities`,
         "POST",
         { type: "NOTE", body },
-        "Could not log the note",
+        "Couldn't log the note.",
     );
 }
 
@@ -185,7 +185,7 @@ export function createTask(
         `/leads/${leadId}/tasks`,
         "POST",
         input,
-        "Could not create the task",
+        "Couldn't create the task.",
     );
 }
 
@@ -198,7 +198,7 @@ export function completeTask(
         `/leads/${leadId}/tasks/${activityId}/complete`,
         "POST",
         {},
-        "Could not complete the task",
+        "Couldn't complete the task.",
     );
 }
 

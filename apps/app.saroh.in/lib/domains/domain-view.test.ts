@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import type { DomainView } from "./domain-view";
 import { checkLine, checkToast, domainScene, domainView } from "./domain-view";
 import type { DomainHostingRead, SiteDomain } from "./service";
+
+pinClock();
 
 const ZONE = "Asia/Kolkata";
 const AT = "2026-10-08T06:30:00.000Z"; // 8 Oct, noon in Kolkata

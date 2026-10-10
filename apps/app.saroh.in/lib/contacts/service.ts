@@ -103,7 +103,7 @@ export function updateContact(
         `/contacts/${contactId}`,
         "PATCH",
         input,
-        "Could not update the contact",
+        "Couldn't update the contact.",
     );
 }
 
@@ -123,7 +123,7 @@ export function createContact(
         "/contacts",
         "POST",
         input,
-        "Could not add the contact",
+        "Couldn't add the contact.",
     );
 }
 
@@ -146,7 +146,7 @@ export interface ContactRemoval {
 export function deleteContact(
     contactId: string,
 ): Promise<CrmResult<ContactRemoval>> {
-    return destroy(`/contacts/${contactId}`, "Could not delete the contact");
+    return destroy(`/contacts/${contactId}`, "Couldn't delete the contact.");
 }
 
 /** Why a privacy removal can't go ahead yet (the API's `RemovalRefusal`). */

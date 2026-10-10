@@ -1,5 +1,6 @@
 import type { PausedCut } from "@/lib/billing/paused";
 import { pausedByCut } from "@/lib/billing/paused";
+import { count } from "@/lib/format/plural";
 
 import type {
     CatalogueListing,
@@ -119,7 +120,7 @@ export function rowFacts(
 ): { variants: string | null; sku: string | null; places: string | null } {
     const n = row.variantCount;
     return {
-        variants: n > 0 ? `${n} ${n === 1 ? "variant" : "variants"}` : null,
+        variants: n > 0 ? count(n, "variant") : null,
         sku: row.sku?.trim() ? row.sku : null,
         places:
             showPlaces && row.places.length > 0

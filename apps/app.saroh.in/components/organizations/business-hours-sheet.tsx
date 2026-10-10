@@ -106,7 +106,8 @@ export function BusinessHoursSheet({
         if (failed.length > 0) {
             // Named, since the others did save: "Rye & Co: A day has to …".
             showError(
-                `${failed.map((f) => f.name).join(", ")}: ${failed[0]?.error ?? "not saved"}`,
+                `Hours weren't saved for ${failed.map((f) => f.name).join(", ")}.`,
+                failed[0]?.error,
             );
             return;
         }
@@ -119,8 +120,8 @@ export function BusinessHoursSheet({
         );
         onSaved(
             stores.length === 1
-                ? "Hours saved"
-                : `Hours saved for all ${stores.length} locations`,
+                ? "Hours saved."
+                : `Hours saved for all ${stores.length} locations.`,
             back &&
                 (async () => {
                     const undone = await undoStorefrontHours(back);

@@ -1,7 +1,9 @@
+import { formatDay, formatTime } from "@/lib/format/datetime";
+import { count as countOf } from "@/lib/format/plural";
 import type { CellOff } from "./days-off";
 import { cellOff } from "./days-off";
 import type { FlagTone, LayerStyle, LayerTone, Off } from "./layers";
-import { clock, dayCount, dayTitle, describeItem } from "./layers";
+import { dayCount, describeItem } from "./layers";
 import type { CalendarCash } from "./money";
 import {
     cellMoney,
@@ -73,7 +75,7 @@ export interface WeekColumn {
 const DOWS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** A day's time, dropped from the front of a title the card times itself. */
-const LEADING_TIME = /^\d{2}:\d{2} /;
+const LEADING_TIME = /^\d{1,2}:\d{2} [ap]m /;
 
 /** One day's cards, every layer switched on, in time; untimed last. */
 export function dayCards(
@@ -103,7 +105,7 @@ export function dayCards(
                 key: `${layer.key}:${item.id}`,
                 layer: layer.key,
                 tone: layer.tone,
-                at: item.at ? clock(item.at, timeZone) : layer.label,
+                at: item.at ? formatTime(item.at, timeZone) : layer.label,
                 title: line.title.replace(LEADING_TIME, ""),
                 full: line.sub ? `${line.title} · ${line.sub}` : line.title,
                 flag: line.flag,
@@ -177,10 +179,8 @@ export function weekColumns({
             ? cellMoney(sum, cash.currency)
             : { in: "", out: "" };
         const label = [
-            `${dayTitle(date, today)}${isToday ? ", today" : ""}: ${
-                count
-                    ? `${count} ${count === 1 ? "thing" : "things"}`
-                    : "nothing"
+            `${formatDay(date, { today, weekday: "short" })}${isToday ? ", today" : ""}: ${
+                count ? countOf(count, "thing") : "nothing"
             }`,
             offDay?.title ?? null,
             problem || null,
@@ -244,7 +244,7 @@ export function weekSummary({
                 (sum, d) => sum + (d.layers[l.key]?.count ?? 0),
                 0,
             );
-            return `${n} ${n === 1 ? l.one : l.many}`;
+            return countOf(n, l.one, l.many);
         })
         .join(" · ");
 }

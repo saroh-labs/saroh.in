@@ -127,7 +127,7 @@ export function InvoiceQuickLook({
         );
     }
 
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const pill = invoicePill(i);
     const who = billedTo(i);
     const late = whenLine(i);

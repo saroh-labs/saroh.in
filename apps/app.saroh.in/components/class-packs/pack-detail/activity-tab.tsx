@@ -83,7 +83,7 @@ export function ActivityTab({
             if (!res) return;
             if (res.state !== "ok") {
                 showError(
-                    "Couldn't load older activity. Nothing has changed — try again.",
+                    "Couldn't load older activity. Nothing has changed. Try again.",
                 );
                 return;
             }

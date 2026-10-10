@@ -253,8 +253,7 @@ export function InvoiceForm({
     );
     const noLine = good.length === 0;
     const typed = lines.some((l) => l.description || l.unitPrice);
-    const show = (cents: number) =>
-        formatMoneyMajor(cents / 100, currency) ?? String(cents / 100);
+    const show = (cents: number) => formatMoneyMajor(cents / 100, currency);
     const withLink = providerConnected;
 
     /** Keep it as a draft. Null when refused, which is said on the form. */
@@ -332,7 +331,7 @@ export function InvoiceForm({
         }
         if (!issued.ok) {
             // The draft is saved; only issuing failed. Say which.
-            showError(`Saved as a draft, but not issued: ${issued.error}`);
+            showError("Saved as a draft, but not issued.", issued.error);
             router.push(to);
             return;
         }
@@ -350,7 +349,8 @@ export function InvoiceForm({
                 reportFailure(link);
             } else {
                 showError(
-                    `${number} issued, but no pay link was made: ${link.error}`,
+                    `${number} issued, but no pay link was made.`,
+                    link.error,
                 );
             }
         } else if (await copyText(link.data.url)) {

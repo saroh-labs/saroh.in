@@ -43,6 +43,24 @@
   (UX audit, 10 Oct): "{Thing} saved." or "{Thing} added.", with a full
   stop, the detail on the second line, and Undo where the write can be
   taken back. Never "Saved", "Done", "{Thing} updated" or "queued".
+- **Current** — **One grammar for every toast** (10 Oct 2026), in the
+  merchant app:
+    - What worked is a sentence in the past tense that names the thing, and
+      ends with a full stop: "Booking moved.", "Code saved.", "Tax rate set
+      to 12%.". Never "successfully", never an exclamation mark, never a
+      bare "Saved." or "Done". A second fact is a second sentence or the
+      description, not a dash.
+    - What failed says what happened and what to do next: "Couldn't save
+      that role.", "The photos weren't added." with the API's guarded
+      sentence as the description, "That didn't go through. Try again.".
+      It is "Couldn't", never "Could not", and it has its full stop. Never
+      an exception's `error.message`, a status code, or the API's sentence
+      glued on after a colon.
+    - A date, a time, an amount or a count in a toast comes from
+      `lib/format` like any other (`frontend-design-system.md` → Numbers
+      and dates).
+    - `scripts/check-formats.mjs` (in `pnpm prepush`) fails "successfully"
+      or an exclamation mark in a toast call.
 - **Adopted** — **Toast copy is product copy.** Show the API's guarded message
   (`res.error`) or your own sentence — never an exception's `error.message`, an
   API `detail` or a response body. Gap: `saroh.in`'s `join-waitlist.tsx`

@@ -2,12 +2,12 @@ import { packStanding } from "@/lib/class-packs/balance";
 import { useWords } from "@/lib/class-packs/pack-activity";
 import { packKind, unitWord } from "@/lib/class-packs/pack-cards";
 import type { Tone } from "@/lib/class-packs/pack-detail";
-import { day } from "@/lib/class-packs/pack-detail";
 import type { PackHolder } from "@/lib/class-packs/pack-detail-data";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
 import { holderRow } from "@/lib/class-packs/pack-holders";
 import type { HeldPack } from "@/lib/class-packs/sell-words";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
+import { formatDate } from "@/lib/format/datetime";
 
 import type { CustomerDetail, DetailPack } from "./detail";
 
@@ -122,7 +122,7 @@ export function packTabRow(
             p.price && p.currency
                 ? h.bought
                 : [
-                      `Bought ${day(p.boughtAt, timeZone)}`,
+                      `Bought ${formatDate(p.boughtAt, timeZone)}`,
                       p.paidBy ? paidByLabel(p.paidBy) : null,
                   ]
                       .filter(Boolean)

@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -18,7 +19,7 @@ const KIND_LABEL: Record<StorefrontKind, string> = {
 };
 
 const ordersLabel = (n: number) =>
-    n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
+    n === 0 ? "no orders yet" : count(n, "order");
 
 /**
  * The business's locations, beside the chosen one's page once there are

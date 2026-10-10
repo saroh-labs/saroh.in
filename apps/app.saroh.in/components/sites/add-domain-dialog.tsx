@@ -73,7 +73,7 @@ export function AddDomainDialog({
             open={open}
             size="lg"
             returnFocusTo={settingsEditId("domain")}
-            title={added ? `${added.domain.hostname} added` : "Add a domain"}
+            title={added ? `${added.domain.hostname} added` : "New domain"}
             description={
                 added
                     ? "One step left, at your registrar. You can close this and come back: the records stay under the domain."

@@ -117,7 +117,7 @@ export function createCourse(input: CourseInput) {
         "/courses",
         "POST",
         input,
-        "Could not save that course.",
+        "Couldn't save that course.",
     );
 }
 export function updateCourse(id: string, input: CourseInput) {
@@ -125,7 +125,7 @@ export function updateCourse(id: string, input: CourseInput) {
         course(id),
         "PATCH",
         input,
-        "Could not save that course.",
+        "Couldn't save that course.",
     );
 }
 export function addSession(id: string, startAt: string) {
@@ -133,7 +133,7 @@ export function addSession(id: string, startAt: string) {
         `${course(id)}/sessions`,
         "POST",
         { startAt },
-        "Could not add that session.",
+        "Couldn't add that session.",
     );
 }
 export function removeSession(id: string, sessionId: string) {
@@ -141,7 +141,7 @@ export function removeSession(id: string, sessionId: string) {
         `${course(id)}/sessions/${encodeURIComponent(sessionId)}`,
         "DELETE",
         undefined,
-        "Could not remove that session.",
+        "Couldn't remove that session.",
     );
 }
 export function enrol(
@@ -152,7 +152,7 @@ export function enrol(
         `${course(id)}/enrollments`,
         "POST",
         input,
-        "Could not enrol them.",
+        "Couldn't enrol them.",
     );
 }
 export function cancelEnrollment(id: string, enrollmentId: string) {
@@ -160,6 +160,6 @@ export function cancelEnrollment(id: string, enrollmentId: string) {
         `${course(id)}/enrollments/${encodeURIComponent(enrollmentId)}/cancel`,
         "POST",
         {},
-        "Could not cancel that enrolment.",
+        "Couldn't cancel that enrolment.",
     );
 }

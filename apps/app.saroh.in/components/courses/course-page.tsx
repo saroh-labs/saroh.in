@@ -1,5 +1,7 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
@@ -26,9 +28,12 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { CourseDetail, Enrollment } from "@/lib/courses/service";
-import { formatTimeRange } from "@/lib/format/datetime";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
-import { invoiceMoney } from "@/lib/invoices/money";
+import {
+    formatMonth,
+    formatTimeRange,
+    formatWeekday,
+    zoneParts,
+} from "@/lib/format/datetime";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -176,8 +181,10 @@ export function CoursePage({
                         : STATUS_LABEL[course.status]}
                 </Badge>
                 {course.service.name} ·{" "}
-                {invoiceMoney(course.price, course.currency)} · {course.seats}{" "}
-                {course.seats === 1 ? "seat" : "seats"}
+                {formatMoneyMajor(course.price, course.currency, {
+                    decimals: "always",
+                })}{" "}
+                · {count(course.seats, "seat")}
                 {course.description ? ` · ${course.description}` : ""}
             </div>
 
@@ -247,22 +254,9 @@ function Sessions({
     const tz = course.service.timezone;
     const now = Date.parse(nowIso);
     const month = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            month: "short",
-        })
-            .format(new Date(iso))
-            .toUpperCase();
-    const dayNum = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            day: "numeric",
-        }).format(new Date(iso));
-    const weekday = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            weekday: "long",
-        }).format(new Date(iso));
+        formatMonth(iso, tz, { month: "short", year: "never" }).toUpperCase();
+    const dayNum = (iso: string) => String(zoneParts(iso, tz).day);
+    const weekday = (iso: string) => formatWeekday(iso, tz);
 
     /**
      * Removing a session cancels the bookings on it, and the API can't put
@@ -506,7 +500,7 @@ function RosterRow({
     enrollment: Enrollment;
     onCancel?: () => void;
 }) {
-    const money = invoiceMoney(e.price, e.currency);
+    const money = formatMoneyMajor(e.price, e.currency, { decimals: "always" });
     return (
         <li className="flex items-center gap-3 px-4 py-3">
             <span
@@ -536,7 +530,7 @@ function RosterRow({
                     ) : (
                         `${money} · no invoice`
                     )}
-                    {` · ${e.upcoming} ${e.upcoming === 1 ? "session" : "sessions"} to come`}
+                    {` · ${count(e.upcoming, "session")} to come`}
                 </span>
             </span>
             {onCancel ? (
@@ -588,7 +582,7 @@ function CancelEnrolmentDialog({
         }
         showSuccess(
             "Enrolment cancelled.",
-            `${enrollment.contact.name} is off the course${n > 0 ? `, and ${n} ${n === 1 ? "session is" : "sessions are"} cancelled` : ""}.`,
+            `${enrollment.contact.name} is off the course${n > 0 ? `, and ${count(n, "session is", "sessions are")} cancelled` : ""}.`,
         );
         router.refresh();
     }
@@ -600,7 +594,7 @@ function CancelEnrolmentDialog({
             title={`Take ${enrollment.contact.name} off ${course.name}?`}
             description={
                 n > 0
-                    ? `Their ${n} ${n === 1 ? "session" : "sessions"} still to come ${n === 1 ? "is" : "are"} cancelled, and their seat frees at once. Sessions already run stay as they were. This cannot be undone.`
+                    ? `Their ${count(n, "session")} still to come ${plural(n, "is", "are")} cancelled, and their seat frees at once. Sessions already run stay as they were. This cannot be undone.`
                     : "Their seat frees at once. Sessions already run stay as they were. This cannot be undone."
             }
             confirmLabel="Cancel enrolment"

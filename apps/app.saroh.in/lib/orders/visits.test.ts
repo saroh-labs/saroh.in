@@ -87,8 +87,8 @@ describe("the Visits card's words (B14)", () => {
 
     it("says each visit's when, who and where", () => {
         const [one, two, three] = d301().visits;
-        expect(visitWhen(one, zone, now)).toBe("12 Sep, 10:00");
-        expect(visitWhen(two, zone, now)).toBe("Today, 10:00");
+        expect(visitWhen(one, zone, now)).toBe("12 Sep, 10:00 am");
+        expect(visitWhen(two, zone, now)).toBe("Today, 10:00 am");
         expect(visitWhen(three, zone, now)).toBe("Not booked yet");
         expect(visitMeta(two, "Rahul")).toBe("Dr. Meenakshi Rao · In person");
         expect(visitMeta({ ...two, where: "ONLINE" }, "Rahul")).toBe(
@@ -100,7 +100,9 @@ describe("the Visits card's words (B14)", () => {
     it("labels the stepper by day, with the time only today", () => {
         const [one, two, three] = d301().visits;
         expect(visitStepLabel(one, zone, now)).toBe("Visit 1 · 12 Sep");
-        expect(visitStepLabel(two, zone, now)).toBe("Visit 2 · Today, 10:00");
+        expect(visitStepLabel(two, zone, now)).toBe(
+            "Visit 2 · Today, 10:00 am",
+        );
         expect(visitStepLabel(three, zone, now)).toBe("Visit 3");
     });
 
@@ -122,7 +124,7 @@ describe("the Visits card's words (B14)", () => {
         });
         expect(visitsNextLabel(v)).toBeNull();
         expect(visitsNextNote(v, zone, now)).toBe(
-            "Next visit 19 Sep, 12:30. You can mark it attended once it starts.",
+            "Next visit tomorrow, 12:30 pm. You can mark it attended once it starts.",
         );
     });
 
@@ -140,7 +142,7 @@ describe("the Visits card's words (B14)", () => {
 
     it("the heading says the type and the next visit", () => {
         expect(visitsHow("Booking, in person", d301(), zone, now)).toBe(
-            "Booking, in person · next visit today, 10:00",
+            "Booking, in person · next visit today, 10:00 am",
         );
         expect(visitsHow("Booking, online", null, zone, now)).toBe(
             "Booking, online",
@@ -164,7 +166,7 @@ describe("the Visits card's words (B14)", () => {
             ),
         });
         expect(quickVisitsText(booked, zone, now)).toBe(
-            "1 of 3 visits · Visit 2 · booked 19 Sep",
+            "1 of 3 visits · Visit 2 · booked tomorrow",
         );
         expect(quickVisitsText(d301(), zone, now)).toBe(
             "1 of 3 visits · Visit 2 · booked today",

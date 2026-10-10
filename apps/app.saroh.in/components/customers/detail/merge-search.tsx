@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
@@ -86,8 +87,7 @@ export function MergeSearch({
                     !status && "sr-only",
                 )}
             >
-                {status ??
-                    `${results.length} ${results.length === 1 ? "match" : "matches"}`}
+                {status ?? count(results.length, "match", "matches")}
             </p>
             {results.length > 0 ? (
                 <ul className="grid gap-1" aria-label="Matching customers">

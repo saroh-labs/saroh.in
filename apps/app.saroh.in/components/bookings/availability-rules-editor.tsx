@@ -104,11 +104,13 @@ export function AvailabilityRulesEditor({
             const startMinute = timeToMinutes(row.start);
             const endMinute = timeToMinutes(row.end);
             if (startMinute === null || endMinute === null) {
-                showError(`Row ${i + 1}: enter valid start and end times`);
+                showError(`Row ${i + 1} needs a start and an end time.`);
                 return;
             }
             if (startMinute >= endMinute) {
-                showError(`Row ${i + 1}: the end must be after the start`);
+                showError(
+                    `Row ${i + 1} ends before it starts. Choose a later end.`,
+                );
                 return;
             }
             rules.push({ dayOfWeek: row.dayOfWeek, startMinute, endMinute });
@@ -123,7 +125,7 @@ export function AvailabilityRulesEditor({
             showError(res.error);
             return;
         }
-        showSuccess("Availability saved");
+        showSuccess("Availability saved.");
         router.refresh();
     }
 

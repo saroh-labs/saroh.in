@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -49,7 +50,7 @@ export function ConnectedPanel({
     /** The customer's other invoices; null when they could not be read. */
     others: Invoice[] | null;
 }) {
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const who = billedTo(i);
     const first = who.name.split(" ")[0] ?? who.name;
     const src = sourceHref(i);
@@ -102,7 +103,7 @@ export function ConnectedPanel({
             : null,
         who.contactId && rest && rest.length > 0
             ? {
-                  label: `${rest.length} more ${rest.length === 1 ? "invoice" : "invoices"} for ${first}`,
+                  label: `${rest.length} more ${plural(rest.length, "invoice")} for ${first}`,
                   sub: unpaid ? `${unpaid} still unpaid` : "All paid",
                   href: customerHref(who.contactId, true),
               }
@@ -156,7 +157,7 @@ export function ConnectedPanel({
  * corrections made against it.
  */
 export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const events: { what: string; when: string | null; key: string }[] = [];
     for (const c of i.corrections ?? []) {
         events.push({

@@ -1,5 +1,5 @@
+import { formatDate, localDateKey } from "@/lib/format/datetime";
 import type { PauseChoice, Subscription } from "./service";
-import { dayText } from "./view";
 
 /**
  * How long a pause lasts (plan 2026-09-26-004, D8): 2, 4 or 8 weeks, which
@@ -23,17 +23,6 @@ export const PAUSE_WEEKS = [2, 4, 8] as const;
 /** The design's pick when the sheet opens. */
 export const DEFAULT_PAUSE = "4";
 
-/** Today's date in a zone, YYYY-MM-DD. */
-export function localDay(at: Date, timeZone: string): string {
-    // en-CA formats as YYYY-MM-DD.
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(at);
-}
-
 /** A YYYY-MM-DD date `days` later, by the calendar. */
 export function addDays(day: string, days: number): string {
     const d = new Date(`${day}T00:00:00Z`);
@@ -45,13 +34,13 @@ export function pauseOptions(
     sub: Pick<Subscription, "timezone">,
     now: Date,
 ): PauseOption[] {
-    const today = localDay(now, sub.timezone);
+    const today = localDateKey(now, sub.timezone);
     return [
         ...PAUSE_WEEKS.map((weeks) => {
             const until = addDays(today, weeks * 7);
             return {
                 key: String(weeks),
-                label: `${weeks} weeks · until ${dayText(until, sub.timezone, now)}`,
+                label: `${weeks} weeks · until ${formatDate(until, sub.timezone, { now })}`,
                 choice: { weeks },
                 until,
             };
@@ -80,13 +69,13 @@ export function pauseNote(
 ): string {
     const first = sub.contact.name.split(" ")[0] || sub.contact.name;
     const tz = sub.timezone;
-    const periodEnd = dayText(sub.currentPeriodEnd, tz, now);
+    const periodEnd = formatDate(sub.currentPeriodEnd, tz, { now });
     const added = `The days it's paused are added to the period ${first} has paid for.`;
     if (!option?.until) {
         return `Nothing is charged or collected until you resume it. Resume before ${periodEnd} and the days it's paused are added to the period ${first} has paid for; later, a new period starts with its invoice.`;
     }
-    const until = dayText(option.until, tz, now);
-    if (option.until <= localDay(new Date(sub.currentPeriodEnd), tz)) {
+    const until = formatDate(option.until, tz, { now });
+    if (option.until <= localDateKey(new Date(sub.currentPeriodEnd), tz)) {
         return `Nothing is charged or collected until ${until}. It restarts on its own. ${added}`;
     }
     return `Nothing is charged or collected until ${until}. ${first} has paid up to ${periodEnd}, so on ${until} it restarts with a new period and its invoice.`;
@@ -101,6 +90,8 @@ export function pauseAgain(
     now: Date,
 ): PauseChoice {
     if (!sub.pausedUntil) return { until: null };
-    const day = localDay(new Date(sub.pausedUntil), sub.timezone);
-    return day > localDay(now, sub.timezone) ? { until: day } : { until: null };
+    const day = localDateKey(new Date(sub.pausedUntil), sub.timezone);
+    return day > localDateKey(now, sub.timezone)
+        ? { until: day }
+        : { until: null };
 }

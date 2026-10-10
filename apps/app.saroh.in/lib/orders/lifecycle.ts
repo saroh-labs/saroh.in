@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { StepTone } from "@/lib/orders/list-row";
 import { rowProgress } from "@/lib/orders/list-row";
@@ -175,7 +176,7 @@ export function durationWords(minutes: number): string {
         return `${Math.floor(minutes / 60)} h${m ? ` ${m} min` : ""}`;
     }
     const days = Math.floor(minutes / (24 * 60));
-    return days === 1 ? "1 day" : `${days} days`;
+    return count(days, "day");
 }
 
 /**

@@ -81,7 +81,7 @@ export function useEditorStyle({
                 .catch(() => {
                     failedStyleJson.current = payloadJson;
                     showError(
-                        "Could not reach Saroh. Your style is still here and will save with your next change.",
+                        "Couldn't reach Saroh. Your style is still here and will save with your next change.",
                     );
                 })
                 .finally(() => setStyleSaving(false));

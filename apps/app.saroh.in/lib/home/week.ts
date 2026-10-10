@@ -1,4 +1,6 @@
+import { formatDay } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type {
     HomeWeek,
@@ -24,9 +26,6 @@ export interface WeekRow {
     href: string;
 }
 
-const plural = (n: number, one: string, many: string) =>
-    `${n} ${n === 1 ? one : many}`;
-
 /** "Up 12% on the same days last week", or why there's no comparing. */
 export function changeLine(change: HomeWeekChange): string {
     switch (change.kind) {
@@ -49,34 +48,17 @@ export function bookingsLine(count: number, lastWeek: number): string {
     return `${Math.abs(d)} ${d > 0 ? "more" : "fewer"} than last week`;
 }
 
-// Spelt out rather than `Intl`'s short month, which some ICU builds write
-// "Sept" and the design doesn't.
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
 /** "Since Monday 14 Sep", from the business's Monday (`2026-09-14`). */
 export function sinceMonday(startDate: string): string {
-    const [, month, day] = startDate.split("-").map(Number);
-    const name = month ? MONTHS[month - 1] : undefined;
-    return name && day ? `Since Monday ${day} ${name}` : "Since Monday";
+    return /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+        ? `Since Monday ${formatDay(startDate, { year: "never" })}`
+        : "Since Monday";
 }
 
 /** "3 bills · 1 overdue", or "Nothing unpaid". */
 export function owedLine(owed: HomeWeekOwed): string {
     if (owed.bills === 0) return "Nothing unpaid";
-    const bills = plural(owed.bills, "bill", "bills");
+    const bills = count(owed.bills, "bill", "bills");
     return owed.overdue > 0 ? `${bills} · ${owed.overdue} overdue` : bills;
 }
 
@@ -84,7 +66,7 @@ function takingsRow(t: HomeWeekTakings): WeekRow {
     return {
         key: `takings:${t.currency}`,
         label: "Sales so far",
-        value: formatMoney(t.amountMinor, t.currency) ?? "",
+        value: formatMoney(t.amountMinor, t.currency),
         sub: changeLine(t.change),
         bad: t.change.kind === "DOWN",
         href: t.href,

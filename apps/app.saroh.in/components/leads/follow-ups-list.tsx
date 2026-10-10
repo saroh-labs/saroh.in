@@ -61,7 +61,7 @@ export function FollowUpsList({
         });
         if (!res) return;
         if (!res.ok) return showError(res.error);
-        showSuccess("Done");
+        showSuccess("Follow-up completed.");
         router.refresh();
     }
 

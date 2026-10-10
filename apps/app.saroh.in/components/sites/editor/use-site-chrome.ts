@@ -138,7 +138,7 @@ export function useSiteChrome({
         save: (value) => updateSiteSettings(siteId, { name: value }),
         onSaved: () => onSaved("name"),
         unreachable:
-            "Could not reach Saroh. The name is still here, and saving will try again shortly.",
+            "Couldn't reach Saroh. The name is still here, and saving will try again shortly.",
     });
     // Read once: a footer richer than one line is Website settings' to edit.
     const [field] = useState(() => footerLineField(footerPreview));
@@ -154,7 +154,7 @@ export function useSiteChrome({
             updateSiteFooter(siteId, footerFromLine(value, format)),
         onSaved: () => onSaved("footer"),
         unreachable:
-            "Could not reach Saroh. The footer is still here, and saving will try again shortly.",
+            "Couldn't reach Saroh. The footer is still here, and saving will try again shortly.",
     });
 
     const saving = nameSave.saving || footerSave.saving;

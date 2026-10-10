@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -231,7 +232,7 @@ export function PrePublishCheck({
                                 zone,
                             )}
                             {review.openNotes > 0
-                                ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`
+                                ? `, with ${count(review.openNotes, "note")} still open.`
                                 : "."}
                             {/*
                              * Which of the two things publishing is about to
