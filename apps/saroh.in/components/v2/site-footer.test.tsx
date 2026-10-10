@@ -93,4 +93,26 @@ describe("SiteFooter", () => {
             "Tools",
         );
     });
+
+    it("says what the name means under the logo", () => {
+        render(<SiteFooter />);
+        expect(screen.getByText("Let's rise together.")).toBeTruthy();
+        expect(
+            screen.getByText(/sa \(with\) \+ aaroh \(rising\)/),
+        ).toBeTruthy();
+    });
+
+    it("links each of Saroh's accounts by name, as a mark", () => {
+        render(<SiteFooter />);
+        const follow = screen.getByRole("list", { name: "Follow Saroh" });
+        expect(follow.querySelectorAll("a")).toHaveLength(5);
+        for (const [name, href] of [
+            ["Saroh on Instagram", "https://www.instagram.com/sarohlabs"],
+            ["Saroh on GitHub", "https://github.com/saroh-labs/saroh.in"],
+        ] as const) {
+            const link = screen.getByRole("link", { name });
+            expect(link.getAttribute("href")).toBe(href);
+            expect(link.querySelectorAll("svg path").length).toBeGreaterThan(0);
+        }
+    });
 });
