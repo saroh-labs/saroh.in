@@ -222,11 +222,11 @@ describe("a course's sessions", () => {
 });
 
 describe("adding a session", () => {
-    it("opens a dialog named Add session, a week after the last one", () => {
+    it("opens a dialog named New session, a week after the last one", () => {
         render(courseOf());
         const d = open();
         expect(d.querySelector("[data-title]")?.textContent).toBe(
-            "Add session",
+            "New session",
         );
         expect(d.querySelector("[data-description]")?.textContent).toBe(
             "It goes on the schedule for Pottery. Times are in Asia/Kolkata.",

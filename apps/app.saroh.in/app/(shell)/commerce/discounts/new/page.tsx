@@ -25,7 +25,7 @@ export default async function NewDiscountPage() {
     return (
         <PageContainer width="form">
             <PageHeader
-                breadcrumb={["Sell", "Discounts", "New code"]}
+                breadcrumb={["Sell", "Discount codes", "New code"]}
                 title="New discount code"
             />
             <DiscountForm options={options} defaultCurrency={defaultCurrency} />

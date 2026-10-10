@@ -1,5 +1,6 @@
 "use client";
 
+import { count as countOf } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
@@ -147,7 +148,7 @@ export function StockScreen({
         const short = results.filter((r) => r.shelf.short > 0);
         const notes = [
             short.length > 0
-                ? `${short.length} ${short.length === 1 ? "shelf is" : "shelves are"} now short for orders already placed.`
+                ? `${countOf(short.length, "shelf is", "shelves are")} now short for orders already placed.`
                 : null,
             mismatched > 0
                 ? `${mismatched} didn't match — the shelf moved while you counted. See Checks.`

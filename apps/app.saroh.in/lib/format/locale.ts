@@ -1,3 +1,4 @@
+import { MONEY_LOCALE } from "@saroh/ui/lib/money";
 /**
  * The one locale every `Intl` call in the workspace formats against.
  *
@@ -24,4 +25,4 @@ export const DISPLAY_LOCALE = "en-GB";
  * DEC-079). Dates stay on `DISPLAY_LOCALE`. Pinned for the same hydration
  * reason as above.
  */
-export const NUMBER_LOCALE = "en-IN";
+export const NUMBER_LOCALE = MONEY_LOCALE;

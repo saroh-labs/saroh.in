@@ -29,10 +29,10 @@ describe("opening hours on Availability (DEC-087)", () => {
 
     it("says which hours aren't bookable in person, and when it's open", () => {
         expect(openingNote([range(480, 1200)], OPEN, 1)).toBe(
-            "08:00–09:00 and 18:00–20:00 aren't bookable in person — you're open 09:00–18:00.",
+            "8:00 to 9:00 am and 6:00 to 8:00 pm aren't bookable in person — you're open 9:00 am to 6:00 pm.",
         );
         expect(openingNote([range(480, 600)], OPEN, 1)).toBe(
-            "08:00–09:00 isn't bookable in person — you're open 09:00–18:00.",
+            "8:00 to 9:00 am isn't bookable in person — you're open 9:00 am to 6:00 pm.",
         );
     });
 

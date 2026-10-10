@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { useRouter } from "next/navigation";
@@ -41,7 +42,7 @@ export function CalendarMissing({
             }
         >
             {listed(missing)} couldn&apos;t be loaded, so{" "}
-            {missing.length === 1 ? "it is" : "they are"} missing from this{" "}
+            {plural(missing.length, "it is", "they are")} missing from this{" "}
             {span} — everything else is here.
             {data.money?.total === null ||
             (money && data.takings?.total === null)

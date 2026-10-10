@@ -1,4 +1,6 @@
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+import { formatNumber } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { SectionKey } from "./editor-sections";
 import { LIMITS, SECTION_JUMPS, SECTION_NAMES } from "./editor-sections";
@@ -103,17 +105,17 @@ export function descriptionFootnote(over: boolean): string {
 
 /** The words a customer reads: "1 character", "240 characters". */
 export function readCount(n: number): string {
-    return `${n.toLocaleString("en-IN")} ${n === 1 ? "character" : "characters"}`;
+    return count(n, "character");
 }
 
 /** What the limit counts, the markup: "1,240 of 5,000 characters". */
 export function markupCount(n: number): string {
-    return `${n.toLocaleString("en-IN")} of ${LIMITS.description.toLocaleString("en-IN")} characters`;
+    return `${formatNumber(n)} of ${formatNumber(LIMITS.description)} characters`;
 }
 
 /** The line under the editor. */
 export function descriptionNote(over: boolean): string {
     return over
-        ? `Longer than the ${LIMITS.description.toLocaleString("en-IN")} characters a description can be.`
+        ? `Longer than the ${formatNumber(LIMITS.description)} characters a description can be.`
         : "Shown on the product page.";
 }

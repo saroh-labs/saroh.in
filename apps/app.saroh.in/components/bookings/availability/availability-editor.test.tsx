@@ -67,7 +67,7 @@ describe("Availability with nobody on the diary (UX-022)", () => {
         );
     });
 
-    it("saves a rule change as Save changes and says the rules were saved, never 'Hours saved'", () => {
+    it("saves a rule change as Save changes and says the rules were saved, never 'Hours saved.'", () => {
         const rules: SaveOp = { kind: "rules", rules: RULES, before: RULES };
         const hours = {
             kind: "hours",

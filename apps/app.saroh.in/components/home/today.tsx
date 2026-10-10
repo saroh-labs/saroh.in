@@ -1,5 +1,6 @@
 "use client";
 
+import { clockValue, formatClock } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -12,7 +13,7 @@ import { useId, useMemo, useState } from "react";
 import { useHold } from "@/components/shared/use-hold";
 import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
-import { clockNow, todayView } from "@/lib/home/today";
+import { todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
@@ -63,7 +64,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
             outcome,
             outcomeTime:
                 outcome === "ATTENDED"
-                    ? clockNow(new Date(), today.zone)
+                    ? clockValue(new Date(), today.zone)
                     : null,
         });
         const who = row.person?.split(" ")[0] ?? "They";
@@ -138,7 +139,7 @@ function TodayLine({
             className={cn(
                 // The whole row is the link (its title's overlay), as the
                 // design draws it; the marks sit above that overlay.
-                "relative grid grid-cols-[56px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
+                "relative grid grid-cols-[76px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
                 !first && "border-t border-border",
             )}
         >
@@ -148,7 +149,7 @@ function TodayLine({
                     first ? "text-foreground" : "text-foreground",
                 )}
             >
-                {row.time}
+                {formatClock(row.time)}
             </span>
             <span className="grid min-w-0 gap-0.5">
                 <Link

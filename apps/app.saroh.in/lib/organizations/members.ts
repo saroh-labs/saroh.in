@@ -150,7 +150,7 @@ export async function dismissStorefrontTeamNotice(): Promise<
         "/storefront-team-notice/dismiss",
         "POST",
         {},
-        "Could not dismiss that notice.",
+        "Couldn't dismiss that notice.",
     );
 }
 
@@ -172,7 +172,7 @@ export async function inviteMember(
     });
     const data = (await res.json().catch(() => null)) as unknown;
     if (res.ok) return { ok: true, data: data as OrganizationInvitation };
-    return toFailure(data, "Could not send that invitation.");
+    return toFailure(data, "Couldn't send that invitation.");
 }
 
 export async function updateMemberRole(
@@ -183,7 +183,7 @@ export async function updateMemberRole(
         `/members/${userId}`,
         "PATCH",
         input,
-        "Could not change that role.",
+        "Couldn't change that role.",
     );
 }
 
@@ -200,14 +200,14 @@ export async function setMemberExtraActions(
         `/members/${userId}/extra-actions`,
         "PUT",
         { actions },
-        "Could not change those permissions.",
+        "Couldn't change those permissions.",
     );
 }
 
 export async function removeMember(
     userId: string,
 ): Promise<CrmResult<{ removed: boolean; revokedLinks: number }>> {
-    return destroy(`/members/${userId}`, "Could not remove that person.");
+    return destroy(`/members/${userId}`, "Couldn't remove that person.");
 }
 
 export async function revokeInvitation(
@@ -215,7 +215,7 @@ export async function revokeInvitation(
 ): Promise<CrmResult<{ revoked: boolean }>> {
     return destroy(
         `/invitations/${invitationId}`,
-        "Could not withdraw that invitation.",
+        "Couldn't withdraw that invitation.",
     );
 }
 

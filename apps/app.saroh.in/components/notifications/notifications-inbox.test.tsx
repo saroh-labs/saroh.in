@@ -273,8 +273,8 @@ describe("how a row looks", () => {
         draw([ORDER, BOOKING, READ, REVIEW]);
         const times = Array.from(host.querySelectorAll("time"));
         expect(times.map((t) => t.textContent)).toEqual([
-            "5 min ago",
-            "2 hr ago",
+            "5 minutes ago",
+            "2 hours ago",
             "Yesterday",
             "3 days ago",
         ]);
@@ -285,7 +285,7 @@ describe("how a row looks", () => {
     it("the time moves on while the page is open", () => {
         draw([ORDER]);
         act(() => void vi.advanceTimersByTime(3 * 60_000));
-        expect(host.querySelector("time")?.textContent).toBe("8 min ago");
+        expect(host.querySelector("time")?.textContent).toBe("8 minutes ago");
     });
 });
 

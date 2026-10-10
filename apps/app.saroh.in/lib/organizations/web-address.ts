@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format/datetime";
 import { useEffect, useRef, useState } from "react";
 
 import { MAX_ADDRESS_LENGTH } from "./address";
@@ -106,30 +107,6 @@ export function addressHost(address: string, suffix: string): string {
     return `${address}${suffix}`;
 }
 
-/**
- * A day in the business's time zone: "28 Dec", with the year when it isn't
- * this one there. A hold ends at an instant; which day that is depends on
- * where the business keeps time, not on the browser or the server.
- */
-export function holdDate(
-    value: string | Date,
-    zone: string,
-    now: Date = new Date(),
-): string {
-    const at = new Date(value);
-    const year = (d: Date) =>
-        new Intl.DateTimeFormat("en-GB", {
-            year: "numeric",
-            timeZone: zone,
-        }).format(d);
-    return at.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        ...(year(at) === year(now) ? {} : { year: "numeric" }),
-        timeZone: zone,
-    });
-}
-
 /** When a hold made now would end: the API's 90 days from now. */
 export function holdEndsFrom(now: Date = new Date()): Date {
     return new Date(now.getTime() + ADDRESS_HOLD_DAYS * DAY_MS);
@@ -147,8 +124,8 @@ export function previousLine(
 ): string {
     const host = addressHost(held.address, suffix);
     return held.redirectUntil
-        ? `${host} forwards here until ${holdDate(held.redirectUntil, zone, now)}`
-        : `${host} is kept for you until ${holdDate(held.reservedUntil, zone, now)}`;
+        ? `${host} forwards here until ${formatDate(held.redirectUntil, zone, { now })}`
+        : `${host} is kept for you until ${formatDate(held.reservedUntil, zone, { now })}`;
 }
 
 /**
@@ -164,7 +141,7 @@ export function consequences(
     now: Date = new Date(),
 ): string[] {
     const old = addressHost(view.address, suffixOf(view));
-    const until = holdDate(holdEndsFrom(now), zone, now);
+    const until = formatDate(holdEndsFrom(now), zone, { now });
     if (!view.links.site) {
         return [`${old} stays yours until ${until}, then it's released`];
     }

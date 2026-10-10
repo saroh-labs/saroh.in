@@ -31,14 +31,14 @@ describe("hoursSummary", () => {
 
     it("says the open days and the hours they share", () => {
         expect(hoursSummary(week({ SUN: { closed: true } }))).toBe(
-            "Mon–Sat · 9:00 AM – 6:00 PM",
+            "Mon–Sat · 9:00 am to 6:00 pm",
         );
-        expect(hoursSummary(week())).toBe("Mon–Sun · 9:00 AM – 6:00 PM");
+        expect(hoursSummary(week())).toBe("Mon–Sun · 9:00 am to 6:00 pm");
         expect(
             hoursSummary(
                 week({ SAT: { closed: true }, SUN: { closed: true } }),
             ),
-        ).toBe("Mon–Fri · 9:00 AM – 6:00 PM");
+        ).toBe("Mon–Fri · 9:00 am to 6:00 pm");
     });
 
     it("names days that aren't neighbours one by one", () => {
@@ -50,7 +50,7 @@ describe("hoursSummary", () => {
                     SUN: { closed: true },
                 }),
             ),
-        ).toBe("Mon–Wed, Fri · 9:00 AM – 6:00 PM");
+        ).toBe("Mon–Wed, Fri · 9:00 am to 6:00 pm");
         expect(
             hoursSummary(
                 week({
@@ -62,7 +62,7 @@ describe("hoursSummary", () => {
                     SUN: { closed: true },
                 }),
             ),
-        ).toBe("Sat · 9:00 AM – 6:00 PM");
+        ).toBe("Sat · 9:00 am to 6:00 pm");
     });
 
     it("counts the open days on other hours, and not the closed ones", () => {
@@ -73,7 +73,7 @@ describe("hoursSummary", () => {
                     SUN: { closed: true },
                 }),
             ),
-        ).toBe("Mon–Fri · 9:00 AM – 6:00 PM + 1 day with different hours");
+        ).toBe("Mon–Fri · 9:00 am to 6:00 pm + 1 day with different hours");
         expect(
             hoursSummary(
                 week({
@@ -81,7 +81,7 @@ describe("hoursSummary", () => {
                     SUN: { open: "11:00", close: "13:00" },
                 }),
             ),
-        ).toBe("Mon–Fri · 9:00 AM – 6:00 PM + 2 days with different hours");
+        ).toBe("Mon–Fri · 9:00 am to 6:00 pm + 2 days with different hours");
     });
 
     it("leads with the hours most days keep; a tie goes to the earlier days", () => {
@@ -92,7 +92,7 @@ describe("hoursSummary", () => {
                     SUN: { closed: true },
                 }),
             ),
-        ).toBe("Tue–Sat · 9:00 AM – 6:00 PM + 1 day with different hours");
+        ).toBe("Tue–Sat · 9:00 am to 6:00 pm + 1 day with different hours");
         expect(
             hoursSummary(
                 week({
@@ -103,7 +103,7 @@ describe("hoursSummary", () => {
                     SUN: { closed: true },
                 }),
             ),
-        ).toBe("Mon–Tue · 9:00 AM – 6:00 PM + 2 days with different hours");
+        ).toBe("Mon–Tue · 9:00 am to 6:00 pm + 2 days with different hours");
     });
 
     it("says Closed every day for a saved week with no open day", () => {
@@ -122,7 +122,7 @@ describe("hoursSummary", () => {
 describe("the editor's own readings of a week", () => {
     it("weekSummary writes it as a shop's door does", () => {
         expect(weekSummary(week({ SUN: { closed: true } }))).toBe(
-            "Mon–Sat 9:00 AM – 6:00 PM · Sun closed",
+            "Mon–Sat 9:00 am to 6:00 pm · Sun closed",
         );
         expect(
             weekSummary(
@@ -132,7 +132,7 @@ describe("the editor's own readings of a week", () => {
                 }),
             ),
         ).toBe(
-            "Mon–Fri 9:00 AM – 6:00 PM · Sat 10:00 AM – 2:00 PM · Sun closed",
+            "Mon–Fri 9:00 am to 6:00 pm · Sat 10:00 am to 2:00 pm · Sun closed",
         );
     });
 

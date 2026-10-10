@@ -124,7 +124,7 @@ export function AttentionSuggestions({
                 if (state.status === "failed") {
                     back();
                     showError(
-                        refused ?? "Could not set that note aside.",
+                        refused ?? "Couldn't set that note aside.",
                         "It is still waiting above their record.",
                     );
                 }

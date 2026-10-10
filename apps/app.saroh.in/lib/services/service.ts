@@ -484,7 +484,7 @@ export { hasEnded, needsOutcome } from "./booking-state";
 export function createService(
     input: CreateServiceInput,
 ): Promise<ApiResult<Service>> {
-    return send<Service>("", "POST", input, "Could not create the service");
+    return send<Service>("", "POST", input, "Couldn't create the service.");
 }
 
 /** Patch a service's terms / status. */
@@ -496,7 +496,7 @@ export function updateService(
         `/${serviceId}`,
         "PATCH",
         input,
-        "Could not update the service",
+        "Couldn't update the service.",
     );
 }
 
@@ -508,7 +508,7 @@ export function archiveService(
         `/${serviceId}`,
         "DELETE",
         undefined,
-        "Could not archive the service",
+        "Couldn't archive the service.",
     );
 }
 
@@ -521,7 +521,7 @@ export function replaceRules(
         `/${serviceId}/rules`,
         "PUT",
         { rules },
-        "Could not save the availability",
+        "Couldn't save the availability.",
     );
 }
 
@@ -535,7 +535,7 @@ export function recordBookingOutcome(
         `/bookings/${bookingId}/outcome`,
         "POST",
         { outcome },
-        "Could not record how it went",
+        "Couldn't record how it went.",
     );
 }
 
@@ -567,7 +567,7 @@ export function bookByHand(
         `/${serviceId}/bookings`,
         "POST",
         input,
-        "Could not make the booking",
+        "Couldn't make the booking.",
     );
 }
 
@@ -583,7 +583,7 @@ export function bookVisit(
         `/treatments/${encodeURIComponent(orderId)}/visits`,
         "POST",
         input,
-        "Could not book the visit",
+        "Couldn't book the visit.",
     );
 }
 
@@ -623,7 +623,7 @@ export function rescheduleBooking(
         `/bookings/${bookingId}`,
         "PATCH",
         { startAt },
-        "Could not move the booking",
+        "Couldn't move the booking.",
     );
 }
 
@@ -643,6 +643,6 @@ export function cancelBooking(
         `/bookings/${bookingId}${query}`,
         "DELETE",
         undefined,
-        "Could not cancel the booking",
+        "Couldn't cancel the booking.",
     );
 }

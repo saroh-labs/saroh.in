@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import { cleanAddressInput } from "@/lib/organizations/address";
 
 import { blockerSentence } from "./blocker-copy";
@@ -484,7 +485,7 @@ export function finishSetupItems(
 
 /** "Bookings and Contacts are on. Finish setup: Add a bookable service." */
 export function turnedOnToast(names: readonly string[], items: string[]) {
-    const on = `${listWords(names)} ${names.length === 1 ? "is" : "are"} on.`;
+    const on = `${listWords(names)} ${plural(names.length, "is", "are")} on.`;
     return items.length > 0 ? `${on} Finish setup: ${items.join(" ")}` : on;
 }
 

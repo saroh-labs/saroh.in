@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -284,7 +285,7 @@ function RefundDraft({
                                   ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
                                   : ""}
                             {putBackUnits > 0 && stock === "back"
-                                ? ` ${putBackUnits} go${putBackUnits === 1 ? "es" : ""} back in stock when the refund is confirmed.`
+                                ? ` ${putBackUnits} ${plural(putBackUnits, "goes", "go")} back in stock when the refund is confirmed.`
                                 : ""}
                         </p>
                     </>

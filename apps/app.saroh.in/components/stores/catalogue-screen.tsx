@@ -1,5 +1,6 @@
 "use client";
 
+import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -263,7 +264,7 @@ export function CatalogueScreen({
             else showError("It couldn't be duplicated.", res.error);
             return;
         }
-        showSuccess(`${res.data.name} is a draft — stock starts at 0.`);
+        showSuccess(`${res.data.name} is a draft. Stock starts at 0.`);
         router.push(productEditHref(res.data.storeId, res.data.id));
     }
 
@@ -308,7 +309,7 @@ export function CatalogueScreen({
         collectionCount,
     );
     const countLabel =
-        `${data.total} ${data.total === 1 ? "product" : "products"}` +
+        count(data.total, "product") +
         (store
             ? ` sold at ${store.name}`
             : many
@@ -449,7 +450,7 @@ export function CatalogueScreen({
                         ? `Delete ${pendingDelete[0]?.name ?? "this product"}?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
-                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
+                description={`${plural(pendingDelete?.length ?? 0, "It is", "They are")} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
                 confirmLabel={
                     pendingDelete?.length === 1
                         ? "Delete product"

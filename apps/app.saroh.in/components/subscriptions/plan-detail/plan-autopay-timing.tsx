@@ -71,8 +71,8 @@ export function PlanAutopayTiming({
             }
             showSuccess(
                 next
-                    ? "Saved. This plan's renewals charge this way from now on."
-                    : "Saved. This plan follows the business setting.",
+                    ? "Timing saved. This plan's renewals charge this way from now on."
+                    : "Timing saved. This plan follows the business setting.",
             );
             router.refresh();
         });

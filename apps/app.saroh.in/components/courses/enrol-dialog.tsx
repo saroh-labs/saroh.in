@@ -1,5 +1,7 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -13,7 +15,6 @@ import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
-import { invoiceMoney } from "@/lib/invoices/money";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 /** What the dialog reads of a course: a list row or a course page's detail. */
@@ -105,7 +106,7 @@ export function EnrolDialog({
         if (!res.ok) return showError(res.error);
         showSuccess(
             `${person?.name ?? "They"} enrolled${choosing ? ` on ${course.name}` : ""}.`,
-            `${n} ${n === 1 ? "session" : "sessions"} booked.`,
+            `${count(n, "session")} booked.`,
         );
         onOpenChange(false);
         router.refresh();
@@ -173,7 +174,7 @@ export function EnrolDialog({
                     <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
                         {booksLine(course)}
                         {invoicesOnEnrol
-                            ? ` · invoice ${priceOk ? invoiceMoney(price.trim(), course.currency) : "not set"}. Nothing is charged and nobody is contacted.`
+                            ? ` · invoice ${priceOk ? formatMoneyMajor(price.trim(), course.currency, { decimals: "always" }) : "not set"}. Nothing is charged and nobody is contacted.`
                             : ". Payments is off, so no invoice is issued."}
                     </p>
                 </div>

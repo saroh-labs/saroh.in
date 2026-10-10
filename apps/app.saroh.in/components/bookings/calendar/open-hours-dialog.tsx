@@ -1,6 +1,13 @@
 "use client";
 
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    formatClock,
+    formatClockRange,
+    formatDay,
+    formatWeekday,
+} from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -8,10 +15,7 @@ import { useState } from "react";
 import type { Block, LocalDate, Span } from "@/lib/services/diary";
 import {
     blockTitle,
-    clock,
-    dayLabel,
     isLive,
-    weekdayName,
     weekdayOf,
     zonedInstant,
 } from "@/lib/services/diary";
@@ -44,7 +48,7 @@ export interface HoursTarget {
 function lengthLabel(minutes: number): string {
     if (minutes % 60) return `${minutes} min`;
     const h = minutes / 60;
-    return `${h} ${h === 1 ? "hour" : "hours"}`;
+    return count(h, "hour");
 }
 
 /**
@@ -69,14 +73,14 @@ export function OpenHoursDialog({
             size="md"
             title={
                 target
-                    ? `${target.mode === "block" ? "Block" : "Open"} ${target.staff.name} from ${clock(target.from)}`
+                    ? `${target.mode === "block" ? "Block" : "Open"} ${target.staff.name} from ${formatClock(target.from)}`
                     : ""
             }
             description={
                 target
                     ? target.mode === "block"
-                        ? `On ${dayLabel(target.date)}. Customers aren't offered the time you block.`
-                        : `On ${dayLabel(target.date)}. Customers can book the time you open.`
+                        ? `On ${formatDay(target.date, { weekday: "short", year: "never" })}. Customers aren't offered the time you block.`
+                        : `On ${formatDay(target.date, { weekday: "short", year: "never" })}. Customers can book the time you open.`
                     : ""
             }
             onClose={onClose}
@@ -113,7 +117,7 @@ function Form({
     const [scope, setScope] = useState<"day" | "week">("day");
     const [saving, setSaving] = useState(false);
     const to = Math.min(from + len, 1440);
-    const dayName = weekdayName(date);
+    const dayName = formatWeekday(date, "UTC");
 
     const works = target.windows.some(([a, b]) => from < b && a < to);
     const weeklyClash = staff.hours.some(
@@ -127,7 +131,7 @@ function Form({
     );
     const bad = block
         ? hit.length
-            ? `That overlaps ${hit.map((b) => `${blockTitle(b)} at ${clock(b.start)}`).join(", ")}. Move or cancel it first.`
+            ? `That overlaps ${hit.map((b) => `${blockTitle(b)} at ${formatClock(b.start)}`).join(", ")}. Move or cancel it first.`
             : ""
         : works || (scope === "week" && weeklyClash)
           ? `${staff.name} already works part of that time. Pick a closed time, or change hours on Availability.`
@@ -143,7 +147,7 @@ function Form({
     async function save() {
         if (bad || saving) return;
         setSaving(true);
-        const range = `${clock(from)}–${clock(to)}`;
+        const range = formatClockRange(from, to);
         if (block) {
             const startAt = zonedInstant(date, from, timezone).toISOString();
             const res = await runAction(
@@ -221,7 +225,7 @@ function Form({
         onClose();
         router.refresh();
         showUndo(
-            `Opened ${range} for ${staff.name} on ${dayLabel(date)} only.`,
+            `Opened ${range} for ${staff.name} on ${formatDay(date, { weekday: "short", year: "never" })} only.`,
             async () => {
                 if (!added) return false;
                 const back = await removeExtraHours(staff.id, added.id);
@@ -234,7 +238,8 @@ function Form({
     return (
         <>
             <p className="mb-3 text-[12.5px] text-muted-foreground">
-                {dayLabel(date)} · {clock(from)}–{clock(to)}
+                {formatDay(date, { weekday: "short", year: "never" })} ·{" "}
+                {formatClockRange(from, to)}
             </p>
             <Eyebrow id="oh-for">For</Eyebrow>
             <div
@@ -262,7 +267,11 @@ function Form({
                             on={scope === "day"}
                             onClick={() => setScope("day")}
                         >
-                            Just {dayLabel(date)}
+                            Just{" "}
+                            {formatDay(date, {
+                                weekday: "short",
+                                year: "never",
+                            })}
                         </Chip>
                         <Chip
                             on={scope === "week"}

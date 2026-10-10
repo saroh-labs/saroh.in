@@ -100,7 +100,7 @@ describe("Add someone who takes bookings", () => {
         act(() => root.render(<Harness />));
         expect(dialog()).toBeNull();
         await press(opener());
-        expect(dialogName()).toBe("Add someone who takes bookings");
+        expect(dialogName()).toBe("New person who takes bookings");
         expect(createStaff).not.toHaveBeenCalled();
     });
 

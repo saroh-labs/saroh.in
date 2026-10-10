@@ -1,3 +1,4 @@
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 
 import { messageStatusWords } from "@/lib/messages/message-status";
@@ -94,11 +95,17 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
 
                         <p className="text-xs text-muted-foreground">
                             {words.sent ? "Sent" : "Recorded"}{" "}
-                            {new Date(message.createdAt).toLocaleString()}
+                            <ViewerDate
+                                iso={message.createdAt}
+                                variant="datetime"
+                            />
                             {status !== message.status ||
-                            message.deliveries.length > 0
-                                ? ` · updated ${new Date(at).toLocaleString()}`
-                                : ""}
+                            message.deliveries.length > 0 ? (
+                                <>
+                                    {" · updated "}
+                                    <ViewerDate iso={at} variant="datetime" />
+                                </>
+                            ) : null}
                         </p>
                     </li>
                 );

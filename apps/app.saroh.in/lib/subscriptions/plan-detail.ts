@@ -1,3 +1,6 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import type {
     Interval,
     Plan,
@@ -9,10 +12,8 @@ import type {
 import type { Tone } from "./view";
 import {
     classesText,
-    dayText,
     listTab,
     longPrice,
-    money,
     olderPrice,
     TAB_LABEL,
     TAB_TONE,
@@ -81,9 +82,9 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
     const archived = plan.status === "ARCHIVED";
     const n = plan.subscriberCount;
     const parts = [
-        `${money(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
+        `${formatMoneyMajor(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
         ...(withClasses ? [lower(classesText(plan.classesPerMonth))] : []),
-        n === 1 ? "1 person on it" : `${n} people on it`,
+        count(n, "person on it", "people on it"),
     ];
     return {
         state: draft
@@ -122,7 +123,7 @@ export function includedText(
         classes: !withClasses
             ? null
             : n
-              ? `${n} ${n === 1 ? "class" : "classes"} each month. Unused ones don't carry over.`
+              ? `${count(n, "class", "classes")} each month. Unused ones don't carry over.`
               : "Unlimited classes.",
     };
 }
@@ -148,7 +149,7 @@ function priceSide(
     if (price === null) return "no price";
     return interval
         ? longPrice(price, currency, interval)
-        : money(price, currency);
+        : formatMoneyMajor(price, currency);
 }
 
 /**
@@ -269,7 +270,7 @@ export function historyRows(
 ): HistoryRow[] {
     const rows: HistoryRow[] = events.map((e) => ({
         id: e.id,
-        date: dayText(e.createdAt, timeZone, now),
+        date: formatDate(e.createdAt, timeZone, { now }),
         what: eventWhat(e, currency),
         who: eventWho(e),
     }));
@@ -318,7 +319,7 @@ export function glanceRows(
         { label: "On it now", value: String(plan.subscriberCount) },
         {
             label: "Coming in a month",
-            value: monthly > 0 ? money(monthly, plan.currency) : "—",
+            value: monthly > 0 ? formatMoneyMajor(monthly, plan.currency) : "—",
         },
         { label: "Price changes", value: priceChangesText(events) },
     ];
@@ -352,7 +353,7 @@ export function subscriberRows(
         .sort((a, b) => ORDER[listTab(a)] - ORDER[listTab(b)])
         .map((s) => {
             const tab = listTab(s);
-            const d = (at: string) => dayText(at, s.timezone, now);
+            const d = (at: string) => formatDate(at, s.timezone, { now });
             const when =
                 tab === "cancelled"
                     ? s.cancelledAt

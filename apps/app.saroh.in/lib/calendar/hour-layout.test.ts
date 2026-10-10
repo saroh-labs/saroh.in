@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
     GRID_PX,
-    hhmm,
     hourLabels,
     MIN_BLOCK_PX,
     minutesOf,
@@ -117,16 +116,14 @@ describe("workBands", () => {
 });
 
 describe("labels and clocks", () => {
-    it("labels 07:00 to 21:00, each at its line", () => {
+    it("labels 7 am to 9 pm, each at its line", () => {
         const labels = hourLabels();
-        expect(labels[0]).toEqual({ text: "07:00", top: 38 });
-        expect(labels.at(-1)?.text).toBe("21:00");
+        expect(labels[0]).toEqual({ text: "7 am", top: 38 });
+        expect(labels.at(-1)?.text).toBe("9 pm");
         expect(labels).toHaveLength(15);
     });
 
-    it("reads and writes a wall clock", () => {
+    it("reads a wall clock", () => {
         expect(minutesOf("09:15")).toBe(555);
-        expect(hhmm(555)).toBe("09:15");
-        expect(hhmm(1470)).toBe("00:30");
     });
 });

@@ -119,7 +119,7 @@ export function OrderTickets({
 function Ticket({ order }: { order: OrderRead }) {
     const money = order.money;
     const format = (a: string | number) =>
-        formatMoneyMajor(a, money?.currency ?? "INR") ?? String(a);
+        formatMoneyMajor(a, money?.currency ?? "INR");
     const attention = ticketAttention(order.attention);
     const address =
         goesToAddress(order) && order.deliveryAddress

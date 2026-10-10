@@ -177,9 +177,11 @@ describe("the lead's actions", () => {
 
     it("opens a sheet named for each button", async () => {
         render();
+        // A sheet that makes a new thing is titled "New {thing}".
+        const titles: Record<string, string> = { "Add note": "New note" };
         for (const name of ["Add note", "Schedule follow-up", "Send message"]) {
             await press(button(name, host));
-            expect(dialogName()).toBe(name);
+            expect(dialogName()).toBe(titles[name] ?? name);
             // Cancel and the sheet's own button are both in it.
             expect(button("Cancel", dialog())).toBeDefined();
             await press(button("Cancel", dialog()));
@@ -206,7 +208,7 @@ describe("Add note", () => {
         expect(showError).toHaveBeenCalledWith(
             "Your role can't add notes to a lead.",
         );
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelector("textarea")?.value).toBe(
             "Called, wants a quote",
         );
@@ -339,7 +341,7 @@ describe("Send message", () => {
         await submit();
 
         expect(showWarning).toHaveBeenCalledWith(
-            "Message suppressed: consent is revoked",
+            "Message not sent. Their consent is revoked.",
         );
         expect(showSuccess).not.toHaveBeenCalled();
         expect(dialog()).toBe(null);

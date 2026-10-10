@@ -167,7 +167,7 @@ describe("the Pack Editor's calls (E14)", () => {
         apiFetch.mockResolvedValue(answer(500, {}));
         expect(await loadPackDraft("pack_1")).toEqual({
             ok: false,
-            error: "Could not load that pack.",
+            error: "Couldn't load that pack.",
         });
     });
 });

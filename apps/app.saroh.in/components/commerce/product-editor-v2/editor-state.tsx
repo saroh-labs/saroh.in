@@ -169,7 +169,7 @@ export function ProductEditorProvider({
                     } catch {
                         // A save that threw never reached the API's answer.
                         showError(
-                            `Couldn't save ${names[k].toLowerCase()} — the connection dropped. Your changes are still here.`,
+                            `Couldn't save ${names[k].toLowerCase()}. The connection dropped. Your changes are still here, so try again.`,
                         );
                     }
                 }

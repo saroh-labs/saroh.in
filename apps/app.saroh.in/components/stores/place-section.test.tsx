@@ -258,7 +258,7 @@ describe("The place's rows", () => {
         expect(says("name")).toBe("Hill Road");
         expect(says("kind")).toBe("Yes, they visit");
         expect(says("address")).toBe("12 Hill Road, Bandra");
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
         expect(says("details")).toBe("No description yet · no logo yet");
         expect(sheet()).toBeNull();
         expect(host.querySelector("input, textarea, form")).toBeNull();
@@ -304,7 +304,7 @@ describe("the Name sheet", () => {
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
         expect(update).toHaveBeenCalledWith(hill.id, { name: "Linking Road" });
-        expect(showSuccess).toHaveBeenCalledWith("Name saved");
+        expect(showSuccess).toHaveBeenCalledWith("Name saved.");
         expect(sheet()).toBeNull();
         expect(says("name")).toBe("Linking Road");
         // The title and the list show the name: the page reads again.
@@ -358,12 +358,12 @@ describe("the Name sheet", () => {
     });
 
     it("a refusal keeps the sheet open with what was typed", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         draw();
         await press(edit("Edit name"));
         type(name(), "Linking Road");
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Name");
         expect(name()?.value).toBe("Linking Road");
         expect(says("name")).toBe("Hill Road");
@@ -462,7 +462,7 @@ describe("the Address sheet", () => {
         expect(update).toHaveBeenCalledWith(hill.id, {
             address: "7 Linking Road\nKhar",
         });
-        expect(showSuccess).toHaveBeenCalledWith("Location address saved");
+        expect(showSuccess).toHaveBeenCalledWith("Location address saved.");
         expect(sheet()).toBeNull();
         expect(says("address")).toBe("7 Linking Road, Khar");
     });
@@ -550,13 +550,13 @@ describe("the Address sheet", () => {
         expect(update).not.toHaveBeenCalled();
         expect(says("address")).toBe("12 Hill Road, Bandra");
 
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         await press(edit("Edit address"));
         expect(box()?.value).toBe("12 Hill Road\nBandra");
         type(box(), "7 Linking Road");
         await press(item("Save"));
         // Said in the sheet, which stays open.
-        expect(sheet()?.textContent).toContain("Could not save that.");
+        expect(sheet()?.textContent).toContain("Couldn't save that.");
         expect(showError).not.toHaveBeenCalled();
         expect(sheetName()).toBe("Address");
         expect(box()?.value).toBe("7 Linking Road");
@@ -594,9 +594,9 @@ describe("the Opening hours sheet", () => {
                 d.day === "SAT" ? { ...d, closed: true } : d,
             ),
         });
-        expect(showSuccess).toHaveBeenCalledWith("Opening hours saved");
+        expect(showSuccess).toHaveBeenCalledWith("Opening hours saved.");
         expect(sheet()).toBeNull();
-        expect(says("hours")).toBe("Mon–Fri · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Fri · 9:00 am to 6:00 pm");
     });
 
     it("never saved: Set hours starts from a week, and Save keeps it as it stands", async () => {
@@ -608,7 +608,7 @@ describe("the Opening hours sheet", () => {
         );
         await press(item("Save"));
         expect(update).toHaveBeenCalledWith(hill.id, { openingHours: WEEK });
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
     });
 
     it("Cancel saves nothing; Save with nothing changed sends nothing", async () => {
@@ -616,7 +616,7 @@ describe("the Opening hours sheet", () => {
         await press(edit("Edit opening hours"));
         await press(item("Every day"));
         await press(item("Cancel"));
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
         expect(document.activeElement).toBe(edit("Edit opening hours"));
         await press(edit("Edit opening hours"));
         expect(item("Mon–Sat")?.getAttribute("data-state")).toBe("on");
@@ -626,12 +626,12 @@ describe("the Opening hours sheet", () => {
     });
 
     it("a refusal keeps it open with the days picked", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         draw();
         await press(edit("Edit opening hours"));
         await press(item("Every day"));
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Opening hours");
         expect(item("Every day")?.getAttribute("data-state")).toBe("on");
     });
@@ -783,7 +783,7 @@ describe("the Description and logo sheet", () => {
             description: "Sourdough since 2019",
             logoMediaId: OWN.mediaId,
         });
-        expect(showSuccess).toHaveBeenCalledWith("Details saved");
+        expect(showSuccess).toHaveBeenCalledWith("Details saved.");
         expect(sheet()).toBeNull();
         expect(says("details")).toBe("Description added · own logo");
         expect(refresh).toHaveBeenCalled();
@@ -909,10 +909,10 @@ describe("the Description and logo sheet", () => {
 
         updateDetails.mockResolvedValue({
             ok: false,
-            error: "Could not save that.",
+            error: "Couldn't save that.",
         });
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Description and logo");
         expect(says("details")).toBe("No description yet · no logo yet");
     });

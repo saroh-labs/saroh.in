@@ -1,3 +1,4 @@
+import { count as countOf } from "@/lib/format/plural";
 import { providerName } from "./providers";
 
 /**
@@ -16,7 +17,6 @@ export function membershipsWarning(
     lead = "Disconnecting",
 ): string {
     const name = providerName(provider);
-    const count =
-        active > 0 ? ` — ${active} ${active === 1 ? "is" : "are"} active` : "";
+    const count = active > 0 ? ` — ${countOf(active, "is", "are")} active` : "";
     return `${lead} stops Saroh syncing with ${name}. It doesn't cancel your customers' autopay memberships there${count}. Cancel them in your ${name} dashboard if you want them stopped.`;
 }

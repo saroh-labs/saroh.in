@@ -104,7 +104,7 @@ async function createForm(
     }
     return {
         ok: false,
-        error: toFailure(data, "Could not create the form").error,
+        error: toFailure(data, "Couldn't create the form.").error,
     };
 }
 
@@ -128,7 +128,7 @@ async function patchForm(
     }
     return {
         ok: false,
-        error: toFailure(data, "Could not update the form").error,
+        error: toFailure(data, "Couldn't update the form.").error,
     };
 }
 

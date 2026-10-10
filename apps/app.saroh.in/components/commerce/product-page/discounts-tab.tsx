@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
@@ -9,7 +10,6 @@ import type { ProductOverview } from "@/lib/products/overview";
 import {
     DISCOUNT_REACH_LABEL,
     discountAmount,
-    plural,
 } from "@/lib/products/overview-rules";
 
 import { TextLink } from "@saroh/ui/text-link";
@@ -47,7 +47,7 @@ export function ProductDiscountsTab({
     if (discounts.status === "forbidden")
         return <PanelForbidden what="discounts" />;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
 
     if (discounts.data.length === 0) {
         return (
@@ -116,9 +116,8 @@ export function ProductDiscountsTab({
                                     ) : (
                                         "No end date"
                                     )}
-                                    {" · "}used{" "}
-                                    {plural(d.usedOnProduct, "time")} on this
-                                    product
+                                    {" · "}used {count(d.usedOnProduct, "time")}{" "}
+                                    on this product
                                 </p>
                             </Card>
                         </li>

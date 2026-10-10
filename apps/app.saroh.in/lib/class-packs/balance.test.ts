@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     balanceLabel,
     classesLeft,
@@ -8,6 +9,8 @@ import {
     usableAt,
     usablePacks,
 } from "./balance";
+
+pinClock();
 
 const NOW = new Date("2026-09-22T10:00:00Z");
 

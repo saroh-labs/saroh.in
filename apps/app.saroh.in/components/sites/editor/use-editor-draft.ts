@@ -298,7 +298,7 @@ export function useEditorDraft({
             revision,
         ).catch(() => ({
             ok: false as const,
-            error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
+            error: "Couldn't reach Saroh — your work is still here. It will save again with your next edit.",
         }));
         setSaving(false);
         if (res.ok) {

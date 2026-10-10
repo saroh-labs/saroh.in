@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -6,7 +7,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
-import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { newStorefrontHref } from "@/lib/stores/links";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -70,7 +70,7 @@ export function ListFirstRun({
                     <Button asChild variant="outline">
                         <Link href="/contacts">
                             {contacts && contacts > 0
-                                ? `Open Contacts (${contacts.toLocaleString(NUMBER_LOCALE)})`
+                                ? `Open Contacts (${formatNumber(contacts)})`
                                 : "Open Contacts"}
                         </Link>
                     </Button>

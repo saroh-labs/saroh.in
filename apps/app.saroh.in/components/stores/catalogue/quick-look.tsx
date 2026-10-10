@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -194,15 +195,10 @@ export function QuickLook({
                                 </Line>
                                 <Line label="Updated" center last>
                                     <span className="font-mono text-[12px]">
-                                        {new Date(row.updatedAt).toLocaleString(
-                                            "en-GB",
-                                            {
-                                                day: "numeric",
-                                                month: "short",
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            },
-                                        )}
+                                        <ViewerDate
+                                            iso={row.updatedAt}
+                                            variant="datetime"
+                                        />
                                     </span>
                                 </Line>
                             </dl>
@@ -264,7 +260,7 @@ function SellToggle({
 }
 
 function PriceBlock({ row }: { row: CatalogueRow }) {
-    const money = (v: string) => formatMoneyMajor(v, row.currency) ?? "—";
+    const money = (v: string) => formatMoneyMajor(v, row.currency);
     return (
         <div className="min-w-0">
             <div className="font-display text-[14px] font-semibold tabular-nums tracking-[-0.02em]">

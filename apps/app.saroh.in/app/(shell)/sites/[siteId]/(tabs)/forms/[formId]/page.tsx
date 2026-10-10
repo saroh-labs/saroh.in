@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ArrowLeft, Inbox } from "lucide-react";
@@ -84,7 +85,7 @@ export default async function FormEntriesPage({
                         {form.name}
                     </h2>
                     <p className="text-[12.5px] text-muted-foreground">
-                        {page.total === 1 ? "1 entry" : `${page.total} entries`}
+                        {count(page.total, "entry", "entries")}
                         {form.status === "ACTIVE"
                             ? ", newest first"
                             : " · no longer taking entries"}

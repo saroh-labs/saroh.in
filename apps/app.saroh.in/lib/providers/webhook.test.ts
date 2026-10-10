@@ -4,27 +4,12 @@ import {
     generateWebhookSecret,
     isTestKey,
     lastUpdateLine,
-    sinceWords,
     WEBHOOK_PLACE,
     webhookFor,
 } from "./webhook";
 
 const now = new Date("2026-09-29T10:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
-
-describe("sinceWords", () => {
-    it("says how long ago, in the words the row uses", () => {
-        expect(sinceWords(ago(20_000), now)).toBe("just now");
-        expect(sinceWords(ago(2 * 60_000), now)).toBe("2 min ago");
-        expect(sinceWords(ago(3 * 3_600_000), now)).toBe("3 h ago");
-        expect(sinceWords(ago(30 * 3_600_000), now)).toBe("yesterday");
-        expect(sinceWords(ago(5 * 86_400_000), now)).toBe("5 days ago");
-        // A clock a little ahead is not "in the future".
-        expect(sinceWords(new Date(now.getTime() + 5_000), now)).toBe(
-            "just now",
-        );
-    });
-});
 
 describe("lastUpdateLine", () => {
     const setup = {
@@ -40,7 +25,7 @@ describe("lastUpdateLine", () => {
                 { ...setup, lastReceivedAt: ago(120_000).toISOString() },
                 now,
             ),
-        ).toBe("Last payment update from Razorpay: 2 min ago.");
+        ).toBe("Last payment update from Razorpay: 2 minutes ago.");
         expect(lastUpdateLine({ ...setup, lastReceivedAt: null }, now)).toBe(
             "No payment updates received yet — check the webhook in Razorpay.",
         );

@@ -1,5 +1,7 @@
 "use client";
 
+import { clockValue } from "@/lib/format/datetime";
+import { count, plural } from "@/lib/format/plural";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
 import { TimeSelect } from "@saroh/ui/time-select";
@@ -19,12 +21,7 @@ function nextSession(course: CourseDetail): { day?: Date; time: string } {
     if (!last) return { day: undefined, time: "18:30" };
     return {
         day: new Date(Date.parse(last.startAt) + 7 * 86_400_000),
-        time: new Intl.DateTimeFormat("en-GB", {
-            timeZone: course.service.timezone,
-            hour: "2-digit",
-            minute: "2-digit",
-            hourCycle: "h23",
-        }).format(new Date(last.startAt)),
+        time: clockValue(last.startAt, course.service.timezone),
     };
 }
 
@@ -75,7 +72,7 @@ export function AddSessionDialog({
         if (!res.ok) return showError(res.error);
         showSuccess(
             on > 0
-                ? `Session added. ${on} ${on === 1 ? "person is" : "people are"} booked on it.`
+                ? `Session added. ${count(on, "person is", "people are")} booked on it.`
                 : "Session added.",
         );
         onOpenChange(false);
@@ -86,10 +83,10 @@ export function AddSessionDialog({
         <FormDialog
             open={open}
             size="md"
-            title="Add session"
+            title="New session"
             description={
                 on > 0
-                    ? `It goes on the schedule for ${course.service.name}, and the ${on === 1 ? "1 person" : `${on} people`} on this course ${on === 1 ? "is" : "are"} booked on it. Times are in ${tz}.`
+                    ? `It goes on the schedule for ${course.service.name}, and the ${count(on, "person", "people")} on this course ${plural(on, "is", "are")} booked on it. Times are in ${tz}.`
                     : `It goes on the schedule for ${course.service.name}. Times are in ${tz}.`
             }
             pending={busy}

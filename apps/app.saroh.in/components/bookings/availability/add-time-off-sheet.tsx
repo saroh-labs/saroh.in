@@ -129,7 +129,7 @@ export function AddTimeOffSheet({
     return (
         <FormSheet
             returnFocusTo={ADD_TIME_OFF_ID}
-            title="Add time off"
+            title="New time off"
             description={`Days ${me.name} can't be booked, or days the business is closed. Bookings already made are kept.`}
             open={open}
             pending={false}

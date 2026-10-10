@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
@@ -53,7 +54,7 @@ export function MonthStrip({
         const { csv, lines } = monthCsv(cash.all, labelOf, at);
         download(csv, monthCsvName(month));
         showSuccess(
-            `Exported ${lines} ${lines === 1 ? "line" : "lines"} for ${monthTitle(month)} as a spreadsheet file.`,
+            `Exported ${count(lines, "line")} for ${monthTitle(month)} as a spreadsheet file.`,
         );
     };
 

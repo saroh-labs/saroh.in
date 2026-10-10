@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import { SECTION_LABELS } from "./editor-constants";
 import type { HeldBackSection } from "./saveable-sections";
 
@@ -17,7 +18,7 @@ export function unfinishedPhrase(heldBack: HeldBackSection[]): string {
         names.length <= 1
             ? (names[0] ?? "")
             : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-    return `the unfinished ${list} section${names.length > 1 ? "s" : ""}`;
+    return `the unfinished ${list} ${plural(Math.max(1, names.length), "section")}`;
 }
 
 /**

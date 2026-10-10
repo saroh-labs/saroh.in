@@ -3,10 +3,14 @@ import {
     unfinishedPhrase,
 } from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import {
+    formatDateTime,
+    formatTime,
+    viewerTimeZone,
+} from "@/lib/format/datetime";
+import { plural } from "@/lib/format/plural";
 import type { EditorStatus, EditorStatusTone } from "@/lib/sites/editor-status";
 import { editorStatus } from "@/lib/sites/editor-status";
-import { exactDate } from "@/lib/sites/format-date";
 import type { ApprovalOutcome, ReviewState } from "@/lib/sites/service";
 
 /**
@@ -155,7 +159,7 @@ export function statusReadout({
     const detail = [
         scheduled,
         lastSavedAt && !dirty
-            ? `Saved at ${lastSavedAt.toLocaleTimeString(DISPLAY_LOCALE, { hour: "2-digit", minute: "2-digit" })}`
+            ? `Saved at ${formatTime(lastSavedAt, viewerTimeZone())}`
             : null,
         pendingSummary
             ? `${pendingSummary} changed since the last publish`
@@ -164,16 +168,14 @@ export function statusReadout({
             ? `${APPROVAL_BADGE[review.latestApproval.outcome].text(
                   review.latestApproval.by,
                   review.approvalIsStale,
-              )} · ${exactDate(review.latestApproval.at, zone)}`
+              )} · ${formatDateTime(review.latestApproval.at, zone, { year: "always" })}`
             : null,
         // What they asked to change, in their words (UX-043).
         review.latestApproval?.outcome === "CHANGES_REQUESTED" &&
         review.latestApproval.reason
             ? `“${review.latestApproval.reason}”`
             : null,
-        openNotes > 0
-            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
-            : null,
+        openNotes > 0 ? `${openNotes} open ${plural(openNotes, "note")}` : null,
     ]
         .filter(Boolean)
         .join("\n");
@@ -188,9 +190,7 @@ export function statusReadout({
                   review.approvalIsStale,
               )
             : null,
-        openNotes > 0
-            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
-            : null,
+        openNotes > 0 ? `${openNotes} open ${plural(openNotes, "note")}` : null,
     ]
         .filter(Boolean)
         .join(" · ");

@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -12,7 +13,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { canOrUnknown } from "@/lib/access/require-can";
-import { contactName, formatValue } from "@/lib/crm/format";
+import { contactName } from "@/lib/crm/format";
 import { firstStageWithLeads, stageAnchor } from "@/lib/crm/pipeline-board";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
@@ -198,7 +199,11 @@ export default async function PipelinePage() {
                                     </p>
                                 ) : (
                                     stageLeads.map((lead) => {
-                                        const amount = formatValue(lead.value);
+                                        const amount = formatMoney(
+                                            lead.value,
+                                            null,
+                                            { decimals: "always" },
+                                        );
                                         return (
                                             <article
                                                 key={lead.id}

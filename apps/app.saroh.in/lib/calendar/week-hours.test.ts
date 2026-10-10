@@ -172,8 +172,8 @@ describe("weekHours: blocks and the All day row", () => {
         );
         const monday = days[0];
         expect(monday.blocks.map((b) => [b.time, b.title, b.width])).toEqual([
-            ["10:00–10:30", "Check-up · Asha", 50],
-            ["10:00–11:00", "Check-up · Ravi", 50],
+            ["10:00 to 10:30 am", "Check-up · Asha", 50],
+            ["10:00 to 11:00 am", "Check-up · Ravi", 50],
         ]);
         expect(monday.blocks[1].left).toBe(50);
         expect(monday.blocks[0].href).toBe("/bookings/Asha");
@@ -208,7 +208,7 @@ describe("weekHours: blocks and the All day row", () => {
             bad: true,
             struck: false,
         });
-        expect(noShow.full).toBe("09:00–09:30 Check-up · Asha · No-show");
+        expect(noShow.full).toBe("9:00 to 9:30 am Check-up · Asha · No-show");
         expect(gone).toMatchObject({
             flag: { label: "Cancelled", tone: "bad" },
             bad: true,
@@ -227,7 +227,7 @@ describe("weekHours: blocks and the All day row", () => {
             ]),
         );
         expect(days[3].blocks[0]).toMatchObject({
-            time: "05:30–06:30",
+            time: "5:30 to 6:30 am",
             startsEarlier: true,
             top: 1,
         });

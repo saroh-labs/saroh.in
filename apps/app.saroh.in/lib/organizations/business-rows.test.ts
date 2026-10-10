@@ -121,9 +121,9 @@ describe("the sheets' words", () => {
         expect(savedWords("address", business)).toBe(
             "Registered address saved. Invoices from now on use it.",
         );
-        expect(savedWords("kind", business)).toBe("What this is saved");
+        expect(savedWords("kind", business)).toBe("What this is saved.");
         expect(savedWords("phone", business)).toBe(
-            "Phone on your website saved",
+            "Phone on your website saved.",
         );
     });
 });

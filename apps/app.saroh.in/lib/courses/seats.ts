@@ -1,4 +1,5 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate, formatTime, formatWeekday } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 import type { Course, CourseStatus } from "./service";
 
@@ -14,7 +15,7 @@ type Seats = Pick<Course, "seats" | "enrolled" | "seatsLeft">;
 /** The roster's badge: "3 seats left", "1 seat left", "Full · 10 of 10". */
 export function seatsLeftLine(c: Seats): string {
     if (c.seatsLeft <= 0) return `Full · ${c.enrolled} of ${c.seats}`;
-    return `${c.seatsLeft} ${c.seatsLeft === 1 ? "seat" : "seats"} left`;
+    return `${count(c.seatsLeft, "seat")} left`;
 }
 
 /** The list's column: "9 of 12 taken". */
@@ -54,27 +55,6 @@ export const STATUS_LABEL: Record<CourseStatus, string> = {
     ARCHIVED: "Archived",
 };
 
-const weekday = (iso: string, timeZone: string) =>
-    new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        weekday: "long",
-    }).format(new Date(iso));
-const clock = (iso: string, timeZone: string) =>
-    // The schedule's own style ("6:30 pm"), so the list and the course page
-    // say a time the same way.
-    new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    }).format(new Date(iso));
-const dayMonth = (iso: string, timeZone: string) =>
-    new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        day: "numeric",
-        month: "short",
-    }).format(new Date(iso));
-
 /**
  * When it runs, as the list says it: "Tuesdays 6:30 pm, from 6 Oct" when every
  * session is the same weekday and time, "8 sessions, from 6 Oct" otherwise,
@@ -89,18 +69,18 @@ export function runsLine(
     const first = c.sessions[0];
     const last = c.sessions[c.sessions.length - 1];
     if (Date.parse(last.startAt) <= now.getTime()) {
-        return `Ended ${dayMonth(last.startAt, tz)}`;
+        return `Ended ${formatDate(last.startAt, tz, { now })}`;
     }
     const from = c.nextSessionAt ?? first.startAt;
-    const days = new Set(c.sessions.map((s) => weekday(s.startAt, tz)));
-    const times = new Set(c.sessions.map((s) => clock(s.startAt, tz)));
+    const days = new Set(c.sessions.map((s) => formatWeekday(s.startAt, tz)));
+    const times = new Set(c.sessions.map((s) => formatTime(s.startAt, tz)));
     const started = Date.parse(first.startAt) <= now.getTime();
     const when = started ? "next" : "from";
     if (days.size === 1 && times.size === 1 && c.sessions.length > 1) {
-        return `${Array.from(days)[0]}s ${Array.from(times)[0]}, ${when} ${dayMonth(from, tz)}`;
+        return `${Array.from(days)[0]}s ${Array.from(times)[0]}, ${when} ${formatDate(from, tz, { now })}`;
     }
     const n = c.sessions.length;
-    return `${n} ${n === 1 ? "session" : "sessions"}, ${when} ${dayMonth(from, tz)}`;
+    return `${count(n, "session")}, ${when} ${formatDate(from, tz, { now })}`;
 }
 
 /**

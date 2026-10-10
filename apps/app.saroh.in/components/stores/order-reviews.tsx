@@ -53,8 +53,8 @@ export function OrderReviews({
             if (result?.status === "queued") {
                 showSuccess(
                     result.note === "consent-not-checked"
-                        ? "Invitation sending — no contact on file, so email consent couldn't be checked"
-                        : "Review invitation sending",
+                        ? "Review invitation sending. No contact is on file, so email consent couldn't be checked."
+                        : "Review invitation sending.",
                 );
             } else if (result) {
                 showWarning(result.message);

@@ -161,8 +161,7 @@ export function useNewOrder({
     }
 
     const currency = data?.currency ?? null;
-    const format = (cents: number) =>
-        formatMoney(cents, currency) ?? (cents / 100).toFixed(2);
+    const format = (cents: number) => formatMoney(cents, currency);
     const subtotal = lines.reduce(
         (sum, l) => sum + (byKey.get(l.key)?.priceCents ?? 0) * l.quantity,
         0,

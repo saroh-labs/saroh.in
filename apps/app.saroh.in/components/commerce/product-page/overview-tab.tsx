@@ -58,7 +58,7 @@ export function ProductOverviewTab({
 }) {
     const { product, orders, reviews, discounts, placement } = overview;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const edit = (section?: EditorSection) =>
         productEditHref(storeId, product.id, section);
     const counted =

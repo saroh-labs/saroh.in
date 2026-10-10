@@ -1,5 +1,11 @@
 "use client";
 
+import {
+    formatClock,
+    formatClockRange,
+    formatDay,
+} from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import {
@@ -32,8 +38,6 @@ import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
 import type { Block, LocalDate } from "@/lib/services/diary";
 import {
     bookingState,
-    clock,
-    dayLabel,
     liveSeats,
     localDateOf,
     localMinuteOf,
@@ -164,8 +168,11 @@ function Body({
                             {title}
                         </SheetTitle>
                         <SheetDescription className="text-[12px] text-muted-foreground">
-                            {dayLabel(date)} · {clock(block.start)}–
-                            {clock(block.end)}
+                            {formatDay(date, {
+                                weekday: "short",
+                                year: "never",
+                            })}{" "}
+                            · {formatClockRange(block.start, block.end)}
                             {staff ? ` · ${staff.name}` : ""}
                         </SheetDescription>
                     </div>
@@ -326,10 +333,7 @@ function OneToOne({
                 key="take"
                 amount={
                     b.take
-                        ? (formatMoney(
-                              b.take.cents,
-                              b.service.currency ?? null,
-                          ) ?? null)
+                        ? formatMoney(b.take.cents, b.service.currency ?? null)
                         : null
                 }
                 variant="outline"
@@ -384,7 +388,7 @@ function OneToOne({
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}. To see ${first} again, book a free time.`
-            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${rule} ${rule === 1 ? "hour" : "hours"} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
+            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
 
     return (
         <>
@@ -569,7 +573,7 @@ function MovePanel({
             ) : (
                 <div className="flex flex-wrap gap-1.5">
                     {slots.map((s) => {
-                        const label = `${dayLabel(localDateOf(s.startAt, ctx.timezone))} · ${clock(localMinuteOf(s.startAt, ctx.timezone))}`;
+                        const label = `${formatDay(localDateOf(s.startAt, ctx.timezone), { weekday: "short", year: "never" })} · ${formatClock(localMinuteOf(s.startAt, ctx.timezone))}`;
                         return (
                             <button
                                 key={s.startAt}
@@ -634,7 +638,7 @@ function ClassLook({
                         : []),
                     [
                         "Prepaid",
-                        `${onPrepaid} of ${live.length} ${live.length === 1 ? "place" : "places"} on a pack or membership`,
+                        `${onPrepaid} of ${count(live.length, "place")} on a pack or membership`,
                     ],
                 ]}
             />

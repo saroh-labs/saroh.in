@@ -13,7 +13,7 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { personHref } from "@/lib/contacts/person-href";
-import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
+import { formatDate, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
 import { bookingStatus } from "@/lib/format/status";
@@ -57,7 +57,11 @@ const FILTERS: DataFilter<BookingWithService>[] = [
         id: "today",
         label: "Today",
         predicate: (b) =>
-            formatDayHeading(b.startAt, b.timezone, new Date()) === "Today",
+            formatDate(b.startAt, b.timezone, {
+                weekday: "short",
+                relative: true,
+                now: new Date(),
+            }) === "Today",
     },
     {
         id: "week",
@@ -122,7 +126,11 @@ export function BookingsView({
             cell: (b) => (
                 <span className="block whitespace-nowrap">
                     <span className="block text-xs text-muted-foreground">
-                        {formatDayHeading(b.startAt, b.timezone, now)}
+                        {formatDate(b.startAt, b.timezone, {
+                            weekday: "short",
+                            relative: true,
+                            now,
+                        })}
                     </span>
                     <span className="block font-medium tabular-nums">
                         {formatTimeRange(b.startAt, b.endAt, b.timezone)}

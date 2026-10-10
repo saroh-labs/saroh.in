@@ -198,7 +198,7 @@ export function connectPaymentProvider(
         "/payment-providers",
         "POST",
         input,
-        "Could not connect the payment provider",
+        "Couldn't connect the payment provider.",
     );
 }
 
@@ -207,7 +207,7 @@ export function disconnectPaymentProvider(
 ): Promise<CrmResult<{ id: string }>> {
     return destroy<{ id: string }>(
         `/payment-providers/${provider}`,
-        "Could not disconnect the payment provider",
+        "Couldn't disconnect the payment provider.",
     );
 }
 
@@ -218,7 +218,7 @@ export function connectCommsProvider(
         "/comms-providers",
         "POST",
         input,
-        "Could not connect the messaging provider",
+        "Couldn't connect the messaging provider.",
     );
 }
 
@@ -227,6 +227,6 @@ export function disconnectCommsProvider(
 ): Promise<CrmResult<{ id: string }>> {
     return destroy<{ id: string }>(
         `/comms-providers/${channel}`,
-        "Could not disconnect the messaging provider",
+        "Couldn't disconnect the messaging provider.",
     );
 }

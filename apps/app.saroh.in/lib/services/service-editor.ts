@@ -10,6 +10,7 @@
  */
 
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
 
@@ -322,7 +323,7 @@ export function changedSections(
 }
 
 function bookingsCount(n: number): string {
-    return n === 1 ? "1 booking" : `${n} bookings`;
+    return count(n, "booking");
 }
 
 /** The line under the title: unsaved, new, or what is still to come. */
@@ -447,7 +448,7 @@ export function depositNote(
 ): string {
     const minor = toMinor(price);
     const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
-    const money = (n: number) => formatMoney(n, currency) ?? "";
+    const money = (n: number) => formatMoney(n, currency);
     if (deposit === "NONE") {
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
@@ -542,7 +543,7 @@ export function glance(
             ? "—"
             : price === 0
               ? "Free"
-              : (formatMoney(price, currency) ?? "—");
+              : formatMoney(price, currency);
     const counted = (n: number | undefined) =>
         usage ? String(n ?? 0) : "Couldn't count";
     // A treatment (E10): its price is for every visit, and so is its time.
@@ -555,8 +556,7 @@ export function glance(
                 ? [
                       [
                           "Per visit",
-                          formatMoney(Math.round(price / visits), currency) ??
-                              "—",
+                          formatMoney(Math.round(price / visits), currency),
                       ] as [string, string],
                   ]
                 : []),

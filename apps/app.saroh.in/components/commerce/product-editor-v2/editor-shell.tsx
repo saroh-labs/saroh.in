@@ -13,7 +13,7 @@ import { useRef, useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
-import { currencySymbol } from "@/lib/format/money";
+import { moneySign } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
@@ -150,7 +150,7 @@ function EditorBody({
     const canEdit = canWrite || canStock;
     const jumpNames = sectionJumps(allergens.length > 0);
     const creating = mode === "create";
-    const symbol = currencySymbol(currency);
+    const symbol = moneySign(currency);
     const [createStatus, setCreateStatus] = useState<ProductStatus>("DRAFT");
     const [creatingNow, setCreatingNow] = useState(false);
     // Creating: what the chosen category starts a product with. Sections

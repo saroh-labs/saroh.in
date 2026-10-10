@@ -18,7 +18,7 @@ import { makeOrderPayLink } from "@/lib/orders/actions";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
 import { runAction } from "@/lib/api/run-action";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 
 /**
  * An order's pay link (B11), as the invoice's: the address is shown once,
@@ -84,7 +84,7 @@ export function usePayLink({
             void copyText(url).then((ok) =>
                 ok
                     ? showSuccess("Pay link copied.")
-                    : showError("Couldn't copy. Select the link and copy it."),
+                    : showError(copyFailedMessage()),
             );
     };
 

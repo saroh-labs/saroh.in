@@ -28,20 +28,20 @@ const render = (at: string, zone?: string) => {
 describe("the order timeline's times", () => {
     it("says an evening in India in India's time", () => {
         const html = render("2025-10-06T14:59:00Z", "Asia/Kolkata");
-        expect(html).toContain("6 Oct 2025, 20:29");
+        expect(html).toContain("6 Oct 2025, 8:29 pm");
         expect(html).not.toContain(">6 Oct 2025, 14:59<");
     });
 
     it("puts a step just before UTC's midnight on the business's next day", () => {
         expect(render("2025-10-05T20:00:00Z", "Asia/Kolkata")).toContain(
-            "6 Oct 2025, 01:30",
+            "6 Oct 2025, 1:30 am",
         );
         expect(render("2025-10-05T20:00:00Z", "America/New_York")).toContain(
-            "5 Oct 2025, 16:00",
+            "5 Oct 2025, 4:00 pm",
         );
     });
 
     it("reads India's when no business zone is given, never UTC", () => {
-        expect(render("2025-10-05T20:00:00Z")).toContain("6 Oct 2025, 01:30");
+        expect(render("2025-10-05T20:00:00Z")).toContain("6 Oct 2025, 1:30 am");
     });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -21,8 +22,6 @@ import { CategoryMergeSheet } from "./category-merge-sheet";
 import { TabIntro } from "./product-settings";
 
 const NAME_MAX = 40;
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
-
 type Category = CatalogueView["categories"][number];
 
 /**
@@ -99,7 +98,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             () => undoRemoval(res.data),
             c.productCount
                 ? {
-                      description: `Its ${plural(c.productCount)} ${c.productCount === 1 ? "is" : "are"} now Uncategorized.`,
+                      description: `Its ${count(c.productCount, "product")} ${plural(c.productCount, "is", "are")} now Uncategorized.`,
                   }
                 : {},
         );
@@ -171,7 +170,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                 {c.name}
                             </p>
                             <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                {plural(c.productCount)}
+                                {count(c.productCount, "product")}
                             </p>
                         </div>
                         {canWrite ? (
@@ -242,7 +241,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                             Uncategorized
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {plural(uncategorizedCount)}
+                            {count(uncategorizedCount, "product")}
                         </p>
                     </div>
                     <span className="text-[12px] text-muted-foreground">

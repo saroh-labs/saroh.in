@@ -1,8 +1,8 @@
+import { formatDay } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import {
     dayChips,
-    dayTitle,
     describeItem,
     itemsTotal,
     layersFor,
@@ -319,7 +319,7 @@ describe("how things read", () => {
     it("an order, with its number and the time it came in", () => {
         expect(describeItem("orders", item(), at)).toEqual({
             title: "Order #1017 · Kavya Iyer",
-            sub: "Placed 10:00",
+            sub: "Placed 10:00 am",
             flag: null,
             href: "/commerce/orders/o1",
         });
@@ -339,7 +339,7 @@ describe("how things read", () => {
             link: { type: "invoice", id: "inv_1" },
         });
         expect(describeItem("payments", paid, at)).toEqual({
-            title: "10:00 Paid · Check-up · Asha Rao",
+            title: "10:00 am Paid · Check-up · Asha Rao",
             sub: "INV-0042",
             flag: null,
             href: "/billing/invoices/inv_1",
@@ -395,7 +395,7 @@ describe("how things read", () => {
                 at,
             ),
         ).toMatchObject({
-            title: "18:00 HIIT circuit",
+            title: "6:00 pm HIIT circuit",
             flag: { label: "Full", tone: "accent" },
             href: "/services/sv",
         });
@@ -415,7 +415,7 @@ describe("how things read", () => {
                 at,
             ),
         ).toEqual({
-            title: "10:00 Physio · Asha Rao",
+            title: "10:00 am Physio · Asha Rao",
             sub: "With Ravi",
             flag: { label: "Awaiting payment", tone: "accent" },
             href: "/bookings/b1",
@@ -453,7 +453,11 @@ describe("money and dates", () => {
         expect(leadingBlanks("2026-11")).toBe(6);
         expect(shiftMonth("2026-12", 1)).toBe("2027-01");
         expect(shiftMonth("2026-01", -1)).toBe("2025-12");
-        expect(dayTitle("2026-09-18", "2026-09-23")).toBe("Fri 18 Sep");
-        expect(dayTitle("2027-01-02", "2026-09-23")).toBe("Sat 2 Jan 2027");
+        expect(
+            formatDay("2026-09-18", { today: "2026-09-23", weekday: "short" }),
+        ).toBe("Fri 18 Sep");
+        expect(
+            formatDay("2027-01-02", { today: "2026-09-23", weekday: "short" }),
+        ).toBe("Sat 2 Jan 2027");
     });
 });

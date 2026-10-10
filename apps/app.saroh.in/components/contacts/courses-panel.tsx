@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
@@ -101,7 +102,7 @@ export function CoursesPanel({
                                                 {on
                                                     ? n === 0
                                                         ? "No sessions to come"
-                                                        : `${n} ${n === 1 ? "session" : "sessions"} to come`
+                                                        : `${count(n, "session")} to come`
                                                     : "Taken off the course"}
                                                 {mentionInvoices && e.invoice
                                                     ? ` · invoice ${STANDING_WORD[e.invoice.standing]}`

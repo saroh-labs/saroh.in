@@ -37,8 +37,8 @@ export function LegacyWays({
                     disabled={!canEdit || pending}
                     onChange={flip(
                         "collectionEnabled",
-                        "Pick-up turned on",
-                        "Pick-up turned off",
+                        "Pick-up turned on.",
+                        "Pick-up turned off.",
                     )}
                 />
             ) : null}
@@ -50,8 +50,8 @@ export function LegacyWays({
                 disabled={!canEdit || pending}
                 onChange={flip(
                     "shippingEnabled",
-                    "Delivery turned on",
-                    "Delivery turned off",
+                    "Delivery turned on.",
+                    "Delivery turned off.",
                 )}
             />
         </>

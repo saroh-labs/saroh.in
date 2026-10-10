@@ -246,7 +246,7 @@ describe("QrMaker — a sample until the code is made", () => {
         expect(host.textContent).toContain("opens Booking page");
         expect(onSaved).toHaveBeenCalledTimes(1);
         expect(showSuccess).toHaveBeenCalledWith(
-            "Code made",
+            "Code made.",
             "glow.saroh.app/q/h7c",
         );
         expect(button("Copy link")?.disabled).toBe(false);

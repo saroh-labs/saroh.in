@@ -52,7 +52,7 @@ export function createPipeline(
         "/pipelines",
         "POST",
         input,
-        "Could not create the pipeline",
+        "Couldn't create the pipeline.",
     );
 }
 
@@ -65,7 +65,7 @@ export function addStage(
         `/pipelines/${pipelineId}/stages`,
         "POST",
         input,
-        "Could not add the stage",
+        "Couldn't add the stage.",
     );
 }
 
@@ -79,7 +79,7 @@ export function updateStage(
         `/pipelines/${pipelineId}/stages/${stageId}`,
         "PATCH",
         input,
-        "Could not update the stage",
+        "Couldn't update the stage.",
     );
 }
 
@@ -90,6 +90,6 @@ export function deleteStage(
 ): Promise<CrmResult<{ id: string }>> {
     return destroy<{ id: string }>(
         `/pipelines/${pipelineId}/stages/${stageId}`,
-        "Could not remove the stage",
+        "Couldn't remove the stage.",
     );
 }

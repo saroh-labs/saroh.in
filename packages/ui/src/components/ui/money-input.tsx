@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { moneyDecimals, moneySign } from "../../lib/money";
 import { cn } from "../../lib/utils";
 import type { InputProps } from "./input";
 import { Input } from "./input";
@@ -16,35 +17,9 @@ import { Input } from "./input";
  * ("1250.50") from the box to the API, which does the arithmetic.
  */
 
-/** The sign a currency is written with ("₹" for INR). */
-export function moneySign(currency: string): string {
-    try {
-        const part = new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency,
-            currencyDisplay: "narrowSymbol",
-        })
-            .formatToParts(0)
-            .find((p) => p.type === "currency");
-        return part?.value ?? currency;
-    } catch {
-        return currency;
-    }
-}
-
-/** How many decimal places a currency is written with (2 for INR, 0 for JPY). */
-export function moneyDecimals(currency: string): number {
-    try {
-        return (
-            new Intl.NumberFormat("en-IN", {
-                style: "currency",
-                currency,
-            }).resolvedOptions().maximumFractionDigits ?? 2
-        );
-    } catch {
-        return 2;
-    }
-}
+// The sign and the decimals are `lib/money.ts`'s: the same answer the app's
+// formatter gives, and callable on the server.
+export { moneyDecimals, moneySign };
 
 /**
  * What a money box keeps of what was typed or pasted: digits and at most one

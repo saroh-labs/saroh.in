@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -15,7 +16,6 @@ import {
     setCommentResolved,
     withdrawReview,
 } from "@/lib/sites/actions";
-import { shortDate } from "@/lib/sites/format-date";
 import { reviewSubject } from "@/lib/sites/release-review";
 import type {
     PublicationRelease,
@@ -421,7 +421,7 @@ function Note({
                     {note.author.name}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {shortDate(note.createdAt, zone)}
+                    {formatDate(note.createdAt, zone)}
                 </span>
             </div>
 

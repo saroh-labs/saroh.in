@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/format/datetime";
 import type {
     OrderDatePreset,
     OrderFilterOptions,
@@ -249,31 +250,6 @@ function typeWords(label: string): string {
     return (tail ? `${tail} ${head}` : label).toLowerCase();
 }
 
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
-/**
- * "3 Sep", for a range said in a sentence. Spelt here rather than by
- * `Intl`, whose short September is "Sep" or "Sept" by ICU version.
- */
-function dayWords(day: string): string {
-    // A day has been through `dayOrNull`: YYYY-MM-DD, a real one.
-    const month = Number(day.slice(5, 7));
-    return `${Number(day.slice(8, 10))} ${MONTHS[month - 1]}`;
-}
-
 const DATE_WORDS: Record<OrderDatePreset, string> = {
     today: "today",
     yesterday: "yesterday",
@@ -335,13 +311,13 @@ export function filteredEmptyTitle(
         if (from && to) {
             words.push(
                 from === to
-                    ? `on ${dayWords(from)}`
-                    : `between ${dayWords(from)} and ${dayWords(to)}`,
+                    ? `on ${formatDay(from, { year: "never" })}`
+                    : `between ${formatDay(from, { year: "never" })} and ${formatDay(to, { year: "never" })}`,
             );
         } else if (from) {
-            words.push(`since ${dayWords(from)}`);
+            words.push(`since ${formatDay(from, { year: "never" })}`);
         } else if (to) {
-            words.push(`up to ${dayWords(to)}`);
+            words.push(`up to ${formatDay(to, { year: "never" })}`);
         }
     }
     return `No ${words.filter(Boolean).join(" ")}`;

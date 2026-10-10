@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 /**
  * What is waiting to go live, in words (#282).
  *
@@ -57,7 +58,7 @@ export function describePendingChanges(
 ): string | null {
     const parts: string[] = [];
     if (sections && sections > 0) {
-        parts.push(sections === 1 ? "1 section" : `${sections} sections`);
+        parts.push(count(sections, "section"));
     }
     for (const kind of site ?? []) {
         if (isKind(kind)) parts.push(LABELS[kind]);
@@ -92,7 +93,7 @@ export function shortPendingChanges(
 ): string | null {
     const parts: string[] = [];
     if (sections && sections > 0) {
-        parts.push(sections === 1 ? "1 block" : `${sections} blocks`);
+        parts.push(count(sections, "block"));
     }
     for (const kind of site ?? []) {
         if (isKind(kind)) parts.push(SHORT_LABELS[kind]);

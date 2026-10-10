@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
@@ -129,7 +130,7 @@ export function NotificationsInbox({
             {unread > 0 ? (
                 <div className="flex items-center justify-between gap-3">
                     <p className="text-[12.5px] text-muted-foreground">
-                        {unread === 1 ? "1 unread" : `${unread} unread`}
+                        {count(unread, "unread", "unread")}
                     </p>
                     <Button
                         variant="outline"

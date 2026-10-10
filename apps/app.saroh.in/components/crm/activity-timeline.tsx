@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -7,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -72,7 +72,7 @@ function CompleteTaskButton({
             showError(res.error);
             return;
         }
-        showSuccess("Task completed");
+        showSuccess("Task completed.");
         router.refresh();
     }
 
@@ -151,23 +151,26 @@ export function ActivityTimeline({
                             {isTask && entry.dueAt && (
                                 <p className="text-xs text-muted-foreground">
                                     Due{" "}
-                                    {new Date(entry.dueAt).toLocaleString(
-                                        DISPLAY_LOCALE,
-                                    )}
+                                    <ViewerDate
+                                        iso={entry.dueAt}
+                                        variant="datetime"
+                                    />
                                     {done && entry.completedAt && (
                                         <>
                                             {" · completed "}
-                                            {new Date(
-                                                entry.completedAt,
-                                            ).toLocaleString(DISPLAY_LOCALE)}
+                                            <ViewerDate
+                                                iso={entry.completedAt}
+                                                variant="datetime"
+                                            />
                                         </>
                                     )}
                                 </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                {new Date(entry.createdAt).toLocaleString(
-                                    DISPLAY_LOCALE,
-                                )}
+                                <ViewerDate
+                                    iso={entry.createdAt}
+                                    variant="datetime"
+                                />
                             </p>
                         </div>
                         {isTask && !done && canWrite && (

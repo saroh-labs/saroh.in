@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import {
     dismissToasts,
     showError,
@@ -65,14 +66,12 @@ export function useKitchen({
     order,
     first,
     currency,
-    format,
     refundTo,
     setPanel,
 }: {
     order: OrderRead;
     first: string;
     currency: string;
-    format: (n: number) => string;
     refundTo: string;
     setPanel: (p: Panel) => void;
 }) {
@@ -227,9 +226,10 @@ export function useKitchen({
                             refresh();
                             return;
                         }
-                        const sent =
-                            formatMoney(res.data.amountCents, currency) ??
-                            format(choice.amount);
+                        const sent = formatMoney(
+                            res.data.amountCents,
+                            currency,
+                        );
                         if (res.data.beingConfirmed) {
                             showInfo(
                                 `${refundTo} hasn't confirmed the ${sent} refund yet.`,
@@ -247,7 +247,7 @@ export function useKitchen({
                                 ? "A credit note is made against its invoice."
                                 : null,
                             back > 0
-                                ? `${back} go${back === 1 ? "es" : ""} back in stock when ${refundTo} confirms it.`
+                                ? `${back} ${plural(back, "goes", "go")} back in stock when ${refundTo} confirms it.`
                                 : null,
                         ].filter((n): n is string => n !== null);
                         showSuccess(
@@ -343,8 +343,7 @@ export function useKitchen({
             }
             setPanel(null);
             const d = res.data;
-            const money = (c: number) =>
-                formatMoney(Math.abs(c), currency) ?? "";
+            const money = (c: number) => formatMoney(Math.abs(c), currency);
             // What is still owed, and what goes back (online, or from the
             // till for what was paid by hand). An API before the audit of
             // 6 Oct 2026 sends only `settleCents`.
@@ -362,7 +361,7 @@ export function useKitchen({
                     );
                 } else {
                     showSuccess(
-                        `Saved. ${money(due)} more is due.`,
+                        `Order saved. ${money(due)} more is due.`,
                         d.online === false ? record : undefined,
                     );
                 }
@@ -373,18 +372,18 @@ export function useKitchen({
                 );
             } else if (fromTill > 0 && online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
                 );
             } else if (fromTill > 0) {
                 showSuccess(
-                    `Saved. Give ${money(fromTill)} back from the till.`,
+                    `Order saved. Give ${money(fromTill)} back from the till.`,
                 );
             } else if (online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}.`,
                 );
             } else {
-                showSuccess("Saved.");
+                showSuccess("Order saved.");
             }
             refresh();
         });
@@ -412,7 +411,7 @@ export function useKitchen({
                       ? "by UPI"
                       : "by card";
             showSuccess(
-                `${formatMoney(res.data.amountCents, currency) ?? ""} recorded, paid ${how}.`,
+                `${formatMoney(res.data.amountCents, currency)} recorded, paid ${how}.`,
                 "Nothing more is due on the order.",
             );
             refresh();

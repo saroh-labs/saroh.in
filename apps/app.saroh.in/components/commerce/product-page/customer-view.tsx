@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import type { ProductPageData, StockWord } from "@saroh/site-blocks";
 import { ProductPage, SiteThemeScope } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
@@ -41,7 +42,7 @@ export function CustomerView({
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
-    const money = (a: string) => formatMoneyMajor(a, product.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, product.currency);
     const edit = (s: EditorSection) => productEditHref(storeId, product.id, s);
     const data = toShopData(overview, counts);
     const live = product.status === "PUBLISHED";
@@ -336,11 +337,7 @@ export function toShopData(
             reply: r.reply,
             // A day is a day wherever it is read; pinned so the server and
             // the browser render the same text.
-            dateLabel: new Date(r.createdAt).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                timeZone: "UTC",
-            }),
+            dateLabel: formatDate(r.createdAt, "UTC"),
         })),
     };
 }

@@ -179,7 +179,7 @@ export async function dismissLateRuleNotice(
         `/storefronts/${encodeURIComponent(storeId)}/late-rule-notice/dismiss`,
         "POST",
         {},
-        "Could not put that notice away.",
+        "Couldn't put that notice away.",
     );
 }
 
@@ -406,7 +406,7 @@ export async function updateStorefront(
         `/storefronts/${encodeURIComponent(storeId)}`,
         "PATCH",
         input,
-        "Could not save that.",
+        "Couldn't save that.",
     );
 }
 
@@ -415,6 +415,6 @@ export async function closeStorefront(
 ): Promise<CrmResult<object>> {
     return destroy(
         `/storefronts/${encodeURIComponent(storeId)}`,
-        "Could not close that location.",
+        "Couldn't close that location.",
     );
 }

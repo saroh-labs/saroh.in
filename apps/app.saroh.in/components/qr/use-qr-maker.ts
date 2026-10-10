@@ -299,7 +299,7 @@ export function useQrMaker(input: UseQrMakerInput) {
             const code = await persist();
             if (!code) return;
             showSuccess(
-                wasNew ? "Code made" : "Changes saved",
+                wasNew ? "Code made." : "Code saved.",
                 wasNew && code.link
                     ? linkWords(code.link)
                     : "The printed code keeps working.",

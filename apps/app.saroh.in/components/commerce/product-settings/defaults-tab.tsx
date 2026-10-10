@@ -1,5 +1,6 @@
 "use client";
 
+import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -87,7 +88,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             const n = res.data.updatedCount;
             showUndo(
                 n
-                    ? `Defaults saved, and ${n} ${n === 1 ? "product" : "products"} updated.`
+                    ? `Defaults saved, and ${count(n, "product")} updated.`
                     : "Defaults saved. Existing products keep their values.",
                 () =>
                     start(async () => {
@@ -168,8 +169,8 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 </span>
                                 <span className="flex-[1_1_200px] text-[12px] text-muted-foreground">
                                     {isAll
-                                        ? `Used by every category that leaves a field empty · ${n} ${n === 1 ? "product" : "products"}`
-                                        : `${n} ${n === 1 ? "product" : "products"} · ${
+                                        ? `Used by every category that leaves a field empty · ${count(n, "product")}`
+                                        : `${count(n, "product")} · ${
                                               own
                                                   ? `${own} of 3 fields set here, the rest from All products`
                                                   : "everything from All products"
@@ -316,7 +317,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             )}
                         >
                             {problem ||
-                                `New products start with this. ${changed.length} ${changed.length === 1 ? "value" : "values"} changed.`}
+                                `New products start with this. ${count(changed.length, "value")} changed.`}
                         </span>
                         <Button
                             variant="outline"
@@ -359,8 +360,8 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 )}
                             />
                             Also update the {hit.count} saved{" "}
-                            {hit.count === 1 ? "product" : "products"} still
-                            using an old value
+                            {plural(hit.count, "product")} still using an old
+                            value
                             {hit.where ? ` (${hit.where})` : ""}. Products with
                             their own value are left alone.
                         </button>
