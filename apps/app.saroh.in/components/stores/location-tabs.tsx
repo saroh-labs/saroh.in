@@ -11,8 +11,8 @@ export const LOCATION_PANEL_ID = "location-panel";
 export const locationTabId = (tab: LocationTab) => `location-tab-${tab}`;
 
 /**
- * A location's tabs (The place · Payments · Delivery · Customers · Pause or
- * close), drawn as Settings › Business draws its own: one line however
+ * A location's tabs (The place · Payments · Delivery · Customers · People ·
+ * Pause or close), drawn as Settings › Business draws its own: one line however
  * narrow, scrolling sideways on a phone with the fade on the side with more
  * and the open tab kept in view (UX-079), arrow keys, Home and End moving
  * between them. Pause or close is last, set apart by a rule.

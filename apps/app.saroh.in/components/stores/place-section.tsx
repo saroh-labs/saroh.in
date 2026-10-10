@@ -9,10 +9,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import {
-    storefrontDetailsHref,
-    storefrontPeopleHref,
-} from "@/lib/stores/links";
+import { Absent, Row, Section as Rows } from "@/components/sites/settings-rows";
+import { storefrontDetailsHref } from "@/lib/stores/links";
+import type { LocationDetails } from "@/lib/stores/location-details";
+import { detailsEmpty, detailsSummary } from "@/lib/stores/location-details";
 import {
     ADDRESS_FIELD_ID,
     KIND_FIELD_ID,
@@ -37,8 +37,9 @@ export const KIND_ANSWER: Record<StorefrontKind, string> = {
 
 /**
  * The place: its name, whether customers come here, and only for a place
- * they visit, its address and opening hours. Its description, logo and the
- * people who work here are a page each, linked from here (#376).
+ * they visit, its address and opening hours. Last, its description and
+ * logo as one read-first row (what is saved, and Edit to their own page),
+ * as Delivery draws its ways. The people who work here are the People tab.
  */
 export function PlaceSection({
     store,
@@ -46,7 +47,11 @@ export function PlaceSection({
     pending,
     save,
     setStore,
-}: SectionProps) {
+    details,
+}: SectionProps & {
+    /** Left out when they couldn't be read: then there is no row. */
+    details?: LocationDetails;
+}) {
     const [name, setName] = useState(store.name);
     const trimmed = name.trim();
     const dirty = trimmed !== store.name;
@@ -212,20 +217,32 @@ export function PlaceSection({
                 </>
             ) : null}
 
-            {/* What used to be the location's own Settings and Members
-                tabs, now a page each (#376). */}
-            <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                    <Link href={storefrontDetailsHref(store.id)}>
-                        Description and logo
-                    </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                    <Link href={storefrontPeopleHref(store.id)}>
-                        People who work here
-                    </Link>
-                </Button>
-            </div>
+            {details ? (
+                <Rows>
+                    <Row
+                        id="location-details"
+                        label="Description and logo"
+                        action={
+                            <Button asChild size="sm" variant="outline">
+                                <Link
+                                    href={storefrontDetailsHref(store.id)}
+                                    aria-label="Edit description and logo"
+                                >
+                                    Edit
+                                </Link>
+                            </Button>
+                        }
+                    >
+                        <span data-testid="location-details-summary">
+                            {detailsEmpty(details) ? (
+                                <Absent>{detailsSummary(details)}</Absent>
+                            ) : (
+                                detailsSummary(details)
+                            )}
+                        </span>
+                    </Row>
+                </Rows>
+            ) : null}
         </Section>
     );
 }

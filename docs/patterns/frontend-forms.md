@@ -112,6 +112,8 @@ typed form into the API's values and back.
   all.
 - `packages/site-blocks` enquiry and booking forms run on merchant sites and
   manage their own state; the package does not depend on `@saroh/ui`.
-- Nine `app.saroh.in` components with a `<form>` still hold fields in `useState`
-  — inline managers such as `categories-manager`, `members-manager` and
-  `pages-panel`. Migrate one when you are already changing it.
+- Eight `app.saroh.in` components with a `<form>` still hold fields in `useState`
+  — inline managers such as `categories-manager` and `pages-panel`. Migrate
+  one when you are already changing it (`members-manager` went when a
+  location's people became a tab: its invite is `invite-person-sheet.tsx`,
+  on the stack above).

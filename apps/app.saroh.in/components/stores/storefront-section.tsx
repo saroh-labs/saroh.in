@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 
 /**
  * One tab's part of a location's page (The place, Payments, Delivery,
- * Customers, Pause or close), and the note under a control. No card and no
+ * Customers, People, Pause or close), and the note under a control. No card and no
  * visible title: the tab strip names it and frames it, so the panel is the
  * controls alone, 20px apart, with an sr-only heading for the outline.
  * Shared by `storefronts-screen.tsx` and the sections split out of it.

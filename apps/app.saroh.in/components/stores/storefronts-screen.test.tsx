@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SiteSelling } from "@/lib/sites/sells-from";
+import type { LocationPeople } from "@/lib/stores/people";
 import type {
     StorefrontSettings,
     StorefrontSummary,
@@ -23,6 +24,12 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: vi.fn(),
 }));
+vi.mock("@/lib/members/actions", () => ({
+    inviteMember: vi.fn(),
+    removeMember: vi.fn(),
+    revokeInvitation: vi.fn(),
+    updateMemberRole: vi.fn(),
+}));
 
 beforeEach(() => {
     address.section = null;
@@ -32,7 +39,7 @@ beforeEach(() => {
  * Sell › Location (DEC-069, L9; the 9 Oct audit, tabs from the owner): the
  * page is titled with the location's name, says what it still needs above
  * its tabs, and splits its parts by job into tabs: The place, Payments,
- * Delivery, Customers, Pause or close, the open one in `?section=`.
+ * Delivery, Customers, People, Pause or close, the open one in `?section=`.
  * Identifiers stay storefront; the words don't. Made-up names only.
  */
 
@@ -159,6 +166,7 @@ describe("StorefrontsScreen as a location's own page", () => {
                 "Payments",
                 "Delivery",
                 "Customers",
+                "People",
                 "Pause or close",
             ],
             open: "The place",
@@ -195,6 +203,7 @@ describe("StorefrontsScreen as a location's own page", () => {
             "payments",
             "delivery",
             "customers",
+            "people",
             "pause-or-close",
         ]) {
             const html = screen({}, section);
@@ -293,11 +302,36 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(html).toMatch(/aria-label="Breadcrumb"[^]*Locations/);
     });
 
-    it("links to Description and logo and People who work here (L14)", () => {
-        const t = text(screen());
-        expect(t).toContain("Description and logo");
-        expect(t).toContain("People who work here");
+    it("The place says what is saved of the description and logo, with Edit to their page", () => {
+        const html = screen({
+            details: { description: "Sourdough since 2019", logo: null },
+        });
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Description and logo Description added, no logo yet Edit",
+        );
+        expect(html).toContain('href="/commerce/locations/st_hill/details"');
+        expect(html).toContain('aria-label="Edit description and logo"');
         expect(t).not.toContain("Web address");
+        expect(
+            text(panel(screen({ details: { description: null, logo: null } }))),
+        ).toContain("No description or logo yet");
+    });
+
+    it("leaves the row out when they couldn't be read, rather than say none", () => {
+        const t = text(panel(screen()));
+        expect(t).not.toContain("Description and logo");
+        expect(t).not.toContain("No description");
+    });
+
+    it("has no loose buttons under The place: people are a tab (10 Oct)", () => {
+        const html = screen({
+            details: { description: null, logo: null },
+        });
+        expect(text(html)).not.toContain("People who work here");
+        expect(html).not.toContain("/people");
+        // One link to the details page: the row's Edit.
+        expect(html.match(/\/details"/g)).toHaveLength(1);
     });
 
     it("no location yet: says so, and offers Add a location", () => {
@@ -313,6 +347,66 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(text(html)).toContain("This location could not be loaded");
         expect(text(html)).toContain("Try again");
         expect(html).not.toContain('role="tablist"');
+    });
+});
+
+describe("the People tab", () => {
+    const people: LocationPeople = {
+        members: [
+            {
+                userId: "u_owner",
+                name: "Asha Rao",
+                email: "asha.rao@example.com",
+                role: "OWNER",
+                kind: "owner",
+            },
+            {
+                userId: "u_dev",
+                name: "Dev Shah",
+                email: "dev.shah@example.com",
+                role: "EDITOR",
+                kind: "member",
+            },
+        ],
+        invitations: [
+            {
+                id: "inv_1",
+                email: "mira.sen@example.com",
+                role: "VIEWER",
+                status: "PENDING",
+                expiresAt: "2026-10-20T00:00:00.000Z",
+                createdAt: "2026-10-10T00:00:00.000Z",
+            },
+        ],
+        canManage: true,
+        canInvite: true,
+    };
+
+    it("shows the roster on the location's own page, with the one line about Team", () => {
+        const html = screen({ people }, "people");
+        expect(tabsOf(html).open).toBe("People");
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Who can work on Hill Road's catalogue, orders and customers. Everyone here is also on your team, under Team.",
+        );
+        expect(t).toContain("Asha Rao asha.rao@example.com Owner");
+        expect(t).toContain("Dev Shah dev.shah@example.com");
+        expect(t).toContain("Invited mira.sen@example.com Invited as viewer");
+        expect(t).toContain("Invite someone");
+        // Read first: no open invite form on the tab.
+        expect(panel(html)).not.toContain("<input");
+    });
+
+    it("a roster that couldn't be read fails on its own tab, not the page", () => {
+        const html = screen({ people: null }, "people");
+        expect(h1(html)).toBe("Hill Road");
+        expect(html).toContain('role="tablist"');
+        const t = text(panel(html));
+        expect(t).toContain("The people here could not be loaded");
+        expect(t).toContain("Try again");
+        expect(panel(html)).toContain('role="alert"');
+        // The other tabs are untouched by it.
+        expect(text(screen({ people: null }))).toContain("Location name");
     });
 });
 
