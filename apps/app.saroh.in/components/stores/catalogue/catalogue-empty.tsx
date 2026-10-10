@@ -1,35 +1,34 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Layers, Package, Plus, Search, Store } from "lucide-react";
+import { Layers, Package, Search, Store } from "lucide-react";
 import Link from "next/link";
 
 import { newProductHref } from "@/lib/products/links";
 import type { EmptyCopy, ListQuery } from "@/lib/products/list-query";
 import { newCollectionHref } from "@/lib/products/list-query";
 import { newStorefrontHref } from "@/lib/stores/links";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /** A business with no storefront: nothing to sell from yet. */
 export function NoStorefront({ canWrite }: { canWrite: boolean }) {
     return (
-        <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
-            <Store
-                aria-hidden
-                className="size-8 stroke-[1.7] text-muted-foreground"
-            />
-            <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                No location yet
-            </p>
-            <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                A product is sold somewhere. Make a location first, and the
-                catalogue starts here.
-            </p>
-            {canWrite ? (
-                <Button asChild className="mt-1">
-                    <Link href={newStorefrontHref}>Create a location</Link>
-                </Button>
-            ) : null}
-        </div>
+        <EmptyState
+            icon={<Store />}
+            title="No locations yet"
+            description={
+                canWrite
+                    ? "A product is sold somewhere, so make a location first."
+                    : "A product is sold somewhere, so a location comes first."
+            }
+            action={
+                canWrite ? (
+                    <Button asChild>
+                        <Link href={newStorefrontHref}>New location</Link>
+                    </Button>
+                ) : undefined
+            }
+        />
     );
 }
 
@@ -69,16 +68,15 @@ export function emptyState(
             </Button>
         ) : empty.action === "show-all" ? (
             <Button variant="outline" onClick={() => go({ view: "all" })}>
-                Show all
+                Show all products
             </Button>
         ) : empty.action === "add-product" && canWrite ? (
             <Button asChild>
-                <Link href={newProductHref(storeId)}>Add product</Link>
+                <Link href={newProductHref(storeId)}>New product</Link>
             </Button>
         ) : empty.action === "new-collection" && canWrite ? (
             <Button asChild>
                 <Link href={newCollectionHref(query)} scroll={false}>
-                    <Plus aria-hidden />
                     New collection
                 </Link>
             </Button>

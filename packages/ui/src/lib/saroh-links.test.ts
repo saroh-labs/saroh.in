@@ -55,12 +55,12 @@ describe("sarohFooterLinks", () => {
     });
 
     it("leaves out a page that is not published yet", () => {
-        // Terms from 8 Oct, Privacy from 10 Oct: on the 9th, no Privacy.
+        // Terms and Privacy both from 10 Oct: on the 9th, neither.
         expect(
             sarohFooterLinks(new Date("2026-10-09T12:00:00+05:30")).map(
                 (l) => l.label,
             ),
-        ).toEqual(["Terms", "Help"]);
+        ).toEqual(["Help"]);
         expect(
             sarohFooterLinks(new Date("2026-10-07T12:00:00+05:30")).map(
                 (l) => l.label,

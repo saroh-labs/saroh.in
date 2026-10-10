@@ -9,6 +9,7 @@ import { useBusinessZone } from "@/components/shared/business-zone";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /** A character that is a letter: letters change case, digits and punctuation do not. */
 const isLetter = (ch: string) => ch.toUpperCase() !== ch.toLowerCase();
@@ -118,9 +119,10 @@ export function BlockFeedback({
             </p>
 
             {open.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-4 text-center text-[0.8125rem] text-muted-foreground">
-                    Nothing said about this {label.toLowerCase()} yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title={`Nothing said about this ${label.toLowerCase()} yet.`}
+                />
             ) : (
                 <ul className="space-y-3">
                     {open.map((c) => (

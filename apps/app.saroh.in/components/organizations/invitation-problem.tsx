@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import { accountsLoginUrl } from "@/lib/accounts";
@@ -12,6 +12,7 @@ import {
     switchAccountLabel,
     wrongPersonDescription,
 } from "@/lib/invitations/outcome";
+import { MailX } from "lucide-react";
 
 import { SwitchAccountButton } from "./switch-account-button";
 
@@ -40,7 +41,7 @@ export function InvitationProblemView({
     signInAs?: string;
 }) {
     const home = (
-        <Button asChild variant={problem === "gone" ? "brand" : "outline"}>
+        <Button asChild variant="outline" className="wk-press">
             <Link href="/">Go to Home</Link>
         </Button>
     );
@@ -52,16 +53,11 @@ export function InvitationProblemView({
                     className="w-full"
                     title={INVITATION_UNREACHABLE.title}
                     description={INVITATION_UNREACHABLE.description}
-                    action={
-                        <Button asChild variant="brand">
-                            {/* A plain link on purpose: a full load of this
-                                page is what asks the API again. */}
-                            <a href={retryHref}>Try again</a>
-                        </Button>
-                    }
+                    // A full load of this page is what asks the API again.
+                    retryHref={retryHref}
                 />
             ) : problem === "wrong-person" ? (
-                <EmptyState
+                <PermissionDeniedState
                     className="w-full"
                     title={INVITATION_WRONG_PERSON_TITLE}
                     description={wrongPersonDescription(
@@ -80,17 +76,18 @@ export function InvitationProblemView({
                     }
                 />
             ) : problem === "gone" ? (
-                <EmptyState
+                <FailedState
                     className="w-full"
+                    icon={<MailX />}
                     title={INVITATION_GONE.title}
                     description={INVITATION_GONE.description}
                     action={home}
                 />
             ) : (
-                <EmptyState
+                <FailedState
                     className="w-full"
                     title={INVITATION_REFUSED_TITLE}
-                    description={refusal}
+                    description={refusal ?? null}
                     action={home}
                 />
             )}

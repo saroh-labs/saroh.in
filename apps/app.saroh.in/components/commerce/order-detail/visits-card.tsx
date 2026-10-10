@@ -18,6 +18,7 @@ import {
     visitWhen,
 } from "@/lib/orders/visits";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import type { PillTone } from "./parts";
 import { FOCUS, Panel, PanelTitle } from "./parts";
 
@@ -155,13 +156,10 @@ export function VisitsCard({
                     ))}
                 </ol>
             ) : (
-                <p
-                    role="status"
-                    className="border-t border-foreground/10 pt-2.5 text-[12.5px] text-muted-foreground"
-                >
-                    The visits couldn&apos;t be read just now. Reload the page
-                    to try again; nothing has changed.
-                </p>
+                <FailedRead
+                    things="the visits"
+                    className="border-t border-foreground/10 pt-2.5"
+                />
             )}
         </Panel>
     );

@@ -2,6 +2,7 @@ import { PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
 import { providerName } from "@/lib/payments/providers";
 import type { SiteSelling } from "@/lib/sites/sells-from";
 import { SELLS_FROM_ANCHOR } from "@/lib/sites/sells-from";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { StorefrontFulfilmentType } from "./fulfilment-types";
 import { STOREFRONT_FULFILMENT_TYPES } from "./fulfilment-types";
@@ -214,7 +215,7 @@ export function locationReadiness(
             key: "plan",
             done: false,
             label: "Not taking orders on your plan",
-            action: away("See Plan and billing", PLAN_AND_BILLING_HREF),
+            action: away(planLabel(), PLAN_AND_BILLING_HREF),
         });
     }
     if (store.pausedAt) {

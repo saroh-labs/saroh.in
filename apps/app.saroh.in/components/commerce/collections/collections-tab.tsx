@@ -16,6 +16,7 @@ import { collectionNote, whyIn } from "@/lib/collections/rules";
 import type { CollectionSummary } from "@/lib/collections/service";
 import type { ProductOverview } from "@/lib/products/overview";
 import { websiteSummary } from "@/lib/products/overview-words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { CollectionSheet } from "./collection-sheet";
 import { ProductCollectionsSheet } from "./product-collections-sheet";
@@ -155,9 +156,10 @@ export function ProductCollectionsTab({
                 </div>
                 <div className="flex flex-col gap-2.5">
                     {inIt.length === 0 ? (
-                        <p className="rounded-[12px] border border-dashed border-border-strong px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                            Not in any collection.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            title="Not in any collection."
+                        />
                     ) : (
                         inIt.map((c) => {
                             const full = byId.get(c.id);
@@ -239,9 +241,7 @@ export function ProductCollectionsTab({
                             </Card>
                         ))
                     ) : (
-                        <p className="rounded-[12px] border border-dashed border-border-strong px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                            {web.lines[0]}
-                        </p>
+                        <EmptyState size="inline" title={web.lines[0]} />
                     )}
                 </div>
                 {placement.data.website.pages.length > 0 ? (

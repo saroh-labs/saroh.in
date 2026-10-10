@@ -9,19 +9,19 @@ import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load this plan"
-            description="The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
+            retry={retry}
+            heading="Edit plan"
+            things="this plan"
             backHref={PLANS_HREF}
-            backLabel="Back to plans"
+            place="Plans"
         />
     );
 }

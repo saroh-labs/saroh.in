@@ -352,7 +352,7 @@ describe("the tab's other states", () => {
     it("a roster that couldn't be read is a failed state with Try again, never an empty one", async () => {
         draw(null);
         expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-            "The people here could not be loaded",
+            "Couldn't load the people here",
         );
         expect(host.textContent).not.toContain("No one else works here yet");
         await press(button("Try again"));

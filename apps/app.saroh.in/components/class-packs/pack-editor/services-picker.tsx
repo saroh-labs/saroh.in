@@ -15,6 +15,7 @@ import {
 } from "@/lib/class-packs/pack-editor";
 import { formatMoney } from "@/lib/format/money";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { FieldError, HELP, PackChip, PackSection } from "./parts";
 
 /**
@@ -46,10 +47,11 @@ export function ServicesPicker({
     return (
         <PackSection title="Good for" sub="What a credit can be used on.">
             {services === null ? (
-                <p role="alert" className={cn(HELP, "mt-2")}>
-                    Your services couldn&apos;t be loaded, so what this pack is
-                    good for stays as it is. Reload to change it.
-                </p>
+                <FailedRead
+                    things="your services"
+                    reassurance="What this pack is good for stays as it is."
+                    className="mt-2"
+                />
             ) : options.length ? (
                 <div
                     role="group"

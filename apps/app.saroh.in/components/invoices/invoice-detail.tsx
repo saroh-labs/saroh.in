@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
 import Link from "next/link";
@@ -17,7 +18,7 @@ import {
     IssueDialog,
     RecordPaymentDialog,
 } from "@/components/invoices/invoice-actions";
-import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
+
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { useInvoiceSend } from "@/components/invoices/send-dialog";
@@ -348,57 +349,62 @@ export function InvoiceDetail({
     return (
         <div>
             {details.step}
-            <InvoiceCrumbs current={invoice.number ?? "Draft"} />
-            <div className="mb-4 flex flex-wrap items-start gap-3.5 print:hidden">
-                <div className="min-w-0 flex-[1_1_300px]">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <h1 className="font-mono text-[26px] font-medium leading-[1.2] tracking-[-0.02em]">
-                            {invoice.number ?? "Draft"}
-                        </h1>
-                        <InvoicePill
-                            label={pill.label}
-                            variant={pill.variant}
-                        />
-                    </div>
-                    <p className="mt-1 text-[12.5px] text-muted-foreground">
-                        {subline}
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {actions.map((a) => {
-                        const cls = cn(
-                            "h-[38px] cursor-pointer rounded-[9px] px-4 text-[14px]",
-                            a.danger &&
-                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                        );
-                        const variant = a.primary ? "default" : "outline";
-                        return a.href ? (
-                            <Button
-                                key={a.id}
-                                asChild
-                                variant={variant}
-                                className={cls}
-                            >
-                                <Link href={a.href}>{a.label}</Link>
-                            </Button>
-                        ) : (
-                            <Button
-                                key={a.id}
-                                type="button"
-                                variant={variant}
-                                className={cls}
-                                disabled={a.disabled}
-                                aria-describedby={
-                                    a.reason ? readOnlyId : undefined
-                                }
-                                onClick={a.onClick}
-                            >
-                                {a.label}
-                            </Button>
-                        );
-                    })}
-                </div>
-            </div>
+            <PageHeader
+                className="mb-4 print:hidden"
+                breadcrumb={[
+                    "Payments",
+                    <Link key="list" href="/billing/invoices">
+                        Invoices
+                    </Link>,
+                    invoice.number ?? "Draft",
+                ]}
+                // A number is a measured value: the mono face, at the
+                // title's size.
+                title={
+                    <span className="font-mono font-medium">
+                        {invoice.number ?? "Draft"}
+                    </span>
+                }
+                badge={
+                    <InvoicePill label={pill.label} variant={pill.variant} />
+                }
+                description={subline}
+                actions={
+                    <>
+                        {actions.map((a) => {
+                            const cls = cn(
+                                a.danger &&
+                                    "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                            );
+                            const variant = a.primary ? "default" : "outline";
+                            return a.href ? (
+                                <Button
+                                    key={a.id}
+                                    asChild
+                                    variant={variant}
+                                    className={cls}
+                                >
+                                    <Link href={a.href}>{a.label}</Link>
+                                </Button>
+                            ) : (
+                                <Button
+                                    key={a.id}
+                                    type="button"
+                                    variant={variant}
+                                    className={cls}
+                                    disabled={a.disabled}
+                                    aria-describedby={
+                                        a.reason ? readOnlyId : undefined
+                                    }
+                                    onClick={a.onClick}
+                                >
+                                    {a.label}
+                                </Button>
+                            );
+                        })}
+                    </>
+                }
+            />
 
             {!canWrite ? (
                 <ReadOnlyNote id={readOnlyId} className="print:hidden">

@@ -138,13 +138,7 @@ export function ProductStockTab({
     }
 
     if (!stock) {
-        return (
-            <PanelFailed
-                what="stock"
-                retryHref={retryHref}
-                note="The rest of the product loaded; only its stock by location did not. Nothing about the stock has changed."
-            />
-        );
+        return <PanelFailed what="stock" retryHref={retryHref} />;
     }
 
     if (!counted) {

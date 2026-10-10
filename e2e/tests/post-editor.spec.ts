@@ -52,8 +52,8 @@ test("a new post keeps its editor through the first save", async ({
         postId = new URL(page.url()).pathname.split("/").pop();
 
         await expect(
-            // The Website boundary's title since #908.
-            page.getByRole("heading", { name: "Website could not be loaded" }),
+            // The Website boundary's title.
+            page.getByRole("heading", { name: "Couldn't load your website" }),
         ).toHaveCount(0);
         await expect(titleBox).toHaveValue(title);
         await expect(body).toContainText("The first words.");

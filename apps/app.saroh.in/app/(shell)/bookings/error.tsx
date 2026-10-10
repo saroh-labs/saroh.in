@@ -8,19 +8,18 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load bookings"
-            description="Your bookings are safe — this is a display problem, not a data one."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Bookings"
+            things="bookings"
+            reassurance="Your bookings are safe."
         />
     );
 }

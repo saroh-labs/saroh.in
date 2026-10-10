@@ -8,6 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { Globe, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -16,9 +17,6 @@ import { Pill } from "@/components/subscriptions/pill";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import { scrollToShow } from "@/lib/customer-workspace/tab-scroll";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
-
-const HEAD_BTN =
-    "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
 
 /** The ⋯ button: the design's 34px square beside Edit details. */
 const MORE_BTN =
@@ -33,48 +31,16 @@ export const EDIT_OFF =
     "Your role can't edit customers. An owner can give you access in Team.";
 export const MORE_OFF = "Merging and removing need permission from an owner.";
 
-/** "Sell › Customers › Priya Raman", or "Contacts › …" where nothing is sold. */
-export function Crumbs({ here, sells }: { here: string; sells: boolean }) {
-    return (
-        <nav
-            aria-label="Breadcrumb"
-            className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground"
-        >
-            {sells ? (
-                <>
-                    <span>Sell</span>
-                    <span aria-hidden>›</span>
-                    <Link
-                        href="/commerce/customers"
-                        className="text-muted-foreground hover:text-foreground"
-                    >
-                        Customers
-                    </Link>
-                </>
-            ) : (
-                <Link
-                    href="/contacts"
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    Contacts
-                </Link>
-            )}
-            <span aria-hidden>›</span>
-            <span aria-current="page" className="text-foreground">
-                {here}
-            </span>
-        </nav>
-    );
-}
-
 /**
- * Who they are: initials, name and its word (Returning, Member), what the
+ * The person's page header. Where they sit ("Sell › Customers › Priya
+ * Raman", or "Contacts › …" where nothing is sold), then who they are: initials, name and its word (Returning, Member), what the
  * team must know (Needs attention's tags), since when, and how to reach
  * them — then New order and New booking for them (#247), Edit details (`contact:write`) and ⋯ More actions (edit,
  * merge or remove, each on its own permission). A role that only reads is
  * told so.
  */
 export function Header({
+    sells,
     name,
     initials,
     tag,
@@ -89,6 +55,8 @@ export function Header({
     menu,
     starts = [],
 }: {
+    /** The crumbs say Sell › Customers; otherwise Contacts. */
+    sells: boolean;
     name: string;
     initials: string;
     tag: Tag | null;
@@ -114,113 +82,145 @@ export function Header({
 }) {
     return (
         <>
-            <div className="mb-3.5 flex flex-wrap items-center gap-3.5">
-                <div
-                    aria-hidden
-                    className="flex size-[52px] shrink-0 items-center justify-center rounded-full bg-brand-subtle font-display text-[18px] font-semibold text-brand-subtle-foreground"
-                >
-                    {initials}
-                </div>
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="flex flex-wrap items-center gap-[9px]">
-                        {/* A long name wraps, however unbroken, and the
-                            tags beside it wrap under it — never off-screen. */}
-                        <h1 className="m-0 min-w-0 max-w-full font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.03em] [overflow-wrap:anywhere]">
-                            {name}
-                        </h1>
-                        {tag ? (
-                            <span title={tag.title} className="inline-flex">
-                                <Pill tone={tag.tone}>{tag.label}</Pill>
-                            </span>
-                        ) : null}
-                        {attention}
-                    </div>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                        {since}
-                    </p>
-                    {/* Phone and email are part of the person: whoever
-                        reads the customer (`contact:read`) sees them
-                        (matrix §3). */}
-                    <div className="mt-[5px] flex min-w-0 flex-wrap gap-3.5 text-[13px]">
-                        {email ? (
-                            // A long address wraps on a phone, whole, rather
-                            // than pushing the page sideways.
-                            <a
-                                href={`mailto:${email}`}
-                                className="min-w-0 max-w-full text-brand transition-colors [overflow-wrap:anywhere] hover:text-foreground active:text-muted-foreground"
-                            >
-                                {email}
-                            </a>
-                        ) : (
-                            <span className="text-foreground/75">No email</span>
-                        )}
-                        <span className="text-foreground/75">
-                            {phone?.trim() ? phone : "No phone"}
-                        </span>
-                    </div>
-                    {signsIn ? (
-                        <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                            <Globe
-                                aria-hidden
-                                className="size-[13px] shrink-0"
-                            />
-                            {signsIn}
-                        </div>
-                    ) : null}
-                </div>
-                {/* On a phone the group drops under the name and wraps a
-                    button to its own line, full size, rather than shrink. */}
-                <div className="flex min-w-0 flex-wrap gap-2">
-                    {starts.map((s) => (
-                        <Button
-                            key={s.href}
-                            variant="outline"
-                            className={HEAD_BTN}
-                            asChild
-                        >
-                            <Link href={s.href}>
-                                <Plus aria-hidden className="mr-1 size-3.5" />
-                                {s.label}
-                            </Link>
-                        </Button>
-                    ))}
-                    <Button
-                        variant="outline"
-                        className={HEAD_BTN}
-                        disabled={!canEdit}
-                        title={canEdit ? undefined : EDIT_OFF}
-                        onClick={onEdit}
+            <PageHeader
+                className="mb-3.5"
+                breadcrumb={
+                    sells
+                        ? [
+                              "Sell",
+                              <Link key="list" href="/commerce/customers">
+                                  Customers
+                              </Link>,
+                              name,
+                          ]
+                        : [
+                              <Link key="list" href="/contacts">
+                                  Contacts
+                              </Link>,
+                              name,
+                          ]
+                }
+                lead={
+                    <div
+                        aria-hidden
+                        className="flex size-[52px] items-center justify-center rounded-full bg-brand-subtle font-display text-[18px] font-semibold text-brand-subtle-foreground"
                     >
-                        Edit details
-                    </Button>
-                    {menu.length ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className={MORE_BTN}
-                                    disabled={!canMore}
-                                    aria-label="More actions"
-                                    title={canMore ? "More actions" : MORE_OFF}
+                        {initials}
+                    </div>
+                }
+                // A long name wraps, however unbroken, and the tags beside
+                // it wrap under it — never off-screen.
+                title={name}
+                badge={
+                    tag || attention ? (
+                        <>
+                            {tag ? (
+                                <span title={tag.title} className="inline-flex">
+                                    <Pill tone={tag.tone}>{tag.label}</Pill>
+                                </span>
+                            ) : null}
+                            {attention}
+                        </>
+                    ) : undefined
+                }
+                description={
+                    <>
+                        <p className="text-[13px] text-muted-foreground">
+                            {since}
+                        </p>
+                        {/* Phone and email are part of the person: whoever
+                            reads the customer (`contact:read`) sees them
+                            (matrix §3). */}
+                        <div className="mt-[5px] flex min-w-0 flex-wrap gap-3.5 text-[13px]">
+                            {email ? (
+                                // A long address wraps on a phone, whole,
+                                // rather than pushing the page sideways.
+                                <a
+                                    href={`mailto:${email}`}
+                                    className="min-w-0 max-w-full text-brand transition-colors [overflow-wrap:anywhere] hover:text-foreground active:text-muted-foreground"
                                 >
-                                    <MoreHorizontal
-                                        aria-hidden
-                                        className="size-4"
-                                    />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                align="end"
-                                className="w-[220px] p-[5px]"
+                                    {email}
+                                </a>
+                            ) : (
+                                <span className="text-foreground/75">
+                                    No email
+                                </span>
+                            )}
+                            <span className="text-foreground/75">
+                                {phone?.trim() ? phone : "No phone"}
+                            </span>
+                        </div>
+                        {signsIn ? (
+                            <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                                <Globe
+                                    aria-hidden
+                                    className="size-[13px] shrink-0"
+                                />
+                                {signsIn}
+                            </div>
+                        ) : null}
+                    </>
+                }
+                // On a phone the group drops under the name and wraps a
+                // button to its own line, full size, rather than shrink.
+                actions={
+                    <>
+                        {starts.map((s) => (
+                            <Button
+                                key={s.href}
+                                variant="outline"
+
+                                asChild
                             >
-                                {menu.map((m) => (
-                                    <MenuRow key={m.label} item={m} />
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : null}
-                </div>
-            </div>
+                                <Link href={s.href}>
+                                    <Plus
+                                        aria-hidden
+                                        className="mr-1 size-3.5"
+                                    />
+                                    {s.label}
+                                </Link>
+                            </Button>
+                        ))}
+                        <Button
+                            variant="outline"
+
+                            disabled={!canEdit}
+                            title={canEdit ? undefined : EDIT_OFF}
+                            onClick={onEdit}
+                        >
+                            Edit details
+                        </Button>
+                        {menu.length ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className={MORE_BTN}
+                                        disabled={!canMore}
+                                        aria-label="More actions"
+                                        title={
+                                            canMore ? "More actions" : MORE_OFF
+                                        }
+                                    >
+                                        <MoreHorizontal
+                                            aria-hidden
+                                            className="size-4"
+                                        />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-[220px] p-[5px]"
+                                >
+                                    {menu.map((m) => (
+                                        <MenuRow key={m.label} item={m} />
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : null}
+                    </>
+                }
+            />
             {!canEdit ? (
                 <p className="-mt-1.5 mb-3 text-[12px] text-muted-foreground">
                     Your role can see this customer but not edit them.

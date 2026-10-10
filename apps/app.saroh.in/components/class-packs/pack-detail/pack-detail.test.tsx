@@ -292,14 +292,14 @@ describe("Pack Detail's Who has it", () => {
 
     it("a pack nobody holds offers Sell this pack", () => {
         render({ state: "ok", data: [] });
-        expect(text()).toContain("Nobody has this pack yet");
+        expect(text()).toContain("No one has this pack yet");
         click(button("Sell this pack"));
         expect(text()).toContain("Sell Ten classes");
     });
 
     it("a failed holders read is named in this tab, and the page stays", () => {
         render({ state: "failed" });
-        expect(text()).toContain("Who has it could not be loaded");
+        expect(text()).toContain("Couldn't load who has this pack");
         expect(button("Try again")).toBeTruthy();
         // The header and the tabs are still there.
         expect(document.querySelector("h1")?.textContent).toBe("Ten classes");
@@ -307,7 +307,7 @@ describe("Pack Detail's Who has it", () => {
         expect(refresh).toHaveBeenCalled();
         click(button("Overview"));
         expect(text()).toContain("Linked to this pack");
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
     });
 
     it("a role that can't change packs sees Extend off, with why", () => {
@@ -452,12 +452,12 @@ describe("Pack Detail's Used this week (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "used", used: { state: "failed" } },
         );
-        expect(text()).toContain("Used this week could not be loaded");
+        expect(text()).toContain("Couldn't load what this pack paid for");
         expect(tabCount("used")).toBeNull();
         click(button("Try again"));
         expect(refresh).toHaveBeenCalled();
         click(button(/^Who has it/));
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
         expect(text()).toContain("6 of 10");
     });
 });
@@ -551,10 +551,10 @@ describe("Pack Detail's Sales (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "sales", sales: { state: "failed" } },
         );
-        expect(text()).toContain("Sales could not be loaded");
+        expect(text()).toContain("Couldn't load this pack's sales");
         click(button("Overview"));
         expect(text()).toContain("Linked to this pack");
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
     });
 
     it("puts the price history in Everything about it", () => {
@@ -668,7 +668,7 @@ describe("Pack Detail's Activity (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "activity", events: { state: "failed" } },
         );
-        expect(text()).toContain("Activity could not be loaded");
+        expect(text()).toContain("Couldn't load this pack's activity");
         expect(tabCount("activity")).toBeNull();
         // Everything about it leaves out a price history it couldn't read.
         click(button("Overview"));

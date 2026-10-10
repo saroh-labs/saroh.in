@@ -64,7 +64,7 @@ test.describe("workspace: what a lower plan paused", () => {
             `${read.products.count} product${read.products.count === 1 ? "" : "s"}`,
         );
         await expect(
-            banner.getByRole("link", { name: "See Plan and billing" }),
+            banner.getByRole("link", { name: "See plans" }),
         ).toHaveAttribute("href", "/settings/billing#change-plan");
     });
 

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { OptionSelect } from "@/components/shared/option-select";
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * Availability windows editor for a Service (S4-003). Each row is one recurring
@@ -126,9 +127,11 @@ export function AvailabilityRulesEditor({
     return (
         <div className="grid gap-3">
             {rows.length === 0 && (
-                <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                    No availability yet. Add a window so visitors can book.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No availability yet"
+                    description="Add a window so customers can book."
+                />
             )}
 
             {rows.map((row, index) => (

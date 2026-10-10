@@ -9,6 +9,7 @@ import { businessEditHref } from "@/lib/organizations/business-rows";
 import { businessTypeOf } from "@/lib/organizations/business-types";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { ReadyAside, ReadyChecklist, ReadyItem, ReadyStep } from "./ready";
 import {
@@ -208,7 +209,7 @@ export function emailAside(input: {
         label: "Email your customers",
         why: EMAIL_PROMPT_MISSED,
         comesWith: "Comes with a paid plan",
-        cta: "See plans",
+        cta: planLabel(),
         href: SEE_PLANS_HREF,
     };
 }

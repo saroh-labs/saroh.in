@@ -16,6 +16,8 @@ import {
     rowTags,
     spentText,
 } from "@/lib/customers/list";
+import { EmptyState } from "@saroh/ui/data-state";
+import { clearLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * The design's columns: Customer · Last order · Orders · Spent. A part the
@@ -198,23 +200,36 @@ function Row({
 /** No row matches the search or filters: say which, and the way out. */
 export function NoMatch({
     title,
+    searched,
     onClear,
 }: {
     title: string;
+    /** A search term narrowed it (else only filters did). */
+    searched: boolean;
     onClear: () => void;
 }) {
     return (
-        <div className="px-5 py-[34px] text-center">
-            <p className="text-[14px] font-semibold">{title}</p>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClear}
-                className="mt-2.5 h-[30px] rounded-[8px] px-3 text-[12.5px]"
-            >
-                Clear search and filters
-            </Button>
+        <div className="p-4">
+            <EmptyState
+                kind="no-results"
+                things="customers"
+                cause="filters"
+                title={title}
+                className="border-0"
+                action={
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="wk-press"
+                        onClick={onClear}
+                    >
+                        {clearLabel(
+                            searched ? "search" : "filters",
+                            "customers",
+                        )}
+                    </Button>
+                }
+            />
         </div>
     );
 }

@@ -1,7 +1,5 @@
-import { Button } from "@saroh/ui/button";
-import { CapabilityOffState } from "@saroh/ui/data-state";
+import { ModuleOffState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -40,7 +38,6 @@ function Unavailable({
     capability: ModuleView;
     switchedOnAt?: SwitchedOnAt;
 }) {
-    const archived = capability.lifecycle === "ARCHIVED";
     // The menu's name for it (Sell, Contacts), never the registry's.
     const name = moduleName(capability.key, [capability]);
     return (
@@ -49,32 +46,14 @@ function Unavailable({
         // arrived where they meant to — the workspace design draws every state
         // INSIDE the page, under its own heading.
         <PageContainer>
-            <PageHeader title={name} className="mb-6" />
-            <CapabilityOffState
-                title={`${name} is turned off`}
-                description={
-                    archived
-                        ? `${name} has been archived for this business. Nothing it holds has been deleted. Turning it back on restores this section.`
-                        : `${name} is not switched on for this business. Nothing it holds has been deleted. Turning it on brings this section back.`
-                }
-                action={
-                    capability.canManage ? (
-                        <Button variant="brand" asChild>
-                            <Link
-                                href={switchedOnAt?.href ?? "/settings/modules"}
-                            >
-                                {switchedOnAt?.label ?? "Turn on in Modules"}
-                            </Link>
-                        </Button>
-                    ) : (
-                        // Say what is true: a MEMBER cannot fix this themselves, so
-                        // offering them a settings button would be a dead end.
-                        <p className="text-sm text-muted-foreground">
-                            An owner or admin can turn it on in Settings ›
-                            Modules.
-                        </p>
-                    )
-                }
+            <PageHeader breadcrumb={[name]} title={name} className="mb-6" />
+            {/* Someone who can't turn it on reads who can: a button to a
+                switch they can't press would be a dead end. */}
+            <ModuleOffState
+                name={name}
+                canTurnOn={capability.canManage}
+                href={switchedOnAt?.href}
+                actionLabel={switchedOnAt?.label}
             />
         </PageContainer>
     );
@@ -143,7 +122,11 @@ export async function ModuleGate({
         if (planOnly) {
             return (
                 <PageContainer>
-                    <PageHeader title={access.module.label} className="mb-6" />
+                    <PageHeader
+                        breadcrumb={[access.module.label]}
+                        title={access.module.label}
+                        className="mb-6"
+                    />
                     <PlanLocked
                         moduleKey={access.module.key}
                         label={access.module.label}

@@ -8,19 +8,20 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load this location"
-            description="Your products and orders are safe — this page just failed to render."
+            retry={retry}
+            heading="Location"
+            things="this location"
+            reassurance="Your products and orders are safe."
             backHref="/stores"
-            backLabel="All locations"
+            place="Location"
         />
     );
 }

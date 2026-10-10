@@ -249,7 +249,7 @@ describe("Razorpay setup, as guided steps", () => {
 
     it("says the address couldn't be loaded rather than show none", () => {
         open("RAZORPAY", { webhooks: null });
-        expect(text()).toContain("The webhook address couldn't be loaded");
+        expect(text()).toContain("Couldn't load the webhook address.");
         // The secret is still required.
         expect(byLabel("Webhook signing secret").required).toBe(true);
     });

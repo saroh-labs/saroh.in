@@ -1,6 +1,7 @@
 import type { BillingAccessView } from "@/lib/billing/access";
 import { accessRow, upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * Where the plan leaves a QR code plain: the catalogue's `qr-branding` row,
@@ -37,7 +38,7 @@ function lockTo(up: { planId: string; name: string } | null): QrStyleLock {
         line: QR_LOCKED_LINE,
         plan: up ? up.name : "a paid plan",
         kept: QR_KEPT_LINE,
-        cta: up ? `See ${up.name}` : "See plans",
+        cta: planLabel(up?.name),
         href: upgradeHref(up?.planId),
     };
 }

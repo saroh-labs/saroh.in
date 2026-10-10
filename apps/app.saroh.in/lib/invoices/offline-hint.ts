@@ -1,6 +1,7 @@
 import type { OnlineFix } from "@/lib/services/online-booking";
 import { PLAN_FIX } from "@/lib/services/online-booking";
 import type { OnlineBlocker } from "@/lib/staff/types";
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /**
  * What Invoice Detail's Payment panel says when an unpaid invoice's link
@@ -31,8 +32,11 @@ export function offlinePayHint({
     // yet (a Razorpay key missing) is fixed on its own row, not here.
     if (blocker !== "PAYMENTS_OFF" && paymentsOn && !providerConnected) {
         return {
-            text: "Connect a payment provider to take payment online.",
-            fix: { href: "/settings/providers", label: "Connect one" },
+            text: providerDisconnected.line("payment"),
+            fix: {
+                href: providerDisconnected.href,
+                label: providerDisconnected.action,
+            },
         };
     }
     // Payments is off, or its provider can't take a payment: the link

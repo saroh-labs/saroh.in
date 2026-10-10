@@ -43,6 +43,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import {
     StepHeading,
@@ -670,11 +671,7 @@ function Connected({
     onDisconnect: (key: string) => void;
 }) {
     if (rows.length === 0) {
-        return (
-            <p className="rounded-[10px] border border-dashed border-border-strong px-3.5 py-3 text-[12.5px] text-muted-foreground">
-                Nothing is connected yet.
-            </p>
-        );
+        return <EmptyState size="inline" title="Nothing is connected yet." />;
     }
     return (
         <ul className="overflow-hidden rounded-[10px] border border-border">

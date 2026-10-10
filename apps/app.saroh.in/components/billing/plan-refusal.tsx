@@ -9,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import { showError, showInfo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -125,7 +126,7 @@ export function PlanRefusalHost() {
                             href={upgradeHref(refusal?.upgradeTo?.planId)}
                             onClick={() => setRefusal(null)}
                         >
-                            {refusal?.cta ?? "See plans"}
+                            {refusal?.cta ?? planLabel()}
                         </Link>
                     </Button>
                 </DialogFooter>

@@ -2,7 +2,6 @@
 
 import { showSuccess } from "@saroh/ui/toast";
 import { Archive } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -12,6 +11,7 @@ import { retireQrCode } from "@/lib/qr/actions";
 import type { QrScreen } from "@/lib/qr/screen";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords, placeWords } from "@/lib/qr/words";
+import { NotPublishedNotice } from "@saroh/ui/data-state";
 
 import { QrCodesList } from "./qr-codes-list";
 import type { DownloadEnv } from "./qr-download";
@@ -122,25 +122,14 @@ export function QrShare({
             </div>
 
             {!view.live ? (
-                <p
+                <NotPublishedNotice
                     role="note"
                     data-qr-not-live=""
-                    className="rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
-                    Your site isn&apos;t published yet. You can make codes now;
-                    they open once it is.
-                    {canChange ? (
-                        <>
-                            {" "}
-                            <Link
-                                href={`/sites/${site.id}`}
-                                className="rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
-                            >
-                                Open your site to publish it
-                            </Link>
-                        </>
-                    ) : null}
-                </p>
+                    className="rounded-[10px] bg-muted px-3.5 py-2.5 text-foreground"
+                    description="Codes you make now open once it is."
+                    canPublish={canChange}
+                    href={`/sites/${site.id}`}
+                />
             ) : null}
 
             {canChange ? (

@@ -6,6 +6,7 @@ import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { FailedRead } from "@/components/shared/failed-read";
 import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
 import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
@@ -91,7 +92,9 @@ export function CustomDomain({
 }) {
     const zone = useBusinessZone();
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState(false);
+    // Try again reads the domains again, without leaving the page.
+    const [attempt, setAttempt] = useState(0);
     const own = useSheetControl();
     const adding = sheet ?? own;
     // The domain the open dialog added: it shows that one's records next.
@@ -110,15 +113,13 @@ export function CustomDomain({
             .catch(() => {
                 if (!cancelled) {
                     setDomains([]);
-                    setLoadError(
-                        "Could not load your domains. Reload to try again.",
-                    );
+                    setLoadError(true);
                 }
             });
         return () => {
             cancelled = true;
         };
-    }, [siteId]);
+    }, [siteId, attempt]);
 
     async function claim(hostname: string) {
         const res = await claimDomain(siteId, hostname);
@@ -188,7 +189,13 @@ export function CustomDomain({
         <>
             {loadError ? (
                 <Block>
-                    <p className="text-sm text-destructive">{loadError}</p>
+                    <FailedRead
+                        things="your domains"
+                        onRetry={() => {
+                            setLoadError(false);
+                            setAttempt((n) => n + 1);
+                        }}
+                    />
                 </Block>
             ) : null}
 

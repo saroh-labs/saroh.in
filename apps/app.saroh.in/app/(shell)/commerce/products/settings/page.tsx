@@ -1,4 +1,3 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -22,6 +21,7 @@ import {
     listFields,
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 export const metadata = { title: "Product settings" };
 
@@ -126,15 +126,8 @@ export default async function ProductSettingsPage({
                 </ProductSettings>
             ) : (
                 <FailedState
-                    title="Couldn't load product settings"
-                    description="Nothing has been changed. Try again in a moment."
-                    action={
-                        <Button asChild variant="outline">
-                            <Link href={productSettingsHref(tab)}>
-                                Try again
-                            </Link>
-                        </Button>
-                    }
+                    title={couldntLoad("product settings")}
+                    retryHref={productSettingsHref(tab)}
                 />
             )}
         </PageContainer>

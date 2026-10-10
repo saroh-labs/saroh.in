@@ -25,11 +25,8 @@ export default async function NotificationsPage() {
     ]);
 
     return (
-        <PageContainer>
-            <PageHeader
-                breadcrumb={["Workspace", "Notifications"]}
-                title="Notifications"
-            />
+        <PageContainer width="full">
+            <PageHeader breadcrumb={["Notifications"]} title="Notifications" />
             <NotificationsInbox
                 notifications={notifications}
                 businessName={organization?.name ?? "this business"}

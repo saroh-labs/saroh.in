@@ -110,7 +110,7 @@ export default async function PeoplePage() {
     const pausedPeople = pausedTeam(paused);
 
     return (
-        <SettingsPanel>
+        <SettingsPanel width="full">
             <TeamScreen
                 organizationName={organization?.name ?? "this business"}
                 members={members}

@@ -15,6 +15,7 @@ import {
     DATA_EXPORT_KEPT,
     DATA_EXPORT_STARTED,
 } from "@/lib/data-export/words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * Settings › Your data (DEC-120): what a download holds, the button that
@@ -65,7 +66,7 @@ export function DataExportPanel({
     };
 
     return (
-        <div className="grid max-w-[760px] gap-5">
+        <div className="grid gap-5">
             <section
                 aria-labelledby="data-export-what"
                 className="grid gap-3 rounded-lg border border-border bg-card p-4"
@@ -120,9 +121,11 @@ export function DataExportPanel({
                     Your downloads
                 </h3>
                 {lines.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        None yet. Prepare one whenever you like.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No downloads yet."
+                        description="Prepare one whenever you like."
+                    />
                 ) : (
                     <ul className="grid divide-y divide-border rounded-lg border border-border bg-card">
                         {lines.map((line) => (

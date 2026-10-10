@@ -1,5 +1,3 @@
-import { Lock } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
@@ -9,21 +7,20 @@ import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
 import {
     AccessLine,
-    ProductCrumbs,
     ProductHeader,
 } from "@/components/commerce/product-page/header";
 import { ProductOrdersTab } from "@/components/commerce/product-page/orders-tab";
 import { ProductOverviewTab } from "@/components/commerce/product-page/overview-tab";
-import {
-    ProductPageState,
-    stateAction,
-} from "@/components/commerce/product-page/page-state";
+import { ProductPageFrame } from "@/components/commerce/product-page/page-state";
 import { ProductPhotosTab } from "@/components/commerce/product-page/photos-tab";
 import { ProductReviewsTab } from "@/components/commerce/product-page/reviews-tab";
 import { ProductStockTab } from "@/components/commerce/product-page/stock-tab";
 import { ProductTabs } from "@/components/commerce/product-page/tabs";
+import { AccessDenied } from "@/components/shared/access-denied";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { productHref, productTabOf } from "@/lib/products/links";
 import {
@@ -95,15 +92,16 @@ export default async function ProductPage({
     // change it — not shown a "not found" that reads like a broken link.
     if (organization?.actions && !organization.actions.includes("store:read")) {
         return (
-            <ProductPageState
-                icon={Lock}
-                title="You can't open this product"
-                description={`Your role in ${organization.name} is ${roleLabel}, which can't see products. An owner or admin can change that in Team.`}
-            >
-                <Link href="/" className={stateAction("primary")}>
-                    Back to Home
-                </Link>
-            </ProductPageState>
+            <ProductPageFrame>
+                <AccessDenied
+                    bare
+                    {...whoCanChange({
+                        thing: "products",
+                        business: organization.name,
+                        role: knownRoleName(organization),
+                    })}
+                />
+            </ProductPageFrame>
         );
     }
 
@@ -184,17 +182,13 @@ export default async function ProductPage({
 
     return (
         <main className="w-full">
-            <ProductCrumbs
-                overview={overview}
-                storeId={store.id}
-                view={view}
-                shopUrl={shopUrl}
-            />
             <ProductHeader
                 overview={overview}
                 storeId={store.id}
                 photosHref={href("photos")}
                 paused={isPaused}
+                view={view}
+                shopUrl={shopUrl}
             />
             {isPaused ? (
                 <div className="border-b border-border px-4 py-2.5 sm:px-[22px]">

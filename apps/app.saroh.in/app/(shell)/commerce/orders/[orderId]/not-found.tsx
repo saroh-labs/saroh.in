@@ -11,9 +11,9 @@ export default function OrderNotFound() {
         <PageContainer>
             <NotFound
                 variant="card"
-                title="No order here"
+                title="Order not found"
                 description="It may have been deleted, or it belongs to another business. Check the number if you typed it."
-                primary={{ href: "/commerce/orders", label: "Back to orders" }}
+                primary={{ href: "/commerce/orders", label: "Back to Orders" }}
             />
         </PageContainer>
     );

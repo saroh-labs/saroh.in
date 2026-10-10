@@ -50,9 +50,9 @@ import type { SellablePack } from "../sell-pack-dialog";
 import { SellPackDialog } from "../sell-pack-dialog";
 import { ActivityTab } from "./activity-tab";
 import { CustomerView } from "./customer-view";
-import { GUTTER } from "./detail-crumbs";
+
 import type { Lens } from "./detail-header";
-import { PackDetailHeader } from "./detail-header";
+import { GUTTER, PackDetailHeader } from "./detail-header";
 import type { ExtendTarget } from "./extend-dialog";
 import { ExtendDialog } from "./extend-dialog";
 import { HoldersTab } from "./holders-tab";

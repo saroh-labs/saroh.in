@@ -17,6 +17,7 @@ import {
 } from "@/lib/content/actions";
 import { CATEGORIES_PARAM } from "@/lib/content/categories-href";
 import type { PostCategory } from "@/lib/content/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Post categories, managed from the Posts tab: the header's "Categories"
@@ -125,19 +126,13 @@ export function PostCategoriesSheet({
         >
             {categories === null ? (
                 <FailedState
-                    title="Categories could not be loaded"
-                    description="Nothing has been changed. Try again in a moment."
-                    action={
-                        <Button
-                            variant="outline"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("categories")}
+                    onRetry={() => router.refresh()}
                 />
             ) : categories.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No categories yet"
                     description="Add one to group posts, such as Announcements."
                 />

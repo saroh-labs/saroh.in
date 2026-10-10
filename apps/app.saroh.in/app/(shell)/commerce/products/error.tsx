@@ -9,19 +9,18 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load products"
-            description="Something went wrong on our side, so this may not be the whole picture. Nothing has been changed, and no product has been deleted."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Products"
+            things="products"
+            reassurance="No product has been deleted."
         />
     );
 }

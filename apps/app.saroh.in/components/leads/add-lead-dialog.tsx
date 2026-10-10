@@ -40,7 +40,13 @@ export function AddLeadDialog({
     ariaLabel,
     variant = "default",
     size,
+    header = false,
 }: {
+    /**
+     * The page header's button: "New lead", with no icon, as every
+     * header's primary is.
+     */
+    header?: boolean;
     contacts: LeadContactOption[];
     /** The pipeline's stages; the first is where a lead starts. */
     stages: { id: string; name: string }[];
@@ -141,8 +147,8 @@ export function AddLeadDialog({
             open={open}
             trigger={
                 <Button variant={variant} size={size} aria-label={ariaLabel}>
-                    <Plus className="mr-1.5 size-4" />
-                    {label}
+                    {header ? null : <Plus className="mr-1.5 size-4" />}
+                    {header ? "New lead" : label}
                 </Button>
             }
             title="Add a lead"

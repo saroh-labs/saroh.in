@@ -34,8 +34,8 @@ export default async function SiteFormsPage({
         return (
             <EmptyState
                 icon={<Inbox />}
-                title="No forms on this site"
-                description="Add an enquiry section to a page in the editor, and its form appears here with everything people send through it."
+                title="No forms yet"
+                description="Add an enquiry section to a page in the editor and its form shows here."
             />
         );
     }

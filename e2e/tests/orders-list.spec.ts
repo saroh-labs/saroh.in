@@ -175,7 +175,7 @@ test.describe("orders list", () => {
         await expect(
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
-        await page.getByRole("button", { name: "View all orders" }).click();
+        await page.getByRole("button", { name: "Show all orders" }).click();
         await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
     });
 

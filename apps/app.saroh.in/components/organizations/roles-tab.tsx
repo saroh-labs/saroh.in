@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -103,10 +104,11 @@ export function RolesTab({
 
     if (!active) {
         return (
-            <p className="rounded-xl border border-border px-4 py-6 text-[13px] text-muted-foreground">
-                The roles could not be loaded. Reload to try again —
-                nobody&apos;s access has changed.
-            </p>
+            <FailedRead
+                size="panel"
+                things="roles"
+                reassurance="Nobody's access has changed."
+            />
         );
     }
 
@@ -362,10 +364,11 @@ function RoleDetail({
             </div>
 
             {catalogue === null ? (
-                <p className="px-4 py-6 text-[12.5px] text-muted-foreground">
-                    The list of permissions could not be loaded. Reload to try
-                    again. Nothing about this role has changed.
-                </p>
+                <FailedRead
+                    things="the list of permissions"
+                    reassurance="Nothing about this role has changed."
+                    className="px-4 py-6"
+                />
             ) : (
                 <div className="px-4 pb-3.5 pt-1.5">
                     <Permissions

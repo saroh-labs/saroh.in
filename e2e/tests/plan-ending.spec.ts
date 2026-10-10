@@ -32,7 +32,7 @@ test("a plan that ends soon says when above the page, and leads to choosing a pl
     await expect(banner).toContainText("and everything you made is kept");
     await expectNothingHiddenSideways(page);
 
-    await banner.getByRole("link", { name: "Choose a plan" }).click();
+    await banner.getByRole("link", { name: "See plans" }).click();
     await expect(page).toHaveURL(/\/settings\/billing#change-plan$/);
     await expect(
         page.getByRole("region", { name: "Change plan" }),

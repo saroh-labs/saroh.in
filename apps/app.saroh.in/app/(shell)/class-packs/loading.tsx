@@ -1,5 +1,22 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import Link from "next/link";
+
+import { ClassPacksTabs } from "@/components/class-packs/class-packs-tabs";
+import { PageLoading } from "@/components/shared/page-loading";
 
 export default function Loading() {
-    return <ListSkeleton />;
+    return (
+        <PageLoading
+            shape="list"
+            width="full"
+            breadcrumb={[
+                <Link key="0" href="/bookings">
+                    Bookings
+                </Link>,
+                "Class packs",
+            ]}
+            title="Class packs"
+            label="Loading class packs"
+            tabs={<ClassPacksTabs current="packs" />}
+        />
+    );
 }

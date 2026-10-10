@@ -15,6 +15,7 @@ import type {
     Organization,
     OrganizationRole,
 } from "@/lib/organizations/service";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 const ROLE_LABEL: Record<OrganizationRole, string> = {
     OWNER: "Owner",
@@ -201,7 +202,7 @@ export function OrganizationSwitcher({
                 ) : null}
                 {matches.length === 0 ? (
                     <p className="px-[9px] py-3.5 text-[12.5px] text-muted-foreground">
-                        No business matches that.
+                        {noMatchLine("businesses", query)}
                     </p>
                 ) : null}
                 <div className="mt-1.5 border-t border-muted pt-1.5">

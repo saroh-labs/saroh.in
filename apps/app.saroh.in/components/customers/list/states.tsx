@@ -1,5 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import { Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -9,9 +10,9 @@ import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { newStorefrontHref } from "@/lib/stores/links";
 
 /**
- * The Customers list's heading, the design's: "Customers" and how many the
- * business has, with Add customer and Import beside it. The count is left
- * out when it isn't known — never shown as 0.
+ * The Customers list's header: the page header every screen draws, with how
+ * many the business has beside the title, and Import and New customer. The
+ * count is left out when it isn't known or is none — never shown as 0.
  */
 export function ListHeading({
     count,
@@ -21,21 +22,13 @@ export function ListHeading({
     actions?: ReactNode;
 }) {
     return (
-        <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-3">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-2.5">
-                <h1 className="m-0 font-display text-[24px] font-semibold tracking-[-0.03em]">
-                    Customers
-                </h1>
-                {count ? (
-                    <span className="text-[13px] tabular-nums text-muted-foreground">
-                        {count}
-                    </span>
-                ) : null}
-            </div>
-            {actions ? (
-                <div className="ml-auto flex flex-wrap gap-2">{actions}</div>
-            ) : null}
-        </div>
+        <PageHeader
+            className="mb-3.5"
+            breadcrumb={["Sell", "Customers"]}
+            title="Customers"
+            count={count ?? undefined}
+            actions={actions}
+        />
     );
 }
 
@@ -70,7 +63,7 @@ export function ListFirstRun({
         <EmptyState
             icon={<Users />}
             title="No customers yet"
-            description="Customers are people who've paid, signed in on your website or been added here. Everyone else is in Contacts."
+            description="People who've paid, signed in on your website or been added here show up as customers."
             action={
                 <div className="flex flex-wrap justify-center gap-2">
                     <Button asChild variant="outline">
@@ -82,9 +75,7 @@ export function ListFirstRun({
                     </Button>
                     {hasStorefront ? null : (
                         <Button asChild>
-                            <Link href={newStorefrontHref}>
-                                Create a location
-                            </Link>
+                            <Link href={newStorefrontHref}>New location</Link>
                         </Button>
                     )}
                 </div>

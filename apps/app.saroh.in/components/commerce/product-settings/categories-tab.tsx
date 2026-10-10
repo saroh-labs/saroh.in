@@ -149,6 +149,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             {categories.length === 0 ? (
                 <EmptyState
                     className="mb-3"
+                    size="panel"
                     title="No categories yet"
                     description={
                         canWrite
