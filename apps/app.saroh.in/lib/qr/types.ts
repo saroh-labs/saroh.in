@@ -70,7 +70,7 @@ export interface QrCodeInput {
 /** What a change sends: only what changed. The target moves as one thing. */
 export type QrCodeChange = Partial<QrCodeInput>;
 
-/** Why the API refused a save (`details.reason`). */
+/** Why the API refused a save or a print file (`details.reason`). */
 export type QrRefusalReason =
     | "unknown"
     | "booking-closed"
@@ -81,7 +81,11 @@ export type QrRefusalReason =
     | "too-light"
     | "retired"
     | "too-many"
-    | "no-free-code";
+    | "no-free-code"
+    /** A print file: the site has no Saroh address for the code to hold. */
+    | "no-address"
+    /** A print file: the code's link is too long for any QR. */
+    | "unencodable";
 
 export type QrResult<T> =
     | { ok: true; data: T }
