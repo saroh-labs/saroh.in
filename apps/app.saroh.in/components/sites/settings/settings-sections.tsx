@@ -155,7 +155,7 @@ export function SettingsSections({
     };
 
     return (
-        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1040px)]">
             <div
                 role="tablist"
                 aria-label="Settings sections"

@@ -35,6 +35,11 @@ vi.mock("@/lib/sites/actions", () => ({
 }));
 const showError = vi.fn();
 const showSuccess = vi.fn();
+// The address row's QR button: its panel reads only when opened.
+vi.mock("@/lib/qr/actions", () => ({
+    openQrPanel: vi.fn(),
+    makeQrPanelCode: vi.fn(),
+}));
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
@@ -255,7 +260,12 @@ describe("the settings' rows", () => {
             ),
         );
         expect(row("settings-title")).toContain("Rye · your site's name");
-        expect(host.querySelector('button[aria-haspopup="dialog"]')).toBeNull();
+        // The address's QR button is for every role; nothing else opens.
+        expect(
+            host.querySelector(
+                'button[aria-haspopup="dialog"]:not([data-qr-button])',
+            ),
+        ).toBeNull();
         expect(item("Edit", host)).toBeUndefined();
         expect(item("Change", host)).toBeUndefined();
         expect(sheet()).toBeNull();
