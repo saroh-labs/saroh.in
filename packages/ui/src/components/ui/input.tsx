@@ -23,15 +23,25 @@ export const fieldFocus =
 export const fieldStates =
     "transition-colors duration-fast hover:border-muted-foreground disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle [&[readonly]]:border-border [&[readonly]]:bg-transparent [&[readonly]]:text-foreground";
 
-export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    /**
+     * 32px, for a field inside a table row or a dense list, where the 38px
+     * box would make every row taller. Still 44px and 16px under a finger.
+     * A call site never sets a field's height: it is this or the default.
+     */
+    dense?: boolean;
+}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-    ({ className, type, ...props }, ref) => {
+    ({ className, type, dense = false, ...props }, ref) => {
         return (
             <input
                 type={type}
                 className={cn(
-                    "flex h-[38px] w-full rounded-md border border-input bg-field px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground coarse:h-11 coarse:text-base",
+                    "flex w-full rounded-md border border-input bg-field py-2 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground coarse:h-11 coarse:text-base",
+                    dense
+                        ? "h-8 px-2.5 text-[0.8125rem]"
+                        : "h-[38px] px-3 text-sm",
                     fieldFocus,
                     fieldStates,
                     className,

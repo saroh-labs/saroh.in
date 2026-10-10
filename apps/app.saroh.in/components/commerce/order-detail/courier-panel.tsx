@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -23,10 +24,6 @@ import {
     useOrderSheetDraft,
 } from "./order-sheet";
 import { FOCUS } from "./parts";
-
-const FIELD =
-    "mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11";
-
 /**
  * The courier's details (B10, DEC-045): who took it, their tracking number
  * and, if they gave one, the tracking link — every one optional, since the
@@ -158,7 +155,7 @@ function CourierDraft({
                 {other ? (
                     <label className="mt-3 block text-[12px] font-medium">
                         Courier&apos;s name
-                        <input
+                        <Input
                             ref={otherRef}
                             type="text"
                             value={otherName}
@@ -167,7 +164,7 @@ function CourierDraft({
                             onChange={(e) => setOtherName(e.target.value)}
                             placeholder="DTDC, India Post…"
                             aria-describedby={`${ids}-other-help`}
-                            className={cn(FIELD, "font-sans")}
+                            className="mt-[5px] w-full font-mono"
                         />
                         <span
                             id={`${ids}-other-help`}
@@ -181,7 +178,7 @@ function CourierDraft({
                     <>
                         <label className="mt-3 block text-[12px] font-medium">
                             Tracking number
-                            <input
+                            <Input
                                 ref={numberRef}
                                 type="text"
                                 value={number}
@@ -191,7 +188,7 @@ function CourierDraft({
                                 onChange={(e) => setNumber(e.target.value)}
                                 placeholder="Leave empty if you don't have it yet"
                                 aria-describedby={`${ids}-number-help`}
-                                className={FIELD}
+                                className="mt-[5px] w-full font-mono"
                             />
                         </label>
                         <p
@@ -204,7 +201,7 @@ function CourierDraft({
                         </p>
                         <label className="mt-3 block text-[12px] font-medium">
                             Tracking link
-                            <input
+                            <Input
                                 type="url"
                                 inputMode="url"
                                 value={link}
@@ -212,7 +209,7 @@ function CourierDraft({
                                 placeholder="https://"
                                 aria-invalid={bad || undefined}
                                 aria-describedby={`${ids}-link-help`}
-                                className={FIELD}
+                                className="mt-[5px] w-full font-mono"
                             />
                         </label>
                         <p

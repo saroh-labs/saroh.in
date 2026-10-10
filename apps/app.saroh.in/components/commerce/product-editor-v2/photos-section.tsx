@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus, Upload } from "lucide-react";
@@ -279,7 +281,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                 {/* The name line is what it shows, typed in
                                     place — for people who can't see it, and
                                     how the editor names it. */}
-                                <input
+                                <Input
                                     value={photo.alt}
                                     maxLength={LIMITS.alt}
                                     disabled={ro}
@@ -298,7 +300,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                     placeholder={name}
                                     title={photo.alt || name}
                                     aria-label={`What ${noun} ${i + 1} shows, for people who can't see it`}
-                                    className="-mx-1 h-6 w-[calc(100%+0.5rem)] truncate rounded-[5px] border border-transparent bg-transparent px-1 text-[11.5px] font-medium placeholder:font-normal placeholder:text-muted-foreground hover:border-border focus-visible:border-border focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                                    className="-mx-1 w-[calc(100%+0.5rem)]"
                                 />
                                 <div className="mt-1 flex gap-[3px] coarse:flex-wrap">
                                     <button
@@ -412,15 +414,17 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 </div>
             ) : null}
             {canWrite && !full ? (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     disabled={ro}
                     aria-expanded={byAddress}
                     onClick={() => setByAddress((o) => !o)}
-                    className="mt-1 text-[11.5px] text-brand hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 coarse:min-h-11"
+                    className="mt-1"
                 >
                     {byAddress ? "Close" : "Or add one by its address"}
-                </button>
+                </Button>
             ) : null}
             {byAddress && !full && !ro ? (
                 <div className="mt-2">

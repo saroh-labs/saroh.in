@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
@@ -115,14 +116,16 @@ export function NeedsYou({
             ) : null}
 
             {more || expanded ? (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => setExpanded((open) => !open)}
-                    className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                    className="justify-self-start"
                 >
                     {expanded ? "Show fewer" : seeAllLabel(needs)}
-                </button>
+                </Button>
             ) : null}
         </section>
     );

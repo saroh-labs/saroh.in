@@ -1,8 +1,7 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
@@ -89,33 +88,25 @@ export function PlanAutopayTiming({
             <label htmlFor={`${id}-select`} className="sr-only">
                 When autopay charges for this plan
             </label>
-            <div className="relative mt-1.5">
-                <select
-                    id={`${id}-select`}
-                    value={value ?? BUSINESS}
-                    disabled={!canWrite || pending}
-                    onChange={(e) => change(e.target.value)}
-                    aria-describedby={`${id}-line ${id}-when`}
-                    className={cn(
-                        "h-9 w-full appearance-none rounded-[8px] border border-border bg-card pl-2.5 pr-8 text-[13px] text-foreground",
-                        "cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted",
-                        "disabled:cursor-default disabled:opacity-80 coarse:h-11",
-                    )}
-                >
-                    <option value={BUSINESS}>
-                        {`Use the business setting (${timingTitle(settings.chargeTiming)})`}
-                    </option>
-                    {timingOptions(settings).map((o) => (
-                        <option key={o.value} value={o.value}>
-                            {o.title}
-                        </option>
-                    ))}
-                </select>
-                <ChevronDown
-                    aria-hidden
-                    className="pointer-events-none absolute right-2.5 top-1/2 size-[13px] -translate-y-1/2 text-muted-foreground"
-                />
-            </div>
+            <OptionSelect
+                id={`${id}-select`}
+                className="mt-1.5"
+                value={value ?? BUSINESS}
+                disabled={pending}
+                readOnly={!canWrite}
+                onValueChange={change}
+                aria-describedby={`${id}-line ${id}-when`}
+                options={[
+                    {
+                        value: BUSINESS,
+                        label: `Use the business setting (${timingTitle(settings.chargeTiming)})`,
+                    },
+                    ...timingOptions(settings).map((o) => ({
+                        value: o.value,
+                        label: o.title,
+                    })),
+                ]}
+            />
             <p
                 id={`${id}-line`}
                 className="mt-2 text-pretty text-[12px] leading-[1.45] text-muted-foreground"

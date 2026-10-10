@@ -298,6 +298,13 @@ describe("Input, Textarea and the select's box share their states", () => {
         has(trigger, "coarse:h-11");
     });
 
+    it("a dense input is 32px at the desk and still 44px and 16px on touch", () => {
+        render(<Input dense aria-label="Qty" />);
+        const box = screen.getByRole("textbox", { name: "Qty" });
+        has(box, "h-8", "coarse:h-11", "coarse:text-base");
+        none(box, /^h-\[38px\]$/);
+    });
+
     it("a read-only select can't be opened and is drawn to be read", () => {
         render(
             <OptionSelect

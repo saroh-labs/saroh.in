@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
@@ -142,7 +143,7 @@ export function MessagesTab({
                     <label htmlFor={`${id}-reply`} className="sr-only">
                         Reply to {firstName}
                     </label>
-                    <textarea
+                    <Textarea
                         id={`${id}-reply`}
                         rows={2}
                         value={draft}
@@ -155,7 +156,7 @@ export function MessagesTab({
                         }}
                         aria-describedby={`${id}-note`}
                         placeholder={`Reply to ${firstName}…`}
-                        className="block w-full resize-y rounded-[8px] border border-border bg-card px-2.5 py-2 text-[13px] leading-[1.5] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="w-full resize-y"
                     />
                     <div className="mt-2 flex items-center gap-2">
                         <span

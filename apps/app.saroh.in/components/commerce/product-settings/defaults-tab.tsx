@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -173,7 +174,8 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             <div className="flex flex-wrap gap-3">
                                 <label className="min-w-0 flex-[2_1_260px] text-[12px] font-medium">
                                     How to use or care for it
-                                    <input
+                                    <Input
+                                        dense
                                         value={r.howToUse}
                                         disabled={!catalogue.canWrite}
                                         onChange={(e) =>
@@ -186,10 +188,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 ? "Nothing — each product says"
                                                 : `All products: ${all.howToUse}`
                                         }
-                                        className={cn(
-                                            textBox,
-                                            "mt-[5px] block h-[34px] w-full rounded-[7px] border-border px-[9px] font-normal",
-                                        )}
+                                        className="mt-[5px] w-full min-w-0"
                                     />
                                 </label>
                                 <label className="min-w-0 flex-[1_1_110px] text-[12px] font-medium">

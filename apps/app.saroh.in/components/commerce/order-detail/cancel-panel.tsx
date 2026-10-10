@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { refundableQuantity } from "@/lib/orders/lifecycle";
@@ -26,9 +28,11 @@ export interface CancelChoice {
     tell: boolean;
 }
 
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
+/** The reasons a refund can give, behind "Choose a reason". */
+const WHY: { value: RefundReason | ""; label: string }[] = [
+    { value: "", label: "Choose a reason" },
+    ...REFUND_REASONS,
+];
 /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
  * refund sheet with every line ticked (the design's option B): a cancel
@@ -122,31 +126,24 @@ function CancelDraft({
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
-                        <select
+                        <OptionSelect
+                            size="sm"
                             value={reason}
-                            onChange={(e) =>
-                                setReason(e.target.value as RefundReason | "")
-                            }
-                            className={cn(FOCUS, FIELD, "cursor-pointer")}
-                        >
-                            <option value="">Choose a reason</option>
-                            {REFUND_REASONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={setReason}
+                            options={WHY}
+                        />
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
                             Say why
-                            <input
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
                                 placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
                         </label>
                     ) : null}

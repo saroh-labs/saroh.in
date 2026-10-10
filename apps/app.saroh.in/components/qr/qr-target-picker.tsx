@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
@@ -103,15 +104,17 @@ export function QrTargetPicker({
             ) : null}
             {targets.more.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         aria-expanded={open}
                         aria-controls={`${id}-more`}
                         onClick={() => setOpen((v) => !v)}
-                        className="w-fit cursor-pointer rounded-[4px] text-[13px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                        className="w-fit"
                     >
                         {open ? "Fewer" : "More… a product or a page"}
-                    </button>
+                    </Button>
                     {open ? (
                         <div id={`${id}-more`} className="flex flex-col gap-2">
                             {targets.more.length >= SEARCH_FROM ? (

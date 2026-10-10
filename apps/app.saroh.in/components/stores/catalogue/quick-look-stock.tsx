@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useMemo, useState } from "react";
 
@@ -89,17 +91,16 @@ export function StockBlock({
                     {canStock && where.length > 1 ? (
                         <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                             Add at
-                            <select
+                            <OptionSelect
+                                size="sm"
+                                className="w-auto"
                                 value={addAt ?? ""}
-                                onChange={(e) => setAddAt(e.target.value)}
-                                className="h-[30px] rounded-[7px] border border-border bg-card py-0 pl-2 pr-8 text-[12.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
-                            >
-                                {where.map((p) => (
-                                    <option key={p.storeId} value={p.storeId}>
-                                        {p.storeName}
-                                    </option>
-                                ))}
-                            </select>
+                                onValueChange={setAddAt}
+                                options={where.map((p) => ({
+                                    value: p.storeId,
+                                    label: p.storeName,
+                                }))}
+                            />
                         </label>
                     ) : null}
                     {stock.shelves.map((s) => (
@@ -191,7 +192,8 @@ function ShelfRow({
             </div>
             {canStock ? (
                 <>
-                    <input
+                    <Input
+                        dense
                         type="text"
                         inputMode="numeric"
                         value={draft}
@@ -206,7 +208,7 @@ function ShelfRow({
                         }}
                         aria-label={`Add stock to ${shelf.title}`}
                         placeholder="+0"
-                        className="h-[30px] w-[52px] rounded-[7px] border border-border bg-card px-2 text-right text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                        className="w-[52px] text-right"
                     />
                     <Button
                         size="sm"

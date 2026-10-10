@@ -1,13 +1,14 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { boxClass, MoneyBox } from "./fields";
+import { MoneyBox } from "./fields";
 
 /**
  * "Add a variant": a value, a SKU (the store's pattern suggests one) and a
@@ -76,30 +77,27 @@ export function VariantAddRow({
                     aria-label={`New variant ${opt}`}
                     className="h-8 rounded-[8px] text-[13px]"
                 />
-                <input
+                <Input
+                    dense
+                    aria-invalid={skuBad}
                     value={sku}
                     onChange={(e) => onSku(e.target.value)}
                     disabled={locked}
                     aria-label="New variant SKU"
                     placeholder={suggested || "SKU"}
-                    className={boxClass({
-                        small: true,
-                        mono: true,
-                        bad: skuBad,
-                    })}
+                    className="font-mono"
                 />
                 <MoneyBox symbol={symbol} small>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={priceBad}
                         value={price}
                         onChange={(e) => onPrice(e.target.value)}
                         inputMode="decimal"
                         disabled={locked}
                         placeholder={productPrice}
                         aria-label="New variant price, blank uses the product's"
-                        className={cn(
-                            boxClass({ small: true, bad: priceBad }),
-                            "pl-[22px]",
-                        )}
+                        className="pl-[22px]"
                     />
                 </MoneyBox>
             </div>

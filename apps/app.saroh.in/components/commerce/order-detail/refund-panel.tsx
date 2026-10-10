@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { putBackOf, refundableQuantity } from "@/lib/orders/lifecycle";
@@ -41,9 +43,17 @@ export interface RefundChoice {
     goodwill: string | null;
 }
 
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
+/** The reasons a refund can give, behind "Choose a reason". */
+const WHY: { value: RefundReason | ""; label: string }[] = [
+    { value: "", label: "Choose a reason" },
+    ...REFUND_REASONS,
+];
 
+/** What happens to the units that come back. */
+const STOCK: { value: "back" | "off"; label: string }[] = [
+    { value: "back", label: "Put back in stock" },
+    { value: "off", label: "Write off" },
+];
 /**
  * "What are you refunding?" — tick lines; every line refunds the order in
  * full, delivery too. Each line refunds what is left of it. Or type another
@@ -172,41 +182,35 @@ function RefundDraft({
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
-                        <select
+                        <OptionSelect
+                            size="sm"
                             value={reason}
-                            onChange={(e) =>
-                                setReason(e.target.value as RefundReason | "")
-                            }
+                            onValueChange={setReason}
+                            options={WHY}
                             aria-invalid={needsWhy || undefined}
                             aria-describedby={
                                 needsWhy ? `${ids}-why-help` : undefined
                             }
-                            className={cn(FOCUS, FIELD)}
-                        >
-                            <option value="">Choose a reason</option>
-                            {REFUND_REASONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
                             Say why
-                            <input
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
                                 placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
                         </label>
                     ) : null}
                     <label className="grid gap-1 text-[12px] font-medium">
                         Or another amount
-                        <input
+                        <Input
+                            dense
                             type="text"
                             inputMode="decimal"
                             value={typed}
@@ -221,26 +225,18 @@ function RefundDraft({
                                     ? `${ids}-amount-help`
                                     : undefined
                             }
-                            className={cn(
-                                FOCUS,
-                                FIELD,
-                                "w-[110px] tabular-nums",
-                            )}
+                            className="w-[110px] tabular-nums"
                         />
                     </label>
                     {putBackUnits > 0 ? (
                         <label className="grid gap-1 text-[12px] font-medium">
                             Stock
-                            <select
+                            <OptionSelect
+                                size="sm"
                                 value={stock}
-                                onChange={(e) =>
-                                    setStock(e.target.value as "back" | "off")
-                                }
-                                className={cn(FOCUS, FIELD)}
-                            >
-                                <option value="back">Put back in stock</option>
-                                <option value="off">Write off</option>
-                            </select>
+                                onValueChange={setStock}
+                                options={STOCK}
+                            />
                         </label>
                     ) : null}
                 </div>

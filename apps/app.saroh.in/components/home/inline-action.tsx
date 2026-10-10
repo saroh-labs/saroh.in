@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import type { RefObject } from "react";
@@ -61,16 +62,18 @@ export function InlineButton({
     buttonRef: RefObject<HTMLButtonElement | null>;
 }) {
     return (
-        <button
+        <Button
+            variant="outline"
+            size="sm"
             ref={buttonRef}
             type="button"
             onClick={onOpen}
             disabled={busy}
             aria-haspopup="dialog"
-            className={cn(QUIET, FOCUS)}
+            className="flex-none"
         >
             {inline.label}
-        </button>
+        </Button>
     );
 }
 
@@ -159,7 +162,7 @@ export function InlineConfirm({
         >
             {isReply ? (
                 <div className="mt-2.5 grid gap-2">
-                    <textarea
+                    <Textarea
                         ref={boxRef}
                         rows={2}
                         value={draft}
@@ -169,10 +172,7 @@ export function InlineConfirm({
                         }
                         aria-label={replyLabel(need)}
                         placeholder="Write your reply"
-                        className={cn(
-                            "w-full resize-y rounded-[9px] border border-border bg-card px-[11px] py-[9px] text-[13.5px] leading-[1.45] text-foreground transition-colors duration-fast placeholder:text-muted-foreground hover:border-foreground/40",
-                            FOCUS,
-                        )}
+                        className="w-full resize-y"
                     />
                 </div>
             ) : null}

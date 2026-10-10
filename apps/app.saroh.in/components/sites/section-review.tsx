@@ -3,6 +3,7 @@
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -317,7 +318,7 @@ function SectionSlot({
                                 SECTION_NAME[section.type] ??
                                 "this section"}
                         </label>
-                        <textarea
+                        <Textarea
                             id={`note-${section.key}`}
                             autoFocus
                             rows={3}
@@ -325,7 +326,7 @@ function SectionSlot({
                             onChange={(e) => setBody(e.target.value)}
                             disabled={saving}
                             placeholder="What should change here?"
-                            className="w-full rounded-md border border-input bg-background p-2 text-sm"
+                            className="w-full"
                         />
                         <div className="flex gap-2">
                             <Button

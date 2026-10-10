@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -175,14 +176,16 @@ export function WeekColumns({
                                 </Link>
                             ))}
                             {col.more > 0 ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => onPick(col.date)}
                                     aria-haspopup="dialog"
-                                    className="cursor-pointer rounded-[7px] px-0.5 py-1 text-left text-[11.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
+                                    className="text-left"
                                 >
                                     {col.more} more — open the day
-                                </button>
+                                </Button>
                             ) : null}
                             {col.empty ? (
                                 <span className="px-0.5 py-1 text-[11.5px] text-muted-foreground">

@@ -276,14 +276,16 @@ function DescriptionSurface({
                     }
                 />
                 <Gap />
-                <button
+                <Button
+                    variant="outline"
+                    size="xs"
                     type="button"
                     aria-expanded={more}
                     onClick={() => setMore((m) => !m)}
-                    className="mr-1 h-7 rounded-[7px] border border-border bg-card px-[9px] text-[11.5px] font-semibold text-foreground/75 hover:bg-muted coarse:h-11"
+                    className="mr-1"
                 >
                     {more ? "Fewer" : "More"}
-                </button>
+                </Button>
                 {more ? (
                     <>
                         <Gap />

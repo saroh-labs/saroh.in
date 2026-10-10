@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -72,28 +72,14 @@ export function TrackStockSwitch({
             <span className="text-[12.5px] text-foreground/75">
                 Track stock
             </span>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={tracked}
+            <Switch
+                size="sm"
+                checked={tracked}
                 aria-label="Track stock for this product"
                 aria-busy={pending}
                 disabled={locked || pending}
-                onClick={() => (tracked ? setAsking(true) : flip(true))}
-                className={cn(
-                    "relative h-[22px] w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed coarse:after:absolute coarse:after:-inset-[11px] coarse:after:content-['']",
-                    tracked ? "bg-foreground" : "bg-border-strong",
-                    pending && "cursor-wait opacity-70",
-                )}
-            >
-                <span
-                    aria-hidden
-                    className={cn(
-                        "absolute top-[3px] size-4 rounded-full bg-card [transition:left_120ms_ease-out]",
-                        tracked ? "left-[17px]" : "left-[3px]",
-                    )}
-                />
-            </button>
+                onCheckedChange={(on) => (on ? flip(true) : setAsking(true))}
+            />
             <ConfirmDialog
                 open={asking}
                 onOpenChange={setAsking}

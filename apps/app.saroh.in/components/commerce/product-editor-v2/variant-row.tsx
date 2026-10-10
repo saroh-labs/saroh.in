@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Trash2 } from "lucide-react";
 
@@ -11,7 +12,7 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { boxClass, FieldHelp, MoneyBox } from "./fields";
+import { FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";
@@ -90,32 +91,28 @@ export function VariantRowView({
                         !r.valueId && !legacy && "border-destructive",
                     )}
                 />
-                <input
+                <Input
+                    dense
+                    aria-invalid={!r.sku.trim() || skuDupe}
                     value={r.sku}
                     onChange={(e) => onChange({ sku: e.target.value })}
                     disabled={locked}
                     aria-label={`Variant ${i + 1} SKU`}
-                    className={boxClass({
-                        small: true,
-                        mono: true,
-                        bad: !r.sku.trim() || skuDupe,
-                    })}
+                    className="font-mono"
                 />
                 <MoneyBox symbol={symbol} small>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={
+                            r.price.trim() !== "" && !isMoney(r.price)
+                        }
                         value={r.price}
                         onChange={(e) => onChange({ price: e.target.value })}
                         inputMode="decimal"
                         disabled={locked}
                         placeholder={productPrice}
                         aria-label={`Variant ${i + 1} price, blank uses the product's`}
-                        className={cn(
-                            boxClass({
-                                small: true,
-                                bad: r.price.trim() !== "" && !isMoney(r.price),
-                            }),
-                            "pl-[22px]",
-                        )}
+                        className="pl-[22px]"
                     />
                 </MoneyBox>
                 <Button
@@ -136,14 +133,15 @@ export function VariantRowView({
                 </Button>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     aria-expanded={open}
                     onClick={() => onOpen(!open)}
-                    className="text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
                 >
                     {open ? "Less" : "More"}
-                </button>
+                </Button>
                 <span
                     className={cn(
                         "min-w-0 text-pretty text-[11.5px]",

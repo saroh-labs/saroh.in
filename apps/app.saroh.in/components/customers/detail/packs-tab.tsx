@@ -211,17 +211,18 @@ function PackItem({
             </div>
             {row.uses.length > 0 ? (
                 <div className="mt-2.5 border-t border-foreground/10 pt-2">
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         aria-expanded={open}
                         aria-controls={ids.uses}
                         onClick={() => setOpen((o) => !o)}
-                        className="rounded-[4px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70 coarse:min-h-11"
                     >
                         {open
                             ? `Hide the ${row.unitsWord} booked`
                             : `${row.unitsWord.charAt(0).toUpperCase()}${row.unitsWord.slice(1)} booked · ${row.uses.length}`}
-                    </button>
+                    </Button>
                     {open ? (
                         <ul id={ids.uses} className="m-0 mt-1 list-none p-0">
                             {row.uses.map((u) => (

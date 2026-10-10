@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -22,10 +23,6 @@ import {
     useOrderSheetDraft,
 } from "./order-sheet";
 import { FOCUS } from "./parts";
-
-const FIELD =
-    "block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
 interface AddressDraft {
     line1: string;
     city: string;
@@ -186,7 +183,8 @@ function FulfilmentDraft({
                         <legend className="text-[12px] font-medium">
                             Address
                         </legend>
-                        <input
+                        <Input
+                            dense
                             aria-label="Street and number"
                             value={addr.line1}
                             onChange={(e) =>
@@ -195,10 +193,11 @@ function FulfilmentDraft({
                                     line1: e.target.value,
                                 }))
                             }
-                            className={cn(FOCUS, FIELD, "mt-1")}
+                            className="mt-1 w-full"
                         />
                         <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                            <input
+                            <Input
+                                dense
                                 aria-label="Town or city"
                                 placeholder="Town or city"
                                 value={addr.city}
@@ -208,9 +207,10 @@ function FulfilmentDraft({
                                         city: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="State"
                                 placeholder="State"
                                 value={addr.state}
@@ -220,9 +220,10 @@ function FulfilmentDraft({
                                         state: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="PIN code"
                                 placeholder="PIN"
                                 inputMode="numeric"
@@ -233,7 +234,7 @@ function FulfilmentDraft({
                                         postalCode: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
                         </div>
                     </fieldset>
@@ -241,7 +242,8 @@ function FulfilmentDraft({
                 {moved ? (
                     <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
                         Delivery charge
-                        <input
+                        <Input
+                            dense
                             type="text"
                             inputMode="decimal"
                             value={charge}
@@ -249,7 +251,7 @@ function FulfilmentDraft({
                             placeholder="₹"
                             aria-invalid={typed.kind === "bad" || undefined}
                             aria-describedby={`${ids}-note`}
-                            className={cn(FOCUS, FIELD, "tabular-nums")}
+                            className="w-full tabular-nums"
                         />
                     </label>
                 ) : null}

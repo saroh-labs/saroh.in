@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
@@ -69,7 +70,8 @@ export function OptionValuesInline({
             <label htmlFor={id} className="text-[12px] font-medium">
                 Add {opt} values
             </label>
-            <input
+            <Input
+                dense
                 id={id}
                 value={typed}
                 disabled={locked || pending}
@@ -81,7 +83,7 @@ export function OptionValuesInline({
                     }
                 }}
                 placeholder="S, M, L"
-                className="h-8 min-w-0 flex-[1_1_160px] rounded-[8px] border border-border bg-card px-2.5 text-[12.5px] coarse:h-11"
+                className="min-w-0 flex-[1_1_160px]"
             />
             <Button
                 size="sm"

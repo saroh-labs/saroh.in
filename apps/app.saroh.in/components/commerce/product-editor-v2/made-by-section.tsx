@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@saroh/ui/date-picker";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -25,7 +26,7 @@ import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp, FieldLabel } from "./fields";
+import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: MadeByValues = {
@@ -181,15 +182,12 @@ export function MadeBySection({
                             >
                                 Maker or supplier
                             </FieldLabel>
-                            <input
+                            <Input
                                 id="pe-maker"
                                 {...form.register("maker")}
                                 disabled={ro}
                                 placeholder="Vetiver Labs"
                                 aria-invalid={makerMissing || !!errors.maker}
-                                className={boxClass({
-                                    bad: makerMissing || !!errors.maker,
-                                })}
                             />
                         </div>
                         <div className="min-w-0 flex-[1_1_150px]">
@@ -199,12 +197,11 @@ export function MadeBySection({
                             >
                                 Made in
                             </FieldLabel>
-                            <input
+                            <Input
                                 id="pe-made-in"
                                 {...form.register("madeIn")}
                                 disabled={ro}
                                 placeholder="Pune, India"
-                                className={boxClass()}
                             />
                         </div>
                     </div>
@@ -225,12 +222,12 @@ export function MadeBySection({
                         >
                             Supplier&apos;s product code
                         </FieldLabel>
-                        <input
+                        <Input
                             id="pe-supplier-code"
                             {...form.register("supplierCode")}
                             disabled={ro}
                             placeholder="For reordering"
-                            className={boxClass({ mono: true })}
+                            className="font-mono"
                         />
                     </div>
                     <div className="h-4" />
@@ -243,12 +240,11 @@ export function MadeBySection({
             >
                 Warranty
             </FieldLabel>
-            <input
+            <Input
                 id="pe-warranty"
                 {...form.register("warranty")}
                 disabled={ro}
                 placeholder="None"
-                className={boxClass()}
             />
             <FieldHelp className="mb-4 mt-1.5">
                 How long, and what it covers — one line. Leave it empty if there
@@ -304,18 +300,13 @@ export function MadeBySection({
             </div>
             {v.returnsMode === "OWN" ? (
                 <>
-                    <input
+                    <Input
                         {...form.register("returnsText")}
                         disabled={ro}
                         aria-label="This product's returns rule"
                         placeholder="Exchange within 7 days, tags on"
                         aria-invalid={ownMissing || !!errors.returnsText}
-                        className={cn(
-                            boxClass({
-                                bad: ownMissing || !!errors.returnsText,
-                            }),
-                            "mt-2",
-                        )}
+                        className="mt-2"
                     />
                     {ownMissing || errors.returnsText ? (
                         <FieldHelp className="mt-1.5" tone="bad">
@@ -457,7 +448,7 @@ function MoreAboutIt({
                                     ]}
                                 />
                             ) : (
-                                <input
+                                <Input
                                     id={id}
                                     value={value}
                                     disabled={disabled}
@@ -470,7 +461,6 @@ function MoreAboutIt({
                                         onChange(f.id, e.target.value)
                                     }
                                     aria-invalid={!!problem}
-                                    className={boxClass({ bad: !!problem })}
                                 />
                             )}
                             {problem ? (

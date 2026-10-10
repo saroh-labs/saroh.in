@@ -2,11 +2,45 @@
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrderReadLine } from "@/lib/orders/read";
 
 import { RefundPanel } from "./refund-panel";
+
+vi.mock("@saroh/ui/option-select", () => ({
+    OptionSelect: ({
+        id,
+        value,
+        onValueChange,
+        options,
+        disabled,
+        readOnly,
+        ...aria
+    }: {
+        id?: string;
+        value: string;
+        onValueChange: (v: string) => void;
+        options: { value: string; label: string; disabled?: boolean }[];
+        disabled?: boolean;
+        readOnly?: boolean;
+        "aria-label"?: string;
+    }) => (
+        <select
+            id={id}
+            aria-label={aria["aria-label"]}
+            value={value}
+            disabled={Boolean(disabled) || Boolean(readOnly)}
+            onChange={(e) => onValueChange(e.target.value)}
+        >
+            {options.map((o) => (
+                <option key={o.value} value={o.value} disabled={o.disabled}>
+                    {o.label}
+                </option>
+            ))}
+        </select>
+    ),
+}));
 
 /**
  * The refund sheet as the design draws it (B8): the lines, then Why (the

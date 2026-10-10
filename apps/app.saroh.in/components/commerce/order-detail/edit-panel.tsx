@@ -1,7 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useState } from "react";
 
 import { sentenceStart } from "@/lib/format/sentence";
@@ -16,11 +18,6 @@ import {
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
-
-const FIELD =
-    "block h-9 w-full rounded-lg border border-border bg-card px-2.5 text-[13px] font-normal coarse:h-11";
-
 interface AddressDraft {
     line1: string;
     city: string;
@@ -238,25 +235,20 @@ function EditDraft({
                 ) : addable && addable.length > 0 ? (
                     <label className="mt-2.5 block text-[12px] font-medium">
                         Add an item
-                        <select
+                        <OptionSelect
+                            size="sm"
+                            className="mt-1 font-normal"
                             value=""
-                            onChange={(e) => pick(e.target.value)}
-                            className={cn(
-                                FOCUS,
-                                "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
-                            )}
-                        >
-                            <option value="">Choose a product…</option>
-                            {addable.map((s) => (
-                                <option
-                                    key={s.key}
-                                    value={s.key}
-                                    disabled={s.soldOut}
-                                >
-                                    {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={pick}
+                            options={[
+                                { value: "", label: "Choose a product…" },
+                                ...addable.map((s) => ({
+                                    value: s.key,
+                                    label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
+                                    disabled: s.soldOut,
+                                })),
+                            ]}
+                        />
                     </label>
                 ) : null}
                 {delivery ? (
@@ -264,7 +256,7 @@ function EditDraft({
                         <legend className="text-[12px] font-medium">
                             Delivery address
                         </legend>
-                        <input
+                        <Input
                             aria-label="Street and number"
                             value={addr.line1}
                             onChange={(e) =>
@@ -273,10 +265,10 @@ function EditDraft({
                                     line1: e.target.value,
                                 }))
                             }
-                            className={cn(FIELD, "mt-[5px]")}
+                            className="mt-[5px] w-full"
                         />
                         <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                            <input
+                            <Input
                                 aria-label="Town or city"
                                 placeholder="Town or city"
                                 value={addr.city}
@@ -286,9 +278,9 @@ function EditDraft({
                                         city: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
-                            <input
+                            <Input
                                 aria-label="State"
                                 placeholder="State"
                                 value={addr.state}
@@ -298,9 +290,9 @@ function EditDraft({
                                         state: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
-                            <input
+                            <Input
                                 aria-label="PIN code"
                                 placeholder="PIN"
                                 inputMode="numeric"
@@ -311,7 +303,7 @@ function EditDraft({
                                         postalCode: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
                         </div>
                     </fieldset>
