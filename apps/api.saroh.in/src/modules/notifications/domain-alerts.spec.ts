@@ -199,6 +199,8 @@ describe("a live domain that stops working", () => {
             data: {
                 organizationId: ORG,
                 type: DOMAIN_DOWN_NOTIFICATION_TYPE,
+                // The row opens the site's settings.
+                siteId: "site_1",
                 title: "shop.ryeandco.in stopped working",
                 body: "Visitors can't reach Rye & Co shop at shop.ryeandco.in. It doesn't point to Saroh any more. Check its CNAME record at your domain provider. You'll find it in the site's Settings, under Your own domain. We'll tell you when it works again.",
             },
@@ -303,6 +305,7 @@ describe("a domain that works again", () => {
             data: {
                 organizationId: ORG,
                 type: DOMAIN_BACK_NOTIFICATION_TYPE,
+                siteId: "site_1",
                 title: "shop.ryeandco.in is working again",
                 body: "Visitors reach Rye & Co shop at shop.ryeandco.in again.",
             },

@@ -112,6 +112,8 @@ describe("booking.notify", () => {
             data: {
                 organizationId: ORG,
                 type: "booking.moved",
+                // The row opens the booking.
+                bookingId: "bk_1",
                 title: "Asha Rao moved their Check-up",
                 body: "Now Tue 6 Oct at 11:00. It was Mon 5 Oct at 10:00.",
             },

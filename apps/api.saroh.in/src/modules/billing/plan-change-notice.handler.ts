@@ -5,6 +5,7 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
+import { noticeOf } from "../notifications/notice-target";
 import { CatalogueAccessService } from "./catalogue-access.service";
 
 /**
@@ -191,7 +192,8 @@ export class PlanChangeNoticeHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId,
-                    type: PLAN_CHANGED_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_CHANGED_NOTIFICATION_TYPE, {}),
                     title: words.title,
                     body: words.body,
                 },

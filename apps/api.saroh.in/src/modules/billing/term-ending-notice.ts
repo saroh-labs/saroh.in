@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { businessTimezone } from "../bookings/staff-availability";
 import { paperDay } from "../invoices/invoice-paper-view";
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { freeChosenNotice, termEndingNotice } from "./billing-emails";
 import { FREE_PLAN_ID } from "./catalogue-access.service";
@@ -87,7 +88,8 @@ async function remindTerm(
         const notice = await tx.notification.create({
             data: {
                 organizationId,
-                type: PLAN_ENDING_NOTIFICATION_TYPE,
+                // It opens Plan and billing.
+                ...noticeOf(PLAN_ENDING_NOTIFICATION_TYPE, {}),
                 title: words.title,
                 body: words.body,
             },
