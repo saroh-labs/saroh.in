@@ -2,6 +2,7 @@
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -67,9 +68,11 @@ export function LibraryPanel({
                     }}
                 />
             ) : items.length === 0 ? (
-                <p className="text-[12px] text-muted-foreground">
-                    No photos in your library yet — upload one.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No photos in your library yet"
+                    description="Upload one."
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
                     {items.map((item) => {

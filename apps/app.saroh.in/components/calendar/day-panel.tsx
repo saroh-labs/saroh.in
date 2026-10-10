@@ -2,6 +2,7 @@ import { formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
 import Link from "next/link";
@@ -154,13 +155,17 @@ export function DayPanel({
                 </div>
             ) : null}
             {groups.length === 0 ? (
-                <p className="py-2.5 text-[13px] text-muted-foreground">
-                    {hidden
-                        ? "Nothing on this day for the layers you have on."
-                        : day.date >= today
-                          ? "Nothing on this day yet."
-                          : "Nothing happened on this day."}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="py-2.5"
+                    title={
+                        hidden
+                            ? "Nothing on this day for the layers you have on"
+                            : day.date >= today
+                              ? "Nothing on this day yet"
+                              : "Nothing happened on this day"
+                    }
+                />
             ) : null}
             {groups.map((layer) => {
                 const cell = day.layers[layer.key];

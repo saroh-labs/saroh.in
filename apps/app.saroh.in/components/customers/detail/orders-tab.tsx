@@ -3,6 +3,7 @@
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
 import type { OrderFilter } from "@/lib/customer-workspace/view";
@@ -25,6 +26,13 @@ const COLS =
  * the desk a table; on a phone (under 760px) a card per order in the Orders
  * list's own frame, so nothing hides sideways.
  */
+/** The tab with nothing under its filter: what is true, in one line. */
+function ordersEmpty(filter: OrderFilter) {
+    return filter === "open"
+        ? { title: "Nothing open", description: "Every order is done." }
+        : { title: "No past orders yet" };
+}
+
 export function OrdersTab({
     rows,
     count,
@@ -111,11 +119,11 @@ export function OrdersTab({
                         </div>
                     ))}
                     {!shown.length ? (
-                        <p className="py-3 text-[13px] text-muted-foreground">
-                            {filter === "open"
-                                ? "Nothing open — every order is done."
-                                : "No past orders yet."}
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="py-3"
+                            {...ordersEmpty(filter)}
+                        />
                     ) : null}
                 </div>
             </div>
@@ -168,11 +176,11 @@ export function OrdersTab({
                     ))}
                 </ul>
             ) : (
-                <p className="rounded-xl border border-border bg-card p-3 text-[13px] text-muted-foreground min-[760px]:hidden">
-                    {filter === "open"
-                        ? "Nothing open — every order is done."
-                        : "No past orders yet."}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="rounded-xl border border-border bg-card p-3 min-[760px]:hidden"
+                    {...ordersEmpty(filter)}
+                />
             )}
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">

@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     Sheet,
     SheetContent,
@@ -181,9 +182,10 @@ export function VariantDrawer({
                                 {orders ? (
                                     <>
                                         {mineOrders.length === 0 ? (
-                                            <p className="text-[12.5px] text-muted-foreground">
-                                                No open orders for this size.
-                                            </p>
+                                            <EmptyState
+                                                size="inline"
+                                                title="No open orders for this size"
+                                            />
                                         ) : (
                                             <ul>
                                                 {mineOrders.map((o) => (
@@ -252,10 +254,10 @@ export function VariantDrawer({
                             <DrawerSection title="Reviews from people who bought it">
                                 {reviews ? (
                                     mineReviews.length === 0 ? (
-                                        <p className="text-[12.5px] text-muted-foreground">
-                                            No reviews from people who bought
-                                            this size yet.
-                                        </p>
+                                        <EmptyState
+                                            size="inline"
+                                            title="No reviews from people who bought this size yet"
+                                        />
                                     ) : (
                                         <ul className="flex flex-col gap-2">
                                             {mineReviews.map((r) => (

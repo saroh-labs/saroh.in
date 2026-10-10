@@ -3,6 +3,7 @@
 import { FailedRead } from "@/components/shared/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
@@ -219,11 +220,12 @@ export function AttentionCard({
                         </div>
                     ))}
                     {!state.entries.length && !hidden ? (
-                        <p className="mt-1.5 text-pretty text-[13px] leading-[1.5] text-muted-foreground">
-                            Nothing yet. An allergy, a medical note or an access
-                            need goes here, and the team sees it by their name
-                            and on their bookings.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="mt-1.5"
+                            title="Nothing yet"
+                            description="An allergy, a medical note or an access need goes here, and the team sees it by their name and on their bookings."
+                        />
                     ) : null}
                     {hidden ? (
                         <p

@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { useState } from "react";
@@ -131,11 +132,19 @@ export function LinesStep({
                 />
                 <div className="mt-2 flex flex-col gap-1.5">
                     {shown.length === 0 ? (
-                        <p className="text-[12.5px] text-muted-foreground">
-                            {products.length === 0
-                                ? `Nothing is sold at ${storeName} yet.`
-                                : `Nothing called “${query.trim()}” here.`}
-                        </p>
+                        products.length === 0 ? (
+                            <EmptyState
+                                size="inline"
+                                title={`Nothing is sold at ${storeName} yet`}
+                            />
+                        ) : (
+                            <EmptyState
+                                size="inline"
+                                kind="no-results"
+                                things="products"
+                                title={`Nothing called “${query.trim()}” here`}
+                            />
+                        )
                     ) : null}
                     {shown.map((p) => (
                         <div

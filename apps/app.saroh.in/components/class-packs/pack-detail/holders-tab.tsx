@@ -149,9 +149,15 @@ export function HoldersTab({
             />
             <div id={panelId}>
                 {list.length === 0 ? (
-                    <p className="pb-1 pt-3.5 text-[13px] text-muted-foreground">
-                        {which === "live" ? emptyLive : "Nothing finished yet."}
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="pb-1 pt-3.5"
+                        title={
+                            which === "live"
+                                ? emptyLive
+                                : "Nothing finished yet"
+                        }
+                    />
                 ) : (
                     <ul className="mt-2 grid">
                         {list.map((r) => (

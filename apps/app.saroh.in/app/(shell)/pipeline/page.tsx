@@ -194,9 +194,11 @@ export default async function PipelinePage() {
 
                             <div className="flex flex-col gap-3">
                                 {stageLeads.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground">
-                                        No leads
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        className="text-xs"
+                                        title="No leads at this stage"
+                                    />
                                 ) : (
                                     stageLeads.map((lead) => {
                                         const amount = formatMoney(

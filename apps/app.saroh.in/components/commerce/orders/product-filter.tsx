@@ -7,6 +7,7 @@ import {
     CommandItem,
     CommandList,
 } from "@saroh/ui/command";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronDown } from "lucide-react";
@@ -14,7 +15,6 @@ import { useEffect, useRef, useState } from "react";
 
 import type { OrderProductOption } from "@/lib/orders/business-service";
 import { findOrderProducts } from "@/lib/orders/list-actions";
-import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * The Orders list's Product filter (plan B, B4): a search picker rather
@@ -111,11 +111,21 @@ export function ProductFilter({
                             </p>
                         ) : null}
                         {!error && found?.length === 0 && !searching ? (
-                            <p className="px-3 py-2.5 text-[12.5px] text-muted-foreground">
-                                {q.trim()
-                                    ? noMatchLine("ordered products", q)
-                                    : "No products have been ordered yet."}
-                            </p>
+                            q.trim() ? (
+                                <EmptyState
+                                    size="inline"
+                                    kind="no-results"
+                                    things="ordered products"
+                                    query={q}
+                                    className="px-3 py-2.5"
+                                />
+                            ) : (
+                                <EmptyState
+                                    size="inline"
+                                    className="px-3 py-2.5"
+                                    title="No products have been ordered yet"
+                                />
+                            )
                         ) : null}
                         {!found && !error ? (
                             <p className="px-3 py-2.5 text-[12.5px] text-muted-foreground">

@@ -4,6 +4,7 @@ import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Label } from "@saroh/ui/label";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import {
@@ -591,9 +592,10 @@ export function CsvImport({
                                     Choose a different file
                                 </Button>
                                 {willWrite === 0 && !pending ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Nothing to import yet.
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        title="Nothing to import yet"
+                                    />
                                 ) : null}
                             </div>
                         </CardContent>

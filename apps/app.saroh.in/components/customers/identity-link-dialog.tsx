@@ -2,6 +2,7 @@
 
 import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
@@ -83,9 +84,11 @@ export function IdentityLinkDialog({
             onClose={() => setOpen(false)}
         >
             {suggestions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    No customers match.
-                </p>
+                <EmptyState
+                    size="inline"
+                    kind="no-results"
+                    things="customers"
+                />
             ) : (
                 <ul className="divide-y rounded-xl border">
                     {suggestions.map((s, index) => (

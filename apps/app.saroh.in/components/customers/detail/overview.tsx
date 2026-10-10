@@ -3,6 +3,7 @@
 import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -324,10 +325,12 @@ function ClassesLeft({
                         </Link>
                     ))}
                     {!m && !packs.length ? (
-                        <p className="mt-2 text-pretty text-[13px] text-muted-foreground">
-                            No membership or packs. Classes are paid one at a
-                            time until they buy one.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="mt-2"
+                            title="No membership or packs"
+                            description="Classes are paid one at a time until they buy one."
+                        />
                     ) : null}
                 </>
             ) : (

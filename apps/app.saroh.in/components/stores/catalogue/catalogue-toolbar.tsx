@@ -2,6 +2,7 @@
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -207,9 +208,11 @@ function ChoiceSub({
                 {choices === null ? (
                     <FailedRead className="px-2 py-1.5" things="these" />
                 ) : choices.length === 0 ? (
-                    <p className="px-2 py-1.5 text-[12.5px] text-muted-foreground">
-                        {empty}
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="px-2 py-1.5"
+                        title={empty}
+                    />
                 ) : (
                     <>
                         <DropdownMenuItem onSelect={() => onPick(null)}>

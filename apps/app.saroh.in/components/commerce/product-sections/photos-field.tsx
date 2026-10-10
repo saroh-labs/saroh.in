@@ -365,10 +365,11 @@ function LibraryPanel({
                     }}
                 />
             ) : items.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    No photos in your library yet — upload one, or add one by
-                    address.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No photos in your library yet"
+                    description="Upload one, or add one by address."
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
                     {items.map((item) => {

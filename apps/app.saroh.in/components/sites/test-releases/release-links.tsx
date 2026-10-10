@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
@@ -79,10 +80,11 @@ export function ReleaseLinks({
                 <LinkBox url={fresh.url} label="New link — shown once" />
             ) : null}
             {active.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    No link works right now.
-                    {canShare ? " Make one to share it." : ""}
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No link works right now"
+                    description={canShare ? "Make one to share it." : undefined}
+                />
             ) : (
                 <ul className="grid gap-1">
                     {active.map((link) => (

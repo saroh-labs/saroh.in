@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
 import { useId, useState } from "react";
@@ -348,8 +349,12 @@ export function EditorRail({
                                     </li>
                                 ))}
                                 {sections.length === 0 ? (
-                                    <li className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                        No blocks yet.
+                                    <li className="px-2 py-6">
+                                        <EmptyState
+                                            size="inline"
+                                            className="justify-center text-center"
+                                            title="No blocks yet"
+                                        />
                                     </li>
                                 ) : null}
                                 <FixedBlockRow
