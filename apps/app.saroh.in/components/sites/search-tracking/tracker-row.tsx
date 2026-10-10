@@ -7,15 +7,15 @@ import {
     NOT_RUNNING_LINE,
     POSTHOG_REGION_WORDS,
     TRACKER_WORDS,
-    trackerHelpHref,
     trackerRunsLine,
 } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
 
 /**
- * One tool in the trackers list (DEC-108, U7), connected or not: its name,
- * where to find its id, a Help link, and how it stands — said in words,
- * never by colour alone. The actions are the caller's, so the read-only
+ * One tool in the trackers list (DEC-108, U7), connected or not, on one
+ * line: its name and how it stands, said in words, never by colour alone,
+ * with its id once connected. Where to find the id, and the Help link,
+ * open with Set up (`TrackerSetupDialog`), not on every row. The actions are the caller's, so the read-only
  * view draws the same row with none.
  *
  * - Connected and running: "On", and where it runs.
@@ -42,9 +42,9 @@ export function TrackerRow({
     return (
         <div
             data-tracker={kind}
-            className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3"
+            className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
         >
-            <div className="min-w-0 flex-1 basis-64 space-y-1">
+            <div className="min-w-0 flex-1 basis-48 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{words.name}</span>
                     <StandingBadge tracker={tracker} standing={standing} />
@@ -68,21 +68,6 @@ export function TrackerRow({
                     standing={standing}
                     lock={lock}
                 />
-                <p className="text-sm text-muted-foreground">
-                    {words.where}{" "}
-                    <a
-                        href={trackerHelpHref(kind)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-foreground underline underline-offset-2 hover:text-muted-foreground active:text-foreground"
-                    >
-                        Help
-                        <span className="sr-only">
-                            {" "}
-                            with finding your {words.name} ID
-                        </span>
-                    </a>
-                </p>
             </div>
             {actions ? (
                 <div className="flex shrink-0 flex-wrap items-center gap-2">

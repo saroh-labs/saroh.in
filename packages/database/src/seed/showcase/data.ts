@@ -1023,7 +1023,10 @@ export interface ShowcaseBusiness {
     bookings: number;
     /** Extra weight for a weekday in the diary, Sunday first. */
     weekdayWeights?: readonly number[];
-    /** A Razorpay connection, so Payments reads as working. */
+    /**
+     * A payment connection, so Payments reads as working: a stand-in, on this
+     * machine's database only (`stand-in-providers.ts`).
+     */
     paymentProvider?: "RAZORPAY" | "CASHFREE";
     /**
      * The registered address its invoices print (DEC-068: issuing one, or

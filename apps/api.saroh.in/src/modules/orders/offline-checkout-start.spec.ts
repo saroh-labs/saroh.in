@@ -217,6 +217,61 @@ describe("Free takes money offline", () => {
         expect(createIntent).not.toHaveBeenCalled();
     });
 
+    it("records the delivery the bag showed: free over the location's amount, though the way has a fee", async () => {
+        onPlan("free");
+        (priceBag as jest.Mock).mockResolvedValueOnce({
+            quote: {
+                currency: "INR",
+                lines: [],
+                ways: [],
+                fulfilment: "LOCAL_DELIVERY",
+                subtotal: "1200.00",
+                delivery: "0.00",
+                freeDelivery: { over: "1000.00", short: null },
+                total: "1200.00",
+                ready: true,
+            },
+            lines: [
+                {
+                    listingId: "listing_1",
+                    productId: "product_1",
+                    fulfilmentTypes: [],
+                },
+            ],
+            settings: {
+                currency: "INR",
+                ways: ["PICKUP", "LOCAL_DELIVERY"],
+                fees: {
+                    localDeliveryFee: "60.00",
+                    shippingFee: null,
+                    freeOver: "1000.00",
+                },
+            },
+        });
+
+        // Its own caller, so the start limit the other tests count is kept.
+        await service.start("site_1", customer, "hash_free_delivery", {
+            lines: [{ listingId: "listing_1", quantity: 2 }],
+            fulfilment: "LOCAL_DELIVERY",
+            key: "key-12345678", // gitleaks:allow (a checkout's idempotency key)
+            payment: "ON_HANDOVER",
+            address: {
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+        } as CheckoutStartDto);
+        expect(createCheckoutOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({
+                type: "LOCAL_DELIVERY",
+                shippingCents: 0,
+            }),
+        );
+    });
+
     it("refuses paying online, and makes nothing", async () => {
         onPlan("free");
 

@@ -45,8 +45,9 @@ export function WebAddressSection({
     if (!read.ok && read.missing) return null;
     return (
         <section
+            id="web-address"
             aria-label="Web address"
-            className="overflow-hidden rounded-xl border border-border bg-card"
+            className="scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
         >
             {read.ok ? (
                 <Loaded view={read.data} zone={zone} />

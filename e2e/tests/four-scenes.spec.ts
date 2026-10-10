@@ -35,9 +35,9 @@ const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
     "/": (page) => page.getByRole("region", { name: "Needs you" }),
     "/bookings": (page) => page.getByRole("radiogroup", { name: "Layout" }),
-    // Sell lands on its location (or locations, with several).
-    "/commerce": (page) =>
-        page.getByRole("heading", { level: 1, name: /^Locations?$/ }),
+    // Sell lands on its location, titled with its own name; its first card
+    // is the same whatever it is called.
+    "/commerce": (page) => page.getByRole("region", { name: "The place" }),
     "/contacts": (page) =>
         page.getByRole("heading", { level: 1, name: "Contacts" }),
 };

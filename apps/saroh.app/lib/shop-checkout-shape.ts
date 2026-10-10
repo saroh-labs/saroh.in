@@ -110,6 +110,15 @@ function isLine(v: unknown): boolean {
     );
 }
 
+/** "Free delivery over" on the quote; absent from an older API. */
+function isFreeDelivery(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) && isString(v.over) && isStringOrNull(v.short))
+    );
+}
+
 /** A code's answer on the quote (DEC-104); absent from an older API. */
 function isDiscount(v: unknown): boolean {
     if (v === undefined || v === null) return true;
@@ -132,6 +141,7 @@ export function isQuote(v: unknown): v is CheckoutQuote {
         isString(v.subtotal) &&
         isString(v.delivery) &&
         isDiscount(v.discount) &&
+        isFreeDelivery(v.freeDelivery) &&
         isString(v.total) &&
         typeof v.ready === "boolean" &&
         // Absent from an API before offline payment: online only.
@@ -185,6 +195,8 @@ const WORDS: Record<ShopProblem, string> = {
     busy: "Too many tries just now. Wait a minute, then try again.",
     "cant-order":
         "This shop isn't taking orders online right now. Ask them about ordering instead.",
+    "payments-down":
+        "The business can't take payment online right now. Please try again later, or pay them another way.",
     invalid: "Check the details and try again.",
     error: SHOP_TROUBLE,
     "test-release": TEST_RELEASE_MESSAGE,
@@ -222,6 +234,16 @@ export function problemOf(
     if (isTestReleaseRefusal(status, body)) return fail("test-release");
     if (status === 401) return fail("signed-out");
     if (status === 403) return fail("cant-order");
+    // The business's online payment failed just now (its provider, or keys
+    // that won't open): said as that, never as our trouble, so the shopper
+    // knows to try later or pay another way.
+    if (
+        status === 503 &&
+        (reason === "provider-unavailable" ||
+            reason === "provider-keys-refused")
+    ) {
+        return fail("payments-down");
+    }
     // A code that stopped applying, said in the customer's words (DEC-104):
     // the checkout writes these sentences for the shopper.
     if (

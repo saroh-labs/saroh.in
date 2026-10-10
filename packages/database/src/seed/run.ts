@@ -54,6 +54,11 @@ import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
 import { seedSarohEmailBusinesses } from "./saroh-email";
+import {
+    PLACEHOLDER_CREDENTIALS,
+    seedStandInCommunicationProvider,
+    seedStandInPaymentProvider,
+} from "./stand-in-providers";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -298,10 +303,9 @@ export async function seed(): Promise<void> {
             provider: "RAZORPAY",
             status: "DISABLED",
             // Placeholders: nothing here is a real credential, and the seed
-            // must never fabricate one that looks usable.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
+            // must never fabricate one that looks usable. DISABLED, so
+            // nothing ever opens them.
+            ...PLACEHOLDER_CREDENTIALS,
         },
     });
 
@@ -1286,49 +1290,24 @@ async function seedProviders(
     siteIds: string[],
     now: Date,
 ) {
-    await prisma.merchantPaymentProvider.upsert({
-        where: {
-            organizationId_provider: {
-                organizationId: orgId,
-                provider: LIVE_PAYMENT_PROVIDER.provider,
-            },
-        },
-        update: { status: LIVE_PAYMENT_PROVIDER.status },
-        create: {
-            id: id("payments", "cashfree"),
-            organizationId: orgId,
-            provider: LIVE_PAYMENT_PROVIDER.provider,
-            status: LIVE_PAYMENT_PROVIDER.status,
-            // Placeholders, as above: the seed must never fabricate a
-            // credential that looks usable.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    // Stand-ins: CONNECTED on a throwaway database, where the browser specs
+    // need them; never written on a shared one (`stand-in-providers.ts`).
+    const standIns = await seedStandInPaymentProvider(prisma, {
+        id: id("payments", "cashfree"),
+        organizationId: orgId,
+        provider: LIVE_PAYMENT_PROVIDER.provider,
     });
-
-    await prisma.communicationProvider.upsert({
-        where: {
-            organizationId_channel: {
-                organizationId: orgId,
-                channel: COMMUNICATION_PROVIDER.channel,
-            },
-        },
-        update: {
-            status: COMMUNICATION_PROVIDER.status,
-            fromAddress: COMMUNICATION_PROVIDER.fromAddress,
-        },
-        create: {
-            id: id("comms", "email"),
-            organizationId: orgId,
-            channel: COMMUNICATION_PROVIDER.channel,
-            provider: COMMUNICATION_PROVIDER.provider,
-            status: COMMUNICATION_PROVIDER.status,
-            fromAddress: COMMUNICATION_PROVIDER.fromAddress,
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    if (!standIns) {
+        console.log(
+            "[seed] not this machine's database: no stand-in provider connections (connect real test keys in Settings › Providers)",
+        );
+    }
+    await seedStandInCommunicationProvider(prisma, {
+        id: id("comms", "email"),
+        organizationId: orgId,
+        channel: COMMUNICATION_PROVIDER.channel,
+        provider: COMMUNICATION_PROVIDER.provider,
+        fromAddress: COMMUNICATION_PROVIDER.fromAddress,
     });
 
     const siteId = siteIds.at(DOMAIN.site);

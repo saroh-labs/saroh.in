@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { CheckoutQuote, QuoteLine } from "./api";
-import { holdReason, overStock, payWords, stockNotice } from "./bag-sheet";
+import {
+    freeDeliveryNote,
+    holdReason,
+    overStock,
+    payWords,
+    stockNotice,
+} from "./bag-sheet";
 import { cleanCode, codeSettled } from "./code-field";
 
 /**
@@ -159,5 +165,63 @@ describe("the bag's discount code (DEC-104)", () => {
         expect(codeSettled({ ...base, discount: null }, null)).toBe(true);
         // An API before site codes never answers for one.
         expect(codeSettled(base, "SAVE10")).toBe(true);
+    });
+});
+
+/**
+ * The location's "Free delivery over" under the bag's delivery row: a nudge
+ * while the items are under it, a plain "free" once they reach it, and
+ * nothing for Pick-up or a shop with no amount.
+ */
+describe("freeDeliveryNote", () => {
+    const ways = (local: string | null, shipping: string | null) =>
+        [
+            { type: "PICKUP", label: "Pick-up", fee: null },
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: local },
+            { type: "SHIPPING", label: "Shipping", fee: shipping },
+        ] satisfies CheckoutQuote["ways"];
+
+    it("says how much more makes delivery free while the bag is under it", () => {
+        const under = quote({
+            ways: ways("60.00", "120.00"),
+            freeDelivery: { over: "999.00", short: "120.00" },
+        });
+        expect(freeDeliveryNote(under, "LOCAL_DELIVERY")).toBe(
+            "Add ₹120 more for free delivery.",
+        );
+        // Before a way is chosen, too.
+        expect(freeDeliveryNote(under, null)).toBe(
+            "Add ₹120 more for free delivery.",
+        );
+    });
+
+    it("says delivery is free once the bag reaches it", () => {
+        const reached = quote({
+            ways: ways(null, null),
+            freeDelivery: { over: "999.00", short: null },
+        });
+        expect(freeDeliveryNote(reached, "SHIPPING")).toBe(
+            "Free delivery on orders of ₹999 or more.",
+        );
+        expect(freeDeliveryNote(reached, null)).toBeNull();
+    });
+
+    it("says nothing for Pick-up, with no amount, or for a way with no fee", () => {
+        const under = quote({
+            ways: ways(null, "120.00"),
+            freeDelivery: { over: "999.00", short: "120.00" },
+        });
+        expect(freeDeliveryNote(under, "PICKUP")).toBeNull();
+        expect(freeDeliveryNote(under, "LOCAL_DELIVERY")).toBeNull();
+        expect(
+            freeDeliveryNote(
+                quote({ ways: ways("60.00", null), freeDelivery: null }),
+                "LOCAL_DELIVERY",
+            ),
+        ).toBeNull();
+        // An API before free delivery sends nothing.
+        expect(
+            freeDeliveryNote(quote({ ways: ways("60.00", null) }), null),
+        ).toBeNull();
     });
 });

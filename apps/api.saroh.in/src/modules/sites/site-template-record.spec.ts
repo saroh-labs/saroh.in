@@ -4,6 +4,7 @@ import {
     publicationTemplate,
     siteTemplate,
     templateFooterLine,
+    templateFormerFooterLines,
 } from "./site-template-record";
 
 describe("a site's template record (KTD-7)", () => {
@@ -69,5 +70,27 @@ describe("the template's own footer line (round 2)", () => {
                 templateVersion: starterTemplate.version,
             }),
         ).toBeNull();
+    });
+
+    it("gives a shop on Store a line that names no other business, and keeps the old one known", () => {
+        const store = { templateId: "ceramics", templateVersion: 1 };
+        expect(templateFooterLine(store)).toBe(
+            "Your area and town · when you are open",
+        );
+        expect(templateFormerFooterLines(store)).toEqual([
+            "Your area and town — and when the studio is open",
+        ]);
+        expect(
+            templateFormerFooterLines({
+                templateId: null,
+                templateVersion: null,
+            }),
+        ).toEqual([]);
+        expect(
+            templateFormerFooterLines({
+                templateId: "bakery",
+                templateVersion: 1,
+            }),
+        ).toEqual([]);
     });
 });

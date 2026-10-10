@@ -83,6 +83,7 @@ export default async function WebsiteTabsLayout({
         paused: pausedSites.includes(s.id),
     }));
     const thisPaused = pausedSites.includes(site.id);
+    const reached = siteAddressOf(site, webAddress, RENDERER_APEX);
 
     return (
         <PageContainer width="full">
@@ -102,9 +103,11 @@ export default async function WebsiteTabsLayout({
                         paused: thisPaused,
                     }}
                     sites={summaries}
-                    address={
-                        siteAddressOf(site, webAddress, RENDERER_APEX)?.host ??
-                        `/${site.slug}`
+                    address={reached?.host ?? `/${site.slug}`}
+                    // A link only once the site is live: before that the
+                    // address opens nothing.
+                    liveUrl={
+                        site.currentPublication && reached ? reached.url : null
                     }
                     canEdit={site.can.edit}
                     mayCreate={navRoleCan(

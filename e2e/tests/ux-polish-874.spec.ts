@@ -1,13 +1,15 @@
-// @covers accounts:/login app:/open app:/choose app:/settings/profile app:/settings/organization app:/billing/plans app:/billing/subscriptions app:/commerce/products api:organizations api:subscriptions pkg:ui
+// @covers accounts:/login app:/open app:/choose app:/settings/profile app:/settings/organization app:/settings/activity app:/billing/plans app:/billing/subscriptions app:/commerce/products api:organizations api:audit api:subscriptions pkg:ui
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { makeBusiness } from "../fixtures/own-business";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * UX polish left from the 7 Oct audit (#874). Read-only on Northwind:
- * nothing here saves.
+ * nothing here saves there. Settings' tabs are read on a business the test
+ * sets up for itself, whose Activity no other test writes to.
  *
  * - UX-079: on a phone, Settings' tabs and Settings › Business's tab strip
  *   fade on the side with more, and the open tab is scrolled into view.
@@ -45,39 +47,48 @@ test.describe("phone tab strips (UX-079)", () => {
     test.skip(({ isMobile }) => !isMobile, "Phone widths only.");
 
     for (const width of [320, 390]) {
+        // On a business of its own (`makeBusiness`, as Asha): the strip's
+        // tabs and the Activity page under it are drawn from the business,
+        // and Northwind's Activity is every other test's changes, its
+        // Providers tab a note other tests turn on and off.
         test(`Settings' tabs say there is more at ${width}px`, async ({
             page,
-        }) => {
+        }, testInfo) => {
             await page.setViewportSize({ width, height: 800 });
-            await signIn(page);
+            const business = await makeBusiness(page, testInfo, "tabs");
+            await page.goto(`/open/${business.id}`);
             // Activity sits late in the row: it must be scrolled to.
             await page.goto("/settings/activity");
-            // The strip settles once fonts load; the open tab stays revealed.
+            // All of it in one look, polled: the strip settles once fonts
+            // load, and the fade follows a render after each scroll. The
+            // page is measured against the width set, not `innerWidth`,
+            // which a phone widens to fit an overflow.
             await expect
-                .poll(
-                    async () =>
-                        (
-                            await strip(
-                                page,
-                                'nav[aria-label="Settings"]',
-                                '[aria-current="page"]',
-                            )
-                        ).inView,
-                )
-                .toBe(true);
-            const got = await strip(
-                page,
-                'nav[aria-label="Settings"]',
-                '[aria-current="page"]',
-            );
-            if (got.overflows) expect(got.mask).toContain("transparent");
-            expect(
-                await page.evaluate(
-                    () =>
-                        document.documentElement.scrollWidth <=
-                        window.innerWidth,
-                ),
-            ).toBe(true);
+                .poll(async () => {
+                    const got = await strip(
+                        page,
+                        'nav[aria-label="Settings"]',
+                        '[aria-current="page"]',
+                    );
+                    const view = await page.evaluate(() => ({
+                        scrollWidth: document.documentElement.scrollWidth,
+                        innerWidth: window.innerWidth,
+                    }));
+                    return {
+                        overflows: got.overflows,
+                        fades: got.mask.includes("transparent"),
+                        inView: got.inView,
+                        fits: view.scrollWidth <= width + 1,
+                        zoomedOut: view.innerWidth > width + 1,
+                    };
+                })
+                .toEqual({
+                    overflows: true,
+                    fades: true,
+                    inView: true,
+                    fits: true,
+                    zoomedOut: false,
+                });
         });
 
         test(`Business's tab strip says there is more at ${width}px`, async ({
@@ -90,15 +101,30 @@ test.describe("phone tab strips (UX-079)", () => {
                 name: "Business details",
             });
             await expect(tabs).toBeVisible();
+            // Pressed until it takes: the tabs are drawn by the server, and
+            // a press before hydration does nothing. Identity would stay
+            // open, in view without anything revealed, and pass for nothing.
             const last = tabs.getByRole("tab").last();
-            await last.click();
-            const got = await strip(
-                page,
-                '[role="tablist"][aria-label="Business details"]',
-                '[aria-selected="true"]',
-            );
-            expect(got.inView).toBe(true);
-            if (got.overflows) expect(got.mask).toContain("transparent");
+            await expect(async () => {
+                await last.click();
+                await expect(last).toHaveAttribute("aria-selected", "true", {
+                    timeout: 2_000,
+                });
+            }).toPass({ timeout: 20_000 });
+            await expect
+                .poll(async () => {
+                    const got = await strip(
+                        page,
+                        '[role="tablist"][aria-label="Business details"]',
+                        '[aria-selected="true"]',
+                    );
+                    return {
+                        inView: got.inView,
+                        fades:
+                            !got.overflows || got.mask.includes("transparent"),
+                    };
+                })
+                .toEqual({ inView: true, fades: true });
         });
     }
 });

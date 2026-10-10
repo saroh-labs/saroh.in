@@ -63,3 +63,17 @@ export function templateFooterLine(site: SiteTemplateColumns): string | null {
     const line = getTemplate(own.id, own.version)?.footer?.line?.trim();
     return line === undefined || line === "" ? null : line;
 }
+
+/**
+ * The lines the site's template started sites with before its line was
+ * reworded (`footer.formerLines`): a site made then and never changed
+ * still has its template's words, not the owner's. Empty for a site with
+ * no record.
+ */
+export function templateFormerFooterLines(site: SiteTemplateColumns): string[] {
+    const own = siteTemplate(site);
+    if (!own) return [];
+    return (getTemplate(own.id, own.version)?.footer?.formerLines ?? [])
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
+}

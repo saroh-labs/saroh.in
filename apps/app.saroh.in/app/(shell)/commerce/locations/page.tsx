@@ -22,6 +22,8 @@ import {
  * it, and read here rather than in the screen for the reason Orders gives:
  * `useSearchParams` would put the whole screen behind Suspense for a value
  * needed once. An unknown id falls back to the first, not to an error.
+ * The open tab (`?section=`) is the screen's own, as Settings › Business
+ * keeps its tab (`useTabParam`): this page is dynamic, so nothing waits on it.
  */
 export async function generateMetadata() {
     // Named by the count, as the rail names it: "Location" for one.
@@ -75,6 +77,7 @@ export default async function StorefrontsPage({
                 businessName={organization?.name ?? "This business"}
                 storefronts={storefronts}
                 selected={selected}
+                chosenId={chosen?.id}
                 site={siteSelling.known ? siteSelling.site : undefined}
                 canCreate={
                     may("store:create") &&

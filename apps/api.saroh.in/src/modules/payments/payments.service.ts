@@ -60,6 +60,7 @@ import {
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
 import {
     assertKeysAccepted,
+    credentialsUnreadable,
     paymentProviderWorks,
     providerOrderFailed,
 } from "./provider-keys";
@@ -1959,7 +1960,17 @@ export class PaymentsService {
         }
 
         // Decrypt in-memory ONLY here, at the moment of the provider call.
-        const credentials = this.openCredentials(providerRow);
+        // Keys that won't open are the same handled 503 as a provider that
+        // fails: the customer reads that online payment is down, never a
+        // bare 500. An order already started stays as it is: nothing was
+        // charged, a retry with the same key tries again, and an online
+        // checkout nobody pays is closed by its job.
+        let credentials: ProviderCredentials;
+        try {
+            credentials = this.openCredentials(providerRow);
+        } catch (err) {
+            throw credentialsUnreadable(providerRow, err);
+        }
         const provider = this.factory.get(providerRow.provider);
         let intent: CreateOrderIntentResult;
         try {
@@ -2229,8 +2240,15 @@ export class PaymentsService {
             iv: row.credentialsIv,
             authTag: row.credentialsAuthTag,
         });
-        const parsed = JSON.parse(json) as Partial<ProviderCredentials>;
-        if (!parsed.keyId || !parsed.keySecret) {
+        // A parse error quotes the text it read, which here is the secret:
+        // it is replaced, never passed on to a log.
+        let parsed: Partial<ProviderCredentials> | null;
+        try {
+            parsed = JSON.parse(json) as Partial<ProviderCredentials> | null;
+        } catch {
+            parsed = null;
+        }
+        if (!parsed?.keyId || !parsed.keySecret) {
             throw new BadRequestException(
                 "Stored provider credentials are malformed",
             );
