@@ -1,5 +1,7 @@
 "use client";
 
+import { formatClock, formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -38,9 +40,7 @@ import {
     addDays,
     blocksOnDay,
     bookedValue,
-    clock,
     dayColumns,
-    dayLabel,
     isLive,
     localDateOf,
     localMinuteOf,
@@ -224,7 +224,7 @@ export function CalendarScreen({
             const byPerson = blocksOnDay(calendar, d, timezone);
             return {
                 date: d,
-                label: dayLabel(d),
+                label: formatDay(d, { weekday: "short", year: "never" }),
                 blocks: Array.from(byPerson.values())
                     .flat()
                     .sort((a, b) => a.start - b.start),
@@ -250,7 +250,7 @@ export function CalendarScreen({
         : null;
     // The week's totals cover all seven days, even on a phone, where the list
     // under them shows one day at a time.
-    const summary = `${live.length} ${live.length === 1 ? "booking" : "bookings"}${
+    const summary = `${count(live.length, "booking")}${
         layout === "week" ? " this week" : ""
     }${
         value !== null && currencyCode
@@ -348,7 +348,7 @@ export function CalendarScreen({
                         ? `${who}'s place cancelled. Within ${rules?.freeCancelHours} hours, so the class is used.`
                         : `${who}'s place cancelled — the class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
                     : `${who}'s place cancelled.`
-                : `Cancelled ${who}'s ${clock(localMinuteOf(b.startAt, timezone))}.`;
+                : `Cancelled ${who}'s ${formatClock(localMinuteOf(b.startAt, timezone))}.`;
             hold(
                 `cancel:${b.id}`,
                 message,
@@ -378,7 +378,7 @@ export function CalendarScreen({
             ).length;
             hold(
                 `class:${seats.map((b) => b.id).join(",")}`,
-                `${title} cancelled.${back ? ` ${back} ${back === 1 ? "class" : "classes"} given back.` : ""}`,
+                `${title} cancelled.${back ? ` ${count(back, "class", "classes")} given back.` : ""}`,
                 async () => {
                     let failed = 0;
                     for (const b of seats) {
@@ -393,7 +393,7 @@ export function CalendarScreen({
                     }
                     if (failed) {
                         showError(
-                            `${failed} ${failed === 1 ? "place" : "places"} could not be cancelled.`,
+                            `${count(failed, "place")} could not be cancelled.`,
                             "The rest are. Open the class to try those again.",
                         );
                     }
@@ -413,7 +413,7 @@ export function CalendarScreen({
                 }
                 setPeek(null);
                 router.refresh();
-                const to = `${dayLabel(localDateOf(slot.startAt, timezone))} at ${clock(localMinuteOf(slot.startAt, timezone))}`;
+                const to = `${formatDay(localDateOf(slot.startAt, timezone), { weekday: "short", year: "never" })} at ${formatClock(localMinuteOf(slot.startAt, timezone))}`;
                 showUndo(`Moved ${firstName(b)} to ${to}.`, async () => {
                     const back = await rescheduleBooking(b.id, b.startAt);
                     router.refresh();
@@ -469,8 +469,8 @@ export function CalendarScreen({
     const step = layout === "week" ? 7 : 1;
     const heading =
         layout === "week"
-            ? `Week of ${dayLabel(weekStart).slice(4)}`
-            : `${dayLabel(date)}${date === today ? " · today" : ""}`;
+            ? `Week of ${formatDay(weekStart, { year: "never" })}`
+            : `${formatDay(date, { weekday: "short", year: "never" })}${date === today ? " · today" : ""}`;
 
     const freeRows =
         staff === null
@@ -517,7 +517,7 @@ export function CalendarScreen({
             empty={
                 date === today
                     ? "Nothing booked today."
-                    : `Nothing booked on ${dayLabel(date)}.`
+                    : `Nothing booked on ${formatDay(date, { weekday: "short", year: "never" })}.`
             }
         />
     );
@@ -652,7 +652,10 @@ export function CalendarScreen({
                                 selected={peek}
                                 canBook={can.book}
                                 canOpenHours={can.hours}
-                                dayText={dayLabel(date)}
+                                dayText={formatDay(date, {
+                                    weekday: "short",
+                                    year: "never",
+                                })}
                                 onBlock={peekFromDay}
                                 onFree={bookGap}
                                 onClosed={openClosed}
@@ -825,7 +828,7 @@ export function rulesSentence(rules: BookingRules | null): string {
     if (rules?.bookAheadDays) {
         const d = rules.bookAheadDays;
         parts.push(
-            `up to ${d % 7 === 0 ? `${d / 7} ${d === 7 ? "week" : "weeks"}` : `${d} ${d === 1 ? "day" : "days"}`} ahead`,
+            `up to ${d % 7 === 0 ? `${d / 7} ${d === 7 ? "week" : "weeks"}` : count(d, "day")} ahead`,
         );
     }
     if (rules?.latestBookingMinutes) {
@@ -839,7 +842,7 @@ export function rulesSentence(rules: BookingRules | null): string {
         : "Customers can book any free time";
     const cancel =
         rules?.freeCancelHours !== null && rules?.freeCancelHours !== undefined
-            ? `, and cancel for free until ${rules.freeCancelHours} ${rules.freeCancelHours === 1 ? "hour" : "hours"} before`
+            ? `, and cancel for free until ${count(rules.freeCancelHours, "hour")} before`
             : "";
     return `${book}${cancel}. Free times are worked out from availability, minus bookings and the gap after each.`;
 }

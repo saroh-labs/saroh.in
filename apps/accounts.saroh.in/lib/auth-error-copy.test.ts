@@ -135,7 +135,7 @@ describe("settle", () => {
 describe("socialErrorCopy", () => {
     it("names the provider and the other way in", () => {
         expect(socialErrorCopy("Google", { status: 500 })).toBe(
-            "Couldn't open Google. Try again, or use your email and password.",
+            "Couldn't open Google. Try again, or ask for a code by email.",
         );
     });
 

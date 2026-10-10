@@ -1,4 +1,5 @@
 import { DEFAULT_TIMEZONE } from "@/lib/invoices/invoice-number";
+import { isTimeZone } from "./datetime";
 
 /**
  * The zone a business's times are written in (UX-008, #836): its own, never
@@ -13,13 +14,7 @@ export function businessZone(
     business: { timeZone?: string | null } | null | undefined,
 ): string {
     const zone = business?.timeZone?.trim();
-    if (!zone) return DEFAULT_TIMEZONE;
-    try {
-        new Intl.DateTimeFormat("en", { timeZone: zone });
-        return zone;
-    } catch {
-        return DEFAULT_TIMEZONE;
-    }
+    return zone && isTimeZone(zone) ? zone : DEFAULT_TIMEZONE;
 }
 
 export { DEFAULT_TIMEZONE as DEFAULT_BUSINESS_ZONE };

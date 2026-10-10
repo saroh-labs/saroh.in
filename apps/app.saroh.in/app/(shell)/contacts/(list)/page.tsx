@@ -46,7 +46,13 @@ export default async function ContactsPage({
                     other: "contacts",
                 })}
                 description="Everyone who has enquired, booked or bought — and anyone you add."
-                actions={canAdd ? <AddContactDialog /> : undefined}
+                actions={
+                    canAdd ? (
+                        // `?new=1` opens it: where setup lands someone who
+                        // chose to keep track of people first.
+                        <AddContactDialog openOnArrival={params.new === "1"} />
+                    ) : undefined
+                }
             />
             <div className="mt-6">
                 <ContactsView

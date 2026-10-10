@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -22,7 +23,6 @@ import type { PauseOption } from "@/lib/subscriptions/pause";
 import { pauseAgain } from "@/lib/subscriptions/pause";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import type { CollectionRow } from "@/lib/subscriptions/view";
-import { dayText } from "@/lib/subscriptions/view";
 
 /**
  * Subscription Detail's writes. Each is one call, then the page reads again.
@@ -57,7 +57,7 @@ export function useSubscriptionActions(
         }));
         setBusy(false);
         if (!res.ok) {
-            showError(res.error ?? "That didn't go through.");
+            showError(res.error ?? "That didn't go through. Try again.");
             router.refresh();
             return false;
         }
@@ -74,9 +74,9 @@ export function useSubscriptionActions(
             return r;
         };
 
-    const periodEndText = dayText(sub.currentPeriodEnd, tz, now);
+    const periodEndText = formatDate(sub.currentPeriodEnd, tz, { now });
     const nextText = sub.nextRenewalAt
-        ? dayText(sub.nextRenewalAt, tz, now)
+        ? formatDate(sub.nextRenewalAt, tz, { now })
         : null;
 
     function pause(option: PauseOption) {
@@ -86,7 +86,7 @@ export function useSubscriptionActions(
                 closeStep();
                 showUndo(
                     option.until
-                        ? `Paused until ${dayText(option.until, tz, now)}. It restarts on its own.`
+                        ? `Paused until ${formatDate(option.until, tz, { now })}. It restarts on its own.`
                         : "Paused. Nothing is charged until you resume it.",
                     undo(() => resumeSubscription(sub.id)),
                 );

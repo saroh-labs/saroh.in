@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,7 +11,6 @@ import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
-import { money } from "@/lib/subscriptions/view";
 
 export type Step = "pause" | "switch" | "cancel";
 
@@ -198,7 +198,8 @@ function SwitchBody({
                                         : "border border-border bg-card font-medium hover:border-border-strong active:bg-accent-active",
                                 )}
                             >
-                                {p.name} · {money(p.price, p.currency)}/
+                                {p.name} ·{" "}
+                                {formatMoneyMajor(p.price, p.currency)}/
                                 {PER[p.interval]}
                             </button>
                         );

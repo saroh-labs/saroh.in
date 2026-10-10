@@ -210,7 +210,9 @@ describe("StorefrontsScreen as a location's own page", () => {
         ]) {
             const html = screen({}, section);
             expect(h1(html)).toBe("Hill Road");
-            expect(html).toContain('data-testid="location-readiness"');
+            expect(html).toContain(
+                'data-setup-checklist="location" data-state="open"',
+            );
         }
     });
 
@@ -241,7 +243,7 @@ describe("StorefrontsScreen as a location's own page", () => {
             "Customers come here Yes, they visit It has an address and opening hours, and can offer pick-up. Change",
         );
         expect(t).toContain("Address 12 Hill Road, Bandra Edit");
-        expect(t).toContain("Opening hours Mon–Sat · 9:00 AM – 6:00 PM Edit");
+        expect(t).toContain("Opening hours Mon–Sat · 9:00 am to 6:00 pm Edit");
         expect(t).toContain(
             "Description and logo No description yet · no logo yet Edit",
         );
@@ -502,7 +504,7 @@ describe("the readiness card", () => {
             site: site(null),
         });
         const t = text(html);
-        expect(t).toContain("Ready for online orders 1 of 3");
+        expect(t).toContain("Get ready for online orders 1 of 3 done");
         // Goal gradient: the done step comes first.
         expect(t.indexOf("Shipping on")).toBeLessThan(
             t.indexOf("Take payments online"),
@@ -526,22 +528,28 @@ describe("the readiness card", () => {
             },
             site: site("st_online"),
         });
-        expect(html).toContain('data-testid="location-ready"');
-        expect(html).not.toContain('data-testid="location-readiness"');
-        expect(text(html)).toContain("Ready for online orders");
+        expect(html).toContain(
+            'data-setup-checklist="location" data-state="folded"',
+        );
+        expect(html).not.toContain(
+            'data-setup-checklist="location" data-state="open"',
+        );
+        expect(text(html)).toContain("Ready for online orders.");
         expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
     it("a counter the shop sells from counts both, and links the live shop", () => {
         const html = screen({ site: site("st_hill") });
-        expect(text(html)).toContain("Ready for the counter and online orders");
+        expect(text(html)).toContain(
+            "Get ready for the counter and online orders",
+        );
         expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
     it("a counter that sells in person counts its address and hours, and says so", () => {
         const t = text(screen({ site: site("st_online") }));
         expect(t).toContain(
-            "Ready for the counter 1 of 2 · Sells in person only",
+            "Get ready for the counter 1 of 2 done · Sells in person only",
         );
         expect(t).toContain("Address on receipts");
         expect(t).toContain("Save its opening hours");

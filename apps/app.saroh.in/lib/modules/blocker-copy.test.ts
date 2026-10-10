@@ -218,9 +218,9 @@ describe("a refused module write's words (DEC-057)", () => {
         ]) {
             const out = moduleErrorSentence(
                 said,
-                "Could not update the module.",
+                "Couldn't update the module.",
             );
-            expect(out).toBe("Could not update the module.");
+            expect(out).toBe("Couldn't update the module.");
         }
     });
 

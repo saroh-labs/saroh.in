@@ -8,7 +8,10 @@ vi.mock("next/navigation", () => ({
 
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 
+import { pinClock } from "@/lib/format/test-clock";
 import { ClassWaitlist } from "./class-waitlist";
+
+pinClock();
 
 /**
  * A class's waitlist on its booking (round-2 A12): the line in order, a
@@ -56,7 +59,7 @@ describe("ClassWaitlist", () => {
             "When a place frees up, the first in line has it held for up to 2 hours to book.",
             "1",
             "Bina Shah",
-            "Place held until 14:30",
+            "Place held until 2:30 pm",
             "Offered",
             "2",
             "Chetan",

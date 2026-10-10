@@ -111,6 +111,6 @@ export async function deleteCustomer(
     if (res.ok) return { ok: true, data: { id: customerId } };
     return {
         ok: false,
-        error: readError(data, "Could not delete the customer"),
+        error: readError(data, "Couldn't delete the customer."),
     };
 }

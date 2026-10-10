@@ -1,5 +1,4 @@
-import { NUMBER_LOCALE } from "@/lib/format/locale";
-
+import { count as countOf } from "@/lib/format/plural";
 /**
  * Pure display helpers shared by the CRM pages (S3-005). No server imports, so
  * they are safe in both server and client components.
@@ -77,25 +76,9 @@ export function openLeadsLabel(
     value: string | null,
 ): string | null {
     if (count <= 0) return null;
-    const leads = count === 1 ? "1 lead" : `${count} leads`;
+    const leads = countOf(count, "lead");
     if (value) return `${value} · ${leads}`;
-    return count === 1 ? "1 open lead" : `${count} open leads`;
-}
-
-/**
- * Format an optional monetary value (minor units) as a plain amount.
- *
- * The locale is pinned rather than inherited: `undefined` resolves to the
- * runtime's locale, which differs between Node and the browser, so a
- * server-rendered amount could hydrate as a different string and fail the whole
- * tree. See `lib/format/locale.ts`.
- */
-export function formatValue(value: number | null | undefined): string | null {
-    if (value === null || value === undefined) return null;
-    return (value / 100).toLocaleString(NUMBER_LOCALE, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+    return countOf(count, "open lead");
 }
 
 /**

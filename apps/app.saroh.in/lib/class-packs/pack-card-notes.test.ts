@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import type { NotePurchase } from "./pack-card-notes";
 import { cardNotes } from "./pack-card-notes";
+
+pinClock();
 
 const NOW = new Date("2026-09-18T06:30:00.000Z");
 const ZONE = "Asia/Kolkata";

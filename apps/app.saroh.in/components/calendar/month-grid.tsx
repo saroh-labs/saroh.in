@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useRef } from "react";
 
@@ -10,7 +12,6 @@ import type { LayerStyle, Off } from "@/lib/calendar/layers";
 import {
     dayChips,
     dayCount,
-    dayTitle,
     leadingBlanks,
     monthTitle,
 } from "@/lib/calendar/layers";
@@ -171,10 +172,8 @@ export function MonthGrid({
                         // The named problem, said as the chip says it (E22).
                         const problem = chips.find((c) => c.key === "act");
                         const label = [
-                            `${dayTitle(day.date, today)}${isToday ? ", today" : ""}: ${
-                                n
-                                    ? `${n} ${n === 1 ? "thing" : "things"}`
-                                    : "nothing"
+                            `${formatDay(day.date, { today, weekday: "short" })}${isToday ? ", today" : ""}: ${
+                                n ? count(n, "thing") : "nothing"
                             }`,
                             dayOff?.title ?? null,
                             problem?.text ?? null,

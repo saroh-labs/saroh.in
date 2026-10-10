@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -139,9 +140,7 @@ function Row({
                         ) : (
                             "No orders yet"
                         )}
-                        {orders
-                            ? ` · ${orders.count === 1 ? "1 order" : `${orders.count} orders`}`
-                            : null}
+                        {orders ? ` · ${count(orders.count, "order")}` : null}
                         {sees.spent && row.spent && row.spent.length > 0
                             ? ` · ${spentText(row.spent)}`
                             : null}

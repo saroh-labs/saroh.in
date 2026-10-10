@@ -62,7 +62,7 @@ export function TaxRateSheet({
                 }
                 save(
                     { taxRate: rate.trim() },
-                    `Tax rate set to ${Number(rate)}%`,
+                    `Tax rate set to ${Number(rate)}%.`,
                     undefined,
                     undefined,
                     onClose,

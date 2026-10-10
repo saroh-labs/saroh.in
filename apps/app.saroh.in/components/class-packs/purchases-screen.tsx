@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
@@ -19,7 +20,6 @@ import type { PackStanding } from "@/lib/class-packs/balance";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { personHref } from "@/lib/contacts/person-href";
-import { invoiceMoney } from "@/lib/invoices/money";
 
 import { TextLink } from "@saroh/ui/text-link";
 import { ClassPacksTabs } from "./class-packs-tabs";
@@ -122,7 +122,8 @@ export function PurchasesScreen({
             money: true,
             width: "118px",
             sortValue: (p) => Number(p.price),
-            cell: (p) => invoiceMoney(p.price, p.currency),
+            cell: (p) =>
+                formatMoneyMajor(p.price, p.currency, { decimals: "always" }),
         },
         {
             id: "paid-by",

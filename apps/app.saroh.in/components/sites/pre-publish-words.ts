@@ -1,4 +1,4 @@
-import { shortDate } from "@/lib/sites/format-date";
+import { formatDate } from "@/lib/format/datetime";
 import type {
     ApprovalOutcome,
     FlagType,
@@ -64,19 +64,19 @@ export const APPROVAL_LINE: Record<
     BYPASSED: {
         approved: false,
         text: ({ by, at }, zone) =>
-            `${by} published without approval on ${shortDate(at, zone)}`,
+            `${by} published without approval on ${formatDate(at, zone)}`,
     },
     // An owner's override of "Publishing needs approval" (DEC-071, T9).
     OVERRIDDEN: {
         approved: false,
         text: ({ by, at }, zone) =>
-            `${by} went live without approval on ${shortDate(at, zone)}`,
+            `${by} went live without approval on ${formatDate(at, zone)}`,
     },
     // The request was taken back (UX-068).
     WITHDRAWN: {
         approved: false,
         text: ({ by, at }, zone) =>
-            `${by} withdrew the review request on ${shortDate(at, zone)}`,
+            `${by} withdrew the review request on ${formatDate(at, zone)}`,
     },
 };
 

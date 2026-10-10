@@ -136,7 +136,7 @@ describe("WeeklyHours — opening hours (DEC-087)", () => {
     it("says which of a day's hours aren't bookable in person, and why", () => {
         draw(OPEN);
         expect(row("Monday")?.textContent).toContain(
-            "08:00–09:00 and 18:00–20:00 aren't bookable in person — you're open 09:00–18:00.",
+            "8:00 to 9:00 am and 6:00 to 8:00 pm aren't bookable in person — you're open 9:00 am to 6:00 pm.",
         );
         // Part of Monday is inside: its chip still reads bookable.
         expect(chip("Monday")).toContain("bg-success-subtle");

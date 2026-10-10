@@ -340,7 +340,7 @@ describe("provider rows", () => {
             }),
         );
         expect(view.connected.map((e) => e.update)).toEqual([
-            "Last payment update from Razorpay: 2 min ago.",
+            "Last payment update from Razorpay: 2 minutes ago.",
             "No payment updates received yet — check the webhook in Cashfree.",
         ]);
 

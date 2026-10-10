@@ -14,7 +14,7 @@ pattern files refer back here.
 - **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
   studio, practice), **Just me** (freelancer, consultant, creator) and **a
   site for my work** (portfolio, blog, projects). Setup asks "What are you
-  setting up?" first, with nothing chosen, and stores the answer as
+  setting up?" as a small choice with "A business" chosen (DEC-127), and stores the answer as
   `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
   before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
   changes it at the top of Settings › Business › Identity, with Undo.
@@ -29,16 +29,15 @@ pattern files refer back here.
   `apps/app.saroh.in/lib/organizations/kind.ts` (`kindWords`,
   `kindDefaults`); an unknown or missing kind reads as `BUSINESS`.
 
-    |                                       | A business                        | Just me                                             | A site for my work                |
-    | ------------------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
-    | The owner                             | your business                     | you                                                 | you                               |
-    | Their people                          | customers                         | clients                                             | readers                           |
-    | Setup's name field                    | What is it called?                | Your name or brand                                  | Your name or brand                |
-    | Settings tab                          | Business                          | Your details                                        | Your details                      |
-    | Home's first run, in order            | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
-    | The module picker suggests            | Sell                              | nothing                                             | Website                           |
-    | Setup asks "registered as a company?" | yes                               | yes                                                 | no                                |
-    | Bookings' Turn on prefill             | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
+    |                            | A business                        | Just me                                             | A site for my work                |
+    | -------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
+    | The owner                  | your business                     | you                                                 | you                               |
+    | Their people               | customers                         | clients                                             | readers                           |
+    | Setup's name field         | What is it called?                | Your name or brand                                  | Your name or brand                |
+    | Settings tab               | Business                          | Your details                                        | Your details                      |
+    | Home's first run, in order | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
+    | The module picker suggests | Sell                              | nothing                                             | Website                           |
+    | Bookings' Turn on prefill  | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
 
     The words reach the surfaces that name the owner or their people in
     general terms: setup, the module picker, Home's first run and the
@@ -48,6 +47,33 @@ pattern files refer back here.
     client" turns nothing on: it opens a new invoice, for someone with
     `invoice:write`, until the business has one.
 
+- **Current** (DEC-127, 10 Oct 2026) — **The first run is three steps on
+  two screens, and it ends in the product.** Sign-up takes an email and a
+  code (DEC-126). Setup is one screen
+  (`components/organizations/business-setup-form.tsx`): your name if the
+  account has none, the name, the web address, the country (India), and
+  "What will you do first?". Create turns that goal on with its defaults,
+  with no second sheet (`lib/modules/first-goal.ts`), and lands on the
+  thing itself: a new product, a new service, the site with Publish, New
+  contact open. Setup never asks whether it is a registered company: the
+  Finish setup step "Choose your business type" does. It says "Steps 2 and
+  3 of 3", never "Last step".
+- **Current** (DEC-127) — **One list of goals, in one set of words**:
+  `lib/modules/goals.ts` ("Sell things", "Take bookings", "Put up a
+  website", "Keep track of people", and a kind's own for the last). Setup,
+  Home's first run and the module picker read it, and `goalHref` is each
+  goal's one destination. Never word the choice again on a new screen.
+- **Current** (DEC-127) — **The web address is asked once**, at setup. The
+  Turn on sheet says it as a line when Website is turned on later, and
+  turns it back into a field only when the API refuses it.
+- **Current** (DEC-127) — **A new business gets one email from Saroh**:
+  "{Business} is set up on Saroh", the next step for the goal chosen, and
+  "Open {Business}" (`apps/api.saroh.in/src/common/email-welcome.ts`).
+  Onboarding sends it, once, to the person who set the business up. Never
+  to someone invited: they are told where they are on arrival instead
+  ("You've joined {Business} as {Role}. …", `lib/organizations/joined.ts`),
+  and every accepted invitation, a location's too, comes through the
+  workspace's door (`/open/:id`), which opens the business they joined.
 - **Current** (DEC-070, K4) — The registered address, business type and
   logo steps appear only once something invoices or takes money: Sell,
   Bookings, Courses, Class packs or Payments on, or an invoice exists
@@ -549,7 +575,8 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
   (Free otherwise, and an unknown plan says so). The second switch is
   production accounts' prelaunch key gate (`PRELAUNCH_GATE` in
   `apps/accounts.saroh.in/wrangler.jsonc`), which keeps sign-in and
-  sign-up to key holders and sends everyone else to www.saroh.in. Flipping
+  sign-up to key holders and sends everyone else to the waitlist page on
+  www.saroh.in (`DEV_REDIRECT_PATH`). Flipping
   both is launch, on the owner's judgement (`PRODUCT.md`); until then no CTA
   points at sign-up or Sign in. Social publishing is not a
   current priority and must not be exposed as production-ready (§22). AI

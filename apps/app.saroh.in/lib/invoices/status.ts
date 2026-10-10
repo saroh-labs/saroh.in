@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { isSince } from "@/lib/views/since";
 
@@ -58,10 +59,7 @@ export function invoiceStatus(
             return {
                 label: "Overdue",
                 variant: "error",
-                detail:
-                    late <= 0
-                        ? "Overdue"
-                        : `${late} ${late === 1 ? "day" : "days"} overdue`,
+                detail: late <= 0 ? "Overdue" : `${count(late, "day")} overdue`,
             };
         }
         case "ISSUED": {
@@ -367,9 +365,7 @@ export function whenLine(
             const late = i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 0;
             return {
                 ...none,
-                before: late
-                    ? `${late} ${late === 1 ? "day" : "days"} late`
-                    : "Overdue",
+                before: late ? `${count(late, "day")} late` : "Overdue",
                 late: true,
             };
         }
@@ -379,10 +375,7 @@ export function whenLine(
             return {
                 before: "Due ",
                 date: i.dueAt,
-                after:
-                    d <= 0
-                        ? " · today"
-                        : ` · in ${d} ${d === 1 ? "day" : "days"}`,
+                after: d <= 0 ? " · today" : ` · in ${count(d, "day")}`,
                 late: false,
             };
         }

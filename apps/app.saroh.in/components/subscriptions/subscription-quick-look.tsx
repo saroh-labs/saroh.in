@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -18,12 +20,10 @@ import {
     chargeHref,
     chargeRow,
     collectionRows,
-    dayText,
     failWhy,
     initials,
     listTab,
     longPrice,
-    money,
     olderPrice,
     pausedText,
     sortCharges,
@@ -141,29 +141,32 @@ function Body({
     const next = sub.pendingPlan ?? sub;
     const nextBig =
         tab === "active" && sub.nextRenewalAt && !sub.endsAt
-            ? money(next.price, next.currency)
+            ? formatMoneyMajor(next.price, next.currency)
             : tab === "failed"
-              ? money(sub.failedCharge?.total ?? sub.price, sub.currency)
+              ? formatMoneyMajor(
+                    sub.failedCharge?.total ?? sub.price,
+                    sub.currency,
+                )
               : "—";
     const nextLine =
         tab === "active"
             ? sub.endsAt
-                ? `Ends ${dayText(sub.endsAt, tz, now)} — what's paid for still happens. Nothing more is charged.`
+                ? `Ends ${formatDate(sub.endsAt, tz, { now })} — what's paid for still happens. Nothing more is charged.`
                 : sub.startsAt
-                  ? `Starts ${dayText(sub.startsAt, tz, now)}. Nothing is charged before then.`
+                  ? `Starts ${formatDate(sub.startsAt, tz, { now })}. Nothing is charged before then.`
                   : sub.nextRenewalAt
-                    ? `On ${dayText(sub.nextRenewalAt, tz, now)} · invoiced with a pay link`
+                    ? `On ${formatDate(sub.nextRenewalAt, tz, { now })} · invoiced with a pay link`
                     : "Nothing is due to renew."
             : tab === "failed"
               ? sub.failedCharge?.dueAt
                   ? Date.parse(sub.failedCharge.dueAt) > now.getTime()
                       ? // Autopay didn't collect it before its due date (D13).
-                        `Autopay didn't collect it · due ${dayText(sub.failedCharge.dueAt, tz, now)}`
-                      : `Was due ${dayText(sub.failedCharge.dueAt, tz, now)} · not paid yet`
+                        `Autopay didn't collect it · due ${formatDate(sub.failedCharge.dueAt, tz, { now })}`
+                      : `Was due ${formatDate(sub.failedCharge.dueAt, tz, { now })} · not paid yet`
                   : "Not paid yet"
               : tab === "paused"
                 ? `${pausedText(sub, now)}. Nothing is charged while paused.`
-                : `Ended${sub.cancelledAt ? ` ${dayText(sub.cancelledAt, tz, now)}` : ""}. Nothing more is charged.`;
+                : `Ended${sub.cancelledAt ? ` ${formatDate(sub.cancelledAt, tz, { now })}` : ""}. Nothing more is charged.`;
     const upcoming = collectionRows(sub, now).slice(0, 3);
     const mine = charges.state === "ok" ? (charges.data[sub.id] ?? []) : [];
     const last = sortCharges(mine)
@@ -179,7 +182,7 @@ function Body({
                     </StatusBadge>
                     <span className="flex-1" />
                     <span className="text-[12px] text-muted-foreground">
-                        Since {dayText(sub.startedAt, tz, now)}
+                        Since {formatDate(sub.startedAt, tz, { now })}
                     </span>
                 </div>
                 <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
@@ -191,14 +194,16 @@ function Body({
                 </p>
                 {older ? (
                     <p className="mt-1.5 text-[12px] text-foreground">
-                        Keeps {money(sub.price, sub.currency)} — the plan is{" "}
-                        {money(older.listPrice, sub.currency)} for new sign-ups
+                        Keeps {formatMoneyMajor(sub.price, sub.currency)} — the
+                        plan is{" "}
+                        {formatMoneyMajor(older.listPrice, sub.currency)} for
+                        new sign-ups
                     </p>
                 ) : null}
                 {sub.pendingPlan && tab !== "cancelled" ? (
                     <p className="mt-1.5 text-[12px] font-semibold text-foreground">
                         Changes to {sub.pendingPlan.name} on{" "}
-                        {dayText(sub.pendingPlan.from, tz, now)}
+                        {formatDate(sub.pendingPlan.from, tz, { now })}
                     </p>
                 ) : null}
             </QuickLookCard>

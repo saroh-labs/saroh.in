@@ -14,7 +14,7 @@ import {
 } from "@/lib/invoices/status";
 
 const money = (amount: string | number, currency: string) =>
-    formatMoneyMajor(amount, currency) ?? String(amount);
+    formatMoneyMajor(amount, currency);
 
 /**
  * One row of the Invoices list, after the design: number and when it was

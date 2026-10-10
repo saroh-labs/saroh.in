@@ -341,7 +341,7 @@ test.describe("bookings calendar", () => {
                     .click({ position: { x: 40, y: 300 } });
                 const dialog = page.getByRole("dialog");
                 await expect(dialog).toContainText(`Open ${person.name} from`);
-                const at = /from (\d\d:\d\d)/.exec(
+                const at = /from (\d{1,2}:\d\d [ap]m)/.exec(
                     (await dialog.getByRole("heading").first().innerText()) ||
                         "",
                 )?.[1];
@@ -356,8 +356,15 @@ test.describe("bookings calendar", () => {
 
                 // The new hours may join hours next to them: find the free gap
                 // that holds the time just opened.
-                const mins = (t: string) =>
-                    Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+                // "9:30 am": the 12-hour clock, read back as minutes.
+                const mins = (t: string) => {
+                    const [clock = "", period] = t.split(" ");
+                    const [h = "0", m = "0"] = clock.split(":");
+                    return (
+                        ((Number(h) % 12) + (period === "pm" ? 12 : 0)) * 60 +
+                        Number(m)
+                    );
+                };
                 const gaps = page.getByRole("button", {
                     name: new RegExp(`^Book ${person.name} at`),
                 });
@@ -369,8 +376,9 @@ test.describe("bookings calendar", () => {
                         )
                     ).findIndex((l) => {
                         const [, a = "", b = ""] =
-                            /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ??
-                            [];
+                            /at (\d{1,2}:\d\d [ap]m), free until (\d{1,2}:\d\d [ap]m)/.exec(
+                                l,
+                            ) ?? [];
                         return (
                             at !== undefined &&
                             mins(a) <= mins(at) &&
@@ -516,12 +524,16 @@ test.describe("availability and services", () => {
             page.getByRole("heading", { level: 1, name: "Availability" }),
         ).toBeVisible();
         const monday = page.getByRole("listitem").filter({ hasText: "Monday" });
-        const first = monday.getByText(/^\d\d:\d\d–\d\d:\d\d$/).first();
+        // A range reads "9:00 to 11:00 am", or "9:00 am to 6:00 pm".
+        const range = /^(\d{1,2}:\d\d)(?: ([ap]m))? to \d{1,2}:\d\d ([ap]m)$/;
+        const first = monday.getByText(range).first();
         test.skip(
             !(await first.count()),
             "The first person has no Monday hours",
         );
-        const [from = ""] = (await first.innerText()).split("–");
+        const [, start = "", own = "", shared = ""] =
+            range.exec((await first.innerText()).trim()) ?? [];
+        const from = `${start} ${own || shared}`;
         // "+ Hours" adds in a small popover over the row, so no day moves.
         await monday.getByRole("button", { name: "+ Hours" }).click();
         const adding = page.getByRole("dialog", {
@@ -544,7 +556,7 @@ test.describe("availability and services", () => {
         const timeOff = page.getByRole("region", { name: "Time off" });
         await expect(timeOff.getByRole("textbox")).toHaveCount(0);
         await timeOff.getByRole("button", { name: "Add time off" }).click();
-        const sheet = page.getByRole("dialog", { name: "Add time off" });
+        const sheet = page.getByRole("dialog", { name: "New time off" });
         await expect(sheet).toBeVisible();
         await sheet.getByLabel(/^Reason/).fill("E2E day off");
         await sheet.getByRole("button", { name: "Add day off" }).click();

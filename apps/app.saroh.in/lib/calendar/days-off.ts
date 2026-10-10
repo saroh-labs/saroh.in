@@ -1,6 +1,10 @@
-import { localDateKey } from "@/lib/format/datetime";
+import {
+    clockValue,
+    formatClockRange,
+    localDateKey,
+} from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
-import { clock } from "./layers";
 import type { CalendarMonth, DayOff } from "./types";
 
 /**
@@ -90,12 +94,11 @@ function everyoneOff(
 const why = (reason: string | null | undefined) =>
     reason ? ` · ${reason}` : "";
 
-const peopleWord = (n: number) => (n === 1 ? "1 person" : `${n} people`);
-
 /** "Dr. Arun Pillai and Dr. Meenakshi Rao off", or "2 people off". */
 function offWords(people: DayOff[]): string {
     const named = people.map((p) => p.name).filter((n): n is string => !!n);
-    if (named.length < people.length) return `${peopleWord(people.length)} off`;
+    if (named.length < people.length)
+        return `${count(people.length, "person", "people")} off`;
     const list =
         named.length < 2
             ? (named[0] ?? "")
@@ -151,7 +154,7 @@ export function cellOff(
 /**
  * The day panel's line under its title: "Closed · Diwali", "Dr. Arun Pillai
  * off · At a conference", with a few hours off named by their hours
- * ("Dr. Meenakshi Rao off 14:00–18:00"). Null when nobody is off.
+ * ("Dr. Meenakshi Rao off 2:00 to 6:00 pm"). Null when nobody is off.
  */
 export function dayOffLine(
     month: Pick<CalendarMonth, "daysOff" | "timezone" | "staff">,
@@ -162,9 +165,14 @@ export function dayOffLine(
     const cell = cellOff(month, date, null);
     const zone = month.timezone;
     const hours = (d: DayOff) =>
-        `${localDateKey(d.startAt, zone) < date ? "00:00" : clock(d.startAt, zone)}–${
-            localDateKey(d.endAt, zone) > date ? "24:00" : clock(d.endAt, zone)
-        }`;
+        formatClockRange(
+            localDateKey(d.startAt, zone) < date
+                ? 0
+                : clockValue(d.startAt, zone),
+            localDateKey(d.endAt, zone) > date
+                ? 24 * 60
+                : clockValue(d.endAt, zone),
+        );
     const parts: string[] = [];
     if (cell?.text === "Closed") {
         parts.push(cell.title);

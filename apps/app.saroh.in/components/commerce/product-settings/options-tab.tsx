@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -15,8 +16,6 @@ import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
 import { TabIntro } from "./product-settings";
-
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
 
 /**
  * The ways customers choose between variants — Volume, Shade, Size — and
@@ -77,7 +76,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                 <ul className="flex flex-col gap-3">
                     {options.map((o) => {
                         const used = o.productCount > 0;
-                        const usedLine = `Used by ${plural(o.productCount)} — change their variants first.`;
+                        const usedLine = `Used by ${count(o.productCount, "product")} — change their variants first.`;
                         return (
                             <li
                                 key={o.id}
@@ -88,7 +87,8 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         {o.name}
                                     </span>
                                     <span className="text-[12px] text-muted-foreground">
-                                        Used by {plural(o.productCount)}
+                                        Used by{" "}
+                                        {count(o.productCount, "product")}
                                     </span>
                                     {canWrite ? (
                                         <div className="flex shrink-0 gap-1.5">

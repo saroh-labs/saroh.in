@@ -29,7 +29,7 @@ export function DraftChecklist({
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const tracked = stock.mode === "variant" || stock.product !== null;
     const rows: {
         done: boolean;

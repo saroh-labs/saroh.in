@@ -1391,7 +1391,7 @@ describe("SiteEditor header and footer text (G6)", () => {
     it("says Not saved when the footer does not save, and tries again after a pause (review G-4)", async () => {
         actions.updateSiteFooter.mockResolvedValue({
             ok: false,
-            error: "Could not save the footer.",
+            error: "Couldn't save the footer.",
         });
         render();
         click(button("Footer"));
@@ -1399,7 +1399,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         await wait(700);
         await wait(0);
         expect(toast.showError).toHaveBeenCalledWith(
-            "Could not save the footer.",
+            "Couldn't save the footer.",
         );
         // Not every pause: the same value waits before it goes again.
         await wait(1500);

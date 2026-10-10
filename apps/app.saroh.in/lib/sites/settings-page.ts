@@ -1,3 +1,4 @@
+import { count as countOf } from "@/lib/format/plural";
 import {
     describePendingChanges,
     pendingChangeCount,
@@ -217,7 +218,7 @@ export function publishWaiting(
     );
     if (count > 0 && what) {
         return {
-            line: `${count === 1 ? "1 change waits" : `${count} changes wait`} for your next publish: ${what}.`,
+            line: `${countOf(count, "change waits", "changes wait")} for your next publish: ${what}.`,
         };
     }
     if (site.hasUnpublishedChanges) {

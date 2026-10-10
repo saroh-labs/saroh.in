@@ -1,14 +1,15 @@
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { PackKind } from "./pack-cards";
-import { money, unitWord } from "./pack-cards";
+import { unitWord } from "./pack-cards";
 import {
     DAY_MS,
     EXTEND_CHOICES,
     MAX_EXTEND_DAYS,
-    count,
-    day,
     runningOut,
 } from "./pack-detail";
 import type { PackDetail, PackHolder } from "./pack-detail-data";
@@ -82,11 +83,11 @@ export function holderRow(
     );
     const when = ended
         ? h.left > 0
-            ? `Ran out ${day(h.expiresAt, timeZone)} with ${h.left} unused`
-            : `Ended ${day(h.expiresAt, timeZone)}`
+            ? `Ran out ${formatDate(h.expiresAt, timeZone)} with ${h.left} unused`
+            : `Ended ${formatDate(h.expiresAt, timeZone)}`
         : h.left === 0
           ? "All used"
-          : `Use by ${day(h.expiresAt, timeZone)}${soon ? ` — ${count(days, "day", "days")} left` : ""}`;
+          : `Use by ${formatDate(h.expiresAt, timeZone)}${soon ? ` — ${count(days, "day", "days")} left` : ""}`;
     const older =
         Number(h.price) !== Number(pack.price) || h.currency !== pack.currency;
     return {
@@ -104,13 +105,13 @@ export function holderRow(
                 ? h.extensions
                       .map(
                           (e) =>
-                              `+${count(e.days, "day", "days")} on ${day(e.createdAt, timeZone)}: ${e.reason}`,
+                              `+${count(e.days, "day", "days")} on ${formatDate(e.createdAt, timeZone)}: ${e.reason}`,
                       )
                       .join(" · ")
                 : null,
         bought: [
-            `Bought ${day(h.soldAt, timeZone)}`,
-            `${money(h.price, h.currency)}${older ? " (older price)" : ""}`,
+            `Bought ${formatDate(h.soldAt, timeZone)}`,
+            `${formatMoneyMajor(h.price, h.currency)}${older ? " (older price)" : ""}`,
             h.paidBy ? paidByLabel(h.paidBy) : null,
         ]
             .filter(Boolean)
@@ -164,7 +165,7 @@ export function extendedToast(
     timeZone: string,
 ): string {
     const first = name.trim().split(/\s+/)[0] || name;
-    return `${first}'s pack now runs to ${day(expiresAt, timeZone)}.`;
+    return `${first}'s pack now runs to ${formatDate(expiresAt, timeZone)}.`;
 }
 
 /**

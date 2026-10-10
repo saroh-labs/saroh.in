@@ -6,6 +6,7 @@
  * their tests agree.
  */
 
+import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { permits } from "@/lib/organizations/permits";
 import type { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -96,7 +97,7 @@ export function canTakeDeskPayments(organization: Org): boolean {
 }
 
 const money = (cents: number, currency: string | null) =>
-    formatMoney(cents, currency) ?? "";
+    formatMoney(cents, currency);
 
 /**
  * The line under When: "Deposit ₹400 paid · ₹400 due at the visit",
@@ -140,19 +141,9 @@ export function refundLine(m: BookingMoney): string | null {
         : `Refund of ${amount} sent. The payment provider is confirming it.`;
 }
 
-/** "Sat 19 Sep, 10:00" — a deadline in the booking's own zone. */
+/** "Sat 19 Sep, 10:00 am" — a deadline in the booking's own zone. */
 export function deadlineText(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    })
-        .format(new Date(iso))
-        .replace("Sept", "Sep");
+    return formatDateTime(iso, timeZone, { weekday: "short" });
 }
 
 /** What a cancel could hand back: never more than was received. */

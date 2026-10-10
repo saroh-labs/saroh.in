@@ -1,6 +1,7 @@
 "use client";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -13,7 +14,7 @@ import { ContactPicker } from "@/components/shared/contact-picker";
 import { runAction } from "@/lib/api/run-action";
 import { sellPack } from "@/lib/class-packs/actions";
 import type { PackKind } from "@/lib/class-packs/pack-cards";
-import { money, packKind } from "@/lib/class-packs/pack-cards";
+import { packKind } from "@/lib/class-packs/pack-cards";
 import type {
     DeskPaidBy,
     HeldPack,
@@ -200,7 +201,7 @@ export function SellPackDialog({
                                 aria-describedby={`${ids.pack}-help`}
                                 options={onSale.map((p) => ({
                                     value: p.id,
-                                    label: `${p.name} · ${money(p.price, p.currency)}`,
+                                    label: `${p.name} · ${formatMoneyMajor(p.price, p.currency)}`,
                                 }))}
                             />
                             {pack ? (

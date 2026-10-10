@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -14,7 +16,6 @@ import { SectionReview } from "@/components/sites/section-review";
 import { VerdictControls } from "@/components/sites/verdict-controls";
 import { runAction } from "@/lib/api/run-action";
 import { createApproval } from "@/lib/sites/actions";
-import { exactDate } from "@/lib/sites/format-date";
 import {
     releaseTitle,
     releaseVerdictLine,
@@ -125,7 +126,9 @@ export function SiteReviewView({
             {review.latestApproval ? (
                 <Notice
                     role="status"
-                    title={exactDate(review.latestApproval.at, zone)}
+                    title={formatDateTime(review.latestApproval.at, zone, {
+                        year: "always",
+                    })}
                 >
                     {review.latestApproval.outcome === "REQUESTED"
                         ? `${review.latestApproval.by} asked for a review.`
@@ -141,7 +144,7 @@ export function SiteReviewView({
                                   ? `${review.latestApproval.by} asked for changes: “${review.latestApproval.reason}”`
                                   : `${review.latestApproval.by} asked for changes.`}
                     {open > 0
-                        ? ` ${open === 1 ? "1 note is" : `${open} notes are`} open.`
+                        ? ` ${count(open, "note is", "notes are")} open.`
                         : ""}
                 </Notice>
             ) : null}

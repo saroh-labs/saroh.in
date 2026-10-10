@@ -310,9 +310,9 @@ describe("BusinessWeek: the hour grid for a business with a team (E27)", () => {
         const yoga = host.querySelector<HTMLAnchorElement>(
             'a[href="/services/hatha"]',
         );
-        expect(pt?.textContent).toContain("07:00–08:00");
+        expect(pt?.textContent).toContain("7:00 to 8:00 am");
         expect(pt?.style.width).toBe("calc(50% - 4px)");
-        expect(yoga?.textContent).toContain("07:30–08:45");
+        expect(yoga?.textContent).toContain("7:30 to 8:45 am");
         expect(yoga?.style.left).toBe("calc(50% + 2px)");
         // One hour below 06:00 is 44px, less the 1px inset.
         expect(pt?.style.top).toBe("45px");

@@ -123,7 +123,7 @@ export function LocationDetailsSheet({
             }
             return;
         }
-        showSuccess("Details saved");
+        showSuccess("Details saved.");
         onSaved({ ...details, description, logo });
         onClose();
     }

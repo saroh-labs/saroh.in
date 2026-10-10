@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
@@ -13,9 +14,8 @@ import {
     listPreviewLinks,
     revokePreviewLink,
 } from "@/lib/sites/actions";
-import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Segmented } from "@saroh/ui/segmented";
 
 /**
@@ -48,16 +48,6 @@ const CHOICES: { days: PreviewLinkDays; label: string }[] = [
 function previewUrl(token: string): string {
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
     return `https://${root}/preview/${encodeURIComponent(token)}`;
-}
-
-/** "11 September 2026" — the day, which is how people say when a link dies. */
-function dayOf(iso: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC",
-    }).format(new Date(iso));
 }
 
 export function PreviewLinks({ siteId }: { siteId: string }) {
@@ -95,8 +85,8 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
         const copied = await copyText(previewUrl(res.data.token));
         showSuccess(
             copied
-                ? `Link copied. It stops working on ${dayOf(res.data.expiresAt)}.`
-                : `Link ready. It stops working on ${dayOf(res.data.expiresAt)}.`,
+                ? `Link copied. It stops working on ${formatDate(res.data.expiresAt, "UTC", { month: "long", year: "always" })}.`
+                : `Link ready. It stops working on ${formatDate(res.data.expiresAt, "UTC", { month: "long", year: "always" })}.`,
         );
     }
 
@@ -149,7 +139,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                                           "Link copied.",
                                                       )
                                                     : showError(
-                                                          "Could not copy. Select the link and copy it yourself.",
+                                                          copyFailedMessage(),
                                                       ),
                                             )
                                         }
@@ -171,7 +161,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                 </div>
                             ) : (
                                 <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
-                                    Shared {shortDate(link.createdAt, zone)}
+                                    Shared {formatDate(link.createdAt, zone)}
                                     {link.createdBy.name
                                         ? ` by ${link.createdBy.name}`
                                         : ""}
@@ -180,13 +170,22 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                 </p>
                             )}
                             <p className="mt-1.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
-                                Stops working on {dayOf(link.expiresAt)}.{" "}
+                                Stops working on{" "}
+                                {formatDate(link.expiresAt, "UTC", {
+                                    month: "long",
+                                    year: "always",
+                                })}
+                                .{" "}
                                 {link.lastUsedAt ? (
                                     <span
-                                        title={exactDate(link.lastUsedAt, zone)}
+                                        title={formatDateTime(
+                                            link.lastUsedAt,
+                                            zone,
+                                            { year: "always" },
+                                        )}
                                     >
                                         Last opened{" "}
-                                        {shortDate(link.lastUsedAt, zone)}.
+                                        {formatDate(link.lastUsedAt, zone)}.
                                     </span>
                                 ) : (
                                     "Not opened yet."

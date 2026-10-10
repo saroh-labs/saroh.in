@@ -199,8 +199,8 @@ describe("sendFailureWords", () => {
     });
 
     it("passes merchant words through", () => {
-        expect(sendFailureWords("Could not send the message", "EMAIL")).toBe(
-            "Could not send the message",
+        expect(sendFailureWords("Couldn't send the message.", "EMAIL")).toBe(
+            "Couldn't send the message.",
         );
     });
 });

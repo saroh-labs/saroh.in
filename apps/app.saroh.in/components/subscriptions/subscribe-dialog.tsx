@@ -1,5 +1,7 @@
 "use client";
 
+import { viewerTimeZone } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -11,7 +13,6 @@ import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
-import { invoiceMoney } from "@/lib/invoices/money";
 import { subscribe } from "@/lib/subscriptions/actions";
 import { renewalWords } from "@/lib/subscriptions/autopay";
 import { explainStart, intervalWords } from "@/lib/subscriptions/renewal";
@@ -80,7 +81,7 @@ export function SubscribeDialog({
                     contactId,
                     planId: plan.id,
                     ...(start ? { startDate: ymd(start) } : {}),
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    timezone: viewerTimeZone(),
                 }),
             { setBusy },
         );
@@ -140,7 +141,7 @@ export function SubscribeDialog({
                             onValueChange={setPlanId}
                             options={active.map((p) => ({
                                 value: p.id,
-                                label: `${p.name} · ${invoiceMoney(p.price, p.currency)} ${intervalWords(p.interval).per}`,
+                                label: `${p.name} · ${formatMoneyMajor(p.price, p.currency, { decimals: "always" })} ${intervalWords(p.interval).per}`,
                             }))}
                         />
                     </div>

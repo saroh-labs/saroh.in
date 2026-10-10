@@ -191,7 +191,7 @@ describe("nextLine", () => {
 
     it("names the next booking today, at its own time", () => {
         expect(nextLine([booking("2026-09-18T05:00:00.000Z")], NOW)).toBe(
-            "Next: 10:30 Haircut.",
+            "Next: 10:30 am Haircut.",
         );
     });
 

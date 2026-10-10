@@ -60,7 +60,7 @@ export function ProductStockTab({
     const { product } = overview;
     const [openId, setOpenId] = useState<string | null>(null);
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const counts = tracking.counts;
     const counted =
         overview.stock.mode === "variant" || overview.stock.product !== null;

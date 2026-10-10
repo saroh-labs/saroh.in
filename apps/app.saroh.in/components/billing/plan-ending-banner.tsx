@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
@@ -39,7 +40,7 @@ export function PlanEndingBanner({
                 <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
                     <span className="font-semibold">
                         Your {ending.planName} plan ends in {days}{" "}
-                        {days === 1 ? "day" : "days"}
+                        {plural(days, "day")}
                     </span>
                     , on <ViewerDate iso={ending.endsAt} />. After that
                     you&rsquo;re on {ending.nextPlanName}, and everything you

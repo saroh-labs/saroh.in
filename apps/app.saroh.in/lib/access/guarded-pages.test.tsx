@@ -134,7 +134,7 @@ const GUARDED: {
     {
         page: "commerce/customers/new",
         action: "contact:write",
-        thing: "Add customer",
+        thing: "New customer",
         load: () => import("@/app/(shell)/commerce/customers/new/page"),
     },
     {

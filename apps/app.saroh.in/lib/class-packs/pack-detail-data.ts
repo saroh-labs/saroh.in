@@ -258,7 +258,7 @@ export async function extendPurchase(
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: data as PackHolder };
     return {
-        ...toFailure(data, "Could not extend that pack."),
+        ...toFailure(data, "Couldn't extend that pack."),
         status: res.status,
     };
 }

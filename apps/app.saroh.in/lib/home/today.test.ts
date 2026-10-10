@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { HomeToday, HomeTodayItem } from "./service";
-import { arrivedLabel, clockNow, todayView } from "./today";
+import { arrivedLabel, todayView } from "./today";
 
 // 09:30 in Mumbai on 18 Sep 2026.
 const NOW = new Date("2026-09-18T09:30:00+05:30");
@@ -54,7 +54,7 @@ describe("todayView", () => {
             ]),
             NOW,
         );
-        expect(view.rows[0].state).toBe("Arrived 09:32");
+        expect(view.rows[0].state).toBe("Arrived 9:32 am");
         expect(view.rows[0].canArrive).toBe(false);
         expect(view.count).toBe("1 still to come · 1 arrived");
     });
@@ -169,15 +169,7 @@ describe("todayView", () => {
 
 describe("arrivedLabel", () => {
     it("adds the time when there is one", () => {
-        expect(arrivedLabel("09:32")).toBe("Arrived 09:32");
+        expect(arrivedLabel("09:32")).toBe("Arrived 9:32 am");
         expect(arrivedLabel(null)).toBe("Arrived");
-    });
-});
-
-describe("clockNow", () => {
-    it("reads the business's clock, not the viewer's", () => {
-        expect(clockNow(new Date("2026-09-18T04:02:00Z"), "Asia/Kolkata")).toBe(
-            "09:32",
-        );
     });
 });

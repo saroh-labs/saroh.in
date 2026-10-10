@@ -24,6 +24,7 @@ import {
 } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
+import { checklistSubject } from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
 
 /**
@@ -114,6 +115,8 @@ export default async function Home() {
                 name={session.user.name}
                 businessName={business?.name ?? "This business"}
                 kind={kind}
+                // The line under the greeting follows the checklist below.
+                subject={setup ? checklistSubject(setup.list) : null}
             />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
@@ -146,7 +149,7 @@ async function loadInvoicing(
 }
 
 /**
- * "Get ready to take money" (F8): for owners and admins only (`org:update`),
+ * "Finish setup" (F8): for owners and admins only (`org:update`),
  * whose steps they are. Best-effort — a settings read that fails leaves the
  * checklist off Home, never Home itself.
  */

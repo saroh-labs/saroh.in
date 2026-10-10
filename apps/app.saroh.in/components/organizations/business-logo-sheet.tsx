@@ -63,7 +63,7 @@ export function BusinessLogoSheet({
             result.data,
             logo
                 ? "Logo saved. It prints on your invoices and receipts."
-                : "Logo removed",
+                : "Logo removed.",
         );
         onClose();
     }

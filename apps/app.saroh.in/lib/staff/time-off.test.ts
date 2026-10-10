@@ -62,7 +62,7 @@ describe("offLines", () => {
         expect(lines).toHaveLength(1);
         expect(lines[0].ids).toEqual(["a", "b", "c"]);
         expect(offLineLabel(lines[0])).toBe(
-            "2 Nov – 4 Nov · 3 days · 14:00–18:00",
+            "2 Nov – 4 Nov · 3 days · 2:00 to 6:00 pm",
         );
     });
 
@@ -77,7 +77,7 @@ describe("offLines", () => {
             false,
         );
         expect(lines.map((l) => l.ids)).toEqual([["a"], ["b"], ["c"]]);
-        expect(offLineLabel(lines[0])).toBe("Mon 2 Nov · 14:00–18:00");
+        expect(offLineLabel(lines[0])).toBe("Mon 2 Nov · 2:00 to 6:00 pm");
     });
 
     it("names a single all-day with its weekday", () => {

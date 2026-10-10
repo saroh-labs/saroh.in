@@ -23,7 +23,12 @@ import { useState } from "react";
  * the point. It stays a visible checkbox because signing every other device
  * out is a consequence the user should see coming.
  */
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+    justSet = false,
+}: {
+    /** The first password was set a moment ago, on this page. */
+    justSet?: boolean;
+} = {}) {
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -84,6 +89,12 @@ export function ChangePasswordForm() {
                     {error && (
                         <p className="text-destructive text-sm">{error}</p>
                     )}
+                    {justSet && !success && !error ? (
+                        <p role="status" className="text-success text-sm">
+                            Password set. You can sign in with it or with a
+                            code.
+                        </p>
+                    ) : null}
                     {success && (
                         <p className="text-success text-sm">
                             Password updated.

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatClock } from "@/lib/format/datetime";
 import {
     Select,
     SelectContent,
@@ -8,12 +9,10 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 
-import { clock } from "@/lib/services/diary";
-
 const TIMES = Array.from({ length: 38 }, (_, i) => 300 + i * 30); // 05:00–23:30
 
 /**
- * A time of day on the half hour, in the diary's 24-hour clock ("06:00"), as
+ * A time of day on the half hour, on the 12-hour clock ("6:00 am"), as
  * the Availability design draws it — the hours chips beside it read the same.
  */
 export function ClockSelect({
@@ -38,7 +37,7 @@ export function ClockSelect({
                 aria-label={label}
                 className="h-8 w-[5.5rem] px-2 tabular-nums"
             >
-                <SelectValue>{clock(value)}</SelectValue>
+                <SelectValue>{formatClock(value)}</SelectValue>
             </SelectTrigger>
             <SelectContent className="max-h-64">
                 {options.map((m) => (
@@ -47,7 +46,7 @@ export function ClockSelect({
                         value={String(m)}
                         className="tabular-nums"
                     >
-                        {clock(m)}
+                        {formatClock(m)}
                     </SelectItem>
                 ))}
             </SelectContent>

@@ -73,7 +73,7 @@ export function FulfilmentSection(props: SectionProps) {
     const turnPickupOff = () => {
         const next = types.filter((t) => t !== "PICKUP");
         setStore((s) => ({ ...s, fulfilmentTypes: next }));
-        save({ fulfilmentTypes: next }, "Pick-up turned off", () =>
+        save({ fulfilmentTypes: next }, "Pick-up turned off.", () =>
             setStore((s) => ({ ...s, fulfilmentTypes: types })),
         );
     };

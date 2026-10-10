@@ -74,7 +74,7 @@ async function write(
     });
     const body: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: body as Discount };
-    return toFailure(body, "Could not save that code.");
+    return toFailure(body, "Couldn't save that code.");
 }
 
 export function createDiscount(input: DiscountInput) {

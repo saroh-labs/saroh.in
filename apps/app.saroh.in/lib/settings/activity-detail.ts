@@ -1,3 +1,5 @@
+import { formatDateTime, timeZoneName } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import {
     ALERT_CHANNEL_LABELS,
     ALERT_CHANNELS,
@@ -8,7 +10,6 @@ import type { AuditEventRow, RoleLabels } from "./activity";
 import { personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
-    counted,
     countOf,
     FIELD_PHRASES,
     fieldsOf,
@@ -40,7 +41,7 @@ export interface ActivityChangeRow {
 }
 
 export interface ActivityDetail {
-    /** "Thursday 25 September 2026, 13:47 IST", in the business's zone. */
+    /** "Thursday 25 September 2026, 1:47 pm IST", in the business's zone. */
     when: string;
     who: {
         name: string;
@@ -109,8 +110,8 @@ function trackingRows(
                 "Products",
                 null,
                 on
-                    ? `${counted(products, "product")} counting again, from 0`
-                    : `${counted(products, "product")} stopped counting`,
+                    ? `${count(products, "product")} counting again, from 0`
+                    : `${count(products, "product")} stopped counting`,
             ),
         );
     }
@@ -125,8 +126,8 @@ function trackingRows(
                     "Sold out by hand",
                     null,
                     business
-                        ? `Cleared ${counted(cleared, "mark")}`
-                        : `Cleared at ${counted(cleared, "location")}`,
+                        ? `Cleared ${count(cleared, "mark")}`
+                        : `Cleared at ${count(cleared, "location")}`,
                 ),
             );
         }
@@ -141,7 +142,7 @@ function trackingRows(
                 null,
                 units === 0
                     ? "None on the shelves"
-                    : `${counted(units, "unit")} set to 0${at > 0 ? ` at ${counted(at, "location")}` : ""}`,
+                    : `${count(units, "unit")} set to 0${at > 0 ? ` at ${count(at, "location")}` : ""}`,
             ),
         );
     }
@@ -424,12 +425,7 @@ export function activityDetail(
 function zoneName(at: Date, timeZone: string): string {
     let fallback = "";
     for (const locale of ["en-IN", "en-GB", "en-US"]) {
-        const name = new Intl.DateTimeFormat(locale, {
-            timeZone,
-            timeZoneName: "short",
-        })
-            .formatToParts(at)
-            .find((p) => p.type === "timeZoneName")?.value;
+        const name = timeZoneName(timeZone, "short", at, locale);
         if (!name) continue;
         if (!/^(GMT|UTC)/.test(name)) return name;
         fallback ||= name;
@@ -437,21 +433,8 @@ function zoneName(at: Date, timeZone: string): string {
     return fallback;
 }
 
-/** "Thursday 25 September 2026, 13:47 IST": to the minute, in the zone. */
+/** "Thursday 25 September 2026, 1:47 pm IST": to the minute, in the zone. */
 export function formatFullMoment(iso: string, timeZone: string): string {
-    const at = new Date(iso);
-    const parts = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).formatToParts(at);
-    const part = (type: Intl.DateTimeFormatPartTypes) =>
-        parts.find((p) => p.type === type)?.value ?? "";
-    const zone = zoneName(at, timeZone);
-    return `${part("weekday")} ${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")}${zone ? ` ${zone}` : ""}`;
+    const zone = zoneName(new Date(iso), timeZone);
+    return `${formatDateTime(iso, timeZone, { weekday: "long", month: "long", year: "always" })}${zone ? ` ${zone}` : ""}`;
 }

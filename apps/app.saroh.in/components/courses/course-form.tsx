@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
@@ -35,7 +36,7 @@ import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
-import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import { formatDate, formatTimeRange } from "@/lib/format/datetime";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 const schema = z.object({
@@ -156,10 +157,10 @@ export function CourseForm({
         }
         showSuccess(
             course
-                ? "Course saved"
+                ? "Course saved."
                 : open
-                  ? `${values.name} is open for enrolment`
-                  : `${values.name} saved as a draft`,
+                  ? `${values.name} is open for enrolment.`
+                  : `${values.name} saved as a draft.`,
         );
         if (!leaving) router.push(`/courses/${res.data.id}`);
         return true;
@@ -310,9 +311,9 @@ export function CourseForm({
                     <p className="-mt-3 text-[12.5px] text-muted-foreground">
                         {service.name} takes {service.capacity} at a time, so
                         the course can have up to {service.capacity}{" "}
-                        {service.capacity === 1 ? "seat" : "seats"}. Seats
-                        nobody has taken are kept from other bookers while the
-                        course is open.
+                        {plural(service.capacity, "seat")}. Seats nobody has
+                        taken are kept from other bookers while the course is
+                        open.
                     </p>
                 ) : null}
 
@@ -433,7 +434,7 @@ function SessionPicker({
                                 {i + 1}
                             </span>
                             <span className="min-w-0 flex-1 text-sm">
-                                {formatDayLabel(iso, tz)} ·{" "}
+                                {formatDate(iso, tz, { weekday: "short" })} ·{" "}
                                 {formatTimeRange(
                                     iso,
                                     new Date(

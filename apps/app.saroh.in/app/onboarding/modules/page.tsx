@@ -25,7 +25,7 @@ export default async function OnboardingModulesPage() {
         <main className="mx-auto w-full max-w-2xl px-6 py-16">
             <PageHeader
                 title="What do you need to do?"
-                description="Pick what you need to start with. Nothing is locked in — add or remove capabilities later without losing data."
+                description="Pick what you need to start with. Nothing is locked in. Add or remove modules later without losing data."
             />
             <ModuleGoalPicker modules={modules} kind={business?.kind} />
         </main>

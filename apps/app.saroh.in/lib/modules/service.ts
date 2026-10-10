@@ -100,7 +100,7 @@ export function setModuleStatus(
         `/modules/${encodeURIComponent(moduleKey)}`,
         "PUT",
         { status, ...options },
-        "Could not update the module.",
+        "Couldn't update the module.",
     );
 }
 
@@ -113,7 +113,7 @@ export function selectProjectModule(
         `/projects/${encodeURIComponent(projectId)}/modules/${encodeURIComponent(moduleKey)}`,
         "PUT",
         null,
-        "Could not select the module for this project.",
+        "Couldn't select the module for this project.",
     );
 }
 
@@ -126,6 +126,6 @@ export function deselectProjectModule(
         `/projects/${encodeURIComponent(projectId)}/modules/${encodeURIComponent(moduleKey)}`,
         "DELETE",
         null,
-        "Could not deselect the module for this project.",
+        "Couldn't deselect the module for this project.",
     );
 }

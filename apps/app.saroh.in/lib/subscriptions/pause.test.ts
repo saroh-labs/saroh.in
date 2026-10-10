@@ -1,9 +1,9 @@
+import { localDateKey } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import {
     addDays,
     DEFAULT_PAUSE,
-    localDay,
     pauseAgain,
     pauseNote,
     pauseOptions,
@@ -116,6 +116,6 @@ describe("pause lengths (D8)", () => {
 
     it("steps calendar days across a month end", () => {
         expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
-        expect(localDay(NOW, "America/Los_Angeles")).toBe("2026-09-18");
+        expect(localDateKey(NOW, "America/Los_Angeles")).toBe("2026-09-18");
     });
 });

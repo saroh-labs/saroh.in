@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import type { OffLine } from "@/lib/staff/time-off";
 import { offLines } from "@/lib/staff/time-off";
 import type {
@@ -322,25 +323,22 @@ function withCurrent(
     ];
 }
 
-const plural = (n: number, one: string, many: string) =>
-    `${n} ${n === 1 ? one : many}`;
-
 export function aheadLabel(days: number): string {
     return days % 7 === 0
-        ? plural(days / 7, "week", "weeks")
-        : plural(days, "day", "days");
+        ? count(days / 7, "week", "weeks")
+        : count(days, "day", "days");
 }
 
 export function latestLabel(minutes: number): string {
     if (minutes % 1440 === 0)
-        return `${plural(minutes / 1440, "day", "days")} before`;
+        return `${count(minutes / 1440, "day", "days")} before`;
     if (minutes % 60 === 0)
-        return `${plural(minutes / 60, "hour", "hours")} before`;
+        return `${count(minutes / 60, "hour", "hours")} before`;
     return `${minutes} minutes before`;
 }
 
 export function cancelLabel(hours: number): string {
-    return `${plural(hours, "hour", "hours")} before`;
+    return `${count(hours, "hour", "hours")} before`;
 }
 
 /**

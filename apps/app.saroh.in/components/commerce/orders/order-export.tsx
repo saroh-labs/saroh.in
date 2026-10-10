@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -61,7 +62,7 @@ export function OrderExport({
         downloadCsv(rows, storeName);
         if (complete) {
             showSuccess(
-                `Exported ${rows.length} ${rows.length === 1 ? "order" : "orders"} as a spreadsheet file.`,
+                `Exported ${count(rows.length, "order")} as a spreadsheet file.`,
             );
         } else {
             showError(

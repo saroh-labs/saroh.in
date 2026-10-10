@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -15,8 +16,6 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
 import { TabIntro } from "./product-settings";
-
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
 
 /**
  * Extra things a product records, for the categories picked — "Skin type"
@@ -108,7 +107,7 @@ export function FieldsTab({
                                     </StatusBadge>
                                     <span className="flex-[1_1_120px] text-[12px] text-muted-foreground">
                                         {cats.length
-                                            ? plural(f.productCount)
+                                            ? count(f.productCount, "product")
                                             : ""}
                                     </span>
                                     {canWrite ? (

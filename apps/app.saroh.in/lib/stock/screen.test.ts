@@ -80,7 +80,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Counted by Arjun, today at 07:12");
+        ).toBe("Counted by Arjun, today at 7:12 am");
         expect(
             lastChangeWords(
                 {
@@ -92,7 +92,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Sold, Order #1016, yesterday at 16:20");
+        ).toBe("Sold, Order #1016, yesterday at 4:20 pm");
         // A role that can't see people or orders reads the change alone.
         expect(
             lastChangeWords(
@@ -100,7 +100,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Wasted, 18 Sep at 07:10");
+        ).toBe("Wasted, 18 Sep at 7:10 am");
         expect(lastChangeWords(null, TZ, NOW)).toBe("No changes logged yet");
     });
 

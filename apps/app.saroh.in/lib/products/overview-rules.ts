@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/format/datetime";
 import type { ProductDetail } from "@/lib/products/service";
 
 /**
@@ -175,11 +176,6 @@ export function stockBadge(
     return null;
 }
 
-/** "1 product", "2 products". */
-export function plural(n: number, one: string, many = `${one}s`): string {
-    return `${n} ${n === 1 ? one : many}`;
-}
-
 /**
  * The price a product sells at: one price, or the range across its
  * variants, en dash between ("₹499 – ₹899").
@@ -268,21 +264,6 @@ export function madeByLine(
     return parts.length > 0 ? parts.join(", ") : null;
 }
 
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
 /** A custom field's value as people read it: "Yes", "24 Sep 2026", "12". */
 export function customFieldText(f: {
     type: "TEXT" | "NUMBER" | "DATE" | "YES_NO";
@@ -291,9 +272,8 @@ export function customFieldText(f: {
     if (f.value === null) return "";
     if (f.type === "YES_NO") return f.value === "true" ? "Yes" : "No";
     if (f.type === "DATE") {
-        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f.value);
-        return m
-            ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] ?? ""} ${m[1]}`
+        return /^\d{4}-\d{2}-\d{2}$/.test(f.value)
+            ? formatDay(f.value, { year: "always" })
             : f.value;
     }
     return f.value;

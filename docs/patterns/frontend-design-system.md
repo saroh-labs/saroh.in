@@ -277,6 +277,22 @@
   already sits beside the rows). The other Settings sections share that
   measure through `SettingsPanel` (`rows`), or take the panel (`full`) for
   a table.
+- **Current** (10 Oct 2026) — **One setup checklist: `SetupChecklist`**
+  (`components/shared/setup-checklist.tsx`, rules in
+  `lib/setup-checklist.ts`). Home's and Settings › Business's "Finish
+  setup", a location's and the website's "Before you share your site" are
+  all it, each passing its own rows. A title, "2 of 4 done" (`doneOf`), the
+  shared `ProgressBar`, done rows ticked first then what is left, and ONE
+  button a row that opens its task in place (a `?edit=` link, or a press).
+  When the last step is done the bar fills, the heading says the true thing
+  (`doneTitle`, a sentence), and the card stays for that visit and is one
+  quiet line on the next (`foldKey`; `fold="once"` lets the line go after,
+  on Home). "Hide for now" with Undo is the screen's to keep (`hide`); it
+  is kept per browser, since there is no per-person preference store on the
+  server. The checklist on Home and Settings is named **Finish setup**
+  wherever it is referred to (`FINISH_SETUP`, `checklistWords` in
+  `lib/settings/ready.ts`), with a line saying what its steps are for.
+  Never draw a fifth checklist by hand.
 - **Current** — **`desk:` is 760px**, where the rail appears and the phone
   layouts end, and `max-desk:` is its exact complement. New code uses them.
   The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet
@@ -468,10 +484,43 @@
 
 ## Numbers and dates
 
-- **Current** — **Shared formatters** in `apps/app.saroh.in/lib/format`:
-  `formatMoney`, `formatMoneyMajor` and `formatCount` in `money.ts`, date and time
-  helpers that take an explicit time zone in `datetime.ts`, and
-  `DISPLAY_LOCALE = "en-GB"` in `locale.ts`. Never concatenate a currency symbol
-  by hand (07 §5).
+- **Current** (10 Oct 2026) — **One formatter each, in
+  `apps/app.saroh.in/lib/format`, and nowhere else.** No screen calls
+  `Intl`, `toLocaleString` or builds a plural by hand:
+  `scripts/check-formats.mjs` (in `pnpm prepush`) fails it.
+    - **Money** (`money.ts`): `formatMoney(paise, currency)` and
+      `formatMoneyMajor("1250.50", currency)` write "₹1,250" and
+      "₹1,250.50": the currency's sign, Indian grouping, no ".00". A ledger
+      or invoice column asks for `{ decimals: "always" }` ("₹1,250.00").
+      Null in, null out, so the caller words what is missing.
+      `formatNumber(1204)` is "1,204". The sign and the decimal places are
+      `moneySign` and `moneyDecimals` from `@saroh/ui/lib/money`, the same
+      ones `MoneyInput` shows and keeps.
+    - **A day** (`datetime.ts`): `formatDate(at, zone)` is "12 Oct" this
+      year and "12 Oct 2025" otherwise. Options add the weekday ("Mon 12
+      Oct"), the long month, `relative` ("Today", "Tomorrow", "Yesterday";
+      `"lower"` mid-sentence) and `year: "always" | "never"`. A
+      "YYYY-MM-DD" key is read as written, never moved by a zone.
+      `formatDay(key, { today })` is for a key with no zone to hand.
+    - **A time**: the 12-hour clock, as the pickers are. `formatTime(at,
+zone)` is "9:30 am", lowercase, no leading zero. `formatClock` does
+      the same for a wall-clock value ("09:30", or minutes); its `short`
+      is for an hour axis ("7 am"). `clockValue` is the "HH:MM" a time
+      field holds, never words.
+    - **Together**: `formatDateTime` is "12 Oct, 9:30 am". A range is
+      `formatTimeRange` or `formatClockRange`: "9:30 to 10:15 am", and
+      "11:30 am to 12:15 pm" across noon.
+    - **How long ago**: `formatRelative` ("5 minutes ago"), only where a
+      screen already says it.
+    - **A count** (`plural.ts`): `count(3, "booking")` is "3 bookings",
+      `count(2, "person", "people")` "2 people". `plural(n, "is", "are")`
+      is the word alone.
+    - Every date function takes the zone. Which zone is the caller's: the
+      booking's own, the business's (`businessZone`, `BusinessDate`), or
+      the viewer's through `ViewerDate`, which is also the only safe way
+      to draw one in a server-rendered component.
+    - A test whose words carry a date and no `now` calls `pinClock()`
+      (`lib/format/test-clock.ts`), or it passes this year and fails the
+      next.
 - **Adopted** — `tabular-nums` on columns of figures, and "—" where zero is a
   state rather than a measurement (07 §5).

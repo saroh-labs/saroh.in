@@ -88,7 +88,7 @@ export function LeadActions({
                             trigger={
                                 <Button className="wk-press">Add note</Button>
                             }
-                            title="Add note"
+                            title="New note"
                             description="Write down a call, a visit or anything the team should remember about this lead. Only your team sees it."
                             onOpen={() => setOpen("note")}
                             onClose={done}

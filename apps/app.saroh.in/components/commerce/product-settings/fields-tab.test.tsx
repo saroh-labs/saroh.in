@@ -165,7 +165,7 @@ describe("Add field", () => {
 
     it("opens a sheet named Add field: name, type, who, where", () => {
         const input = open();
-        expect(s.title(s.sheet())).toBe("Add field");
+        expect(s.title(s.sheet())).toBe("New field");
         expect(input.value).toBe("");
         expect(radio("Text")?.getAttribute("aria-checked")).toBe("true");
         expect(radio("Team only")?.getAttribute("aria-checked")).toBe("true");

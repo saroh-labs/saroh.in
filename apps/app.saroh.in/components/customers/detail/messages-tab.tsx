@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate, formatTime } from "@/lib/format/datetime";
+import { formatNumber } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
@@ -8,7 +10,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { clock } from "@/lib/calendar/layers";
 import {
     markThreadReadAction,
     replyAction,
@@ -23,7 +24,6 @@ import {
     REPLY_MAX,
     replyNote,
 } from "@/lib/customer-workspace/thread";
-import { dayText } from "@/lib/subscriptions/view";
 
 import { UNREACHED } from "@/lib/api/unreached";
 import { Empty } from "./parts";
@@ -131,8 +131,8 @@ export function MessagesTab({
                                 </div>
                                 <div className="mt-1 text-[11.5px] text-muted-foreground">
                                     {messageFrom(m, firstName)} ·{" "}
-                                    {dayText(m.at, timeZone, now)},{" "}
-                                    {clock(m.at, timeZone)}
+                                    {formatDate(m.at, timeZone, { now })},{" "}
+                                    {formatTime(m.at, timeZone)}
                                 </div>
                             </li>
                         );
@@ -170,7 +170,7 @@ export function MessagesTab({
                             )}
                         >
                             {over
-                                ? `Over ${REPLY_MAX.toLocaleString("en-IN")} characters`
+                                ? `Over ${formatNumber(REPLY_MAX)} characters`
                                 : replyNote(thread.signsIn, firstName)}
                         </span>
                         <Button

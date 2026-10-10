@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/format/money";
 import { ListSearch } from "@saroh/ui/list-search";
 
 import { chipClass } from "@/components/shared/chip";
@@ -10,7 +11,6 @@ import type {
     ListQuery,
 } from "@/lib/customers/list";
 import { chipsFor, SORT_LABEL, sortsFor } from "@/lib/customers/list";
-import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 const ALL_STORES = "all";
@@ -124,7 +124,7 @@ function ChipButton({
         >
             {label}
             <span className="ml-1.5 tabular-nums opacity-70">
-                {count.toLocaleString(NUMBER_LOCALE)}
+                {formatNumber(count)}
             </span>
         </button>
     );

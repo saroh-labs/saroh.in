@@ -123,7 +123,7 @@ export function sendMessage(
             ...(subject ? { subject } : {}),
             body,
         },
-        "Could not send the message",
+        "Couldn't send the message.",
     );
 }
 
@@ -135,6 +135,6 @@ export function setConsent(
         "/consents",
         "POST",
         { ...input, source: "crm-ui" },
-        "Could not update consent",
+        "Couldn't update consent.",
     );
 }

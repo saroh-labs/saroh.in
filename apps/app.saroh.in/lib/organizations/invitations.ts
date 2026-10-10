@@ -1,6 +1,6 @@
+import { formatDate } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { z } from "zod";
-
-import { shortDate } from "@/lib/sites/format-date";
 
 /**
  * What the Team screen says about an invitation, and what it refuses to send
@@ -56,9 +56,9 @@ export function invitationMeta(
     const created = new Date(invitation.createdAt);
     const expires = new Date(invitation.expiresAt);
     const day = (d: Date) =>
-        shortDate(d, zone) === shortDate(now, zone)
+        formatDate(d, zone) === formatDate(now, zone)
             ? "today"
-            : shortDate(d, zone);
+            : formatDate(d, zone);
 
     const parts = [`Invited ${day(created)}`];
     const lastSent = new Date(expires.getTime() - INVITE_TTL_MS);
@@ -70,7 +70,7 @@ export function invitationMeta(
     parts.push(
         expires.getTime() <= now.getTime()
             ? `link expired ${day(expires)} — resend for a fresh one`
-            : `link works until ${shortDate(expires, zone)}`,
+            : `link works until ${formatDate(expires, zone)}`,
     );
     return parts.join(" · ");
 }
@@ -135,17 +135,15 @@ export function teamCountLine(
     // Bookable staff with no login use a seat too (DEC-105, UX-053).
     if (noLogin > 0) {
         parts.push(
-            `${noLogin === 1 ? "1 person" : `${noLogin} people`} taking bookings with no login`,
+            `${count(noLogin, "person", "people")} taking bookings with no login`,
         );
     }
     if (waiting > 0) {
-        parts.push(
-            `${waiting === 1 ? "1 invite" : `${waiting} invites`} waiting`,
-        );
+        parts.push(`${count(waiting, "invite")} waiting`);
     }
     if (viewOnly > 0) {
         parts.push(
-            `${viewOnly === 1 ? "1 view-only person" : `${viewOnly} view-only people`}, no seat`,
+            `${count(viewOnly, "view-only person", "view-only people")}, no seat`,
         );
     }
     return parts.join(" · ");

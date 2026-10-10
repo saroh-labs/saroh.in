@@ -159,7 +159,7 @@ export function AddLeadDialog({
                     {header ? "New lead" : label}
                 </Button>
             }
-            title="Add a lead"
+            title="New lead"
             description="Who, and what they wanted. The rest is whatever you happened to learn."
             pending={saving}
             saveLabel="Add lead"

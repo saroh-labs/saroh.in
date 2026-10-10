@@ -1,3 +1,4 @@
+import { formatClock, formatDay } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import type { BookingsCalendar, DiaryBooking } from "./booking-calendar";
@@ -6,8 +7,6 @@ import {
     blocksOnDay,
     bookedValue,
     busySpans,
-    clock,
-    dayLabel,
     firstStartIn,
     localDateOf,
     localMinuteOf,
@@ -115,9 +114,11 @@ describe("calendar days", () => {
         expect(sep.days).toHaveLength(30);
         // 1 Sep 2026 is a Tuesday: one blank before it on a Monday grid.
         expect(sep.lead).toBe(1);
-        expect(dayLabel("2026-09-18")).toBe("Fri 18 Sep");
-        expect(clock(435)).toBe("07:15");
-        expect(clock(1440)).toBe("24:00");
+        expect(
+            formatDay("2026-09-18", { weekday: "short", year: "never" }),
+        ).toBe("Fri 18 Sep");
+        expect(formatClock(435)).toBe("7:15 am");
+        expect(formatClock(1440)).toBe("12:00 am");
     });
 });
 

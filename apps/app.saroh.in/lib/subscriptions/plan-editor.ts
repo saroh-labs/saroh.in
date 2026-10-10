@@ -3,10 +3,12 @@ import type {
     EditorProblem,
     EditorRecord,
 } from "@/lib/editor-shell/types";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { AutopayLimit, PlanEditorRecord, PlanValues } from "./plan-drafts";
 import type { Interval, Plan } from "./service";
-import { classesText, money } from "./view";
+import { classesText } from "./view";
 
 /*
  * The Plan Editor's rules (plan 2026-09-26-004, D7), after "Saroh Plan
@@ -254,7 +256,7 @@ export function planChanges(
     const after = priceOf(form);
     if (after !== before && after > 0) {
         out.push(
-            `price ${money(before, cur)} → ${money(after, cur)} for new sign-ups`,
+            `price ${formatMoneyMajor(before, cur)} → ${formatMoneyMajor(after, cur)} for new sign-ups`,
         );
     }
     if (form.interval !== published.interval) {
@@ -314,7 +316,7 @@ export function everyNote(form: PlanForm, autopay = false): string {
     const invoiced = `Invoiced each ${EVERY[form.interval]} ${how}.`;
     if (form.interval === "MONTH" || form.interval === "WEEK") return invoiced;
     const cur = form.currency || "INR";
-    return `Works out to ${money(Math.round(price * PER_MONTH[form.interval]), cur)} a month. ${invoiced}`;
+    return `Works out to ${formatMoneyMajor(Math.round(price * PER_MONTH[form.interval]), cur)} a month. ${invoiced}`;
 }
 
 /**
@@ -339,8 +341,8 @@ export function autopayLimitWarning(
         (hi, l) => (toMinorUnits(l.limit) > toMinorUnits(hi) ? l.limit : hi),
         short[0].limit,
     );
-    const who = members === 1 ? "1 member" : `${members} members`;
-    return `Autopay covers up to ${money(cap, currency || "INR")}; ${who} will need to authorise again`;
+    const who = count(members, "member");
+    return `Autopay covers up to ${formatMoneyMajor(cap, currency || "INR")}; ${who} will need to authorise again`;
 }
 
 /** "1500.5" as 150050: compared in whole paise, never as floats. */
@@ -367,13 +369,19 @@ export function glance(
         {
             label: "Per month",
             value: price
-                ? money(Math.round(price * PER_MONTH[form.interval]), cur)
+                ? formatMoneyMajor(
+                      Math.round(price * PER_MONTH[form.interval]),
+                      cur,
+                  )
                 : "—",
         },
         { label: "On it now", value: String(figures?.subscriberCount ?? 0) },
         {
             label: "Coming in a month",
-            value: coming > 0 ? money(coming, figures?.currency ?? cur) : "—",
+            value:
+                coming > 0
+                    ? formatMoneyMajor(coming, figures?.currency ?? cur)
+                    : "—",
         },
     ];
 }
@@ -383,8 +391,8 @@ export function whoPays(
     figures: PlanFigures | null,
 ): { label: string; value: string }[] {
     return (figures?.byPrice ?? []).map((b) => ({
-        label: `${b.count} ${b.count === 1 ? "person" : "people"}${b.current ? "" : " · older price"}`,
-        value: money(b.price, b.currency),
+        label: `${count(b.count, "person", "people")}${b.current ? "" : " · older price"}`,
+        value: formatMoneyMajor(b.price, b.currency),
     }));
 }
 

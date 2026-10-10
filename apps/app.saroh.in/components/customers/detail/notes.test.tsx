@@ -139,7 +139,7 @@ describe("the Notes tab", () => {
     it("offers text only: no allergen picker", async () => {
         render([note()]);
         await press(buttons("Add note")[0]);
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelectorAll("textarea")).toHaveLength(1);
         expect(dialog()?.querySelector('[role="group"]')).toBe(null);
         expect(dialog()?.querySelector("[aria-pressed]")).toBe(null);
@@ -158,7 +158,7 @@ describe("the Notes tab", () => {
         render([]);
         expect(buttons("Add note")).toHaveLength(1);
         await press(buttons("Add note")[0]);
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
     });
 
     it("shows a note's words and who wrote it, with no allergy chips", () => {
@@ -199,7 +199,7 @@ describe("the Add note sheet", () => {
             body: "Likes the corner table",
         });
         expect(showError).toHaveBeenCalledWith("Your role can't add notes.");
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelector("textarea")?.value).toBe(
             "Likes the corner table",
         );

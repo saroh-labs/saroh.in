@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
@@ -9,8 +10,6 @@ import type { CatalogueView } from "@/lib/products/settings";
 import { Notice } from "@saroh/ui/notice";
 
 type Category = CatalogueView["categories"][number];
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
-
 /**
  * Merge a category into another: pick where its products go, read what
  * will move and how many, then Merge. Uncategorized is always a choice.
@@ -94,7 +93,7 @@ export function CategoryMergeSheet({
             <Notice role="status">
                 {into === null
                     ? "Pick where its products should go."
-                    : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
+                    : `The ${count(category.productCount, "product")} in ${category.name} move to ${into}, and ${category.name} goes away.`}
             </Notice>
         </FormSheet>
     );

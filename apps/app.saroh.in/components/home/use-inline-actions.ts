@@ -163,11 +163,8 @@ export function useInlineActions() {
             await takeBack();
             setDone(need.id, null);
             showSuccess(undoneText(inline, false));
-        } catch (error) {
-            showError(
-                "That couldn't be undone.",
-                error instanceof Error ? error.message : undefined,
-            );
+        } catch {
+            showError("That couldn't be undone.", "Try again.");
         }
     }
 

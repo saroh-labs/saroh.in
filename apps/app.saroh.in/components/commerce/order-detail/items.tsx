@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -43,7 +44,7 @@ export function OrderItems({
             <div className="flex items-baseline gap-2 px-4 pb-1 pt-[13px]">
                 <PanelTitle className="flex-1">Items</PanelTitle>
                 <span className="text-[12px] text-muted-foreground">
-                    {units === 1 ? "1 item" : `${units} items`}
+                    {count(units, "item")}
                 </span>
             </div>
             <ul>

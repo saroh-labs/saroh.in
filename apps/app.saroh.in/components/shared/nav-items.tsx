@@ -485,7 +485,7 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                     {
                         href: "/commerce/discounts",
-                        label: "Discounts",
+                        label: "Discount codes",
                         action: "discount:read",
                     },
                     {

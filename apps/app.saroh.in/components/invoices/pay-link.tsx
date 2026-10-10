@@ -1,7 +1,7 @@
 "use client";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { invoiceMoney } from "@/lib/invoices/money";
+import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceOnlinePayment } from "@/lib/invoices/service";
 import { Notice } from "@saroh/ui/notice";
 
@@ -38,7 +38,9 @@ export function PaymentsToRefund({
         <div className="flex flex-col gap-2 print:hidden">
             {owed.map((p) => {
                 const name = providerName(p.provider);
-                const amount = invoiceMoney(p.amount, p.currency);
+                const amount = formatMoneyMajor(p.amount, p.currency, {
+                    decimals: "always",
+                });
                 return (
                     <Notice
                         key={p.id}

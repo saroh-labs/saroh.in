@@ -43,8 +43,8 @@ export function OutcomeControl({
             }
             showSuccess(
                 next === "ATTENDED"
-                    ? "Marked as attended"
-                    : "Marked as a no-show",
+                    ? "Booking marked as attended."
+                    : "Booking marked as a no-show.",
             );
             router.refresh();
         });

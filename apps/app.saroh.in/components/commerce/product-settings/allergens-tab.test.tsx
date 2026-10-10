@@ -114,9 +114,9 @@ describe("Add allergen", () => {
         return s.inputs(s.dialog())[0];
     }
 
-    it("opens a dialog named Add allergen with the one field", () => {
+    it("opens a dialog named New allergen with the one field", () => {
         const input = open();
-        expect(s.title(s.dialog())).toBe("Add allergen");
+        expect(s.title(s.dialog())).toBe("New allergen");
         expect(s.inputs(s.dialog())).toHaveLength(1);
         expect(input.value).toBe("");
     });

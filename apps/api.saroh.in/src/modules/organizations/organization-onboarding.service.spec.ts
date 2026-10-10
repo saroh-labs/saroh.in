@@ -40,7 +40,14 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// The welcome email's transport: never a real one in a unit test.
+jest.mock("../../common/email", () => ({
+    sendWelcomeEmail: jest.fn().mockResolvedValue("sent"),
+}));
+
 import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
+
+import { sendWelcomeEmail as sendWelcomeEmailFn } from "../../common/email";
 
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
@@ -59,6 +66,7 @@ const profileCreate = prisma.businessProfile.create as jest.Mock;
 const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
+const sendWelcomeEmail = sendWelcomeEmailFn as unknown as jest.Mock;
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -200,6 +208,92 @@ describe("OrganizationOnboardingService.onboard", () => {
             targetId: "org_1",
             outcome: AuditOutcome.Success,
             metadata: { slug: "acme", kind: "BUSINESS" },
+        });
+    });
+
+    describe("the welcome email (UX audit, 10 Oct)", () => {
+        it("goes once to whoever set the business up, with the goal they chose", async () => {
+            await service.onboard(
+                "user_1",
+                { name: "Acme", goal: "WEBSITE" },
+                { email: "asha@example.com" },
+            );
+            expect(sendWelcomeEmail).toHaveBeenCalledTimes(1);
+            expect(sendWelcomeEmail).toHaveBeenCalledWith("asha@example.com", {
+                businessName: "Acme",
+                goal: "WEBSITE",
+                // The app's own address differs by environment.
+                openUrl: expect.stringMatching(/\/open\/org_1$/) as string,
+                address: "acme",
+            });
+        });
+
+        it("says no goal for someone who will decide later", async () => {
+            await service.onboard(
+                "user_1",
+                { name: "Acme" },
+                { email: "asha@example.com" },
+            );
+            expect(sendWelcomeEmail).toHaveBeenCalledWith(
+                "asha@example.com",
+                expect.objectContaining({ goal: null }),
+            );
+        });
+
+        it("is not sent when nobody is named as setting it up", async () => {
+            // A backfill or a script making a business: no person to greet.
+            await service.onboard("user_1", { name: "Acme" });
+            expect(sendWelcomeEmail).not.toHaveBeenCalled();
+        });
+
+        it("is never sent when the business was not made", async () => {
+            orgFindUnique.mockResolvedValue({ id: "taken" });
+            await expect(
+                service.onboard(
+                    "user_1",
+                    { name: "Acme" },
+                    { email: "asha@example.com" },
+                ),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(sendWelcomeEmail).not.toHaveBeenCalled();
+        });
+
+        it("a send that fails never fails the onboarding", async () => {
+            sendWelcomeEmail.mockRejectedValueOnce(new Error("smtp down"));
+            await expect(
+                service.onboard(
+                    "user_1",
+                    { name: "Acme" },
+                    { email: "asha@example.com" },
+                ),
+            ).resolves.toEqual({ id: "org_1", slug: "acme" });
+        });
+
+        it("is the only place it is sent from: joining a business sends none", () => {
+            // An invited member never onboards. Nothing else in the API
+            // may send it, or a team member would be told they set the
+            // business up.
+            const { readFileSync, readdirSync } =
+                jest.requireActual<typeof import("node:fs")>("node:fs");
+            const { join } =
+                jest.requireActual<typeof import("node:path")>("node:path");
+            const root = join(__dirname, "..", "..");
+            const callers = (readdirSync(root, { recursive: true }) as string[])
+                .filter((f) => f.endsWith(".ts") && !f.endsWith(".spec.ts"))
+                .filter((f) =>
+                    /sendWelcomeEmail\(/.test(
+                        readFileSync(join(root, f), "utf8"),
+                    ),
+                )
+                .sort();
+            expect(callers).toEqual([
+                join("common", "email.ts"),
+                join(
+                    "modules",
+                    "organizations",
+                    "organization-onboarding.service.ts",
+                ),
+            ]);
         });
     });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
@@ -13,8 +14,6 @@ import { extendHolder } from "@/lib/class-packs/actions";
 import {
     EXTEND_REASON_MAX,
     MAX_EXTEND_DAYS,
-    day,
-    dayWithWeekday,
 } from "@/lib/class-packs/pack-detail";
 import {
     defaultExtendDays,
@@ -85,7 +84,7 @@ export function ExtendDialog({
             open
             size="md"
             title={`Extend ${target.name}'s pack`}
-            description={`Use by ${day(target.expiresAt, timeZone)} now. Up to ${MAX_EXTEND_DAYS} more days at a time.`}
+            description={`Use by ${formatDate(target.expiresAt, timeZone)} now. Up to ${MAX_EXTEND_DAYS} more days at a time.`}
             pending={busy}
             saveLabel="Extend pack"
             savingLabel="Extending…"
@@ -115,9 +114,10 @@ export function ExtendDialog({
                 className="m-0 text-[13px] font-semibold"
             >
                 New use-by:{" "}
-                {dayWithWeekday(
+                {formatDate(
                     extendedTo(target.expiresAt, days).toISOString(),
                     timeZone,
+                    { weekday: "short" },
                 )}
             </p>
             <div className="grid gap-1.5">

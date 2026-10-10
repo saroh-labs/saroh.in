@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import type { ModuleView } from "./schema";
 
 /**
@@ -111,12 +112,12 @@ export function offImpact({
     const parts: string[] = [];
     if (dependents.length > 0) {
         parts.push(
-            `${listWords(dependents)} ${dependents.length === 1 ? "turns" : "turn"} off with it`,
+            `${listWords(dependents)} ${plural(dependents.length, "turns", "turn")} off with it`,
         );
     }
     if (rows.length > 0) {
         parts.push(
-            `${listWords(rows)} ${rows.length === 1 ? "leaves" : "leave"} the rail`,
+            `${listWords(rows)} ${plural(rows.length, "leaves", "leave")} the rail`,
         );
     }
     const said = parts.join(", and ");

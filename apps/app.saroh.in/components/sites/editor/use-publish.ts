@@ -197,7 +197,7 @@ export function usePublish({
             showError(
                 onlyHeldBack
                     ? `Finish or remove ${unfinishedPhrase(heldBack)} before publishing.`
-                    : "You have unsaved changes — save the draft first.",
+                    : "You have unsaved changes. Save the draft first.",
             );
             return;
         }

@@ -1,6 +1,8 @@
 "use client";
 
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
 import type { OrderFilter } from "@/lib/customer-workspace/view";
@@ -9,9 +11,7 @@ import {
     orderStatus,
     orderWhat,
     ordersShown,
-    whenText,
 } from "@/lib/customer-workspace/view";
-import { money } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
@@ -91,14 +91,17 @@ export function OrdersTab({
                             </span>
                             <span className="tabular-nums">
                                 {o.total && o.currency
-                                    ? money(o.total, o.currency)
+                                    ? formatMoneyMajor(o.total, o.currency)
                                     : "—"}
                             </span>
                             <span className="text-muted-foreground">
                                 {o.via.storefront.name}
                             </span>
                             <span className="text-muted-foreground">
-                                {whenText(o.placedAt, timeZone, now)}
+                                {formatDate(o.placedAt, timeZone, {
+                                    now,
+                                    relative: true,
+                                })}
                             </span>
                             <span>
                                 <StatusBadge tone={isOpen(o) ? "ok" : "off"}>
@@ -136,7 +139,7 @@ export function OrdersTab({
                             aside={
                                 o.total && o.currency ? (
                                     <span className="font-display text-[14px] font-semibold tabular-nums">
-                                        {money(o.total, o.currency)}
+                                        {formatMoneyMajor(o.total, o.currency)}
                                     </span>
                                 ) : null
                             }
@@ -154,7 +157,10 @@ export function OrdersTab({
                             }
                             footer={
                                 <div className="text-[12px] text-muted-foreground">
-                                    {whenText(o.placedAt, timeZone, now)}
+                                    {formatDate(o.placedAt, timeZone, {
+                                        now,
+                                        relative: true,
+                                    })}
                                     {` · ${o.via.storefront.name}`}
                                 </div>
                             }

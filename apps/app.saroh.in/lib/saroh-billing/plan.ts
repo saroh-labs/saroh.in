@@ -1,4 +1,5 @@
-import { formatCount, formatMoney } from "@/lib/format/money";
+import { formatCompact, formatMoney } from "@/lib/format/money";
+import { plural } from "@/lib/format/plural";
 
 /**
  * Settings → Plan and billing, as data: what Saroh charges this business
@@ -120,7 +121,7 @@ export interface PlanUsage {
 /** "Last month Saroh sent 214 receipts and 38 invoices for …". */
 export function usageLine(usage: PlanUsage, businessName: string): string {
     const n = (count: number, one: string) =>
-        `${formatCount(count)} ${one}${count === 1 ? "" : "s"}`;
+        `${formatCompact(count)} ${plural(count, one)}`;
     const took = formatMoney(usage.paymentsCents, usage.currency);
     return `Last month Saroh sent ${n(usage.receipts, "receipt")} and ${n(usage.invoices, "invoice")} for ${businessName}, and took ${took} in payments.`;
 }
@@ -209,7 +210,7 @@ export function planSummary(
             ? {
                   kind: "charge",
                   iso: subscription.currentPeriodEnd,
-                  amount: formatMoney(plan.priceCents, plan.currency) ?? "",
+                  amount: formatMoney(plan.priceCents, plan.currency),
               }
             : { kind: "text", text: "Date not set yet" },
         warning:

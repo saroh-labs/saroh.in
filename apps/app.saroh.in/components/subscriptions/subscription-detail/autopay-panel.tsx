@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
@@ -24,7 +26,6 @@ import type {
     AutopayLink,
     AutopayMethod,
 } from "@/lib/subscriptions/service";
-import { dayText, money } from "@/lib/subscriptions/view";
 import { ShareLink } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 /**
@@ -185,7 +186,7 @@ function SendLinkDialog({
                         : made.emailed?.status === "SUPPRESSED"
                           ? `${firstName} has turned off email, so it wasn't sent. Copy it and send it to them yourself.`
                           : `Copy it and send it to ${firstName} yourself.`
-                } It covers renewals up to ${money(made.limit, made.currency)} and works until ${dayText(made.expiresAt, timeZone, now)}.`}
+                } It covers renewals up to ${formatMoneyMajor(made.limit, made.currency)} and works until ${formatDate(made.expiresAt, timeZone, { now })}.`}
                 doneOnly
                 fieldsClassName="gap-0"
                 onClose={onClose}
@@ -208,7 +209,7 @@ function SendLinkDialog({
             title="Send a set-up link"
             description={`${firstName} approves autopay on ${provider}'s page. The link is for one way to pay. Pick the one they'll use.${
                 limitLow
-                    ? ` Its limit covers this renewal of ${money(limitLow.amount, limitLow.currency)}. Once they approve it, it replaces their current autopay.`
+                    ? ` Its limit covers this renewal of ${formatMoneyMajor(limitLow.amount, limitLow.currency)}. Once they approve it, it replaces their current autopay.`
                     : ""
             }`}
             pending={busy}

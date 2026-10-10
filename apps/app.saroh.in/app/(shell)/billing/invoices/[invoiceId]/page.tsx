@@ -93,7 +93,7 @@ export default async function InvoicePage({
             : null;
     const businessName = organization?.name ?? "This business";
     const who = billedTo(invoice);
-    const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, invoice.currency);
     const late = whenLine(invoice);
     // Its dates in the business's zone, as its paper prints them (#836).
     const zone = invoiceZone(business);

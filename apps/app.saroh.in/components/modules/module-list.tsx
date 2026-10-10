@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
@@ -260,7 +261,7 @@ function ModuleRow({
             offOrder.map((k) => [k, "DISABLED"]),
             () =>
                 showUndo(
-                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? ` — ${listWords(leaving)} ${leaving.length === 1 ? "has" : "have"} left the rail` : ""}. Nothing is deleted.`,
+                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? ` — ${listWords(leaving)} ${plural(leaving.length, "has", "have")} left the rail` : ""}. Nothing is deleted.`,
                     // Undo in the order the API accepts: needed before needing.
                     () =>
                         run(

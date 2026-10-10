@@ -204,8 +204,6 @@ export const RAW_ALLOWED = {
     "components/modules/turn-on/bookings-fields.tsx": ["label"],
     // label: a label that wraps its control
     "components/modules/turn-on/setup-fields.tsx": ["label"],
-    // button: one of a segmented choice (radio)
-    "components/organizations/business-setup-form.tsx": ["button"],
     // label: a label that wraps its control
     "components/organizations/invite-diary-person.tsx": ["label"],
     // label: a label that wraps its control
@@ -216,6 +214,8 @@ export const RAW_ALLOWED = {
     "components/organizations/organization-switcher.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip, a row or card that is one button; input: a native radio inside its own label; label: a label that wraps its control
     "components/organizations/roles-tab.tsx": ["button", "input", "label"],
+    // button: one of a set of radio cards
+    "components/organizations/setup-goal-choice.tsx": ["button"],
     // button: one of a segmented choice (radio)
     "components/organizations/setup-kind-choice.tsx": ["button"],
     // button: one of a segmented choice (radio); input: a native radio inside its own label, a native tick inside its own label; label: a label that wraps its control

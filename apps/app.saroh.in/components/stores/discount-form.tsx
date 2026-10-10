@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
@@ -207,7 +208,7 @@ export function DiscountForm({
             else showError(res.error);
             return;
         }
-        showSuccess(discount ? "Code saved" : `${res.data.code} is ready`);
+        showSuccess(discount ? "Code saved." : `${res.data.code} is ready.`);
         router.push("/commerce/discounts");
         router.refresh();
     }
@@ -515,7 +516,7 @@ export function DiscountForm({
                                 <FormDescription>
                                     Across every order. Leave empty for no cap.
                                     {discount
-                                        ? ` Used ${discount.used} ${discount.used === 1 ? "time" : "times"} so far.`
+                                        ? ` Used ${count(discount.used, "time")} so far.`
                                         : ""}
                                 </FormDescription>
                                 <FormMessage />

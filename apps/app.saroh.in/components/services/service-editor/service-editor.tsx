@@ -222,7 +222,7 @@ export function ServiceEditor({
             router.refresh();
             if (whoError) {
                 setSaved({ ...draft, staffIds: saved.staffIds });
-                showError(`Saved, but who takes it didn't change: ${whoError}`);
+                showError("Saved, but who takes it didn't change.", whoError);
                 return;
             }
             setSaved(draft);
@@ -241,7 +241,7 @@ export function ServiceEditor({
         );
         const whoError = who ? who.error : UNREACHED;
         if (whoError) {
-            showError(`Added, but who takes it didn't save: ${whoError}`);
+            showError("Added, but who takes it wasn't saved.", whoError);
         } else {
             showSuccess(message);
         }

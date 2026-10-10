@@ -1,5 +1,5 @@
-import { formatTime } from "@saroh/ui/time-select";
-
+import { formatClockRange } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import type { OpeningHoursDay, Weekday } from "./storefronts";
 
 /**
@@ -22,8 +22,7 @@ const sameHours = (a: OpeningHoursDay, b: OpeningHoursDay) =>
     a.closed === b.closed &&
     (a.closed || (a.open === b.open && a.close === b.close));
 
-const hours = (d: OpeningHoursDay) =>
-    `${formatTime(d.open)} – ${formatTime(d.close)}`;
+const hours = (d: OpeningHoursDay) => formatClockRange(d.open, d.close);
 
 /** Every open day on the same hours — the case for almost every shop. */
 export function isUniform(week: OpeningHoursDay[]): boolean {
@@ -39,7 +38,7 @@ export function hoursBackwards(week: OpeningHoursDay[]): boolean {
 }
 
 /**
- * "Mon–Sat 9:00 AM – 6:00 PM · Sun closed": runs of neighbouring days with
+ * "Mon–Sat 9:00 am to 6:00 pm · Sun closed": runs of neighbouring days with
  * the same hours, the way a shop writes them on its door.
  */
 export function weekSummary(week: OpeningHoursDay[]): string {
@@ -81,7 +80,7 @@ function dayRuns(week: OpeningHoursDay[], at: number[]): string {
 
 /**
  * The row's one line: the hours most open days keep and the days that keep
- * them ("Mon–Sat · 9:00 AM – 6:00 PM"), then how many open days differ
+ * them ("Mon–Sat · 9:00 am to 6:00 pm"), then how many open days differ
  * ("+ 2 days with different hours"). "Not set yet" for a week never saved,
  * "Closed every day" for one with no open day. Hours kept by as many days
  * as another's win by coming first in the week.
@@ -101,9 +100,7 @@ export function hoursSummary(week: OpeningHoursDay[] | null): string {
     if (!first) return "Closed every day";
     const others = open.length - main.length;
     const more =
-        others === 0
-            ? ""
-            : ` + ${others} ${others === 1 ? "day" : "days"} with different hours`;
+        others === 0 ? "" : ` + ${count(others, "day")} with different hours`;
     const days = dayRuns(
         week,
         main.map((m) => m.at),

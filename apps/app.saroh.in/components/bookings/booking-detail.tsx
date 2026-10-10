@@ -16,7 +16,11 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
-import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import {
+    formatDate,
+    formatDateTime,
+    formatTimeRange,
+} from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { bookingStatus } from "@/lib/format/status";
 import {
@@ -203,7 +207,10 @@ export function BookingDetailView({
                         )}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        {formatDayLabel(booking.startAt, timezone)} · {timezone}
+                        {formatDate(booking.startAt, timezone, {
+                            weekday: "short",
+                        })}{" "}
+                        · {timezone}
                     </p>
                     {/* The one fact a moved booking must not hide. Without it
                         a merchant looking at the current time has no way to
@@ -212,7 +219,11 @@ export function BookingDetailView({
                         <p className="mt-3 text-sm text-muted-foreground">
                             Moved from{" "}
                             <span className="text-foreground">
-                                {shortTime(firstMove.fromStartAt, timezone)}
+                                {formatDateTime(
+                                    firstMove.fromStartAt,
+                                    timezone,
+                                    { weekday: "short" },
+                                )}
                             </span>
                             {moved.length > 1
                                 ? ` · moved ${moved.length} times`
@@ -270,12 +281,10 @@ export function BookingDetailView({
                         // Shown, disabled, with why (FB-1, DEC-098).
                         <TakePaymentLocked
                             className="mt-3"
-                            amount={
-                                formatMoney(
-                                    booking.money.take.cents,
-                                    booking.money.currency,
-                                ) ?? null
-                            }
+                            amount={formatMoney(
+                                booking.money.take.cents,
+                                booking.money.currency,
+                            )}
                             triggerClassName="h-9"
                         />
                     ) : null}
@@ -374,7 +383,9 @@ export function BookingDetailView({
                                 {eventTitle(event, timezone)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {formatDayLabel(event.createdAt, timezone)}
+                                {formatDate(event.createdAt, timezone, {
+                                    weekday: "short",
+                                })}
                                 {/* Null actor means the booker did it through
                                     the public form — the difference between
                                     "they booked" and "we moved it". */}
@@ -443,23 +454,12 @@ function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "NO_SHOW") return "Marked as a no-show";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
     const from = event.fromStartAt
-        ? shortTime(event.fromStartAt, timeZone)
+        ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })
         : null;
-    const to = event.toStartAt ? shortTime(event.toStartAt, timeZone) : null;
+    const to = event.toStartAt
+        ? formatDateTime(event.toStartAt, timeZone, { weekday: "short" })
+        : null;
     return from && to ? `Moved from ${from} to ${to}` : "Moved";
-}
-
-/** "Mon, 20 Jul, 9:00 AM" — a whole instant, short enough for a history line. */
-function shortTime(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    }).format(new Date(iso));
 }
 
 /** "Asha" from "Asha Rao"; an email stays whole. */

@@ -1,9 +1,11 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import type {
     Subscription,
     SubscriptionEvent,
     SubscriptionEventPlan,
 } from "./service";
-import { dayText, money } from "./view";
 
 /**
  * A subscription's log in words (D9), for its Changes card: what was done,
@@ -58,7 +60,7 @@ function plan(v: unknown): SubscriptionEventPlan | null {
 
 function planPrice(p: SubscriptionEventPlan): string {
     return typeof p.price === "string" && typeof p.currency === "string"
-        ? ` (${money(p.price, p.currency)})`
+        ? ` (${formatMoneyMajor(p.price, p.currency)})`
         : "";
 }
 
@@ -71,14 +73,19 @@ export function changeWhat(
     const data = event.data as Data;
     const day = (iso: unknown, withWeekday = false) => {
         const at = str(iso);
-        return at ? dayText(at, sub.timezone, now, withWeekday) : "";
+        return at
+            ? formatDate(at, sub.timezone, {
+                  now,
+                  weekday: withWeekday ? "short" : undefined,
+              })
+            : "";
     };
     const invoice = event.invoice?.number ? ` · ${event.invoice.number}` : "";
     switch (event.kind) {
         case "SUBSCRIBED": {
             const p = plan(data.plan);
             const on = p
-                ? ` on ${p.name}${p.price ? ` at ${money(p.price, p.currency)}` : ""}`
+                ? ` on ${p.name}${p.price ? ` at ${formatMoneyMajor(p.price, p.currency)}` : ""}`
                 : "";
             const starts = str(data.startsAt);
             return starts
@@ -96,7 +103,7 @@ export function changeWhat(
             }
             const days = num(data.extendedDays) ?? 0;
             return days > 0
-                ? `Resumed — the paid period moved ${days} ${days === 1 ? "day" : "days"} later`
+                ? `Resumed — the paid period moved ${count(days, "day")} later`
                 : "Resumed";
         }
         case "CANCELLED":
@@ -206,7 +213,7 @@ function periodText(data: Data, timeZone: string, now: Date): string {
     const end = str(data.periodEnd);
     if (!start || !end) return "a period";
     const last = new Date(new Date(end).getTime() - 86_400_000).toISOString();
-    return `${dayText(start, timeZone, now)} – ${dayText(last, timeZone, now)}`;
+    return `${formatDate(start, timeZone, { now })} – ${formatDate(last, timeZone, { now })}`;
 }
 
 /**
@@ -246,6 +253,6 @@ export function changeRows(
     return events.map((e) => ({
         id: e.id,
         what: changeWhat(e, sub, now),
-        when: `${dayText(e.createdAt, sub.timezone, now)} · ${changeWho(e, sub, viewerId)}`,
+        when: `${formatDate(e.createdAt, sub.timezone, { now })} · ${changeWho(e, sub, viewerId)}`,
     }));
 }

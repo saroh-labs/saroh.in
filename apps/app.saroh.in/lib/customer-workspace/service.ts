@@ -135,7 +135,7 @@ export async function linkCustomer(
     const data: unknown = await res.json().catch(() => null);
     return {
         ok: false,
-        error: toFailure(data, "Could not link customer.").error,
+        error: toFailure(data, "Couldn't link customer.").error,
     };
 }
 
@@ -276,7 +276,7 @@ export function createNote(
         `/customers/${encodeURIComponent(contactId)}/notes`,
         "POST",
         input,
-        "Could not add the note.",
+        "Couldn't add the note.",
     );
 }
 
@@ -286,7 +286,7 @@ export function deleteNote(
 ): Promise<CrmResult<{ ok: true }>> {
     return destroy<{ ok: true }>(
         `/customers/${encodeURIComponent(contactId)}/notes/${encodeURIComponent(noteId)}`,
-        "Could not delete the note.",
+        "Couldn't delete the note.",
     );
 }
 
@@ -314,8 +314,8 @@ async function writeAttention(
     return toFailure(
         body,
         method === "POST"
-            ? "Could not add that to Needs attention."
-            : "Could not save that change.",
+            ? "Couldn't add that to Needs attention."
+            : "Couldn't save that change.",
     );
 }
 
@@ -348,7 +348,7 @@ export async function confirmAttention(
     );
     const body: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: body as AttentionEntry };
-    return toFailure(body, "Could not add that to Needs attention.");
+    return toFailure(body, "Couldn't add that to Needs attention.");
 }
 
 /** Take an entry off the list; the API keeps the row, stamped removed. */
@@ -358,7 +358,7 @@ export function removeAttention(
 ): Promise<CrmResult<{ ok: true }>> {
     return destroy<{ ok: true }>(
         attentionPath(contactId, entryId),
-        "Could not take that off Needs attention.",
+        "Couldn't take that off Needs attention.",
     );
 }
 

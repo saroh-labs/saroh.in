@@ -1,6 +1,7 @@
 "use client";
 
 import { FormSheet } from "@/components/shared/form-sheet";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -237,7 +238,7 @@ function UnlinkedItem({
                 showSuccess(`Linked to ${holderName}.`);
                 onLinked(holderName);
             } else {
-                showError("Couldn't link them", res.error);
+                showError("Couldn't link them.", res.error);
             }
         });
     }
@@ -256,7 +257,7 @@ function UnlinkedItem({
                     ) : null}
                     <p className="mt-0.5 text-[12px] text-muted-foreground">
                         {c.paidOrders !== undefined
-                            ? `${c.paidOrders === 1 ? "1 paid order" : `${c.paidOrders} paid orders`}`
+                            ? count(c.paidOrders, "paid order")
                             : "Paid"}
                         {c.storefront ? ` at ${c.storefront.name}` : null}
                         {c.lastPaidOrderAt ? (

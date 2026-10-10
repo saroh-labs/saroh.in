@@ -4,6 +4,11 @@
  * The API stores the IANA name and checks it against the tz database.
  */
 
+import {
+    isTimeZone,
+    timeZoneName,
+    viewerTimeZone,
+} from "@/lib/format/datetime";
 import { DEFAULT_TIMEZONE } from "@/lib/invoices/invoice-number";
 
 export { DEFAULT_TIMEZONE };
@@ -38,25 +43,14 @@ const RENAMED: Record<string, string> = {
 /** A zone by the name the tz database uses now. */
 export const currentZoneName = (zone: string) => RENAMED[zone] ?? zone;
 
-/** Whether this browser knows the zone. */
-export function isKnownZone(zone: string): boolean {
-    if (!zone) return false;
-    try {
-        new Intl.DateTimeFormat("en", { timeZone: zone });
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 /**
  * The zone this browser is in, by its current name, or null when it cannot
  * say (or says something the API would refuse).
  */
 export function browserZone(): string | null {
     try {
-        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        return zone && isKnownZone(zone) ? currentZoneName(zone) : null;
+        const zone = viewerTimeZone();
+        return zone && isTimeZone(zone) ? currentZoneName(zone) : null;
     } catch {
         return null;
     }
@@ -67,11 +61,7 @@ function zoneName(
     style: "longGeneric" | "shortOffset",
     at: Date,
 ): string {
-    return (
-        new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: style })
-            .formatToParts(at)
-            .find((p) => p.type === "timeZoneName")?.value ?? ""
-    );
+    return timeZoneName(zone, style, at);
 }
 
 /** "America/Argentina/Buenos_Aires" → "Buenos Aires". */
@@ -106,7 +96,7 @@ export interface ZoneOption {
  */
 export function zoneOption(zone: string, at: Date = new Date()): ZoneOption {
     const current = currentZoneName(zone);
-    if (!isKnownZone(current)) {
+    if (!isTimeZone(current)) {
         return {
             zone: current,
             label: current,
@@ -148,7 +138,7 @@ export function timeZoneOptions(at: Date = new Date()): ZoneOption[] {
     }
     const names = new Set(["UTC", ...zones.map(currentZoneName)]);
     return Array.from(names)
-        .filter(isKnownZone)
+        .filter(isTimeZone)
         .map((zone) => zoneOption(zone, at))
         .sort(
             (a, b) =>

@@ -155,7 +155,7 @@ export function OrderDetail({
     const number = `#${order.orderId}`;
     const first = firstName(order.customer?.name ?? order.walkIn?.name);
     const currency = order.money?.currency ?? "INR";
-    const format = (n: number) => formatMoneyMajor(n, currency) ?? String(n);
+    const format = (n: number) => formatMoneyMajor(n, currency);
     const kitchenSteps = stepsOf(order);
     const refundedFull = order.refundStanding === "REFUNDED";
     // A treatment is fulfilled by its visits (B14): no kitchen stages.
@@ -205,7 +205,6 @@ export function OrderDetail({
         order,
         first,
         currency,
-        format,
         refundTo,
         setPanel,
     });

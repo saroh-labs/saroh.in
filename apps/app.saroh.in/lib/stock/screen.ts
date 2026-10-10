@@ -5,7 +5,7 @@
  * these only say it.
  */
 
-import { localDateKey } from "@/lib/format/datetime";
+import { formatDate, formatTime } from "@/lib/format/datetime";
 
 import type { LastChange, StockCell } from "./levels";
 import { readCount, signed } from "./levels";
@@ -69,55 +69,13 @@ export function rowName(row: {
         : row.productName;
 }
 
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
-/** "today", "yesterday" or "18 Sep" (with the year when not this one). */
-export function dayWords(
-    iso: string,
-    timeZone: string,
-    now: Date = new Date(),
-): string {
-    const key = localDateKey(iso, timeZone);
-    const today = localDateKey(now, timeZone);
-    if (key === today) return "today";
-    if (key === localDateKey(new Date(now.getTime() - 86_400_000), timeZone)) {
-        return "yesterday";
-    }
-    const [y, m, d] = key.split("-");
-    const day = `${Number(d)} ${MONTHS[Number(m) - 1]}`;
-    return y === today.slice(0, 4) ? day : `${day} ${y}`;
-}
-
-/** "07:12", 24-hour, in the business's zone. */
-export function timeWords(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(new Date(iso));
-}
-
 /** "today at 07:12". */
 export function atWords(
     iso: string,
     timeZone: string,
     now: Date = new Date(),
 ): string {
-    return `${dayWords(iso, timeZone, now)} at ${timeWords(iso, timeZone)}`;
+    return `${formatDate(iso, timeZone, { now, relative: "lower" })} at ${formatTime(iso, timeZone)}`;
 }
 
 const KIND_WORDS: Record<LastChange["kind"], string> = {

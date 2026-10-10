@@ -77,7 +77,7 @@ export function AddCustomerForm() {
         const name = [input.firstName, input.lastName]
             .filter(Boolean)
             .join(" ");
-        showSuccess(`${name || input.email} added`);
+        showSuccess(`${name || input.email} added.`);
         router.push(personHref(res.contactId));
     }
 

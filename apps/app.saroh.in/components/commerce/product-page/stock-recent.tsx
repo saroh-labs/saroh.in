@@ -1,11 +1,11 @@
 "use client";
 
+import { formatDateTime, viewerTimeZone } from "@/lib/format/datetime";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
-import { formatMoment } from "@/lib/format/datetime";
 import { STOCK_CHECKS_HREF, stockLogHref } from "@/lib/products/links";
 import { orderRef } from "@/lib/products/overview-words";
 import { signed } from "@/lib/stock/levels";
@@ -17,16 +17,15 @@ import { TextLink } from "@saroh/ui/text-link";
 
 const noop = () => undefined;
 const subscribe = () => noop;
-const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const serverZone = () => "UTC";
 
-/** "Today, 07:12" in the viewer's zone (UTC until the browser knows). */
+/** "Today, 7:12 am" in the viewer's zone (UTC until the browser knows). */
 function useMoment() {
-    const tz = useSyncExternalStore(subscribe, zone, serverZone);
-    return (iso: string) => formatMoment(iso, tz);
+    const tz = useSyncExternalStore(subscribe, viewerTimeZone, serverZone);
+    return (iso: string) => formatDateTime(iso, tz, { relative: true });
 }
 
-/** "Counted today at 07:10 by Arjun" — the latest change, for the table's heading. */
+/** "Counted today at 7:10 am by Arjun" — the latest change, for the table's heading. */
 export function LastChange({ entry }: { entry: StockLogEntry }) {
     const moment = useMoment();
     const when = moment(entry.createdAt)

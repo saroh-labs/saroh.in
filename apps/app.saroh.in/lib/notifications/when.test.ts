@@ -12,10 +12,10 @@ const HR = 60 * MIN;
 describe("how long ago a notification came in", () => {
     it("counts minutes, then hours, while it is today", () => {
         expect(relativeWhen(ago(20_000), NOW, ZONE)).toBe("Just now");
-        expect(relativeWhen(ago(5 * MIN), NOW, ZONE)).toBe("5 min ago");
-        expect(relativeWhen(ago(59 * MIN), NOW, ZONE)).toBe("59 min ago");
-        expect(relativeWhen(ago(2 * HR), NOW, ZONE)).toBe("2 hr ago");
-        expect(relativeWhen(ago(14 * HR), NOW, ZONE)).toBe("14 hr ago");
+        expect(relativeWhen(ago(5 * MIN), NOW, ZONE)).toBe("5 minutes ago");
+        expect(relativeWhen(ago(59 * MIN), NOW, ZONE)).toBe("59 minutes ago");
+        expect(relativeWhen(ago(2 * HR), NOW, ZONE)).toBe("2 hours ago");
+        expect(relativeWhen(ago(14 * HR), NOW, ZONE)).toBe("14 hours ago");
     });
 
     it("then the day: Yesterday, some days ago, a date", () => {
@@ -32,7 +32,7 @@ describe("how long ago a notification came in", () => {
     it("minutes still count across midnight", () => {
         const justPast = new Date("2026-10-10T18:40:00.000Z"); // 00:10 on the 11th
         expect(relativeWhen("2026-10-10T18:20:00.000Z", justPast, ZONE)).toBe(
-            "20 min ago",
+            "20 minutes ago",
         );
     });
 

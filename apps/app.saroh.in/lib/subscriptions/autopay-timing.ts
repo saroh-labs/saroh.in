@@ -6,7 +6,8 @@
  * timeline each option shows.
  */
 
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 export const AUTOPAY_CHARGE_TIMINGS = [
     "ON_RENEWAL_DATE",
@@ -66,7 +67,7 @@ export interface TimingOption {
 export function timingOptions(
     s: Pick<AutopayTimingSettings, "leadDays" | "dueDays">,
 ): TimingOption[] {
-    const lead = days(s.leadDays);
+    const lead = count(s.leadDays, "day");
     return [
         {
             value: "ON_RENEWAL_DATE",
@@ -84,14 +85,10 @@ export function timingOptions(
         {
             value: "ON_DUE_DATE",
             title: "Charge on the due date",
-            consequence: `The invoice goes out on the renewal date and autopay charges on its due date, ${days(s.dueDays)} later. No time for a Retry before it's overdue.`,
+            consequence: `The invoice goes out on the renewal date and autopay charges on its due date, ${count(s.dueDays, "day")} later. No time for a Retry before it's overdue.`,
             isDefault: false,
         },
     ];
-}
-
-function days(n: number): string {
-    return `${n} ${n === 1 ? "day" : "days"}`;
 }
 
 /** The option's title, for a plan that follows the business. */
@@ -114,19 +111,6 @@ export interface TimelineStep {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function dayLabel(ms: number): string {
-    return (
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: "UTC",
-            day: "numeric",
-            month: "short",
-        })
-            .format(new Date(ms))
-            // ICU's en-GB says "Sept"; every other month is three letters.
-            .replace("Sept", "Sep")
-    );
-}
-
 /**
  * The small timeline an option shows for one renewal: when the invoice and
  * the bank's notice go out, and when autopay charges. `renewal` is a day
@@ -138,7 +122,8 @@ export function timingTimeline(
     s: Pick<AutopayTimingSettings, "leadDays" | "dueDays">,
 ): TimelineStep[] {
     const r = Date.parse(`${renewal}T00:00:00Z`);
-    const at = (offset: number) => dayLabel(r + offset * DAY_MS);
+    const at = (offset: number) =>
+        formatDate(r + offset * DAY_MS, "UTC", { year: "never" });
     switch (timing) {
         case "ON_RENEWAL_DATE":
             return [

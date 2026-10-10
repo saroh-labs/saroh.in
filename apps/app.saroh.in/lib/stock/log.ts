@@ -4,12 +4,12 @@
  * and say them.
  */
 
-import { localDateKey } from "@/lib/format/datetime";
+import { formatDate, localDateKey } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 import type { StockEntryKind } from "./levels";
 import { signed } from "./levels";
 import type { Tone } from "./screen";
-import { dayWords, timeWords } from "./screen";
 
 // ---- Filters ----
 
@@ -152,7 +152,10 @@ export function groupByDay<T extends { createdAt: string }>(
         const key = localDateKey(e.createdAt, timeZone);
         let day = days.find((d) => d.key === key);
         if (!day) {
-            const words = dayWords(e.createdAt, timeZone, now);
+            const words = formatDate(e.createdAt, timeZone, {
+                now,
+                relative: "lower",
+            });
             day = {
                 key,
                 label: words.charAt(0).toUpperCase() + words.slice(1),
@@ -165,12 +168,9 @@ export function groupByDay<T extends { createdAt: string }>(
     return days;
 }
 
-/** "07:12". */
-export const entryTime = timeWords;
-
 /** "N entries", with "so far" while more pages wait. */
 export function logCountWords(n: number, more: boolean): string {
-    const words = `${n} ${n === 1 ? "entry" : "entries"}`;
+    const words = count(n, "entry", "entries");
     return more ? `${words} so far` : words;
 }
 

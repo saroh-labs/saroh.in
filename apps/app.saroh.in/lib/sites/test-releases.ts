@@ -25,14 +25,15 @@ export type {
     TestReleaseStanding,
     TestReleaseStatus,
 } from "./test-release-types";
-export { clockTime, dayKey, nextSlot, whenIn, zoneName } from "./zone-time";
+export { nextSlot, whenIn, zoneName } from "./zone-time";
+import { formatDate } from "@/lib/format/datetime";
 import type {
     GoLiveResult,
     TestRelease,
     TestReleaseLink,
     TestReleaseStanding,
 } from "./test-release-types";
-import { shortDay, whenIn, zoneName } from "./zone-time";
+import { whenIn, zoneName } from "./zone-time";
 
 /** How long a shared link works, as the API accepts it. */
 export type TestReleaseLinkDays = 1 | 7 | 30;
@@ -324,9 +325,9 @@ export function linkLine(
         : "Not opened yet";
     switch (link.state) {
         case "active":
-            return `Works until ${shortDay(link.expiresAt, zone)} · ${opened}`;
+            return `Works until ${formatDate(link.expiresAt, zone, { now })} · ${opened}`;
         case "expired":
-            return `Stopped working on ${shortDay(link.expiresAt, zone)} · ${opened}`;
+            return `Stopped working on ${formatDate(link.expiresAt, zone, { now })} · ${opened}`;
         case "revoked":
             return `Turned off · ${opened}`;
         case "ended":

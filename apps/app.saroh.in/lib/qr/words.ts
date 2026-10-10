@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import type {
     QrCodeView,
     QrPlace,
@@ -70,10 +71,7 @@ export function madeWords(code: Pick<QrCodeView, "bookings" | "orders">): {
 } {
     return {
         bookings: code.bookings > 0 ? String(code.bookings) : "–",
-        orders:
-            code.orders > 0
-                ? `${code.orders} ${code.orders === 1 ? "order" : "orders"}`
-                : null,
+        orders: code.orders > 0 ? count(code.orders, "order") : null,
     };
 }
 
