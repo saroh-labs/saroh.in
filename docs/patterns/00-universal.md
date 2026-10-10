@@ -269,7 +269,8 @@ with why it stops there:
   (416) — the media set's staged list with its upload, drop and address
   paths; and the header, jumps, create flow and two columns. The library
   panel went to `photo-library-panel.tsx`, and the status pill, read-only
-  note, next steps and leave dialog to `editor-parts.tsx`. A little over;
+  note and next steps to `editor-parts.tsx` (leaving asks through the one
+  guard, `components/shared/use-leave-guard.tsx`). A little over;
   what is left shares one component's state.
 
 Split rather than listed: `organizations/organization-settings-form.tsx`

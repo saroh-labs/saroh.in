@@ -59,7 +59,7 @@ Settings › Business (`components/organizations/`) draw `Row`s from
 `components/sites/settings-rows.tsx` — label, a sentence of what is saved,
 Edit — and each Edit opens its own `@saroh/ui/sheet` with one Save.
 `SettingsSheetFrame` in `components/shared/settings-sheet-frame.tsx` is the
-frame to use (`PlaceSheetFrame` names it by a location's row): the fields
+one frame to use (`PlaceSheetFrame` names it by a location's row): the fields
 scroll, Save then Cancel sit at the foot, nothing saves until Save, a
 refusal keeps the sheet open with what was typed, Cancel, Escape and the
 close button drop the draft, it can't be dismissed while saving, each
@@ -67,10 +67,24 @@ opening is a fresh draft (a `key` per opening) and the keyboard returns to
 the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
 Product settings' lists (`components/commerce/product-settings/`) are the
 same rule for a list you manage: `NameDialog` for a one-field add or rename,
-`SettingsSheet` for anything with more (an option's name and values, a
-field, a merge), each opened by its own trigger so the keyboard returns to
-it, and `ConfirmDialog` (`returnFocusTo`) before a delete. No row turns
-into a form, and the task finishes inside what opened.
+the same `SettingsSheetFrame` with a `trigger` for anything with more (an
+option's name and values, a field, a merge), so the keyboard returns to the
+button that opened it, and `ConfirmDialog` (`returnFocusTo`) before a delete.
+No row turns into a form, and the task finishes inside what opened.
+
+**Current** — **A stray press outside never drops typed work** (UX audit,
+10 Oct). In every sheet frame a press outside closes it only while nothing
+has changed; once the draft differs from what it opened with, a press
+outside does nothing, and Cancel, Escape and the close button are the ways
+out. `SettingsSheetFrame` reads that from its own fields
+(`components/shared/use-draft-changed.ts`: boxes, ticks, chips, what a
+picker shows, a picture, a rich text box), so a sheet passes nothing; one
+whose work the fields can't show passes `dirty`. `ActionSheetContent` takes
+`dirty`, and Order Detail's sheets say it with `useOrderSheetDraft`. A long
+dialog that holds typed work (New booking, Add a lead, Invite to team) asks
+the same reader in its `onInteractOutside`. Never write a sheet's
+`SheetContent` and footer by hand: draw the frame, so the rule stays in one
+place (`settings-sheet-frame.test.tsx` lists the sheets and fails a copy).
 
 A record's page is the same rule: Order Detail
 (`components/commerce/order-detail/`) shows status, items, payments and
@@ -80,7 +94,8 @@ how it's fulfilled, cancel) opens its own sheet, one at a time.
 `components/shared/action-sheet.tsx`: the fields scroll
 (`OrderSheetBody`) and what the change does to the money stays at the
 foot with the button that makes it (`OrderSheetFoot`), wider
-(`sm:max-w-lg`) where a list of lines needs it. A sheet opened from more
+(`sm:max-w-lg`) where a list of lines needs it. Its way out reads "Cancel"
+unless the sheet's own button cancels something (`dismiss="Keep order"`). A sheet opened from more
 than one button has no single trigger, so `useOrderPanel` remembers the
 button pressed and gives the keyboard back to it. A change that is held
 ten seconds (a refund, a cancel) closes its sheet into the hold card on
@@ -99,9 +114,9 @@ a button that only needs a name or a choice opens its dialog there
 (the calendar's "Add someone") instead of sending the merchant to another
 page.
 
-Website › Settings follows it (`components/sites/settings/`): its frame is
-`SettingsSheetFrame` in `settings-sheet.tsx`, a copy of The place's with
-the same classes until the two are lifted into one, and its links are
+Website › Settings follows it (`components/sites/settings/`): it draws the
+same `SettingsSheetFrame` (`settings-sheet.tsx` there keeps only the note
+and problem type and `useSheetControl`), and its links are
 `settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
 is done inside its sheet or dialog (the share image and the site icon are
 uploaded there, Add domain shows its DNS records there); an Edit never
@@ -154,6 +169,32 @@ preview under its fields, from the draft.
   "Validation failed" with no field, so it can only be a toast. An empty or
   malformed value is caught by zod and shown under its field first, e.g.
   `lib/discounts/value.ts` in the discount form.
+- **Current** — **Enter runs the form's first submit button, so that button
+  is the reversible one** (UX audit, 10 Oct). A step that can't be taken
+  back (issuing an invoice numbers it and locks its lines) is a
+  `type="button"` with its own press, never the form's submit: the invoice
+  form's one submit is Save as draft. Where the primary is reversible (a
+  course), it is the submit, so Enter runs it.
+- **Current** — **One leave guard, one question** (UX audit, 10 Oct). Every
+  create and edit flow mounts `useLeaveGuard({ dirty, lost, save? })` from
+  `components/shared/use-leave-guard.tsx` and draws its `dialog`: "Leave
+  without saving?", one sentence saying what would be lost (`lostNew`,
+  `lostChanges`, or the flow's own), then Stay (the default) or Leave, and
+  Save and leave only where a draft can be kept. It catches every link, the
+  command menu and Search settings (`lib/nav/leave-request.ts`), and tab
+  close; the browser's back button is not caught. `dirty` is true only when
+  something changed (`formState.isDirty`, or a compare with what was
+  loaded). An editor that saves by itself passes `flush`: a way out saves
+  first, and asks only when that save can't go. A link that stays on the
+  same screen passes through `keeps` (the stock count's filters). Never
+  write a leave dialog or a `beforeunload` of a flow's own:
+  `leave-guard-flows.test.ts` lists the flows and fails one that does.
+- **Current** — **A confirm that cancels something offers "Keep …" as its
+  way out** (UX audit, 10 Oct): "Keep order", "Keep booking", "Keep
+  enrolment", "Keep subscription", "Keep autopay", "Keep invoice", never
+  "Cancel" beside "Cancel order", and the same words wherever the same
+  action is asked from (`cancel-way-out.test.ts`). A reversible Cancel (a
+  stock count in progress) asks nothing and offers Undo (`useCountMode`).
 - **Current** — **Money stays a string** from input to API
   (`price: values.price.trim()`). The API computes in cents.
 - **Current** — **Disable submit while the action runs.** All nine forms and
