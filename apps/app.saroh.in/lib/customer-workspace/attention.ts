@@ -261,7 +261,7 @@ export function rolesThatSeeSensitive(
  */
 export function sensitiveTickText(roles: string[] | null | undefined): string {
     const who = roles?.length ? ` (${roles.join(", ")})` : "";
-    return `Sensitive — only people who can see sensitive notes${who} can read it`;
+    return `Sensitive. Only people who can see sensitive notes${who} can read it`;
 }
 
 /** The allergen is picked from the list, when the business has one. */
@@ -300,7 +300,7 @@ export function draftProblem(
     } else if (draft.label.trim().length > LABEL_MAX) {
         return {
             field: "label",
-            message: `Keep it under ${LABEL_MAX} characters; add the rest as detail.`,
+            message: `Keep it under ${LABEL_MAX} characters. Add the rest as detail.`,
         };
     }
     if (draft.detail.trim().length > DETAIL_MAX) {

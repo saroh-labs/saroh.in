@@ -123,7 +123,7 @@ export function VariantDrawer({
                                             {open.price === null ||
                                             open.price === product.price
                                                 ? "The product's price"
-                                                : `Its own price — the product's is ${money(product.price)}`}
+                                                : `Its own price. The product's is ${money(product.price)}`}
                                         </p>
                                         <p className="mt-1 font-mono text-[11.5px] text-muted-foreground">
                                             SKU {open.sku}

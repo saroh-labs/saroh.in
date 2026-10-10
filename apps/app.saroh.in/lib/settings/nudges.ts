@@ -145,7 +145,7 @@ function businessType(
     return {
         key: "businessType",
         label: "Choose your business type",
-        why: "Sole proprietor, partnership, LLP, private limited or another — so your business details are complete.",
+        why: "Sole proprietor, partnership, LLP, private limited or another, so your business details are complete.",
         cta: "Choose type",
         // Straight to the Type row's sheet, not the top of the tab.
         href: businessEditHref("type"),

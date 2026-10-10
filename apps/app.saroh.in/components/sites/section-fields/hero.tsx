@@ -65,8 +65,8 @@ export function HeroFields({
                     </div>
                     <p className="text-[12px] leading-relaxed text-muted-foreground">
                         Off, the heading is kept for screen readers and search
-                        engines only — for a page whose menu already shows the
-                        same name.
+                        engines only. Use it for a page whose menu already shows
+                        the same name.
                     </p>
                 </div>
             ) : null}

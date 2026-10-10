@@ -330,7 +330,7 @@ export function SubscriptionsScreen({
                         {truncated ? (
                             <p className="mt-3 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                                 Showing the newest {LIST_LIMIT} subscriptions
-                                and every active or paused one; older cancelled
+                                and every active or paused one. Older cancelled
                                 ones are not listed.
                             </p>
                         ) : null}

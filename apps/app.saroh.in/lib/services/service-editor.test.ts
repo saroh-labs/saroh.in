@@ -35,7 +35,7 @@ import {
 describe("VIEW_ONLY (E26)", () => {
     it("says the role can't change set-up, in words, with no permission code", () => {
         expect(VIEW_ONLY).toBe(
-            "View only — your role can't change services, hours or booking rules.",
+            "View only. Your role can't change services, hours or booking rules.",
         );
         expect(VIEW_ONLY).not.toMatch(/:|booking settings/);
     });
@@ -369,11 +369,11 @@ describe("the words around the editor", () => {
         expect(
             savedMessage({ isNew: false, name: "x", kind: "one", comingUp: 2 }),
         ).toBe(
-            "Saved. New bookings use it; 2 bookings already made keep the old details.",
+            "Saved. New bookings use it, and 2 bookings already made keep the old details.",
         );
         expect(
             savedMessage({ isNew: false, name: "x", kind: "one", comingUp: 0 }),
-        ).toBe("Saved. New bookings use it; nothing already booked changes.");
+        ).toBe("Saved. New bookings use it. Nothing already booked changes.");
         expect(
             savedMessage({
                 isNew: false,
@@ -381,12 +381,12 @@ describe("the words around the editor", () => {
                 kind: "one",
                 comingUp: null,
             }),
-        ).toContain("bookings already made keep their details");
+        ).toContain("Bookings already made keep their details");
     });
 
     it("explains time, where, the booking page and who takes it", () => {
         expect(timeNote("class", true)).toBe(
-            "A class runs at set times; people book a place.",
+            "A class runs at set times, and people book a place.",
         );
         expect(timeNote("one", false)).toContain("its own weekly hours");
         expect(whereNote("EITHER")).toBe(
@@ -451,7 +451,7 @@ describe("glance", () => {
         expect(rows[2]).toEqual(["Booked this week", "Couldn't count"]);
         expect(glance(draft({ price: "" }), null, "INR")[0]).toEqual([
             "Price",
-            "—",
+            "Not set",
         ]);
     });
 });
@@ -481,7 +481,7 @@ describe("At booking, they pay (E8)", () => {
 
     it("works the split out from the price as typed, in the design's words", () => {
         expect(depositNote("NONE", "1200", "INR")).toBe(
-            "No card needed to book. No-shows cost you the slot.",
+            "No card needed to book. No-shows cost you the time.",
         );
         expect(depositNote("PERCENT_25", "1,200", "INR")).toBe(
             "They pay ₹300 when booking, and the rest (₹900) at the visit. Refunded if they cancel in time.",
@@ -499,10 +499,10 @@ describe("At booking, they pay (E8)", () => {
             "They pay ₹1,200 online when booking: your booking rules take payment online only.",
         );
         expect(depositNote("NONE", "0", "INR", 1, "ONLINE")).toBe(
-            "No card needed to book. No-shows cost you the slot.",
+            "No card needed to book. No-shows cost you the time.",
         );
         expect(depositNote("NONE", "1200", "INR", 1, "DESK")).toBe(
-            "No card needed to book. No-shows cost you the slot.",
+            "No card needed to book. No-shows cost you the time.",
         );
     });
 

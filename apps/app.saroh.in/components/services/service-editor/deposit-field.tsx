@@ -18,7 +18,7 @@ import { TextLink } from "@saroh/ui/text-link";
 import { HELP } from "./fields";
 
 const DEPOSITS: [DepositMode, string][] = [
-    ["NONE", "Nothing — they pay at the visit"],
+    ["NONE", "Nothing, they pay at the visit"],
     ["PERCENT_25", "25% deposit"],
     ["PERCENT_50", "50% deposit"],
     ["FULL", "The full price"],

@@ -87,7 +87,7 @@ export function cardNotes(
     }
     for (const [price, { n, currency }] of Array.from(older.entries())) {
         notes.push({
-            text: `${n} bought at ${formatMoneyMajor(price, currency)} — they keep it`,
+            text: `${n} bought at ${formatMoneyMajor(price, currency)}, and they keep it`,
             tone: "quiet",
         });
     }

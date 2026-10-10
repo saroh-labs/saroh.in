@@ -81,15 +81,15 @@ export function PayLinkPanel({
                     </Field>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                         Send it to them however you talk. The booking shows
-                        unpaid until they pay. Cancelling it stops the link; a
+                        unpaid until they pay. Cancelling it stops the link. A
                         payment they&apos;d already started shows on Home as one
                         to refund.
                     </p>
                 </>
             ) : link.plan ? (
                 <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
-                    No pay link — your plan doesn&apos;t take payment online.
-                    The booking is made; they can pay at the session.
+                    No pay link. Your plan doesn&apos;t take payment online. The
+                    booking is made, and they can pay at the session.
                 </p>
             ) : (
                 <Refusal>{`${link.error} ${isRoleRefusal(link.error) ? LINK_REFUSED : LINK_FAILED}`}</Refusal>

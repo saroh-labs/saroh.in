@@ -164,7 +164,7 @@ export function WeekHourGrid({
                                     aria-haspopup="dialog"
                                     className="cursor-pointer px-0.5 text-left text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
-                                    {allDayMore} more — open the day
+                                    {allDayMore} more. Open the day
                                 </Button>
                             ) : null}
                         </div>

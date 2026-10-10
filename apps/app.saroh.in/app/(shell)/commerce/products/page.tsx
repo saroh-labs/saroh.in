@@ -148,7 +148,7 @@ export default async function CataloguePage({
         reviews === null ? (
             <PartialRead
                 things="reviews"
-                so="Their count shows as “—”. It is not zero."
+                so="Their count can't be shown. It is not zero."
             />
         ) : null;
 

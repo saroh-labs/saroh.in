@@ -413,7 +413,7 @@ function ShareControl({
                 <ShareChoice
                     icon={<UserCheck className="size-4" />}
                     label="Ask a teammate to review"
-                    hint="Puts the site In review. Reviewers comment on blocks; publishing still works."
+                    hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
                     disabled={p.asking}
                     onSelect={pick(p.askForReview)}
                 />

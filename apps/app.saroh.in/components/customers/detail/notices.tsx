@@ -40,7 +40,7 @@ export function PossibleMatch({
             <div className="flex flex-wrap items-center gap-2.5">
                 <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground [overflow-wrap:anywhere]">
                     <strong className="font-semibold">
-                        Possible match — link?
+                        Possible match. Link them?
                     </strong>{" "}
                     {who}. Their orders stay apart until someone links them.
                 </span>

@@ -141,22 +141,22 @@ export const VERIFICATION_WORDS: Record<
     google: {
         label: "Google Search Console",
         console: "Search Console",
-        where: "Add a property, choose URL prefix, enter {host}, then choose HTML tag. Paste the tag or just the code.",
+        where: "Add a property, choose URL prefix, enter {host}, then choose HTML tag. Paste the tag or only the code.",
     },
     bing: {
         label: "Bing Webmaster Tools",
         console: "Bing Webmaster Tools",
-        where: "Add {host}, choose HTML Meta Tag, and paste the tag or just the code.",
+        where: "Add {host}, choose HTML Meta Tag, and paste the tag or only the code.",
     },
     meta: {
         label: "Meta",
         console: "Meta Business Suite",
-        where: "In Business settings, open Domains, add {host} and choose the meta-tag option. Paste the tag or just the code.",
+        where: "In Business settings, open Domains, add {host} and choose the meta-tag option. Paste the tag or only the code.",
     },
     pinterest: {
         label: "Pinterest",
         console: "Pinterest",
-        where: "In Settings, open Claimed accounts, claim {host} and choose Add HTML tag. Paste the tag or just the code.",
+        where: "In Settings, open Claimed accounts, claim {host} and choose Add HTML tag. Paste the tag or only the code.",
     },
 };
 
@@ -206,7 +206,7 @@ export const TRACKER_WORDS: Record<
     },
     plausible: {
         name: "Plausible",
-        where: "In Plausible, Site settings › Site installation. Paste the script; the ID starts pa-.",
+        where: "In Plausible, Site settings › Site installation. Paste the script. The ID starts pa-.",
         placeholder: "pa-…, or paste the Plausible script",
     },
     umami: {
@@ -255,7 +255,7 @@ export function trackerSavedLine(kind: TrackerKind): {
         title: "Added to your live site.",
         description: needsConsent(kind)
             ? "It runs on pages visitors browse after they accept cookies, never on checkout or payment pages."
-            : "It runs on every page except checkout and payment pages; it uses no cookies, so visitors aren't asked.",
+            : "It runs on every page except checkout and payment pages. It uses no cookies, so visitors aren't asked.",
     };
 }
 

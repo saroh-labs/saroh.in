@@ -272,8 +272,8 @@ export function PayLinkRow({ url, name }: { url: string; name: string }) {
             </span>
             <ShareLink value={url} text="Your link to pay" />
             <span className="basis-full text-[12px] text-muted-foreground">
-                Send it to {name} yourself — Saroh doesn&apos;t send it. It
-                works until it&apos;s paid or you make another.
+                Send it to {name} yourself. Saroh doesn&apos;t send it. It works
+                until it&apos;s paid or you make another.
             </span>
         </div>
     );

@@ -293,7 +293,7 @@ describe("how people pay when they book (DEC-088)", () => {
             "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.",
         );
         expect(payWayHint("DESK", "NO_PROVIDER")).toBe(
-            "Nobody pays on the booking page; they pay when they come, a deposit too.",
+            "Nobody pays on the booking page. They pay when they come, a deposit too.",
         );
         expect(payWayHint("ONLINE", "NO_PROVIDER")).toBe(
             "Everyone pays on the booking page when they book. Free services book with nothing to pay. Right now no payment provider is connected, so nobody can book a service with a price online.",

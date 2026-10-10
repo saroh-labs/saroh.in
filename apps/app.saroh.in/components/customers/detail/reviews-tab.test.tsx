@@ -96,6 +96,6 @@ describe("the Reviews tab", () => {
         const html = render([review({ productId: null, body: null })]);
         expect(html).not.toContain("/commerce/products/");
         expect(html).toContain("Sourdough");
-        expect(html).toContain("No comment left — just a rating.");
+        expect(html).toContain("No comment left, only a rating.");
     });
 });

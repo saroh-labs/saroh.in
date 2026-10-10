@@ -77,7 +77,7 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
               materials: {
                   label: "Ingredients or material",
                   placeholder:
-                      "Aqua, Ethyl ascorbic acid, Glycerin… — or 100% linen",
+                      "Aqua, Ethyl ascorbic acid, Glycerin… or 100% linen",
                   field: "Ingredients or material",
               },
               saves: "Saves how to use it, what it is made of and how it's fulfilled.",

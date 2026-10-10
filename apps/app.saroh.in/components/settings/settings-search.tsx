@@ -135,7 +135,7 @@ export function SettingsSearch({
                             setQuery(e.target.value);
                             setActive(0);
                         }}
-                        placeholder="Find a setting — GSTIN, invoice prefix…"
+                        placeholder="Find a setting: GSTIN, invoice prefix…"
                         aria-label="Find a setting"
                         role="combobox"
                         aria-expanded

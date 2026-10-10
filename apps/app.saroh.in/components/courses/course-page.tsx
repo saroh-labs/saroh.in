@@ -422,7 +422,7 @@ function Roster({
     );
     const full = course.seatsLeft <= 0;
     const why = full
-        ? "Every seat is taken. Add a seat in the course, or wait for someone to cancel — a cancellation frees one straight away."
+        ? "Every seat is taken. Add a seat in the course, or wait for someone to cancel. A cancellation frees one straight away."
         : course.status === "DRAFT"
           ? "Open the course to take enrolments."
           : course.status !== "OPEN"

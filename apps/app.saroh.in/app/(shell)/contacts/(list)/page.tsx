@@ -45,7 +45,7 @@ export default async function ContactsPage({
                     one: "contact",
                     other: "contacts",
                 })}
-                description="Everyone who has enquired, booked or bought — and anyone you add."
+                description="Everyone who has enquired, booked or bought, and anyone you add."
                 actions={
                     canAdd ? (
                         // `?new=1` opens it: where setup lands someone who

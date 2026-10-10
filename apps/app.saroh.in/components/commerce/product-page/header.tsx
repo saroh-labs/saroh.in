@@ -46,8 +46,8 @@ function ShopControls({
             ? null
             : "Its shop page opens once your online shop is live."
         : product.status === "ARCHIVED"
-          ? "Archived — its page does not open for customers."
-          : "Publish it first — a draft has no public page.";
+          ? "Archived. Its page does not open for customers."
+          : "Publish it first. A draft has no public page.";
     return (
         <>
             {note ? (
@@ -110,7 +110,7 @@ function ShopControls({
                         href={shopUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-label="View on the shop — opens in a new tab"
+                        aria-label="View on the shop, opens in a new tab"
                     >
                         View on the shop
                         <ExternalLink aria-hidden className="size-3" />
@@ -235,7 +235,7 @@ export function ProductHeader({
                         <Link
                             href={photosHref}
                             scroll={false}
-                            aria-label="Cover photo — open Photos"
+                            aria-label="Cover photo, open Photos"
                             className={cn(
                                 FOCUS,
                                 "size-14 shrink-0 overflow-hidden rounded-xl bg-muted",

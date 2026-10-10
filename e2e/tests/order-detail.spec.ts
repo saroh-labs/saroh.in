@@ -117,7 +117,7 @@ test.describe("order detail", () => {
 
         // The stepper answers the keyboard, not only the header button.
         await page
-            .getByRole("button", { name: "Start preparing — next step" })
+            .getByRole("button", { name: "Start preparing, next step" })
             .focus();
         await page.keyboard.press("Enter");
         await expect(
@@ -134,7 +134,7 @@ test.describe("order detail", () => {
         await expect(page.getByText(/Marking ready in \d+s/)).toBeVisible();
         await expect(
             page.getByText(
-                /Nothing is sent to Sneha — the step shows on the order/,
+                /Nothing is sent to Sneha. The step shows on the order/,
             ),
         ).toBeVisible();
         await page
@@ -179,7 +179,7 @@ test.describe("order detail", () => {
             hasText: "Priya is allergic to sesame",
         });
         await expect(banner).toContainText(
-            "Sourdough loaf — may contain sesame",
+            "Sourdough loaf: may contain sesame",
         );
         await expect(
             page.getByText("May contain sesame").first(),
@@ -515,7 +515,7 @@ test.describe("shipping on order detail", () => {
         await expect(address).toContainText("/pay/o/");
         const first = (await address.textContent()) ?? "";
         await expect(
-            money.getByText("Shown this once — copy it now."),
+            money.getByText("Shown this once, so copy it now."),
         ).toBeVisible();
 
         // The customer's page reads the order, by the token alone.

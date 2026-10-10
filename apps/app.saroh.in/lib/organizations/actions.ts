@@ -80,7 +80,7 @@ export async function setActiveOrganization(organizationId: string): Promise<
     if (!chosen) {
         return {
             ok: false,
-            error: "You are not a member of that organization.",
+            error: "You aren't in that business.",
         };
     }
     // Their access is paused (#800): the API would refuse every read.

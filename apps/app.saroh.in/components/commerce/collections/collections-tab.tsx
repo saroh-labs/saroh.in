@@ -103,8 +103,8 @@ export function ProductCollectionsTab({
                     title="Not in a collection, not on the website"
                     description={
                         canEdit && handPicked
-                            ? "Collections are how it shows up on the site — a Breads section, a Weekend list. Add it to one here, or make one from Products."
-                            : "Collections are how it shows up on the site — a Breads section, a Weekend list. Add it to one from Products."
+                            ? "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one here, or make one from Products."
+                            : "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one from Products."
                     }
                 >
                     {canEdit && handPicked ? (
@@ -194,7 +194,7 @@ export function ProductCollectionsTab({
                                     ) : null}
                                     {!c.showing ? (
                                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                            Hidden while it is archived; selling
+                                            Hidden while it is archived. Selling
                                             it again brings it back.
                                         </p>
                                     ) : null}

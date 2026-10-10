@@ -47,7 +47,7 @@ test.describe("the Pack Editor on Northwind (E18)", () => {
         );
 
         await expect(
-            page.getByText("Not saved yet — start with a name"),
+            page.getByText("Not saved yet. Start with a name"),
         ).toBeVisible();
         const name = `E2E pack ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
@@ -75,7 +75,7 @@ test.describe("the Pack Editor on Northwind (E18)", () => {
             await expect(publish).toBeEnabled();
             await publish.click();
             await expect(
-                page.getByText(`${name} is published — you can sell it now.`),
+                page.getByText(`${name} is published. You can sell it now.`),
             ).toBeVisible();
             await expect(page.getByText("On sale · no changes")).toBeVisible();
 

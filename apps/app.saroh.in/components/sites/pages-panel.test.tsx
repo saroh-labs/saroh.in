@@ -264,7 +264,7 @@ describe("the open page's settings (G16)", () => {
     it("shows a Book page's address as fixed, never as a field", async () => {
         render({ active: "p-book" });
         await press(button(/^Settings for Book/));
-        expect(host.textContent).toContain("/book — your booking page's path");
+        expect(host.textContent).toContain("/book · your booking page's path");
         expect(host.textContent).toContain("Page path");
         expect(host.textContent).not.toMatch(/\bAddress\b/);
         expect(host.querySelector("input.font-mono")).toBeNull();

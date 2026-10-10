@@ -189,7 +189,7 @@ describe("the web address row", () => {
             }),
         );
         expect(text()).toContain(
-            "Customers see shop.rye.in; rye.saroh.app still works",
+            "Customers see shop.rye.in, and rye.saroh.app still works",
         );
     });
 

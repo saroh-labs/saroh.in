@@ -213,14 +213,14 @@ describe("explainStart", () => {
 
     it("explains a backdated start: only the period holding today is billed", () => {
         expect(explainStart("2026-03-15", "MONTH", "2026-09-24")).toBe(
-            "It keeps the 15th as its renewal day. Only the period holding today, 15 Sep to 14 Oct, is invoiced now — the months before are not billed.",
+            "It keeps the 15th as its renewal day. Only the period holding today, 15 Sep to 14 Oct, is invoiced now. The months before are not billed.",
         );
     });
 
     it("clamps a month-end start to a shorter month", () => {
         // 31 Jan → 28 Feb → 31 Mar: on 10 March the period is 28 Feb to 30 Mar.
         expect(explainStart("2026-01-31", "MONTH", "2026-03-10")).toBe(
-            "It keeps the 31st as its renewal day. Only the period holding today, 28 Feb to 30 Mar, is invoiced now — the months before are not billed.",
+            "It keeps the 31st as its renewal day. Only the period holding today, 28 Feb to 30 Mar, is invoiced now. The months before are not billed.",
         );
     });
 
@@ -249,7 +249,7 @@ describe("checkedLine", () => {
                 NOW,
             ),
         ).toBe(
-            "Renewals last checked 14 minutes ago. 3 invoices went out today; the next check is within the hour.",
+            "Renewals last checked 14 minutes ago. 3 invoices went out today, and the next check is within the hour.",
         );
     });
 
@@ -275,7 +275,7 @@ describe("checkedLine", () => {
                 NOW,
             ),
         ).toBe(
-            "Renewals last checked 5 hours ago. None went out today; the next check is late.",
+            "Renewals last checked 5 hours ago. None went out today, and the next check is late.",
         );
     });
 
@@ -290,7 +290,7 @@ describe("checkedLine", () => {
                 NOW,
             ),
         ).toBe(
-            "Renewals last checked 5 hours ago. None went out today; the next check is late.",
+            "Renewals last checked 5 hours ago. None went out today, and the next check is late.",
         );
     });
 });
@@ -396,7 +396,7 @@ describe("rowInvoice", () => {
                 },
                 NOW,
             )?.note,
-        ).toBe("2 invoices overdue · ₹2,400.00 — pause or cancel?");
+        ).toBe("2 invoices overdue · ₹2,400.00. Pause or cancel?");
     });
 
     it("points at the latest when nothing is overdue", () => {

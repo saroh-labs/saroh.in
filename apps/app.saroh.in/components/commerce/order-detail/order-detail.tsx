@@ -330,7 +330,7 @@ export function OrderDetail({
           : !money || remaining <= 0
             ? "Nothing has been paid to refund."
             : money.recordedByHand
-              ? "Paid by hand — hand it back by hand, then record it from the menu."
+              ? "Paid by hand. Hand it back by hand, then record it from the menu."
               : can.refundOnline === false
                 ? "Your payment provider isn't connected, so Saroh can't send this refund. Refund it in your provider's dashboard, then record it as refunded."
                 : hold?.kind === "refund"

@@ -193,7 +193,7 @@ const orders = (n: number) => plural(n, "order");
 /** "moved by someone else", or each reason once: "moved by someone else; not paid yet". */
 function reasons(list: (string | null)[]): string {
     const words = list.map((r) => r ?? "try again");
-    return words.filter((w, i) => words.indexOf(w) === i).join("; ");
+    return words.filter((w, i) => words.indexOf(w) === i).join(", ");
 }
 
 /**

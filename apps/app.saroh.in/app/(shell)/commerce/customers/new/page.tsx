@@ -43,7 +43,7 @@ export default async function NewCustomerPage() {
                     "New customer",
                 ]}
                 title="New customer"
-                description="An email is enough; the rest is whatever you know. They join your business, not one location, and show on Customers straight away."
+                description="An email is enough. The rest is whatever you know. They join your business, not one location, and show on Customers straight away."
             />
             <AddCustomerForm />
         </PageContainer>

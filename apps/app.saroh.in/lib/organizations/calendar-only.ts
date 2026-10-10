@@ -16,7 +16,7 @@ export const CALENDAR_ONLY_ROLE = "calendar-only";
 
 /** What the role is for, wherever one is picked. */
 export const CALENDAR_ONLY_BLURB =
-    "Their own diary only — sees and changes the bookings they take. No customer list, no team, no money.";
+    "Their own diary only: sees and changes the bookings they take. No customer list, no team, no money.";
 
 /** The same, in a few words. */
 export const CALENDAR_ONLY_PLAIN = "their own diary only";

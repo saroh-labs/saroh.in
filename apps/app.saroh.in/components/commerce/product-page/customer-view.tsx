@@ -89,7 +89,7 @@ export function CustomerView({
                 : variantLine ||
                   (stock.product
                       ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
-                      : "No stock count — the shop doesn't say how many are left."),
+                      : "No stock count. The shop doesn't say how many are left."),
             // The editor's Stock section counts a product that counts
             // stock; untracked, its Sold out is marked on the Overview.
             action:
@@ -114,7 +114,7 @@ export function CustomerView({
             body: product.howToUse
                 ? onTheShop(product.shopFields, "howToUse")
                     ? "One line under the price. Every variant shares it."
-                    : "Written, but Team only — so it isn't shown."
+                    : "Written, but Team only, so it isn't shown."
                 : "Not written yet.",
             action: { label: "Edit", href: edit("details") },
         },
@@ -140,10 +140,10 @@ export function CustomerView({
             <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-3">
                 <p className="min-w-0 flex-[1_1_280px] text-[12.5px] text-muted-foreground">
                     {live
-                        ? "The shop page as a customer opens it. Try the variants — nothing is added to a basket."
+                        ? "The shop page as a customer opens it. Try the variants. Nothing is added to a basket."
                         : product.status === "ARCHIVED"
-                          ? "Archived — customers cannot see this page. This is how it looked."
-                          : "A draft — customers cannot see this yet. This is how it will look once it is published."}
+                          ? "Archived. Customers cannot see this page. This is how it looked."
+                          : "A draft. Customers cannot see this yet. This is how it will look once it is published."}
                 </p>
                 <SwitchRow
                     side="start"

@@ -49,7 +49,7 @@ describe("planCard (D3)", () => {
             price: "₹1,500 / month",
             classes: "8 classes a month included",
             subscribers: "15 subscribers · brings in ₹21,600 a month",
-            olderPrices: ["3 still on ₹1,200 — they keep it"],
+            olderPrices: ["3 still on ₹1,200, and they keep it"],
             archived: false,
             draft: false,
             unpublished: false,
@@ -145,12 +145,12 @@ describe("archiveToast", () => {
         expect(
             archiveToast({ name: "Drop-in", subscriberCount: 4 }, true),
         ).toBe(
-            "Drop-in archived. Its 4 subscribers carry on; nobody new can join.",
+            "Drop-in archived. Its 4 subscribers carry on, and nobody new can join.",
         );
         expect(
             archiveToast({ name: "Drop-in", subscriberCount: 1 }, true),
         ).toBe(
-            "Drop-in archived. Its 1 subscriber carries on; nobody new can join.",
+            "Drop-in archived. Its 1 subscriber carries on, and nobody new can join.",
         );
         expect(
             archiveToast({ name: "Drop-in", subscriberCount: 0 }, true),

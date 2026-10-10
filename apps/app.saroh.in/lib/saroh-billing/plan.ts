@@ -176,7 +176,7 @@ export function planSummary(
     if (subscription.status === "CANCELLED") {
         return {
             ...base,
-            next: { kind: "text", text: "Nothing — the plan has ended" },
+            next: { kind: "text", text: "Nothing. The plan has ended" },
             warning: `This plan has ended. ${businessName} is back to what Saroh gives every business.`,
         };
     }
@@ -215,7 +215,7 @@ export function planSummary(
             : { kind: "text", text: "Date not set yet" },
         warning:
             subscription.status === "TRIALING"
-                ? "In the first month — regular charges start after it."
+                ? "In the first month. Regular charges start after it."
                 : null,
     };
 }

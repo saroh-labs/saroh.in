@@ -252,7 +252,7 @@ describe("Razorpay setup, as guided steps", () => {
         expect(text()).not.toContain("Test mode");
         typeInto(byLabel("Key ID"), "rzp_test_AbC123");
         expect(text()).toContain(
-            "Test mode — use Razorpay's test dashboard for the webhook too.",
+            "Test mode: use Razorpay's test dashboard for the webhook too.",
         );
     });
 

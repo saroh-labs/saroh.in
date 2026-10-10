@@ -79,7 +79,7 @@ describe("TaxRows' seller (DEC-082)", () => {
                 businessName="Rye Bakehouse"
             />,
         );
-        expect(html).toContain("No GST — Rye &amp; Co. isn&#x27;t registered");
+        expect(html).toContain("No GST. Rye &amp; Co. isn&#x27;t registered");
         expect(html).not.toContain("Rye Bakehouse");
     });
 });

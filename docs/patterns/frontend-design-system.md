@@ -524,5 +524,7 @@ zone)` is "9:30 am", lowercase, no leading zero. `formatClock` does
     - A test whose words carry a date and no `now` calls `pinClock()`
       (`lib/format/test-clock.ts`), or it passes this year and fails the
       next.
-- **Adopted** — `tabular-nums` on columns of figures, and "—" where zero is a
-  state rather than a measurement (07 §5).
+- **Current** (10 Oct 2026) — `tabular-nums` on columns of figures, and a
+  word where zero is a state rather than a measurement: "Not set", "None",
+  "Not known", "Not yet", never a lone "—" and never 0 (`saroh-product.md`
+  → One word each; `pnpm check:copy` fails a dash).

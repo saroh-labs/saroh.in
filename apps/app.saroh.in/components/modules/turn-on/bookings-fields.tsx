@@ -90,7 +90,7 @@ export function BookingsFields({
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
-                                            –
+                                            to
                                         </span>
                                         <TimeSelect
                                             value={day.close}

@@ -464,7 +464,7 @@ describe("a shop customer's overview", () => {
             overdueCount: 1,
         };
         expect(orderTiles(d, NOW)[1].note).toBe("₹300 still owed");
-        expect(owedLine(d)).toBe("1 invoice unpaid · ₹300 — some overdue");
+        expect(owedLine(d)).toBe("1 invoice unpaid · ₹300, some overdue");
     });
 
     it("finds what they usually buy, and the size they take", () => {
@@ -514,7 +514,7 @@ describe("a shop customer's overview", () => {
     it("says how they get their orders and where the last delivery went", () => {
         const rows = shop().orders?.rows ?? [];
         expect(howTheyGet(rows)).toBe(
-            "Collects at Rye & Co. — 1 of 2 orders. The rest were delivered.",
+            "Collects at Rye & Co.: 1 of 2 orders. The rest were delivered.",
         );
         expect(deliveryAddress(rows)).toBe("14 Hill Road, Bengaluru");
         expect(howTheyGet([order()])).toBe("Always collects at Rye & Co.");
@@ -527,7 +527,7 @@ describe("a shop customer's overview", () => {
             "Always collects at Rye & Co.",
         );
         expect(deliveryAddress([order()])).toBe(
-            "No address — they have only collected.",
+            "No address. They have only collected.",
         );
         // The address kept on their record comes first (C8).
         expect(deliveryAddress(rows, "3 Lake View, Pune 411001")).toBe(
@@ -671,7 +671,7 @@ describe("a gym customer's bookings and classes", () => {
             expect.objectContaining({
                 left: "1 of 5",
                 bar: "accent",
-                sub: "Use by 1 Oct — 8 days left · bought 21 Aug for ₹2,200",
+                sub: "Use by 1 Oct, 8 days left · bought 21 Aug for ₹2,200",
             }),
         );
     });

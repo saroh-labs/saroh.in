@@ -124,7 +124,7 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
+    MEMBER: "Runs the day: sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -133,7 +133,7 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
 const ROLE_PLAIN: Record<OrganizationRole, string> = {
     OWNER: "can open everything",
     ADMIN: "everything except removing an owner",
-    MEMBER: "runs the day — no money or settings",
+    MEMBER: "runs the day, no money or settings",
     REVIEWER: "invited websites, nothing else",
 };
 
@@ -311,7 +311,7 @@ export function TeamScreen({
             if (isBuiltIn(key)) return ROLE_BLURB[key];
             if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_BLURB;
             const n = byKey.get(key)?.actions.length ?? 0;
-            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${count(n, "permission")}.`;
+            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it: ${count(n, "permission")}.`;
         },
         plainOf: (key) => {
             if (isBuiltIn(key)) return ROLE_PLAIN[key];
@@ -391,9 +391,9 @@ export function TeamScreen({
                         bookableNoLogin,
                     )}
                     {over
-                        ? " — the team is over its plan's limit."
+                        ? ". The team is over its plan's limit."
                         : teamLimit.full
-                          ? " — the team is at its plan's limit."
+                          ? ". The team is at its plan's limit."
                           : ""}
                 </p>
             ) : null}

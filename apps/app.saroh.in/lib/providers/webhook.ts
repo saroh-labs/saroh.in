@@ -45,7 +45,7 @@ export function lastUpdateLine(
     if (!setup) return null;
     const name = providerName(setup.provider);
     if (!setup.lastReceivedAt) {
-        return `No payment updates received yet — check the webhook in ${name}.`;
+        return `No payment updates received yet. Check the webhook in ${name}.`;
     }
     const at = new Date(setup.lastReceivedAt);
     if (Number.isNaN(at.getTime())) return null;

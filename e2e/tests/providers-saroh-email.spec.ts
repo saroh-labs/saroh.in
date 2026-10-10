@@ -241,7 +241,7 @@ test.describe("with Saroh sending a business's booking emails", () => {
         // block is back.
         await expect(block(page)).toBeVisible();
         await expect(connected).toContainText(
-            "Disconnected — Saroh sends your booking emails for now, counted against your plan",
+            "Disconnected. Saroh sends your booking emails for now, counted against your plan",
         );
     });
 });

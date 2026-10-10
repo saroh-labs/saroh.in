@@ -13,7 +13,7 @@ describe("leftBusinessNotice (UX-073)", () => {
                 memberOf: [],
             }),
         ).toBe(
-            "You're no longer in Hill Road Bakes — someone there removed you, or it closed. Your account is still yours: set one up of your own below, or ask them to invite you again.",
+            "You're no longer in Hill Road Bakes. Someone there removed you, or it closed. Your account is still yours: set one up of your own below, or ask them to invite you again.",
         );
     });
 
@@ -26,7 +26,7 @@ describe("leftBusinessNotice (UX-073)", () => {
                 userId: "user_1",
                 memberOf: ["org_other"],
             }),
-        ).toMatch(/^You're no longer in that business — /);
+        ).toMatch(/^You're no longer in that business\. /);
     });
 
     it("says nothing to someone still in it, or new", () => {

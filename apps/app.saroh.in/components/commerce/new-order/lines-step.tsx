@@ -126,7 +126,7 @@ export function LinesStep({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     aria-label="Add a product"
-                    placeholder="Add a product — type to find it"
+                    placeholder="Add a product: type to find it"
                     autoComplete="off"
                     className={FIELD}
                 />

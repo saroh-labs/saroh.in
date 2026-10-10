@@ -305,7 +305,7 @@ export function CsvImport({
                             <p className="text-sm font-medium">
                                 {count(result.failed, "row")} could not be
                                 imported. Fix these in your file and import it
-                                again — rows that already succeeded will be
+                                again. Rows that already succeeded will be
                                 skipped or updated, not duplicated.
                             </p>
                             <IssueList
@@ -359,7 +359,7 @@ export function CsvImport({
                     {fileName ? (
                         <p className="text-sm text-muted-foreground">
                             {fileName}
-                            {plan ? ` — ${plan.totalRows} rows` : ""}
+                            {plan ? ` · ${plan.totalRows} rows` : ""}
                         </p>
                     ) : null}
                 </CardContent>
@@ -539,7 +539,7 @@ export function CsvImport({
                                         Rows that will not be imported
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                        The rest can still be imported — fix
+                                        The rest can still be imported. Fix
                                         these and run the file again.
                                     </p>
                                     <IssueList

@@ -262,7 +262,7 @@ export function InvoiceQuickLook({
         >
             {i.standing === "OVERDUE" && i.dueAt ? (
                 <Notice tone="error">
-                    {late.before} — due{" "}
+                    {late.before}, due{" "}
                     <ViewerDate
                         iso={i.dueAt}
                         variant="dayMonth"
@@ -455,7 +455,7 @@ export function TaxRows({
         email: null,
     }).name;
     const rows: [string, string][] = isExemptPaper(i)
-        ? [["Exempt from GST — no tax is charged", ""]]
+        ? [["Exempt from GST. No tax is charged", ""]]
         : i.gst
           ? [
                 ["Taxable value", money(i.subtotal)],
@@ -468,7 +468,7 @@ export function TaxRows({
             ]
           : Number(i.tax) > 0
             ? [["Tax", money(i.tax)]]
-            : [[`No GST — ${seller} isn't registered`, ""]];
+            : [[`No GST. ${seller} isn't registered`, ""]];
     return (
         <div className="py-1">
             {rows.map(([k, v]) => (
@@ -492,7 +492,7 @@ function payLine(i: Invoice, money: (a: string) => string) {
     if (i.order && (i.standing === "PAID" || i.standing === "CREDITED")) {
         return i.standing === "CREDITED"
             ? "Refunded on the order. A credit note cancels it."
-            : "Paid with the order — its payments and refunds are made there.";
+            : "Paid with the order. Its payments and refunds are made there.";
     }
     switch (i.standing) {
         case "PAID":
@@ -509,9 +509,9 @@ function payLine(i: Invoice, money: (a: string) => string) {
                 </>
             );
         case "CREDITED":
-            return "Cancelled. A credit note cancels it — nothing is owed.";
+            return "Cancelled. A credit note cancels it. Nothing is owed.";
         case "VOID":
-            return "Voided — nothing is owed.";
+            return "Voided. Nothing is owed.";
         case "DRAFT":
             return "A draft has no number and can still change.";
         default:

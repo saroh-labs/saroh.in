@@ -14,7 +14,7 @@ import { HELP } from "./fields";
 const WHERE: [LocationType, string][] = [
     ["IN_PERSON", "In person"],
     ["ONLINE", "Online"],
-    ["EITHER", "Either — they choose"],
+    ["EITHER", "Either, they choose"],
 ];
 
 /**

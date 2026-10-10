@@ -162,8 +162,8 @@ export function PayLinkBlock({
                     />
                 </div>
                 <p className="mt-1.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
-                    Shown this once — copy it now. Saroh doesn&apos;t send it;
-                    the order shows paid once they pay.
+                    Shown this once, so copy it now. Saroh doesn&apos;t send it.
+                    The order shows paid once they pay.
                 </p>
             </div>
         );

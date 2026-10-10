@@ -64,12 +64,12 @@ describe("PartialRead, above a page whose rest arrived", () => {
         draw(
             <PartialRead
                 things="reviews"
-                so="Their count shows as “—”. It is not zero."
+                so="Their count can't be shown. It is not zero."
             />,
         );
         const notice = host.querySelector('[role="status"]');
         expect(notice?.textContent).toContain(
-            "Couldn't load reviews. Their count shows as “—”. It is not zero.",
+            "Couldn't load reviews. Their count can't be shown. It is not zero.",
         );
         // Something unknown, not something broken: never an alert.
         expect(host.querySelector('[role="alert"]')).toBe(null);

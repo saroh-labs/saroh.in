@@ -109,7 +109,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
         <section>
             <TabIntro title="Defaults">
                 What a new product starts with. A category&apos;s own value
-                wins; leave it empty and the All products value is used. Saved
+                wins. Leave it empty and the All products value is used. Saved
                 products keep their values unless you choose to update them.
             </TabIntro>
             {catalogue.canWrite ? null : <ReadOnlyNote />}
@@ -195,7 +195,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         }
                                         placeholder={
                                             isAll || !all?.howToUse
-                                                ? "Nothing — each product says"
+                                                ? "Nothing. Each product says"
                                                 : `All products: ${all.howToUse}`
                                         }
                                         className="w-full min-w-0"

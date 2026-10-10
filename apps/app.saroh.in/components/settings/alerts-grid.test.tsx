@@ -101,7 +101,7 @@ describe("AlertsGrid", () => {
         render(prefs());
         expect(host.textContent).toContain("What you hear about");
         expect(host.textContent).toContain(
-            "Only for you — your team picks their own.",
+            "Only for you. Your team picks their own.",
         );
         const headers = Array.from(
             host.querySelectorAll('[role="columnheader"]'),
@@ -143,7 +143,7 @@ describe("AlertsGrid", () => {
         saveAlert.mockResolvedValue({ ok: true, data: prefs() });
         undoAlert.mockResolvedValue({
             ok: false,
-            error: "Changed since — reload",
+            error: "Changed since. Reload",
         });
         render(prefs());
         await act(async () => {
@@ -153,14 +153,14 @@ describe("AlertsGrid", () => {
         const undo = offer.mock.calls[0]?.[1] as () => Promise<unknown>;
         await expect(undo()).resolves.toEqual({
             ok: false,
-            error: "Changed since — reload",
+            error: "Changed since. Reload",
         });
     });
 
     it("a refused save says so, and offers no Undo", async () => {
         saveAlert.mockResolvedValue({
             ok: false,
-            error: "Something went wrong saving your alerts.",
+            error: "That didn't go through. Try again. saving your alerts.",
         });
         render(prefs());
         await act(async () => {
@@ -168,7 +168,7 @@ describe("AlertsGrid", () => {
             await Promise.resolve();
         });
         expect(showError).toHaveBeenCalledWith(
-            "Something went wrong saving your alerts.",
+            "That didn't go through. Try again. saving your alerts.",
             "Your alerts are as they were.",
         );
         expect(offer).not.toHaveBeenCalled();
@@ -212,7 +212,7 @@ describe("AlertsGrid", () => {
         const whatsapp = switchFor("New order by WhatsApp");
         expect(whatsapp.disabled).toBe(true);
         expect(whatsapp.getAttribute("aria-label")).toBe(
-            "New order by WhatsApp, off — no WhatsApp number for you",
+            "New order by WhatsApp, off. no WhatsApp number for you",
         );
         expect(host.textContent).toContain(
             "Saroh doesn't keep a WhatsApp number for you",

@@ -391,7 +391,7 @@ describe("the API's field errors (a 400 with field paths)", () => {
                     message: "Validation failed",
                     details: [
                         "setup.storefrontName should not be empty",
-                        "Something went wrong",
+                        "That didn't go through. Try again.",
                     ],
                 },
             }),

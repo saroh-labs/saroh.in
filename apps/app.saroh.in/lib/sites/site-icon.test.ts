@@ -112,7 +112,7 @@ describe("what an icon file may be", () => {
             /isn't square/,
         );
         expect(siteIconShapeNote({ width: 64, height: 64 })).toBe(
-            "This image is 64 × 64. It may look soft on a phone; 192 × 192 or larger is sharper.",
+            "This image is 64 × 64. It may look soft on a phone, and 192 × 192 or larger is sharper.",
         );
         // Unknown size: nothing to say.
         expect(siteIconShapeNote({})).toBeNull();

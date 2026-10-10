@@ -181,8 +181,8 @@ export function ReviewsView({
             />
             <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                 Every review comes from a customer the business invited, for an
-                order that was paid and shipped. Hiding a review keeps it here;
-                nothing a customer wrote is deleted.
+                order that was paid and shipped. Hiding a review keeps it here.
+                Nothing a customer wrote is deleted.
             </p>
 
             <ReviewSheet

@@ -289,7 +289,7 @@ export function OrdersScreen({
                         onChange={(storefront) => go({ storefront })}
                         noun={{ one: "open order", other: "open orders" }}
                         label="Show orders taken at"
-                        note={`A filter, not a scope. The order book belongs to ${businessName}; this narrows it to one location.`}
+                        note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
                     />
                 ) : null}
                 {range ? (

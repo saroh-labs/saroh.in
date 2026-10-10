@@ -446,7 +446,7 @@ function SitePicker({
                 ) : null}
                 <DropdownMenuSeparator />
                 <p className="px-[9px] pb-1 pt-0.5 text-[11px] leading-[1.45] text-muted-foreground">
-                    This picks which website you are editing — it is not a scope
+                    This picks which website you are editing. It is not a scope
                     the whole rail follows.
                 </p>
             </DropdownMenuContent>

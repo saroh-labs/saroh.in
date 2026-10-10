@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     // and a description that uses a word the app never says is a small lie
     // search engines repeat. Named for what a merchant does, not for our nouns.
     description:
-        "Run your business from one place — sell, take bookings, follow up on enquiries, and keep your website in step.",
+        "Run your business from one place: sell, take bookings, follow up on enquiries, and keep your website in step.",
     // On a phone's home screen (10 Oct 2026). The manifest itself is
     // `app/manifest.ts`, which Next links from here; these are the tags
     // iOS reads instead of it.

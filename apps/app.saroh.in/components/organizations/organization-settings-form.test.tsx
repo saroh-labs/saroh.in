@@ -184,7 +184,7 @@ describe("Identity's rows and sheets", () => {
         await type(input("name"), "   ");
         await press(item("Save"));
         expect(save).not.toHaveBeenCalled();
-        expect(sheet()?.textContent).toContain("Name is required");
+        expect(sheet()?.textContent).toContain("Add a name.");
     });
 
     it("a refusal keeps the sheet open with what was typed, on the field the API names", async () => {

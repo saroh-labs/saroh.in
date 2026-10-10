@@ -159,7 +159,7 @@ describe("extras on Team (F17)", () => {
     it("sums up the role plus what was added, in words", () => {
         expect(extrasSummary("Member", [])).toBeNull();
         expect(extrasSummary("Member", ["Refund orders", "See invoices"])).toBe(
-            "Member plus refund orders and see invoices. Extras only ever add — they cannot take away what Member already allows.",
+            "Member plus refund orders and see invoices. Extras only ever add. They cannot take away what Member already allows.",
         );
     });
 });

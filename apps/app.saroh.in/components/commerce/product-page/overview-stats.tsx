@@ -142,7 +142,7 @@ export function VariantsStat({
                     : undefined
             }
             label="Variants"
-            value={product.variants.length || "—"}
+            value={product.variants.length || "None"}
             hint={
                 product.variants.length
                     ? product.variants
@@ -160,7 +160,7 @@ export function VariantsStat({
         <Link
             href={href}
             scroll={false}
-            aria-label="Variants — see sizes and prices"
+            aria-label="Variants, see sizes and prices"
             className={cn(FOCUS, "rounded-[12px]")}
         >
             {stat}

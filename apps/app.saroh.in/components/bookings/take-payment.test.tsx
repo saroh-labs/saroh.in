@@ -205,7 +205,7 @@ describe("Take ₹X at the desk", () => {
             receivedCents: 100_000,
         });
         expect(showSuccess).toHaveBeenCalledWith(
-            "₹500 taken in cash — give ₹500 change.",
+            "₹500 taken in cash. Give ₹500 change.",
         );
         expect(refresh).toHaveBeenCalled();
         expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -487,7 +487,7 @@ describe("the calendar quick look's Take ₹X", () => {
         const trigger = peekTake();
         expect(trigger?.textContent).toBe("Take ₹500");
         expect(document.body.textContent).toContain(
-            "Not yet — pays at the session",
+            "Not yet. Pays at the session",
         );
         act(() => trigger?.click());
         const dialogs = document.querySelectorAll('[role="dialog"]');

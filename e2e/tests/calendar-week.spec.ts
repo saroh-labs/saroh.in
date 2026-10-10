@@ -65,7 +65,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})?–\\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
                 ),
             }),
         ).toBeVisible();
@@ -101,7 +101,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2} (${MONTHS})( \\d{4})?–\\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2} (${MONTHS})( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
                 ),
             }),
         ).toBeVisible();

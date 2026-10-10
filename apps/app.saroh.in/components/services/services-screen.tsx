@@ -222,7 +222,7 @@ export function ServicesScreen({
                                         ? "Who takes it couldn't be loaded"
                                         : who.length
                                           ? `With ${who.map((p) => callName(p.name)).join(", ")}`
-                                          : "Nobody takes it yet — it books in its own hours"}
+                                          : "Nobody takes it yet. It books in its own hours"}
                                 </div>
                                 {problem ? (
                                     <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">

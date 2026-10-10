@@ -59,7 +59,7 @@ describe("when autopay charges", () => {
         expect(options[0].consequence).toContain("2 days early");
         expect(options[0].consequence).toContain("cancel or pause");
         expect(options[2].consequence).toContain(
-            "No time for a Retry before it's overdue",
+            "No time to try again before it's overdue",
         );
         expect(timingTitle("ON_DUE_DATE")).toBe("Charge on the due date");
     });

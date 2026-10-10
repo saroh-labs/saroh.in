@@ -89,7 +89,7 @@ export function heldByLine(
         .map((s) => `${s.title} ${s.promised}`)
         .join(", ");
     const held = `${promised} held by ${count(openOrders, "open order")}`;
-    return sizes ? `${held} — ${sizes}` : held;
+    return sizes ? `${held}: ${sizes}` : held;
 }
 
 // ---- Linked to this product ----
@@ -121,7 +121,7 @@ export function openOrderLine(
     const status = (
         ORDER_STATUS_LABEL[order.status] ?? order.status
     ).toLowerCase();
-    return `${orderRef(order.orderNumber)} ${first} — ${what}, ${status}`;
+    return `${orderRef(order.orderNumber)} ${first}: ${what}, ${status}`;
 }
 
 /**
@@ -146,7 +146,7 @@ export function collectionsSummary(placement: ProductPlacement): {
             shown.length === 0
                 ? "In no collection"
                 : `In ${count(shown.length, "collection")}`,
-        names: shown.map((c) => c.name).join(", ") || "—",
+        names: shown.map((c) => c.name).join(", ") || "None",
     };
 }
 

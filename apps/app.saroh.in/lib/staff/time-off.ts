@@ -113,7 +113,7 @@ export function offLineLabel(
 ): string {
     const when =
         line.days > 1
-            ? `${shortDate(line.fromDate)} – ${shortDate(line.toDate)} · ${line.days} days`
+            ? `${shortDate(line.fromDate)} to ${shortDate(line.toDate)} · ${line.days} days`
             : formatDay(line.fromDate, { weekday: "short", year: "never" });
     const part =
         line.startMinute === null || line.endMinute === null

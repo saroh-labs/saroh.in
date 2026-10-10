@@ -199,7 +199,7 @@ export function VariantsSection({
         {
             dirty,
             problem: bad
-                ? "A variant needs a fix — see the row marked in red."
+                ? "A variant needs a fix. See the row marked in red."
                 : "",
             note: failed ? `${failed} Your changes are still here.` : undefined,
             noteIsError: !!failed,
@@ -261,7 +261,7 @@ export function VariantsSection({
                     <p className="mb-3 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                         Sold as itself
                         {shownPrice ? ` at ${shownPrice}` : ""}. Add variants if
-                        it comes in sizes, shades or colours — each keeps the
+                        it comes in sizes, shades or colours. Each keeps the
                         product&apos;s description and category, and gets its
                         own stock count.
                     </p>
@@ -279,10 +279,10 @@ export function VariantsSection({
             ) : (
                 <>
                     <FieldHelp className="mb-[11px]">
-                        Each variant is the same product — same description and
-                        category. Its value comes from Settings → Options; SKU,
-                        price and photo can differ; a grey price is the
-                        product&apos;s {shownPrice}.
+                        Each variant is the same product, with the same
+                        description and category. Its value comes from Settings
+                        → Options. SKU, price and photo can differ. A grey price
+                        is the product&apos;s {shownPrice}.
                     </FieldHelp>
                     <OptionChoice
                         options={options}
@@ -382,7 +382,7 @@ export function VariantsSection({
                         noteBad={dupSku || newPriceBad}
                         note={
                             values.length === 0
-                                ? `No values for ${opt} yet — add them above.`
+                                ? `No values for ${opt} yet. Add them above.`
                                 : allTaken
                                   ? `Every ${opt} is already a variant. Add another value above.`
                                   : dupSku

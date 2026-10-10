@@ -283,7 +283,7 @@ export function ReleaseRow({
                             )}
                         >
                             {gate.kind === "override"
-                                ? `${gate.why} As an owner you can still go live without approval; it's recorded.`
+                                ? `${gate.why} As an owner you can still go live without approval, and it's recorded.`
                                 : gate.why}
                         </p>
                     ) : null}

@@ -330,7 +330,7 @@ describe("QrPanel — a saved link", () => {
         );
         expect(q("[data-qr-link]")?.textContent).toBe("glow.saroh.app");
         expect(q("[data-qr-not-counted]")?.textContent).toBe(
-            "Not counted. This is a QR of the link itself; an owner or admin can make a saved code that counts its scans.",
+            "Not counted. This is a QR of the link itself. An owner or admin can make a saved code that counts its scans.",
         );
         expect(panelButton("Make this code")).toBeUndefined();
         expect(makeQrPanelCode).not.toHaveBeenCalled();

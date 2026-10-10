@@ -170,7 +170,7 @@ describe("Sales by month", () => {
         });
         expect(months[5]).toMatchObject({ n: "1 sold", amt: "₹1,500" });
         expect(months[5].pct).toBe(56);
-        expect(months[0]).toMatchObject({ n: "—", amt: "", pct: 0 });
+        expect(months[0]).toMatchObject({ n: "None sold", amt: "", pct: 0 });
         expect(note).toBe("₹4,200 in the last six months");
     });
 
@@ -183,7 +183,7 @@ describe("Sales by month", () => {
             ZONE,
         );
         expect(months[5].n).toBe("1 sold");
-        expect(months[4].n).toBe("—");
+        expect(months[4].n).toBe("None sold");
     });
 
     it("no sales, and none lately, are said differently", () => {
@@ -226,11 +226,11 @@ describe("Price history", () => {
             { t: "₹1,500 now", sub: "Since 1 Sep · 1 bought at this price" },
             {
                 t: "₹1,200",
-                sub: "Until 1 Sep · 2 bought at it — they keep it",
+                sub: "Until 1 Sep · 2 bought at it, and they keep it",
             },
             {
                 t: "₹1,000",
-                sub: "Until 1 Aug · 0 bought at it — they keep it",
+                sub: "Until 1 Aug · 0 bought at it, and they keep it",
             },
         ]);
         expect(h.about).toBe("₹1,000 until 1 Aug · ₹1,200 until 1 Sep");
@@ -353,9 +353,9 @@ describe("Activity", () => {
         const say = (e: Partial<PackEvent>) =>
             activityText(event(e), PACK, "CLASSES");
         expect(say({ kind: "CREATED" })).toBe("Created");
-        expect(say({ kind: "PUBLISHED" })).toBe("Published — on sale");
+        expect(say({ kind: "PUBLISHED" })).toBe("Published and on sale");
         expect(say({ kind: "ARCHIVED" })).toBe(
-            "Archived — nobody new can buy it",
+            "Archived. Nobody new can buy it",
         );
         expect(say({ kind: "RESTORED" })).toBe("Back on sale");
         expect(
@@ -383,7 +383,7 @@ describe("Activity", () => {
                 holder: { purchaseId: "pp_1", contactId: "c_1", name: "Asha" },
                 details: { days: 1, reason: "Fever", expiresAt: ["a", "b"] },
             }),
-        ).toBe("Asha's pack extended 1 day — Fever");
+        ).toBe("Asha's pack extended 1 day: Fever");
     });
 
     it("names what changed, before and after", () => {
@@ -403,7 +403,7 @@ describe("Activity", () => {
                 "CLASSES",
             ),
         ).toBe(
-            "Price ₹1,500, was ₹1,200; 10 classes, was 8; use within 60 days, was 30; classes it covers changed; now for a first pack only",
+            "Price ₹1,500, was ₹1,200 · 10 classes, was 8 · use within 60 days, was 30 · classes it covers changed · now for a first pack only",
         );
         expect(
             activityText(
@@ -418,7 +418,7 @@ describe("Activity", () => {
                 "ONE_TO_ONE",
             ),
         ).toBe(
-            "Renamed to “Ten classes”, was “Ten”; now for one-to-one sessions",
+            "Renamed to “Ten classes”, was “Ten” · now for one-to-one sessions",
         );
         expect(
             activityText(

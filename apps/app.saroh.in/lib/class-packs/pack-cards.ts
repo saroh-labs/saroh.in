@@ -164,13 +164,13 @@ export function packCard(p: PackListItem, canWrite: boolean): PackCardView {
         terms,
         sold: String(p.sold),
         takings,
-        stillToUse: left === undefined ? "—" : String(left),
+        stillToUse: left === undefined ? "Not known" : String(left),
         stillToUseNote:
             people > 0
                 ? `across ${count(people, "person", "people")}`
                 : "Nobody has any left",
         why: draft
-            ? "Draft — not on sale until you publish it in the editor."
+            ? "Draft. Not on sale until you publish it in the editor."
             : archived
               ? "Archived, so it can't be sold. Sell again puts it back on sale."
               : null,
@@ -245,6 +245,6 @@ export function rulesNote(freeCancelHours: number | null | undefined): string {
     const cancel =
         freeCancelHours === null
             ? "Cancel before it starts and the class comes back."
-            : `Cancel ${count(freeCancelHours, "hour", "hours")} or more before and the class comes back; later, it's used.`;
+            : `Cancel ${count(freeCancelHours, "hour", "hours")} or more before and the class comes back. Later, it's used.`;
     return `${spend} ${cancel} ${end}`;
 }

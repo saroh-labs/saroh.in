@@ -9,6 +9,7 @@
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
         "check:security-headers": "node scripts/check-security-headers.mjs",
+        "check:copy": "node scripts/check-app-copy.mjs",
         "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
         "check:formats": "node scripts/check-formats.mjs",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",

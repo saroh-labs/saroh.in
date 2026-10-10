@@ -53,7 +53,7 @@ describe("dataExportLine (DEC-120)", () => {
             NOW,
         );
         expect(line.detail).toBe(
-            "12.4 MB · 2 files were too big to fit; media.csv inside lists them",
+            "12.4 MB · 2 files were too big to fit, and media.csv inside lists them",
         );
     });
 

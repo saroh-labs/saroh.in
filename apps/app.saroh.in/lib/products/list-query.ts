@@ -144,7 +144,7 @@ export function emptyCopy(
             return {
                 kind: "chip",
                 title: "No collections yet",
-                note: "Collections group products into the sets people browse — Bread, Gifts, new arrivals.",
+                note: "Collections group products into the sets people browse: Bread, Gifts, new arrivals.",
                 action: "new-collection",
             };
         }
@@ -162,7 +162,7 @@ export function emptyCopy(
         return {
             kind: "chip",
             title: "Nothing tracked yet",
-            note: "Turn on inventory tracking for a product and its stock level shows here.",
+            note: "Turn on stock tracking for a product and its stock level shows here.",
             action: "add-product",
         };
     }

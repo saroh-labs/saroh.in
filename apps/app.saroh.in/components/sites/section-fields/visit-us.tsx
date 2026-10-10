@@ -196,7 +196,7 @@ export function VisitUsFields({
                 <TextLink href={LOCATIONS} external>
                     Sell › Locations
                 </TextLink>
-                ); the hours in{" "}
+                ), and the hours in{" "}
                 <TextLink href={HOURS} external>
                     Settings › Hours
                 </TextLink>

@@ -43,7 +43,7 @@ const EDITS = {
         ["Cancel", "cancel"],
     ],
     failed: [
-        ["Retry or fix payment", ""],
+        ["Try again or fix payment", ""],
         ["Pause instead", "pause"],
         ["Cancel", "cancel"],
     ],
@@ -148,11 +148,11 @@ function Body({
                     sub.failedCharge?.total ?? sub.price,
                     sub.currency,
                 )
-              : "—";
+              : "None";
     const nextLine =
         tab === "active"
             ? sub.endsAt
-                ? `Ends ${formatDate(sub.endsAt, tz, { now })} — what's paid for still happens. Nothing more is charged.`
+                ? `Ends ${formatDate(sub.endsAt, tz, { now })}. What's paid for still happens. Nothing more is charged.`
                 : sub.startsAt
                   ? `Starts ${formatDate(sub.startsAt, tz, { now })}. Nothing is charged before then.`
                   : sub.nextRenewalAt
@@ -195,7 +195,7 @@ function Body({
                 </p>
                 {older ? (
                     <p className="mt-1.5 text-[12px] text-foreground">
-                        Keeps {formatMoneyMajor(sub.price, sub.currency)} — the
+                        Keeps {formatMoneyMajor(sub.price, sub.currency)}. The
                         plan is{" "}
                         {formatMoneyMajor(older.listPrice, sub.currency)} for
                         new sign-ups
@@ -214,7 +214,7 @@ function Body({
                         {failWhy(sub, now)}
                     </div>
                     <div className="mt-[3px] text-[12px] text-foreground/75">
-                        Saroh doesn&apos;t charge cards — open it to send a new
+                        Saroh doesn&apos;t charge cards. Open it to send a new
                         pay link, record a payment, pause or cancel.
                     </div>
                 </Notice>
@@ -303,8 +303,8 @@ function Body({
                     </div>
                     <p className="mt-2 text-[11.5px] text-muted-foreground">
                         {tab === "cancelled"
-                            ? "Starts a new subscription at today's price — the old one keeps its history."
-                            : "Opens the subscription with that step ready — nothing changes until you confirm there."}
+                            ? "Starts a new subscription at today's price. The old one keeps its history."
+                            : "Opens the subscription with that step ready. Nothing changes until you confirm there."}
                     </p>
                 </QuickLookCard>
             ) : (

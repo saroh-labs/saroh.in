@@ -106,7 +106,7 @@ describe("searchSettings", () => {
         const hits = searchSettings("team", owner);
         expect(hits.map((h) => h.label)).toEqual([
             "Roles and what they open",
-            "People — invite or change a role",
+            "People: invite or change a role",
         ]);
         expect(hits[0]?.href).toBe("/settings/people?tab=roles");
     });
@@ -216,7 +216,7 @@ describe("searchSettings", () => {
     it("finds who changed what for those who may read it", () => {
         expect(searchSettings("who changed", owner)).toEqual([
             {
-                label: "Activity — who changed what",
+                label: "Activity: who changed what",
                 where: "Activity",
                 href: "/settings/activity",
             },
@@ -238,10 +238,10 @@ describe("searchSettings", () => {
             searchSettings("people", actor, { byPage: false }).map(
                 (h) => h.label,
             );
-        expect(labels(owner)).toEqual(["People — invite or change a role"]);
+        expect(labels(owner)).toEqual(["People: invite or change a role"]);
         expect(labels(member)).toEqual(["People on the team"]);
         expect(labels({ role: null })).toEqual([
-            "People — invite or change a role",
+            "People: invite or change a role",
         ]);
     });
 

@@ -13,7 +13,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { settingsEditHref } from "@/lib/sites/settings-edit";
 
 /** The lock's reason, said beside the controls it disables (G6). */
-export const FIXED_LOCK = "On every page — can't be removed or moved";
+export const FIXED_LOCK = "On every page. Can't be removed or moved";
 
 /** What the inspector edits about the header and footer (G6). */
 export interface FixedBlockText {
@@ -132,7 +132,7 @@ export function FixedBlockInspector({
                     <Badge variant="neutral">Fixed</Badge>
                 </h2>
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
-                    On every page of this site. Its text is edited here; where
+                    On every page of this site. Its text is edited here. Where
                     it sits is not a per-page choice.
                 </p>
             </div>

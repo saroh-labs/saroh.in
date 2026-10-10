@@ -300,9 +300,7 @@ describe("a connection whose provider refused its keys (UX-012, FB-7)", () => {
         for (const entry of view.connected) {
             expect(entry.state).toBe("ATTENTION");
             expect(entry.fix).toBe("Enter keys again");
-            expect(entry.note).toMatch(
-                /^Needs attention — .* refused its keys/,
-            );
+            expect(entry.note).toMatch(/^Needs attention. .* refused its keys/);
         }
     });
 });

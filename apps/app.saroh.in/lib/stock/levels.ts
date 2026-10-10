@@ -181,5 +181,5 @@ export function addedWords(
     what: string,
     canSell: number,
 ): string {
-    return `Added ${units} to ${what} — ${canSell} can sell now`;
+    return `Added ${units} to ${what}. ${canSell} can sell now`;
 }

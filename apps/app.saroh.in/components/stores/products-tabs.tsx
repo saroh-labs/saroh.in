@@ -30,7 +30,7 @@ export function ProductsTabs({
         { id: "all", label: "All" },
         { id: "collections", label: "Collections" },
         ...(showInventory
-            ? [{ id: "inventory" as const, label: "Inventory" }]
+            ? [{ id: "inventory" as const, label: "Stock" }]
             : []),
         ...(showReviews ? [{ id: "reviews" as const, label: "Reviews" }] : []),
     ];

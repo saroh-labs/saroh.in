@@ -224,7 +224,7 @@ export function planBlocker(
 ): string | null {
     if (!form.name.trim()) return "Add a name to save the draft";
     if (form.price.trim() && parsePrice(form.price) === null) {
-        return "Fix the price to save — a number, with at most two decimals";
+        return "Fix the price to save: a number, with at most two decimals";
     }
     if (
         ctx.withClasses &&
@@ -297,8 +297,8 @@ export function changesNote(
         (!form.classes || parseClasses(form.classes) !== null);
     const who = `The ${subscribers} already on it`;
     return classes
-        ? `${who} keep what they pay — nobody's price changes under them. Their classes change from their next renewal.`
-        : `${who} keep what they agreed to — nobody's price changes under them.`;
+        ? `${who} keep what they pay. Nobody's price changes under them. Their classes change from their next renewal.`
+        : `${who} keep what they agreed to. Nobody's price changes under them.`;
 }
 
 /**
@@ -342,7 +342,7 @@ export function autopayLimitWarning(
         short[0].limit,
     );
     const who = count(members, "member");
-    return `Autopay covers up to ${formatMoneyMajor(cap, currency || "INR")}; ${who} will need to authorise again`;
+    return `Autopay covers up to ${formatMoneyMajor(cap, currency || "INR")}, so ${who} will need to authorise again`;
 }
 
 /** "1500.5" as 150050: compared in whole paise, never as floats. */
@@ -373,7 +373,7 @@ export function glance(
                       Math.round(price * PER_MONTH[form.interval]),
                       cur,
                   )
-                : "—",
+                : "Not set",
         },
         { label: "On it now", value: String(figures?.subscriberCount ?? 0) },
         {
@@ -381,7 +381,7 @@ export function glance(
             value:
                 coming > 0
                     ? formatMoneyMajor(coming, figures?.currency ?? cur)
-                    : "—",
+                    : "None",
         },
     ];
 }
@@ -417,10 +417,10 @@ export const PLAN_COPY: EditorCopy = {
     noun: "plan",
     liveLabel: "Live",
     liveClean: "Open to new sign-ups · no changes",
-    draftSaved: "Draft · saved — nobody can join it yet",
+    draftSaved: "Draft · saved, nobody can join it yet",
     draftFirstSaved:
-        "Saved as a draft — nobody can join it yet. Delete draft if you change your mind.",
-    notStarted: "Not saved yet — start with a name",
+        "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
+    notStarted: "Not saved yet. Start with a name",
     viewLabel: "View plan",
 };
 

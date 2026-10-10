@@ -347,7 +347,7 @@ export function SubscriptionDetail({
                                 ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
                                 : sub.retryVia === "MANDATE"
                                   ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
-                                  : `Saroh doesn't charge a card or try again on its own — ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
+                                  : `Saroh doesn't charge a card or try again on its own. ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
                         </div>
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />
@@ -384,7 +384,7 @@ export function SubscriptionDetail({
                                 hint={
                                     tab === "failed"
                                         ? "Not collected until the renewal is paid"
-                                        : "Skip one — nothing is refunded, it just isn't collected"
+                                        : "Skip one. Nothing is refunded, and it isn't collected"
                                 }
                                 canWrite={canWrite}
                                 busyDate={busyDate}
@@ -421,7 +421,7 @@ export function SubscriptionDetail({
                             )}
                             older={
                                 older
-                                    ? `Keeps ${formatMoneyMajor(sub.price, sub.currency)} — the plan is ${formatMoneyMajor(older.listPrice, sub.currency)} for new sign-ups`
+                                    ? `Keeps ${formatMoneyMajor(sub.price, sub.currency)}. The plan is ${formatMoneyMajor(older.listPrice, sub.currency)} for new sign-ups`
                                     : null
                             }
                             // What the customer set up (D12) comes first;
@@ -462,7 +462,7 @@ export function SubscriptionDetail({
                 pauseNote={(option) => pauseNote(option, sub, now)}
                 plans={plans}
                 currentPlanId={sub.plan.id}
-                switchNote={`Starts at the next renewal${nextText ? `, ${nextText}` : ""}. This period stays as it is — no part-payments.`}
+                switchNote={`Starts at the next renewal${nextText ? `, ${nextText}` : ""}. This period stays as it is, with no part-payments.`}
                 onPause={pause}
                 onSwitch={switchTo}
                 cancel={{

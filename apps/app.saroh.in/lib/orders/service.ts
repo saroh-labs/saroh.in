@@ -46,8 +46,8 @@ async function mutate(
     const id = (data as { id?: unknown } | null)?.id;
     if (res.ok && typeof id === "string") return { ok: true, data: { id } };
     // The API's envelope is `{ error: { message, details } }`; reading only a
-    // top-level `message` turned every refusal into "Something went wrong".
-    return toFailure(data, "Something went wrong");
+    // top-level `message` turned every refusal into "That didn't go through. Try again.".
+    return toFailure(data, "That didn't go through. Try again.");
 }
 
 export function updateOrder(

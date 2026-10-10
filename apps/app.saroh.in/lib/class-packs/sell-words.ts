@@ -39,7 +39,7 @@ const PAID_BY_LABEL: Record<PaidBy, string> = {
 
 /** How a sale was paid, in a list: "UPI"; "—" when nobody recorded it. */
 export function paidByLabel(paidBy: PaidBy | null | undefined): string {
-    return paidBy ? PAID_BY_LABEL[paidBy] : "—";
+    return paidBy ? PAID_BY_LABEL[paidBy] : "Not recorded";
 }
 
 /** The pack as the dialog reads it. */
@@ -161,7 +161,7 @@ export function sellNote(pack: SellPack, invoicesOnSale: boolean): string {
     const kind = packKind(pack);
     const theirs = `The ${unitWord(kind, 2)} are on their account straight away.`;
     return invoicesOnSale
-        ? `Books nothing · invoice ${formatMoneyMajor(pack.price, pack.currency)}. ${theirs} Saroh doesn't send the invoice — open it from Invoices to print it or mark it paid.`
+        ? `Books nothing · invoice ${formatMoneyMajor(pack.price, pack.currency)}. ${theirs} Saroh doesn't send the invoice. Open it from Invoices to print it or mark it paid.`
         : `Books nothing. ${theirs}`;
 }
 

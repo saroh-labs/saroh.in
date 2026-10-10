@@ -380,7 +380,7 @@ function PaymentsForm({
                         >
                             {keyIdWrong
                                 ? "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_."
-                                : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+                                : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it. The secret never leaves Saroh."}
                         </p>
                     ) : (
                         <SecretField
@@ -389,7 +389,7 @@ function PaymentsForm({
                             value={publicKey}
                             onChange={setPublicKey}
                             optional
-                            hint="Shown to the checkout; not a secret."
+                            hint="Shown to the checkout. Not a secret."
                         />
                     )}
                 </section>

@@ -74,7 +74,7 @@ export default async function NewCoursePage() {
                         >
                             Make a service
                         </Link>{" "}
-                        first — its length and how many it takes at once set the
+                        first. Its length and how many it takes at once set the
                         course's sessions and seats.
                     </p>
                 ) : (

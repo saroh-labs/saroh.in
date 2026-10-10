@@ -46,7 +46,7 @@ const optionalText = (schema: z.ZodString) =>
 
 export const formSchema = z
     .object({
-        name: z.string().trim().min(1, { message: "Name is required" }),
+        name: z.string().trim().min(1, { message: "Add a name." }),
         // What is being set up (DEC-070): words and defaults only.
         kind: z.enum(ORGANIZATION_KINDS),
         legalName: z.string().optional(),

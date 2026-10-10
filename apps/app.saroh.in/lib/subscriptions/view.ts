@@ -137,8 +137,8 @@ export function failWhy(
     }
     const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     return late > 0
-        ? `Renewal of ${amount} isn't paid — ${count(late, "day")} past due`
-        : `Renewal of ${amount} isn't paid — past due`;
+        ? `Renewal of ${amount} isn't paid, ${count(late, "day")} past due`
+        : `Renewal of ${amount} isn't paid, past due`;
 }
 
 /**
@@ -170,7 +170,7 @@ export function retryOffer(
     }
     // Absent: an API older than D13, where Retry is a pay link.
     if (sub.retryVia === null || !sub.failedCharge || !canPayLink) return null;
-    return { label: "Retry with a new pay link", via: "PAY_LINK" };
+    return { label: "Try again with a new pay link", via: "PAY_LINK" };
 }
 
 /**
@@ -276,7 +276,7 @@ export function rowWhen(
             ? [`Next ${formatDate(sub.nextRenewalAt, tz, { now })}`, badge]
                   .filter(Boolean)
                   .join(" · ")
-            : "—",
+            : "None",
         danger: false,
     };
 }
@@ -343,7 +343,7 @@ export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
         .filter((b) => !b.current)
         .map(
             (b) =>
-                `${b.count} still on ${formatMoneyMajor(b.price, b.currency)} — they keep it`,
+                `${b.count} still on ${formatMoneyMajor(b.price, b.currency)}, and they keep it`,
         );
 }
 
@@ -404,7 +404,7 @@ export function headline(
     if (tab === "paused") {
         return {
             pill,
-            big: "—",
+            big: "None",
             when: "",
             line: `${pausedLine(sub, now)} Nothing is charged while paused.`,
         };
@@ -412,7 +412,7 @@ export function headline(
     if (tab === "cancelled") {
         return {
             pill,
-            big: "—",
+            big: "None",
             when: "",
             line: `Cancelled. Ended ${sub.cancelledAt ? d(sub.cancelledAt) : "at the end of its period"}. Nothing more is charged.`,
         };
@@ -420,9 +420,9 @@ export function headline(
     if (ending) {
         return {
             pill,
-            big: "—",
+            big: "None",
             when: "",
-            line: `Ends ${d(ending)}. No more charges — what's paid for still happens.`,
+            line: `Ends ${d(ending)}. No more charges. What's paid for still happens.`,
         };
     }
     if (sub.startsAt) {
@@ -434,7 +434,12 @@ export function headline(
         };
     }
     if (!sub.nextRenewalAt) {
-        return { pill, big: "—", when: "", line: "Nothing is due to renew." };
+        return {
+            pill,
+            big: "None",
+            when: "",
+            line: "Nothing is due to renew.",
+        };
     }
     const on = d(sub.nextRenewalAt);
     return {
@@ -546,7 +551,7 @@ export function chargeRow(
                     : ["Void", "off"];
     const period =
         c.periodStart && c.periodEnd
-            ? `${formatDate(c.periodStart, timeZone, { now })} – ${formatDate(
+            ? `${formatDate(c.periodStart, timeZone, { now })} to ${formatDate(
                   // The period's end is the next one's start: say the last day.
                   new Date(Date.parse(c.periodEnd) - 1).toISOString(),
                   timeZone,
@@ -608,7 +613,7 @@ const CHECK_STATE: Record<
 > = {
     REFUNDED: "refunded",
     REFUNDING: "being refunded",
-    NOT_REFUNDED: "not refunded — refund it from your payment provider",
+    NOT_REFUNDED: "not refunded, so refund it from your payment provider",
 };
 
 function autopayCheckText(
@@ -629,11 +634,11 @@ function autopayStateText(autopay: SubscriptionAutopay): string {
             return `${withHow("Autopay on")}${limit}`;
         }
         case "PAUSED":
-            return `${withHow("Autopay paused")} — paused in their UPI app`;
+            return `${withHow("Autopay paused")}, paused in their UPI app`;
         case "PENDING":
-            return `${withHow("Autopay pending")} — waiting for them to approve it`;
+            return `${withHow("Autopay pending")}, waiting for them to approve it`;
         case "FAILED":
-            return `${withHow("Autopay failed")} — ${
+            return `${withHow("Autopay failed")}: ${
                 AUTOPAY_FAILED[autopay.failure ?? ""] ??
                 AUTOPAY_FAILED.NOT_APPROVED
             }`;
@@ -660,8 +665,8 @@ export function gstNote(
     if (!issued.length) return "";
     if (issued.some((c) => c.gst)) return "Each renewal makes a GST invoice.";
     return where === "list"
-        ? "Not GST-registered — renewals make receipts."
-        : "Not GST-registered — receipts, not tax invoices.";
+        ? "Not GST-registered. Renewals make receipts."
+        : "Not GST-registered. Receipts, not tax invoices.";
 }
 
 // — Changes ————————————————————————————————————————————————————
@@ -680,7 +685,7 @@ export function ranLine(
 ): { text: string; late: boolean } {
     if (!r.lastCheckedAt) {
         return {
-            text: "Renewals haven't run yet — invoices go out when they do.",
+            text: "Renewals haven't run yet. Invoices go out when they do.",
             late: true,
         };
     }
@@ -692,7 +697,7 @@ export function ranLine(
     });
     return {
         text: late
-            ? `Renewals last ran ${when} — later than it should have; renewals wait until it runs again.`
+            ? `Renewals last ran ${when}, later than it should have. Renewals wait until it runs again.`
             : `Renewals last ran ${when}.`,
         late,
     };

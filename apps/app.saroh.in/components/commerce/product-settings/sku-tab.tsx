@@ -126,7 +126,7 @@ export function SkuTab({
         <section>
             <TabIntro title="SKU pattern">
                 How the editor suggests a SKU for a new product or variant. It
-                is only a suggestion — the field stays editable, and SKUs you
+                is only a suggestion. The field stays editable, and SKUs you
                 already have are never rewritten.
             </TabIntro>
             {canWrite ? null : <ReadOnlyNote />}
@@ -228,7 +228,7 @@ export function SkuTab({
                                 {r.variant ? ` · ${r.variant}` : ""}
                             </span>
                             <span className="min-w-0 break-all font-mono text-[12px] text-muted-foreground">
-                                {r.now || "—"}
+                                {r.now || "None"}
                             </span>
                             <span
                                 className={cn(
@@ -240,7 +240,7 @@ export function SkuTab({
                                           : "text-foreground",
                                 )}
                             >
-                                {r.next || "—"}
+                                {r.next || "None"}
                             </span>
                         </div>
                     ))

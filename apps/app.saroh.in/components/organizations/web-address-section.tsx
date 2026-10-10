@@ -114,7 +114,7 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                     <span className="font-mono">
                                         {view.customDomain}
                                     </span>
-                                    ;{" "}
+                                    , and{" "}
                                     <span className="font-mono">
                                         {hostOf(view.platformOrigin)}
                                     </span>{" "}

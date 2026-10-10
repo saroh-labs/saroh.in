@@ -17,7 +17,7 @@ export type Tone = "plain" | "ok" | "warn" | "danger" | "muted";
  * carries the same idempotency key, so it is never made twice.
  */
 export const STOCK_UNREACHABLE =
-    "Saroh couldn't be reached. Try again — it won't be done twice.";
+    "Saroh couldn't be reached. Try again. It won't be done twice.";
 
 // ---- Levels ----
 
@@ -244,7 +244,7 @@ export function moveProblem(input: {
     }
     const read = readCount(units);
     if (read.kind !== "count" || read.value < 1) {
-        return "How many to move — a whole number.";
+        return "How many to move, as a whole number.";
     }
     const spare = Math.max(0, from.onHand - Math.max(0, from.promised));
     if (read.value > spare) {
@@ -286,7 +286,7 @@ export function entrySaved(
     onHand: number,
 ): string {
     const label = ENTRY_KINDS.find((k) => k.kind === kind)?.label ?? kind;
-    return `Recorded ${units} ${label.toLowerCase()} — ${onHand} on hand now.`;
+    return `Recorded ${units} ${label.toLowerCase()}. ${onHand} on hand now.`;
 }
 
 /**
@@ -300,7 +300,7 @@ export function entryProblem(input: {
 }): string | null {
     const read = readCount(input.units);
     if (read.kind !== "count" || read.value < 1) {
-        return "How many — a whole number, 1 or more.";
+        return "How many, as a whole number, 1 or more.";
     }
     if (
         input.kind === "WASTED" &&

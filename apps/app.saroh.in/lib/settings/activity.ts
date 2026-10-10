@@ -206,11 +206,11 @@ function trackingTail(on: boolean, meta: Record<string, unknown>): string {
     if (on) {
         const cleared = countOf(meta.soldOutCleared) ?? 0;
         return cleared > 0
-            ? ` — cleared Sold out at ${count(cleared, "location")}`
+            ? `, cleared Sold out at ${count(cleared, "location")}`
             : "";
     }
     const units = countOf(meta.unitsZeroed) ?? 0;
-    return units > 0 ? ` — ${formatNumber(units)} set to 0` : "";
+    return units > 0 ? `, ${formatNumber(units)} set to 0` : "";
 }
 
 /**

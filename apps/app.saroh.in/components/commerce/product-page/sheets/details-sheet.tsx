@@ -203,7 +203,7 @@ export function DetailsSheet({
                                     />
                                 </FormControl>
                                 <FormDescription>
-                                    One per product — what it is. It drives the
+                                    One per product: what it is. It drives the
                                     shop&apos;s filters and your reports.
                                 </FormDescription>
                             </FormItem>
@@ -336,8 +336,8 @@ export function DetailsSheet({
                                     <Input {...field} placeholder="None" />
                                 </FormControl>
                                 <FormDescription>
-                                    Leave it empty if there is none; the shop
-                                    shows nothing.
+                                    Leave it empty if there is none, and the
+                                    shop shows nothing.
                                 </FormDescription>
                             </FormItem>
                         )}

@@ -101,8 +101,8 @@ function rulesOnly(ops: readonly SaveOp[]): boolean {
 /** The save bar's line: what saving will do. */
 export function unsavedText(ops: readonly SaveOp[]): string {
     return rulesOnly(ops)
-        ? "Unsaved. New bookings follow the rules when you save; bookings already made keep theirs."
-        : "Unsaved. New free times show on the calendar and the booking page when you save; bookings already made don't move.";
+        ? "Unsaved. New bookings follow the rules when you save. Bookings already made keep theirs."
+        : "Unsaved. New free times show on the calendar and the booking page when you save. Bookings already made don't move.";
 }
 
 /** The toast once saved: never "Hours saved" for a rule (UX-022). */
@@ -521,7 +521,7 @@ export function AvailabilityEditor({
                                         when={`${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })} · ${formatClockRange(x.startMinute, x.endMinute)}`}
                                         why={
                                             n
-                                                ? `${count(n, "booking")} that day — kept if you close these`
+                                                ? `${count(n, "booking")} that day, kept if you close these`
                                                 : null
                                         }
                                         warn={n > 0}
@@ -542,7 +542,7 @@ export function AvailabilityEditor({
                                 title="No extra hours"
                                 description={
                                     canEdit
-                                        ? "Click closed time on the calendar to add some."
+                                        ? "Choose closed time on the calendar to add some."
                                         : undefined
                                 }
                             />

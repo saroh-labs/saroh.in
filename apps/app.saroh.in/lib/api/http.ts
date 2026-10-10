@@ -290,7 +290,11 @@ export async function mutate<T>(
 ): Promise<CrmResult<T>> {
     try {
         const base = await orgBase();
-        if (!base) return { ok: false, error: "No active organization." };
+        if (!base)
+            return {
+                ok: false,
+                error: "No business is open. Choose one and try again.",
+            };
         const res = await apiFetch(`${base}${path}`, {
             method,
             body: JSON.stringify(body),
@@ -344,7 +348,11 @@ export async function destroy<T>(
 ): Promise<CrmResult<T>> {
     try {
         const base = await orgBase();
-        if (!base) return { ok: false, error: "No active organization." };
+        if (!base)
+            return {
+                ok: false,
+                error: "No business is open. Choose one and try again.",
+            };
         const res = await apiFetch(`${base}${path}`, { method: "DELETE" });
         const data = (await res.json().catch(() => null)) as
             (T & { message?: string }) | null;

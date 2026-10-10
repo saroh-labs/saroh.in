@@ -98,7 +98,7 @@ export function ConnectedPanel({
         who.contactId
             ? {
                   label: who.name,
-                  sub: "Customer — orders, subscriptions and all invoices",
+                  sub: "Customer: orders, subscriptions and all invoices",
                   href: customerHref(who.contactId, true),
               }
             : null,
@@ -115,8 +115,8 @@ export function ConnectedPanel({
         <SidePanel label="Connected">
             {links.length === 0 ? (
                 <p className="text-[13px] text-muted-foreground">
-                    Written by hand for someone no longer in your contacts —
-                    nothing else is connected to it.
+                    Written by hand for someone no longer in your contacts.
+                    Nothing else is connected to it.
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1.5">
@@ -171,7 +171,7 @@ export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
     if (i.voidedAt) {
         events.push({
             key: "void",
-            what: `Voided${i.voidReason ? ` — ${i.voidReason}` : ""}`,
+            what: `Voided${i.voidReason ? `: ${i.voidReason}` : ""}`,
             when: i.voidedAt,
         });
     }

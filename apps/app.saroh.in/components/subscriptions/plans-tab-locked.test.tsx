@@ -137,7 +137,7 @@ describe("the Plans tab without memberships on the plan", () => {
         await act(() => Promise.resolve());
         expect(actions.setPlanArchived).toHaveBeenCalledWith("plan_1", true);
         expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Monthly archived. Its 3 subscribers carry on; nobody new can join.",
+            "Monthly archived. Its 3 subscribers carry on, and nobody new can join.",
         );
         expect(toast.showUndo).not.toHaveBeenCalled();
     });

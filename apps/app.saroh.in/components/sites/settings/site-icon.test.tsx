@@ -301,7 +301,7 @@ describe("the Site icon sheet", () => {
         await press(edit("Add site icon"));
         expect(sheetName()).toBe("Site icon");
         expect(sheet()?.textContent).toContain(
-            "PNG, JPG or WebP, at least 192 × 192; square works best.",
+            "PNG, JPG or WebP, at least 192 × 192. Square works best.",
         );
         // Before a pick, the sheet draws what the site shows now.
         expect(preview("tab")).toMatch(/^data:image\/svg\+xml,/);

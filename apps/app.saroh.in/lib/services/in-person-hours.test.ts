@@ -29,16 +29,16 @@ describe("opening hours on Availability (DEC-087)", () => {
 
     it("says which hours aren't bookable in person, and when it's open", () => {
         expect(openingNote([range(480, 1200)], OPEN, 1)).toBe(
-            "8:00 to 9:00 am and 6:00 to 8:00 pm aren't bookable in person — you're open 9:00 am to 6:00 pm.",
+            "8:00 to 9:00 am and 6:00 to 8:00 pm aren't bookable in person. You're open 9:00 am to 6:00 pm.",
         );
         expect(openingNote([range(480, 600)], OPEN, 1)).toBe(
-            "8:00 to 9:00 am isn't bookable in person — you're open 9:00 am to 6:00 pm.",
+            "8:00 to 9:00 am isn't bookable in person. You're open 9:00 am to 6:00 pm.",
         );
     });
 
     it("says a closed day is closed", () => {
         expect(openingNote([range(600, 900)], OPEN, 0)).toBe(
-            "Not bookable in person — you're closed on Sundays.",
+            "Not bookable in person. You're closed on Sundays.",
         );
         expect(whollyOutside(range(600, 900), OPEN, 0)).toBe(true);
         expect(whollyOutside(range(480, 1200), OPEN, 1)).toBe(false);

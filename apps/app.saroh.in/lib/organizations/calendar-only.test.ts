@@ -82,7 +82,7 @@ describe("Team's seat count with a diary invite (DEC-105)", () => {
         expect(
             teamCountLine(counts.people, counts.waiting, counts.viewOnly, 1),
         ).toBe(
-            "Just you · 1 person taking bookings with no login · 1 invite waiting · 1 view-only person, no seat",
+            "Just you · 1 person taking bookings with no sign-in · 1 invite waiting · 1 view-only person, no seat",
         );
     });
 });

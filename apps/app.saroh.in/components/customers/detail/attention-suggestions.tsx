@@ -354,8 +354,8 @@ function SuggestionCard({
             )}
             {unplaced ? (
                 <Notice tone="error">
-                    {failed.message} Nothing was added; your choices are still
-                    here.
+                    {failed.message} Nothing was added, and your choices are
+                    still here.
                 </Notice>
             ) : null}
             <div className="flex flex-wrap gap-2">

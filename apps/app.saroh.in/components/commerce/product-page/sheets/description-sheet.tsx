@@ -161,7 +161,7 @@ export function DescriptionSheet({
                             <FormItem>
                                 <div className="flex items-center justify-between gap-2">
                                     <FormLabel>
-                                        Key points — one per line
+                                        Key points, one per line
                                     </FormLabel>
                                     <ShopSwitch
                                         field="Key points"
@@ -213,7 +213,7 @@ export function DescriptionSheet({
                                     <Textarea
                                         {...field}
                                         rows={3}
-                                        placeholder="Aqua, Niacinamide, Glycerin… — or 100% linen"
+                                        placeholder="Aqua, Niacinamide, Glycerin… or 100% linen"
                                     />
                                 </FormControl>
                                 <FormMessage />

@@ -206,9 +206,9 @@ describe("the Product grid's fields (G12)", () => {
         );
         expect(rows).toEqual([
             "Sourdough",
-            "Old loafArchived — not shown on the site",
-            "Test cakeDraft — not shown until published",
-            "Unknown productDeleted — not shown on the site",
+            "Old loafArchived, not shown on the site",
+            "Test cakeDraft, not shown until published",
+            "Unknown productDeleted, not shown on the site",
         ]);
     });
 

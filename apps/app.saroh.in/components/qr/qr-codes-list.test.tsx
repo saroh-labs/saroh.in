@@ -166,7 +166,7 @@ describe("QrCodesList", () => {
         expect(
             row(list(), "bbb")?.querySelector("[data-qr-bookings]")
                 ?.textContent,
-        ).toBe("–");
+        ).toBe("None");
     });
 
     it("says a gone page is gone, and still offers Change", () => {

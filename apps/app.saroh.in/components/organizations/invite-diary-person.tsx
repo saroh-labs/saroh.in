@@ -30,7 +30,7 @@ export function InviteDiaryPerson({
             hint={
                 picked
                     ? `${picked.name} already takes bookings, so this uses no extra seat. Their diary becomes theirs to see when they join.`
-                    : "Pick someone who takes bookings with no login to give them one."
+                    : "Pick someone who takes bookings with no sign-in to give them one."
             }
         >
             <OptionSelect
@@ -39,7 +39,7 @@ export function InviteDiaryPerson({
                 onValueChange={onPick}
                 disabled={disabled}
                 options={[
-                    { value: "", label: "No one — they don't take bookings" },
+                    { value: "", label: "No one. They don't take bookings" },
                     ...people.map((p) => ({ value: p.id, label: p.name })),
                 ]}
             />

@@ -217,7 +217,7 @@ export function ProviderRowView({
                                 href={entry.manageHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label={`Manage ${entry.name} — opens ${entry.name}'s dashboard`}
+                                aria-label={`Manage ${entry.name}, opens ${entry.name}'s dashboard`}
                             >
                                 Manage
                                 <ExternalLink aria-hidden className="size-4" />

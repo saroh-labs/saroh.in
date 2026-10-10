@@ -207,7 +207,7 @@ export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
     const soFar = at.when === "current" ? " so far" : "";
     const ahead = at.when === "future";
     const money = (minor: number) =>
-        ahead ? "—" : minorMoney(minor, at.currency);
+        ahead ? "Not yet" : minorMoney(minor, at.currency);
     return [
         { key: "in", label: `In${soFar}`, value: money(done.in), out: false },
         {

@@ -89,7 +89,7 @@ export function canvasChromeFor({
 
 /** What Preview's bar says while nothing has been tried. */
 const PREVIEW_NOTE =
-    "This is your site with the draft. Try it; nothing is live until you publish.";
+    "This is your site with the draft. Try it. Nothing is live until you publish.";
 
 /**
  * The canvas: the page, drawn with the real site blocks, in a window whose
@@ -286,8 +286,8 @@ export function EditorCanvas({
                     className="mx-auto mb-4 text-center text-xs text-muted-foreground"
                     style={{ maxWidth: DEVICE_WIDTH[device] }}
                 >
-                    Nothing&rsquo;s live yet — publish when you&rsquo;re ready,
-                    nobody can see this in the meantime.
+                    Nothing&rsquo;s live yet. Publish when you&rsquo;re ready.
+                    Nobody can see this in the meantime.
                 </p>
             ) : null}
             <div

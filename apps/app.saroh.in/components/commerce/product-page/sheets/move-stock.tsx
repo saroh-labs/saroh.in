@@ -66,7 +66,7 @@ export function MoveStock({
                 : !Number.isInteger(n) || n < 1
                   ? "Whole numbers, 1 or more."
                   : n > can
-                    ? `Only ${can} can move — the rest is promised to open orders.`
+                    ? `Only ${can} can move. The rest is promised to open orders.`
                     : null);
     const nameOf = (id: string) =>
         stores.find(([sid]) => sid === id)?.[1] ?? "the location";

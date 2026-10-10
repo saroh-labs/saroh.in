@@ -45,7 +45,7 @@ describe("inviteEmailError", () => {
 
     it("points an existing invite at Resend", () => {
         expect(inviteEmailError("Ravi@example.in", known)).toBe(
-            "They're already invited — resend it from the list.",
+            "They're already invited. Resend it from the list.",
         );
     });
 
@@ -66,7 +66,7 @@ describe("inviteSchema", () => {
         expect(res.success).toBe(false);
         expect(res.error?.issues[0]).toMatchObject({
             path: ["email"],
-            message: "They're already invited — resend it from the list.",
+            message: "They're already invited. Resend it from the list.",
         });
     });
 
@@ -144,7 +144,7 @@ describe("invitationMeta", () => {
                 ZONE,
                 now,
             ),
-        ).toBe("Invited 20 Aug · link expired 27 Aug — resend for a fresh one");
+        ).toBe("Invited 20 Aug · link expired 27 Aug, resend for a fresh one");
     });
 
     it("says the day in the business's zone, not UTC's (UX-008)", () => {
@@ -182,10 +182,10 @@ describe("the team cap, said (UX-028, DEC-105)", () => {
 
     it("says the bookable staff with no login: they take seats too (UX-053)", () => {
         expect(teamCountLine(1, 0, 0, 1)).toBe(
-            "Just you · 1 person taking bookings with no login",
+            "Just you · 1 person taking bookings with no sign-in",
         );
         expect(teamCountLine(2, 1, 1, 3)).toBe(
-            "2 people including you · 3 people taking bookings with no login · 1 invite waiting · 1 view-only person, no seat",
+            "2 people including you · 3 people taking bookings with no sign-in · 1 invite waiting · 1 view-only person, no seat",
         );
         expect(
             bookableWithNoLogin([

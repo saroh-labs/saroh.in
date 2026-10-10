@@ -45,7 +45,7 @@ describe("offLines", () => {
             closed: true,
         });
         expect(offLineLabel(line)).toBe(
-            "2 Nov – 6 Nov · 5 days · all day · business closed",
+            "2 Nov to 6 Nov · 5 days · all day · business closed",
         );
     });
 
@@ -62,7 +62,7 @@ describe("offLines", () => {
         expect(lines).toHaveLength(1);
         expect(lines[0].ids).toEqual(["a", "b", "c"]);
         expect(offLineLabel(lines[0])).toBe(
-            "2 Nov – 4 Nov · 3 days · 2:00 to 6:00 pm",
+            "2 Nov to 4 Nov · 3 days · 2:00 to 6:00 pm",
         );
     });
 

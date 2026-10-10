@@ -211,7 +211,7 @@ export function linkedCards(
                         ? "Only to people who haven't bought one"
                         : `To anyone without ${units} left`
                     : header.draft
-                      ? "Draft — not on sale"
+                      ? "Draft, not on sale"
                       : "Archived",
             },
         ],
@@ -252,8 +252,8 @@ export function aboutRows(
             k: "Credits are for",
             v:
                 kind === "ONE_TO_ONE"
-                    ? "One-to-one sessions only — never classes"
-                    : "Classes only — never one-to-one sessions",
+                    ? "One-to-one sessions only, never classes"
+                    : "Classes only, never one-to-one sessions",
         },
         { k: "How many", v: `${pack.credits} ${unitWord(kind, pack.credits)}` },
         { k: "Price", v: price },
@@ -279,7 +279,7 @@ export function aboutRows(
             : []),
         {
             k: "Unused credits",
-            v: `End with the pack; you can extend a use-by by up to ${MAX_EXTEND_DAYS} days`,
+            v: `End with the pack. You can extend a use-by by up to ${MAX_EXTEND_DAYS} days`,
         },
     ];
     if (opts.freeCancelHours !== undefined) {

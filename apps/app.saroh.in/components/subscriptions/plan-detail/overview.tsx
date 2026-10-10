@@ -89,8 +89,8 @@ export function PlanOverview({
                 {autopay}
                 <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                     Changing the price only affects people who join after the
-                    change. Archiving stops new sign-ups; everyone already on it
-                    carries on.
+                    change. Archiving stops new sign-ups, and everyone already
+                    on it carries on.
                 </p>
             </aside>
         </div>

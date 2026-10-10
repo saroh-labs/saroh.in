@@ -364,7 +364,7 @@ export function EditorRail({
                                 />
                             </ul>
                             <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
-                                Header and footer carry a lock — they are on
+                                Header and footer carry a lock. They are on
                                 every page, so this page cannot remove them.
                             </p>
                         </>

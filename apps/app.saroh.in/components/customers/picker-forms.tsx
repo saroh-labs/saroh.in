@@ -253,7 +253,7 @@ export function DuplicateWarning({
         <Notice tone="warning" role="alert" className="mb-3">
             <div className="grid gap-2">
                 <p>
-                    {who} already has this phone. Likely the same person — pick
+                    {who} already has this phone. Likely the same person. Pick
                     them, or add someone new anyway.
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">

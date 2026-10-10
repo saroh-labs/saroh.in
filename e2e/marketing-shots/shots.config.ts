@@ -538,8 +538,8 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions/seed_sc_rc_sub_arjun",
         viewport: { width: 1024, height: 560 },
-        mark: 'button:has-text("Retry with a new pay link")',
-        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        mark: 'button:has-text("Try again with a new pay link")',
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Try again with a new pay link",
         caption: "Arjun Mehta's renewal at Rye & Co., not paid yet",
     },
 

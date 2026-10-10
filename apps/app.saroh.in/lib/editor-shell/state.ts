@@ -237,14 +237,14 @@ export function statusLine(input: {
     });
     if (save.phase === "conflict") {
         return {
-            text: `${conflictText(save.conflict, copy.noun)} — reload to see it. Your edits here aren't saved.`,
+            text: `${conflictText(save.conflict, copy.noun)}. Reload to see it. Your edits here aren't saved.`,
             tone: "danger",
             action: "reload",
         };
     }
     if (save.phase === "failed") {
         return {
-            text: "Not saved — your changes are still here.",
+            text: "Not saved. Your changes are still here.",
             tone: "danger",
             action: "retry",
         };
@@ -295,17 +295,17 @@ export function shellActions(input: {
     if (save.phase === "conflict") {
         why = "Reload to see their changes before you publish.";
     } else if (save.phase === "failed") {
-        why = "Your last change isn't saved — try again before you publish.";
+        why = "Your last change isn't saved. Try again before you publish.";
     } else if (problems.length > 0) {
         // Not before anything is typed: a new, empty record isn't wrong yet.
         if (record || typed) {
             why =
                 problems.length === 1
-                    ? `1 thing to fix before publishing — ${lowerFirst(problems[0].message)}.`
-                    : `${problems.length} things to fix before publishing — they're marked below.`;
+                    ? `1 thing to fix before publishing: ${lowerFirst(problems[0].message)}.`
+                    : `${problems.length} things to fix before publishing. They're marked below.`;
         }
     } else if (p === "live" && !unsaved) {
-        why = "Nothing to publish yet — edits appear here as a draft first.";
+        why = "Nothing to publish yet. Edits appear here as a draft first.";
     }
     const blocked =
         save.phase === "conflict" ||

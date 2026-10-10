@@ -20,7 +20,7 @@ export function logoFileProblem(file: {
         return "That file isn't a PNG, JPG or WebP image.";
     }
     if (file.size > LOGO_MAX_BYTES) {
-        return `That image is ${(file.size / LOGO_MAX_BYTES).toFixed(1)} MB — keep it under 1 MB.`;
+        return `That image is ${(file.size / LOGO_MAX_BYTES).toFixed(1)} MB. Keep it under 1 MB.`;
     }
     return null;
 }

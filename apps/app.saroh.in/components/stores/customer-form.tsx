@@ -23,7 +23,7 @@ import type { Customer } from "@/lib/customers/service";
 import { trimmedOr } from "@/lib/forms/values";
 
 const formSchema = z.object({
-    email: z.string().trim().min(1, { message: "Email is required" }),
+    email: z.string().trim().min(1, { message: "Add their email address." }),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: z.string().optional(),

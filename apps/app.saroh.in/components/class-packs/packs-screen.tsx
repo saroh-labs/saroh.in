@@ -29,7 +29,7 @@ function archiveToast(pack: PackListItem, archived: boolean): string {
     if (!archived) return `${pack.name} is on sale again.`;
     const people = pack.people ?? pack.activeHolders;
     return people > 0
-        ? `${pack.name} archived. Nobody new can buy it; ${count(people, "person keeps", "people keep")} their classes until their dates.`
+        ? `${pack.name} archived. Nobody new can buy it. ${count(people, "person keeps", "people keep")} their classes until their dates.`
         : `${pack.name} archived. Nobody new can buy it.`;
 }
 

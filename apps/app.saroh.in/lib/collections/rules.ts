@@ -163,7 +163,7 @@ export function capacity(count: number): {
         full: left === 0,
         words:
             left === 0
-                ? `Full — a collection holds up to ${COLLECTION_PRODUCTS_MAX} products.`
+                ? `Full. A collection holds up to ${COLLECTION_PRODUCTS_MAX} products.`
                 : `${count} of ${COLLECTION_PRODUCTS_MAX}`,
     };
 }
@@ -319,7 +319,7 @@ export function membershipRows(
                 name: c.name,
                 on,
                 locked: true,
-                note: `Fills itself from the category ${c.category?.name ?? ""} — change the product's category to change this.`,
+                note: `Fills itself from the category ${c.category?.name ?? ""}. Change the product's category to change this.`,
             };
         }
         const full = !on && c.productCount >= COLLECTION_PRODUCTS_MAX;
@@ -329,7 +329,7 @@ export function membershipRows(
             on,
             locked: full,
             note: full
-                ? `Full — it holds ${COLLECTION_PRODUCTS_MAX} products, the most a collection can.`
+                ? `Full. It holds ${COLLECTION_PRODUCTS_MAX} products, the most a collection can.`
                 : collectionNote(c),
         };
     });

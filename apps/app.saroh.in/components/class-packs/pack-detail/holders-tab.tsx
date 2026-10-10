@@ -77,7 +77,7 @@ export function HoldersTab({
             </h2>
             <span className="text-[12px] text-muted-foreground">
                 Extend a use-by date by up to {MAX_EXTEND_DAYS} days at a time,
-                with a reason — it&apos;s kept with their pack.
+                with a reason. It&apos;s kept with their pack.
             </span>
         </div>
     );

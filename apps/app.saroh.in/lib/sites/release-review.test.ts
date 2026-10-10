@@ -85,7 +85,7 @@ describe("a version's row in the history", () => {
         });
         expect(labels(p)).toEqual(["Bypassed"]);
         expect(lines(p)).toContain(
-            "Published without approval by Asha — a reviewer had asked for changes.",
+            "Published without approval by Asha. A reviewer had asked for changes.",
         );
         expect(versionRowCopy(p).lines.at(-1)?.tone).toBe("warning");
     });

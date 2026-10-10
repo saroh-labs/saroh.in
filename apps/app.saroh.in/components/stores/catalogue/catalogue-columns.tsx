@@ -37,7 +37,7 @@ import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 export function priceText(row: CatalogueRow): string {
     const money = (v: string) => formatMoneyMajor(v, row.currency);
     return row.priceRange
-        ? `${money(row.priceRange.low)} – ${money(row.priceRange.high)}`
+        ? `${money(row.priceRange.low)} to ${money(row.priceRange.high)}`
         : money(row.price);
 }
 
@@ -131,7 +131,7 @@ export function catalogueColumns({
         },
         {
             id: "inventory",
-            header: "Inventory",
+            header: "Stock",
             priority: "secondary",
             width: "128px",
             cell: (r) => {

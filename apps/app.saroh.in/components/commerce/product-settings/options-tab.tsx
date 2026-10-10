@@ -76,7 +76,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                 <ul className="flex flex-col gap-3">
                     {options.map((o) => {
                         const used = o.productCount > 0;
-                        const usedLine = `Used by ${count(o.productCount, "product")} — change their variants first.`;
+                        const usedLine = `Used by ${count(o.productCount, "product")}. Change their variants first.`;
                         return (
                             <li
                                 key={o.id}

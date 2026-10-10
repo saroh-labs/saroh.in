@@ -89,7 +89,7 @@ export default async function ChoosePage({
                 <SplitPanel
                     eyebrow="Where to"
                     heading="You are in more than one business."
-                    body="Pick the one you want to work in. Everything — the sidebar, what you can change, what you can see — follows from it."
+                    body="Pick the one you want to work in. Everything follows from it: the sidebar, what you can change and what you can see."
                     points={[
                         "Your role can differ in each",
                         "Nothing is shared between them except you",

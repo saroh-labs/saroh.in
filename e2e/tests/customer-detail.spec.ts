@@ -270,13 +270,17 @@ test.describe("customer detail", () => {
         });
 
         await page.goto(`/customers/${who.id}`);
-        await expect(page.getByText("Possible match — link?")).toBeVisible();
+        await expect(
+            page.getByText("Possible match. Link them?"),
+        ).toBeVisible();
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
             name: "Link a commerce customer",
         });
         await dialog.getByRole("button", { name: "Link" }).first().click();
-        await expect(page.getByText("Possible match — link?")).toHaveCount(0);
+        await expect(page.getByText("Possible match. Link them?")).toHaveCount(
+            0,
+        );
         await tab(page, /^Orders/).click();
         await expect(
             page
@@ -454,7 +458,7 @@ test.describe("needs attention", () => {
             /Rahul \S+ wrote this when booking online/,
         );
         await expect(notes).toContainText(
-            /only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
+            /Only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
         );
     });
 });

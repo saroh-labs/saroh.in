@@ -77,7 +77,7 @@ export function ordersLine({
             : `No paid orders in the last ${rangeLabel}.`;
     }
     return before
-        ? "Orders counts from October 2026, when Insights began recording paid orders; earlier ones aren't counted."
+        ? "Orders counts from October 2026, when Insights began recording paid orders. Earlier ones aren't counted."
         : null;
 }
 

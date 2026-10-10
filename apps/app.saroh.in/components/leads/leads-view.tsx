@@ -47,7 +47,7 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground">—</span>;
+const Missing = () => <span className="text-muted-foreground">Not set</span>;
 
 export function LeadsView({
     leads,
@@ -135,7 +135,7 @@ export function LeadsView({
                 // which is not, hence `ViewerDate`.
                 l.status === "OPEN" ? (
                     <span className="whitespace-nowrap text-muted-foreground">
-                        {formatWaiting(l.createdAt, now) ?? "—"}
+                        {formatWaiting(l.createdAt, now) ?? "Not known"}
                     </span>
                 ) : (
                     <ViewerDate

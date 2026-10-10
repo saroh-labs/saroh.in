@@ -239,7 +239,7 @@ function OneToOne({
             "Paid online"
         )
     ) : b.paidWith === "DESK" ? (
-        "Not yet — pays at the session"
+        "Not yet. Pays at the session"
     ) : (
         paidText(b)
     );
@@ -407,7 +407,7 @@ function OneToOne({
                             person: person ?? undefined,
                         }),
                     ],
-                    ["Email", b.contact?.email ?? b.bookerEmail ?? "—"],
+                    ["Email", b.contact?.email ?? b.bookerEmail ?? "Not set"],
                     ...needsAttention(person),
                 ]}
             />
@@ -656,7 +656,7 @@ function ClassLook({
                     <p className="mt-1.5 text-[12.5px]">
                         {live.length} of {s.capacity} booked
                         {full
-                            ? " — full; cancelling a place frees one"
+                            ? " · full. Cancelling a place frees one."
                             : ` · ${s.capacity - live.length} free`}
                     </p>
                 </Card>

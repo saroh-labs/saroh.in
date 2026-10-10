@@ -347,7 +347,7 @@ export function CalendarScreen({
                 ? prepaid
                     ? late
                         ? `${who}'s place cancelled. Within ${rules?.freeCancelHours} hours, so the class is used.`
-                        : `${who}'s place cancelled — the class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
+                        : `${who}'s place cancelled. The class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
                     : `${who}'s place cancelled.`
                 : `Cancelled ${who}'s ${formatClock(localMinuteOf(b.startAt, timezone))}.`;
             hold(

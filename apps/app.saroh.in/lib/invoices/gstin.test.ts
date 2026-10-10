@@ -14,10 +14,10 @@ describe("gstinProblem — the API's rules, said part by part", () => {
     it("names what is still missing from a short one", () => {
         // The screenshot's case: the PAN is in, the last three are not.
         expect(gstinProblem("06ABCDE1234N")).toBe(
-            "12 of 15 characters — add the entity number, the Z and the check character.",
+            "12 of 15 characters. Add the entity number, the Z and the check character.",
         );
         expect(gstinProblem("06ABC")).toBe(
-            "5 of 15 characters — add the PAN, the entity number, the Z and the check character.",
+            "5 of 15 characters. Add the PAN, the entity number, the Z and the check character.",
         );
     });
 

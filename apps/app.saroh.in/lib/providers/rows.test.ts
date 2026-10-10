@@ -17,7 +17,7 @@ describe("disconnecting a payment provider (#921)", () => {
         expect(
             paymentsConsequence({ provider: "RAZORPAY", activeMemberships: 4 }),
         ).toMatch(
-            /^Checkout stops taking online payments.* Disconnecting stops Saroh syncing with Razorpay\. It doesn't cancel your customers' autopay memberships there — 4 are active\. Cancel them in your Razorpay dashboard if you want them stopped\.$/,
+            /^Checkout stops taking online payments.* Disconnecting stops Saroh syncing with Razorpay\. It doesn't cancel your customers' autopay memberships there \(4 are active\)\. Cancel them in your Razorpay dashboard if you want them stopped\.$/,
         );
         // None active, or an older API: the count sentence is left out.
         expect(paymentsConsequence({ provider: "CASHFREE" })).toContain(
@@ -218,7 +218,7 @@ describe("provider rows", () => {
         );
         const [razorpay, cashfree] = view.connected;
         expect(razorpay.note).toBe("Takes online payments at Rye & Co.");
-        expect(cashfree.note).toMatch(/no location's checkout uses it yet/);
+        expect(cashfree.note).toMatch(/No location's checkout uses it yet/);
         expect(view.available.some((e) => e.type === "Payments")).toBe(false);
     });
 
@@ -263,7 +263,7 @@ describe("provider rows", () => {
         const [razorpay] = view.connected;
         expect(razorpay.state).toBe("ATTENTION");
         expect(razorpay.note).toBe(
-            "Needs its webhook signing secret — payments can't be confirmed until you add it.",
+            "Needs its webhook signing secret. Payments can't be confirmed until you add it.",
         );
         expect(razorpay.fix).toBe("Add webhook secret");
         // The same setup dialog, opened on Razorpay, is the fix.
@@ -341,7 +341,7 @@ describe("provider rows", () => {
         );
         expect(view.connected.map((e) => e.update)).toEqual([
             "Last payment update from Razorpay: 2 minutes ago.",
-            "No payment updates received yet — check the webhook in Cashfree.",
+            "No payment updates received yet. Check the webhook in Cashfree.",
         ]);
 
         // Unread: nothing is claimed either way.
@@ -611,7 +611,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
         const [resend] = view.connected;
         expect(resend.state).toBe("DISCONNECTED");
         expect(resend.note).toBe(
-            "Disconnected — Saroh sends your booking emails for now, counted against your plan; other email isn't sent until a provider is connected again.",
+            "Disconnected. Saroh sends your booking emails for now, counted against your plan. Other email isn't sent until a provider is connected again.",
         );
         // The block still shows, and Connect jumps to another provider.
         expect(view.bookingEmails?.kind).toBe("block");
@@ -629,7 +629,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
             input({ messaging: [comms("EMAIL", "RESEND", "DISABLED")] }),
         ).connected[0];
         expect(off.note).toBe(
-            "Disconnected — email isn't sent until a provider is connected again.",
+            "Disconnected. Email isn't sent until a provider is connected again.",
         );
     });
 

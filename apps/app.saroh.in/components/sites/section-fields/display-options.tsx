@@ -56,7 +56,7 @@ export function DisplayOptions({
                 options={LAYOUTS}
                 value={layout}
                 onChange={onLayout}
-                note="Cards sit side by side; a list is one per row with the photo on the left."
+                note="Cards sit side by side. A list is one per row with the photo on the left."
             />
             {photos ? (
                 <ChoiceField

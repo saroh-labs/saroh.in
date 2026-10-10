@@ -58,7 +58,7 @@ describe("changeWhat", () => {
             }),
         ).toBe("Paused until 20 Oct");
         expect(what({ kind: "RESUMED", data: { extendedDays: 5 } })).toBe(
-            "Resumed — the paid period moved 5 days later",
+            "Resumed. The paid period moved 5 days later",
         );
         expect(what({ kind: "RESUMED", data: { extendedDays: 0 } })).toBe(
             "Resumed",
@@ -69,8 +69,8 @@ describe("changeWhat", () => {
                 kind: "CANCEL_SCHEDULED",
                 data: { endsAt: "2026-10-31T18:30:00.000Z" },
             }),
-        ).toBe("Cancelled — ends 1 Nov");
-        expect(what({ kind: "KEPT" })).toBe("Kept going — no longer ending");
+        ).toBe("Cancelled, ends 1 Nov");
+        expect(what({ kind: "KEPT" })).toBe("Kept going, no longer ending");
         expect(what({ kind: "ENDED" })).toBe("Ended with its period");
     });
 
@@ -127,13 +127,13 @@ describe("changeWhat", () => {
         // Without invoice:read the API leaves it out.
         expect(what(renewed)).toBe("Renewed");
         expect(what({ kind: "RENEWED", data: { uncharged: true } })).toBe(
-            "Renewed — nothing charged, every collection skipped",
+            "Renewed. Nothing charged, every collection skipped",
         );
         expect(what({ ...renewed, kind: "INVOICED" })).toBe(
-            "Invoiced 1 Oct – 31 Oct",
+            "Invoiced 1 Oct to 31 Oct",
         );
         expect(what({ kind: "RESUMED", data: { restarted: true } })).toBe(
-            "Resumed — a new period started",
+            "Resumed. A new period started",
         );
         expect(what({ kind: "RETRIED" })).toBe("Made a new pay link");
     });
@@ -142,9 +142,9 @@ describe("changeWhat", () => {
         expect(what({ kind: "RENEWAL_FAILED" })).toBe("Renewal payment failed");
         expect(
             what({ kind: "RENEWAL_FAILED", data: { reason: "CHECKOUT_OPEN" } }),
-        ).toBe("Autopay didn't charge — the customer was paying by link");
+        ).toBe("Autopay didn't charge. The customer was paying by link");
         expect(what({ kind: "MANDATE_LIMIT_LOW" })).toBe(
-            "Not charged — above the autopay limit",
+            "Not charged, above the autopay limit",
         );
         expect(what({ kind: "SOMETHING_NEW" })).toBe("Changed");
     });
@@ -153,13 +153,11 @@ describe("changeWhat", () => {
         const cancelled = (reason?: string) =>
             what({ kind: "MANDATE_CANCELLED", data: { reason } });
         expect(cancelled("SUBSCRIPTION_ENDED")).toBe(
-            "Autopay cancelled — subscription ended",
+            "Autopay cancelled, subscription ended",
         );
-        expect(cancelled("MERGED")).toBe(
-            "Autopay cancelled — customers merged",
-        );
+        expect(cancelled("MERGED")).toBe("Autopay cancelled, customers merged");
         expect(cancelled("PRIVACY_REMOVAL")).toBe(
-            "Autopay cancelled — their details were removed",
+            "Autopay cancelled, their details were removed",
         );
         expect(cancelled()).toBe("Autopay cancelled");
     });
@@ -175,15 +173,15 @@ describe("changeWhat", () => {
                 },
             }),
         ).toBe(
-            "Invoiced 30 Oct – 29 Nov early, for autopay on the renewal date",
+            "Invoiced 30 Oct to 29 Nov early, for autopay on the renewal date",
         );
         const dropped = (data: Record<string, unknown>) =>
             what({ kind: "EARLY_INVOICE_CANCELLED", data });
         expect(dropped({ reason: "CANCELLED", by: "VOIDED" })).toBe(
-            "Voided the early renewal invoice — cancelled before the renewal, autopay not charged",
+            "Voided the early renewal invoice: cancelled before the renewal, autopay not charged",
         );
         expect(dropped({ reason: "PAUSED", by: "CREDITED" })).toBe(
-            "Credited the early renewal invoice — paused before the renewal, autopay not charged",
+            "Credited the early renewal invoice: paused before the renewal, autopay not charged",
         );
         expect(dropped({ reason: "PLAN_CHANGED", by: "VOIDED" })).toContain(
             "plan changed before the renewal",
@@ -300,6 +298,6 @@ describe("autopay set up by the customer (D12)", () => {
         ).toBe("Autopay set-up link made for card and emailed");
         expect(
             what({ kind: "MANDATE_CANCELLED", data: { reason: "REPLACED" } }),
-        ).toBe("Autopay replaced — they approved a new one");
+        ).toBe("Autopay replaced. They approved a new one");
     });
 });

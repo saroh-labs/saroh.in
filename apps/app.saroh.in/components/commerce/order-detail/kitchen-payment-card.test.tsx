@@ -57,7 +57,7 @@ describe("whether it is paid, for the kitchen (UX-010)", () => {
             <KitchenPaymentCard order={order()} canRecord={false} />,
         );
         expect(html).toContain("To pay on collection");
-        expect(html).toContain("ask the owner or an admin to mark it paid");
+        expect(html).toContain("Ask the owner or an admin to mark it paid");
         expect(html).not.toContain("₹");
     });
 });

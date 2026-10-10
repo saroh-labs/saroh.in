@@ -150,7 +150,11 @@ export async function ensureFormForSection(
     input: EnsureFormInput,
 ): Promise<FormsResult<{ formId: string }>> {
     const base = await formsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     if (input.fields.length === 0) {
         return {
             ok: false,

@@ -90,7 +90,7 @@ export function ProductOverviewTab({
                     ) : (
                         <ProductStat
                             label="Can be sold now"
-                            value="—"
+                            value="Not set"
                             hint="No stock count yet"
                         />
                     )
@@ -155,7 +155,7 @@ export function ProductOverviewTab({
                                     <LinkedLines
                                         lines={live.map(
                                             (d) =>
-                                                `${d.code} — ${d.description ?? discountAmount(d, money)}`,
+                                                `${d.code}: ${d.description ?? discountAmount(d, money)}`,
                                         )}
                                     />
                                 </>

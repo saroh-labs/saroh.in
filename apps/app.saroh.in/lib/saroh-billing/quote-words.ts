@@ -99,7 +99,7 @@ export function quoteSummary(
         case "TO_FREE":
             return {
                 title: `Move to ${plan}`,
-                lead: "Everything stays until then. Anything over Free's limits stays readable; you can't add more.",
+                lead: "Everything stays until then. Anything over Free's limits stays readable, but you can't add more.",
                 lines: [
                     {
                         label: "From",
@@ -141,7 +141,7 @@ export function quoteSummary(
             return oneTime
                 ? {
                       title: `Upgrade to ${plan}`,
-                      lead: `One payment for the rest of your year; you're on ${plan} as soon as it goes through. ${stay}`,
+                      lead: `One payment for the rest of your year. You're on ${plan} as soon as it goes through. ${stay}`,
                       lines: [
                           {
                               label: "Today, for the rest of your year",
@@ -158,7 +158,7 @@ export function quoteSummary(
                   }
                 : {
                       title: `Upgrade to ${plan}`,
-                      lead: `You pay the difference for the rest of this period today, as you set up autopay for ${plan}; it isn't refunded. You're on ${plan} as soon as it goes through. ${stay}`,
+                      lead: `You pay the difference for the rest of this period today, as you set up autopay for ${plan}. It isn't refunded. You're on ${plan} as soon as it goes through. ${stay}`,
                       lines: [
                           {
                               label: "Today, for the rest of this period",

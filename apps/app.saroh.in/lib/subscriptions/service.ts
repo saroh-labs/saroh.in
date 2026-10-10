@@ -782,7 +782,7 @@ export function cancelAutopay(id: string) {
         `${sub(id)}/autopay/cancel`,
         "POST",
         {},
-        "Couldn't cancel autopay. Nothing changed — try again.",
+        "Couldn't cancel autopay. Nothing changed. Try again.",
     );
 }
 

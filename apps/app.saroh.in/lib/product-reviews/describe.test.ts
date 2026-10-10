@@ -30,7 +30,7 @@ describe("labels", () => {
     it("reads '4.6 · 12', and '—' when there are none", () => {
         expect(ratingLabel({ average: 4.6, count: 12 })).toBe("4.6 · 12");
         expect(ratingLabel({ average: 5, count: 1 })).toBe("5.0 · 1");
-        expect(ratingLabel(null)).toBe("—");
+        expect(ratingLabel(null)).toBe("None");
     });
 
     it("draws stars", () => {
@@ -46,7 +46,7 @@ describe("labels", () => {
                 reviewed: 1,
                 lines: 3,
             }),
-        ).toBe("Invitation sent — 1 of 3 reviewed so far.");
+        ).toBe("Invitation sent. 1 of 3 reviewed so far.");
         expect(
             invitationSentence({
                 ...base,
@@ -71,7 +71,7 @@ describe("labels", () => {
                 lines: 3,
             }),
         ).toBe(
-            "Invitation sending — it shows as sent once your email provider accepts it.",
+            "Invitation sending. It shows as sent once your email provider accepts it.",
         );
         expect(
             invitationSentence({

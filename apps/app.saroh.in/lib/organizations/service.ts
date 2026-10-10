@@ -194,7 +194,7 @@ export async function createOrganization(
         return { ok: true, data: { id: data.id, slug: data.slug } };
     }
     // The API's envelope is `{ error: { message, details } }`.
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,

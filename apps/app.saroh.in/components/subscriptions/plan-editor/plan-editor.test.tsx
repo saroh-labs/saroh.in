@@ -196,10 +196,10 @@ describe("the Plan Editor", () => {
             interval: "MONTH",
             classesPerMonth: null,
         });
-        expect(text()).toContain("Saved as a draft — nobody can join it yet");
+        expect(text()).toContain("Saved as a draft. Nobody can join it yet");
         expect(button("Publish").disabled).toBe(true);
         expect(text()).toContain(
-            "1 thing to fix before publishing — add the price.",
+            "1 thing to fix before publishing: add the price.",
         );
 
         actions.savePlanDraft.mockResolvedValue({
@@ -296,7 +296,7 @@ describe("the Plan Editor", () => {
         expect(field("Name").getAttribute("aria-invalid")).toBe("true");
         expect(button("Publish changes").disabled).toBe(true);
         expect(text()).toContain(
-            "1 thing to fix before publishing — there's already a plan called Drop-in.",
+            "1 thing to fix before publishing: there's already a plan called Drop-in.",
         );
     });
 
@@ -370,7 +370,7 @@ describe("the price and members' autopay (D13)", () => {
 
         type(price, "1800");
         expect(text()).toContain(
-            "Autopay covers up to ₹1,500; 2 members will need to authorise again",
+            "Autopay covers up to ₹1,500, so 2 members will need to authorise again",
         );
         const warning = Array.from(host.querySelectorAll("p")).find((p) =>
             p.textContent.startsWith("Autopay covers up to"),

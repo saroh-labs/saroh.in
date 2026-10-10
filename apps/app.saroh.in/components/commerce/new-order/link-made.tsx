@@ -26,7 +26,7 @@ export function LinkMade({
     return (
         <StepCard title="Payment link">
             <p className="text-pretty text-[13px] leading-[1.5]">
-                Order made. It waits unpaid until they pay — send them this link
+                Order made. It waits unpaid until they pay. Send them this link
                 {reach ? ` at ${reach}` : ""}.
             </p>
             <div className="mt-2.5 flex min-w-0 items-center gap-2">
@@ -41,7 +41,7 @@ export function LinkMade({
                 />
             </div>
             <p className="mt-1.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
-                Shown this once — copy it now. Saroh doesn&apos;t send it; the
+                Shown this once, so copy it now. Saroh doesn&apos;t send it. The
                 order shows paid once they pay.
             </p>
             <div className="mt-3 flex flex-wrap justify-end gap-2">

@@ -104,9 +104,9 @@ export function untrackedLine(places: readonly SoldOutPlace[]): string {
     const out = places.filter((p) => p.soldOut);
     if (out.length === 0) return "Available on the shop.";
     if (places.length <= 1 || out.length === places.length) {
-        return "Sold out — marked by hand";
+        return "Sold out, marked by hand";
     }
-    return `Sold out at ${listNames(out.map((p) => p.name))} — marked by hand`;
+    return `Sold out at ${listNames(out.map((p) => p.name))}, marked by hand`;
 }
 
 /**
@@ -120,10 +120,10 @@ export const UNTRACKED_NOTE =
 export function untrackedShort(places: readonly SoldOutPlace[]): string {
     const line = untrackedLine(places);
     if (line === "Available on the shop.") {
-        return "Not tracked — sells unless you mark it sold out.";
+        return "Not tracked. Sells unless you mark it sold out.";
     }
-    const said = line.replace(" — marked by hand", ", marked by hand");
-    return `Not tracked — ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
+    const said = line;
+    return `Not tracked · ${said.charAt(0).toLowerCase()}${said.slice(1)}.`;
 }
 
 /**
@@ -137,7 +137,7 @@ export function untrackedDetail(places: readonly SoldOutPlace[]): string {
     if (line === "Available on the shop.") {
         return "Not tracked · always available";
     }
-    const said = line.replace(" — marked by hand", ", marked by hand");
+    const said = line;
     return `Not tracked · ${said.charAt(0).toLowerCase()}${said.slice(1)}`;
 }
 

@@ -313,7 +313,7 @@ export function yourPlan(input: {
     }
 
     if (sub?.status === "CANCELLED") {
-        next = { kind: "text", text: "Nothing — the plan has ended" };
+        next = { kind: "text", text: "Nothing. The plan has ended" };
     } else if (sub?.status === "PAST_DUE") {
         next = { kind: "text", text: "Payment overdue" };
         notes.push({
@@ -361,8 +361,8 @@ export function yourPlan(input: {
                 : `Your plan was due to move to ${to} on `,
             iso: move.from,
             tail: samePlan
-                ? ". Authorise the new amount to keep it; until then nothing changes."
-                : `. Authorise the new amount to move; until then you stay on ${name}.`,
+                ? ". Authorise the new amount to keep it. Until then nothing changes."
+                : `. Authorise the new amount to move. Until then you stay on ${name}.`,
             action: { label: "Authorise", planId: move.planId, cycle },
         });
     } else if (move && !samePlan && !underOverride) {
@@ -372,7 +372,7 @@ export function yourPlan(input: {
                 tone: "info",
                 lead: `Your plan moves to ${to} from `,
                 iso: move.from,
-                tail: ". It's waiting on Saroh and applies on its own; everything stays until then.",
+                tail: ". It's waiting on Saroh and applies on its own. Everything stays until then.",
                 action: null,
             });
         } else {
@@ -420,7 +420,7 @@ export function yourPlan(input: {
                           ? "The year you paid for ends on "
                           : `Your 12 months of ${name} end on `,
                       iso: term.endsAt,
-                      tail: `. Pay for the next term to keep ${name} from that day, at today's price; otherwise you move to Free then.`,
+                      tail: `. Pay for the next term to keep ${name} from that day, at today's price. Otherwise you move to Free then.`,
                       action: { label: "Renew", planId, cycle },
                   }
                 : {

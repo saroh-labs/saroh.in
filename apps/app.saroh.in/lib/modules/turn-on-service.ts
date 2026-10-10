@@ -55,7 +55,11 @@ export async function enableModule(
 ): Promise<EnableResult> {
     const base = await orgBase();
     if (!base) {
-        return { ok: false, error: "No active organization.", fields: {} };
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+            fields: {},
+        };
     }
     const res = await apiFetch(`${base}/modules/${encodeURIComponent(key)}`, {
         method: "PUT",

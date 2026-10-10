@@ -102,9 +102,9 @@ export function deskNote(choice: DeskChoice, amount: string): string {
         case "UPI":
             return `Show the counter QR. Record it once ${amount} shows on your UPI app.`;
         case "CARD":
-            return `Key ${amount} into the machine; record it once it approves.`;
+            return `Key ${amount} into the machine, and record it once it approves.`;
         case "LINK":
-            return "You get a link to send them. The booking shows unpaid until they pay; Saroh doesn't send it for you yet.";
+            return "You get a link to send them. The booking shows unpaid until they pay. Saroh doesn't send it for you yet.";
     }
 }
 
@@ -173,6 +173,6 @@ export function deskTakenText(
               ? `${amount} taken by UPI`
               : `${amount} taken by card`;
     return paid.changeCents
-        ? `${how} — give ${format(paid.changeCents)} change.`
+        ? `${how}. Give ${format(paid.changeCents)} change.`
         : `${how}. The invoice is marked paid.`;
 }

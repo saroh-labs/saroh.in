@@ -263,7 +263,9 @@ test.describe("phone reflow: Customer Detail", () => {
         });
         await page.setViewportSize(WIDTHS[0]);
         await page.goto(`/customers/${who.id}`);
-        await expect(page.getByText("Possible match — link?")).toBeVisible();
+        await expect(
+            page.getByText("Possible match. Link them?"),
+        ).toBeVisible();
         await noSidewaysScroll(page, "Customer Detail with a long email");
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {

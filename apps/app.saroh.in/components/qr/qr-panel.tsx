@@ -267,7 +267,7 @@ function Saved({
             }
         >
             <p data-qr-not-counted="" className={NOTE}>
-                Not counted. This is a QR of the link itself; an owner or admin
+                Not counted. This is a QR of the link itself. An owner or admin
                 can make a saved code that counts its scans.
             </p>
             {notLive}

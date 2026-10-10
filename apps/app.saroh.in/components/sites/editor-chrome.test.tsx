@@ -122,7 +122,9 @@ describe("ReleaseRow", () => {
 
         const owner = row({ needsApproval: true, canOverride: true });
         expect(disabled(owner, "Go live…")).toBe(false);
-        expect(owner).toContain("go live without approval; it&#x27;s recorded");
+        expect(owner).toContain(
+            "go live without approval, and it&#x27;s recorded",
+        );
     });
 });
 

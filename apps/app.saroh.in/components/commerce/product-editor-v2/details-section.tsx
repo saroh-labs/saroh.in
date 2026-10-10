@@ -343,13 +343,13 @@ function Allergens({
             </div>
             {group("Contains", contains, onContains)}
             <p className="mb-[7px] mt-3.5 text-[12.5px] font-medium">
-                May contain — same kitchen
+                May contain (same kitchen)
             </p>
             {group("May contain", may, onMay)}
             <FieldHelp className="mt-[9px]">
                 {contains.length || may.length
                     ? `Customers see: ${contains.length ? `Contains ${names(contains)}.` : ""}${may.length ? ` May contain ${names(may)}.` : ""}`
-                    : "Tick nothing and the shop says nothing — it will not claim a product is allergen-free."}
+                    : "Tick nothing and the shop says nothing. It will not claim a product is allergen-free."}
             </FieldHelp>
         </>
     );

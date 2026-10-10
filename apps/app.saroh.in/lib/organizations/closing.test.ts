@@ -179,7 +179,7 @@ describe("closingBanner (#921)", () => {
             NOW,
         );
         expect(b?.memberships?.warnings).toEqual([
-            "Deleting the business stops Saroh syncing with Razorpay. It doesn't cancel your customers' autopay memberships there — 2 are active. Cancel them in your Razorpay dashboard if you want them stopped.",
+            "Deleting the business stops Saroh syncing with Razorpay. It doesn't cancel your customers' autopay memberships there (2 are active). Cancel them in your Razorpay dashboard if you want them stopped.",
         ]);
         expect(b?.memberships?.lines).toEqual([
             {

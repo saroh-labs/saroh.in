@@ -56,7 +56,7 @@ export function initialTemplateId(
 }
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
+    name: z.string().trim().min(1, { message: "Add a name." }),
     subdomain: z
         .string()
         .trim()
@@ -173,7 +173,7 @@ export function CreateSiteForm({
                                 <FormLabel>Site name</FormLabel>
                                 <FormControl>
                                     <Input
-                                        placeholder="My Site"
+                                        placeholder="My site"
                                         maxLength={120}
                                         disabled={isSubmitting}
                                         {...field}

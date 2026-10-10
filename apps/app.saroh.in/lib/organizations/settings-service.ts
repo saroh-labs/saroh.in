@@ -252,7 +252,7 @@ export async function readOrganizationSettings(): Promise<
     if (!base) {
         return {
             ok: false,
-            error: "No active organization.",
+            error: "No business is open. Choose one and try again.",
             forbidden: false,
         };
     }
@@ -298,7 +298,11 @@ export async function updateOrganizationSettings(
     input: OrganizationSettingsInput,
 ): Promise<SettingsResult<OrganizationSettings>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
 
     const res = await apiFetch(base, {
         method: "PATCH",
@@ -309,7 +313,7 @@ export async function updateOrganizationSettings(
         .catch(() => null)) as OrganizationSettings | null;
 
     if (!res.ok || !data) {
-        return toFailure(data, "Couldn't save your organization.");
+        return toFailure(data, "Couldn't save your business details.");
     }
     return { ok: true, data };
 }
@@ -322,7 +326,11 @@ export async function updateBusinessLogo(
     mediaId: string | null,
 ): Promise<SettingsResult<OrganizationSettings>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
 
     const res = await apiFetch(
         `${base}/logo`,

@@ -39,7 +39,7 @@ steps:
           - { label: Provider, value: Cashfree }
           - { label: Type, value: Payments }
     # SETUP: step 1 "Your API keys", fields "Key ID", "Key secret" and
-    # "Public key" (optional, "Shown to the checkout; not a secret.").
+    # "Public key" (optional, "Shown to the checkout. Not a secret.").
     # KEYS: Key ID and Key secret are Cashfree's client id and secret.
     - title: Add your API keys
       body: "Key ID and Key secret are your Cashfree app's client ID and client secret. The public key is optional: it's shown to the checkout and isn't a secret. Your keys are sealed when saved and never shown again."
@@ -85,7 +85,7 @@ steps:
             }
     # WORDS: lastUpdateLine(). ROWS: the "Connected" pill.
     - title: Check that payment updates arrive
-      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says 'No payment updates received yet — check the webhook in Cashfree.'"
+      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says 'No payment updates received yet. Check the webhook in Cashfree.'"
       rows:
           - {
                 label: Cashfree,

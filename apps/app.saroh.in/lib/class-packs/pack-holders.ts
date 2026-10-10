@@ -87,7 +87,7 @@ export function holderRow(
             : `Ended ${formatDate(h.expiresAt, timeZone)}`
         : h.left === 0
           ? "All used"
-          : `Use by ${formatDate(h.expiresAt, timeZone)}${soon ? ` — ${count(days, "day", "days")} left` : ""}`;
+          : `Use by ${formatDate(h.expiresAt, timeZone)}${soon ? `, ${count(days, "day", "days")} left` : ""}`;
     const older =
         Number(h.price) !== Number(pack.price) || h.currency !== pack.currency;
     return {
@@ -188,5 +188,5 @@ export function extendFailure(
         return `Your role can't extend packs. ${WHO_CAN_CHANGE}`;
     }
     if (res.status === 400) return res.error;
-    return `Couldn't extend ${first}'s pack. Nothing has changed — try again.`;
+    return `Couldn't extend ${first}'s pack. Nothing has changed. Try again.`;
 }

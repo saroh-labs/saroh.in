@@ -55,7 +55,7 @@ export function weekSummary(week: OpeningHoursDay[]): string {
         .map(({ from, to, day }) => {
             const a = SHORT_DAY[week[from]?.day ?? "MON"];
             const b = SHORT_DAY[week[to]?.day ?? "MON"];
-            const days = from === to ? a : `${a}–${b}`;
+            const days = from === to ? a : `${a} to ${b}`;
             return day.closed ? `${days} closed` : `${days} ${hours(day)}`;
         })
         .join(" · ");
@@ -73,7 +73,7 @@ function dayRuns(week: OpeningHoursDay[], at: number[]): string {
         .map(({ from, to }) => {
             const a = SHORT_DAY[week[from]?.day ?? "MON"];
             const b = SHORT_DAY[week[to]?.day ?? "MON"];
-            return from === to ? a : `${a}–${b}`;
+            return from === to ? a : `${a} to ${b}`;
         })
         .join(", ");
 }

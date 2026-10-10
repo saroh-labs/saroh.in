@@ -243,7 +243,7 @@ test.describe("bookings calendar", () => {
         if (!found) return;
         const sheet = await openPeek(page, found);
         await expect(
-            sheet.getByText("No phone yet — add it on their page"),
+            sheet.getByText("No phone yet. Add it on their page"),
         ).toBeVisible();
     });
 
@@ -663,7 +663,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
         test.skip(!opened, "Northwind doesn't take bookings");
         const name = `E2E either ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
-        await page.getByRole("radio", { name: "Either — they choose" }).click();
+        await page.getByRole("radio", { name: "Either, they choose" }).click();
         await page
             .getByLabel("Link to join")
             .fill("https://meet.example.com/e2e-either");

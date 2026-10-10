@@ -164,7 +164,7 @@ export function MoreSettings({
                         </Button>
                         <p className={HELP}>
                             To stop bookings for now, use Stop taking bookings
-                            instead — Delete can&apos;t be undone.
+                            instead. Delete can&apos;t be undone.
                         </p>
                     </div>
                 ) : null}

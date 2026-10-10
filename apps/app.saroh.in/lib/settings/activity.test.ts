@@ -401,7 +401,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { product: film, unitsZeroed: 38, storefronts: 2 },
             }),
         ).toBe(
-            `Sanjay turned Track stock off for ${film} — 38 set to 0 → ${film}`,
+            `Sanjay turned Track stock off for ${film}, 38 set to 0 → ${film}`,
         );
         // Nothing on the shelves: nothing to say about units.
         expect(
@@ -426,7 +426,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { product: "Rye loaf", soldOutCleared: 2 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf — cleared Sold out at 2 locations → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf, cleared Sold out at 2 locations → Rye loaf",
         );
         // A first count started it.
         expect(
@@ -440,7 +440,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf with its first count — cleared Sold out at 1 location → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf with its first count, cleared Sold out at 1 location → Rye loaf",
         );
         // It opens the product.
         expect(

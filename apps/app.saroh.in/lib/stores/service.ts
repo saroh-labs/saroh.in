@@ -45,7 +45,7 @@ async function mutate(
     if (res.ok && typeof id === "string") {
         return { ok: true, data: { id } };
     }
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     const field = failure.field;
     return {
         ok: false,

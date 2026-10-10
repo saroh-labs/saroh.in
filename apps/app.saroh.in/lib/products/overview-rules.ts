@@ -186,7 +186,7 @@ export function priceLabel(
 ): string {
     return price.min === price.max
         ? format(price.min)
-        : `${format(price.min)} – ${format(price.max)}`;
+        : `${format(price.min)} to ${format(price.max)}`;
 }
 
 /** "4.6 from 12" — or null when nobody has reviewed it yet. */

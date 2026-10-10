@@ -78,7 +78,7 @@ describe("Also sell (E12)", () => {
 
     it("says what changed, and that nothing sold is lost", () => {
         expect(alsoSellToast("Class packs", true)).toBe(
-            "Class packs is on — it's in the Bookings menu now. Settings › Modules shows the same switch.",
+            "Class packs is on. It's in the Bookings menu now. Settings › Modules shows the same switch.",
         );
         expect(alsoSellToast("Class packs", false)).toContain(
             "nothing already sold changes",

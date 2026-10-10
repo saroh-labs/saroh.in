@@ -95,7 +95,11 @@ export async function markNotificationRead(
     id: string,
 ): Promise<NotificationsResult<{ id: string }>> {
     const base = await notificationsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${id}/read`, { method: "POST" });
     const data = (await res.json().catch(() => null)) as {
         message?: string;
@@ -114,7 +118,11 @@ export async function markAllNotificationsRead(): Promise<
     NotificationsResult<{ updated: number; readAt: string | null }>
 > {
     const base = await notificationsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/read-all`, { method: "POST" });
     const data = (await res.json().catch(() => null)) as {
         updated?: number;
@@ -139,7 +147,11 @@ export async function undoMarkAllNotificationsRead(
     readAt: string,
 ): Promise<NotificationsResult<{ updated: number }>> {
     const base = await notificationsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/read-all/undo`, {
         method: "POST",
         body: JSON.stringify({ readAt }),

@@ -93,7 +93,7 @@ describe("autopayPanel (D14)", () => {
             }),
         );
         expect(p.notice).toEqual({
-            text: "Autopay limit too low — covers up to ₹1,500, this renewal is ₹1,800",
+            text: "Autopay limit too low. It covers up to ₹1,500, and this renewal is ₹1,800",
             tone: "warn",
         });
         expect(p.sendLabel).toBe("Send a set-up link");
@@ -114,7 +114,7 @@ describe("autopayPanel (D14)", () => {
             }),
         );
         expect(p.line).toBe(
-            "Autopay pending · UPI — waiting for them to approve it",
+            "Autopay pending · UPI, waiting for them to approve it",
         );
         expect(p.detail).toBe("Set-up link sent by Priya · 2 Oct");
         expect(p.sendLabel).toBe("Send a new set-up link");
@@ -134,7 +134,7 @@ describe("autopayPanel (D14)", () => {
             }),
         );
         expect(p.line).toBe(
-            "Autopay cancelled 2 Oct — being confirmed with Razorpay",
+            "Autopay cancelled 2 Oct, being confirmed with Razorpay",
         );
         expect(p.notice?.tone).toBe("info");
         expect(p.canCancel).toBe(false);
@@ -218,7 +218,7 @@ describe("cancelledText", () => {
         expect(
             cancelledText({ outcome: "CONFIRMING", provider: "Razorpay" })
                 .detail,
-        ).toBe("Razorpay hasn't confirmed yet; Saroh keeps asking.");
+        ).toBe("Razorpay hasn't confirmed yet. Saroh keeps asking.");
         expect(
             cancelledText({ outcome: "REFUSED", provider: "Razorpay" }).detail,
         ).toContain("Razorpay dashboard");

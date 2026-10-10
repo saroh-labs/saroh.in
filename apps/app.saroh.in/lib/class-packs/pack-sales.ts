@@ -90,7 +90,7 @@ export function salesByMonth(
     const months = groups.map((g) => ({
         key: g.key,
         label: g.label,
-        n: g.sales.length > 0 ? `${g.sales.length} sold` : "—",
+        n: g.sales.length > 0 ? `${g.sales.length} sold` : "None sold",
         amt: g.sales.length > 0 ? totals(sumByCurrency(g.sales)) : "",
         pct: Math.round((100 * own(g.sales)) / most),
     }));
@@ -184,7 +184,7 @@ export function priceHistory(
             t: M(c.before),
             sub: [
                 `Until ${formatDate(c.at, timeZone)}`,
-                n === null ? null : `${n} bought at it — they keep it`,
+                n === null ? null : `${n} bought at it, and they keep it`,
             ]
                 .filter(Boolean)
                 .join(" · "),

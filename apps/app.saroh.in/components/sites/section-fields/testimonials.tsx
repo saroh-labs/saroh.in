@@ -54,7 +54,7 @@ export function TestimonialsFields({
                             <Input
                                 value={item.name}
                                 onChange={(e) => set({ name: e.target.value })}
-                                placeholder="Who said it — a quote needs a name"
+                                placeholder="Who said it (a quote needs a name)"
                             />
                         </Field>
                         <Field optional label="Role or detail">

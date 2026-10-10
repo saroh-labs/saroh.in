@@ -259,7 +259,7 @@ export function allergyCheck(
         for (const a of [...has, ...may]) hit.set(a.id, a);
         out.lines[line.id] = text;
         out.named.push(
-            `${line.name ?? "A product that no longer exists"} — ${text.toLowerCase()}`,
+            `${line.name ?? "A product that no longer exists"}: ${text.toLowerCase()}`,
         );
     }
     out.hits = Array.from(hit.values());
@@ -283,10 +283,10 @@ export function eventText(
                 e.toStage === "HANDED_TO_COURIER" && e.note
                     ? `Handed to ${e.note}`
                     : stage(e.toStage);
-            return e.undoneAt ? `${base} — undone` : base;
+            return e.undoneAt ? `${base}, undone` : base;
         }
         case "UNDO":
-            return `Undone — back to ${stage(e.toStage).toLowerCase()}`;
+            return `Undone, back to ${stage(e.toStage).toLowerCase()}`;
         case "EDIT":
             // A change of how it leaves (B9) says it whole: "Changed from
             // Pick-up to Local delivery".

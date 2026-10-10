@@ -134,7 +134,7 @@ export function BusinessSheetFields({
                             <FormDescription>
                                 {typeAsked
                                     ? "You said at setup that the business is registered. Choose which kind before you take money."
-                                    : "An individual trades in their own name; a company is registered as one."}
+                                    : "An individual trades in their own name. A company is registered as one."}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

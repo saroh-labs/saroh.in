@@ -46,7 +46,7 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     richText: "Paragraphs of your own words, with headings and links.",
     cta: "A single button asking for the next step.",
     gallery: "Your photos, in a grid, a carousel or a masonry wall.",
-    enquiry: "A form visitors fill in; each one arrives in Leads.",
+    enquiry: "A form visitors fill in. Each one arrives in Leads.",
     booking: "Visitors pick a time for one of your services and book it.",
     features: "A few short points: what you do, or why buy from you.",
     faq: "Questions and answers, each answer one tap away.",

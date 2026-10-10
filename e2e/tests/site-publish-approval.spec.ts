@@ -73,7 +73,7 @@ test(
             await expect(
                 page
                     .getByText(
-                        "Only an approved test release can go live. You can still go live without approval; it's recorded.",
+                        "Only an approved test release can go live. You can still go live without approval, and it's recorded.",
                     )
                     .filter({ visible: true }),
             ).toHaveCount(1);
