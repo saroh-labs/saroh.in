@@ -5,6 +5,8 @@ import type {
 import type { PaymentMethod } from "@/lib/invoices/service";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 
+import type { OnlinePayment } from "./online-payment";
+
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14):
  * `GET /organizations/:org/orders/:id`. Types only, so the client screen and
@@ -291,6 +293,12 @@ export interface OrderRead extends FulfilmentFields {
      * makes it. Only with `order:read`; absent from an API before B11.
      */
     payLinkCreatedAt?: string | null;
+    /**
+     * Where its online payment stands when it isn't simply paid (#122);
+     * null when there is nothing to chase. Absent from an older API, or when
+     * the read couldn't say.
+     */
+    onlinePayment?: OnlinePayment | null;
     items: OrderReadLine[];
     events: OrderReadEvent[];
     next: {

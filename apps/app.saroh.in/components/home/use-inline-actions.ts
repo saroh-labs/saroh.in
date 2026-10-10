@@ -27,6 +27,7 @@ import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
+import { refundMismatch } from "@/lib/payments/actions";
 import { replyToReview } from "@/lib/product-reviews/actions";
 import { retrySubscription } from "@/lib/subscriptions/actions";
 
@@ -258,6 +259,26 @@ export function useInlineActions() {
         );
     }
 
+    /**
+     * Refund a payment taken at the wrong amount (PAY-06): exactly what it
+     * took goes back through the provider. The row leaves Home once the
+     * refund is on its way; the order or invoice stays as it was.
+     */
+    async function refund(need: HomeNeed, inline: HomeInline) {
+        setBusy(need.id);
+        const res = await refundMismatch(inline.target);
+        setBusy(null);
+        if (!res.ok) {
+            showError(failedText(inline), res.error);
+            return;
+        }
+        setDone(need.id, { text: inline.done });
+        showSuccess(
+            inline.done,
+            "Your payment provider sends it back. It can take a few days to reach them.",
+        );
+    }
+
     /** The confirm's button: run the row's action. */
     function confirm(need: HomeNeed) {
         const inline = need.inline;
@@ -273,7 +294,8 @@ export function useInlineActions() {
                 void markSent(need, inline);
                 return;
             case "once":
-                void retry(need, inline);
+                if (inline.kind === "REFUND") void refund(need, inline);
+                else void retry(need, inline);
                 return;
             case "held":
                 sendHeld(need, inline);

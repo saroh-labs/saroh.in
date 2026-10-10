@@ -60,7 +60,7 @@ export interface OrderPowers {
 }
 
 export function orderPowers(
-    organization: Pick<Organization, "role" | "actions"> | null,
+    organization: { role: string; actions?: readonly string[] } | null,
 ): OrderPowers {
     if (!organization) {
         return {

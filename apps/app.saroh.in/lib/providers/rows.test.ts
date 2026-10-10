@@ -4,8 +4,27 @@ import type { ProviderHealth } from "@/lib/provider-health/service";
 
 import { CONTACT_EMAIL_HREF } from "./booking-emails";
 import type { ProviderRowsInput } from "./rows";
-import { buildProvidersView, dashboardFor, RAZORPAY_KEY_ID } from "./rows";
+import {
+    buildProvidersView,
+    dashboardFor,
+    paymentsConsequence,
+    RAZORPAY_KEY_ID,
+} from "./rows";
 import type { SarohEmailState } from "./service";
+
+describe("disconnecting a payment provider (#921)", () => {
+    it("warns that its customers' autopay memberships there aren't cancelled", () => {
+        expect(
+            paymentsConsequence({ provider: "RAZORPAY", activeMemberships: 4 }),
+        ).toMatch(
+            /^Checkout stops taking online payments.* Disconnecting stops Saroh syncing with Razorpay\. It doesn't cancel your customers' autopay memberships there — 4 are active\. Cancel them in your Razorpay dashboard if you want them stopped\.$/,
+        );
+        // None active, or an older API: the count sentence is left out.
+        expect(paymentsConsequence({ provider: "CASHFREE" })).toContain(
+            "autopay memberships there. Cancel them in your Cashfree dashboard",
+        );
+    });
+});
 
 describe("Razorpay key id check", () => {
     it("takes a test or live key id and nothing else", () => {

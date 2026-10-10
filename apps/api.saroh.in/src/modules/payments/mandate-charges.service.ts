@@ -6,6 +6,7 @@ import { fromMinor, toMinor } from "../../common/money";
 import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
 import { chargePlan, keptPlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
+import { captureDiffers, describeMismatch } from "./capture-mismatch";
 import {
     checkoutOpenOn,
     checkoutsOpenOn,
@@ -15,6 +16,7 @@ import {
 import { mandateChargingOn } from "./mandate-charge-gate";
 import {
     failMandateChargeInTx,
+    mismatchedChargeInTx,
     recordChargeEventInTx,
     settleCapturedChargeInTx,
 } from "./mandate-charge-outcome";
@@ -858,6 +860,8 @@ export class MandateChargesService {
                 status: true,
                 provider: true,
                 providerIntentId: true,
+                amountCents: true,
+                currency: true,
             },
         });
         if (!intent || !OPEN_CHARGE.includes(intent.status)) return "ALREADY";
@@ -886,6 +890,23 @@ export class MandateChargesService {
         }
         switch (found.status) {
             case "SUCCEEDED": {
+                // PAY-06: only the amount and currency asked for pays the
+                // invoice. Anything else is owed back and the charge fails.
+                if (captureDiffers(intent, found, { strict: true })) {
+                    this.logger.error(
+                        `Charge ${intentId}: ${intent.provider} payment ${found.providerPaymentRef ?? "(no id)"} ${describeMismatch(intent, found)}; not marked paid, recorded as needing a refund`,
+                    );
+                    const moved = await prisma.$transaction((tx) =>
+                        mismatchedChargeInTx(
+                            tx,
+                            organizationId,
+                            intentId,
+                            found.providerPaymentRef,
+                            found,
+                        ),
+                    );
+                    return moved ? "FAILED" : "ALREADY";
+                }
                 const settled = await prisma.$transaction((tx) =>
                     settleCapturedChargeInTx(
                         tx,

@@ -19,23 +19,23 @@ fixed in this change, with tests. The rest are risks, listed for a decision.
 
 ## Summary
 
-| ID     | Severity | Verdict | Finding                                                                                          | Status                   |
-| ------ | -------- | ------- | ------------------------------------------------------------------------------------------------ | ------------------------ |
-| PAY-01 | Medium   | Bug     | Pay-link success trusted an intent status read before the lock → a good payment "needs a refund" | **Fixed** (#106)         |
-| PAY-02 | Medium   | Bug     | A failure event overwrote SUPERSEDED intents, and in a race SUCCEEDED ones                       | **Fixed** (#106)         |
-| PAY-03 | Medium   | Bug     | Public checkout opened intents on orders already PAID, REFUNDED or cancelled                     | **Fixed** (#106)         |
-| PAY-04 | Medium   | Bug     | Billing event ids were `type:subscriptionId`, so a repeat of the same event type was dropped     | **Fixed** (#106)         |
-| PAY-05 | Medium   | Risk    | Webhook inbox is unique on `(provider, providerEventId)` across all orgs                         | Open — needs a migration |
-| PAY-06 | Low      | Risk    | Captured amount and currency are never compared with the intent                                  | Open                     |
-| PAY-07 | Low      | Risk    | Billing reconcile reads status outside a transaction; out-of-order events can move state back    | Open                     |
-| PAY-08 | Low      | Risk    | `/public/orders/*` had no rate limit                                                             | **Fixed** (#106)         |
-| PAY-09 | Low      | Risk    | No timestamp tolerance on Cashfree; Razorpay's event-id header is not signed                     | Open                     |
-| PAY-10 | Low      | OK      | Credential encryption sound; hardening possible (tag length, AAD, key version)                   | Open (hardening)         |
-| PAY-11 | Info     | OK      | Signature verification and raw-body handling                                                     | —                        |
-| PAY-12 | Info     | OK      | Org scoping on webhook and public paths                                                          | —                        |
-| PAY-13 | Info     | OK      | RLS cutover: no webhook or public payment path changes behaviour                                 | —                        |
-| PAY-14 | Info     | OK      | Idempotency of intent creation and refunds                                                       | —                        |
-| PAY-15 | Medium   | Risk    | The pay link's per-caller limits see saroh.app's server, not the buyer                           | Open — needs a decision  |
+| ID     | Severity | Verdict | Finding                                                                                          | Status                  |
+| ------ | -------- | ------- | ------------------------------------------------------------------------------------------------ | ----------------------- |
+| PAY-01 | Medium   | Bug     | Pay-link success trusted an intent status read before the lock → a good payment "needs a refund" | **Fixed** (#106)        |
+| PAY-02 | Medium   | Bug     | A failure event overwrote SUPERSEDED intents, and in a race SUCCEEDED ones                       | **Fixed** (#106)        |
+| PAY-03 | Medium   | Bug     | Public checkout opened intents on orders already PAID, REFUNDED or cancelled                     | **Fixed** (#106)        |
+| PAY-04 | Medium   | Bug     | Billing event ids were `type:subscriptionId`, so a repeat of the same event type was dropped     | **Fixed** (#106)        |
+| PAY-05 | Medium   | Risk    | Webhook inbox is unique on `(provider, providerEventId)` across all orgs                         | **Fixed** (1a78e763f)   |
+| PAY-06 | Low      | Risk    | Captured amount and currency are never compared with the intent                                  | **Fixed** (1a78e763f)   |
+| PAY-07 | Low      | Risk    | Billing reconcile reads status outside a transaction; out-of-order events can move state back    | Open                    |
+| PAY-08 | Low      | Risk    | `/public/orders/*` had no rate limit                                                             | **Fixed** (#106)        |
+| PAY-09 | Low      | Risk    | No timestamp tolerance on Cashfree; Razorpay's event-id header is not signed                     | Open                    |
+| PAY-10 | Low      | OK      | Credential encryption sound; hardening possible (tag length, AAD, key version)                   | Open (hardening)        |
+| PAY-11 | Info     | OK      | Signature verification and raw-body handling                                                     | —                       |
+| PAY-12 | Info     | OK      | Org scoping on webhook and public paths                                                          | —                       |
+| PAY-13 | Info     | OK      | RLS cutover: no webhook or public payment path changes behaviour                                 | —                       |
+| PAY-14 | Info     | OK      | Idempotency of intent creation and refunds                                                       | —                       |
+| PAY-15 | Medium   | Risk    | The pay link's per-caller limits see saroh.app's server, not the buyer                           | Open — needs a decision |
 
 ---
 
@@ -99,7 +99,7 @@ still a duplicate. Tests are in `billing/providers/billing-provider.spec.ts`.
 
 Old inbox rows keep their old ids, which can't collide with the new format.
 
-## PAY-05: inbox uniqueness is global, not per org — Risk
+## PAY-05: inbox uniqueness is global, not per org — Fixed
 
 `WebhookEvent` is `@@unique([provider, providerEventId])`, with no
 organization in the key. Merchants set their own webhook secret, so merchant B
@@ -110,13 +110,65 @@ not verified. **Fix:** a migration changing the unique to
 `(organizationId, provider, providerEventId)`, plus a test with the same id
 under two orgs.
 
-## PAY-06: captured amount never compared — Risk
+**Fixed** in 1a78e763f. Migration `20261104100000_webhook_inbox_unique_per_org`
+makes the unique `(organizationId, provider, providerEventId)`. It first
+checks that no rows would collide under the new key (none can: it widens the
+old one) and stops rather than drop a row, builds the new index, then drops
+the old one, so duplicates are refused throughout. `organizationId` stays
+nullable; the inbox always writes it, and NULLs never collide. Saroh's own
+billing inbox (`BillingWebhookEvent`) has no business in its URL and keeps
+its key. Tests: `webhooks/webhooks.inbox.db.spec.ts` (the same id under two
+businesses is two deliveries, a repeat in one is a duplicate); the migration
+replays from empty, and was applied to a database holding rows.
+
+## PAY-06: captured amount never compared — Fixed
 
 Neither the normalized event nor the adapters carry the payment amount. The
 amount is fixed server-side on the provider order and enforced by the provider,
 so this is defence in depth. **Fix:** parse amount and currency, and on a
 mismatch record `CAPTURED_NEEDS_REFUND` without marking the order or invoice
 paid.
+
+**Fixed** in 1a78e763f. Adapters normalise what was captured in paise
+(`capturedAmountCents`: Razorpay's `payment.entity.amount` as is, Cashfree's
+rupee `payment_amount` read as decimal text) and its currency. Every path
+that settles from the provider compares it with the intent first: the
+webhook and its replay (`WebhooksService.reconcile`), the checkout return,
+the pending sweep and `payments reconcile` (`payment-lookup.service.ts`),
+and an autopay charge's look-up (`mandate-charges.service.ts`). Only the
+exact amount in the same currency settles, so a partial capture and an
+over-capture both count as mismatches. On a mismatch nothing is marked paid. The capture is
+recorded once per provider payment as `CAPTURED_NEEDS_REFUND` with
+`rawResponse.invoiceStatus` `AMOUNT_MISMATCH` and both figures, an error is
+logged, and an open intent fails as a decline does: an order goes UNPAID to
+FAILED, an invoice raises the team's "Payment failed" alert, an autopay
+renewal logs RENEWAL_FAILED with reason AMOUNT_MISMATCH, and the customer
+can pay again. A look-up must report the amount. A signed webhook that
+carries none is settled on the provider order's amount, as before. Code:
+`payments/capture-mismatch.ts`. Tests: `capture-mismatch.spec.ts`,
+`webhooks.service.spec.ts` (PAY-06), `payment-lookup.db.spec.ts` and
+`subscriptions.charge.db.spec.ts`.
+
+**Follow-up done** (owner decision 9 Oct): a mismatch on an intent that is
+now FAILED used to miss Home's "refunds owed" list, which read SUCCEEDED
+intents only. Now every mismatch not yet refunded is its own row there,
+whatever its intent's status, at what it captured, with the order or invoice
+it was for (`home/home-mismatch-refunds.ts`), and carries **Refund**
+(`order:refund`, while its provider is connected). Refund sends exactly the
+captured amount against that payment through the provider, as a
+PaymentRefund on the intent keyed to the attempt (`amount-mismatch:<attempt>`,
+`payments/mismatch-refund.ts`, `POST …/payment-attempts/:attemptId/refund`);
+it is idempotent, looks before resending a lost answer, and sends a fresh row
+after a refusal. The order or invoice is left as it is: no credit note, step
+or stock. The provider's refund webhook for such a payment settles that row
+(or, for a refund made in the dashboard, records one keyed to the attempt,
+matched by the payment id Razorpay and Cashfree carry on the refund) before
+the order's refund path, so it is never refused on a FAILED order. Tests:
+`mismatch-refund.spec.ts`, `mismatch-refund.db.spec.ts`,
+`home.refunds.spec.ts`, `home.inline.spec.ts`. Residual: a second capture on
+an intent that had already succeeded (one provider order paid twice, which
+neither provider takes) would have its refund read as part of that payment
+going back.
 
 ## PAY-07: billing reconcile ordering — Risk
 

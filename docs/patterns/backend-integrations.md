@@ -27,6 +27,8 @@ failed call never undoes the verification: the row stays VERIFIED with
 The next check is "Check now" or the `domains.recheck` chain (#860,
 `backend-jobs.md`), which asks Cloudflare often until a domain is live and
 daily after, at most 50 domains a run and stopping on repeated failures.
+Either one moving a live domain to a problem, or back, tells the team once
+per incident (#917, `team.alert` `domain`).
 With `CLOUDFLARE_HOSTNAMES_TOKEN` or `CLOUDFLARE_HOSTNAMES_ZONE_ID` unset the
 port is null, a WARN says so at boot, and the read says `hosting.state: "OFF"`
 (`domain-hosting-sync.ts`).
@@ -73,6 +75,10 @@ a note saying so.
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
   public (a checkout's public key, a sending address), never a credential.
+  Disconnecting a payment provider's confirm says it cancels none of the
+  customers' autopay memberships there, with how many are active (owner,
+  9 Oct, #921: `activeMemberships` on the list,
+  `lib/payments/memberships-warning.ts`).
 - **Current** (UX-012) — **Keys are checked before they are kept, and
   watched after.** Connecting a provider asks it one cheap authenticated
   read with the typed keys (`verifyCredentials` on the port: Razorpay
@@ -89,7 +95,14 @@ a note saying so.
   view sends as `attention: { reason, since } | null` and provider health
   reads as FAILED, and queues the team's `provider` alert on the same
   transaction, only when the row wasn't flagged already. Entering keys
-  again clears it. A provider order that fails at checkout is a deliberate
+  again clears it, and so does a live call the provider accepts on the
+  flagged row (`paymentProviderWorks`, `commsProviderWorks`); either
+  queues the team's "working again" alert on the same transaction, told
+  only when the stop was (#555, `notifications/provider-alerts.ts`: once
+  per incident, bell and Saroh's email on the Payment failed row, fixed
+  words, Settings › Providers). Only these two live calls flag today: a
+  checkout's provider order and an email's send. A refund, a mandate call
+  or a payment look-up that gets a 401 flags nothing yet. A provider order that fails at checkout is a deliberate
   503 in the customer's words (`provider-keys-refused` or
   `provider-unavailable`), never an unhandled 500
   (`payments/provider-keys.ts`).
@@ -114,12 +127,32 @@ a note saying so.
   (`webhookSecretMissing`, readiness `PAYMENTS_WEBHOOK_SECRET_MISSING`) and
   builds the webhook URL setup shows. A new provider declares its signing
   scheme there.
-- **Current** — **Inboxes are idempotent.** `(provider, providerEventId)` is
-  unique, so a duplicate delivery hits P2002 and returns 200 without moving state
-  twice. Reconciliation follows a state machine that rejects illegal
+- **Current** — **Inboxes are idempotent, per business.** The merchant inbox
+  (`WebhookEvent`) is unique on `(organizationId, provider, providerEventId)`
+  (PAY-05), so a duplicate delivery hits P2002 and returns 200 without moving
+  state twice, and another business can never claim an event id first. Saroh's
+  own billing inbox (`BillingWebhookEvent`) has no business in its URL and
+  stays `(provider, providerEventId)`. Reconciliation follows a state machine that rejects illegal
   transitions.
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
+- **Current** — **A capture is compared before it pays anything** (PAY-06).
+  Adapters normalise what the provider captured in paise
+  (`capturedAmountCents`, Razorpay's `amount` as is, Cashfree's rupee
+  `payment_amount` read as decimal text) and its currency. A webhook, a
+  checkout return, the pending sweep or an autopay charge's look-up whose
+  amount or currency differs from the intent's never marks the order or
+  invoice paid: the capture is recorded once as `CAPTURED_NEEDS_REFUND`
+  (`rawResponse.invoiceStatus` AMOUNT_MISMATCH, both figures), logged, and an
+  open intent fails as a decline does (`payments/capture-mismatch.ts`). A
+  look-up must report the amount; a signed webhook that carries none is
+  settled on the provider order's own amount. Such a capture is the
+  attempt's to refund, never the order's: Home lists it until refunded and
+  offers Refund, which sends exactly what was captured against that payment
+  as a PaymentRefund keyed `amount-mismatch:<attempt>`, touching no order,
+  invoice or credit note; its refund webhook (Saroh's, or a dashboard
+  refund matched by payment id) settles on that row before the order's
+  refund path (`payments/mismatch-refund.ts`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an

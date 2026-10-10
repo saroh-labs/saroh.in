@@ -129,7 +129,12 @@ export interface HomeUnavailable {
 
 /** The inline actions a Needs-you row can carry (F4). */
 export type HomeInlineKind =
-    "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY" | "REVIEW_REPLY";
+    | "MARK_SENT"
+    | "RETRY"
+    | "SEND_REMINDER"
+    | "REPLY"
+    | "REVIEW_REPLY"
+    | "REFUND";
 
 /**
  * How a Retry is made (F4, D13): `PAY_LINK`, a fresh pay link; `MANDATE`,
@@ -166,7 +171,10 @@ export interface HomeInline {
     sends: boolean;
     /** Whether Undo is offered after (never once a message has left). */
     undoable: boolean;
-    /** What it acts on: the order, subscription, invoice, contact or review id. */
+    /**
+     * What it acts on: the order, subscription, invoice, contact or review
+     * id; for REFUND, the mismatched payment's attempt id.
+     */
     target: string;
     /** The customer's first name, for what the toast says after; else null. */
     person: string | null;

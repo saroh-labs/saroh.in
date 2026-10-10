@@ -11,10 +11,14 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { WaitlistInvitesService } from "../waitlist/invites.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import type { CancelOperationInput } from "./admin-operation-cancel";
+import { cancelOperation, OPERATION_CANCELLED } from "./admin-operation-cancel";
 import { AdminPermission } from "./admin-permissions";
+import { cancelJob, classifyJobCancels } from "./job-cancel";
 
 export const OPERATION_KINDS = [
     "jobs.retry",
+    "jobs.cancel",
     "webhooks.replay",
     "waitlist.invite",
 ] as const;
@@ -42,13 +46,18 @@ export interface OperationPlan {
 
 const TARGET_TYPE: Record<OperationKind, string> = {
     "jobs.retry": "job",
+    "jobs.cancel": "job",
     "webhooks.replay": "webhook_event",
     "waitlist.invite": "waitlist",
 };
 
-/** The permission each kind is started under, for the audit trail. */
-const PERMISSION: Record<OperationKind, AdminPermission> = {
+/**
+ * The permission each kind is started under, for the audit trail. Cancelling
+ * a job is the other half of retrying one (#907): the same people do both.
+ */
+export const PERMISSION: Record<OperationKind, AdminPermission> = {
     "jobs.retry": AdminPermission.JobsRetry,
+    "jobs.cancel": AdminPermission.JobsRetry,
     "webhooks.replay": AdminPermission.WebhooksReplay,
     "waitlist.invite": AdminPermission.WaitlistInvite,
 };
@@ -224,6 +233,18 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         });
     }
 
+    /** Stop an operation's rows that have not started (#907). */
+    cancel(input: CancelOperationInput) {
+        return cancelOperation(
+            this.audit,
+            (kind) =>
+                (OPERATION_KINDS as readonly string[]).includes(kind)
+                    ? PERMISSION[kind as OperationKind]
+                    : undefined,
+            input,
+        );
+    }
+
     /** Work through an operation's PENDING rows, one claimed row at a time. */
     async run(operationId: string): Promise<void> {
         await prisma.adminOperation.updateMany({
@@ -284,8 +305,10 @@ export class AdminOperationsService implements OnApplicationBootstrap {
             where: { id: operationId },
             select: { failed: true, total: true },
         });
-        await prisma.adminOperation.update({
-            where: { id: operationId },
+        // A cancelled operation keeps its CANCELLED (#907): the row that was
+        // running when it was cancelled has recorded what it did above.
+        await prisma.adminOperation.updateMany({
+            where: { id: operationId, status: { not: OPERATION_CANCELLED } },
             data: {
                 status:
                     counts &&
@@ -325,6 +348,8 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         switch (kind) {
             case "jobs.retry":
                 return this.classifyJobs(ids);
+            case "jobs.cancel":
+                return classifyJobCancels(ids);
             case "webhooks.replay":
                 return this.classifyWebhooks(ids);
             case "waitlist.invite":
@@ -434,6 +459,7 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         targetId: string,
     ): Promise<{ status: "DONE" | "SKIPPED" | "FAILED"; detail?: string }> {
         if (kind === "waitlist.invite") return this.invites.sendOne(targetId);
+        if (kind === "jobs.cancel") return cancelJob(targetId);
         if (kind === "webhooks.replay") {
             const result = await this.webhooks.replay(targetId);
             if (result.status === "skipped") {

@@ -7,6 +7,7 @@ import { handoverOf, HomeInlineService, retryVia } from "./home-inline";
 import {
     firstNameOf,
     markSentWords,
+    refundMismatchWords,
     reminderWords,
     replyWords,
     retryWords,
@@ -95,11 +96,23 @@ function setup(opts: {
     charges?: Record<string, "CHARGING" | "MANDATE">;
     /** D14: the business offers autopay now. */
     autopayOffered?: boolean;
+    /** PAY-06: captures taken at the wrong amount. */
+    attempts?: unknown[];
+    /** The providers connected now, by name. */
+    connected?: string[];
 }) {
     const db = {
         order: { findMany: jest.fn().mockResolvedValue(opts.orders ?? []) },
         merchantPaymentProvider: {
             count: jest.fn().mockResolvedValue(opts.providers ?? 1),
+            findMany: jest.fn().mockResolvedValue(
+                (opts.connected ?? ["razorpay"]).map((provider) => ({
+                    provider,
+                })),
+            ),
+        },
+        paymentAttempt: {
+            findMany: jest.fn().mockResolvedValue(opts.attempts ?? []),
         },
     };
     const readFor = jest.fn(async (_org: string, id: string) => ({
@@ -217,6 +230,29 @@ describe("the words", () => {
     });
 });
 
+describe("refundMismatchWords (PAY-06)", () => {
+    it("says how much goes back, how, and that the order stays unpaid", () => {
+        expect(
+            refundMismatchWords("Farah", "₹450.00", "Razorpay", "order"),
+        ).toEqual({
+            label: "Refund",
+            confirm:
+                "₹450.00 goes back to Farah through Razorpay, the way they paid. The order stays unpaid, as it is now. A refund can't be undone.",
+            yes: "Refund ₹450.00",
+            done: "Refund on its way to Farah",
+            sends: false,
+        });
+    });
+
+    it("speaks of the customer when the row names nobody", () => {
+        const words = refundMismatchWords(null, "₹1.00", "Cashfree", null);
+        expect(words.confirm).toBe(
+            "₹1.00 goes back to the customer through Cashfree, the way they paid. A refund can't be undone.",
+        );
+        expect(words.done).toBe("Refund on its way");
+    });
+});
+
 describe("handoverOf", () => {
     it("is the handover step when that's the order's next step", () => {
         expect(handoverOf(order("o"))).toBe("HANDED_TO_COURIER");
@@ -318,6 +354,59 @@ describe("HomeInlineService.decorate", () => {
         const { needs } = flattenNeeds(actions, "Asia/Kolkata");
         expect(needs[0].inline?.kind).toBe("MARK_SENT");
         expect(needs[1].inline).toBeUndefined();
+    });
+
+    it("offers Refund on a capture taken at the wrong amount, at what it took (PAY-06)", async () => {
+        const mismatch = (id: string, provider = "razorpay") => ({
+            id,
+            rawResponse: {
+                invoiceStatus: "AMOUNT_MISMATCH",
+                capturedAmountCents: 45000,
+                capturedCurrency: "INR",
+            },
+            paymentIntent: {
+                provider,
+                currency: "INR",
+                orderId: "ord_1",
+                invoiceId: null,
+            },
+        });
+        const { service } = setup({
+            attempts: [mismatch("att_1"), mismatch("att_2", "cashfree")],
+            connected: ["razorpay"],
+        });
+        const actions = [
+            action("PAYMENTS_REFUNDS_OWED", [
+                ev("att_1", {
+                    subtitle:
+                        "Farah Khan · Paid online at a different amount than asked",
+                }),
+                // Its provider isn't connected: nothing to send it through.
+                ev("att_2"),
+                // An invoice paid twice: a link to the invoice, as before.
+                ev("pi_1"),
+            ]),
+        ];
+        await service.decorate(actions, OWNER, NOW);
+        const [owed, disconnected, invoice] = actions[0].evidence ?? [];
+        expect(owed.inline).toMatchObject({
+            kind: "REFUND",
+            target: "att_1",
+            person: "Farah",
+            yes: "Refund ₹450.00",
+            sends: false,
+            undoable: false,
+        });
+        expect(disconnected.inline).toBeUndefined();
+        expect(invoice.inline).toBeUndefined();
+    });
+
+    it("offers no Refund to a role without order:refund", async () => {
+        const { service, db } = setup({ attempts: [] });
+        const actions = [action("PAYMENTS_REFUNDS_OWED", [ev("att_1")])];
+        await service.decorate(actions, holding("invoice:read"), NOW);
+        expect(actions[0].evidence?.[0].inline).toBeUndefined();
+        expect(db.paymentAttempt.findMany).not.toHaveBeenCalled();
     });
 
     it("offers no Mark sent to a role without order:stage", async () => {

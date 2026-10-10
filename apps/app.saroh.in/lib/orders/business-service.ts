@@ -6,6 +6,7 @@ import type {
     AttentionSource,
 } from "@/lib/customer-workspace/attention";
 
+import type { OnlinePayment } from "./online-payment";
 import type { FulfilmentFields, FulfilmentType } from "./read";
 
 /**
@@ -105,6 +106,13 @@ export interface OrderRow extends FulfilmentFields {
      * from an API before it or when it couldn't be read.
      */
     nextVisit?: { startAt: string; timezone: string } | null;
+    /**
+     * Where its online payment stands when it isn't simply paid (#122):
+     * "Payment failed", "Waiting for Razorpay", "Payment not finished".
+     * Null when there is nothing to chase; absent from an older API or
+     * when it couldn't be read.
+     */
+    onlinePayment?: OnlinePayment | null;
 }
 
 /** One Needs attention entry on a row (B15): its kind and words. */

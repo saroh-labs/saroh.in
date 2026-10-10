@@ -212,6 +212,28 @@ describe("Admin console permission assignments", () => {
     });
 });
 
+describe("Job cancel permissions (#907)", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it.each(["planCancel", "cancelJobs", "planRetry", "retry"] as const)(
+        "lets the people who retry jobs %s",
+        (method) => {
+            expect(perms(method)).toEqual([AdminPermission.JobsRetry]);
+        },
+    );
+
+    // The route reads with platform:read; the service then checks the
+    // permission the operation was started under (admin-operation-cancel).
+    it("cancels an operation behind platform read plus the start permission", () => {
+        expect(perms("cancelOperation")).toEqual([
+            AdminPermission.PlatformRead,
+        ]);
+    });
+});
+
 describe("Waitlist permissions", () => {
     const perms = (name: string) => {
         const route = routeHandlers().find((r) => r.name === name);

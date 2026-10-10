@@ -2,9 +2,17 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         organization: { findMany: jest.fn(), findUnique: jest.fn() },
         auditEvent: { groupBy: jest.fn(async () => []) },
-        job: { groupBy: jest.fn(async () => []) },
+        job: {
+            groupBy: jest.fn(async () => []),
+            // Deleted businesses whose clean-up failed (#921).
+            findMany: jest.fn(async () => []),
+        },
         webhookEvent: { groupBy: jest.fn(async () => []) },
     },
+}));
+// Deletions waiting on refunds (#921): none unless a test says so.
+jest.mock("./deletion-trail", () => ({
+    businessesWaitingOnRefunds: jest.fn(async () => new Set()),
 }));
 
 import { ForbiddenException } from "@nestjs/common";
@@ -12,6 +20,7 @@ import { prisma } from "@saroh/database";
 
 import type { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
+import { businessesWaitingOnRefunds } from "./deletion-trail";
 
 const findMany = prisma.organization.findMany as jest.Mock;
 const jobGroupBy = prisma.job.groupBy as jest.Mock;
@@ -79,10 +88,70 @@ describe("AdminOrganizationsService.directory", () => {
         });
     });
 
-    it("searches by id, name or slug otherwise", async () => {
+    it("searches by id, name, slug or web address otherwise", async () => {
         findMany.mockResolvedValue([]);
         await service.directory({ q: "north" }, { canReadPii: false });
-        expect(findMany.mock.calls[0][0].where.AND[0].OR).toHaveLength(3);
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or.slice(0, 3)).toEqual([
+            { id: "north" },
+            { name: { contains: "north", mode: "insensitive" } },
+            { slug: { contains: "north", mode: "insensitive" } },
+        ]);
+        // The bare address: a site's Saroh address or a claimed host.
+        expect(or).toContainEqual({
+            sites: {
+                some: {
+                    subdomain: { contains: "north", mode: "insensitive" },
+                },
+            },
+        });
+        expect(or).toContainEqual({
+            domains: {
+                some: {
+                    hostname: { contains: "north", mode: "insensitive" },
+                },
+            },
+        });
+    });
+
+    it("finds a business by its custom domain, pasted as a link (#907)", async () => {
+        findMany.mockResolvedValue([]);
+        await service.directory(
+            { q: "https://Shop.Northwind.com/products?x=1" },
+            { canReadPii: false },
+        );
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or).toContainEqual({
+            domains: {
+                some: {
+                    hostname: {
+                        contains: "shop.northwind.com",
+                        mode: "insensitive",
+                    },
+                },
+            },
+        });
+        // A custom domain names no Saroh address.
+        expect(JSON.stringify(or)).not.toContain("subdomain");
+    });
+
+    it("finds a business by its Saroh address (#907)", async () => {
+        findMany.mockResolvedValue([]);
+        await service.directory(
+            { q: "northwind.saroh.app" },
+            { canReadPii: false },
+        );
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or).toContainEqual({
+            sites: {
+                some: {
+                    subdomain: { contains: "northwind", mode: "insensitive" },
+                },
+            },
+        });
+        expect(or).toContainEqual({
+            slug: { equals: "northwind", mode: "insensitive" },
+        });
     });
 
     it("pages on a cursor with a tie-breaking order, reading one extra row", async () => {
@@ -117,6 +186,34 @@ describe("AdminOrganizationsService.directory", () => {
         const page = await service.directory({}, { canReadPii: false });
         expect(page.items[0]?.attention).toEqual(["PAST_DUE", "FAILED_JOBS"]);
         expect(page.items[0]?.plan).toEqual({ key: "pro", name: "Pro" });
+    });
+
+    it("flags a deleted business whose clean-up has failed (#921)", async () => {
+        findMany.mockResolvedValue([
+            record("gone", { lifecycleStatus: "DELETED_RETAINED" }),
+        ]);
+        (prisma.job.findMany as jest.Mock).mockResolvedValueOnce([
+            { organizationId: "gone" },
+        ]);
+        const page = await service.directory({}, { canReadPii: false });
+        expect(page.items[0]?.attention).toEqual(["DELETION_CLEANUP"]);
+    });
+
+    it("flags a deletion waiting on refunds, and finds it under Needs attention (#921)", async () => {
+        findMany.mockResolvedValue([
+            record("closing", { lifecycleStatus: "PENDING_DELETION" }),
+        ]);
+        (businessesWaitingOnRefunds as jest.Mock).mockResolvedValue(
+            new Set(["closing"]),
+        );
+        const page = await service.directory(
+            { health: "attention" },
+            { canReadPii: false },
+        );
+        expect(page.items[0]?.attention).toEqual(["DELETION_WAITING_REFUNDS"]);
+        const where = JSON.stringify(findMany.mock.calls[0][0].where);
+        expect(where).toContain('{"id":{"in":["closing"]}}');
+        (businessesWaitingOnRefunds as jest.Mock).mockResolvedValue(new Set());
     });
 
     it("filters to businesses without a plan", async () => {

@@ -6,8 +6,10 @@ import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin-shell";
 import { AutoRefresh } from "@/components/operations/auto-refresh";
+import { CancelOperation } from "@/components/operations/cancel-operation";
 import { Facts, Panel } from "@/components/panel";
-import { requireStaff } from "@/lib/console";
+import { can, requireStaff } from "@/lib/console";
+import type { AdminPermission } from "@/lib/control-plane";
 import { formatDateTime } from "@/lib/format";
 import type { OperationDetail } from "@/lib/machinery";
 import { getOperation } from "@/lib/machinery";
@@ -16,8 +18,17 @@ export const metadata = { title: "Operation" };
 
 const TITLE: Record<OperationDetail["kind"], string> = {
     "jobs.retry": "Job retry",
+    "jobs.cancel": "Job cancel",
     "webhooks.replay": "Webhook replay",
     "waitlist.invite": "Waitlist invites",
+};
+
+/** The permission each kind is started (and cancelled) under. */
+const START_PERMISSION: Record<OperationDetail["kind"], AdminPermission> = {
+    "jobs.retry": "jobs:retry",
+    "jobs.cancel": "jobs:retry",
+    "webhooks.replay": "webhooks:replay",
+    "waitlist.invite": "waitlist:invite",
 };
 
 const ITEM: Partial<
@@ -53,6 +64,19 @@ export default async function OperationPage({
     const running =
         operation.status === "PENDING" || operation.status === "RUNNING";
     const title = TITLE[operation.kind];
+    const waiting = operation.items.filter(
+        (item) => item.status === "PENDING",
+    ).length;
+    // Cancelling needs the permission it was started under; the API checks.
+    const canCancel =
+        running &&
+        waiting > 0 &&
+        can(gate.staff, START_PERMISSION[operation.kind]);
+    const state = running
+        ? "Running"
+        : operation.status === "CANCELLED"
+          ? "Cancelled"
+          : "Finished";
 
     return (
         <AdminShell staff={gate.staff}>
@@ -62,8 +86,16 @@ export default async function OperationPage({
                     breadcrumb={["Operations", title]}
                     title={title}
                     description={operation.reason}
+                    actions={
+                        canCancel ? (
+                            <CancelOperation
+                                operationId={operation.id}
+                                waiting={waiting}
+                            />
+                        ) : undefined
+                    }
                 />
-                <Panel title={running ? "Running" : "Finished"}>
+                <Panel title={state}>
                     {() => (
                         <div className="grid gap-4">
                             <Progress

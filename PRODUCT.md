@@ -91,7 +91,17 @@ SUGGESTION — so the first thing on screen is the most consequential.
 - `--accent` is a shadcn neutral (32 component usages), **not** a brand accent —
   renaming it breaks components
 - Turning a capability off never deletes merchant data
-- Currently waitlist-only; open signup is gated on UX work
+- Sign-up is closed until early access opens, and opening it is the owner's
+  call on judgement, not a checklist. Two switches hold it shut, and flipping
+  both is the whole of opening: production `accounts.saroh.in` admits only a
+  browser holding the prelaunch key while `PRELAUNCH_GATE` is `on` in
+  `apps/accounts.saroh.in/wrangler.jsonc` (anyone else lands on
+  www.saroh.in; `off` and the next deploy takes the key away), and
+  `saroh.in` sends every start button to `/waitlist` and shows no Sign in or
+  Pricing until `NEXT_PUBLIC_LAUNCH_MODE` is `open` (`apps/saroh.in/lib/links.ts`).
+  Until then people join the waitlist (`WaitlistSignup`), and staff invite
+  from it in `admin.saroh.in` (`waitlist:invite`); the invitation's sign-up
+  link works once accounts is open
 
 ## Brand Commitments
 

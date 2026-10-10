@@ -2531,7 +2531,7 @@ model AdminOperation {
   id String @id @default(cuid())
 
   kind        String // "jobs.retry" | "webhooks.replay"
-  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED | CANCELLED (#907)
   actorUserId String
   reason      String
 
@@ -4057,7 +4057,7 @@ model Job {
   type    String // handler key, e.g. "enquiry.notify"
   payload Json // handler input
 
-  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED
+  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED; PENDING → CANCELLED (staff, #907)
   attempts    Int    @default(0)
   maxAttempts Int    @default(5)
 
@@ -4086,6 +4086,10 @@ model Job {
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
   // One waiting run of the custom-domain re-check chain (#860), like the renewal chain.
   @@unique([type], map: "Job_one_pending_domains_recheck", where: raw("type = 'domains.recheck' AND status = 'PENDING'"))
+  // One waiting run of the daily analytics retention sweep (#799), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_analytics_retention", where: raw("type = 'analytics.retention' AND status = 'PENDING'"))
+  // One waiting run of the daily business deletion sweep (#907), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_organization_deletion", where: raw("type = 'organization.deletion' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4755,7 +4759,8 @@ model PaymentAttempt {
   provider    String
   providerRef String? // provider payment id
   // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
-  // taken on an invoice that was already paid or void when it arrived, or
+  // taken on an invoice that was already paid or void when it arrived, or at
+  // an amount or currency the intent didn't ask for (PAY-06), or
   // STOCK_HELD: Saroh's note that this payment's order held its units
   // (stock/reserve.ts reserveOnPayment), not a provider interaction.
   status      String
@@ -4851,8 +4856,11 @@ model WebhookEvent {
 
   createdAt DateTime @default(now())
 
-  // Idempotency backstop: one row per provider event.
-  @@unique([provider, providerEventId])
+  // Idempotency backstop: one row per provider event, per business (PAY-05,
+  // #106). Unique across all businesses let one business, signing bodies to
+  // its own endpoint, claim an event id first and have another's real
+  // delivery dropped as a duplicate.
+  @@unique([organizationId, provider, providerEventId])
   @@index([organizationId])
   @@index([status])
 }

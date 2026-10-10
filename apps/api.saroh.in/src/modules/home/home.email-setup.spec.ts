@@ -119,7 +119,7 @@ describe("no email provider on Home", () => {
         };
         const setup: HomeAction = {
             code: "CRM_SETUP",
-            title: "Create a pipeline",
+            title: "Add your first lead",
             href: "/settings/modules",
             severity: "SETUP",
         };

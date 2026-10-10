@@ -30,6 +30,7 @@ jest.mock("@saroh/database", () => {
         },
         delivery: { create: jest.fn() },
         job: { create: jest.fn() },
+        customerNotice: { findFirst: jest.fn() },
         contact: { findUnique: jest.fn() },
         lead: { findUnique: jest.fn() },
         invoice: { findFirst: jest.fn() },
@@ -279,6 +280,34 @@ describe("CommunicationsService.connectProvider — the key checked first (UX-01
             }),
         );
         expect(result.attention).toBeNull();
+    });
+
+    it("tells the team emails go out again when the key ends a refusal they were told of, but not whoever entered it (#555)", async () => {
+        const { service } = serviceAnswering("ACCEPTED");
+        providerFindUnique.mockResolvedValue({
+            attentionAt: new Date("2026-10-08T09:00:00Z"),
+        });
+        (prisma.customerNotice.findFirst as jest.Mock).mockResolvedValue({
+            eventKey: "team:provider:cp_1:down:2026-10-08T09:00:00.000Z",
+        });
+
+        await service.connectProvider(ctx(), RESEND);
+
+        expect(prisma.job.create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "EMAIL",
+                    providerId: "cp_1",
+                    since: expect.any(String),
+                    actorUserId: ctx().userId,
+                },
+            },
+        });
+        providerFindUnique.mockReset();
     });
 
     it("lets through a provider the adapter can't check (an SMTP relay)", async () => {

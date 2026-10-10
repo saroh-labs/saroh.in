@@ -3,6 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMoneyString } from "../../common/money";
+import { billingMayChargeFor } from "../billing/business-closing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import {
     chargeUnderWayOn,
@@ -342,6 +343,16 @@ export class SubscriptionChargeHandler {
         intentId: string,
         now: Date,
     ): Promise<boolean> {
+        // A closing or deleted business debits nobody (#921): the charge is
+        // let go and the invoice keeps its pay link, which the business's
+        // closed state refuses in turn.
+        if (!(await billingMayChargeFor(prisma, organizationId))) {
+            await this.letGo(organizationId, intentId);
+            this.logger.warn(
+                `subscription_charge_business_closed org=${organizationId} intent=${intentId}`,
+            );
+            return false;
+        }
         const invoice = await prisma.invoice.findFirst({
             where: { id: p.invoiceId, organizationId },
             select: {

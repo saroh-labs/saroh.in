@@ -8,6 +8,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import type { CustomerPick } from "@/lib/customers/picker";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {
     OrderFilterOptions,
@@ -125,6 +126,11 @@ export function OrdersScreen({
          * reason beside it — before anyone fills the sheet in.
          */
         blocked?: string | null;
+        /**
+         * Who it is for, already chosen (#247): the person page's New
+         * order arrives with `?new=1&contactId=`. Null starts it empty.
+         */
+        initialPick?: CustomerPick | null;
     } | null;
 }) {
     const router = useRouter();
@@ -369,6 +375,7 @@ export function OrdersScreen({
                     canLink={can.create}
                     online={newOrder.online ?? true}
                     canSearch={newOrder.canSearch}
+                    initialPick={newOrder.initialPick ?? null}
                 />
             ) : null}
 

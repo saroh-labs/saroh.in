@@ -97,6 +97,7 @@ export function CustomerDetailScreen({
     crumbsSell,
     deleteWords,
     canRecordPayment = false,
+    starts = [],
 }: {
     d: CustomerDetail;
     initialTab: TabKey;
@@ -148,6 +149,8 @@ export function CustomerDetailScreen({
     deleteWords?: string;
     /** `invoice:write`: Record payment on each unpaid invoice (#869). */
     canRecordPayment?: boolean;
+    /** New order, New booking for them (#247), in the header. */
+    starts?: { label: string; href: string }[];
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -355,6 +358,7 @@ export function CustomerDetailScreen({
                     canMore={canWrite || canMerge || canRemove}
                     onEdit={more.edit}
                     menu={more.menu}
+                    starts={starts}
                 />
                 <DuplicateNotice
                     // A same email is offered to whoever edits contacts

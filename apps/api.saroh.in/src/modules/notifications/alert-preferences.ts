@@ -89,16 +89,20 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // R34: an order to pay on handover nobody came for in three days.
     order: ["order.new", "order.uncollected"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
-    // UX-012: a provider that refused the business's keys.
-    failed: ["payment.failed", "provider.attention"],
+    // UX-012: a provider that refused the business's keys, and (#555) one
+    // that works again.
+    failed: ["payment.failed", "provider.attention", "provider.back"],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.
+    // #917: a live custom domain that stopped working, and came back.
     site: [
         "site.live",
         "site.not_live",
         "site.review.approved",
         "site.review.changes",
         "site.review.note",
+        "domain.down",
+        "domain.back",
     ],
 };
 

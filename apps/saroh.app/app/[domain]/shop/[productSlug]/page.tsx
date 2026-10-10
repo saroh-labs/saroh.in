@@ -12,6 +12,7 @@ import {
 
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
+import { productJsonLdScript } from "@/lib/product-json-ld";
 import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
@@ -140,6 +141,17 @@ export default async function ShopProductPage({
     // The page's main landmark (UX-082): the header and footer sit outside.
     return (
         <main className="mx-auto w-full max-w-screen-xl">
+            {/* Product structured data (#473), from what this page shows. */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: productJsonLdScript({
+                        product,
+                        origin: `https://${domain}`,
+                        business,
+                    }),
+                }}
+            />
             <ProductPage product={product} preview={false} action={action} />
         </main>
     );

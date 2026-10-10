@@ -11,6 +11,7 @@ import { DateTime, IANAZone } from "luxon";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { billingMayChargeFor } from "../billing/business-closing";
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -1832,6 +1833,11 @@ export class SubscriptionsService {
                 await endMandates(tx, sub.organizationId, id);
                 return "ended";
             }
+            // A closing or deleted business renews nothing (#921), read
+            // again under the lock: the period waits.
+            if (!(await billingMayChargeFor(tx, sub.organizationId))) {
+                return "skipped";
+            }
 
             // A plan change booked for this renewal takes effect now. A new
             // interval starts its own chain where the old period ended.
@@ -1948,7 +1954,9 @@ export class SubscriptionsService {
                 sub.cancelAtPeriodEnd ||
                 sub.currentPeriodEnd <= now ||
                 now < earlyIssueAt(sub.currentPeriodEnd, sub.timezone) ||
-                !this.charges
+                !this.charges ||
+                // A closing or deleted business renews nothing (#921).
+                !(await billingMayChargeFor(tx, sub.organizationId))
             ) {
                 return "skipped";
             }

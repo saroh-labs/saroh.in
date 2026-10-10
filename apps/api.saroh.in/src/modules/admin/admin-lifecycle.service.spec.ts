@@ -14,6 +14,14 @@ jest.mock("@saroh/database", () => {
         },
         auditEvent: { create: jest.fn() },
         adminOrganizationNote: { create: jest.fn() },
+        // Scheduling deletion stops renewals (#921).
+        billingCheckout: {
+            findMany: jest.fn(async () => []),
+            findUnique: jest.fn(async () => null),
+            update: jest.fn(),
+        },
+        job: { create: jest.fn() },
+        $queryRaw: jest.fn(),
         $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
             callback(prisma),
         ),
@@ -216,6 +224,44 @@ describe("AdminLifecycleService — lifecycle", () => {
             (data.deletionScheduledAt.getTime() - Date.now()) / 86_400_000;
         expect(days).toBeGreaterThan(29.9);
         expect(days).toBeLessThanOrEqual(30);
+    });
+
+    it("charges no renewal during the window: the provider subscription ends with the period paid (#921)", async () => {
+        subFind.mockResolvedValue({
+            id: "sub_1",
+            status: "ACTIVE",
+            provider: "RAZORPAY",
+            providerSubscriptionId: "rzp_sub_1",
+            cancelAtPeriodEnd: false,
+        });
+        const { service } = build();
+        await service.scheduleDeletion({
+            staff,
+            organizationId: "org_1",
+            reason: "Owner asked to close",
+            confirmName: "Northwind Supply",
+            retentionDays: 30,
+        });
+        expect(prisma.subscription.update).toHaveBeenCalledWith({
+            where: { id: "sub_1" },
+            data: { cancelAtPeriodEnd: true },
+        });
+        expect(prisma.job.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "billing.provider.cancel",
+                payload: {
+                    provider: "RAZORPAY",
+                    providerSubscriptionId: "rzp_sub_1",
+                    atCycleEnd: true,
+                },
+            }),
+        });
+        // Written to both ledgers with the counts.
+        expect(tenantAudit).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                metadata: expect.objectContaining({ providerCancels: 1 }),
+            }),
+        });
     });
 
     it("cancels a scheduled deletion by reinstating", async () => {

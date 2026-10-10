@@ -36,7 +36,6 @@ const CLASS_LEVEL: Record<string, string> = {
     "leads/leads.controller.ts": "CRM",
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
-    "bookings/bookings.controller.ts": "APPOINTMENTS",
     // A12: a class's waitlist, for the team.
     "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
@@ -58,13 +57,10 @@ const CLASS_LEVEL: Record<string, string> = {
     // addresses kept for one release.
     "catalogue/catalogue.controller.ts": "COMMERCE",
     "catalogue/store-catalogue.controller.ts": "COMMERCE",
-    // The business's orders across its storefronts, and the storefronts.
-    "orders/organization-orders.controller.ts": "COMMERCE",
+    // The storefronts.
     "stores/storefronts.controller.ts": "COMMERCE",
-    "customers/customers.controller.ts": "COMMERCE",
     "discounts/discounts.controller.ts": "COMMERCE",
     "product-reviews/product-reviews.controller.ts": "COMMERCE",
-    "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
     // #531: the business's products and where each is sold.
@@ -75,10 +71,6 @@ const CLASS_LEVEL: Record<string, string> = {
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
-    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
-    // Both of its controllers: the packs, and using one on a booking (E12).
-    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
-    "courses/courses.controller.ts": "COURSES",
 };
 
 /**
@@ -90,6 +82,27 @@ const METHOD_LEVEL: Record<string, string> = {
     // DEC-070: invoicing needs no module; only the pay link is Payments'.
     "invoices/invoices.controller.ts": "PAYMENTS",
     "communications/communications.controller.ts": "COMMUNICATIONS",
+    // #117: history reads stay open when the module is off; every write and
+    // operational route is gated. `history-reads.gate.spec.ts` pins which.
+    "orders/orders.controller.ts": "COMMERCE",
+    "orders/organization-orders.controller.ts": "COMMERCE",
+    "customers/customers.controller.ts": "COMMERCE",
+    "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // #117 (owner, 9 Oct): plans, subscriptions, packs and courses keep their
+    // history readable too, and cancelling a subscription or an enrolment is
+    // wind-down, allowed with the module off.
+    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
+    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
+    "courses/courses.controller.ts": "COURSES",
+};
+
+/**
+ * A METHOD_LEVEL file may hold a second controller that is wholly a write and
+ * gated at the class: named here, so no other one is.
+ */
+const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
+    // Using a pack on a booking, or taking it off (E12).
+    "class-packs/class-packs.controller.ts": ["BookingClassPackController"],
 };
 
 /**
@@ -145,6 +158,8 @@ const NEVER: Record<string, string> = {
     "admin/admin-waitlist.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-deployments.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-usage.controller.ts":
         "staff control plane, not a tenant surface",
     "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
@@ -309,9 +324,14 @@ describe("module enforcement rollout (#117)", () => {
             // If it ever moves to the class, the exempt handlers below it stop
             // being exempt — which is the mistake this file exists to catch.
             const classLevel = new RegExp(
-                `@RequireModule\\("${moduleKey}"\\)\\s*\\nexport class`,
+                `@RequireModule\\("${moduleKey}"\\)\\s*\\n(?:@IgnoreModuleReadiness\\(\\)\\s*\\n)?export class (\\w+)`,
+                "g",
             );
-            expect(text).not.toMatch(classLevel);
+            const gatedWhole = Array.from(
+                text.matchAll(classLevel),
+                (m) => m[1],
+            );
+            expect(gatedWhole).toEqual(CLASS_LEVEL_WITHIN[file] ?? []);
         },
     );
 
@@ -409,9 +429,9 @@ describe("module enforcement rollout (#117)", () => {
         }
     });
 
-    it("gates both Class packs controllers on CLASS_PACKS, not Appointments (E12)", () => {
+    it("gates Class packs on CLASS_PACKS, not Appointments (E12)", () => {
         const text = source("class-packs/class-packs.controller.ts");
-        expect(text.match(/@RequireModule\("CLASS_PACKS"\)/g)).toHaveLength(2);
+        expect(text).toContain('@RequireModule("CLASS_PACKS")');
         expect(text).not.toContain('@RequireModule("APPOINTMENTS")');
     });
 

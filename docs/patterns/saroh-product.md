@@ -359,7 +359,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   amended 2026-10-07): sign-in and account mail, team invitations, Saroh's
   billing, the waitlist, alerts to a business's own team (enquiries, and
   the team alerts — new order, booking, failed payment, someone joining, a
-  go-live — for every business, provider or not, in fixed words with the
+  go-live, a custom domain that stopped working (#917) — for every business, provider or not, in fixed words with the
   business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
   with Saroh's built-in customer accounts (ADR-011), and a template test
   sent to the signed-in user's own verified address. A business that brings
@@ -420,7 +420,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
   nothing when the browser sends Do Not Track or Global Privacy Control,
   nothing from the account area, never on a test release or preview), and an
-  enquiry writes `enquiry.submitted` in its own transaction (UX-032).
+  enquiry writes `enquiry.submitted` in its own transaction (UX-032). Its
+  Orders tile (#919) counts `order.paid` less `order.refunded` (#867) over the
+  range's days; nothing before #867 is back-filled (DEC-012), so a line under
+  the tiles says so while the range reaches back before
+  `ORDERS_RECORDED_FROM` (`lib/analytics/website-words.ts`).
 
 ## One word each
 
@@ -461,8 +465,12 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
   start button then goes to accounts `/signup?plan=&cycle=`, the plan rides
   through verification to onboarding, is checked there against the live
   catalogue, and a paid one goes on to its checkout once the business exists
-  (Free otherwise, and an unknown plan says so). Flipping the switch is
-  launch; until then no CTA points at sign-up. Social publishing is not a
+  (Free otherwise, and an unknown plan says so). The second switch is
+  production accounts' prelaunch key gate (`PRELAUNCH_GATE` in
+  `apps/accounts.saroh.in/wrangler.jsonc`), which keeps sign-in and
+  sign-up to key holders and sends everyone else to www.saroh.in. Flipping
+  both is launch, on the owner's judgement (`PRODUCT.md`); until then no CTA
+  points at sign-up or Sign in. Social publishing is not a
   current priority and must not be exposed as production-ready (§22). AI
   features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,

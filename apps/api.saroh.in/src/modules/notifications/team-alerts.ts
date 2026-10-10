@@ -39,13 +39,20 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   becomes due; told on the New order row's choices, once per order.
  * - `provider`: a connected payment or email provider refused the
  *   business's keys on a live call and was marked as needing attention
- *   (UX-012). Keyed to the connection and the instant it was flagged, so
- *   each refusal is told once; told on the Payment failed row. Saroh
- *   sends the email, so an email provider's refusal is emailed too.
+ *   (UX-012), `change` "down" (or absent, as queued before #555); or it
+ *   works again — keys entered again, or a live call accepted — "back"
+ *   (#555). Keyed to the connection, the change and the instant, and told
+ *   once per incident (`provider-alerts.ts`); on the Payment failed row.
+ *   Saroh sends the email, so an email provider's refusal is emailed too.
+ *   `actorUserId` is who entered the keys again, not emailed.
  * - `review`: the website's review (UX-043). A review asked for, or a new
  *   test release, emails the site's reviewers (they have no bell); a verdict, or a reviewer's first note of a round, tells
  *   the people who publish, on the Website row. Keyed to the approval, the
  *   release, or the reviewer's round.
+ * - `domain`: a live custom domain stopped reaching its site, or came back
+ *   (#917, `domain-alerts.ts`), queued by the domain's check. `at` is the
+ *   check that saw it; told once per incident, on the Your website row.
+ *   `actorUserId` pressed "Check now" and isn't emailed.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -57,11 +64,21 @@ export type TeamAlertPayload =
           event: "provider";
           channel: "PAYMENTS" | "EMAIL";
           providerId: string;
+          /** When it was flagged ("down") or cleared ("back"). */
           since: string;
+          change?: "down" | "back";
+          actorUserId?: string | null;
       }
     | { event: "review"; about: "approval"; approvalId: string }
     | { event: "review"; about: "note"; commentId: string }
     | { event: "review"; about: "release"; testReleaseId: string }
+    | {
+          event: "domain";
+          domainId: string;
+          change: "down" | "back";
+          at: string;
+          actorUserId?: string | null;
+      }
     | {
           event: "site";
           testReleaseId: string;

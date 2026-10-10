@@ -85,7 +85,11 @@ describe("the public plans route (G9)", () => {
     );
 
     it("carries no guard: visitors have no session or organization", () => {
-        expect(source).not.toContain("@UseGuards(");
+        // Only the one every public site read carries: a deleted business's
+        // site is offline (#921). It asks for no session.
+        expect(source.match(/@UseGuards\([^)]*\)/g)).toEqual([
+            "@UseGuards(PublicSiteOnlineGuard)",
+        ]);
         expect(source).not.toContain("@RequireModule(");
     });
 

@@ -22,6 +22,7 @@ import {
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
+import { onlinePaymentWords } from "@/lib/orders/online-payment";
 import { handoverPayment } from "@/lib/orders/pay-on-handover";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
@@ -370,6 +371,14 @@ export function OrderDetail({
                 {unpaid ? (
                     <PaymentBanner
                         failed={order.paymentStatus === "FAILED"}
+                        online={
+                            order.onlinePayment
+                                ? onlinePaymentWords(
+                                      order.onlinePayment,
+                                      linkable && can.payOnline === true,
+                                  )
+                                : null
+                        }
                         first={first}
                         canRecord={can.edit}
                         onCash={() =>
@@ -525,7 +534,6 @@ export function OrderDetail({
                                 number={number}
                                 first={first}
                                 refundTo={refundTo}
-                                remaining={remaining}
                                 linkable={
                                     can.payLink && (can.payOnline ?? false)
                                 }

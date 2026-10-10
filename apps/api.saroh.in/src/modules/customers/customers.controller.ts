@@ -18,9 +18,14 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { CustomersService } from "./customers.service";
 import { CreateCustomerDto, UpdateCustomerDto } from "./dto";
 
+/**
+ * A storefront's customers. Commerce gates adding, changing and removing
+ * one, per handler; reading the customers already on the books is history,
+ * and stays open when a business switches Commerce off (#117,
+ * `MODULE_ROLLOUT.md`). The service still asks `order:read` of every read.
+ */
 @Controller("stores/:storeId/customers")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
-@RequireModule("COMMERCE")
 export class CustomersController {
     constructor(private readonly customers: CustomersService) {}
 
@@ -30,6 +35,7 @@ export class CustomersController {
     }
 
     @Post()
+    @RequireModule("COMMERCE")
     @HttpCode(201)
     create(
         @CurrentUser() user: AuthUser,
@@ -49,6 +55,7 @@ export class CustomersController {
     }
 
     @Delete(":customerId")
+    @RequireModule("COMMERCE")
     remove(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
@@ -58,6 +65,7 @@ export class CustomersController {
     }
 
     @Put(":customerId")
+    @RequireModule("COMMERCE")
     update(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,

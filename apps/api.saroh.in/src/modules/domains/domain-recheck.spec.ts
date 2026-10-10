@@ -11,6 +11,8 @@ jest.mock("@saroh/database", () => ({
         },
         site: { update: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
+        customerNotice: { findFirst: jest.fn() },
+        $transaction: jest.fn(),
     },
 }));
 
@@ -46,6 +48,8 @@ const findUnique = prisma.domain.findUnique as jest.Mock;
 const update = prisma.domain.update as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
+const lastTold = prisma.customerNotice.findFirst as jest.Mock;
+const transaction = prisma.$transaction as jest.Mock;
 
 const NOW = new Date("2026-10-09T10:00:00.000Z");
 const MIN = 60 * 1000;
@@ -205,6 +209,11 @@ describe("DomainRecheckHandler", () => {
             },
         );
         jobCreate.mockResolvedValue({});
+        lastTold.mockResolvedValue(null);
+        // One client: the transaction's writes land in the same table.
+        transaction.mockImplementation(
+            (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma),
+        );
     });
 
     afterEach(() => {
@@ -213,6 +222,22 @@ describe("DomainRecheckHandler", () => {
     });
 
     const job = { id: "job_1", payload: {} } as unknown as Job;
+
+    function alerts() {
+        return jobCreate.mock.calls
+            .map(
+                ([arg]) =>
+                    (
+                        arg as {
+                            data: {
+                                type: string;
+                                payload: Record<string, unknown>;
+                            };
+                        }
+                    ).data,
+            )
+            .filter((d) => d.type === "team.alert");
+    }
 
     function nextRuns() {
         return jobCreate.mock.calls
@@ -266,6 +291,72 @@ describe("DomainRecheckHandler", () => {
             hostingStatus: "FAILED",
             hostingError: HOSTING_WORDS.blocked,
         });
+    });
+
+    it("tells the team once when a live domain goes down, on the check's transaction (#917)", async () => {
+        const { handler, hosting } = setup();
+        const made = await hosting.register("shop.acme.com");
+        hosting.set(made.id, "FAILED", "CERTIFICATE");
+        const domain = row({
+            hostname: "shop.acme.com",
+            hostingId: made.id,
+            hostingStatus: "ACTIVE",
+            hostingCheckedAt: ago(DAY),
+        });
+        seed(domain);
+
+        await handler.sweep(NOW);
+
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(alerts()).toEqual([
+            {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "domain",
+                    domainId: domain.id,
+                    change: "down",
+                    at: NOW.toISOString(),
+                    actorUserId: null,
+                },
+            },
+        ]);
+
+        // Checked again a day on, still down: nothing new to say.
+        lastTold.mockResolvedValue({
+            eventKey: `team:domain:${domain.id}:down:${NOW.toISOString()}`,
+        });
+        jest.setSystemTime(new Date(NOW.getTime() + DAY));
+        await handler.sweep(new Date(NOW.getTime() + DAY));
+        expect(alerts()).toHaveLength(1);
+
+        // It works again: told once.
+        hosting.set(made.id, "ACTIVE");
+        jest.setSystemTime(new Date(NOW.getTime() + 2 * DAY));
+        await handler.sweep(new Date(NOW.getTime() + 2 * DAY));
+        expect(alerts().map((a) => a.payload)).toEqual([
+            expect.objectContaining({ change: "down" }),
+            expect.objectContaining({ change: "back" }),
+        ]);
+    });
+
+    it("says nothing when a domain goes live for the first time", async () => {
+        const { handler, hosting } = setup();
+        const made = await hosting.register("shop.acme.com");
+        hosting.set(made.id, "ACTIVE");
+        seed(
+            row({
+                hostname: "shop.acme.com",
+                hostingId: made.id,
+                hostingStatus: "PENDING",
+                verifiedAt: ago(10 * MIN),
+                hostingCheckedAt: ago(5 * MIN),
+            }),
+        );
+
+        await handler.sweep(NOW);
+
+        expect(alerts()).toEqual([]);
     });
 
     it("leaves a domain alone until its turn", async () => {

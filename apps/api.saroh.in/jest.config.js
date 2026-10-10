@@ -76,6 +76,12 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
+        // #117: the guard's shadow/refused log lines and their throttle, the
+        // history reads that stay open with a module off, and the source
+        // scan of what is gated — no database.
+        "<rootDir>/src/modules/capabilities/module-enforcement.log.spec.ts",
+        "<rootDir>/src/modules/capabilities/history-reads.gate.spec.ts",
+        "<rootDir>/src/modules/capabilities/module-annotations.spec.ts",
         // #274 the same guard with the REAL availability service, per role:
         // which roles reach which module under MODULE_ENFORCEMENT (mocked I/O).
         "<rootDir>/src/modules/capabilities/module-enforcement.roles.spec.ts",
@@ -212,6 +218,9 @@ module.exports = {
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
+        // #122: an order's online payment in words — failed, waiting, not
+        // finished — with a mocked Prisma.
+        "<rootDir>/src/modules/orders/online-payment.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
         // B13: New order's rules and how a walk-in reads, DB-free. The
@@ -234,6 +243,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/uncollected.spec.ts",
         // Record as refunded's amount and words (UX-061).
         "<rootDir>/src/modules/orders/hand-payments.spec.ts",
+        // Another amount recorded by hand (#865, DEC-116), pure.
+        "<rootDir>/src/modules/orders/hand-refund.spec.ts",
+        // What a cancel sends back once part went back by hand (#918).
+        "<rootDir>/src/modules/orders/order-cancel.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
