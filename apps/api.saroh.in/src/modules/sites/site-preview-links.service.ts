@@ -82,7 +82,7 @@ export interface PreviewView {
      * preview without them reads as before.
      */
     modules?: PublicModulePageStates;
-    /** The icon publishing would show (DEC-121); null for the plain tile. */
+    /** The icon publishing would show (DEC-124); null for the plain tile. */
     icon?: PublicSiteIcon | null;
 }
 
@@ -321,7 +321,7 @@ export class SitePreviewLinksService {
             siteId: link.siteId,
             expiresAt: link.expiresAt,
             ...(modules ? { modules } : {}),
-            // The icon publishing would show (DEC-121): the draft's own,
+            // The icon publishing would show (DEC-124): the draft's own,
             // else the business logo.
             icon: await publicSiteIcon(snapshot, link.organizationId),
         };

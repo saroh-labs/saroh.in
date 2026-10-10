@@ -215,6 +215,21 @@ organizations/:org/customers`: everyone who has paid (an order through a
   deleted** — an order keeps who bought it; the menu shows why, it does not
   hide the option.
 
+## Closing a business
+
+- **Current** (DEC-120, owner 9 Oct) — **A business scheduled for deletion
+  winds down.** Until its date nothing new starts, and what is already made
+  can be finished, cancelled and refunded; the banner on every page says so
+  and, to an owner, offers **Download your data** (Settings › Your data, the
+  owner's alone, open at any time): one zip of spreadsheets and uploaded
+  files, emailed as a link and kept 7 days. Copy never promises a refund can
+  be sent online once the payment provider is disconnected: it says to
+  refund in the provider's dashboard and record it.
+- **Current** (DEC-120) — **Customers are never told a business is closing,
+  suspended or deleted.** Its site says "This business isn't taking orders
+  right now." / "…isn't taking bookings online right now." (the paused
+  words, #800), and a refusal names no state.
+
 ## Bookings
 
 - **Current** — Availability is pure, timezone-aware geometry
@@ -337,6 +352,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
   publications keep validating.
+- **Current** (DEC-121, amended 10 Oct) — **A site says who the customer
+  is buying from, in the business's own details, never in Saroh's words.**
+  The footer's "Sold by ‹legal name›" (the site's name when none is set;
+  "Run by" where the shop doesn't serve), its registered address and its
+  contact, each only if set, on every plan; the order and booking
+  confirmations carry the one line. Never the GSTIN. "Report", to
+  `saroh.in/customers`, sits beside "Made with Saroh" on Free only: a paid
+  site carries no Saroh link. Settings › Business asks for the details
+  while a business with a published website lacks them (`lib/settings/nudges.ts`).
 - **Current** — A merchant's site never wears Saroh's brand (`--site-*`, gates
   G2 and G6). A Site owns its Posts (ADR-004).
 - **Current** — A form entry is the record of what someone typed; it

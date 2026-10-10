@@ -6,7 +6,7 @@ import {
 } from "../organizations/business-logo";
 
 /**
- * A site's icon (DEC-121): what a browser tab, a bookmark and a phone's
+ * A site's icon (DEC-124): what a browser tab, a bookmark and a phone's
  * home screen show for a merchant's site.
  *
  * Which one a site shows, in order:

@@ -1,5 +1,5 @@
 /**
- * The business logo is the icon of a site with none of its own (DEC-121),
+ * The business logo is the icon of a site with none of its own (DEC-124),
  * read live by the public site read. So setting or removing it tells the
  * merchant sites' page cache (#863), or a kept page carries the old logo in
  * its head until its five minutes are up. DB-free.

@@ -55,7 +55,7 @@ export class UpdateStoreDto {
     description?: string | null;
 
     /**
-     * The location's own logo (DEC-120): an image the business uploaded to
+     * The location's own logo (DEC-123): an image the business uploaded to
      * its library, or `null` to use the business logo. Left out, the logo
      * stays as it is.
      */

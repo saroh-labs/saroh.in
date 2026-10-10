@@ -13,9 +13,11 @@ import {
 import { CataloguePlan } from "@/components/business/catalogue-plan";
 import { CloseAccess } from "@/components/business/close-access";
 import { DeletionPanels } from "@/components/business/deletion-panels";
+import { LegalHoldNotice } from "@/components/business/legal-hold-notice";
 import { LifecycleActions } from "@/components/business/lifecycle-actions";
 import {
     ATTENTION_LABEL,
+    LegalHoldBadge,
     LifecycleBadge,
 } from "@/components/business/lifecycle-badge";
 import {
@@ -46,6 +48,7 @@ import {
 } from "@/lib/businesses";
 import { can, requireStaff } from "@/lib/console";
 import type { StaffIdentity } from "@/lib/control-plane";
+import { dataKeptLine, legalHoldLine } from "@/lib/deletion-words";
 import {
     asWords,
     camelToWords,
@@ -149,6 +152,7 @@ function SummaryStrip({ summary }: { summary: BusinessRow }) {
     return (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <LifecycleBadge status={summary.lifecycleStatus} />
+            {summary.legalHold && <LegalHoldBadge />}
             {summary.attention.map((reason) => (
                 <Badge key={reason} variant="warning">
                     {ATTENTION_LABEL[reason]}
@@ -175,6 +179,8 @@ function Business({
     const { facts } = view;
     const id = facts.id;
     const lifecycleWrite = can(staff, "organization:lifecycle:write");
+    const liftHold = can(staff, "organization:legal-hold:lift");
+    const hold = facts.legalHold ?? null;
     const subscriptionWrite = can(staff, "subscription:override");
     const modulesWrite = can(staff, "organization:modules:write");
     const pricingOverride = can(staff, "pricing:override");
@@ -186,6 +192,12 @@ function Business({
 
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            {/* Before anything else on the page (DEC-122). */}
+            {hold && (
+                <div className="xl:col-span-2">
+                    <LegalHoldNotice hold={hold} />
+                </div>
+            )}
             <div className="grid min-w-0 content-start gap-6">
                 <Panel
                     title="What they see"
@@ -628,6 +640,32 @@ function Business({
                                               ],
                                           ] as [string, string][])
                                         : []),
+                                    ...(hold
+                                        ? ([
+                                              [
+                                                  "Legal hold",
+                                                  legalHoldLine(hold),
+                                              ],
+                                              [
+                                                  "Held because",
+                                                  hold.reason ?? "—",
+                                              ],
+                                          ] as [string, string][])
+                                        : []),
+                                    ...(dataKeptLine(facts)
+                                        ? ([
+                                              [
+                                                  "Deleted",
+                                                  formatDate(
+                                                      facts.deletedRetainedAt,
+                                                  ),
+                                              ],
+                                              [
+                                                  "Its data",
+                                                  dataKeptLine(facts) ?? "—",
+                                              ],
+                                          ] as [string, string][])
+                                        : []),
                                     ...(facts.deletionScheduledAt
                                         ? ([
                                               [
@@ -654,6 +692,8 @@ function Business({
                                     organizationId={id}
                                     name={facts.name}
                                     status={facts.lifecycleStatus}
+                                    held={hold !== null}
+                                    canLiftHold={liftHold}
                                 />
                             )}
                         </div>

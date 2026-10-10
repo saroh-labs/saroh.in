@@ -70,6 +70,9 @@ module.exports = {
         // The waitlist's mocked specs run in the default/unit project; only
         // waitlist.db.spec.ts (U30) runs here.
         "<rootDir>/src/modules/waitlist/(?!.*\\.db\\.spec\\.ts$)",
+        // Customers' reports: mocked specs in the unit project; only
+        // business-reports.db.spec.ts runs here.
+        "<rootDir>/src/modules/business-reports/(?!.*\\.db\\.spec\\.ts$)",
         // Plans catalogue U3: pure specs run in the unit project; only the
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",

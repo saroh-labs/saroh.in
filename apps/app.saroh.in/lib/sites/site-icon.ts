@@ -6,7 +6,7 @@ import type { SiteDetail, SiteIconSaved } from "./service";
 import { resolveStyleVariables } from "./style";
 
 /**
- * The words and rules of the "Site icon" row (DEC-121). Pure, so the row,
+ * The words and rules of the "Site icon" row (DEC-124). Pure, so the row,
  * its sheet and the read-only view say the same thing.
  *
  * A site shows its own icon, else the business logo, else a plain tile with

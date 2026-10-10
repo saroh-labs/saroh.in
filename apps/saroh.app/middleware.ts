@@ -31,7 +31,7 @@ export const config = {
         "/robots.txt",
         "/sitemap.xml",
         /*
-         * 6. …and so is its icon (DEC-121): `/favicon.ico`, which browsers
+         * 6. …and so is its icon (DEC-124): `/favicon.ico`, which browsers
          *    ask for on their own, and the plain tile a site without an
          *    icon serves. This app ships no icon file of its own, so on a
          *    merchant's address the answer is always that merchant's.

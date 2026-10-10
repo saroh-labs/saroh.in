@@ -7,6 +7,8 @@ import { CookieChoicesButton } from "./consent-banner";
 import { phoneText } from "./lib/phone";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
+import type { SiteSeller } from "./sold-by";
+import { SoldByBlock } from "./sold-by";
 import { trimTrailingSlashes } from "./url-path";
 
 /**
@@ -83,6 +85,12 @@ export interface SiteContact {
  */
 export interface SiteCredit {
     href: string;
+    /**
+     * "Report", beside the credit (DEC-121): where a customer reports the
+     * business to Saroh (`reportBusinessHref`). Free only, as the credit is:
+     * a paid site carries no Saroh link at all.
+     */
+    reportHref?: string | null;
 }
 
 /** Where "Made with Saroh" links: saroh.in with the business's code. */
@@ -124,6 +132,7 @@ export function SiteFooter({
     contact = null,
     credit = null,
     cookieChoices = false,
+    seller = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
@@ -137,11 +146,32 @@ export function SiteFooter({
      * visitor (DEC-108). Off draws nothing.
      */
     cookieChoices?: boolean;
+    /**
+     * "Sold by ‹legal name›" with the registered address (DEC-121), on
+     * every plan, in the business's own details. The renderer passes it for
+     * a published site; null draws none (the editor's canvas, the catalog).
+     * Its email and phone are drawn only in the `left` layout, which has no
+     * contact row of its own.
+     */
+    seller?: SiteSeller | null;
 }) {
     const phone = nonBlank(contact?.phone);
     const email = nonBlank(contact?.email);
     const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
+    const left = footer?.layout === "left";
+    const owner = seller ? (
+        <SoldByBlock
+            seller={
+                left
+                    ? seller
+                    : // The contact row above already shows these.
+                      { ...seller, email: null, phone: null }
+            }
+            className={left ? "mt-3 text-left" : "mt-2"}
+            linkClassName={FOOTER_LINK}
+        />
+    ) : null;
     if (footer?.layout === "left") {
         return (
             <LeftFooter
@@ -149,6 +179,7 @@ export function SiteFooter({
                 name={name}
                 credit={credit}
                 cookieChoices={cookieChoices}
+                owner={owner}
             />
         );
     }
@@ -213,10 +244,17 @@ export function SiteFooter({
                         ) : null}
                         {hasLine && credit ? " · " : null}
                         {credit ? <MadeWithSaroh credit={credit} /> : null}
+                        {credit?.reportHref ? (
+                            <>
+                                {" · "}
+                                <ReportLink href={credit.reportHref} />
+                            </>
+                        ) : null}
                         {(hasLine || credit) && cookieChoices ? " · " : null}
                         {cookieChoices ? <CookieChoicesButton /> : null}
                     </p>
                 ) : null}
+                {owner}
             </div>
         </footer>
     );
@@ -250,6 +288,24 @@ function MadeWithSaroh({
 }
 
 /**
+ * "Report" (DEC-121), beside the credit on Free: a customer's way to tell
+ * Saroh about the business. In the footer's own colours, as the credit is.
+ */
+function ReportLink({ href }: { href: string }) {
+    return (
+        <a
+            href={href}
+            target="_blank"
+            rel="noopener"
+            aria-label="Report this business to Saroh"
+            className={FOOTER_LINK}
+        >
+            Report
+        </a>
+    );
+}
+
+/**
  * The `left` footer — the designs' row (Bakery, Ceramics, Blogs): one row
  * on the page's column, its margins inside the column so it lines up with
  * the header and the sections, wrapping on a phone —
@@ -263,11 +319,14 @@ function LeftFooter({
     name,
     credit,
     cookieChoices,
+    owner,
 }: {
     written: SiteFooterContent | null;
     name: string;
     credit: SiteCredit | null;
     cookieChoices: boolean;
+    /** "Sold by ‹legal name›", under the row (DEC-121); null draws none. */
+    owner: ReactNode;
 }) {
     const line = written ? footerLine(written) : null;
     return (
@@ -312,7 +371,11 @@ function LeftFooter({
                             className={cookieChoices ? "" : "ml-auto"}
                         />
                     ) : null}
+                    {credit?.reportHref ? (
+                        <ReportLink href={credit.reportHref} />
+                    ) : null}
                 </div>
+                {owner}
             </div>
         </footer>
     );

@@ -1,5 +1,5 @@
 /**
- * A location's logo against a real Postgres (DEC-120): with none of its
+ * A location's logo against a real Postgres (DEC-123): with none of its
  * own it reads the business logo; an image from the library becomes its
  * own, is replaced, and is held against deletion; clearing it falls back
  * to the business's; another business's image and one too big are refused;

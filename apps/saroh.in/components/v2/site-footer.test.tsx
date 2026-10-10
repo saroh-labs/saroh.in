@@ -29,6 +29,15 @@ describe("SiteFooter", () => {
         ).toBe("mailto:contact@saroh.in");
     });
 
+    it("links customers of a business to /customers, always (DEC-121)", () => {
+        render(<SiteFooter />);
+        expect(
+            screen
+                .getByRole("link", { name: "Bought from a business on Saroh?" })
+                .getAttribute("href"),
+        ).toBe("/customers");
+    });
+
     it("says who makes Saroh, and has no Resources column, Privacy or Terms before they're live", () => {
         render(<SiteFooter />);
         expect(screen.getByText(MADE_BY)).toBeTruthy();

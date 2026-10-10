@@ -39,7 +39,7 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             create: jest.fn(),
         },
-        // The logo that stands in for a site's icon (DEC-121): none here.
+        // The logo that stands in for a site's icon (DEC-124): none here.
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         siteApproval: {
             findFirst: jest.fn(),
@@ -1172,7 +1172,7 @@ describe("SitesService public read (drafts never leak)", () => {
         });
         // No module pages: nothing is added to the read (G15). No icon of
         // its own and no logo: none, and the renderer draws the plain tile
-        // (DEC-121).
+        // (DEC-124).
         expect(result).toEqual({
             snapshot: { pages: [] },
             publishedAt,

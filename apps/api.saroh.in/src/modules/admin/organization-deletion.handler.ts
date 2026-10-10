@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { NOT_ON_LEGAL_HOLD } from "../organizations/legal-hold";
 import type { OutstandingRefund } from "../payments/refunds-outstanding";
 import { refundsOutstanding } from "../payments/refunds-outstanding";
 import {
@@ -46,6 +47,8 @@ export interface DeletionSweep {
     deleted: string[];
     /** Past their window and left PENDING_DELETION: refunds are owed (#921). */
     waiting: string[];
+    /** Past their window and left alone: on legal hold (DEC-122). */
+    held: number;
     /** Due when listed, but no longer due or no longer scheduled when re-read. */
     passed: number;
     failed: number;
@@ -64,10 +67,13 @@ export interface DeletionSweep {
  * credit notes, customers and the audit trails are records (ADR-008, GST).
  * What "deleted" means everywhere else is the lifecycle table
  * (`organization-lifecycle.policy.ts`, #921): billed for nothing, its site
- * offline, closed to its members. What it leaves behind — its Saroh
- * subscription at the provider, custom hostnames, media, payment keys and
- * pending jobs — is cleared by `organization.deletion.cleanup`, queued on
- * the same transaction (`organization-deletion-cleanup.handler.ts`).
+ * offline, closed to its members. What keeps it reachable — its Saroh
+ * subscription at the provider, custom hostnames, payment and messaging
+ * keys and pending jobs — is shut off by `organization.deletion.cleanup`,
+ * queued on the same transaction (`organization-deletion-cleanup.handler.ts`).
+ * Its data and files are kept for 180 days and then erased by
+ * `organization.retention.erase` (DEC-122,
+ * `organization-retention-erase.handler.ts`).
  *
  * Conservative by construction: it lists only businesses still
  * `PENDING_DELETION` whose `deletionScheduledAt` has passed, then re-checks
@@ -87,6 +93,12 @@ export interface DeletionSweep {
  * which flags it "Deletion waiting on refunds" on the console. Each daily
  * run asks again.
  *
+ * **A legal hold holds it back for good** (DEC-122, owner 10 Oct): a
+ * business on legal hold (`organizations/legal-hold.ts`) is never listed,
+ * and the write is fenced on the hold as well, so one placed between the
+ * list and the write wins. It stays `PENDING_DELETION` past its window
+ * until a Platform Owner lifts the hold; the next daily run then takes it.
+ *
  * A self-rescheduling daily chain like the waitlist's retention sweep
  * (ADR-007): one PENDING run at a time (`Job_one_pending_organization_deletion`),
  * a failing business is logged and skipped, and the run throws only when
@@ -104,10 +116,11 @@ export class OrganizationDeletionHandler {
             if (
                 result.deleted.length > 0 ||
                 result.waiting.length > 0 ||
+                result.held > 0 ||
                 result.failed > 0
             ) {
                 this.logger.log(
-                    `organization_deletion deleted=${result.deleted.length} waiting=${result.waiting.length} passed=${result.passed} failed=${result.failed} ids=${result.deleted.join(",")} waiting_ids=${result.waiting.join(",")}`,
+                    `organization_deletion deleted=${result.deleted.length} waiting=${result.waiting.length} held=${result.held} passed=${result.passed} failed=${result.failed} ids=${result.deleted.join(",")} waiting_ids=${result.waiting.join(",")}`,
                 );
             }
         } catch (error) {
@@ -140,9 +153,18 @@ export class OrganizationDeletionHandler {
         const result: DeletionSweep = {
             deleted: [],
             waiting: [],
+            held: 0,
             passed: 0,
             failed: 0,
         };
+        // Counted for the log only: a held business is never listed below.
+        result.held = await prisma.organization.count({
+            where: {
+                lifecycleStatus: OrganizationLifecycleStatus.PendingDeletion,
+                deletionScheduledAt: { not: null, lte: now },
+                legalHoldAt: { not: null },
+            },
+        });
         // Never fetch an id twice, so one that always fails can't starve the rest.
         const tried: string[] = [];
         for (;;) {
@@ -151,6 +173,8 @@ export class OrganizationDeletionHandler {
                     lifecycleStatus:
                         OrganizationLifecycleStatus.PendingDeletion,
                     deletionScheduledAt: { not: null, lte: now },
+                    // On legal hold: its data is kept (DEC-122).
+                    ...NOT_ON_LEGAL_HOLD,
                     ...(tried.length > 0 ? { id: { notIn: tried } } : {}),
                 },
                 select: { id: true },
@@ -183,7 +207,8 @@ export class OrganizationDeletionHandler {
 
     /**
      * Take one business to `DELETED_RETAINED` if, read again inside the
-     * transaction, it is still `PENDING_DELETION`, its window has ended and
+     * transaction, it is still `PENDING_DELETION`, its window has ended, it
+     * is not on legal hold (DEC-122) and
      * it owes its customers no refund (#921, owner 9 Oct). True when it was
      * deleted; false when it was left alone; `{ refunds }` when a refund is
      * still owed, being sent or unconfirmed by its provider
@@ -204,11 +229,13 @@ export class OrganizationDeletionHandler {
                     lifecycleVersion: true,
                     deletionScheduledAt: true,
                     deletionScheduledBy: true,
+                    legalHoldAt: true,
                 },
             });
             if (
                 organization?.lifecycleStatus !==
                     OrganizationLifecycleStatus.PendingDeletion ||
+                organization.legalHoldAt ||
                 !organization.deletionScheduledAt ||
                 organization.deletionScheduledAt.getTime() > now.getTime()
             ) {
@@ -233,6 +260,7 @@ export class OrganizationDeletionHandler {
                         OrganizationLifecycleStatus.PendingDeletion,
                     lifecycleVersion: organization.lifecycleVersion,
                     deletionScheduledAt: { not: null, lte: now },
+                    ...NOT_ON_LEGAL_HOLD,
                 },
                 data: {
                     lifecycleStatus:

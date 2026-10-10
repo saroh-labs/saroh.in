@@ -1,5 +1,5 @@
 /**
- * A site's icon against a real Postgres (DEC-121): an image from the
+ * A site's icon against a real Postgres (DEC-124): an image from the
  * library is set, replaced and removed as the site's own; another
  * business's image or site, a wrong type and an image too big are refused;
  * the library will not delete it while it is the icon; it is draft until a

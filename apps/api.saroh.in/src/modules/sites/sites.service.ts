@@ -327,7 +327,7 @@ export interface PublicSiteView {
      */
     modules?: PublicModulePageStates;
     /**
-     * The icon the site shows (DEC-121): its own from the snapshot, else the
+     * The icon the site shows (DEC-124): its own from the snapshot, else the
      * business logo read live, else null, and the renderer draws a plain
      * tile with the site's initial. Resolved here so the renderer makes no
      * extra request.
@@ -437,7 +437,7 @@ export interface SiteDetailView {
     socialImageBytes: number | null;
     /**
      * The site's own icon as saved, and the business logo that stands in
-     * without one (DEC-121). Draft, like the share image.
+     * without one (DEC-124). Draft, like the share image.
      */
     icon: SiteIconView;
     /** Where this site's posts live (#232); null means the default. */
@@ -613,7 +613,7 @@ const draftSiteSelect = {
     socialImageWidth: true,
     socialImageHeight: true,
     socialImageBytes: true,
-    // The site's own icon and its media type (DEC-121).
+    // The site's own icon and its media type (DEC-124).
     ...DRAFT_ICON_SELECT,
     footer: true,
     navigation: true,
@@ -1944,7 +1944,7 @@ export class SitesService {
                           height: site.socialImageHeight,
                       }
                     : null,
-                // The site's own icon (DEC-121), only when it has one: a
+                // The site's own icon (DEC-124), only when it has one: a
                 // site without keeps a snapshot byte for byte what it was,
                 // so an approval given before icons still covers its draft.
                 // The logo that stands in is the business's and is read

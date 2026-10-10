@@ -1,5 +1,5 @@
 /**
- * The plain icon of a site that has none (DEC-121): a tile in the site's
+ * The plain icon of a site that has none (DEC-124): a tile in the site's
  * accent colour with its initial, as an SVG. It is what a merchant's tab
  * shows when they uploaded no icon and the business has no logo, so it is
  * drawn from the site's own `--site-*` colours and never carries Saroh's

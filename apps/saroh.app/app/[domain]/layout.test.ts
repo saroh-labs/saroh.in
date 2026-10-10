@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateMetadata } from "./layout";
 
 /**
- * The icon in a merchant page's head (DEC-121): the site's own, else the
+ * The icon in a merchant page's head (DEC-124): the site's own, else the
  * business logo, else its plain tile, on a live host and a test release's
  * alike. The data layer is mocked; what is under test is what the layout
  * declares from the one public read.

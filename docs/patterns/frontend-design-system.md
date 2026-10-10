@@ -55,6 +55,9 @@
   may be laid out `left` (`Site.footer.layout`), which a save of the line
   alone keeps. `left` is the designs' row (name, line, and on Free
   "Made with Saroh" at the end, DEC-102) with its margins inside `max-w-site-content`, as the header's.
+  Under either layout, "Sold by ‹legal name›" with the business's
+  registered address and contact (`sold-by.tsx`, DEC-121), in the footer's
+  own colours; on Free, "Report" follows the credit.
 - **Current** — **Template round 2.** A palette may name two optional
   status roles, `status` (the "open now" dot on the page) and
   `statusInverse` (over a hero photo's wash or an inverse band), each held
@@ -259,7 +262,7 @@
   The stroke is never Saffron, and the dot drops below 20px. Every brand app
   ships `favicon.ico`, `icon.svg` and `apple-icon.png` in `app/`, rendered from
   that master.
-- **Current** — **`saroh.app` ships no icon file** (DEC-121). A merchant's
+- **Current** — **`saroh.app` ships no icon file** (DEC-124). A merchant's
   site shows its own icon (Website › Settings), else the business logo, else
   a plain tile with its initial in `--site-accent`
   (`plainSiteIconSvg`, `@saroh/site-blocks/site-icon`, which the site serves

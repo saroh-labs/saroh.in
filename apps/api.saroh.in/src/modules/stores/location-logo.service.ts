@@ -18,7 +18,7 @@ import {
 import { StoresService } from "./stores.service";
 
 /**
- * A location read with its logos, and saved with its own logo (DEC-120).
+ * A location read with its logos, and saved with its own logo (DEC-123).
  * `StoresService` still decides who may read and write the location and
  * makes the write; this adds the logo around it.
  *

@@ -100,7 +100,7 @@ const TRIGGERS: [string, RegExp, string][] = [
     [
         "organizations/organization-settings.service.ts",
         /private async logoChangedOnSites[\s\S]*enqueuePageRevalidation\(prisma, \{\s*cause: "icon"/,
-        "a site with no icon of its own keeps the old business logo in its tab (DEC-121)",
+        "a site with no icon of its own keeps the old business logo in its tab (DEC-124)",
     ],
     [
         "content/posts.service.ts",

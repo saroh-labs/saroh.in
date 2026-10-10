@@ -15,7 +15,7 @@ export interface SiteIconSaved {
 }
 
 /**
- * Setting and removing a site's own icon (DEC-121), in Website › Settings.
+ * Setting and removing a site's own icon (DEC-124), in Website › Settings.
  *
  * `site:update`, as the rest of Search and sharing. Draft state, like the
  * share image: the write does not publish, so the live site keeps the icon

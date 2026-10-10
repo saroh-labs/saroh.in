@@ -7,7 +7,7 @@ import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
- * A site's icon, from the settings to the tab (DEC-121).
+ * A site's icon, from the settings to the tab (DEC-124).
  *
  * The owner uploads an icon in Website › Settings › Search and sharing,
  * inside the row's sheet, and publishes. A visitor's page then names that
@@ -75,7 +75,7 @@ async function favicon(visitor: BrowserContext) {
     };
 }
 
-test.describe("a site's icon (DEC-121)", { tag: "@serial" }, () => {
+test.describe("a site's icon (DEC-124)", { tag: "@serial" }, () => {
     test("uploaded in settings, live after publish, and back to the fallback when removed", async ({
         page,
         browser,

@@ -2,6 +2,7 @@ import { BOOKINGS_HREF } from "../../account/bookings-model";
 import { cn } from "../../lib/utils";
 import { payInstructionsOf, payWaysText } from "../../pay-instructions/model";
 import { PayInstructionsCard } from "../../pay-instructions/pay-instructions";
+import { SoldByLine } from "../../sold-by";
 import type { Phase } from "../flow-state";
 import type { BookingPageData } from "../model";
 import {
@@ -20,6 +21,7 @@ export function DoneCard({
     where,
     rules,
     visits = 1,
+    soldBy = null,
     onAgain,
 }: {
     phase: Extract<Phase, { kind: "done" }>;
@@ -33,6 +35,8 @@ export function DoneCard({
     rules: BookingPageData["rules"];
     /** More than one: visit 1 of a treatment was booked (E10). */
     visits?: number;
+    /** "Run by ‹legal name›" (DEC-121); null draws none. */
+    soldBy?: string | null;
     onAgain: () => void;
 }) {
     const { booking } = phase;
@@ -165,6 +169,8 @@ export function DoneCard({
                 </a>
                 .{changeRules(rules, phase.paid)}
             </p>
+            {/* Who the booking is with, in its own name (DEC-121). */}
+            <SoldByLine line={soldBy} className="text-site-muted mt-2" />
         </div>
     );
 }

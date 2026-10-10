@@ -6,7 +6,7 @@ import {
 } from "@saroh/site-blocks/site-icon";
 
 /**
- * A merchant site's icon (DEC-121): the tab, a bookmark, a phone's home
+ * A merchant site's icon (DEC-124): the tab, a bookmark, a phone's home
  * screen.
  *
  * The public site read resolves which one (the site's own, published; else

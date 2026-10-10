@@ -12,6 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -343,6 +344,7 @@ export class SubscriptionsController {
     }
 
     @Post(":subscriptionId/cancel")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     cancel(
         @OrgContext() ctx: OrganizationContext,
@@ -416,6 +418,7 @@ export class SubscriptionsController {
 
     /** Undo a booked plan change. */
     @Delete(":subscriptionId/plan-change")
+    @LifecycleWrite("wind-down")
     @RequireModule("PAYMENTS")
     @IgnoreModuleReadiness()
     cancelPlanChange(
@@ -475,6 +478,7 @@ export class SubscriptionsController {
      * (DEC-026). The subscription goes on, invoiced with a pay link.
      */
     @Post(":subscriptionId/autopay/cancel")
+    @LifecycleWrite("wind-down")
     @RequireModule("PAYMENTS")
     @IgnoreModuleReadiness()
     @HttpCode(200)

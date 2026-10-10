@@ -38,7 +38,7 @@ import type { PlaceSheets } from "./use-place-sheets";
  * are): one card of rows in Website settings' "label · what is saved ·
  * Edit" pattern. Its name; whether customers come here; only for a place
  * they visit, its address and opening hours; and its description and logo
- * (its own, or the business's it uses until it has one, DEC-120).
+ * (its own, or the business's it uses until it has one, DEC-123).
  * Each Edit opens that row's own side sheet (`place-sheets.tsx`,
  * `location-details-sheet.tsx`) with one Save; nothing in this tab saves
  * on its own but "Turn Pick-up off". Read-only roles see the rows without

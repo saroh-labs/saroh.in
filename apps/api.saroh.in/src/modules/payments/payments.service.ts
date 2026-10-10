@@ -46,7 +46,7 @@ import {
     planRemainingLines,
 } from "../orders/order-refunds";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
@@ -1690,7 +1690,9 @@ export class PaymentsService {
         options: { idempotencyKey?: string; provider?: string } = {},
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
-        await assertOrganizationOpen(order.organizationId);
+        // Paying an order already made is finishing it: open while the
+        // business winds down (DEC-120).
+        await assertOrganizationWindingDown(order.organizationId);
         await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);
     }
@@ -1879,7 +1881,7 @@ export class PaymentsService {
                 "This location is paused and is not taking payments.",
             );
         }
-        await assertOrganizationOpen(customer.organizationId);
+        await assertOrganizationWindingDown(customer.organizationId);
         const { organizationId } = customer;
         return this.createIntentFor(
             organizationId,

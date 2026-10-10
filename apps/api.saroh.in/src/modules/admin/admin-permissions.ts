@@ -61,6 +61,14 @@ export const AdminPermission = {
     // (#886, DEC-107). Platform Owners only (owner, 8 Oct): no other role
     // carries it.
     DeploymentsRun: "deployments:run",
+    // Mark a customer's report about a business done (DEC-121). Its own
+    // permission: Support takes the reports and closes them, and must not
+    // need the lifecycle write that suspends a business to do it.
+    ReportsResolve: "reports:resolve",
+    // Lift a legal hold on a business (DEC-122). Platform Owners only
+    // (owner, 10 Oct): no other role carries it. Placing one needs the
+    // lifecycle write that suspends.
+    OrganizationLegalHoldLift: "organization:legal-hold:lift",
 } as const;
 
 export type AdminPermission =
@@ -82,6 +90,8 @@ const ROLE_PERMISSIONS = {
         AdminPermission.WaitlistInvite,
         // Support takes the misuse report and already opens the business.
         AdminPermission.OrganizationTrackersWrite,
+        // Support reads customers' reports and marks them done (DEC-121).
+        AdminPermission.ReportsResolve,
     ],
     [AdminRole.Operations]: [
         AdminPermission.PlatformRead,

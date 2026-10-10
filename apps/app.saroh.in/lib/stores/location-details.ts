@@ -4,7 +4,7 @@
  * Edit"). They are edited in the row's sheet (`storefrontDetailsHref`
  * opens it); the row only says what is saved. Pure.
  *
- * A location uses the business logo unless it has its own (DEC-120).
+ * A location uses the business logo unless it has its own (DEC-123).
  */
 
 /** A location's own logo: where it is served, and its library image. */
@@ -79,7 +79,7 @@ export function detailsEmpty(details: LocationDetails): boolean {
 /** What `GET /stores/:id` says of the description and the logos. */
 export interface StoreLogos {
     description?: string | null;
-    /** The stored address alone, from an API before DEC-120. */
+    /** The stored address alone, from an API before DEC-123. */
     logo?: string | null;
     ownLogo?: LocationLogo | null;
     businessLogo?: { url: string } | null;

@@ -2,7 +2,7 @@ import { getSiteForHost } from "@/lib/publication";
 import { faviconResponse, noIconResponse } from "@/lib/site-icon";
 
 /**
- * `/favicon.ico` on a merchant's address (DEC-121). Browsers ask for this
+ * `/favicon.ico` on a merchant's address (DEC-124). Browsers ask for this
  * path on their own, so it answers with that site's icon: a forward to its
  * own image or the business logo, or the plain tile with its initial. A
  * host with no live site is a 404, like its pages. This app ships no icon

@@ -47,7 +47,7 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
     "sites/site-tracking.controller.ts": "WEBSITE",
-    // A site's own icon (DEC-121).
+    // A site's own icon (DEC-124).
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
@@ -284,6 +284,16 @@ const NEVER: Record<string, string> = {
     // QR codes plan U9: the free QR code maker's email gate, the same way.
     "tools/qr-maker.controller.ts":
         "saroh.in's public QR code maker's email gate, not a tenant surface",
+    // Terms rev 46 (9 Oct): a customer reports a business at
+    // saroh.in/customers, with no account and whatever it has switched on.
+    "business-reports/public-business-reports.controller.ts":
+        "saroh.in's report-a-business form, not a tenant surface",
+    "admin/admin-business-reports.controller.ts":
+        "staff control plane (customers' reports), not a tenant surface",
+    // DEC-120: an owner takes the business's data whatever it has switched
+    // off, and while it is closing or suspended.
+    "data-export/data-export.controller.ts":
+        "the owner's download of the business's own data — no module holds it",
 };
 
 /** Controllers with a test of their own below, not a row above. */

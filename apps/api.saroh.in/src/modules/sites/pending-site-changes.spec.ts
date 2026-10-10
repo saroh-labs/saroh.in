@@ -64,7 +64,7 @@ describe("pendingSiteChanges", () => {
         ["menu", { navigation: [] }],
         ["name", { name: "Northwind" }],
         ["posts", { postsPrefix: "news" }],
-        // The site's own icon (DEC-121). The live side here has no `icon`
+        // The site's own icon (DEC-124). The live side here has no `icon`
         // key at all, as every snapshot published before icons.
         [
             "icon",

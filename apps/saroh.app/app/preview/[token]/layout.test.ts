@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateMetadata } from "./layout";
 
 /**
- * A draft preview's tab shows the icon publishing would (DEC-121), and
+ * A draft preview's tab shows the icon publishing would (DEC-124), and
  * stays unindexed whatever the link's state.
  */
 const preview = vi.hoisted((): { found: unknown } => ({ found: null }));

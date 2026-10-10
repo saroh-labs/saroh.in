@@ -82,7 +82,7 @@ test.describe("Locations (DEC-069)", () => {
         await expect(
             details.getByLabel("Description", { exact: true }),
         ).toBeVisible();
-        // The logo is uploaded here, or the business's is used (DEC-120):
+        // The logo is uploaded here, or the business's is used (DEC-123):
         // no web link to type, and nothing that leaves the sheet.
         const logo = details.getByRole("group", { name: "Logo" });
         await expect(logo).toBeVisible();

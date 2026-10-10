@@ -40,7 +40,11 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import type { EntitlementService } from "../billing/entitlement.service";
 import type { ModuleLifecycleService } from "../capabilities/module-lifecycle.service";
 import type { AdminAuditService } from "./admin-audit.service";
-import { AdminLifecycleService } from "./admin-lifecycle.service";
+import {
+    AdminLifecycleService,
+    LEGAL_HOLD_BLOCKS_DELETION,
+    LEGAL_HOLD_BLOCKS_REINSTATE,
+} from "./admin-lifecycle.service";
 
 const orgFind = prisma.organization.findUnique as jest.Mock;
 const orgUpdateMany = prisma.organization.updateMany as jest.Mock;
@@ -291,6 +295,298 @@ describe("AdminLifecycleService — lifecycle", () => {
                 reason: " x ",
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("AdminLifecycleService — legal hold (DEC-122)", () => {
+    const HELD_AT = new Date("2026-10-10T06:00:00.000Z");
+    const suspended = { ...northwind, lifecycleStatus: "SUSPENDED" };
+    const held = {
+        ...suspended,
+        legalHoldAt: HELD_AT,
+        legalHoldReason: "Selling counterfeit goods",
+        legalHoldByUserId: "staff_9",
+    };
+
+    it("places the hold with the suspension, in both ledgers, the reason on Saroh's only", async () => {
+        const { service, audit } = build();
+
+        await service.suspend({
+            staff,
+            organizationId: "org_1",
+            reason: "Selling counterfeit goods",
+            confirmName: "Northwind Supply",
+            legalHold: true,
+        });
+
+        expect(orgUpdateMany.mock.calls[0][0].data).toEqual(
+            expect.objectContaining({
+                lifecycleStatus: "SUSPENDED",
+                legalHoldAt: expect.any(Date),
+                legalHoldReason: "Selling counterfeit goods",
+                legalHoldByUserId: "staff_1",
+            }),
+        );
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: "organization.legal_hold.placed",
+                permission: "organization:lifecycle:write",
+                reason: "Selling counterfeit goods",
+            }),
+        );
+        // Its people see that a hold exists, never why.
+        const own = tenantAudit.mock.calls
+            .map(([arg]) => (arg as { data: Record<string, unknown> }).data)
+            .find((d) => d.action === "organization.legal_hold.placed");
+        expect(own).toEqual(
+            expect.objectContaining({
+                organizationId: "org_1",
+                metadata: { byOperator: true },
+            }),
+        );
+        expect(JSON.stringify(own)).not.toContain("counterfeit");
+    });
+
+    it("suspends without a hold unless it is asked for", async () => {
+        const { service, audit } = build();
+        await service.suspend({
+            staff,
+            organizationId: "org_1",
+            reason: "Chargeback investigation",
+            confirmName: "Northwind Supply",
+        });
+        expect(orgUpdateMany.mock.calls[0][0].data).not.toHaveProperty(
+            "legalHoldAt",
+        );
+        expect(audit.write.mock.calls.map(([, entry]) => entry.action)).toEqual(
+            ["organization.suspended"],
+        );
+    });
+
+    it("places a hold on a business already suspended, fenced on its version", async () => {
+        orgFind.mockResolvedValue({ ...suspended, legalHoldAt: null });
+        const { service, audit } = build();
+
+        await expect(
+            service.placeLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Police notice 14/2026",
+            }),
+        ).resolves.toEqual({ ok: true, changed: true });
+
+        expect(orgUpdateMany).toHaveBeenCalledWith({
+            where: { id: "org_1", lifecycleVersion: 3, legalHoldAt: null },
+            data: {
+                legalHoldAt: expect.any(Date),
+                legalHoldReason: "Police notice 14/2026",
+                legalHoldByUserId: "staff_1",
+                // Bumped, so a deletion the sweep is writing loses.
+                lifecycleVersion: { increment: 1 },
+            },
+        });
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: "organization.legal_hold.placed",
+                reason: "Police notice 14/2026",
+            }),
+        );
+    });
+
+    it.each(["PENDING_DELETION", "DELETED_RETAINED"])(
+        "places a hold on a %s business too",
+        async (lifecycleStatus) => {
+            orgFind.mockResolvedValue({
+                ...northwind,
+                lifecycleStatus,
+                legalHoldAt: null,
+            });
+            const { service } = build();
+            await expect(
+                service.placeLegalHold({
+                    staff,
+                    organizationId: "org_1",
+                    reason: "Police notice 14/2026",
+                }),
+            ).resolves.toEqual({ ok: true, changed: true });
+        },
+    );
+
+    it("refuses a hold on an active business: it is suspended with the hold", async () => {
+        orgFind.mockResolvedValue({ ...northwind, legalHoldAt: null });
+        const { service } = build();
+        await expect(
+            service.placeLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Police notice 14/2026",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(orgUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("needs a reason to place one and to lift one", async () => {
+        orgFind.mockResolvedValue(held);
+        const { service } = build();
+        await expect(
+            service.placeLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: " ",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            service.liftLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "ok",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(orgUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses to schedule a held business's deletion", async () => {
+        orgFind.mockResolvedValue(held);
+        const { service, audit } = build();
+        await expect(
+            service.scheduleDeletion({
+                staff,
+                organizationId: "org_1",
+                reason: "Owner asked to close",
+                confirmName: "Northwind Supply",
+            }),
+        ).rejects.toThrow(LEGAL_HOLD_BLOCKS_DELETION);
+        expect(orgUpdateMany).not.toHaveBeenCalled();
+        expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    it("refuses to reinstate a held business: it is never active", async () => {
+        orgFind.mockResolvedValue(held);
+        const { service } = build();
+        await expect(
+            service.reinstate({
+                staff,
+                organizationId: "org_1",
+                reason: "Owner called",
+            }),
+        ).rejects.toThrow(LEGAL_HOLD_BLOCKS_REINSTATE);
+        expect(orgUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("lifts the hold under the Platform Owner's permission, keeping who placed it and why on the ledger", async () => {
+        orgFind.mockResolvedValue(held);
+        const { service, audit } = build();
+
+        await expect(
+            service.liftLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Case closed, order of 2 Dec",
+            }),
+        ).resolves.toEqual({ ok: true, changed: true });
+
+        expect(orgUpdateMany).toHaveBeenCalledWith({
+            where: {
+                id: "org_1",
+                lifecycleVersion: 3,
+                legalHoldAt: { not: null },
+            },
+            data: {
+                legalHoldAt: null,
+                legalHoldReason: null,
+                legalHoldByUserId: null,
+                lifecycleVersion: { increment: 1 },
+            },
+        });
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: "organization.legal_hold.lifted",
+                permission: "organization:legal-hold:lift",
+                reason: "Case closed, order of 2 Dec",
+                metadata: expect.objectContaining({
+                    heldSince: HELD_AT.toISOString(),
+                    placedBy: "staff_9",
+                    placedFor: "Selling counterfeit goods",
+                }),
+            }),
+        );
+        expect(tenantAudit).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "organization.legal_hold.lifted",
+                metadata: { byOperator: true },
+            }),
+        });
+        // Suspended, not deleted: no clean-up to queue.
+        expect(prisma.job.create).not.toHaveBeenCalled();
+    });
+
+    it("queues the clean-up again when a deleted business's hold is lifted", async () => {
+        orgFind.mockResolvedValue({
+            ...held,
+            lifecycleStatus: "DELETED_RETAINED",
+        });
+        const { service } = build();
+        await service.liftLegalHold({
+            staff,
+            organizationId: "org_1",
+            reason: "Case closed, order of 2 Dec",
+        });
+        expect(prisma.job.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "organization.deletion.cleanup",
+                organizationId: "org_1",
+            }),
+        });
+    });
+
+    it("treats a second place or lift as done already", async () => {
+        const { service, audit } = build();
+        orgFind.mockResolvedValue(held);
+        await expect(
+            service.placeLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Police notice 14/2026",
+            }),
+        ).resolves.toEqual({ ok: true, changed: false });
+        orgFind.mockResolvedValue({ ...suspended, legalHoldAt: null });
+        await expect(
+            service.liftLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Case closed, order of 2 Dec",
+            }),
+        ).resolves.toEqual({ ok: true, changed: false });
+        expect(orgUpdateMany).not.toHaveBeenCalled();
+        expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    it("loses cleanly to a change made at the same moment", async () => {
+        orgFind.mockResolvedValue({ ...suspended, legalHoldAt: null });
+        orgUpdateMany.mockResolvedValue({ count: 0 });
+        const { service } = build();
+        await expect(
+            service.placeLegalHold({
+                staff,
+                organizationId: "org_1",
+                reason: "Police notice 14/2026",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("answers 404 for a business that doesn't exist", async () => {
+        orgFind.mockResolvedValue(null);
+        const { service } = build();
+        await expect(
+            service.liftLegalHold({
+                staff,
+                organizationId: "nope",
+                reason: "Case closed, order of 2 Dec",
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });
 

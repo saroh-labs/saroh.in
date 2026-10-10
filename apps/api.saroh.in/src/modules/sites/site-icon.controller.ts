@@ -17,7 +17,7 @@ import { SetSiteIconDto } from "./dto";
 import { SiteIconService } from "./site-icon.service";
 
 /**
- * A site's own icon (DEC-121), the "Site icon" row of Website › Settings.
+ * A site's own icon (DEC-124), the "Site icon" row of Website › Settings.
  * Draft state: saved here, live at the next publish. Read with the site
  * (`GET …/sites/:siteId`, `icon`).
  */

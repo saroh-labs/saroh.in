@@ -1,4 +1,4 @@
-// DB-free: which icon a site shows (DEC-121), with the database mocked.
+// DB-free: which icon a site shows (DEC-124), with the database mocked.
 jest.mock("@saroh/database", () => ({
     prisma: { businessProfile: { findUnique: jest.fn() } },
     runInOrgContext: jest.fn((_org: string, fn: () => unknown) => fn()),

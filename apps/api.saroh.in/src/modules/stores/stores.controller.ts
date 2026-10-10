@@ -13,6 +13,7 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { storeLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { authorize } from "../organizations/organization-policy";
@@ -63,14 +64,16 @@ export class StoresController {
 
     /**
      * The location, with its own logo, the business's and the one to show
-     * (`ownLogo`, `businessLogo`, `effectiveLogo`; DEC-120).
+     * (`ownLogo`, `businessLogo`, `effectiveLogo`; DEC-123).
      */
     @Get(":id")
     get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
         return this.locationLogo.read(user.id, id);
     }
 
+    /** A setting: refused while the business is closing or suspended (DEC-120). */
     @Put(":id")
+    @UseGuards(BetterAuthGuard, storeLifecycleGuard("id"))
     update(
         @CurrentUser() user: AuthUser,
         @Param("id") id: string,

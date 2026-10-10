@@ -1,5 +1,5 @@
 /**
- * A location's logo (DEC-120), with a mocked Prisma: which logo a read
+ * A location's logo (DEC-123), with a mocked Prisma: which logo a read
  * says (own, the business's, none), and what a save writes — its own from
  * the library, back to the business's, the old address field left for an
  * older app. The library and the real columns are `location-logo.db.spec.ts`.

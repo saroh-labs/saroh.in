@@ -58,7 +58,7 @@ const LOGO_HINT: Record<LogoSource, string> = {
  * still lands here), saved through the same action as the name, which has
  * its own row.
  *
- * The logo is the business's until the location has its own (DEC-120): the
+ * The logo is the business's until the location has its own (DEC-123): the
  * sheet says which, and an own logo is uploaded, replaced and given up
  * right here (`LogoUpload`), never on another page. Nothing changes until
  * Save, which waits for an upload; a picture uploaded and then cancelled

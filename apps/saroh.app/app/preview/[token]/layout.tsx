@@ -34,7 +34,7 @@ import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 const readPreview = cache(getPreviewByToken);
 
 /**
- * The tab shows the icon publishing would (DEC-121): the draft's own, else
+ * The tab shows the icon publishing would (DEC-124): the draft's own, else
  * the business logo, else the plain tile with the site's initial. A dead
  * link has none.
  */

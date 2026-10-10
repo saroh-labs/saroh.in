@@ -9,7 +9,8 @@ const FIRST_ROWS = 3;
 
 /**
  * Above every page while the business is scheduled for deletion (#921,
- * owner 9 Oct): when, what still works, the refunds not yet back with its
+ * owner 9 Oct): when, what still works while it winds down and, for an
+ * owner, "Download your data" (DEC-120); the refunds not yet back with its
  * customers — each linked to its order or invoice, with what to find it by
  * in the provider's dashboard — and the autopay memberships deletion won't
  * cancel at the provider. Said in words, never only a colour. The API
@@ -36,7 +37,22 @@ export function ClosingBanner({ view }: { view: ClosingView | null }) {
                     .
                 </span>{" "}
                 {b.body}
+                {b.data ? (
+                    <>
+                        {" "}
+                        <Link
+                            href={b.data.href}
+                            className="font-semibold underline underline-offset-2"
+                        >
+                            {b.data.label}
+                        </Link>
+                    </>
+                ) : null}
             </p>
+
+            {b.refundInDashboard ? (
+                <p className="text-pretty font-medium">{b.refundInDashboard}</p>
+            ) : null}
 
             {b.refunds ? (
                 <section aria-label="Refunds not yet back with customers">

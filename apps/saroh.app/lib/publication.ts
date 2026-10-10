@@ -81,7 +81,7 @@ export interface PublicationSite {
     /** The share image a link preview uses (#188). */
     socialImageUrl?: string | null;
     /**
-     * The site's own icon (DEC-121). Absent when it has none, and on every
+     * The site's own icon (DEC-124). Absent when it has none, and on every
      * snapshot published before icons. Pages don't read it from here: the
      * public read resolves the icon to show (this one, else the business
      * logo) and sends it beside the snapshot ({@link ResolvedSite.icon}).
@@ -158,7 +158,7 @@ interface PublicSiteView {
      * snapshot. Present only when the snapshot holds a module page.
      */
     modules?: unknown;
-    /** The icon to show (DEC-121); absent from an API that predates it. */
+    /** The icon to show (DEC-124); absent from an API that predates it. */
     icon?: unknown;
 }
 
@@ -172,7 +172,7 @@ export interface ResolvedSite {
     siteId: string | null;
     modules: ModulePageStates | null;
     /**
-     * The icon the site shows (DEC-121): its own, else the business logo.
+     * The icon the site shows (DEC-124): its own, else the business logo.
      * Null with neither, and the site then serves its plain tile
      * (`lib/site-icon.ts`).
      */
@@ -377,7 +377,7 @@ export type PreviewLookup =
            */
           modules: ModulePageStates | null;
           /**
-           * The icon publishing would show (DEC-121): the draft's own, else
+           * The icon publishing would show (DEC-124): the draft's own, else
            * the business logo; null for the plain tile.
            */
           icon: SiteIcon | null;

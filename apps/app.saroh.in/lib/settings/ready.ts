@@ -129,7 +129,8 @@ export type ReadyStepKey =
 export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
 
 /** What Settings also asks for, beside the steps (`nudges.ts`, DEC-056). */
-export type SettingsNudgeKey = "email" | "businessType" | "logo" | "pipeline";
+export type SettingsNudgeKey =
+    "email" | "seller" | "businessType" | "logo" | "pipeline";
 
 export interface ReadyItem {
     key: ReadyStepKey | SettingsNudgeKey;

@@ -12,6 +12,8 @@ export type {
     CreateSignedUploadUrlInput,
     HeadObjectResult,
     ObjectStorage,
+    PutObjectBody,
+    PutObjectOptions,
     SignedDownloadUrl,
     SignedDownloadUrlOptions,
     SignedUploadUrl,

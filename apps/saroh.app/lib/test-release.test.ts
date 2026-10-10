@@ -115,7 +115,7 @@ describe("fetchTestRelease", () => {
             snapshot: SNAPSHOT,
             siteId: "site_nw",
             modules: { SHOP: "off" },
-            // None sent: the release shows the site's plain tile (DEC-121).
+            // None sent: the release shows the site's plain tile (DEC-124).
             icon: null,
             release: RELEASE_BODY.release,
             liveUrl: "https://northwind.saroh.app/",

@@ -17,7 +17,7 @@ jest.mock("@saroh/database", () => {
             businessProfile: { count: jest.fn().mockResolvedValue(0) },
             // Locations using it as their own logo; default "none".
             store: { count: jest.fn().mockResolvedValue(0) },
-            // Sites using it as their own icon (DEC-121); default "none".
+            // Sites using it as their own icon (DEC-124); default "none".
             site: { count: jest.fn().mockResolvedValue(0) },
             // The delete guard counts publications referencing a key. Default
             // to "none", so existing remove tests keep their meaning.

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The "Site icon" row of Website › Settings and its sheet (DEC-121): the
+ * The "Site icon" row of Website › Settings and its sheet (DEC-124): the
  * row says which icon the site shows (its own, the business logo, a plain
  * tile with its initial); the sheet uploads one, shows it at a tab's and a
  * phone's size, removes it and saves. Nothing saves until Save, a refusal

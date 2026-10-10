@@ -3,7 +3,7 @@ import { noIconResponse, plainIconResponse } from "@/lib/site-icon";
 
 /**
  * The plain icon of a site that has none of its own and no business logo
- * (DEC-121): a tile in the site's accent colour with its initial, drawn
+ * (DEC-124): a tile in the site's accent colour with its initial, drawn
  * from the published snapshot. The site's pages link to it
  * (`siteIconMetadata`). A host with no live site is a 404.
  *

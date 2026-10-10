@@ -98,6 +98,21 @@ model Organization {
   deletionReason      String?
   deletedRetainedAt   DateTime?
 
+  // Legal hold (DEC-122, owner 10 Oct): set by an operator on a business
+  // found doing something the law prohibits, lifted only by a Platform
+  // Owner. While set, nothing deletes or erases the business's data: no
+  // deletion can be scheduled, the deletion sweep, its clean-up, the
+  // retention eraser and every retention sweep leave its rows, and privacy
+  // removals and "Download your data" are refused. Read it through
+  // `organizations/legal-hold.ts`.
+  legalHoldAt       DateTime?
+  legalHoldReason   String?
+  legalHoldByUserId String?
+  // When `organization.retention.erase` finished erasing a deleted
+  // business's files and personal data, RETENTION_AFTER_DELETION_DAYS (180)
+  // after `deletedRetainedAt` (DEC-122). Null until then.
+  retentionErasedAt DateTime?
+
   // Relations
   stores              Store[]
   memberships         Membership[]
@@ -141,6 +156,9 @@ model Organization {
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
 
+  // "Download your data" (DEC-120): each zip an owner asked for.
+  dataExports DataExport[]
+
   // Products v2 (#460): photos, per-variant stock, store options, defaults.
   productImages      ProductImage[]
   variantInventory   VariantInventory[]
@@ -183,6 +201,8 @@ model Organization {
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
   qrScanDays           QrScanDay[]
+  // What customers reported about this business at saroh.in/customers.
+  businessReports      BusinessReport[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -659,6 +679,41 @@ model Media {
   @@index([organizationId])
 }
 
+// "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's
+// records as CSV files and its uploaded media, built by the
+// `data-export.build` job, kept in object storage behind a signed link and
+// deleted 7 days after it is ready (`data-export.expire`). One QUEUED or
+// RUNNING per business (the partial unique index): asking again while one
+// is being made is answered with that one.
+model DataExport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The owner who asked. A bare id, like AuditEvent's actor: the row
+  // outlives a membership.
+  requestedByUserId String
+
+  status String @default("QUEUED") // QUEUED | RUNNING | READY | FAILED | EXPIRED
+
+  // Where the zip is, once READY; cleared when it expires.
+  storageKey String?
+  sizeBytes  BigInt?
+  // What it holds: rows per file, and media files put in or left out.
+  counts     Json?
+  // Why it failed, in words; never a stack or a provider body.
+  failure    String?
+
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  readyAt   DateTime?
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([organizationId], map: "DataExport_one_running_per_org", where: raw("status = 'QUEUED' OR status = 'RUNNING'"))
+  @@index([organizationId, createdAt])
+}
+
 // ============================================================================
 // STORE (Multi-Tenant Root)
 // ============================================================================
@@ -673,7 +728,7 @@ model Store {
   // L15 drops the column (a later release).
   slug        String? @unique
   description String?
-  // The location's own logo (DEC-120): the address it is served from, and
+  // The location's own logo (DEC-123): the address it is served from, and
   // the library object it came from, taken when it was set (the business
   // logo's pattern). Both null: the location uses the business logo. An
   // address with no object is one typed in before a logo could be uploaded.
@@ -2305,6 +2360,8 @@ model Session {
 
   @@unique([token])
   @@index([userId])
+  // The security-log retention sweep reads ended sessions in this order (DEC-122).
+  @@index([expiresAt])
 }
 
 model Account {
@@ -3005,7 +3062,7 @@ model Site {
 
   // The site's icon (the browser tab, a bookmark, a phone's home screen):
   // a library object, and the address it is served from, taken when it was
-  // set (the business logo's shape, DEC-121). Draft like the share image:
+  // set (the business logo's shape, DEC-124). Draft like the share image:
   // it travels into the Publication snapshot at publish. Null means none of
   // its own, and the site then shows the business logo, else a plain tile
   // with its initial. The library refuses to delete it while it is the
@@ -4187,6 +4244,10 @@ model Job {
   @@unique([type], map: "Job_one_pending_analytics_retention", where: raw("type = 'analytics.retention' AND status = 'PENDING'"))
   // One waiting run of the daily business deletion sweep (#907), like the renewal chain.
   @@unique([type], map: "Job_one_pending_organization_deletion", where: raw("type = 'organization.deletion' AND status = 'PENDING'"))
+  // One waiting run of the daily retention eraser (DEC-122), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_organization_retention_erase", where: raw("type = 'organization.retention.erase' AND status = 'PENDING'"))
+  // One waiting run of the daily security-log retention sweep (DEC-122), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_security_logs_retention", where: raw("type = 'security-logs.retention' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -7321,4 +7382,33 @@ model SarohInvoiceSequence {
   series    String   @id
   last      Int
   updatedAt DateTime @updatedAt
+}
+
+// A report a customer sent at saroh.in/customers about a business that uses
+// Saroh: the site's address as they gave it, what happened, and an email if
+// they left one. `organizationId` is set when the address is a Saroh site,
+// else null. Staff read it in the admin console (organization:read; the
+// reporter's email only with organization:pii:read) and mark it done
+// (reports:resolve). Kept when the business is deleted.
+model BusinessReport {
+  id             String               @id @default(cuid())
+  organizationId String?
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  // The host as typed and normalised ("shop.example.com"), not a full URL.
+  siteHost       String
+  message        String
+  reporterEmail  String?
+  // A digest of the reporter's address, as the waitlist keeps one; never the address.
+  ipHash         String?
+  status         BusinessReportStatus @default(OPEN)
+  doneAt         DateTime?
+  createdAt      DateTime             @default(now())
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+enum BusinessReportStatus {
+  OPEN
+  DONE
 }

@@ -56,7 +56,7 @@ export interface TestReleaseView {
      */
     modules?: PublicModulePageStates;
     /**
-     * The icon the release shows (DEC-121): its frozen own, else the
+     * The icon the release shows (DEC-124): its frozen own, else the
      * business logo read live, else null for the plain tile.
      */
     icon?: PublicSiteIcon | null;

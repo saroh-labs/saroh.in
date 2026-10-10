@@ -20,7 +20,7 @@ const details = (over: Partial<LocationDetails> = {}): LocationDetails => ({
     ...over,
 });
 
-describe("logoSource — own, then the business's, then none (DEC-120)", () => {
+describe("logoSource — own, then the business's, then none (DEC-123)", () => {
     it("its own logo wins over the business's", () => {
         expect(logoSource(details({ logo: OWN, businessLogo: RYE }))).toBe(
             "own",

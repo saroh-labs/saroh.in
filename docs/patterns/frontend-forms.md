@@ -114,7 +114,7 @@ leave-with-unsaved-changes guard. **What a row needs is done in its sheet**
 (owner, 10 Oct): an Edit never sends someone to another page, so an upload
 sits in the sheet itself (`components/shared/logo-upload.tsx`, a logo field
 with no page state; a location's own logo uses it too, with the business
-logo standing in until it has one, DEC-120) and a field another row owns
+logo standing in until it has one, DEC-123) and a field another row owns
 joins the sheet that needs it (turning GST on asks for the registered
 address there). The same goes for a prompt on another screen: the QR
 maker's "Add your logo" opens the business logo's sheet in place

@@ -17,7 +17,7 @@ import { SiteIconSummary } from "./site-icon-summary";
 import type { SettingsSave } from "./use-settings-save";
 
 /**
- * The "Site icon" row of Search and sharing (DEC-121), read first: the icon
+ * The "Site icon" row of Search and sharing (DEC-124), read first: the icon
  * the site shows, small, and one line saying which it is (its own, the
  * business logo, or a plain tile with its initial). Add or Change opens the
  * row's sheet, where the image is uploaded, seen at its sizes and removed.

@@ -78,7 +78,7 @@ export async function closeAccessAction(
 
 export async function suspendAction(
     organizationId: string,
-    input: Reasoned & { confirmName: string },
+    input: Reasoned & { confirmName: string; legalHold?: boolean },
 ) {
     return refresh(
         organizationId,
@@ -87,6 +87,38 @@ export async function suspendAction(
             "POST",
             input,
             "Could not suspend this business.",
+        ),
+    );
+}
+
+/** Place a legal hold on a business already suspended or closing (DEC-122). */
+export async function placeLegalHoldAction(
+    organizationId: string,
+    input: Reasoned,
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/legal-hold`,
+            "POST",
+            input,
+            "Could not place the legal hold.",
+        ),
+    );
+}
+
+/** Lift a legal hold. The API takes it from a Platform Owner only. */
+export async function liftLegalHoldAction(
+    organizationId: string,
+    input: Reasoned,
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/legal-hold/lift`,
+            "POST",
+            input,
+            "Could not lift the legal hold.",
         ),
     );
 }

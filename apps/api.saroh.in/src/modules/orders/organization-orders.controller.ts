@@ -12,6 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -175,6 +176,7 @@ export class OrganizationOrdersController {
      * as an order id.
      */
     @Post("stage/batches")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     createBatch(
@@ -194,6 +196,7 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/commit")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     commitBatch(
@@ -204,6 +207,7 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/cancel")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     cancelBatch(
@@ -214,6 +218,7 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/undo")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     undoBatch(
@@ -245,6 +250,7 @@ export class OrganizationOrdersController {
 
     /** Move to the next kitchen stage (`order:stage`). */
     @Post(":orderId/stage")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     moveStage(
@@ -260,6 +266,7 @@ export class OrganizationOrdersController {
      * once the visit has started. The last visit attended fulfils the order.
      */
     @Post(":orderId/visits/:visitNumber/attended")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     markVisitAttended(
@@ -272,6 +279,7 @@ export class OrganizationOrdersController {
 
     /** Undo the last kitchen step (`order:stage`). */
     @Post(":orderId/stage/undo")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     undoStage(
@@ -288,6 +296,7 @@ export class OrganizationOrdersController {
      * (B11). `order:create` or `order:edit` (B16; see OrderPayLinkService).
      */
     @Post(":orderId/pay-link")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
@@ -311,6 +320,7 @@ export class OrganizationOrdersController {
      * counter. `order:edit`, as any payment recorded by hand (B16).
      */
     @Post(":orderId/record-payment")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     recordDifference(
@@ -328,6 +338,7 @@ export class OrganizationOrdersController {
      * `order:refund` when a paid order's money moves, B16).
      */
     @Post(":orderId/fulfilment")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     @HttpCode(200)
     changeFulfilment(
@@ -348,6 +359,7 @@ export class OrganizationOrdersController {
      * included. Winding down is not selling; `order:refund` still applies.
      */
     @Post(":orderId/cancel")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     cancel(
         @OrgContext() ctx: OrganizationContext,

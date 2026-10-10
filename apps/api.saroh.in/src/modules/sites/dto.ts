@@ -384,7 +384,7 @@ export class CreateApprovalDto {
 /**
  * Set a site's icon to an image the business uploaded to its library
  * (`POST /organizations/:id/media/upload-url`, then `/complete`), as the
- * business logo is set (DEC-121).
+ * business logo is set (DEC-124).
  */
 export class SetSiteIconDto {
     @Transform(trim)

@@ -540,7 +540,7 @@ export class OrganizationSettingsService {
     }
 
     /**
-     * The logo is the icon of a site with none of its own (DEC-121), read
+     * The logo is the icon of a site with none of its own (DEC-124), read
      * live by the public site read, so the pages the merchant sites keep
      * (#863) carry the old one in their head until told. Queued after the
      * write, for the business's published sites; with the cache off there

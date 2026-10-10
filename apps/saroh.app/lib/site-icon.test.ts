@@ -130,7 +130,7 @@ describe("a merchant's site never shows Saroh's mark", () => {
 
     it("the app ships no icon file of its own for Next to serve on every host", () => {
         // `app/favicon.ico` was the framework's default mark, served on
-        // every merchant's address until DEC-121.
+        // every merchant's address until DEC-124.
         const files = readdirSync(app);
         expect(
             files.filter((f) => /^(favicon|icon|apple-icon)\d*\./.test(f)),

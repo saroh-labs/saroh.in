@@ -1,5 +1,5 @@
 /**
- * A location's logo (DEC-120): its own when it has one, else the
+ * A location's logo (DEC-123): its own when it has one, else the
  * business's, else none. Pure — what the read says and what a save writes;
  * `LocationLogoService` does the reading and the library checks.
  *

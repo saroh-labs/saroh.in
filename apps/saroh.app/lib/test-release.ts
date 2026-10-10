@@ -54,7 +54,7 @@ export type TestReleaseLookup =
           /** The REAL site's id: every live read (shop, booking) keys on it. */
           siteId: string;
           modules: ModulePageStates | null;
-          /** The icon the release shows (DEC-121); null for the plain tile. */
+          /** The icon the release shows (DEC-124); null for the plain tile. */
           icon: SiteIcon | null;
           release: TestReleaseInfo;
           /** The live site's address; null if it has never been published. */

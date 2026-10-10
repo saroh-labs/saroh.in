@@ -301,6 +301,18 @@ const envSchema = z.object({
     // crashed mid-flight) is reclaimed by the next claim. Default 5 min.
     JOB_VISIBILITY_MS: z.coerce.number().int().positive().default(300_000),
 
+    // How long a deleted business's data is kept before the retention
+    // eraser removes its files and personal data (DEC-122): 180 days, as the
+    // Privacy Policy says. An override can only lengthen it; a lower value
+    // is refused here and floored again where it is read
+    // (`organizations/retention.ts`), so a typo can never erase early.
+    RETENTION_AFTER_DELETION_DAYS: z.coerce
+        .number()
+        .int()
+        .min(180)
+        .max(3650)
+        .optional(),
+
     // Error tracking (#103). Off when unset: every 5xx is still logged, and
     // nothing leaves the process. No tracker SDK is installed yet, so a value
     // here only logs a warning at startup — see

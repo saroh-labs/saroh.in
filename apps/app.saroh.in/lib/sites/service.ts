@@ -669,7 +669,7 @@ export interface SiteCapabilities {
     manageDomain: boolean;
 }
 
-/** A site's icon as Website › Settings reads it (DEC-121). */
+/** A site's icon as Website › Settings reads it (DEC-124). */
 export interface SiteIconSaved {
     /** The site's own icon; null when it has none. */
     own: { url: string; mediaId: string | null } | null;
@@ -707,7 +707,7 @@ export interface SiteDetail extends SiteSummary {
     socialImageBytes: number | null;
     /**
      * The site's own icon as saved, and the business logo that stands in
-     * without one (DEC-121). Draft, like the share image. Absent from an
+     * without one (DEC-124). Draft, like the share image. Absent from an
      * older API, which reads as neither.
      */
     icon?: SiteIconSaved;

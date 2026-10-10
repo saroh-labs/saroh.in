@@ -325,6 +325,65 @@ export function sendTeamAlertEmail(
     return Promise.resolve();
 }
 
+/** What the "your data is ready" email says (DEC-120). */
+export interface DataExportReadyMail {
+    /** The business's name; escaped here. */
+    businessName: string;
+    /** The signed link to the zip itself. */
+    url: string;
+    /** When that link stops working. */
+    linkExpiresAt: Date;
+    /** Until when the workspace can make a new link. */
+    keptUntil: Date;
+    /** Settings › Your data in the workspace. */
+    workspaceUrl: string;
+}
+
+function dayOf(date: Date): string {
+    return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Kolkata",
+    });
+}
+
+/**
+ * "Your data is ready" to the owner who asked for it (DEC-120): Saroh
+ * speaking to its own user about their own business (DEC-011 amended
+ * 2026-10-07, sent as DEC-085 has it), so Saroh sends it, provider or not.
+ * The link is a signed one to the zip that stops working after a day; the
+ * workspace makes a new one until the zip is deleted. Awaited, so the job
+ * knows whether it went. Without SMTP the log says so and never prints
+ * the link: the link is the data.
+ */
+export async function sendDataExportReadyEmail(
+    to: string,
+    mail: DataExportReadyMail,
+): Promise<"sent" | "not-configured" | "failed"> {
+    // One line: a name is tenant text, and a subject takes no line break.
+    const name = mail.businessName.replace(/\s+/g, " ").trim().slice(0, 80);
+    const subject = `Your data from ${name} is ready`;
+    if (!transporter) {
+        console.info(`[Data export] (no SMTP) ready email not sent to ${to}`);
+        return "not-configured";
+    }
+    const html = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(subject)}</h2>
+  <p>${esc(`Everything ${name} keeps in Saroh is in one zip file: customers, orders, invoices and credit notes, bookings, products and stock, memberships, class packs, courses and enquiries as spreadsheets (CSV), and the photos and videos you uploaded.`)}</p>
+  <p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Download your data</a></p>
+  <p>${esc(`This link works until ${dayOf(mail.linkExpiresAt)}. After that, download it from Settings › Your data in Saroh until ${dayOf(mail.keptUntil)}, when the file is deleted.`)}</p>
+  <p><a href="${esc(mail.workspaceUrl)}">Open Settings › Your data</a></p>
+  <p style="color:#666;font-size:12px">${esc("You asked for this from your business's Settings in Saroh. The file holds your customers' details, so keep it somewhere safe.")}</p>
+</div>`;
+    try {
+        await transporter.sendMail({ from: FROM, to, subject, html });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 /**
  * Tell an owner or admin a customer wrote from their account on the
  * business's site (UX-014). Sent by the `customer-message.notify` job, once

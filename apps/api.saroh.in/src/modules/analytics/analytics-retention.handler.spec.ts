@@ -3,6 +3,8 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         analyticsEvent: { findMany: jest.fn(), deleteMany: jest.fn() },
         analyticsDailyAggregate: { deleteMany: jest.fn() },
+        // Businesses on legal hold (DEC-122): none unless a test says so.
+        organization: { findMany: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
     },
 }));
@@ -30,6 +32,7 @@ const deleteMany = prisma.analyticsEvent.deleteMany as jest.Mock;
 const aggregateDelete = prisma.analyticsDailyAggregate.deleteMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
+const held = prisma.organization.findMany as jest.Mock;
 
 const NOW = new Date("2026-10-09T03:00:00.000Z");
 
@@ -58,6 +61,7 @@ describe("AnalyticsRetentionHandler", () => {
         jest.resetAllMocks();
         jest.useFakeTimers({ now: NOW, advanceTimers: true });
         jobCreate.mockResolvedValue({});
+        held.mockResolvedValue([]);
         log = jest.spyOn(Logger.prototype, "log").mockImplementation();
         error = jest.spyOn(Logger.prototype, "error").mockImplementation();
     });
@@ -104,6 +108,34 @@ describe("AnalyticsRetentionHandler", () => {
         expect(nextRun()).toEqual(
             new Date(NOW.getTime() + ANALYTICS_RETENTION_EVERY_MS),
         );
+    });
+
+    it("leaves the events of a business on legal hold, in the read and in the delete (DEC-122)", async () => {
+        held.mockResolvedValue([{ id: "org_held" }, { id: "org_held_2" }]);
+        findMany.mockResolvedValueOnce(ids(2));
+        deleteMany.mockResolvedValueOnce({ count: 2 });
+
+        await new AnalyticsRetentionHandler().handle(run());
+
+        expect(held).toHaveBeenCalledWith({
+            where: { legalHoldAt: { not: null } },
+            select: { id: true },
+        });
+        const notHeld = { notIn: ["org_held", "org_held_2"] };
+        expect(findMany.mock.calls[0][0]).toEqual({
+            where: { expiresAt: { lt: NOW }, organizationId: notHeld },
+            select: { id: true },
+            orderBy: { expiresAt: "asc" },
+            take: ANALYTICS_RETENTION_BATCH,
+        });
+        expect(deleteMany.mock.calls[0][0]).toEqual({
+            where: {
+                id: { in: ["ev_0", "ev_1"] },
+                expiresAt: { lt: NOW },
+                organizationId: notHeld,
+            },
+        });
+        expect(error).not.toHaveBeenCalled();
     });
 
     it("says nothing when nothing is due, and comes back in a day", async () => {

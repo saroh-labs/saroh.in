@@ -7,6 +7,7 @@ import {
     CalendarClock,
     Clock,
     CreditCard,
+    Download,
     Globe,
     Home,
     KanbanSquare,
@@ -1196,6 +1197,16 @@ export const SETTINGS_PAGES = [
         description: "Hosting, email and payments behind it",
         icon: Link2,
         action: "provider:read",
+    },
+    {
+        // "Download your data" (DEC-120): the owner's alone, by role, as
+        // the API has it. Last, after everything the business runs on.
+        href: "/settings/data",
+        label: "Your data",
+        description: "Download everything as one file",
+        icon: Download,
+        action: "org:settings:read",
+        ownerOnly: true,
     },
 ] as const satisfies readonly SettingsPage[];
 

@@ -8,7 +8,7 @@ import type { SiteHostKind } from "./site-host-mode";
  * On a test release's host there is no share card: a link pasted into a chat
  * must not unfurl looking like the real site, and it is never indexed. The
  * title and the site's icon stay, so a reviewer's tabs still read (an icon
- * is not a share card; DEC-121). On a live host the metadata is returned as
+ * is not a share card; DEC-124). On a live host the metadata is returned as
  * it was.
  */
 export function shareable(

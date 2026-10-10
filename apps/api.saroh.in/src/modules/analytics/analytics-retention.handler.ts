@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { heldOrganizationIds } from "../organizations/legal-hold";
 
 /**
  * The self-rescheduling job that deletes detailed analytics rows past their
@@ -45,6 +46,10 @@ export interface RetentionSweep {
  * configured and is kept. It logs counts only, never a business, event or
  * visitor.
  *
+ * **A business on legal hold keeps its events** (DEC-122,
+ * `organizations/legal-hold.ts`): its rows are left out of the read and of
+ * the delete until the hold is lifted, when the next run takes them.
+ *
  * It reschedules itself like the waitlist retention sweep (ADR-007): one
  * PENDING run at a time (`Job_one_pending_analytics_retention`), a failed
  * sweep is logged and the chain goes on, and it throws only when the next
@@ -83,9 +88,13 @@ export class AnalyticsRetentionHandler {
     /** Delete events whose retention ended before `now`, up to the run's cap. */
     async sweep(now: Date): Promise<RetentionSweep> {
         let deleted = 0;
+        // On legal hold: read once a run; there are few.
+        const held = await heldOrganizationIds(prisma);
+        const notHeld =
+            held.length > 0 ? { organizationId: { notIn: held } } : {};
         for (let batch = 0; batch < ANALYTICS_RETENTION_MAX_BATCHES; batch++) {
             const due = await prisma.analyticsEvent.findMany({
-                where: { expiresAt: { lt: now } },
+                where: { expiresAt: { lt: now }, ...notHeld },
                 select: { id: true },
                 orderBy: { expiresAt: "asc" },
                 take: ANALYTICS_RETENTION_BATCH,
@@ -95,6 +104,7 @@ export class AnalyticsRetentionHandler {
                 where: {
                     id: { in: due.map((row) => row.id) },
                     expiresAt: { lt: now },
+                    ...notHeld,
                 },
             });
             deleted += count;

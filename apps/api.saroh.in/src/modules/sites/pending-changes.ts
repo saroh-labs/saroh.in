@@ -288,7 +288,7 @@ const SITE_CHANGE_FIELDS: Record<
     name: ["name", "slug"],
     search: ["seoTitle", "seoDescription"],
     shareImage: ["socialImageUrl", "socialImage"],
-    // The site's own icon (DEC-121). The logo that stands in for it is the
+    // The site's own icon (DEC-124). The logo that stands in for it is the
     // business's, read live, and never part of a snapshot.
     icon: ["icon"],
     posts: ["postsPrefix"],

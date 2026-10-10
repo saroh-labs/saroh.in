@@ -21,7 +21,7 @@ import {
 } from "../orders/order-pay-link";
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { orderPayOnline } from "./order-pay-online";
 import type { CreateIntentResult } from "./payments.service";
@@ -223,7 +223,8 @@ export class PublicOrderPayService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        await assertOrganizationOpen(found.organizationId);
+        // Paying what the business already asked for (DEC-120).
+        await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const order = await prisma.order.findFirst({
                 where: { id: found.id, organizationId: found.organizationId },

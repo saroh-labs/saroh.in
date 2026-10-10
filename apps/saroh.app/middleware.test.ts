@@ -293,7 +293,7 @@ describe("middleware: a site's crawl files (#890)", () => {
     });
 });
 
-describe("middleware: a site's icon (DEC-121)", () => {
+describe("middleware: a site's icon (DEC-124)", () => {
     it("lists /favicon.ico and the plain tile in the matcher, past the dotted-path rule", async () => {
         const { config } = await import("./middleware");
         expect(config.matcher).toContain("/favicon.ico");

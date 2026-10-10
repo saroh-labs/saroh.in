@@ -18,6 +18,12 @@ jest.mock("@saroh/database", () => {
         ...actual,
         runInOrgContext: jest.fn((_org: string, cb: () => unknown) => cb()),
         prisma: {
+            // An active business (DEC-120): its shop takes orders.
+            organization: {
+                findUnique: jest
+                    .fn()
+                    .mockResolvedValue({ lifecycleStatus: "ACTIVE" }),
+            },
             site: { findFirst: jest.fn() },
             customerAccount: { findFirst: jest.fn() },
             customer: { findMany: jest.fn() },

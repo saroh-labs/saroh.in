@@ -12,7 +12,9 @@ import {
 } from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
@@ -27,7 +29,7 @@ import { OrdersService } from "./orders.service";
  * service still asks `order:read` of every read.
  */
 @Controller("stores/:storeId/orders")
-@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@UseGuards(BetterAuthGuard, StoreLifecycleGuard, ModuleEnforcementGuard)
 export class OrdersController {
     constructor(private readonly orders: OrdersService) {}
 
@@ -101,6 +103,7 @@ export class OrdersController {
     }
 
     @Patch(":orderId")
+    @LifecycleWrite("wind-down")
     @RequireModule("COMMERCE")
     update(
         @CurrentUser() user: AuthUser,

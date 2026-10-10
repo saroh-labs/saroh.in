@@ -11,8 +11,9 @@ import type { LaunchMode } from "@/lib/links";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
- * (plan U26): Home, Pricing, the eight features, the three solutions, and the
- * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16).
+ * (plan U26): Home, Pricing, the eight features, the three solutions, the
+ * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16), and
+ * /customers, for customers of a business on Saroh (Terms rev 46).
  * `/pricing` only once the launch switch is open: before that it redirects
  * to the waitlist (`redirects.js`), and a sitemap never lists a redirect.
  *
@@ -47,6 +48,9 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         ...FEATURE_SLUGS.map(featureHref),
         ...SOLUTION_SLUGS.map(solutionHref),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
+        // For customers of a business on Saroh (Terms rev 46): every
+        // merchant site's footer links here, whatever the launch mode.
+        "/customers",
         ...resources,
         ...entries,
         ...help,

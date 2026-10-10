@@ -26,6 +26,10 @@ import {
  *
  * - **Email**, while Communications is on and no email provider sends
  *   (`emailAttention`) — the danger dot when one that was sending stopped.
+ * - **Who customers are buying from** (DEC-121), for a business with a
+ *   published website, until it has a legal name, a registered address and
+ *   a contact (an email or the website's phone): its site says "Sold by" in
+ *   those details, and with none set says only its name.
  * - **Business type**, until one is chosen, for a business that didn't say
  *   Registered at setup. One that did is asked by the take-money steps
  *   instead (`readyChecklist`): Registered saves no type, so the real one
@@ -97,6 +101,38 @@ function email(
         href: "/settings/providers",
         broken: false,
         left: attention !== null,
+    };
+}
+
+const filled = (v: string | null | undefined) => !!v?.trim();
+
+/**
+ * The details the website's "Sold by" block shows (DEC-121). Asked only
+ * with a website published now: `setup` counts them, and unread (an older
+ * API) is not asked. The address is the one the site prints: a first line.
+ */
+function seller(
+    settings: Pick<
+        OrganizationSettings,
+        "profile" | "setup" | "registeredAddress"
+    >,
+): Nudge | null {
+    const { setup, profile, registeredAddress } = settings;
+    if (!setup || setup.sites - setup.sitesNotLive <= 0) return null;
+    // Absent from an API older than the registered address: unknown.
+    if (registeredAddress === undefined) return null;
+    const set =
+        filled(profile?.legalName) &&
+        filled(registeredAddress.line1) &&
+        (filled(profile?.contactEmail) || filled(profile?.phone));
+    return {
+        key: "seller",
+        label: "Add your business's legal name, address and a contact",
+        why: "Customers must be able to see who they're buying from.",
+        cta: "Add details",
+        href: business("address"),
+        broken: false,
+        left: !set,
     };
 }
 
@@ -184,7 +220,10 @@ export function settingsNudges({
     messaging,
     emailSetup,
 }: {
-    settings: Pick<OrganizationSettings, "profile" | "logo" | "setup">;
+    settings: Pick<
+        OrganizationSettings,
+        "profile" | "logo" | "setup" | "registeredAddress"
+    >;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
     /** Whether the plan can connect one (DEC-091); unread asks as before. */
@@ -194,6 +233,7 @@ export function settingsNudges({
     const money = handlesMoney(modules, settings.setup) !== false;
     return [
         email(modules, messaging, emailSetup),
+        seller(settings),
         money ? businessType(settings) : null,
         money ? logo(settings) : null,
         pipeline(modules),

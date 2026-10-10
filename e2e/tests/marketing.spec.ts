@@ -67,6 +67,9 @@ const INDEXED = [
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     "/waitlist",
+    // "Bought from a business that uses Saroh?" (DEC-121): always listed,
+    // whatever the launch mode.
+    "/customers",
 ];
 
 /**

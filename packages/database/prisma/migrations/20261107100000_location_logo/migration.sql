@@ -1,4 +1,4 @@
--- A location's own logo (DEC-120): the library object beside the address
+-- A location's own logo (DEC-123): the library object beside the address
 -- "Store"."logo" already holds. Null on both: the location uses the
 -- business logo. Additive; "Store" keeps its policies, which read the
 -- row's "organizationId" and not its columns.

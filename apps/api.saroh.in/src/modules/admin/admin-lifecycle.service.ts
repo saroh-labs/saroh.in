@@ -15,6 +15,11 @@ import { EntitlementService } from "../billing/entitlement.service";
 import { backfillOneOrganization } from "../capabilities/module-backfill";
 import { ModuleLifecycleService } from "../capabilities/module-lifecycle.service";
 import { isModuleKey } from "../capabilities/module-registry";
+import { LEGAL_HOLD_CODE } from "../organizations/legal-hold";
+import {
+    legalHoldAllowsMoveTo,
+    legalHoldMayBePlaced,
+} from "../organizations/organization-lifecycle.policy";
 import {
     assertOrganizationLifecycleTransition,
     OrganizationLifecycleStatus,
@@ -22,6 +27,7 @@ import {
 import type { AdminAuditInput } from "./admin-audit.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
+import { enqueueDeletionCleanup } from "./organization-deletion-cleanup.handler";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,7 +43,24 @@ export const OPERATOR_LIFECYCLE_ACTIONS = [
     "organization.deletion.scheduled",
     // Written by the deletion sweep when the window ends (#907).
     "organization.deleted",
+    // A legal hold placed or lifted (DEC-122).
+    "organization.legal_hold.placed",
+    "organization.legal_hold.lifted",
+    // Written by the retention eraser, 180 days after deletion (DEC-122).
+    "organization.retention.erased",
 ] as const;
+
+/** The admin ledger's and the business's history's rows for a hold (DEC-122). */
+export const LEGAL_HOLD_PLACED_ACTION = "organization.legal_hold.placed";
+export const LEGAL_HOLD_LIFTED_ACTION = "organization.legal_hold.lifted";
+
+/** What an operator is told when a held business is reinstated. */
+export const LEGAL_HOLD_BLOCKS_REINSTATE =
+    "This business is on legal hold, so it stays closed to new activity. A Platform Owner lifts the hold first.";
+
+/** What an operator is told when a held business's deletion is asked for. */
+export const LEGAL_HOLD_BLOCKS_DELETION =
+    "This business is on legal hold, so its data can't be deleted. A Platform Owner lifts the hold first.";
 
 /** Retention window bounds for a scheduled deletion, in days. */
 export const DELETION_WINDOW = { min: 7, default: 30, max: 90 } as const;
@@ -64,6 +87,15 @@ export interface OperatorCommand {
  * subscription is told to end with the period paid, on the same
  * transaction (#921). When the window ends the daily sweep
  * (`organization-deletion.handler.ts`, #907) takes it to `DELETED_RETAINED`.
+ *
+ * **Legal hold** (DEC-122, owner 10 Oct, `organizations/legal-hold.ts`): an
+ * operator places one when suspending a business for activity the law
+ * prohibits, or on a business that is already suspended or on its way out;
+ * only a Platform Owner lifts it (`organization:legal-hold:lift`). Both take
+ * a reason, write the admin ledger with it, and write the business's own
+ * history without it. While it is held, scheduling its deletion is refused,
+ * and so is reinstating it: a held business is never active, so its
+ * workspace takes no write that could delete a record.
  */
 @Injectable()
 export class AdminLifecycleService {
@@ -73,16 +105,140 @@ export class AdminLifecycleService {
         private readonly entitlements: EntitlementService,
     ) {}
 
-    /** Suspend: the business keeps its data and can read it; nothing new happens. */
-    async suspend(command: OperatorCommand & { confirmName: string }) {
+    /**
+     * Suspend: the business keeps its data and can read it; nothing new
+     * happens. With `legalHold` ("Suspended for activity the law prohibits —
+     * keep its data", DEC-122) the hold is placed on the same transaction,
+     * with the same reason, and written to both ledgers as its own row.
+     */
+    async suspend(
+        command: OperatorCommand & { confirmName: string; legalHold?: boolean },
+    ) {
+        const hold = command.legalHold === true;
         return this.transition(command, OrganizationLifecycleStatus.Suspended, {
             confirmName: command.confirmName,
             data: (now) => ({
                 suspendedAt: now,
                 suspendedByUserId: command.staff.userId,
                 suspensionReason: command.reason,
+                ...(hold
+                    ? {
+                          legalHoldAt: now,
+                          legalHoldReason: command.reason,
+                          legalHoldByUserId: command.staff.userId,
+                      }
+                    : {}),
             }),
             action: "organization.suspended",
+            metadata: hold ? { legalHold: true } : undefined,
+            inTx: hold
+                ? async (tx, organizationId) => {
+                      await this.recordHold(tx, command, organizationId, {
+                          action: LEGAL_HOLD_PLACED_ACTION,
+                          permission:
+                              AdminPermission.OrganizationLifecycleWrite,
+                          metadata: { with: "suspension" },
+                      });
+                      return {};
+                  }
+                : undefined,
+        });
+    }
+
+    /**
+     * Place a legal hold on a business that is already suspended, scheduled
+     * for deletion or deleted (DEC-122). An active business is suspended
+     * with the hold instead: the Terms suspend such an account at once.
+     * Guarded on `lifecycleVersion`, which it bumps, so a deletion the sweep
+     * is writing at the same moment and this hold can't both win.
+     */
+    async placeLegalHold(command: OperatorCommand) {
+        const reason = requireReason(command.reason);
+        const now = new Date();
+        return prisma.$transaction(async (tx) => {
+            const organization = await this.holdTarget(
+                tx,
+                command.organizationId,
+            );
+            if (organization.legalHoldAt) {
+                return { ok: true, changed: false };
+            }
+            if (!legalHoldMayBePlaced(organization.lifecycleStatus)) {
+                throw new ConflictException(
+                    "Suspend this business with the legal hold ticked; a hold isn't placed on an active business.",
+                );
+            }
+            const updated = await tx.organization.updateMany({
+                where: {
+                    id: organization.id,
+                    lifecycleVersion: organization.lifecycleVersion,
+                    legalHoldAt: null,
+                },
+                data: {
+                    legalHoldAt: now,
+                    legalHoldReason: reason,
+                    legalHoldByUserId: command.staff.userId,
+                    lifecycleVersion: { increment: 1 },
+                },
+            });
+            if (updated.count === 0) throw changedMeanwhile();
+            await this.recordHold(tx, { ...command, reason }, organization.id, {
+                action: LEGAL_HOLD_PLACED_ACTION,
+                permission: AdminPermission.OrganizationLifecycleWrite,
+                metadata: { status: organization.lifecycleStatus },
+            });
+            return { ok: true, changed: true };
+        });
+    }
+
+    /**
+     * Lift a legal hold (DEC-122): a Platform Owner's, with a reason
+     * (`organization:legal-hold:lift`, which no other role carries). The
+     * business stays in the state it is in. A deleted one gets its clean-up
+     * queued again, since the one that ran while it was held stood aside;
+     * the retention eraser picks it up on its next daily run.
+     */
+    async liftLegalHold(command: OperatorCommand) {
+        const reason = requireReason(command.reason);
+        return prisma.$transaction(async (tx) => {
+            const organization = await this.holdTarget(
+                tx,
+                command.organizationId,
+            );
+            if (!organization.legalHoldAt) {
+                return { ok: true, changed: false };
+            }
+            const updated = await tx.organization.updateMany({
+                where: {
+                    id: organization.id,
+                    lifecycleVersion: organization.lifecycleVersion,
+                    legalHoldAt: { not: null },
+                },
+                data: {
+                    legalHoldAt: null,
+                    legalHoldReason: null,
+                    legalHoldByUserId: null,
+                    lifecycleVersion: { increment: 1 },
+                },
+            });
+            if (updated.count === 0) throw changedMeanwhile();
+            await this.recordHold(tx, { ...command, reason }, organization.id, {
+                action: LEGAL_HOLD_LIFTED_ACTION,
+                permission: AdminPermission.OrganizationLegalHoldLift,
+                metadata: {
+                    status: organization.lifecycleStatus,
+                    heldSince: organization.legalHoldAt.toISOString(),
+                    placedBy: organization.legalHoldByUserId,
+                    placedFor: organization.legalHoldReason,
+                },
+            });
+            if (
+                organization.lifecycleStatus ===
+                OrganizationLifecycleStatus.DeletedRetained
+            ) {
+                await enqueueDeletionCleanup(tx, organization.id);
+            }
+            return { ok: true, changed: true };
         });
     }
 
@@ -537,6 +693,7 @@ export class AdminLifecycleService {
                     name: true,
                     lifecycleStatus: true,
                     lifecycleVersion: true,
+                    legalHoldAt: true,
                 },
             });
             if (!organization)
@@ -555,6 +712,23 @@ export class AdminLifecycleService {
                 organization.lifecycleStatus as OrganizationLifecycleStatus;
             if (from === to) return { ok: true, changed: false, status: to };
             assertOrganizationLifecycleTransition(from, to);
+            // A held business's data is kept "even if deletion was
+            // requested" (the Terms; DEC-122): no window starts. Placing a
+            // hold bumps the version this write is fenced on, so a hold set
+            // since this read refuses it too.
+            // Nor does it go back to active: while it is held its workspace
+            // stays closed to new writes, so none of its people can delete
+            // a record either. Which moves a hold allows is the lifecycle
+            // table's (`LEGAL_HOLD_DECISIONS`).
+            if (organization.legalHoldAt && !legalHoldAllowsMoveTo(to)) {
+                throw new ConflictException({
+                    message:
+                        to === OrganizationLifecycleStatus.Active
+                            ? LEGAL_HOLD_BLOCKS_REINSTATE
+                            : LEGAL_HOLD_BLOCKS_DELETION,
+                    details: { code: LEGAL_HOLD_CODE },
+                });
+            }
 
             // Guarded on the version read above: a concurrent change bumps it,
             // this matches nothing, and the operator is told to reload rather
@@ -570,11 +744,7 @@ export class AdminLifecycleService {
                     lifecycleVersion: { increment: 1 },
                 },
             });
-            if (updated.count === 0) {
-                throw new ConflictException(
-                    "This business changed while you were looking at it. Reload and try again.",
-                );
-            }
+            if (updated.count === 0) throw changedMeanwhile();
 
             const effects = options.inTx
                 ? await options.inTx(tx, organization.id)
@@ -628,6 +798,60 @@ export class AdminLifecycleService {
         });
     }
 
+    /** A business a hold is placed on or lifted from: any that exists. */
+    private async holdTarget(tx: Tx, organizationId: string) {
+        const organization = await tx.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                id: true,
+                lifecycleStatus: true,
+                lifecycleVersion: true,
+                legalHoldAt: true,
+                legalHoldReason: true,
+                legalHoldByUserId: true,
+            },
+        });
+        if (!organization)
+            throw new NotFoundException("Organization not found");
+        return organization;
+    }
+
+    /**
+     * A hold placed or lifted, on both ledgers in the change's transaction:
+     * the admin ledger with the operator's reason, and the business's own
+     * history without it (its people see that a hold exists, never why).
+     */
+    private async recordHold(
+        tx: Tx,
+        command: OperatorCommand,
+        organizationId: string,
+        entry: {
+            action: string;
+            permission: AdminAuditInput["permission"];
+            metadata: Record<string, unknown>;
+        },
+    ): Promise<void> {
+        await this.ledger(tx, {
+            command,
+            permission: entry.permission,
+            action: entry.action,
+            targetType: "organization",
+            targetId: organizationId,
+            metadata: entry.metadata,
+        });
+        await tx.auditEvent.create({
+            data: {
+                action: entry.action,
+                actorUserId: command.staff.userId,
+                organizationId,
+                targetType: "organization",
+                targetId: organizationId,
+                outcome: "SUCCESS",
+                metadata: { byOperator: true },
+            },
+        });
+    }
+
     private async organizationOrThrow(
         db: Pick<Tx, "organization">,
         organizationId: string,
@@ -663,6 +887,12 @@ function operatorContext(command: OperatorCommand): OrganizationContext {
         roleKey: PLATFORM_OPERATOR_ROLE_KEY,
         actions: new Set(["module:manage"]),
     };
+}
+
+function changedMeanwhile(): ConflictException {
+    return new ConflictException(
+        "This business changed while you were looking at it. Reload and try again.",
+    );
 }
 
 export function assertNotProviderManaged(

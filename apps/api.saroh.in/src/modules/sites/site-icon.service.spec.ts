@@ -1,4 +1,4 @@
-// DB-free: setting and removing a site's own icon (DEC-121). The database
+// DB-free: setting and removing a site's own icon (DEC-124). The database
 // package is mocked so nothing touches Postgres, and the environment so the
 // library's storage provider (imported with `MediaService`) needs no `.env`.
 jest.mock("../../env", () => ({
