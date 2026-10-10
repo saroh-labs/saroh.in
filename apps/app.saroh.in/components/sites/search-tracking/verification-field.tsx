@@ -19,6 +19,7 @@ import {
     verificationSavedLine,
 } from "@/lib/sites/search-tracking";
 
+import { TextLink } from "@saroh/ui/text-link";
 import type { SaveSection } from "./parts";
 import { LineRow } from "./parts";
 
@@ -106,14 +107,9 @@ export function VerificationField({
                     <span className="mt-1 block" role="status">
                         {verificationSavedLine(service)}{" "}
                         {liveUrl ? (
-                            <a
-                                href={liveUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline underline-offset-2 hover:text-muted-foreground active:text-foreground"
-                            >
+                            <TextLink href={liveUrl} external>
                                 View your live page
-                            </a>
+                            </TextLink>
                         ) : null}
                     </span>
                 ) : null}

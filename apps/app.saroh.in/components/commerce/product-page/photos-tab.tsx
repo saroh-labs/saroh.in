@@ -6,6 +6,7 @@ import { mediaCounter } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { StateLink, TabState } from "./panel-state";
 import { SheetButton } from "./sheet-button";
 
@@ -102,14 +103,9 @@ export function ProductPhotosTab({
                                 <p className="text-[11.5px] text-muted-foreground">
                                     Photo:{" "}
                                     {img.creditUrl ? (
-                                        <a
-                                            href={img.creditUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="underline underline-offset-2"
-                                        >
+                                        <TextLink href={img.creditUrl} external>
                                             {img.creditName}
-                                        </a>
+                                        </TextLink>
                                     ) : (
                                         img.creditName
                                     )}

@@ -5,7 +5,6 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
-import Link from "next/link";
 import { useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
@@ -32,6 +31,7 @@ import {
 } from "@/lib/stores/location-address";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** Sell › Locations, for a business with no location customers visit yet. */
 const LOCATIONS_HREF = "/commerce/locations";
@@ -407,12 +407,7 @@ function RegisteredAddressChoice({
             <div className="grid gap-4 text-sm">
                 <p className="text-pretty">
                     {ADDRESS_SHEET.noLocation}{" "}
-                    <Link
-                        href={LOCATIONS_HREF}
-                        className="font-medium underline underline-offset-2 hover:text-foreground active:text-muted-foreground"
-                    >
-                        Open Locations
-                    </Link>
+                    <TextLink href={LOCATIONS_HREF}>Open Locations</TextLink>
                 </p>
 
                 <div className="grid gap-1.5">

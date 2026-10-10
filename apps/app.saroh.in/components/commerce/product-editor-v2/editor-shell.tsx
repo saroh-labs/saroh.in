@@ -33,6 +33,7 @@ import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
@@ -319,12 +320,9 @@ function EditorBody({
                     // everyone, and why, not "you're viewing as …".
                     <ReadOnlyNote>
                         {pausedWords("product")}{" "}
-                        <Link
-                            href={PLAN_AND_BILLING_HREF}
-                            className="font-medium underline underline-offset-2"
-                        >
+                        <TextLink href={PLAN_AND_BILLING_HREF}>
                             {planLabel()}
-                        </Link>
+                        </TextLink>
                     </ReadOnlyNote>
                 ) : !canWrite ? (
                     <ReadOnlyNote>

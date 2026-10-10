@@ -13,6 +13,7 @@ import { exactDate } from "@/lib/sites/format-date";
 import { releaseTitle } from "@/lib/sites/release-review";
 import { getPublication, getSite } from "@/lib/sites/service";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * One past version, as it was served (#283, #194).
@@ -103,12 +104,11 @@ export default async function PastVersionPage({
                 {release ? (
                     <>
                         {" It went live from "}
-                        <Link
+                        <TextLink
                             href={`/sites/${siteId}/releases/${release.id}`}
-                            className="font-medium underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
                         >
                             {releaseTitle(release)}
-                        </Link>
+                        </TextLink>
                         .
                     </>
                 ) : null}

@@ -444,7 +444,7 @@ describe("verification codes", () => {
         );
         expect(
             row.querySelector('a[href="https://rye.saroh.app"]')?.textContent,
-        ).toBe("View your live page");
+        ).toBe("View your live page (opens in a new tab)");
         expect(row.textContent).not.toMatch(/\bVerified\b/);
         expect(buttonIn(row, "Edit")).toBeDefined();
     });

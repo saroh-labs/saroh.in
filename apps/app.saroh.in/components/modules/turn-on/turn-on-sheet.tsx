@@ -9,7 +9,6 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { Skeleton } from "@saroh/ui/skeleton";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 
@@ -30,6 +29,7 @@ import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
 import { Section } from "./field";
 import { ConnectChoice, SellFields, WebsiteFields } from "./setup-fields";
@@ -372,12 +372,9 @@ function ConnectLocked({
     return (
         <div className="grid gap-2 rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
             <p className="text-pretty">{connectLockLine(moduleKey, lock)}</p>
-            <Link
-                href={lock.href}
-                className="justify-self-start font-semibold text-foreground underline underline-offset-2"
-            >
+            <TextLink href={lock.href} className="justify-self-start">
                 {lock.cta}
-            </Link>
+            </TextLink>
         </div>
     );
 }

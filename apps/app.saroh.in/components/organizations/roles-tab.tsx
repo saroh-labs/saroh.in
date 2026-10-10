@@ -16,7 +16,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Info, Lock, Plus } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -37,6 +36,7 @@ import type {
 } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
@@ -162,12 +162,9 @@ export function RolesTab({
                         />
                         <p>
                             {rolesLock.line}{" "}
-                            <Link
-                                href={rolesLock.href}
-                                className="font-medium text-foreground underline underline-offset-4"
-                            >
+                            <TextLink href={rolesLock.href}>
                                 {rolesLock.cta}
-                            </Link>
+                            </TextLink>
                         </p>
                     </div>
                 ) : canEdit ? (

@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-
 import { OptionSelect } from "@/components/shared/option-select";
 import { PAY_WAY, payWayHint } from "@/lib/services/availability-rules";
 import type { BookingPayment, OnlineBlocker } from "@/lib/staff/types";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "How people pay when they book" on the Booking rules card (DEC-088):
@@ -47,18 +46,17 @@ export function PayWayRow({
                 {needsFix ? (
                     <>
                         {" "}
-                        <Link
+                        <TextLink
                             href={
                                 blocker === "PAYMENTS_OFF"
                                     ? "/settings/modules"
                                     : "/settings/providers"
                             }
-                            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             {blocker === "PAYMENTS_OFF"
                                 ? "Turn on Payments"
                                 : "Connect a provider"}
-                        </Link>
+                        </TextLink>
                     </>
                 ) : null}
             </p>

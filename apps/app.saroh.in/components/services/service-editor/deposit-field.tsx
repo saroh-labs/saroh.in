@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useId } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
@@ -13,6 +12,7 @@ import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { HELP } from "./fields";
 
 const DEPOSITS: [DepositMode, string][] = [
@@ -119,12 +119,9 @@ export function DepositField({
                     className="mt-2"
                 >
                     {problem.text}{" "}
-                    <Link
-                        href={problem.fix.href}
-                        className="rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
+                    <TextLink href={problem.fix.href}>
                         {problem.fix.label}
-                    </Link>
+                    </TextLink>
                 </Notice>
             ) : null}
         </>

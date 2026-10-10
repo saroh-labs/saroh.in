@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -20,6 +18,7 @@ import { useGridCatalogue } from "@/components/sites/use-grid-catalogue";
 import type { ProductGridContent } from "@/lib/sites/service";
 
 import { Segmented } from "@saroh/ui/segmented";
+import { TextLink } from "@saroh/ui/text-link";
 import {
     DisplayOptions,
     hiddenFlag,
@@ -270,12 +269,9 @@ function CollectionField({
             <Field label="Collection">
                 <p className="text-sm text-muted-foreground">
                     No collections yet.{" "}
-                    <Link
-                        href="/commerce/products?tab=collections"
-                        className="underline hover:text-foreground"
-                    >
+                    <TextLink href="/commerce/products?tab=collections">
                         Make one in Sell › Products
-                    </Link>
+                    </TextLink>
                     , then choose it here.
                 </p>
             </Field>
@@ -367,12 +363,9 @@ function PickedField({
             <Field label="Products">
                 <p className="text-sm text-muted-foreground">
                     No products yet.{" "}
-                    <Link
-                        href="/commerce/products"
-                        className="underline hover:text-foreground"
-                    >
+                    <TextLink href="/commerce/products">
                         Add one in Sell › Products
-                    </Link>
+                    </TextLink>
                     , then pick it here.
                 </p>
             </Field>

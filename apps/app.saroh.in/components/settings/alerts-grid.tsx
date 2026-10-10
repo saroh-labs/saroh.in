@@ -2,7 +2,6 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 
 import { useSettingsUndo } from "@/components/organizations/use-settings-undo";
@@ -21,6 +20,7 @@ import {
     withAlert,
 } from "@/lib/notifications/preferences";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** The grid's columns: the alert, then 56px a channel (76px from sm). */
 const GRID_COLS: Record<number, string> = {
@@ -104,12 +104,12 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                             {note.link ? (
                                 <>
                                     {" "}
-                                    <Link
+                                    <TextLink
                                         href={note.link.href}
-                                        className="wk-press cursor-pointer rounded-sm font-semibold text-foreground underline underline-offset-2 hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/60"
+                                        className="wk-press"
                                     >
                                         {note.link.label}
-                                    </Link>
+                                    </TextLink>
                                 </>
                             ) : null}
                         </span>

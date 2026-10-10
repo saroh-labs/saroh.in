@@ -6,6 +6,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PausedView } from "@/lib/billing/paused";
 import { PLAN_AND_BILLING_HREF, pausedBanner } from "@/lib/billing/paused";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Above every page while a move to a lower plan has paused something, or
@@ -55,12 +56,7 @@ export function PausedNote({
     return (
         <Notice tone="warning" role="note" className={className}>
             {children}{" "}
-            <Link
-                href={PLAN_AND_BILLING_HREF}
-                className="font-medium underline underline-offset-2"
-            >
-                {planLabel()}
-            </Link>
+            <TextLink href={PLAN_AND_BILLING_HREF}>{planLabel()}</TextLink>
         </Notice>
     );
 }

@@ -15,6 +15,7 @@ import type {
 } from "@/lib/modules/turn-on-schema";
 import { usesLine } from "@/lib/sites/template-picker";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Field, INPUT } from "./field";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
@@ -243,18 +244,17 @@ export function WebsiteFields({
             </Field>
             {suggestion && suggestion !== w.address ? (
                 // The one asked for is taken: the API offers a free one.
-                <button
-                    type="button"
+                <TextLink
                     onClick={() =>
                         update((d) => ({
                             ...d,
                             WEBSITE: { ...d.WEBSITE, address: suggestion },
                         }))
                     }
-                    className="-mt-2 w-fit cursor-pointer rounded-sm text-left text-[12px] font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                    className="-mt-2 w-fit text-left text-[12px] coarse:min-h-11"
                 >
                     Use {suggestion}.saroh.app
-                </button>
+                </TextLink>
             ) : null}
             {template && choices.length > 1 ? (
                 <TemplateChoice

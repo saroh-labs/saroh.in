@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-
 import { TREATMENT_NEEDS_STOREFRONT } from "@/lib/services/service-editor";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { HELP, NumberField } from "./fields";
 
 /** Where a business adds the storefront a treatment is sold from. */
@@ -42,12 +41,7 @@ export function VisitsStorefrontNote() {
             <span className="text-destructive-subtle-foreground">
                 {TREATMENT_NEEDS_STOREFRONT}
             </span>{" "}
-            <Link
-                href={STOREFRONTS_HREF}
-                className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                Add a location
-            </Link>
+            <TextLink href={STOREFRONTS_HREF}>Add a location</TextLink>
         </p>
     );
 }

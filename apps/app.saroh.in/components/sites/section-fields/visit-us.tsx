@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@saroh/ui/button";
@@ -21,6 +20,7 @@ import type { VisitUsContent } from "@/lib/sites/service";
 import { visitPlaceChoice } from "@/lib/sites/visit-place";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
@@ -124,14 +124,9 @@ export function VisitUsFields({
                     <p className="text-sm text-muted-foreground">
                         Add a location customers visit, with its location
                         address, in{" "}
-                        <Link
-                            href={LOCATIONS}
-                            target="_blank"
-                            rel="noopener"
-                            className="underline hover:text-foreground"
-                        >
+                        <TextLink href={LOCATIONS} external>
                             Sell › Locations
-                        </Link>
+                        </TextLink>
                         . Until there is one, this block shows your
                         business&apos;s own address and hours from Settings, or
                         nothing when there are none.
@@ -198,23 +193,13 @@ export function VisitUsFields({
 
             <p className="text-sm text-muted-foreground">
                 The location address is set on the location (
-                <Link
-                    href={LOCATIONS}
-                    target="_blank"
-                    rel="noopener"
-                    className="underline hover:text-foreground"
-                >
+                <TextLink href={LOCATIONS} external>
                     Sell › Locations
-                </Link>
+                </TextLink>
                 ); the hours in{" "}
-                <Link
-                    href={HOURS}
-                    target="_blank"
-                    rel="noopener"
-                    className="underline hover:text-foreground"
-                >
+                <TextLink href={HOURS} external>
                     Settings › Hours
-                </Link>
+                </TextLink>
                 .
             </p>
         </div>

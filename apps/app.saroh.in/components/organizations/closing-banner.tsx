@@ -1,9 +1,8 @@
-import Link from "next/link";
-
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { ClosingView } from "@/lib/organizations/closing";
 import { closingBanner } from "@/lib/organizations/closing";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** Rows shown before the rest fold under "Show all". */
 const FIRST_ROWS = 3;
@@ -39,12 +38,9 @@ export function ClosingBanner({ view }: { view: ClosingView | null }) {
                     {b.data ? (
                         <>
                             {" "}
-                            <Link
-                                href={b.data.href}
-                                className="font-semibold underline underline-offset-2"
-                            >
+                            <TextLink href={b.data.href}>
                                 {b.data.label}
-                            </Link>
+                            </TextLink>
                         </>
                     ) : null}
                 </p>
@@ -66,12 +62,9 @@ export function ClosingBanner({ view }: { view: ClosingView | null }) {
                                 body: (
                                     <>
                                         {line.href ? (
-                                            <Link
-                                                href={line.href}
-                                                className="font-medium underline underline-offset-2"
-                                            >
+                                            <TextLink href={line.href}>
                                                 {line.label}
-                                            </Link>
+                                            </TextLink>
                                         ) : (
                                             <span className="font-medium">
                                                 {line.label}
@@ -110,12 +103,9 @@ export function ClosingBanner({ view }: { view: ClosingView | null }) {
                             rows={b.memberships.lines.map((line) => ({
                                 key: line.key,
                                 body: (
-                                    <Link
-                                        href={line.href}
-                                        className="underline underline-offset-2"
-                                    >
+                                    <TextLink href={line.href}>
                                         {line.label}
-                                    </Link>
+                                    </TextLink>
                                 ),
                             }))}
                             what="memberships"

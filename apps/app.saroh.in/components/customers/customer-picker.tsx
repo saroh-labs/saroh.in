@@ -24,6 +24,7 @@ import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
 
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 
 /** How long typing settles before the search runs. */
@@ -226,13 +227,9 @@ export function CustomerPicker({
                     className="mb-2 text-[12.5px] text-destructive-subtle-foreground"
                 >
                     Couldn&apos;t search customers — try again.{" "}
-                    <button
-                        type="button"
-                        onClick={() => setRetry((n) => n + 1)}
-                        className="font-semibold underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
-                    >
+                    <TextLink onClick={() => setRetry((n) => n + 1)}>
                         Try again
-                    </button>
+                    </TextLink>
                 </p>
             ) : null}
             {forbidden && canSearch ? (

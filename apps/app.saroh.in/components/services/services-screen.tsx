@@ -28,6 +28,7 @@ import {
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock } from "lucide-react";
 
 const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
@@ -224,12 +225,9 @@ export function ServicesScreen({
                                 {problem ? (
                                     <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
                                         {problem.line}{" "}
-                                        <Link
-                                            href={problem.fix.href}
-                                            className="rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        >
+                                        <TextLink href={problem.fix.href}>
                                             {problem.fix.label}
-                                        </Link>
+                                        </TextLink>
                                     </p>
                                 ) : null}
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">

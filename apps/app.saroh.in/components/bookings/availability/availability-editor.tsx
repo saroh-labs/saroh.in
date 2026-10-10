@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -47,6 +46,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
 import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
@@ -396,13 +396,7 @@ export function AvailabilityEditor({
                     In-person bookings are only offered while you&apos;re open,
                     so hours outside your opening hours aren&apos;t bookable in
                     person. Opening hours are in{" "}
-                    <Link
-                        href={HOURS}
-                        className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-                    >
-                        Settings › Hours
-                    </Link>
-                    .
+                    <TextLink href={HOURS}>Settings › Hours</TextLink>.
                 </p>
             ) : null}
             {canEdit ? null : (

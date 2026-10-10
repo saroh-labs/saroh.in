@@ -53,6 +53,7 @@ import {
 } from "@/lib/services/treatment";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { ClassSeats } from "./class-seats";
 import { Eyebrow, STATE_TONE } from "./parts";
 import type {
@@ -476,12 +477,7 @@ function OrderText({
 }) {
     if (!canRead) return <>{orderLabel(treatment)}</>;
     return (
-        <Link
-            href={orderHref(treatment)}
-            className="rounded-sm font-medium underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            {orderLabel(treatment)}
-        </Link>
+        <TextLink href={orderHref(treatment)}>{orderLabel(treatment)}</TextLink>
     );
 }
 

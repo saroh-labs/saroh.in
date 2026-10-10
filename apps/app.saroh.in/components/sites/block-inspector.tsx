@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Info } from "lucide-react";
-import Link from "next/link";
 
 import { SECTION_ICONS } from "@/components/sites/block-icons";
 import { BOUND_BLOCKS, boundHref } from "@/components/sites/block-kinds";
@@ -15,6 +14,7 @@ import { SectionPadding } from "@/components/sites/section-fields/padding";
 import type { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 import type { Flag, Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The inspector's Block tab (#340): what can be changed about the selected
@@ -142,14 +142,9 @@ export function BlockInspector({
                          * work autosave has not sent yet.
                          */}
                         {boundLink ? (
-                            <Link
-                                href={boundLink}
-                                target="_blank"
-                                rel="noopener"
-                                className="font-medium underline underline-offset-2"
-                            >
+                            <TextLink href={boundLink} external>
                                 {bound.linkLabel}
-                            </Link>
+                            </TextLink>
                         ) : null}
                     </div>
                 </div>

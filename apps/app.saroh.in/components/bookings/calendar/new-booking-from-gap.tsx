@@ -42,6 +42,7 @@ import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Chip, Eyebrow } from "./parts";
 import { btn } from "./quick-look-types";
 
@@ -371,21 +372,19 @@ function Form({
 
             <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
                 {extra ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => void closeExtra()}
-                        className="text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
+                        className="text-[12.5px]"
                     >
                         Close these extra hours
-                    </button>
+                    </TextLink>
                 ) : null}
-                <button
-                    type="button"
+                <TextLink
                     onClick={() => onBlock(target)}
-                    className="mr-auto text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
+                    className="mr-auto text-[12.5px]"
                 >
                     Block this time instead
-                </button>
+                </TextLink>
                 <Button
                     type="button"
                     variant="outline"

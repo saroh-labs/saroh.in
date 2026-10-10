@@ -24,6 +24,7 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
+import { TextLink } from "@saroh/ui/text-link";
 import type { SaveOutcome } from "./parts";
 
 /**
@@ -98,19 +99,14 @@ export function TrackerSetupDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {words.where}{" "}
-                        <a
-                            href={trackerHelpHref(kind)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-foreground underline underline-offset-2 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground"
-                        >
+                        <TextLink href={trackerHelpHref(kind)} external>
                             Help
                             <span className="sr-only">
                                 {" "}
                                 with finding your {words.name} ID (opens in a
                                 new tab)
                             </span>
-                        </a>
+                        </TextLink>
                     </DialogDescription>
                 </DialogHeader>
                 <form
