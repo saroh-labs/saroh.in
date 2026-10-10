@@ -669,6 +669,14 @@ export interface SiteCapabilities {
     manageDomain: boolean;
 }
 
+/** A site's icon as Website › Settings reads it (DEC-121). */
+export interface SiteIconSaved {
+    /** The site's own icon; null when it has none. */
+    own: { url: string; mediaId: string | null } | null;
+    /** The business logo that stands in without one; null when there is none. */
+    businessLogoUrl: string | null;
+}
+
 export interface SiteDetail extends SiteSummary {
     /** Server-owned permission for the draft editor. */
     canEdit: boolean;
@@ -697,6 +705,12 @@ export interface SiteDetail extends SiteSummary {
     socialImageWidth: number | null;
     socialImageHeight: number | null;
     socialImageBytes: number | null;
+    /**
+     * The site's own icon as saved, and the business logo that stands in
+     * without one (DEC-121). Draft, like the share image. Absent from an
+     * older API, which reads as neither.
+     */
+    icon?: SiteIconSaved;
     /** Where this site's posts live (#232); null means the default, "blog". */
     postsPrefix: string | null;
     /**
@@ -1171,6 +1185,36 @@ export async function updateSiteSettings(
     return {
         ok: false,
         ...readError(data, "Could not save these settings."),
+    };
+}
+
+/**
+ * Set a site's own icon to an image in the business's library, or take it
+ * off (`mediaId` null). Draft, like the share image: the live site shows it
+ * after the next publish. The API refuses an image that is not a PNG, JPG
+ * or WebP under 1 MB, in words that are shown as they are.
+ */
+export async function saveSiteIcon(
+    siteId: string,
+    mediaId: string | null,
+): Promise<SitesResult<{ icon: SiteIconSaved }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(
+        `${base}/${siteId}/icon`,
+        mediaId === null
+            ? { method: "DELETE" }
+            : { method: "PUT", body: JSON.stringify({ mediaId }) },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        icon?: SiteIconSaved;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.icon) return { ok: true, data: { icon: data.icon } };
+    return {
+        ok: false,
+        ...readError(data, "Could not save the site icon."),
     };
 }
 

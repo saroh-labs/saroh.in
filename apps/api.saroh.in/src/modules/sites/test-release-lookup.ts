@@ -8,6 +8,8 @@ import type { PublicModulePageStates } from "./module-pages";
 import { publicModulePageStates } from "./module-pages";
 import type { SiteHostClass } from "./site-host-mode";
 import { siteHostMode } from "./site-host-mode";
+import type { PublicSiteIcon } from "./site-icon";
+import { publicSiteIcon } from "./site-icon";
 import { siteOriginOf } from "./site-origin";
 import { hashPreviewToken } from "./site-preview-links.service";
 
@@ -53,6 +55,11 @@ export interface TestReleaseView {
      * reads it: which modules are on is outside the release (R6).
      */
     modules?: PublicModulePageStates;
+    /**
+     * The icon the release shows (DEC-121): its frozen own, else the
+     * business logo read live, else null for the plain tile.
+     */
+    icon?: PublicSiteIcon | null;
     release: { name: string; number: number; madeAt: Date };
     /** The live site's address, for "see the live site"; null if never published. */
     liveUrl: string | null;
@@ -207,9 +214,10 @@ export async function resolveTestRelease(
         }
 
         const { snapshot, publishedAt } = release.publication;
-        const [modules, liveUrl] = await Promise.all([
+        const [modules, liveUrl, icon] = await Promise.all([
             publicModulePageStates(snapshot, organizationId),
             siteOriginOf(organizationId, { siteId: site.id }),
+            publicSiteIcon(snapshot, organizationId),
         ]);
 
         // Recorded, not awaited: a reviewer's page must not wait on, or fail
@@ -227,6 +235,7 @@ export async function resolveTestRelease(
             publishedAt,
             siteId: site.id,
             ...(modules ? { modules } : {}),
+            icon,
             release: {
                 name: release.name,
                 number: release.number,

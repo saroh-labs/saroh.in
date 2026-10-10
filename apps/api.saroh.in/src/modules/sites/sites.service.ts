@@ -112,6 +112,13 @@ import {
     siteHostMode,
     siteRootDomain,
 } from "./site-host-mode";
+import type { PublicSiteIcon, SiteIconView } from "./site-icon";
+import {
+    DRAFT_ICON_SELECT,
+    draftIcon,
+    publicSiteIcon,
+    siteIconView,
+} from "./site-icon";
 import type { SiteNavigation } from "./site-navigation";
 import {
     parseSiteNavigation,
@@ -319,6 +326,13 @@ export interface PublicSiteView {
      * before.
      */
     modules?: PublicModulePageStates;
+    /**
+     * The icon the site shows (DEC-121): its own from the snapshot, else the
+     * business logo read live, else null, and the renderer draws a plain
+     * tile with the site's initial. Resolved here so the renderer makes no
+     * extra request.
+     */
+    icon?: PublicSiteIcon | null;
 }
 
 /**
@@ -421,6 +435,11 @@ export interface SiteDetailView {
     socialImageWidth: number | null;
     socialImageHeight: number | null;
     socialImageBytes: number | null;
+    /**
+     * The site's own icon as saved, and the business logo that stands in
+     * without one (DEC-121). Draft, like the share image.
+     */
+    icon: SiteIconView;
     /** Where this site's posts live (#232); null means the default. */
     postsPrefix: string | null;
     createdAt: Date;
@@ -594,6 +613,8 @@ const draftSiteSelect = {
     socialImageWidth: true,
     socialImageHeight: true,
     socialImageBytes: true,
+    // The site's own icon and its media type (DEC-121).
+    ...DRAFT_ICON_SELECT,
     footer: true,
     navigation: true,
     // Not part of the snapshot: what a Publication is stamped with (KTD-7).
@@ -905,6 +926,8 @@ export class SitesService {
                 socialImageWidth: true,
                 socialImageHeight: true,
                 socialImageBytes: true,
+                iconUrl: true,
+                iconMediaId: true,
                 postsPrefix: true,
                 footer: true,
                 navigation: true,
@@ -954,6 +977,8 @@ export class SitesService {
             templateVersion,
             templateStyleId,
             pages,
+            iconUrl,
+            iconMediaId,
             ...rest
         } = site;
         const pending = await this.pendingSectionChanges([site.id]);
@@ -999,6 +1024,10 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            icon: await siteIconView(ctx.organizationId, {
+                iconUrl,
+                iconMediaId,
+            }),
             template: siteTemplate({
                 templateId,
                 templateVersion,
@@ -1886,6 +1915,7 @@ export class SitesService {
          * the safety of a permanent write depend on a string the client sent.
          */
         const publishedFooter = sanitizedFooter(draftFooter);
+        const icon = draftIcon(site);
         const snapshot: SiteSnapshot = {
             site: {
                 name: site.name,
@@ -1914,6 +1944,12 @@ export class SitesService {
                           height: site.socialImageHeight,
                       }
                     : null,
+                // The site's own icon (DEC-121), only when it has one: a
+                // site without keeps a snapshot byte for byte what it was,
+                // so an approval given before icons still covers its draft.
+                // The logo that stands in is the business's and is read
+                // live, never copied here.
+                ...(icon ? { icon } : {}),
                 /*
                  * The look travels with the content (#189). Normalized here so
                  * a snapshot is always complete, never half-styled by whatever
@@ -2236,6 +2272,7 @@ export class SitesService {
             publishedAt,
             siteId: site.id,
             ...(modules ? { modules } : {}),
+            icon: await publicSiteIcon(snapshot, site.organizationId),
         };
     }
 

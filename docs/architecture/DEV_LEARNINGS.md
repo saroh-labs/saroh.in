@@ -3801,3 +3801,23 @@ Northwind is open but nobody takes the service the label is "no times"
 can be in; read the function that writes the words, not one day's screen
 (`saroh-browser-tests` skill: date-dependent assertions).
 **Category**: browser tests · `e2e/tests/public-booking.spec.ts`
+
+## Every merchant's tab showed the framework's default icon
+
+**Symptom**: every merchant site, on its Saroh address and on its own domain,
+showed the same black circle with a triangle in the browser tab: the
+framework's default mark, not the merchant's and not chosen by anyone.
+**Cause**: `apps/saroh.app/app/favicon.ico` was the file the app was scaffolded
+with. Next serves `app/favicon.ico` on every host, and the middleware's
+matcher skips dotted root paths, so no merchant route was ever asked. The
+"merchant sites never inherit Saroh's brand" gates (`check:blocks`) look at
+tokens and typefaces, not at metadata files.
+**Fix**: the file is gone and the renderer ships no icon of its own. A site
+shows its own icon, else the business logo, else a plain tile with its
+initial (DEC-121); `/favicon.ico` and `/site-icon.svg` are in the
+middleware's matcher and answered per host.
+**Check**: `apps/saroh.app/lib/site-icon.test.ts` fails if `favicon.*`,
+`icon.*` or `apple-icon.*` appears under `apps/saroh.app/app`, or
+`public/favicon.ico`; `app/[domain]/layout.test.ts` and
+`favicon.ico/route.test.ts` pin the three cases.
+**Category**: merchant sites · `apps/saroh.app/lib/site-icon.ts`

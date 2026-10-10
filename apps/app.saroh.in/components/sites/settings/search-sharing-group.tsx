@@ -23,13 +23,15 @@ import {
     TitleSheet,
 } from "./search-sharing-sheets";
 import { ShareImageThumb } from "./share-image-thumb";
+import { SiteIconRow } from "./site-icon-row";
 import type { SettingsSave } from "./use-settings-save";
 import { shareImageOf } from "./use-share-image";
 
 /**
- * Search and sharing: the search title, the description and the share
- * image, then how the link looks where it is shared. All three are part of
- * the draft ("Next publish").
+ * Search and sharing: the search title, the description, the share image
+ * and the site icon, then how the link looks where it is shared. All four
+ * are part of the draft ("Next publish"). The site icon is its own row and
+ * sheet (`site-icon-row.tsx`).
  *
  * Each row says what is saved and its Edit opens the row's sheet, where
  * the length is counted and the link's card drawn as it is typed. A save
@@ -166,6 +168,8 @@ export function SearchSharingGroup({
                         </div>
                     </div>
                 </Row>
+
+                <SiteIconRow site={site} state={state} />
 
                 {/* What the link looks like when it is posted (#220), drawn
                     from what the rows above have saved. WhatsApp first; the

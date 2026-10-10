@@ -430,8 +430,9 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   throws and is retried. Queued only while `SITE_PAGE_CACHE` is `on`.
 - **Who queues it** (`sites/page-cache-revalidate.ts`): `putLive` (every
   publish, restore and go-live), a web-address change, a post published,
-  unpublished or deleted, trackers saved or switched by Saroh, and the
-  catalogue. **Stock is heard at its locks:** every flow that changes a
+  unpublished or deleted, trackers saved or switched by Saroh, the business
+  logo set or removed (it is the icon of a site with none of its own,
+  DEC-121), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.

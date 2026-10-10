@@ -653,6 +653,8 @@ model Media {
   businessLogos  BusinessProfile[] @relation("BusinessLogo")
   // The locations whose own logo it is.
   locationLogos  Store[]           @relation("LocationLogo")
+  // The sites whose icon it is (Website › Settings).
+  siteIcons      Site[]            @relation("SiteIcon")
 
   @@index([organizationId])
 }
@@ -3000,6 +3002,17 @@ model Site {
   socialImageWidth  Int?
   socialImageHeight Int?
   socialImageBytes  Int?
+
+  // The site's icon (the browser tab, a bookmark, a phone's home screen):
+  // a library object, and the address it is served from, taken when it was
+  // set (the business logo's shape, DEC-121). Draft like the share image:
+  // it travels into the Publication snapshot at publish. Null means none of
+  // its own, and the site then shows the business logo, else a plain tile
+  // with its initial. The library refuses to delete it while it is the
+  // icon; the SetNull is only a backstop.
+  iconMediaId String?
+  iconMedia   Media?  @relation("SiteIcon", fields: [iconMediaId], references: [id], onDelete: SetNull)
+  iconUrl     String?
 
   // The footer a merchant writes for themselves (#202): `{ format, value }`,
   // the same shape richText sections carry, so one authoring surface and one

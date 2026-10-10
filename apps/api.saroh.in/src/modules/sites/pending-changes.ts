@@ -252,7 +252,7 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
  * The site-level things publishing would change (#282).
  *
  * Sections were the only thing counted, but the snapshot carries far more: the
- * site name, search title and description, share image, blog address, style,
+ * site name, search title and description, share image, icon, blog address, style,
  * footer, menu and the page list. A merchant who changed only their search
  * title was told "Nothing — the live site matches your draft" and then
  * wondered why Google never updated. #188 named that failure.
@@ -265,6 +265,7 @@ export const SITE_CHANGE_KINDS = [
     "name",
     "search",
     "shareImage",
+    "icon",
     "posts",
     "style",
     "footer",
@@ -287,6 +288,9 @@ const SITE_CHANGE_FIELDS: Record<
     name: ["name", "slug"],
     search: ["seoTitle", "seoDescription"],
     shareImage: ["socialImageUrl", "socialImage"],
+    // The site's own icon (DEC-121). The logo that stands in for it is the
+    // business's, read live, and never part of a snapshot.
+    icon: ["icon"],
     posts: ["postsPrefix"],
     style: ["style"],
     footer: ["footer"],

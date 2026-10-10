@@ -115,9 +115,26 @@ describe("fetchTestRelease", () => {
             snapshot: SNAPSHOT,
             siteId: "site_nw",
             modules: { SHOP: "off" },
+            // None sent: the release shows the site's plain tile (DEC-121).
+            icon: null,
             release: RELEASE_BODY.release,
             liveUrl: "https://northwind.saroh.app/",
         });
+    });
+
+    it("carries the icon the release shows", async () => {
+        const icon = {
+            url: "https://media.saroh.test/org/o1/site-image/icon.png",
+            type: "image/png",
+            source: "site",
+        };
+        answer(200, { ...RELEASE_BODY, icon });
+        const found = await fetchTestRelease(
+            "test--northwind.saroh.app",
+            TOKEN,
+            null,
+        );
+        expect(found.ok && found.icon).toEqual(icon);
     });
 
     it.each(["expired", "revoked", "discarded"] as const)(

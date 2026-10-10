@@ -5,6 +5,8 @@ import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
 import type { SiteHostKind } from "@/lib/site-host-mode";
 import { classifySiteHost } from "@/lib/site-host-mode";
+import type { SiteIcon } from "@/lib/site-icon";
+import { siteIconOf } from "@/lib/site-icon";
 import { SITE_RELAY_HEADER } from "@/lib/site-relay";
 import type { TestReleaseInfo } from "@/lib/test-release";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
@@ -79,6 +81,13 @@ export interface PublicationSite {
     /** The share image a link preview uses (#188). */
     socialImageUrl?: string | null;
     /**
+     * The site's own icon (DEC-121). Absent when it has none, and on every
+     * snapshot published before icons. Pages don't read it from here: the
+     * public read resolves the icon to show (this one, else the business
+     * logo) and sends it beside the snapshot ({@link ResolvedSite.icon}).
+     */
+    icon?: { url: string; type?: string | null } | null;
+    /**
      * The path segment this site's posts live under (#232) — `/blog` unless
      * the merchant chose another word. Absent on snapshots published before
      * posts could be published at all, which is why the reader below defaults.
@@ -149,6 +158,8 @@ interface PublicSiteView {
      * snapshot. Present only when the snapshot holds a module page.
      */
     modules?: unknown;
+    /** The icon to show (DEC-121); absent from an API that predates it. */
+    icon?: unknown;
 }
 
 /**
@@ -160,6 +171,12 @@ export interface ResolvedSite {
     snapshot: PublicationSnapshot;
     siteId: string | null;
     modules: ModulePageStates | null;
+    /**
+     * The icon the site shows (DEC-121): its own, else the business logo.
+     * Null with neither, and the site then serves its plain tile
+     * (`lib/site-icon.ts`).
+     */
+    icon: SiteIcon | null;
     /**
      * `test` on a test release's host (DEC-071, T5): the snapshot is the
      * release's frozen one, and nothing here takes a real order.
@@ -359,6 +376,11 @@ export type PreviewLookup =
            * page then shows, as before.
            */
           modules: ModulePageStates | null;
+          /**
+           * The icon publishing would show (DEC-121): the draft's own, else
+           * the business logo; null for the plain tile.
+           */
+          icon: SiteIcon | null;
       }
     | { ok: false; reason: "expired" | "revoked" | "missing" };
 
@@ -402,6 +424,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         siteId?: string;
         expiresAt?: string;
         modules?: unknown;
+        icon?: unknown;
     } | null;
     if (!body?.snapshot || !body.expiresAt) {
         return { ok: false, reason: "missing" };
@@ -413,6 +436,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         siteId: body.siteId ?? null,
         expiresAt: body.expiresAt,
         modules: modulePageStatesOf(body.modules),
+        icon: siteIconOf(body.icon),
     };
 }
 
@@ -634,6 +658,7 @@ export async function getSiteForHost(
             snapshot: found.snapshot as PublicationSnapshot,
             siteId: found.siteId,
             modules: found.modules,
+            icon: found.icon,
             mode: "test",
             release: found.release,
         };
@@ -669,6 +694,7 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         snapshot: body.snapshot,
         siteId: body.siteId ?? null,
         modules: modulePageStatesOf(body.modules),
+        icon: siteIconOf(body.icon),
         mode: "live",
         release: null,
     };

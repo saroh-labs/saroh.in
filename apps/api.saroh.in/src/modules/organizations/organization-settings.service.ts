@@ -18,6 +18,10 @@ import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
+import {
+    enqueuePageRevalidation,
+    pageCacheRevalidationOn,
+} from "../sites/page-cache-revalidate";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -511,6 +515,7 @@ export class OrganizationSettingsService {
             update: data,
         });
         await this.recordLogo(ctx, had?.logoUrl ? "changed" : "added");
+        await this.logoChangedOnSites(ctx.organizationId);
         return this.read(ctx.organizationId);
     }
 
@@ -527,8 +532,34 @@ export class OrganizationSettingsService {
             },
             data: { logoMediaId: null, logoUrl: null },
         });
-        if (count > 0) await this.recordLogo(ctx, "removed");
+        if (count > 0) {
+            await this.recordLogo(ctx, "removed");
+            await this.logoChangedOnSites(ctx.organizationId);
+        }
         return this.read(ctx.organizationId);
+    }
+
+    /**
+     * The logo is the icon of a site with none of its own (DEC-121), read
+     * live by the public site read, so the pages the merchant sites keep
+     * (#863) carry the old one in their head until told. Queued after the
+     * write, for the business's published sites; with the cache off there
+     * is nothing to tell, so nothing is read.
+     */
+    private async logoChangedOnSites(organizationId: string): Promise<void> {
+        if (!pageCacheRevalidationOn()) return;
+        const sites = await prisma.site.findMany({
+            where: {
+                organizationId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+            },
+            select: { id: true },
+        });
+        await enqueuePageRevalidation(prisma, {
+            cause: "icon",
+            siteIds: sites.map((s) => s.id),
+        });
     }
 
     /**

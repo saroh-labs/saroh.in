@@ -98,6 +98,11 @@ const TRIGGERS: [string, RegExp, string][] = [
         "Saroh's switch waits for the page's minute (DEC-108)",
     ],
     [
+        "organizations/organization-settings.service.ts",
+        /private async logoChangedOnSites[\s\S]*enqueuePageRevalidation\(prisma, \{\s*cause: "icon"/,
+        "a site with no icon of its own keeps the old business logo in its tab (DEC-121)",
+    ],
+    [
         "content/posts.service.ts",
         /enqueuePageRevalidation\(tx, \{\s*cause: "publish"/,
         "a published post is missing from the journal",

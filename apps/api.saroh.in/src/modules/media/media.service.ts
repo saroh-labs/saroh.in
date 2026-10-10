@@ -296,6 +296,18 @@ export class MediaService {
             );
         }
 
+        // A site's own icon (DEC-121): saved, perhaps not yet published, so
+        // the published-site check above does not see it. Deleting it would
+        // put a broken image in the tab at the next publish.
+        const asIcon = await prisma.site.count({
+            where: { iconMediaId: media.id },
+        });
+        if (asIcon > 0) {
+            throw new ConflictException(
+                "This image is your site icon. Remove it in Website settings before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 

@@ -14,6 +14,7 @@ export const SITE_CHANGE_KINDS = [
     "name",
     "search",
     "shareImage",
+    "icon",
     "posts",
     "style",
     "footer",
@@ -26,6 +27,7 @@ const LABELS: Record<SiteChangeKind, string> = {
     name: "the site name",
     search: "search settings",
     shareImage: "the share image",
+    icon: "the site icon",
     posts: "the blog address",
     style: "the style",
     footer: "the footer",
@@ -68,6 +70,7 @@ const SHORT_LABELS: Record<SiteChangeKind, string> = {
     name: "site name",
     search: "search",
     shareImage: "share image",
+    icon: "site icon",
     posts: "blog address",
     // The style is edited in the rail's Brand tab (G2), so the pill uses the
     // word on that tab.

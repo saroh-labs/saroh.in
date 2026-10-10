@@ -64,6 +64,12 @@ describe("pendingSiteChanges", () => {
         ["menu", { navigation: [] }],
         ["name", { name: "Northwind" }],
         ["posts", { postsPrefix: "news" }],
+        // The site's own icon (DEC-121). The live side here has no `icon`
+        // key at all, as every snapshot published before icons.
+        [
+            "icon",
+            { icon: { url: "https://img.test/icon.png", type: "image/png" } },
+        ],
     ])("reports %s", (kind, change) => {
         expect(
             pendingSiteChanges(
@@ -104,6 +110,26 @@ describe("pendingSiteChanges", () => {
         const draft = { ...liveSite, seoTitle: null, seoDescription: null };
         expect(
             pendingSiteChanges(draft, livePages, snapshot(olderLive)),
+        ).toEqual([]);
+    });
+
+    it("reports the icon removed or replaced, and nothing once it matches", () => {
+        const icon = { url: "https://img.test/icon.png", type: "image/png" };
+        const live = snapshot({ ...liveSite, icon });
+        // Removed: publish writes no `icon` key for a site without one.
+        expect(pendingSiteChanges(liveSite, livePages, live)).toEqual(["icon"]);
+        expect(
+            pendingSiteChanges(
+                {
+                    ...liveSite,
+                    icon: { ...icon, url: "https://img.test/2.png" },
+                },
+                livePages,
+                live,
+            ),
+        ).toEqual(["icon"]);
+        expect(
+            pendingSiteChanges({ ...liveSite, icon }, livePages, live),
         ).toEqual([]);
     });
 

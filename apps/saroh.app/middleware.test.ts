@@ -292,3 +292,33 @@ describe("middleware: a site's crawl files (#890)", () => {
         expect(rewrittenTo(res)).toBeNull();
     });
 });
+
+describe("middleware: a site's icon (DEC-121)", () => {
+    it("lists /favicon.ico and the plain tile in the matcher, past the dotted-path rule", async () => {
+        const { config } = await import("./middleware");
+        expect(config.matcher).toContain("/favicon.ico");
+        expect(config.matcher).toContain("/site-icon.svg");
+    });
+
+    it("rewrites a merchant host's /favicon.ico to that merchant's route", () => {
+        expect(
+            rewrittenTo(
+                middleware(request("https://rye.saroh.app/favicon.ico")),
+            ),
+        ).toBe("https://rye.saroh.app/rye.saroh.app/favicon.ico");
+        expect(
+            rewrittenTo(middleware(request("https://shop.rye.in/favicon.ico"))),
+        ).toBe("https://shop.rye.in/shop.rye.in/favicon.ico");
+        expect(
+            rewrittenTo(
+                middleware(request("https://rye.saroh.app/site-icon.svg")),
+            ),
+        ).toBe("https://rye.saroh.app/rye.saroh.app/site-icon.svg");
+    });
+
+    it("leaves the renderer's own address alone: it is no merchant's site", () => {
+        expect(
+            rewrittenTo(middleware(request("https://saroh.app/favicon.ico"))),
+        ).toBeNull();
+    });
+});
