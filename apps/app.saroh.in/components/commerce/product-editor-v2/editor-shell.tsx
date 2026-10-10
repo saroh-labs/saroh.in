@@ -53,6 +53,8 @@ export interface ProductEditorProps {
     storeId: string;
     storeName: string;
     currency: string;
+    /** The business is GST-registered: Basics asks for a rate and HSN. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     categoriesHref: string;
     options: ProductOptionView[];
@@ -118,6 +120,7 @@ function EditorBody({
     storeId,
     storeName,
     currency,
+    gstRegistered,
     categories,
     categoriesHref,
     options,
@@ -370,6 +373,7 @@ function EditorBody({
                         storeId={storeId}
                         currency={currency}
                         symbol={symbol}
+                        gstRegistered={gstRegistered}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
                         onCategoryChange={(id) => void categoryChanged(id)}

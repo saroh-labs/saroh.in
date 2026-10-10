@@ -585,3 +585,21 @@ describe("visits (E10)", () => {
         ]);
     });
 });
+
+describe("who takes it, with one person on the diary", () => {
+    it("a new service starts with the one person on it", () => {
+        expect(draftOf(null, ["p1"], "Asia/Kolkata").staffIds).toEqual(["p1"]);
+        expect(draftOf(null, [], "Asia/Kolkata").staffIds).toEqual([]);
+    });
+
+    it("is not asked for when there is nobody to choose between", () => {
+        const named = { ...draftOf(null, [], "Asia/Kolkata"), name: "Trim" };
+        expect(serviceProblems(named, true, false, true)).not.toContain(
+            "Pick who takes it.",
+        );
+        // With two or more on the diary it still is.
+        expect(serviceProblems(named, true, false, false)).toContain(
+            "Pick who takes it.",
+        );
+    });
+});

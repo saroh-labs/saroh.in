@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { useState } from "react";
 
@@ -85,15 +85,12 @@ export function LinesStep({
                                     </div>
                                 ) : null}
                             </div>
-                            <Button
+                            <IconButton
+                                label={`One fewer ${title}`}
+                                icon={<span>−</span>}
                                 variant="outline"
-                                size="icon-sm"
-                                type="button"
                                 onClick={() => onBump(line.key, -1)}
-                                aria-label={`One fewer ${title}`}
-                            >
-                                −
-                            </Button>
+                            />
                             <span
                                 aria-label={`${line.quantity} of ${title}`}
                                 className="min-w-[22px] text-center font-semibold tabular-nums"
@@ -107,16 +104,13 @@ export function LinesStep({
                                         : undefined
                                 }
                             >
-                                <Button
+                                <IconButton
+                                    label={`One more ${title}`}
+                                    icon={<span>+</span>}
                                     variant="outline"
-                                    size="icon-sm"
-                                    type="button"
                                     onClick={() => onBump(line.key, 1)}
                                     disabled={room === 0}
-                                    aria-label={`One more ${title}`}
-                                >
-                                    +
-                                </Button>
+                                />
                             </Tip>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {format(s.priceCents * line.quantity)}

@@ -67,6 +67,7 @@ export function BasicsSection({
     storeId,
     currency,
     symbol,
+    gstRegistered,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -75,6 +76,8 @@ export function BasicsSection({
     storeId: string;
     currency: string;
     symbol: string;
+    /** Only a GST-registered business sets a rate and an HSN code. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -325,52 +328,56 @@ export function BasicsSection({
                 </FieldHelp>
             </div>
 
-            {/* GST (ADR-008): printed on a registered business's tax invoice. */}
-            <div className="mt-4 flex flex-wrap gap-3.5">
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
-                    <OptionSelect
-                        id="pe-gst"
-                        value={v.gstRate as GstRateValue}
-                        onValueChange={(rate) =>
-                            form.setValue("gstRate", rate, {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                            })
-                        }
-                        options={GST_RATE_OPTIONS}
-                        disabled={ro}
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={errors.gstRate ? "bad" : "quiet"}
-                    >
-                        {errors.gstRate?.message ??
-                            "Included in the price. Bread and other nil-rated goods are 0%."}
-                    </FieldHelp>
+            {/* GST (ADR-008): printed on a registered business's tax invoice,
+                so only a registered business is asked. A rate or a code
+                already saved stays in view either way. */}
+            {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
+                <div className="mt-4 flex flex-wrap gap-3.5">
+                    <div className="min-w-0 flex-[1_1_150px]">
+                        <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
+                        <OptionSelect
+                            id="pe-gst"
+                            value={v.gstRate as GstRateValue}
+                            onValueChange={(rate) =>
+                                form.setValue("gstRate", rate, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                })
+                            }
+                            options={GST_RATE_OPTIONS}
+                            disabled={ro}
+                        />
+                        <FieldHelp
+                            className="mt-1.5"
+                            tone={errors.gstRate ? "bad" : "quiet"}
+                        >
+                            {errors.gstRate?.message ??
+                                "Included in the price. Bread and other nil-rated goods are 0%."}
+                        </FieldHelp>
+                    </div>
+                    <div className="min-w-0 flex-[1_1_150px]">
+                        <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
+                        <Input
+                            id="pe-hsn"
+                            {...form.register("hsnCode")}
+                            inputMode="numeric"
+                            disabled={ro}
+                            placeholder="1905 90 10"
+                            aria-invalid={hsnBad || !!errors.hsnCode}
+                            className="font-mono"
+                        />
+                        <FieldHelp
+                            className="mt-1.5"
+                            tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
+                        >
+                            {hsnBad
+                                ? "An HSN code is 4 to 8 digits."
+                                : (errors.hsnCode?.message ??
+                                  "Team only. Printed on tax invoices.")}
+                        </FieldHelp>
+                    </div>
                 </div>
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
-                    <Input
-                        id="pe-hsn"
-                        {...form.register("hsnCode")}
-                        inputMode="numeric"
-                        disabled={ro}
-                        placeholder="1905 90 10"
-                        aria-invalid={hsnBad || !!errors.hsnCode}
-                        className="font-mono"
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
-                    >
-                        {hsnBad
-                            ? "An HSN code is 4 to 8 digits."
-                            : (errors.hsnCode?.message ??
-                              "Team only. Printed on tax invoices.")}
-                    </FieldHelp>
-                </div>
-            </div>
+            ) : null}
         </SectionCard>
     );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Info } from "lucide-react";
 
@@ -221,26 +222,20 @@ export function BlockInspector({
              * some people cannot reorder.
              */}
             <div className="flex items-center gap-1 border-t pt-3">
-                <Button
-                    type="button"
+                <IconButton
+                    label="Move block up"
+                    icon={<span>↑</span>}
                     variant="outline"
-                    size="icon-sm"
-                    aria-label="Move block up"
                     disabled={index === 0}
                     onClick={() => onMove(-1)}
-                >
-                    ↑
-                </Button>
-                <Button
-                    type="button"
+                />
+                <IconButton
+                    label="Move block down"
+                    icon={<span>↓</span>}
                     variant="outline"
-                    size="icon-sm"
-                    aria-label="Move block down"
                     disabled={index === count - 1}
                     onClick={() => onMove(1)}
-                >
-                    ↓
-                </Button>
+                />
                 <Button
                     type="button"
                     variant="outline"

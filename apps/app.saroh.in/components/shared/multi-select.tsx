@@ -10,6 +10,7 @@ import {
     CommandItem,
     CommandList,
 } from "@saroh/ui/command";
+import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronsUpDown, X } from "lucide-react";
@@ -132,16 +133,13 @@ export function MultiSelect({
                         <li key={o.id}>
                             <Badge variant="neutral" className="gap-1 pr-1">
                                 {o.label}
-                                <Button
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    type="button"
+                                <IconButton
+                                    label={`Remove ${o.label}`}
+                                    icon={<X aria-hidden className="size-3" />}
+                                    size="xs"
                                     disabled={disabled}
                                     onClick={() => toggle(o.id)}
-                                    aria-label={`Remove ${o.label}`}
-                                >
-                                    <X aria-hidden className="size-3" />
-                                </Button>
+                                />
                             </Badge>
                         </li>
                     ))}

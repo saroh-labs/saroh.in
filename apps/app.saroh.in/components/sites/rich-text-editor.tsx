@@ -2,6 +2,7 @@
 
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -569,14 +570,11 @@ function EditorSurface({
                 />
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label="Insert image"
-                        >
-                            <ImagePlus className="size-4" />
-                        </Button>
+                        <IconButton
+                            label="Insert image"
+                            icon={<ImagePlus className="size-4" />}
+                            size="xs"
+                        />
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-80">
                         <MediaPicker

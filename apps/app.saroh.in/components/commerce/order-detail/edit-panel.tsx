@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -166,30 +167,24 @@ function EditDraft({
                                 <span className="min-w-0 flex-1 text-[13px]">
                                     {name}
                                 </span>
-                                <Button
+                                <IconButton
+                                    label={`One fewer ${name}`}
+                                    icon={<span>−</span>}
                                     variant="outline"
-                                    size="icon-sm"
-                                    type="button"
                                     onClick={() => step(l.id, -1)}
-                                    aria-label={`One fewer ${name}`}
-                                >
-                                    −
-                                </Button>
+                                />
                                 <span
                                     aria-live="polite"
                                     className="min-w-[22px] text-center text-[13.5px] font-semibold tabular-nums"
                                 >
                                     {qty[l.id]}
                                 </span>
-                                <Button
+                                <IconButton
+                                    label={`One more ${name}`}
+                                    icon={<span>+</span>}
                                     variant="outline"
-                                    size="icon-sm"
-                                    type="button"
                                     onClick={() => step(l.id, 1)}
-                                    aria-label={`One more ${name}`}
-                                >
-                                    +
-                                </Button>
+                                />
                             </div>
                         );
                     })}

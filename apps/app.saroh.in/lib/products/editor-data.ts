@@ -1,6 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { readOrganizationSettings } from "@/lib/organizations/settings-service";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
 import { roleName } from "@/lib/products/editor-labels";
 import { getProductListings } from "@/lib/products/listings";
@@ -44,6 +45,7 @@ export async function loadEditorContext(
         defaults,
         business,
         listings,
+        businessSettings,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
         listCategories(),
@@ -68,6 +70,10 @@ export async function loadEditorContext(
                   return null;
               })
             : null,
+        // Whether the business is GST-registered: its products carry a GST
+        // rate and an HSN code only then. Unknown reads as registered, so
+        // a failed read never hides a field someone needs.
+        readOrganizationSettings().catch(() => null),
     ]);
     return {
         storeId: store.id,
@@ -82,6 +88,9 @@ export async function loadEditorContext(
         stores: stores.map((s) => ({ id: s.id, name: s.name })),
         listings,
         businessTracks: business?.tracked ?? true,
+        gstRegistered: businessSettings?.ok
+            ? (businessSettings.data.tax?.registered ?? false)
+            : true,
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
         defaults,

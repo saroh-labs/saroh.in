@@ -81,19 +81,6 @@ export function CreateStoreForm() {
                         </FormItem>
                     )}
                 />
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Description (optional)</FormLabel>
-                            <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
                 <Button
                     type="submit"
                     className="wk-press justify-self-start"

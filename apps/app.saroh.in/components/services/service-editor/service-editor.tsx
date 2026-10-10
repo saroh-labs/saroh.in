@@ -110,7 +110,16 @@ export function ServiceEditor({
     const hasStaff = people.length > 0;
     const isNew = service === null;
     const [saved, setSaved] = useState(() =>
-        draftOf(service, service ? staffFor(service.id, people) : [], timezone),
+        draftOf(
+            service,
+            service
+                ? staffFor(service.id, people)
+                : // One person on the diary: they take it, unasked.
+                  people.length === 1 && people[0]
+                  ? [people[0].id]
+                  : [],
+            timezone,
+        ),
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
@@ -130,7 +139,12 @@ export function ServiceEditor({
     const [tried, setTried] = useState(false);
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
-    const problems = serviceProblems(draft, hasStaff, noStorefront);
+    const problems = serviceProblems(
+        draft,
+        hasStaff,
+        noStorefront,
+        people.length === 1,
+    );
     const bad = problems.length > 0;
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
     const pill = statePill(isNew, draft.taking);
