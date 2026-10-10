@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
@@ -236,11 +237,14 @@ export function VariantDrawer({
                                             sold this month.
                                         </p>
                                     </>
+                                ) : overview.orders.status === "failed" ? (
+                                    <FailedRead
+                                        things="orders"
+                                        reassurance="Stock figures above are still right."
+                                    />
                                 ) : (
                                     <p className="text-[12.5px] text-muted-foreground">
-                                        {overview.orders.status === "failed"
-                                            ? "Couldn't load orders. Stock figures above are still right."
-                                            : "Your role can't see orders."}
+                                        Your role can&apos;t see orders.
                                     </p>
                                 )}
                             </DrawerSection>
@@ -290,11 +294,11 @@ export function VariantDrawer({
                                             ))}
                                         </ul>
                                     )
+                                ) : overview.reviews.status === "failed" ? (
+                                    <FailedRead things="reviews" />
                                 ) : (
                                     <p className="text-[12.5px] text-muted-foreground">
-                                        {overview.reviews.status === "failed"
-                                            ? "Couldn't load reviews."
-                                            : "Your role can't see reviews."}
+                                        Your role can&apos;t see reviews.
                                     </p>
                                 )}
                             </DrawerSection>
