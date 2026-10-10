@@ -1334,3 +1334,25 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences: the counter's New order still fills the way's flat fee for staff to keep or change; it doesn't apply the amount.
 - Cancel after a refund by hand (#918, 2026-10-09): "Cancel order…" refunds what is left on the order, not every line in full. Paid online, that amount goes back to the provider, capped as below and split across the payments as another amount is; with nothing left it hands nothing back and just cancels. Paid by hand, the counter gives back what is left. Credit notes cover only what is refunded now. The cancel dialog says how much goes back and how ("₹100 has already been refunded, so the ₹380 left goes back to Razorpay, in 3–5 days."). Part by hand and the rest online makes the order **Refunded** once nothing is left.
 - Consequences: `Order.refundedByHand` keeps what was handed back by hand (migration `20261103100000_order_refunded_by_hand`). Insights' `order.refunded` is still written only for a full refund, since that figure is net of full refunds by design (#867). An online refund, by line or another amount, is capped at what is left on the order with refunds by hand counted, so money handed back by hand is never sent back again online; a cancel works that amount out itself (`onlineRefundableInTx`). `docs/patterns/backend-billing-and-classes.md` → "Orders and the shelf".
+
+## DEC-118 A QR code holds a short link on the Saroh address, and counts scans without a cookie
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: a merchant prints a QR once and it stays on a counter, a card or a bag for years. The page it points at changes, a custom domain can lapse, and the merchant wants to know whether the paper works.
+- Decision: a saved code holds a short link on the business's Saroh address, `<address>.saroh.app/q/<code>`, never the custom domain: the Saroh address forwards after a change (DEC-069) and can't lapse. Where it points can be changed later without reprinting. A retired code forwards to the site's home page, since paper outlives the row; a code with scans is retired, never deleted.
+- Two kinds. A _saved code_ (a row, a short link, a scan count) for pages that stay: the site, the shop, the booking page, a product, a service, any page. An _instant QR_ (drawn in the browser, nothing saved, not counted) for a link that belongs to one record, such as a pay link.
+- Counting: the site's `/q/<code>` handler asks the API to resolve and count, and the API takes that call only with the relay signature. One row per code per day (`QrScanDay`); link-preview fetchers are skipped. No cookie and no stored visitor detail, so DEC-108's "no banner needed" still holds. A failure to count never stops the visitor: they are forwarded anyway.
+- Bookings and orders: the redirect lands with `?src=qr-<code>` and a booking or order made from that page keeps it (`sourceCode`). It rides the URL only, so a visitor who goes to another page first is not counted, and the column says so.
+- Drawing: one renderer in `packages/ui` (`qr-art.ts`) for the workspace and the free tool on saroh.in. Where the design and a code that scans disagree, the code that scans wins: a branded code keeps its alignment pattern as a small eye, a logo needs version 3 or more, and a colour too light to scan is warned about or not offered.
+- Access: `site:read` / `site:update` (DEC-039, no new staff permissions). A plain code is in every plan; branding, print files and scan counts sit behind one catalogue row (`qr-branding`), refused in the usual `MODULE_LOCKED` shape.
+- The free tool (`/tools/qr-code-maker`) saves nothing: it draws in the browser. Its email unlocks the download and is Saroh's own words with a link back; it never attaches a file made from a stranger's link.
+- Consequences: `/q` is a reserved path on every merchant address. The UPI QR on invoices is unchanged. Scans are not yet a dimension in Insights.
+
+## DEC-119 What isn't built yet is listed with a period, not a date
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
+- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
+- Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
