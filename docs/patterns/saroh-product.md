@@ -98,6 +98,48 @@ pattern files refer back here.
   never becomes a zero or a false "nothing to do"
   (`.agents/skills/saroh-product-states/SKILL.md`).
 
+## Moments
+
+- **Current** (10 Oct 2026) — **A moment is one calm line where the product
+  marks that something good happened for the business**, in the right place,
+  once, with the real fact in it and at most one thing worth doing next. The
+  shared piece is `Moment` (`apps/app.saroh.in/components/shared/moment.tsx`):
+  a `Notice` in the success tone with a title, one fact line, one optional
+  action and Dismiss, announced politely (`role="status"`), entering on the
+  motion tokens and still under reduced motion.
+
+    | Moment                   | Where                                   | Says                                                       |
+    | ------------------------ | --------------------------------------- | ---------------------------------------------------------- |
+    | First order              | Orders, and Home in its first 24 hours  | "Your first order" · who, how much · Open order            |
+    | 10th and 100th order     | Orders (Home when its figures allow)    | "Your 10th order" · who, how much · Open order             |
+    | First booking            | All bookings, and Home in its first day | "Your first booking" · who, what, when · Open booking      |
+    | The site's first publish | The publish check's finished state      | "‹Site› is live." · the address as a link · Share, QR code |
+    | Setup finished           | `SetupChecklist`'s own done title       | Its own words; not a `Moment`                              |
+
+- **Current** — **A moment is derived, never stored.** It is the first order
+  because the business has exactly one (`lib/moments/derive.ts`, from the
+  reads the screen already makes), only within a week of it, and only for
+  someone who can open the thing (`order:read`, `booking:read`). What is
+  stored is that the business has seen it: `Organization.momentsSeen`, a
+  fixed list of keys (`organizations/moments.ts` in the API,
+  `lib/moments/keys.ts` in the app; `GET` and `POST …/moments/:key/seen`,
+  `org:read`). Dismissing it or following its action marks it seen for the
+  whole business, on every device. If the seen list can't be read, nothing
+  is shown. Home reads a list for a moment only when its own figures make a
+  first possible (`homeMayHaveFirstOrder`), so a shop past its first day
+  pays nothing. A new moment is a key in both lists, a rule in `derive.ts`
+  with its test, and a row here.
+- **Current** — **What a moment must never be:** an exclamation mark, an
+  emoji, confetti, "Congratulations", a streak, a badge, a count of days in
+  a row, a modal, anything that blocks the work or asks to be looked at
+  twice. Never a number that was not read, never a claim that Saroh holds
+  money, and never a second message for something already said (setup's
+  welcome email and the checklist's done title are those moments).
+- **Not built** — a first online payment (no read counts a business's
+  online payments), a first online order as its own moment and a first
+  returning customer (the Orders list row says neither), and a day-close
+  summary (there is no day close).
+
 ## Capabilities (modules)
 
 - **Current** — Nine capability modules (ADR-003): Website, CRM,
