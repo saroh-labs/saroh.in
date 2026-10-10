@@ -15,6 +15,7 @@ import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * The class this reader's tokens are scoped to. A literal, for the same reason
@@ -91,10 +92,11 @@ export function SectionReview({
 
     if (sections.length === 0) {
         return (
-            <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                This page has no sections yet. There is nothing to read here
-                until someone adds one.
-            </p>
+            <EmptyState
+                size="panel"
+                title="No sections yet"
+                description="There is nothing to read here until someone adds one."
+            />
         );
     }
 

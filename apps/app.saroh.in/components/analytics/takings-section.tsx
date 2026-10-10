@@ -29,7 +29,9 @@ import {
     weekReadout,
 } from "@/lib/analytics/takings-words";
 import { newOrderHref } from "@/lib/orders/links";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { whoCanChange } from "@/components/shared/who-can-change";
 import type { ReadoutBar } from "./readout-bars";
 import { ReadoutBars } from "./readout-bars";
 import { barTone, PlaceSplit, SO_FAR, WeekSpark } from "./takings-marks";
@@ -68,9 +70,8 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <PermissionDeniedState
                 className="mt-3"
-                title="Sales need access to payments"
-                description="Your role can open Insights but not the business's payments, so its sales aren't shown here. The website's figures below are still yours to see."
-                note="An owner or admin can add “See payments” to your role in Settings › Team."
+                size="panel"
+                {...whoCanChange({ thing: "sales" })}
             />
         );
     }
@@ -78,13 +79,9 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <FailedState
                 className="mt-3"
-                title="Sales could not be loaded"
-                description="Something went wrong on our side, so this part of Insights is missing. Nothing has been changed."
-                action={
-                    <Button asChild variant="outline">
-                        <Link href="/analytics">Try again</Link>
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("sales")}
+                retryHref="/analytics"
             />
         );
     }
@@ -94,8 +91,9 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
             <EmptyState
                 className="mt-3"
                 icon={<Wallet />}
-                title="No money has come in yet"
-                description="Your first paid order or invoice shows here the week it's paid: what came in, where it was sold and how this week is going."
+                size="panel"
+                title="No takings yet"
+                description="Your first paid order or invoice shows here the week it's paid."
                 action={
                     <div className="flex flex-wrap justify-center gap-2">
                         <Button asChild>

@@ -18,6 +18,7 @@ import {
     visitWhen,
 } from "@/lib/orders/visits";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel, PanelTitle } from "./parts";
@@ -143,10 +144,10 @@ export function VisitsCard({
                     ))}
                 </ol>
             ) : (
-                <Notice role="status" layout="banner">
-                    The visits couldn&apos;t be read just now. Reload the page
-                    to try again; nothing has changed.
-                </Notice>
+                <FailedRead
+                    things="the visits"
+                    className="border-t border-foreground/10 pt-2.5"
+                />
             )}
         </Panel>
     );

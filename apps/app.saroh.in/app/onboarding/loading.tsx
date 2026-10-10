@@ -9,15 +9,18 @@ import { SplitShell } from "@saroh/ui/split-shell";
 export default function Loading() {
     return (
         <SplitShell panel={<div aria-hidden className="h-48" />}>
-            <div aria-busy="true" aria-label="Loading" className="grid gap-5">
-                <Skeleton className="h-7 w-56" />
-                <Skeleton className="h-4 w-72" />
-                {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="grid gap-2">
-                        <Skeleton className="h-4 w-40" />
-                        <Skeleton className="h-[38px] w-full" />
-                    </div>
-                ))}
+            <div role="status" aria-busy="true">
+                <span className="sr-only">Loading</span>
+                <div aria-hidden className="grid gap-5">
+                    <Skeleton className="h-7 w-56" />
+                    <Skeleton className="h-4 w-72" />
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <div key={i} className="grid gap-2">
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-[38px] w-full" />
+                        </div>
+                    ))}
+                </div>
             </div>
         </SplitShell>
     );

@@ -72,13 +72,11 @@ export default async function SitePostsPage({
             <EmptyState
                 icon={<NotebookPen />}
                 title="No posts yet"
-                description="Posts are dated and listed newest first; pages are not. If this site never needs a journal, it never needs this tab."
+                description="Posts are dated and listed newest first, like a journal or news."
                 action={
                     site.can.edit ? (
                         <Button asChild>
-                            <Link href={`${base}/new`}>
-                                Write the first post
-                            </Link>
+                            <Link href={`${base}/new`}>New post</Link>
                         </Button>
                     ) : undefined
                 }

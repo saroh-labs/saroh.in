@@ -8,19 +8,20 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load this order"
-            description="The team can keep working from the printed ticket. Nothing has changed."
+            retry={retry}
+            heading="Order"
+            things="this order"
+            reassurance="The team can keep working from the printed ticket."
             backHref="/commerce/orders"
-            backLabel="Back to orders"
+            place="Orders"
         />
     );
 }

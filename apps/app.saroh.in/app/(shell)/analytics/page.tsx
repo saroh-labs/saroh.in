@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics/service";
 import { ApiError } from "@/lib/api/errors";
 import { requireSession } from "@/lib/session";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { Segmented } from "@saroh/ui/segmented";
 
 /** Supported quick date ranges (label → days back from today). */
@@ -82,8 +83,9 @@ export default async function AnalyticsPage({
               : null;
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Insights"]}
                 title="Insights"
                 description="How this week is going, what the business took week by week, and how your website is doing."
             />
@@ -139,12 +141,9 @@ export default async function AnalyticsPage({
                     />
                 ) : (
                     <FailedState
-                        title="Your website's figures could not be loaded"
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href="/analytics">Try again</Link>
-                            </Button>
-                        }
+                        size="panel"
+                        title={couldntLoad("your website's figures")}
+                        retryHref="/analytics"
                     />
                 )}
             </section>

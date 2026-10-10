@@ -77,7 +77,7 @@ export function SectionCard({
         <section
             aria-labelledby={`sec-${k}`}
             className={cn(
-                "scroll-mt-[176px] rounded-[12px] border bg-card max-[760px]:scroll-mt-[230px]",
+                "scroll-mt-[176px] rounded-[12px] border bg-card max-desk:scroll-mt-[230px]",
                 dirty
                     ? problem
                         ? "border-destructive"
@@ -90,7 +90,7 @@ export function SectionCard({
                 <h2
                     id={`sec-${k}`}
                     // The jumps land on the heading; clear the sticky header.
-                    className="scroll-mt-[190px] font-display text-[15px] font-semibold tracking-[-0.015em] max-[760px]:scroll-mt-[250px]"
+                    className="scroll-mt-[190px] font-display text-[15px] font-semibold tracking-[-0.015em] max-desk:scroll-mt-[250px]"
                 >
                     {title}
                 </h2>

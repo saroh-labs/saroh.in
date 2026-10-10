@@ -98,6 +98,6 @@ describe("the header's site address", () => {
         expect(html).toContain('href="/sites/site_1"');
         expect(html).toContain('target="_blank"');
         expect(html).toContain(">Preview<");
-        expect(html).toContain("not published yet (opens in a new tab)");
+        expect(html).toContain("not live yet (opens in a new tab)");
     });
 });

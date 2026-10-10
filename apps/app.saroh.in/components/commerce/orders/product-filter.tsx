@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { OrderProductOption } from "@/lib/orders/business-service";
 import { findOrderProducts } from "@/lib/orders/list-actions";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * The Orders list's Product filter (plan B, B4): a search picker rather
@@ -111,7 +112,7 @@ export function ProductFilter({
                         {!error && found?.length === 0 && !searching ? (
                             <p className="px-3 py-2.5 text-[12.5px] text-muted-foreground">
                                 {q.trim()
-                                    ? `No ordered product matches “${q.trim()}”.`
+                                    ? noMatchLine("ordered products", q)
                                     : "No products have been ordered yet."}
                             </p>
                         ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import {
     dismissToasts,
     showError,
@@ -30,7 +31,7 @@ import { EntrySheet } from "./entry-sheet";
 import { LevelsPanel } from "./levels-panel";
 import { LogList } from "./log-list";
 import { MoveDialog } from "./move-dialog";
-import { StockHeader } from "./stock-header";
+
 import { useCountMode } from "./use-count-mode";
 
 type Tab = "levels" | "log" | "checks";
@@ -215,15 +216,17 @@ export function StockScreen({
 
     return (
         <div className="flex flex-col gap-5">
-            <StockHeader
-                subline={stockSubline(business, storefronts)}
+            <PageHeader
+                className="mb-0"
+                breadcrumb={["Sell", "Stock"]}
+                title="Stock"
+                description={stockSubline(business, storefronts) || undefined}
                 actions={
                     canWrite ? (
                         <>
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="rounded-[9px] px-3.5 text-[12.5px]"
                                 onClick={() => setRecording(true)}
                             >
                                 Record stock
@@ -232,7 +235,6 @@ export function StockScreen({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="rounded-[9px] px-3.5 text-[12.5px]"
                                     onClick={() => setMoving(true)}
                                 >
                                     Move stock
@@ -240,7 +242,6 @@ export function StockScreen({
                             ) : null}
                             <Button
                                 type="button"
-                                className="rounded-[9px] px-4 text-[12.5px]"
                                 disabled={counting}
                                 onClick={startCount}
                             >

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import { openTotal } from "@/lib/home/inline-actions";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import {
     formatList,
@@ -77,12 +78,12 @@ export function NeedsYou({
             </div>
 
             {state === "clear" ? (
-                <p className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm text-neutral-700 dark:text-muted-foreground">
-                    <strong className="font-semibold text-success-subtle-foreground">
-                        Nothing needs you.
-                    </strong>{" "}
-                    {next}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="rounded-xl border border-border bg-card px-4 py-3.5"
+                    title="Nothing needs you."
+                    description={next}
+                />
             ) : null}
 
             {state === "unknown" ? (

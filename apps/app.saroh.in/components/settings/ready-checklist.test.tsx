@@ -132,6 +132,15 @@ describe("one checklist on Home and Settings (UX-019)", () => {
         expect(html).toContain("Add your logo");
     });
 
+    it("is one card, with Make it yours ruled off inside it", () => {
+        const html = renderToStaticMarkup(
+            <ReadyChecklist list={{ ...list, extras: [logo] }} />,
+        );
+        expect(html.match(/<section/g)).toHaveLength(1);
+        expect(html).toContain('aria-label="Get ready to take money"');
+        expect(html).toContain('role="group" aria-label="Make it yours"');
+    });
+
     it("keeps Make it yours once the counted steps are done, and drops done suggestions", () => {
         const done: Checklist = {
             ...list,

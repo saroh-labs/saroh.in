@@ -11,7 +11,6 @@ import {
     lastChangeWords,
     moveNote,
     moveProblem,
-    noRowsWords,
     parseCountKey,
     rowSub,
     stockSubline,
@@ -122,19 +121,12 @@ describe("the Levels table", () => {
         ).toBe("Rye · 3 locations count separately · every change is logged");
     });
 
-    it("words the footer and the empty table", () => {
+    it("words the footer", () => {
         expect(untrackedLine(1)).toBe(
             "1 product isn't tracked and always sells:",
         );
         expect(untrackedLine(3)).toBe(
             "3 products aren't tracked and always sell:",
-        );
-        expect(noRowsWords({ needs: true, q: "" })).toMatch(/^Nothing needs/);
-        expect(noRowsWords({ needs: false, q: "", all: true })).toMatch(
-            /^No product counts stock yet/,
-        );
-        expect(noRowsWords({ needs: false, q: "rye" })).toBe(
-            'No products match "rye".',
         );
     });
 });

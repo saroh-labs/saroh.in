@@ -9,6 +9,7 @@ import { useState } from "react";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /** A friendly label for an activity type. */
 function activityLabel(type: string): string {
@@ -105,9 +106,7 @@ export function ActivityTimeline({
     canWrite?: boolean;
 }) {
     if (activities.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">No activity yet.</p>
-        );
+        return <EmptyState size="inline" title="No activity yet." />;
     }
 
     return (

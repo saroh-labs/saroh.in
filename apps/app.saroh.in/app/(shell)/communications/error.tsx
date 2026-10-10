@@ -8,19 +8,18 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load messages"
-            description="Nothing was sent or lost — this page just failed to render."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Messages"
+            things="messages"
+            reassurance="Nothing was sent or lost."
         />
     );
 }

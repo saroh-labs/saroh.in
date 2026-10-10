@@ -82,7 +82,7 @@ test("the owner makes a QR code, a phone scans it, and the list counts it", asyn
         await page.goto(`/open/${NORTHWIND_ORG}`);
         await page.goto("/settings/share");
         await expect(
-            page.getByRole("heading", { name: "Share", level: 2 }),
+            page.getByRole("heading", { name: "Share", level: 1 }),
         ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "QR codes", exact: true }),

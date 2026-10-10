@@ -11,9 +11,10 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { Segmented } from "@saroh/ui/segmented";
 
 const BAR = {
@@ -85,9 +86,8 @@ export function HoldersTab({
             <>
                 {head}
                 <PermissionDeniedState
-                    title="You can't see who has this pack"
-                    description="Your role doesn't reach the people holding packs."
-                    note={WHO_CAN_CHANGE}
+                    size="panel"
+                    {...whoCanChange({ thing: "who has this pack" })}
                 />
             </>
         );
@@ -97,13 +97,12 @@ export function HoldersTab({
             <>
                 {head}
                 <FailedState
-                    title="Who has it could not be loaded"
-                    description="This tab couldn't read who holds the pack. Nothing has changed — everyone still has the classes they had."
-                    action={
-                        <Button variant="outline" onClick={onRetry}>
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("who has this pack")}
+                    description={nothingChanged(
+                        "Everyone still has the classes they had.",
+                    )}
+                    onRetry={onRetry}
                 />
             </>
         );
@@ -114,7 +113,8 @@ export function HoldersTab({
                 {head}
                 <EmptyState
                     icon={<Users />}
-                    title="Nobody has this pack yet"
+                    size="panel"
+                    title="No one has this pack yet"
                     description={`Once it's sold, each person shows here with the ${unitsWord} they have left and when they run out.`}
                     action={
                         sellable ? (

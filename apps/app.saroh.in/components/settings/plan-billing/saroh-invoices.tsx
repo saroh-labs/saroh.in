@@ -7,6 +7,7 @@ import { ReceiptText } from "lucide-react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { SarohInvoice } from "@/lib/saroh-billing/plan-view";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { RefreshButton } from "./refresh-button";
 import { card, cardHead } from "./styles";
@@ -26,10 +27,13 @@ export function SarohInvoices({
             <h3 className={cardHead}>Invoices from Saroh</h3>
             {invoices === null ? (
                 <FailedState
-                    title="Saroh's invoices couldn't be loaded"
-                    description="This doesn't mean there are none. Nothing has been changed."
+                    size="panel"
+                    title={couldntLoad("Saroh's invoices")}
+                    description={nothingChanged(
+                        "This doesn't mean there are none.",
+                    )}
                     action={<RefreshButton />}
-                    className="rounded-none border-0 py-8 sm:py-8"
+                    className="rounded-none border-0"
                 />
             ) : invoices.length === 0 ? (
                 <EmptyState

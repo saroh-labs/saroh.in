@@ -1,8 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
+import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ import {
 } from "@/lib/services/diary";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
+import { Users } from "lucide-react";
 
 import { Segmented } from "@saroh/ui/segmented";
 import { AddPersonDialog } from "../availability/add-person-dialog";
@@ -61,7 +63,6 @@ import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
-import { BookingsTopBar } from "./parts";
 import type { QuickLookActions } from "./quick-look-types";
 import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
@@ -522,44 +523,53 @@ export function CalendarScreen({
     );
 
     return (
-        <>
-            <BookingsTopBar page="Calendar">
-                <BookingsViewSwitch current="calendar" />
-                <Segmented
-                    label="Layout"
-                    className="ml-auto"
-                    value={layout}
-                    onValueChange={(id) => go(id, date)}
-                    options={(
-                        [
-                            ["day", "Day by person", "Day"],
-                            ["week", "Week", "Week"],
-                            ["agenda", "Agenda", "Agenda"],
-                        ] as const
-                    ).map(([id, label, short]) => ({
-                        value: id,
-                        label: (
-                            <>
-                                <span className="max-[759px]:hidden">
-                                    {label}
-                                </span>
-                                <span className="min-[760px]:hidden">
-                                    {short}
-                                </span>
-                            </>
-                        ),
-                        // A phone has no week grid.
-                        className:
-                            id === "week" ? "max-[759px]:hidden" : undefined,
-                    }))}
-                />
-            </BookingsTopBar>
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <div>
+            {/* The date is the page's title; the two view switches sit
+                before New booking. */}
+            <PageHeader
+                className="mb-3"
+                breadcrumb={["Bookings", "Calendar"]}
+                title={heading}
+                actions={newBooking}
+                meta={
+                    <>
+                        <BookingsViewSwitch current="calendar" />
+                        <Segmented
+                            label="Layout"
+                            className="ml-auto"
+                            value={layout}
+                            onValueChange={(id) => go(id, date)}
+                            options={(
+                                [
+                                    ["day", "Day by person", "Day"],
+                                    ["week", "Week", "Week"],
+                                    ["agenda", "Agenda", "Agenda"],
+                                ] as const
+                            ).map(([id, label, short]) => ({
+                                value: id,
+                                label: (
+                                    <>
+                                        <span className="max-[759px]:hidden">
+                                            {label}
+                                        </span>
+                                        <span className="min-[760px]:hidden">
+                                            {short}
+                                        </span>
+                                    </>
+                                ),
+                                // A phone has no week grid.
+                                className:
+                                    id === "week"
+                                        ? "max-[759px]:hidden"
+                                        : undefined,
+                            }))}
+                        />
+                    </>
+                }
+            />
+            <div>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                        {heading}
-                    </h1>
                     <div className="flex gap-1">
                         <NavLink
                             href={calendarHref(layout, addDays(date, -step))}
@@ -591,7 +601,6 @@ export function CalendarScreen({
                     >
                         {summary}
                     </span>
-                    {newBooking}
                 </div>
                 <Legend classes={hasClasses} />
                 {staff === null ? (
@@ -738,7 +747,7 @@ export function CalendarScreen({
                     hoursHint="Set their hours in Availability."
                 />
             ) : null}
-        </>
+        </div>
     );
 }
 
@@ -855,22 +864,19 @@ function NoOneYet({
     onAdd: () => void;
 }) {
     return (
-        <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-            <p className="text-[14px] font-semibold">
-                Nobody is on the diary yet
-            </p>
-            <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                Add the people who take bookings and their hours, and each gets
-                a column here with their free times to book.
-            </p>
-            {canHours ? (
-                <Button
-                    className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onAdd}
-                >
-                    Add someone
-                </Button>
-            ) : null}
-        </div>
+        <EmptyState
+            icon={<Users />}
+            title="No one on the diary yet"
+            description={
+                canHours
+                    ? "Add the people who take bookings and their hours, and each gets a column here."
+                    : "The people who take bookings each get a column here."
+            }
+            action={
+                canHours ? (
+                    <Button onClick={onAdd}>Add someone</Button>
+                ) : undefined
+            }
+        />
     );
 }

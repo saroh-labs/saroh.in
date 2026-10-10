@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 
 import type { SiteNavigationItem, SitePage } from "@/lib/sites/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * The menu, open for editing (#206): its entries in order, each renamable,
@@ -109,9 +110,7 @@ export function MenuEditor({
                     })}
                 </ol>
             ) : (
-                <p className="text-sm text-muted-foreground">
-                    No pages in the menu yet.
-                </p>
+                <EmptyState size="inline" title="No pages in the menu yet." />
             )}
             {offered.length ? (
                 <div className="flex flex-wrap gap-1.5">

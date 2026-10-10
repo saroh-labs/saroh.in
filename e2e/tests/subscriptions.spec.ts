@@ -151,10 +151,10 @@ test.describe("subscriptions", () => {
     test("a subscription that isn't there says so", async ({ page }) => {
         await page.goto("/billing/subscriptions/no-such-subscription");
         await expect(
-            page.getByRole("heading", { name: "No subscription here" }),
+            page.getByRole("heading", { name: "Subscription not found" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Back to subscriptions" }),
+            page.getByRole("link", { name: "Back to Subscriptions" }),
         ).toBeVisible();
     });
 });
@@ -361,10 +361,10 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await signIn(page);
         await page.goto("/billing/plans/no-such-plan");
         await expect(
-            page.getByRole("heading", { name: "That plan isn't here" }),
+            page.getByRole("heading", { name: "Plan not found" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Back to plans" }),
+            page.getByRole("link", { name: "Back to Plans" }),
         ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
     });
 

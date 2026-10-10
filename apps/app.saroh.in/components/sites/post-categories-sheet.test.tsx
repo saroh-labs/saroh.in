@@ -240,9 +240,7 @@ describe("post categories, from the Posts tab", () => {
     it("says a list that couldn't be read is not an empty one", () => {
         render(null);
         openSheet();
-        expect(sheet()?.textContent).toContain(
-            "Categories could not be loaded",
-        );
+        expect(sheet()?.textContent).toContain("Couldn't load categories");
         expect(sheet()?.textContent).not.toContain("No categories yet");
         expect(button("New category")).toBeUndefined();
         act(() => button("Try again")?.click());

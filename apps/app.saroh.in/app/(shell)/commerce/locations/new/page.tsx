@@ -1,7 +1,6 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { LimitReachedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Store } from "lucide-react";
 import Link from "next/link";
 
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
@@ -73,11 +72,10 @@ export default async function NewStorefrontPage() {
                 }
             />
             {full !== null ? (
-                <EmptyState
-                    icon={<Store />}
-                    title={`This business has ${full} locations, as many as Saroh allows`}
-                    description="Close one it no longer sells from to add another."
-                    action={
+                <LimitReachedState
+                    title={`You're at ${full} of ${full} locations`}
+                    description="Close one you no longer sell from to add another."
+                    secondary={
                         <Button asChild variant="outline">
                             <Link href="/commerce/locations">
                                 {storefronts.length === 1

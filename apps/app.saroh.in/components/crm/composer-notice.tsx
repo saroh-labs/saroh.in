@@ -1,8 +1,9 @@
-import { Button } from "@saroh/ui/button";
-import Link from "next/link";
-
 import type { ComposerGate } from "@/lib/messages/composer-gate";
-import { Notice } from "@saroh/ui/notice";
+import {
+    ModuleOffState,
+    PlanLockedState,
+    ProviderDisconnectedState,
+} from "@saroh/ui/data-state";
 
 /**
  * What the lead's "Send a message" shows in place of the composer when it
@@ -16,33 +17,30 @@ export function ComposerNotice({ gate }: { gate: ComposerGate }) {
     if (gate.kind === "off") {
         if (!gate.canManage) return null;
         return (
-            <p className="text-pretty text-sm text-muted-foreground">
-                Messaging is off for your business.{" "}
-                <Link
-                    href="/settings/modules"
-                    className="font-medium text-foreground underline underline-offset-2"
-                >
-                    Turn on Communications
-                </Link>{" "}
-                to write to this lead from here.
-            </p>
+            <ModuleOffState
+                size="inline"
+                name="Messaging"
+                description={null}
+                canTurnOn
+            />
         );
     }
-    return (
-        <Notice role="status">
-            <div className="flex flex-wrap items-center gap-3">
-                <p className="min-w-0 flex-[1_1_220px] text-pretty text-sm">
-                    {gate.title}
-                </p>
-                <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="wk-press"
-                >
-                    <Link href={gate.href}>{gate.cta}</Link>
-                </Button>
-            </div>
-        </Notice>
+    return gate.kind === "plan" ? (
+        <PlanLockedState
+            size="inline"
+            name="Sending from here"
+            title={gate.title}
+            description={null}
+            plan={gate.plan}
+            href={gate.href}
+            canChangePlan
+        />
+    ) : (
+        <ProviderDisconnectedState
+            size="inline"
+            provider="email"
+            title={gate.title}
+            href={gate.href}
+        />
     );
 }

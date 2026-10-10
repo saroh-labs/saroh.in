@@ -10,6 +10,7 @@ import {
     monthDays,
     STATE_LABEL,
 } from "@/lib/services/diary";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { STATE_TONE } from "./parts";
@@ -35,11 +36,7 @@ export function AgendaList({
     empty: string;
 }) {
     if (blocks.length === 0) {
-        return (
-            <p className="rounded-[11px] border border-dashed border-border px-3.5 py-5 text-[13px] text-muted-foreground">
-                {empty}
-            </p>
-        );
+        return <EmptyState size="inline" title={empty} />;
     }
     return (
         <ul className="flex flex-col gap-2">

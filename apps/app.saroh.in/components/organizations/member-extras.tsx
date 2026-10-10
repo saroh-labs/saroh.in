@@ -13,6 +13,7 @@ import {
     sameExtras,
 } from "@/lib/organizations/extras";
 import type { RoleCatalogue } from "@/lib/organizations/roles";
+import { couldntLoadLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * The Edit drawer's extras draft: what the person holds now, what is being
@@ -76,9 +77,7 @@ export function useMemberExtras({
         groups,
         lockedReason:
             lockedReason ??
-            (catalogue
-                ? null
-                : "The list of permissions couldn't be loaded. Reload to try again."),
+            (catalogue ? null : couldntLoadLine("the list of permissions")),
         chosen,
         /** Only when the switches could have moved them. */
         changed:

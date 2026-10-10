@@ -95,8 +95,8 @@ export default async function FormEntriesPage({
             {page.items.length === 0 ? (
                 <EmptyState
                     icon={<Inbox />}
-                    title="Nothing sent yet"
-                    description="When someone fills this form in on the live site, what they sent shows here — and they appear in Contacts and Leads."
+                    title="No entries yet"
+                    description="When someone fills this form in on your live site, what they sent shows here."
                 />
             ) : (
                 <ul className="flex flex-col gap-3">

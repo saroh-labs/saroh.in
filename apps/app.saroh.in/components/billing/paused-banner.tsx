@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -33,9 +34,7 @@ export function PausedBanner({ view }: { view: PausedView | null }) {
                     {b.body}
                 </p>
                 <Button asChild size="sm" className="shrink-0">
-                    <Link href={PLAN_AND_BILLING_HREF}>
-                        See Plan and billing
-                    </Link>
+                    <Link href={PLAN_AND_BILLING_HREF}>{planLabel()}</Link>
                 </Button>
             </div>
         </Notice>
@@ -60,7 +59,7 @@ export function PausedNote({
                 href={PLAN_AND_BILLING_HREF}
                 className="font-medium underline underline-offset-2"
             >
-                See Plan and billing
+                {planLabel()}
             </Link>
         </Notice>
     );

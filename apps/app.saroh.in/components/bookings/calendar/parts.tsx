@@ -10,66 +10,9 @@ import type { DiaryState } from "@/lib/services/diary";
 
 /**
  * Small pieces the Bookings screens share (the "Saroh Bookings" design):
- * the crumb strip above each screen, the state pill and the choice chip.
+ * the state pill and the choice chip. Where a screen sits ("Bookings ›
+ * Calendar") is the page header's breadcrumb, as on every screen.
  */
-
-/** The Bookings screens draw their own crumb strip edge to edge. */
-export const BARE = "space-y-0 px-0 pb-0 pt-0 sm:px-0";
-
-/**
- * "Bookings › Calendar", with whatever the screen puts on the right. Without
- * a page it is just "Bookings" (the locked card, drawn for every route).
- */
-export function BookingsTopBar({
-    page,
-    children,
-}: {
-    page?: string;
-    children?: ReactNode;
-}) {
-    return (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
-            <nav
-                aria-label="Breadcrumb"
-                className="flex items-center gap-2 text-[12px]"
-            >
-                {page ? (
-                    <span className="text-muted-foreground">Bookings</span>
-                ) : (
-                    <span className="text-foreground" aria-current="page">
-                        Bookings
-                    </span>
-                )}
-                {page ? (
-                    <>
-                        <Chevron />
-                        <span className="text-foreground" aria-current="page">
-                            {page}
-                        </span>
-                    </>
-                ) : null}
-            </nav>
-            {children}
-        </div>
-    );
-}
-
-function Chevron() {
-    return (
-        <svg
-            aria-hidden
-            viewBox="0 0 24 24"
-            className="size-3 shrink-0 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M9.5 5 L16.5 12 L9.5 19" />
-        </svg>
-    );
-}
 
 /**
  * Bookings, locked for a role that can't read them (E5): the named denied
@@ -90,7 +33,7 @@ export function BookingsLocked({
     role: string | null;
 }) {
     return (
-        <div className="px-[22px] py-[60px] max-[759px]:px-4">
+        <div>
             <PermissionDeniedState
                 {...whoCanChange({ thing: "Bookings", business, role })}
                 action={

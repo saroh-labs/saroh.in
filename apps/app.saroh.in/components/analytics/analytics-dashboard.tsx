@@ -15,6 +15,7 @@ import {
     tickEvery,
 } from "@/lib/analytics/website-words";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import type { ReadoutBar } from "./readout-bars";
 import { ReadoutBars } from "./readout-bars";
@@ -101,9 +102,10 @@ function DailyVisits({ daily }: { daily: DailyPoint[] }) {
                 Tap a day to read its visits and visitors.
             </p>
             {daily.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    No visits recorded in this range yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No visits in this range yet."
+                />
             ) : (
                 <ReadoutBars
                     bars={bars}
@@ -124,9 +126,7 @@ function TopPages({ pages }: { pages: TopPage[] }) {
                 Pages people opened most
             </h3>
             {pages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    No page visits yet.
-                </p>
+                <EmptyState size="inline" title="No page visits yet." />
             ) : (
                 <ol className="divide-y divide-foreground/10">
                     {pages.map((p) => (

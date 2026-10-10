@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { DetailCrumbs } from "@/components/class-packs/pack-detail/detail-crumbs";
 import type { SellContext } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackDetailScreen } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
@@ -10,7 +9,7 @@ import {
     canSellPacks,
     canWritePacks,
 } from "@/lib/class-packs/access";
-import { detailHeader, tabFromQuery } from "@/lib/class-packs/pack-detail";
+import { tabFromQuery } from "@/lib/class-packs/pack-detail";
 import {
     getPackDetail,
     readPackEvents,
@@ -108,10 +107,6 @@ export default async function PackDetailPage({
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <DetailCrumbs
-                here={pack.name}
-                aside={detailHeader(pack).bookingPage}
-            />
             <PackDetailScreen
                 // Another pack starts on its own tab and lens.
                 key={pack.id}

@@ -106,10 +106,9 @@ test("the address, type and logo wait for a first invoice", async ({
     // Her kind's words: "your address", not "your registered address".
     await expect(card).toContainText("Add your address");
     await expect(card).not.toContainText("registered address");
-    // The type and the logo are suggested apart, never counted (UX-019).
-    const extras = page
-        .getByRole("region", { name: "Make it yours" })
-        .filter({ visible: true });
+    // The type and the logo are suggested apart, never counted (UX-019):
+    // ruled off inside the same card, not a second card.
+    const extras = card.getByRole("group", { name: "Make it yours" });
     await expect(extras).toContainText("Choose your business type");
     await expect(extras).toContainText("Add your logo");
     const add = card.getByRole("link", { name: "Add address" });

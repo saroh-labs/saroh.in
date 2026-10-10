@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { providerName } from "@/lib/payments/providers";
 import type {
     PaymentProviderName,
@@ -143,12 +144,15 @@ export function WebhookAddressStep({
                         ) : null}
                     </div>
                 </>
-            ) : (
+            ) : setup ? (
                 <p className="rounded-[10px] border border-dashed border-border-strong px-3 py-2.5 text-[12.5px] leading-[1.45] text-muted-foreground">
-                    {setup
-                        ? `Saroh hasn't set the address ${name} should send payment updates to yet, so it can't be shown. Contact Saroh support before connecting — ${name} needs it to confirm payments.`
-                        : `The webhook address couldn't be loaded. Reload the page to see it — ${name} still needs it to confirm payments.`}
+                    {`Saroh hasn't set the address ${name} should send payment updates to yet, so it can't be shown. Contact Saroh support before connecting. ${name} needs it to confirm payments.`}
                 </p>
+            ) : (
+                <FailedRead
+                    things="the webhook address"
+                    reassurance={`${name} still needs it to confirm payments.`}
+                />
             )}
         </section>
     );

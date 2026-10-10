@@ -381,9 +381,7 @@ describe("Send message", () => {
         const reason = document.getElementById(
             send?.getAttribute("aria-describedby") ?? "",
         );
-        expect(reason?.textContent).toContain(
-            "Messaging is off for your business.",
-        );
+        expect(reason?.textContent).toContain("Messaging is turned off.");
         expect(reason?.querySelector('a[href="/settings/modules"]')).not.toBe(
             null,
         );

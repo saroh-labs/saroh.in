@@ -158,7 +158,9 @@ describe("How to pay us (R32)", () => {
         // Exactly this, with no stray whitespace: the server's and the
         // client's text must match, or React reports a hydration mismatch
         // (UX-086).
-        expect(preview()?.querySelector("p.border-dashed")?.textContent).toBe(
+        expect(
+            preview()?.querySelector('[data-state="empty"] p')?.textContent,
+        ).toBe(
             "Nothing set yet. Customers see “Pay Northwind the way they've asked you to.”",
         );
         expect(preview()?.querySelector('[data-testid="upi-qr"]')).toBeNull();

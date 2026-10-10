@@ -1,3 +1,4 @@
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
@@ -59,9 +60,11 @@ export function PlanOverview({
                             </div>
                         ))
                     ) : (
-                        <p className="border-t border-border/70 pt-1.5 text-[13px] text-muted-foreground">
-                            Nobody&apos;s on this plan yet.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="border-t border-border/70 pt-1.5"
+                            title="No one is on this plan yet."
+                        />
                     )}
                 </section>
             </div>

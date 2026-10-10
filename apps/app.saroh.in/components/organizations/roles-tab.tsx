@@ -22,6 +22,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FailedRead } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
@@ -111,10 +112,11 @@ export function RolesTab({
 
     if (!active) {
         return (
-            <p className="rounded-xl border border-border px-4 py-6 text-[13px] text-muted-foreground">
-                The roles could not be loaded. Reload to try again —
-                nobody&apos;s access has changed.
-            </p>
+            <FailedRead
+                size="panel"
+                things="roles"
+                reassurance="Nobody's access has changed."
+            />
         );
     }
 
@@ -433,10 +435,11 @@ function RoleDetail({
             </div>
 
             {catalogue === null ? (
-                <p className="px-4 py-6 text-[12.5px] text-muted-foreground">
-                    The list of permissions could not be loaded. Reload to try
-                    again — nothing about this role has changed.
-                </p>
+                <FailedRead
+                    things="the list of permissions"
+                    reassurance="Nothing about this role has changed."
+                    className="px-4 py-6"
+                />
             ) : (
                 <div className="px-4 pb-3.5 pt-1.5">
                     {byGroup.map(({ group, capabilities }) => {

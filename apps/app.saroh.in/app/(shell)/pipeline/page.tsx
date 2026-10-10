@@ -20,6 +20,7 @@ import { listLeads } from "@/lib/leads/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listPipelines } from "@/lib/pipelines/service";
 import { requireSession } from "@/lib/session";
+import { Inbox } from "lucide-react";
 
 /**
  * Pipeline board for the active organization (S3-005) — the acceptance
@@ -55,9 +56,10 @@ export default async function PipelinePage() {
         // Home's CRM step ("Add your first lead") lands here (#352).
         const addLead = canWrite ? await loadAddLead(pipelines) : null;
         return (
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <Header />
                 <EmptyState
+                    icon={<Inbox />}
                     title="No leads yet"
                     description={
                         addLead
@@ -100,7 +102,7 @@ export default async function PipelinePage() {
     }));
 
     return (
-        <PageContainer width="wide" className="max-w-full">
+        <PageContainer width="full">
             <Header
                 pipelineName={pipeline.name}
                 action={
@@ -116,7 +118,7 @@ export default async function PipelinePage() {
                                 }))}
                             />
                         ) : null}
-                        {addLead ? <AddLeadDialog {...addLead} /> : null}
+                        {addLead ? <AddLeadDialog {...addLead} header /> : null}
                     </>
                 }
             />
@@ -253,14 +255,11 @@ function Header({
 }) {
     return (
         <PageHeader
+            breadcrumb={["Pipeline"]}
             title="Pipeline"
             description={pipelineName}
-            actions={
-                <>
-                    <LeadsViewSwitch current="board" />
-                    {action}
-                </>
-            }
+            meta={<LeadsViewSwitch current="board" />}
+            actions={action}
         />
     );
 }

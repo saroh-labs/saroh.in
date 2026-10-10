@@ -12,6 +12,7 @@ import type {
     SubscriptionEvent,
     SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
@@ -115,9 +116,7 @@ export function ChangesCard({
                             Earlier changes weren&apos;t recorded.
                         </p>
                     ) : rows.length === 0 ? (
-                        <p className="text-[12.5px] text-muted-foreground">
-                            Nothing has changed yet.
-                        </p>
+                        <EmptyState size="inline" title="No changes yet." />
                     ) : null}
                 </>
             )}

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,7 +51,6 @@ import {
 } from "./editor-sections";
 import { MoreSettings } from "./more-settings";
 
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px]";
 const SERVICES_HREF = "/services";
 
 /**
@@ -234,105 +234,97 @@ export function ServiceEditor({
 
     return (
         <main className="w-full pb-8">
-            <nav
-                aria-label="Breadcrumb"
-                className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px] text-[12px]"
-            >
-                <Link
-                    href="/bookings"
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    Bookings
-                </Link>
-                <Chevron />
-                <Link
-                    href={SERVICES_HREF}
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    Services
-                </Link>
-                <Chevron />
-                <span aria-current="page" className="min-w-0 truncate">
-                    {crumb}
-                </span>
-            </nav>
-
-            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-2.5 border-b border-border bg-card px-6 py-3 dark:bg-background max-[759px]:px-4">
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">
-                            {title}
-                        </h1>
+            <div className="sticky top-[61px] z-10 border-b border-border bg-card px-4 py-3 dark:bg-background sm:px-[26px]">
+                <PageHeader
+                    className="mb-0"
+                    breadcrumb={[
+                        <Link key="bookings" href="/bookings">
+                            Bookings
+                        </Link>,
+                        <Link key="services" href={SERVICES_HREF}>
+                            Services
+                        </Link>,
+                        crumb,
+                    ]}
+                    title={title}
+                    badge={
                         <StatusBadge tone={pill.tone} hint={pill.hint}>
                             {pill.label}
                         </StatusBadge>
-                    </div>
-                    <div
-                        role="status"
-                        className={cn(
-                            "mt-0.5 text-[12.5px]",
-                            dirty && canEdit
-                                ? "text-brand"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {stateLine({
-                            isNew,
-                            dirty: dirty && canEdit,
-                            comingUp,
-                        })}
-                    </div>
-                </div>
-                {canEdit ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {isNew ? null : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className={BTN}
-                                disabled={saving}
-                                onClick={() => set({ taking: !draft.taking })}
-                            >
-                                {takingLabel(draft.taking)}
-                            </Button>
-                        )}
-                        {dirty ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className={BTN}
-                                disabled={saving}
-                                onClick={() => setDraft(saved)}
-                            >
-                                Discard changes
-                            </Button>
-                        ) : null}
-                        <Button
-                            type="button"
-                            className={BTN}
-                            disabled={saveOff}
-                            onClick={() => void save()}
+                    }
+                    description={
+                        <div
+                            role="status"
+                            className={cn(
+                                "text-[12.5px]",
+                                dirty && canEdit
+                                    ? "text-brand"
+                                    : "text-muted-foreground",
+                            )}
                         >
-                            {saving
-                                ? "Saving…"
-                                : isNew
-                                  ? "Add service"
-                                  : "Save changes"}
-                        </Button>
-                    </div>
-                ) : (
-                    <span className="text-[12.5px] text-muted-foreground">
-                        {VIEW_ONLY}
-                    </span>
-                )}
+                            {stateLine({
+                                isNew,
+                                dirty: dirty && canEdit,
+                                comingUp,
+                            })}
+                        </div>
+                    }
+                    actions={
+                        canEdit ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {isNew ? null : (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+
+                                        disabled={saving}
+                                        onClick={() =>
+                                            set({ taking: !draft.taking })
+                                        }
+                                    >
+                                        {takingLabel(draft.taking)}
+                                    </Button>
+                                )}
+                                {dirty ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+
+                                        disabled={saving}
+                                        onClick={() => setDraft(saved)}
+                                    >
+                                        Discard changes
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    disabled={saveOff}
+                                    onClick={() => void save()}
+                                >
+                                    {saving
+                                        ? "Saving…"
+                                        : isNew
+                                          ? "Add service"
+                                          : "Save changes"}
+                                </Button>
+                            </div>
+                        ) : (
+                            <span className="text-[12.5px] text-muted-foreground">
+                                {VIEW_ONLY}
+                            </span>
+                        )
+                    }
+                />
             </div>
             {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
-                <Notice tone="error">{problems.join(" ")}</Notice>
+                <Notice tone="error" layout="banner">
+                    {problems.join(" ")}
+                </Notice>
             ) : null}
 
             <fieldset
                 disabled={!canEdit || saving}
-                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-6 pb-7 pt-4 max-[759px]:px-4"
+                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-4 pb-7 pt-4 sm:px-[26px]"
             >
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
@@ -402,22 +394,5 @@ export function ServiceEditor({
                 />
             ) : null}
         </main>
-    );
-}
-
-function Chevron() {
-    return (
-        <svg
-            aria-hidden
-            viewBox="0 0 24 24"
-            className="size-3 shrink-0 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M9.5 5 L16.5 12 L9.5 19" />
-        </svg>
     );
 }

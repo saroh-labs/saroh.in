@@ -37,8 +37,9 @@ describe("BookingsView — first run", () => {
     it("offers nothing to share when the booking page isn't live", () => {
         const html = render(null);
         expect(html).not.toContain("Share your booking page");
+        expect(html).toContain("No bookings yet");
         expect(html).toContain(
-            "Bookings appear here as visitors reserve slots on your services.",
+            "They show here when a customer books, or when you add one.",
         );
     });
 });

@@ -4,6 +4,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { showUndo } from "@saroh/ui/toast";
 import { ArrowLeft, ArrowRight, ImagePlus, Link2, Star, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
@@ -21,6 +22,7 @@ import {
     mediaCounts,
     mediaFileProblem,
 } from "@/lib/products/editor-sections";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * A product's photos and videos, in the order customers see them (the
@@ -175,10 +177,11 @@ export function PhotosField({
                     })}
                 </ol>
             ) : (
-                <div className="rounded-[10px] border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No photos yet. Add up to {LIMITS.photos} photos and{" "}
-                    {LIMITS.videos} videos.
-                </div>
+                <EmptyState
+                    size="panel"
+                    title="No photos yet"
+                    description={`Add up to ${LIMITS.photos} photos and ${LIMITS.videos} videos.`}
+                />
             )}
 
             {allFull ? (
@@ -343,12 +346,12 @@ function LibraryPanel({
                 </Button>
             </div>
             {items === "loading" ? (
-                <p
-                    role="status"
-                    className="text-[12.5px] text-muted-foreground"
-                >
-                    Loading your photos…
-                </p>
+                <div role="status" aria-busy="true" className="flex gap-2">
+                    <span className="sr-only">Loading your photos</span>
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                </div>
             ) : items === null ? (
                 <p role="alert" className="text-[12.5px] text-destructive">
                     Couldn&apos;t load your photos. Close this and try again, or

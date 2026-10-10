@@ -10,9 +10,11 @@ import type {
 import { checklistHeading } from "@/lib/settings/ready";
 
 /**
- * "Get ready to take money" ("Saroh Settings" design): a card at the top of
- * Business listing what is left, a bar for how far along the business is,
- * and a button per step to the place that does it. The steps and the count
+ * "Get ready to take money" ("Saroh Settings" design): the one "what's
+ * left" card on Business, listing what is left, a bar for how far along the
+ * business is, and a button per step to the place that does it. The page's
+ * layout places it (`SettingsColumns`): above the tabs, and to their right
+ * on a wide screen, as on Sell › Location. The steps and the count
  * are Home's (`readyChecklist`, F8, UX-019), under the same heading, which
  * follows the steps (DEC-070): with nothing that invoices or takes money,
  * it is about the site.
@@ -22,19 +24,37 @@ import { checklistHeading } from "@/lib/settings/ready";
  * has it and See plans — so the count can reach all done without it.
  *
  * What Settings also suggests — email, business type, logo, a pipeline
- * (`settingsChecklist`, DEC-056) — is "Make it yours", apart and never
- * counted. Nothing renders once nothing is left in either.
+ * (`settingsChecklist`, DEC-056) — is "Make it yours", under the steps in
+ * the same card, ruled off and never counted. It was a second card stacked
+ * on the first, which pushed the settings themselves below the fold.
+ * Nothing renders once nothing is left in either.
  */
 export function ReadyChecklist({ list }: { list: Checklist }) {
+    if (!readyHasLeft(list)) return null;
     const counted = list.total > 0 && list.left.length > 0;
     const extras = (list.extras ?? []).filter((e) => !e.done);
-    if (!counted && extras.length === 0) return null;
     return (
-        <div className="grid gap-3">
+        <section
+            aria-label={counted ? checklistHeading(list) : "Make it yours"}
+            className={cn(
+                "grid gap-3 rounded-xl border px-4 py-3",
+                counted
+                    ? "border-highlight-border bg-brand-subtle"
+                    : "border-border bg-card",
+            )}
+        >
             {counted ? <Steps list={list} /> : null}
-            {extras.length > 0 ? <MakeItYours items={extras} /> : null}
-        </div>
+            {extras.length > 0 ? (
+                <MakeItYours items={extras} ruled={counted} />
+            ) : null}
+        </section>
     );
+}
+
+/** Whether the card has anything to say, so a layout can leave its place out. */
+export function readyHasLeft(list: Checklist): boolean {
+    const counted = list.total > 0 && list.left.length > 0;
+    return counted || (list.extras ?? []).some((e) => !e.done);
 }
 
 /** The counted steps, Home's, with the plan's asides under them. */
@@ -42,10 +62,7 @@ function Steps({ list }: { list: Checklist }) {
     const pct = Math.round((100 * list.done) / list.total);
     const heading = checklistHeading(list);
     return (
-        <section
-            aria-label={heading}
-            className="grid gap-2 rounded-xl border border-highlight-border bg-brand-subtle px-4 py-3"
-        >
+        <div className="grid gap-2">
             <div className="flex flex-wrap items-baseline gap-2.5">
                 <h3 className="font-display text-[15px] font-semibold tracking-[-0.01em]">
                     {heading}
@@ -134,7 +151,7 @@ function Steps({ list }: { list: Checklist }) {
                     ))}
                 </ul>
             ) : null}
-        </section>
+        </div>
     );
 }
 
@@ -142,11 +159,22 @@ function Steps({ list }: { list: Checklist }) {
  * "Make it yours" (UX-019): what Settings suggests beyond taking money.
  * Quiet, uncounted, no bar: a suggestion, not a step left.
  */
-function MakeItYours({ items }: { items: ReadyStep[] }) {
+function MakeItYours({
+    items,
+    ruled,
+}: {
+    items: ReadyStep[];
+    /** Under the counted steps: ruled off from them. */
+    ruled: boolean;
+}) {
     return (
-        <section
+        <div
+            role="group"
             aria-label="Make it yours"
-            className="grid gap-2 rounded-xl border border-border bg-card px-4 py-3"
+            className={cn(
+                "grid gap-2",
+                ruled && "border-t border-highlight-border pt-3",
+            )}
         >
             <h3 className="font-display text-[14px] font-semibold tracking-[-0.01em]">
                 Make it yours
@@ -168,7 +196,7 @@ function MakeItYours({ items }: { items: ReadyStep[] }) {
                         />
                         <span className="grid min-w-0 flex-[1_1_220px] gap-px">
                             <span>{item.label}</span>
-                            <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
+                            <span className="text-pretty text-[12.5px] leading-[1.45] text-foreground/80">
                                 {item.why}
                             </span>
                         </span>
@@ -183,6 +211,6 @@ function MakeItYours({ items }: { items: ReadyStep[] }) {
                     </li>
                 ))}
             </ul>
-        </section>
+        </div>
     );
 }

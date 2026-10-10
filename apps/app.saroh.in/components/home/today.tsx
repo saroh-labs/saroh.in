@@ -13,6 +13,7 @@ import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
 import { clockNow, todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
+import { EmptyState } from "@saroh/ui/data-state";
 
 type Outcome = "ATTENDED" | "NO_SHOW";
 type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
@@ -100,8 +101,11 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
 
             <ul className="overflow-hidden rounded-xl border border-border bg-card">
                 {view.empty ? (
-                    <li className="px-4 py-3.5 text-[13.5px] text-muted-foreground">
-                        Nothing booked today.
+                    <li className="px-4 py-3.5">
+                        <EmptyState
+                            size="inline"
+                            title="Nothing booked today."
+                        />
                     </li>
                 ) : null}
                 {view.rows.map((row, i) => (

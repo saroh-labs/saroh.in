@@ -1,8 +1,10 @@
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { useId } from "react";
 
+import { TryAgainLink } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { BookingEmails } from "@/lib/providers/booking-emails";
 import {
@@ -37,7 +39,11 @@ export function BookingEmailsBlock({
 }) {
     const id = useId();
     if (emails.kind === "unread") {
-        return <PartialNotice>{emails.text}</PartialNotice>;
+        return (
+            <PartialNotice action={<TryAgainLink />}>
+                {emails.text}
+            </PartialNotice>
+        );
     }
     const b = emails.block;
     // Near or at the cap, the way out is what the block asks for.
@@ -75,7 +81,7 @@ export function BookingEmailsBlock({
                     ) : b.own === "upgrade" ? (
                         <div className="shrink-0">
                             <Button asChild size="sm" variant={variant}>
-                                <Link href={SEE_PLANS_HREF}>See plans</Link>
+                                <Link href={SEE_PLANS_HREF}>{planLabel()}</Link>
                             </Button>
                         </div>
                     ) : null}

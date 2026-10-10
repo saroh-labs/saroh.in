@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Plus } from "lucide-react";
+import { countLabel } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
@@ -180,9 +180,22 @@ export function OrdersScreen({
     return (
         <div className="min-w-0">
             <OrdersHeading
+                count={countLabel(page.counts.all, {
+                    one: "order",
+                    other: "orders",
+                })}
                 actions={
                     stores.length > 0 && !kitchen ? (
                         <>
+                            {/* A file of every order leaves Saroh: its own
+                                power (`order:export`, B16). */}
+                            {can.export ? (
+                                <OrderExport
+                                    query={query}
+                                    total={page.counts[query.tab]}
+                                    storeName={store?.name}
+                                />
+                            ) : null}
                             {newOrder ? (
                                 <>
                                     {newOrder.blocked ? (
@@ -204,19 +217,9 @@ export function OrdersScreen({
                                         }
                                         className="cursor-pointer active:scale-[0.98]"
                                     >
-                                        <Plus className="mr-1.5 size-4" />
                                         New order
                                     </Button>
                                 </>
-                            ) : null}
-                            {/* A file of every order leaves Saroh: its own
-                                power (`order:export`, B16). */}
-                            {can.export ? (
-                                <OrderExport
-                                    query={query}
-                                    total={page.counts[query.tab]}
-                                    storeName={store?.name}
-                                />
                             ) : null}
                         </>
                     ) : undefined
@@ -292,6 +295,11 @@ export function OrdersScreen({
                         options={filterOptions}
                         go={go}
                         share={share}
+                        onNew={
+                            newOrder && !newOrder.blocked
+                                ? () => setNewOpen(true)
+                                : undefined
+                        }
                     />
                 ) : (
                     <>

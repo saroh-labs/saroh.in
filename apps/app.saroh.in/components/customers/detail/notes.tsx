@@ -124,19 +124,21 @@ export function Notes({
                 </ReadOnlyNote>
             )}
             {empty ? (
-                <Empty title="No notes yet">
-                    Useful for things the team should remember: a usual order,
-                    how they like to be called. An allergy goes on Needs
-                    attention, where orders are checked against it.
-                    {canWrite ? (
-                        <div className="mt-3.5">
+                <Empty
+                    title="No notes yet"
+                    action={
+                        canWrite ? (
                             <SheetTrigger asChild>
                                 <Button size="sm" className={SMALL}>
                                     Add note
                                 </Button>
                             </SheetTrigger>
-                        </div>
-                    ) : null}
+                        ) : undefined
+                    }
+                >
+                    Things the team should remember show here, like a usual
+                    order. An allergy goes on Needs attention, where orders are
+                    checked against it.
                 </Empty>
             ) : null}
             <div className="flex flex-col gap-2">

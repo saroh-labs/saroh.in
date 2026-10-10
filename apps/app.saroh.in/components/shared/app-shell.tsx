@@ -5,7 +5,6 @@ import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { ClosingBanner } from "@/components/organizations/closing-banner";
-import { AccessDenied } from "@/components/shared/access-denied";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
@@ -16,6 +15,7 @@ import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
+import { PageContainer } from "@/components/shared/page-container";
 import { TabBar } from "@/components/shared/tab-bar";
 import { accountsUrl } from "@/lib/accounts";
 import { businessZone } from "@/lib/format/business-zone";
@@ -23,7 +23,6 @@ import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
-import { MEMBER_PAUSED_BODY } from "@/lib/organizations/choose";
 import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
     listOrganizations,
@@ -33,6 +32,8 @@ import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
+import { Button } from "@saroh/ui/button";
+import { PausedState } from "@saroh/ui/data-state";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -68,18 +69,28 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     // Every business they're in has paused their access (#800): the API
     // would refuse each read, so say why once instead of a page of denials.
+    // Paused, not denied: no role changed, and the way back is the plan.
     if (activeOrg?.paused) {
         return (
             <div className="flex min-h-screen flex-col">
                 <AppHeader onboarding user={session.user} />
                 <main id="main-content" className="flex-1">
-                    <AccessDenied
-                        title={`Your access to ${activeOrg.name} is paused`}
-                        description={MEMBER_PAUSED_BODY}
-                        note={null}
-                        backHref={`${accountsUrl}/apps`}
-                        backLabel="Your businesses"
-                    />
+                    <PageContainer>
+                        <PausedState
+                            business={activeOrg.name}
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <a href={`${accountsUrl}/apps`}>
+                                        Your businesses
+                                    </a>
+                                </Button>
+                            }
+                        />
+                    </PageContainer>
                 </main>
             </div>
         );

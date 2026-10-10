@@ -414,17 +414,17 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(panel(html)).not.toContain("<a ");
     });
 
-    it("no location yet: says so, and offers Add a location", () => {
+    it("no location yet: says so, and offers New location", () => {
         const html = screen({ storefronts: [], selected: null });
-        expect(text(html)).toContain("No location yet");
-        expect(text(html)).toContain("Add a location");
+        expect(text(html)).toContain("No locations yet");
+        expect(text(html)).toContain("New location");
         expect(h1(html)).toBe("Location");
     });
 
     it("a location that couldn't be read keeps its name and offers Try again", () => {
         const html = screen({ selected: null, chosenId: hill.id });
         expect(h1(html)).toBe("Hill Road");
-        expect(text(html)).toContain("This location could not be loaded");
+        expect(text(html)).toContain("Couldn't load this location");
         expect(text(html)).toContain("Try again");
         expect(html).not.toContain('role="tablist"');
     });
@@ -482,7 +482,7 @@ describe("the People tab", () => {
         expect(h1(html)).toBe("Hill Road");
         expect(html).toContain('role="tablist"');
         const t = text(panel(html));
-        expect(t).toContain("The people here could not be loaded");
+        expect(t).toContain("Couldn't load the people here");
         expect(t).toContain("Try again");
         expect(panel(html)).toContain('role="alert"');
         // The other tabs are untouched by it.
@@ -552,7 +552,7 @@ describe("the readiness card", () => {
     it("a location past the plan's limit (#800) is not ready, and says why", () => {
         const t = text(screen({ notTakingOrders: [hill.id] }));
         expect(t).toContain("Not taking orders on your plan");
-        expect(t).toContain("See Plan and billing");
+        expect(t).toContain("See plans");
     });
 
     it("a paused location counts its pause as a step left", () => {

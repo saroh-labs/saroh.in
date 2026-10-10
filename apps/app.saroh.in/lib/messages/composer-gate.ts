@@ -3,6 +3,7 @@ import { accessRow, ownAccountsRoom, upgradeHref } from "@/lib/billing/access";
 import type { MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL } from "@/lib/messages/constants";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { planLabel, providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /**
  * Whether the lead's "Send a message" composer can send on a channel, and
@@ -28,7 +29,14 @@ export type ComposerGate =
     | { kind: "compose" }
     | { kind: "off"; canManage: boolean }
     | { kind: "connect"; title: string; cta: string; href: string }
-    | { kind: "plan"; title: string; cta: string; href: string };
+    | {
+          kind: "plan";
+          title: string;
+          cta: string;
+          href: string;
+          /** The plan that has it, by name, when one does. */
+          plan: string | null;
+      };
 
 const NOUN: Record<MessageChannel, string> = {
     EMAIL: "your email",
@@ -74,15 +82,19 @@ export function composerGate({
         return {
             kind: "plan",
             title,
-            cta: up ? `See ${up.name}` : "See plans",
+            cta: planLabel(up?.name),
             href: upgradeHref(up?.planId),
+            plan: up?.name ?? null,
         };
     }
     return {
         kind: "connect",
-        title: `Connect ${NOUN[channel]} to write from here.`,
-        cta: `Connect ${channel === "EMAIL" ? "email" : CHANNEL_LABEL[channel]}`,
-        href: "/settings/providers",
+        title:
+            channel === "EMAIL"
+                ? providerDisconnected.line("email")
+                : `${CHANNEL_LABEL[channel]} isn't connected, so nothing is sent from here.`,
+        cta: providerDisconnected.action,
+        href: providerDisconnected.href,
     };
 }
 

@@ -32,7 +32,6 @@ export default async function ModulesSettingsPage() {
 
     return (
         <SettingsPanel
-            width="default"
             header={
                 <SettingsPanelHeader
                     title="Modules"

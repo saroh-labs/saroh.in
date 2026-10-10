@@ -1,50 +1,48 @@
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
-import { cn } from "@saroh/ui/lib/utils";
+import { Button } from "@saroh/ui/button";
+import {
+    EmptyState,
+    FailedState,
+    PermissionDeniedState,
+} from "@saroh/ui/data-state";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import type { LucideIcon } from "lucide-react";
-import { Lock, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { Children } from "react";
+
+import { whoCanChange } from "@/components/shared/who-can-change";
 
 /**
- * The product page's own state card: the design draws it smaller than the
- * workspace's (a 28px icon, a 17px line, 36/24 of padding) because it sits
- * inside a tab, under the product's header, not as the whole page.
+ * A product tab with nothing in it yet: the shared empty card at panel
+ * size, since it sits inside a tab under the product's header, not as the
+ * whole page. `children` are its actions (up to two `StateLink`s).
  */
 export function TabState({
     icon: Icon,
     title,
     description,
     children,
-    role = "status",
 }: {
     icon: LucideIcon;
     title: string;
     description: React.ReactNode;
     /** Up to two `StateLink`s. */
     children?: React.ReactNode;
-    role?: "status" | "alert";
 }) {
+    const actions = Children.toArray(children);
     return (
-        <div
-            role={role}
-            className="flex flex-col items-center gap-[9px] rounded-[12px] border border-dashed border-border px-6 py-9 text-center"
-        >
-            <Icon
-                aria-hidden
-                className="size-7 text-muted-foreground/60"
-                strokeWidth={1.8}
-            />
-            <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                {title}
-            </h2>
-            <p className="max-w-[46ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                {description}
-            </p>
-            {children ? (
-                <div className="mt-1.5 flex flex-wrap justify-center gap-2">
-                    {children}
-                </div>
-            ) : null}
-        </div>
+        <EmptyState
+            size="panel"
+            icon={<Icon />}
+            title={title}
+            description={description}
+            action={
+                actions.length ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {actions}
+                    </div>
+                ) : undefined
+            }
+        />
     );
 }
 
@@ -59,63 +57,63 @@ export function StateLink({
     children: React.ReactNode;
 }) {
     return (
-        <Link
-            href={href}
-            className={cn(
-                "inline-flex items-center rounded-[9px] text-[12.5px] font-semibold coarse:min-h-11",
-                primary
-                    ? "h-[34px] bg-foreground px-3.5 text-background hover:bg-foreground/90"
-                    : "h-8 border border-border bg-card px-3 text-foreground hover:bg-muted",
-            )}
+        <Button
+            asChild
+            variant={primary ? "default" : "outline"}
+            className="wk-press"
         >
-            {children}
-        </Link>
+            <Link href={href}>{children}</Link>
+        </Button>
     );
 }
 
 /**
- * A panel of the product page that did not arrive: it could not be read
- * (retry, and say the rest of the page is current) or this role may not see
- * it (say so, and who can change it). Never a zero, never an empty list.
+ * A panel of the product page that could not be read: the failed card, an
+ * alert with Try again (a fresh load of the tab, which reads it again).
+ * Never a zero, never an empty list. `reassurance` is the one true thing
+ * the tab can add to "Nothing has been changed."
  */
 export function PanelFailed({
     what,
     retryHref,
-    note,
+    reassurance = "The rest of the product loaded.",
     elsewhere,
 }: {
     what: string;
     retryHref: string;
-    note?: string;
+    reassurance?: string;
     /** Where the same records can be read on their own screen. */
     elsewhere?: { href: string; label: string };
 }) {
     return (
-        <TabState
-            role="alert"
-            icon={TriangleAlert}
-            title={`Couldn't load ${what}`}
-            description={
-                note ??
-                "The rest of the product loaded; only this did not. Nothing about the product has changed."
+        <FailedState
+            size="panel"
+            title={couldntLoad(what)}
+            description={nothingChanged(reassurance)}
+            retryHref={retryHref}
+            action={
+                elsewhere ? (
+                    <StateLink href={elsewhere.href}>
+                        {elsewhere.label}
+                    </StateLink>
+                ) : undefined
             }
-        >
-            <StateLink href={retryHref} primary>
-                Try again
-            </StateLink>
-            {elsewhere ? (
-                <StateLink href={elsewhere.href}>{elsewhere.label}</StateLink>
-            ) : null}
-        </TabState>
+        />
     );
 }
 
+/**
+ * A panel this role may not see: the denied card, with the one sentence
+ * (`whoCanChange`). Not the empty card, and nothing to retry.
+ */
 export function PanelForbidden({ what }: { what: string }) {
+    const words = whoCanChange({ thing: what });
     return (
-        <TabState
-            icon={Lock}
-            title={`Your role can't see ${what}`}
-            description={`Everything else about the product is here. ${WHO_CAN_CHANGE}`}
+        <PermissionDeniedState
+            size="panel"
+            title={words.title}
+            description={words.description}
+            note={words.note}
         />
     );
 }

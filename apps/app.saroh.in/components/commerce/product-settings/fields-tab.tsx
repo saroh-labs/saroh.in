@@ -70,6 +70,7 @@ export function FieldsTab({
 
             {fields.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No custom fields yet"
                     description="Add one to record something extra, such as Skin type for serums or Fabric care for dresses."
                     action={addOne}

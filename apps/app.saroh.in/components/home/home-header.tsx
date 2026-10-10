@@ -1,10 +1,11 @@
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { dateLine, greeting, sinceLinks } from "@/lib/home/last-day";
 import type { HomeLastDay } from "@/lib/home/service";
 
 /**
- * Home's header, as the design draws it (round 2, F6): the greeting in the
+ * Home's page header (round 2, F6), the one every screen draws: the greeting in the
  * business's part of the day, the business's date and name, and "Last 24
  * hours" — each figure a link to exactly the rows it counts (`?since=`).
  *
@@ -32,33 +33,35 @@ export function HomeHeader({
     const links = sinceLinks(lastDay);
 
     return (
-        <header className="grid gap-1">
-            <h1 className="text-balance font-display text-[28px] font-semibold tracking-[-0.03em]">
-                {greeting(lastDay, name)}
-            </h1>
-            <p className="text-[13.5px] text-muted-foreground">
-                {dateLine(lastDay, businessName, only, kind)}
-            </p>
-            {links.length > 0 ? (
-                <div
-                    role="group"
-                    aria-labelledby="home-last-24-hours"
-                    className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
-                >
-                    <span id="home-last-24-hours" className="label">
-                        Last 24 hours
-                    </span>
-                    {links.map((link) => (
-                        <Link
-                            key={link.key}
-                            href={link.href}
-                            className="rounded-sm underline decoration-border-strong underline-offset-[3px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        <PageHeader
+            className="mb-0"
+            breadcrumb={["Home"]}
+            title={greeting(lastDay, name)}
+            description={
+                <>
+                    <p>{dateLine(lastDay, businessName, only, kind)}</p>
+                    {links.length > 0 ? (
+                        <div
+                            role="group"
+                            aria-labelledby="home-last-24-hours"
+                            className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
                         >
-                            {link.label}
-                        </Link>
-                    ))}
-                </div>
-            ) : null}
-        </header>
+                            <span id="home-last-24-hours" className="label">
+                                Last 24 hours
+                            </span>
+                            {links.map((link) => (
+                                <Link
+                                    key={link.key}
+                                    href={link.href}
+                                    className="rounded-sm underline decoration-border-strong underline-offset-[3px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                >
+                                    {link.label}
+                                </Link>
+                            ))}
+                        </div>
+                    ) : null}
+                </>
+            }
+        />
     );
 }

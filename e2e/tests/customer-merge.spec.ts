@@ -135,7 +135,7 @@ test.describe("Customer Detail — merge", () => {
         });
         await expect(dialog.getByLabel("Find the other record")).toBeFocused();
         await dialog.getByLabel("Find the other record").fill("zzzz-nobody");
-        await expect(dialog).toContainText("No other customer matches");
+        await expect(dialog).toContainText("No other customers match");
         // Nothing is merged without a record picked.
         await expect(
             dialog.getByRole("button", { name: "Merge", exact: true }),

@@ -10,6 +10,8 @@ import { ProductThumb } from "@/components/stores/catalogue/product-thumb";
 import type { PickableProduct } from "@/lib/collections/actions";
 import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
+import { EmptyState } from "@saroh/ui/data-state";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * A hand-picked collection's products (#524): the ones picked, in the
@@ -89,10 +91,11 @@ export function ProductsPicker({
             </div>
 
             {picked.length === 0 ? (
-                <p className="rounded-[9px] border border-dashed border-border-strong px-3 py-3 text-[12.5px] text-muted-foreground">
-                    Nothing picked yet. Search below and tick the products it
-                    should hold.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="Nothing picked yet"
+                    description="Search below and tick the products it should hold."
+                />
             ) : (
                 <ol
                     aria-labelledby="collection-products-label"
@@ -207,7 +210,7 @@ export function ProductsPicker({
                         ) : found.items.length === 0 ? (
                             <p className="text-[12px] text-muted-foreground">
                                 {q.trim()
-                                    ? `No products match “${q.trim()}”.`
+                                    ? noMatchLine("products", q)
                                     : "No products yet."}
                             </p>
                         ) : (

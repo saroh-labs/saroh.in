@@ -48,7 +48,7 @@ export function LevelsTable({
     values: Readonly<Record<string, string>>;
     onValue: (key: string, raw: string, logSaid: number) => void;
     /** What the table says with no rows. */
-    empty: string;
+    empty: React.ReactNode;
 }) {
     const n = storefronts.length;
     // Product, a column per storefront, Last change — the design's widths.
@@ -127,11 +127,7 @@ export function LevelsTable({
                         );
                     })}
                 </div>
-                {rows.length === 0 ? (
-                    <p className="py-7 text-center text-[13px] text-muted-foreground">
-                        {empty}
-                    </p>
-                ) : null}
+                {rows.length === 0 ? <div className="p-3">{empty}</div> : null}
             </div>
         </div>
     );

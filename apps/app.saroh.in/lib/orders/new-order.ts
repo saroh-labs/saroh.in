@@ -8,6 +8,7 @@
 
 import type { CustomerPick } from "@/lib/customers/picker";
 import { METHOD_WORD } from "@/lib/payments/method-words";
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How it is paid, as the API takes it. */
 export type NewOrderPay = "CASH" | "UPI" | "CARD" | "LINK" | "LATER";
@@ -116,7 +117,7 @@ export function payOptions(input: {
                       key: "LINK" as const,
                       label: "Send a payment link",
                       off: !input.canLink
-                          ? "Connect a payment provider to send a link"
+                          ? providerDisconnected.title("payment")
                           : !reach
                             ? "Needs a customer with a phone or email"
                             : null,

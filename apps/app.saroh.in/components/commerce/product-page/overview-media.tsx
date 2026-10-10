@@ -7,6 +7,7 @@ import { mediaCounter } from "@/lib/products/editor-sections";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { onTheShop } from "@/lib/products/overview-rules";
 import { detailTag } from "@/lib/products/overview-words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { CardHead, DetailRow, ShownTag } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
@@ -83,10 +84,11 @@ export function OverviewPhotos({
                         })}
                     </div>
                 ) : (
-                    <p className="rounded-[10px] border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        No photos yet. The shop shows a plain tile until you add
-                        one.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No photos yet"
+                        description="The shop shows a plain tile until you add one."
+                    />
                 )}
                 <p className="text-[12px] text-muted-foreground">
                     {mediaCounter(media)}

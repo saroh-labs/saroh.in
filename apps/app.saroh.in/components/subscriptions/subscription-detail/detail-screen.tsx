@@ -2,6 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -37,7 +39,6 @@ import {
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Notice } from "@saroh/ui/notice";
-import { PaymentsCrumbs } from "../payments-crumbs";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
 import { ActionSheet } from "./action-sheets";
@@ -266,43 +267,36 @@ export function SubscriptionDetail({
 
     return (
         <>
-            <PaymentsCrumbs
-                here={name}
-                back={{
-                    href: "/billing/subscriptions",
-                    label: "Subscriptions",
-                }}
-            />
-            <div className="flex flex-col gap-4 px-6 pb-[26px] pt-5">
+            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
+                <PageHeader
+                    className="mb-0"
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="list" href="/billing/subscriptions">
+                            Subscriptions
+                        </Link>,
+                        name,
+                    ]}
+                    title={name}
+                    badge={
+                        <StatusBadge tone={head.pill.tone}>
+                            {head.pill.label}
+                        </StatusBadge>
+                    }
+                    description={[
+                        sub.plan.name,
+                        longPrice(sub.price, sub.currency, sub.interval),
+                        `Since ${dayText(sub.startedAt, tz, now)}`,
+                        bizName,
+                    ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                />
                 <section
                     aria-label="Next charge"
                     className="flex flex-wrap items-end gap-5 rounded-xl border border-border-strong bg-card px-5 py-[18px]"
                 >
                     <div className="min-w-0 flex-[1_1_300px]">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em]">
-                                {name}
-                            </h1>
-                            <StatusBadge tone={head.pill.tone}>
-                                {head.pill.label}
-                            </StatusBadge>
-                        </div>
-                        <p className="mt-1 text-[12.5px] text-muted-foreground">
-                            {[
-                                sub.plan.name,
-                                longPrice(
-                                    sub.price,
-                                    sub.currency,
-                                    sub.interval,
-                                ),
-                                `Since ${dayText(sub.startedAt, tz, now)}`,
-                                bizName,
-                            ]
-                                .filter(Boolean)
-                                .join(" · ")}
-                        </p>
-                    </div>
-                    <div className="flex-[0_1_auto] text-right">
                         <div className="label">Next charge</div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
                             {head.big}

@@ -16,6 +16,7 @@ import type { SearchTrackingRead } from "@/lib/sites/search-tracking";
 import { PRIVACY_NOTE, VERIFICATION_WORDS } from "@/lib/sites/search-tracking";
 import type { SiteAddress } from "@/lib/sites/share-links";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * "Search and tracking" for someone who may see the site and not change it
@@ -58,9 +59,11 @@ export function SiteSearchTrackingRead({
             <Block title="Your trackers">
                 {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
                 {view.trackers.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">
-                        No trackers connected yet.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="px-4 py-3"
+                        title="No trackers connected yet."
+                    />
                 ) : (
                     TRACKER_KINDS.filter((k) => byKind.has(k)).map((kind) => (
                         <TrackerRow

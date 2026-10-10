@@ -176,7 +176,7 @@ test.describe("customer detail", () => {
         await page.goto("/customers/not_a_contact");
         await expect(page).toHaveURL(/\/contacts\/not_a_contact$/);
         await expect(
-            page.getByRole("heading", { name: "This person isn't here" }),
+            page.getByRole("heading", { name: "Contact not found" }),
         ).toBeVisible();
     });
 

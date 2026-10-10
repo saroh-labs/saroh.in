@@ -112,6 +112,7 @@ export function AllergensTab({
 
             {allergens.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No allergens yet"
                     description="A shop that sells food usually starts with the common eight; anyone else can leave this empty."
                     action={

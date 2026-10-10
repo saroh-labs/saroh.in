@@ -27,6 +27,7 @@ export default async function ProjectModulesPage({
     return (
         <PageContainer width="form">
             <PageHeader
+                breadcrumb={["Settings", "Project modules"]}
                 title="Project modules"
                 description="Choose which of your business's modules appear in this project. The business's own settings always take precedence."
             />

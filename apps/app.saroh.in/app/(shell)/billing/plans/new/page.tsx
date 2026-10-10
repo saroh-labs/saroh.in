@@ -1,11 +1,12 @@
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
-import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
+
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { membershipPlansLock } from "@/lib/billing/access";
 import { permitsFor } from "@/lib/organizations/permits";
@@ -51,15 +52,18 @@ export default async function NewPlanPage() {
     const locked = membershipPlansLock(await billingAccessOrNull());
     if (locked) {
         return (
-            <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-                <PaymentsCrumbs
-                    here="New plan"
-                    trail={[{ href: PLANS_HREF, label: "Plans" }]}
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="plans" href={PLANS_HREF}>
+                            Plans
+                        </Link>,
+                        "New plan",
+                    ]}
+                    title="New plan"
                 />
-                <div className="max-w-[640px] space-y-3 px-6 pb-[26px] pt-5">
-                    <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
-                        New plan
-                    </h1>
+                <div className="max-w-[640px] space-y-3">
                     <LimitNoticeBlock
                         full={false}
                         title={locked.title}
