@@ -68,7 +68,7 @@ afterEach(unmount);
 const LINKED = {
     instagram: "https://www.instagram.com/rye",
     whatsapp: "https://wa.me/919845012345",
-    googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
+    telegram: "https://t.me/rye_co",
 };
 
 const socialRow = () => row(BUSINESS_ROW_ID.social);
@@ -99,7 +99,7 @@ describe("the Social links row", () => {
         onTab("contact");
         draw(settings({ socialLinks: LINKED }));
         expect(socialRow()?.textContent).toContain(
-            "Instagram, WhatsApp, Google Maps",
+            "Instagram, WhatsApp, Telegram",
         );
         expect(socialRow()?.textContent).toContain("On your website's footer");
         expect(edit("Edit social links")).not.toBeNull();
@@ -139,7 +139,6 @@ describe("the Social links sheet", () => {
             ["youtube", "@yourchannel or youtube.com/@yourchannel"],
             ["x", "@yourname or x.com/yourname"],
             ["linkedin", "linkedin.com/company/yourname"],
-            ["googleMaps", "maps.app.goo.gl/… or g.page/yourname"],
             ["pinterest", "yourname or pinterest.com/yourname"],
             ["telegram", "@yourname or t.me/yourname"],
         ]) {
@@ -150,6 +149,14 @@ describe("the Social links sheet", () => {
                 sheet()?.querySelector(`label[for="${id}"]`)?.textContent,
             ).not.toBe("");
         }
+    });
+
+    it("has no Google Maps field: that is an address's map, not a social link", async () => {
+        onTab("contact");
+        draw(settings());
+        await press(item("Add links"));
+        expect(input("googleMaps")).toBeNull();
+        expect(sheet()?.textContent).not.toContain("Google Maps");
     });
 
     it("starts from what is saved", async () => {
@@ -220,7 +227,7 @@ describe("the Social links sheet", () => {
         });
         expect(sheet()).toBeNull();
         expect(socialRow()?.textContent).toContain(
-            "Instagram, WhatsApp, X, Google Maps",
+            "Instagram, WhatsApp, X, Telegram",
         );
         expect(showSuccess).toHaveBeenCalledWith(
             "Social links saved. Your website shows them now.",

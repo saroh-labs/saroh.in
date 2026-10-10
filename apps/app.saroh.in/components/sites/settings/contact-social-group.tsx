@@ -29,6 +29,7 @@ import {
     CONTACT_OWNER_ONLY,
     CONTACT_UNREAD,
 } from "@/lib/sites/site-contact";
+import type { VisitedLocation } from "@/lib/stores/storefronts";
 
 import { EditAction } from "./edit-actions";
 import { SiteAddressSheet } from "./site-address-sheet";
@@ -65,7 +66,17 @@ export function ContactSocialGroup({
     view,
     business: initial,
     state,
+    locations: initialLocations = null,
+    canEditLocations = false,
 }: {
+    /**
+     * The locations customers visit, whose addresses the Address sheet
+     * edits in place; null when they couldn't be read (Sell off, or a
+     * role the API won't show them to).
+     */
+    locations?: VisitedLocation[] | null;
+    /** May change a location (`store:write`). */
+    canEditLocations?: boolean;
     /** What the website shows; null when it couldn't be read. */
     view: SiteContactView | null;
     business: OrganizationSettings | null;
@@ -74,6 +85,7 @@ export function ContactSocialGroup({
     const router = useRouter();
     // What the last save answered, so a row reads it at once.
     const [business, setBusiness] = useState(initial);
+    const [locations, setLocations] = useState(initialLocations);
     const canEdit = state !== null && business !== null;
     const editing = canEdit ? state.editing : null;
 
@@ -254,9 +266,23 @@ export function ContactSocialGroup({
                 <SiteAddressSheet
                     {...addressSheet}
                     contact={view.contact}
+                    locations={locations}
+                    canEditLocations={canEditLocations}
                     chosen={chosen}
+                    registeredMapUrl={business.registeredAddressMapUrl ?? null}
                     registeredSet={addressText(valuesOf(business)) !== ""}
                     onSaved={saved}
+                    onLocationSaved={(next, said) => {
+                        setLocations(
+                            (all) =>
+                                all?.map((l) =>
+                                    l.id === next.id ? next : l,
+                                ) ?? all,
+                        );
+                        showSuccess(said);
+                        // The row reads what the website shows.
+                        router.refresh();
+                    }}
                 />
             ) : null}
             {business && socialSheet ? (

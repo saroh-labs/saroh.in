@@ -123,7 +123,6 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
             "WhatsApp",
             "YouTube",
             "LinkedIn",
-            "Google Maps",
             "Pinterest",
             "Telegram",
         ],

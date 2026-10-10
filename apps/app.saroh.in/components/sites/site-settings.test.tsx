@@ -19,6 +19,9 @@ vi.mock("@/lib/sites/actions", () => ({
 }));
 // Each reads on its own once mounted; the words around them are what is
 // under test here.
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: vi.fn(),
+}));
 // The business's own sheets open from Contact and social (DEC-125).
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),

@@ -118,14 +118,14 @@ describe("what Save sends", () => {
 describe("a refusal's field", () => {
     it("names its network", () => {
         expect(socialNetworkOfField("socialLinks.instagram")).toBe("instagram");
-        expect(socialNetworkOfField("socialLinks.googleMaps")).toBe(
-            "googleMaps",
-        );
+        expect(socialNetworkOfField("socialLinks.telegram")).toBe("telegram");
     });
 
     it("is nothing for any other field", () => {
         expect(socialNetworkOfField("phone")).toBeNull();
         expect(socialNetworkOfField("socialLinks.myspace")).toBeNull();
+        // Google Maps is an address's map link now, not a network.
+        expect(socialNetworkOfField("socialLinks.googleMaps")).toBeNull();
         expect(socialNetworkOfField(undefined)).toBeNull();
     });
 });

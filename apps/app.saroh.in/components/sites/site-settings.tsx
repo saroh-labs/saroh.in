@@ -19,6 +19,7 @@ import {
     shareReadiness,
 } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import type { VisitedLocation } from "@/lib/stores/storefronts";
 
 import { AddressGroup } from "./settings/address-group";
 import { ContactSocialGroup } from "./settings/contact-social-group";
@@ -55,7 +56,16 @@ export function SiteSettings({
     tracking = null,
     contact = null,
     business = null,
+    locations = null,
+    canEditLocations = false,
 }: {
+    /**
+     * The locations customers visit, for the Address sheet to edit in
+     * place; null when they couldn't be read.
+     */
+    locations?: VisitedLocation[] | null;
+    /** May change a location (`store:write`). */
+    canEditLocations?: boolean;
     site: SiteDetail;
     /**
      * What the website shows of how to reach the business (DEC-125); null
@@ -137,6 +147,8 @@ export function SiteSettings({
                         view={contact}
                         business={business}
                         state={state}
+                        locations={locations}
+                        canEditLocations={canEditLocations}
                     />
                 ),
                 // Where the shop sells from (G11): only while it is open.

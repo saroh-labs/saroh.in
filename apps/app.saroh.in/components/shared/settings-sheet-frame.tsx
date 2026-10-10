@@ -31,6 +31,7 @@ export function SettingsSheetFrame({
     open,
     pending,
     saveOff = false,
+    doneOnly = false,
     onClose,
     onSubmit,
     children,
@@ -45,6 +46,11 @@ export function SettingsSheetFrame({
     pending: boolean;
     /** Save waits on something in the sheet, such as an upload. */
     saveOff?: boolean;
+    /**
+     * The sheet holds nothing of its own to save (a list whose rows each
+     * open their own edit): its foot is one Done, which closes it.
+     */
+    doneOnly?: boolean;
     onClose: () => void;
     onSubmit: FormEventHandler<HTMLFormElement>;
     children: ReactNode;
@@ -90,21 +96,33 @@ export function SettingsSheetFrame({
                     </div>
 
                     <SheetFooter className="mt-4 flex-row flex-wrap items-center gap-2 border-t border-border pt-4 sm:justify-start sm:space-x-0">
-                        <Button
-                            type="submit"
-                            variant="brand"
-                            disabled={pending || saveOff}
-                        >
-                            {pending ? "Saving…" : "Save"}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={pending}
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </Button>
+                        {doneOnly ? (
+                            <Button
+                                type="button"
+                                variant="brand"
+                                onClick={onClose}
+                            >
+                                Done
+                            </Button>
+                        ) : (
+                            <>
+                                <Button
+                                    type="submit"
+                                    variant="brand"
+                                    disabled={pending || saveOff}
+                                >
+                                    {pending ? "Saving…" : "Save"}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={onClose}
+                                >
+                                    Cancel
+                                </Button>
+                            </>
+                        )}
                     </SheetFooter>
                 </form>
             </SheetContent>

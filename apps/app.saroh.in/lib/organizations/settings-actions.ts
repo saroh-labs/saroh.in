@@ -47,6 +47,7 @@ export async function saveOrganizationSettings(
         if (
             input.socialLinks !== undefined ||
             input.siteShowsRegisteredAddress !== undefined ||
+            input.registeredAddressMapUrl !== undefined ||
             input.profile?.phone !== undefined ||
             input.profile?.contactEmail !== undefined ||
             input.registeredAddress !== undefined

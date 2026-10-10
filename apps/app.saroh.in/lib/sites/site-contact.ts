@@ -75,17 +75,20 @@ export const ADDRESS_SHEET = {
     description: "Where customers can find you.",
     fromLocations:
         "Your website shows the address of each location customers visit. A location with no counter never shows its address.",
-    changeLocation:
-        "To change one, open the location in Sell and edit its address.",
+    readOnly: "Your role can read these addresses but not change them.",
+    noAddress: "No address yet. Your website shows none for it.",
+    directionsOwn: "Get directions opens your Google Maps link.",
+    directionsSearch: "Get directions searches for this address.",
     noLocation:
-        "No location customers visit has an address, so your website shows none.",
+        "An address shows on your website once a location customers visit has one. You have none yet.",
     switchLabel: "Show your registered address",
     switchNote:
         "The address printed on your invoices. Leave this off if it is your home.",
     registeredMissing:
         "You haven't added a registered address yet, so nothing shows until you do.",
     whileLocations:
-        "Your registered address isn't shown while a location has one.",
+        "Your registered address isn't shown while a location customers visit has an address.",
+    mapLinkSaved: "Google Maps link saved. Get directions opens it now.",
 } as const;
 
 /** What saving the choice says. */

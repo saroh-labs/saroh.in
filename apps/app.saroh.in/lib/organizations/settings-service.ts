@@ -146,6 +146,12 @@ export interface OrganizationSettings {
      * older API: no.
      */
     siteShowsRegisteredAddress?: boolean;
+    /**
+     * The registered address's place on Google Maps (DEC-125), which Get
+     * directions opens while the website shows that address. Absent from
+     * an older API: none.
+     */
+    registeredAddressMapUrl?: string | null;
 }
 
 /**
@@ -168,6 +174,11 @@ export interface SiteContactPlace {
     name: string | null;
     /** Lines joined by "\n". */
     address: string;
+    /**
+     * The address's place on Google Maps, which Get directions opens; null
+     * or absent: a search for the address.
+     */
+    mapUrl?: string | null;
 }
 
 export interface SiteContactView {
@@ -213,6 +224,8 @@ export interface OrganizationSettingsInput {
     socialLinks?: Partial<Record<SocialNetwork, string>>;
     /** Show the registered address on the website (DEC-125). */
     siteShowsRegisteredAddress?: boolean;
+    /** Its Google Maps link, as typed; "" clears it. */
+    registeredAddressMapUrl?: string;
 }
 
 /** A refusal names the field it is about when the API says which. */

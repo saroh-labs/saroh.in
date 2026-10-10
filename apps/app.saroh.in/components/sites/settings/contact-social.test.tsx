@@ -40,6 +40,10 @@ const save = vi.fn();
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: (...args: unknown[]) => save(...args) as unknown,
 }));
+const updateStore = vi.fn();
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: (...args: unknown[]) => updateStore(...args) as unknown,
+}));
 const showError = vi.fn();
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -168,7 +172,7 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    for (const mock of [save, showError, showSuccess, refresh]) {
+    for (const mock of [save, updateStore, showError, showSuccess, refresh]) {
         mock.mockReset();
     }
 });
@@ -429,47 +433,248 @@ describe("editing in place", () => {
 });
 
 describe("the address on the website", () => {
-    it("says the locations supply it, and that the registered address waits", async () => {
-        draw(FULL, FULL_BUSINESS());
+    const INDIRANAGAR = {
+        id: "st_indira",
+        name: "Indiranagar",
+        address: "12th Main\nBengaluru",
+        mapUrl: null,
+    };
+    const KORAMANGALA = {
+        id: "st_kora",
+        name: "Koramangala",
+        address: null,
+        mapUrl: null,
+    };
+    const drawWith = (
+        locations: (typeof INDIRANAGAR | typeof KORAMANGALA)[] | null,
+        canEditLocations = true,
+        view = FULL,
+    ) =>
+        act(() =>
+            root.render(
+                <SiteSettings
+                    site={site}
+                    address={address}
+                    contact={view}
+                    business={FULL_BUSINESS()}
+                    locations={locations}
+                    canEditLocations={canEditLocations}
+                />,
+            ),
+        );
+    const box = () =>
+        sheet()?.querySelector<HTMLTextAreaElement>('[name="address"]') ?? null;
+    const typeArea = async (el: HTMLTextAreaElement | null, value: string) => {
+        if (!el) throw new Error("No field to type in");
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                Object.getPrototypeOf(el) as object,
+                "value",
+            )?.set?.call(el, value);
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+    };
+
+    it("lists each location customers visit, with an Edit for each, and no link away", async () => {
+        drawWith([INDIRANAGAR, KORAMANGALA]);
         await press(named("Edit address on your website"));
         expect(sheetName()).toBe("Address on your website");
         expect(sheet()?.textContent).toContain(
             "Your website shows the address of each location customers visit.",
         );
+        expect(sheet()?.textContent).toContain("12th Main, Bengaluru");
         expect(sheet()?.textContent).toContain(
-            "Indiranagar: 12th Main, Bengaluru",
+            "Get directions searches for this address.",
         );
         expect(sheet()?.textContent).toContain(
-            "Your registered address isn't shown while a location has one.",
+            "No address yet. Your website shows none for it.",
+        );
+        expect(
+            sheet()?.querySelector(
+                '[aria-label="Edit address of Indiranagar"]',
+            ),
+        ).not.toBeNull();
+        expect(
+            sheet()?.querySelector('[aria-label="Add address of Koramangala"]'),
+        ).not.toBeNull();
+        // Finished here: nothing sends the merchant to Sell.
+        expect(sheet()?.querySelector("a")).toBeNull();
+        expect(sheet()?.textContent).not.toContain("Open Locations");
+        // A list has nothing of its own to save.
+        expect(item("Done")).toBeDefined();
+        expect(item("Save")).toBeUndefined();
+        expect(sheet()?.querySelector('[role="switch"]')).toBeNull();
+    });
+
+    it("edits a location's address and Google Maps link in place, through the location's own save", async () => {
+        updateStore.mockResolvedValue({
+            ok: true,
+            data: {
+                id: "st_indira",
+                name: "Indiranagar",
+                address: "14 Hill Road\nBengaluru",
+                mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
+            },
+        });
+        drawWith([INDIRANAGAR, KORAMANGALA]);
+        await press(named("Edit address on your website"));
+        await press(
+            sheet()?.querySelector<HTMLButtonElement>(
+                '[aria-label="Edit address of Indiranagar"]',
+            ),
+        );
+        // The location's own fields, in the sheet that was opened.
+        expect(sheetName()).toBe("Indiranagar: address");
+        expect(window.location.pathname).toBe("/sites/site_rye/settings");
+        expect(box()?.value).toBe("12th Main\nBengaluru");
+
+        await typeArea(box(), "14 Hill Road\nBengaluru");
+        await type(input("mapUrl"), "maps.app.goo.gl/AbC123xyZ");
+        expect(sheet()?.textContent).toContain(
+            "Get directions opens maps.app.goo.gl/AbC123xyZ",
+        );
+        await press(item("Save"));
+
+        expect(updateStore).toHaveBeenCalledWith("st_indira", {
+            address: "14 Hill Road\nBengaluru",
+            mapUrl: "maps.app.goo.gl/AbC123xyZ",
+        });
+        expect(save).not.toHaveBeenCalled();
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Location address saved. Your website shows it now.",
+        );
+        expect(refresh).toHaveBeenCalled();
+        // Back in the list, which reads the save at once.
+        expect(sheetName()).toBe("Address on your website");
+        expect(sheet()?.textContent).toContain("14 Hill Road, Bengaluru");
+        expect(sheet()?.textContent).toContain(
+            "Get directions opens your Google Maps link.",
         );
     });
 
-    it("shows the registered address only when the owner turns it on", async () => {
+    it("keeps the edit open on a refusal, with what was typed", async () => {
+        updateStore.mockResolvedValue({
+            ok: false,
+            error: "You don't have access to change this location.",
+        });
+        drawWith([INDIRANAGAR]);
+        await press(named("Edit address on your website"));
+        await press(
+            sheet()?.querySelector<HTMLButtonElement>(
+                '[aria-label="Edit address of Indiranagar"]',
+            ),
+        );
+        await typeArea(box(), "14 Hill Road");
+        await press(item("Save"));
+        expect(sheetName()).toBe("Indiranagar: address");
+        expect(box()?.value).toBe("14 Hill Road");
+        expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
+            "You don't have access to change this location.",
+        );
+        expect(showSuccess).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("holds Save on a link that isn't Google Maps, and Cancel comes back to the list", async () => {
+        drawWith([INDIRANAGAR]);
+        await press(named("Edit address on your website"));
+        await press(
+            sheet()?.querySelector<HTMLButtonElement>(
+                '[aria-label="Edit address of Indiranagar"]',
+            ),
+        );
+        await type(input("mapUrl"), "https://evil.example/maps");
+        await press(item("Save"));
+        expect(updateStore).not.toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain(
+            "That isn't a Google Maps link.",
+        );
+        await press(item("Cancel"));
+        expect(sheetName()).toBe("Address on your website");
+        expect(sheet()?.textContent).toContain("12th Main, Bengaluru");
+    });
+
+    it("is read-only for someone who may not change a location, and says who can", async () => {
+        drawWith([INDIRANAGAR], false);
+        await press(named("Edit address on your website"));
+        expect(sheet()?.textContent).toContain("12th Main, Bengaluru");
+        expect(
+            sheet()?.querySelector(
+                '[aria-label="Edit address of Indiranagar"]',
+            ),
+        ).toBeNull();
+        expect(sheet()?.querySelector('[role="note"]')?.textContent).toContain(
+            "Your role can read these addresses but not change them. An owner or admin can change what your role reaches in Team.",
+        );
+    });
+
+    it("shows what the website shows, read-only, when the locations can't be read", async () => {
+        drawWith(null);
+        await press(named("Edit address on your website"));
+        expect(sheet()?.textContent).toContain("Indiranagar");
+        expect(sheet()?.textContent).toContain("12th Main, Bengaluru");
+        expect(
+            sheet()?.querySelector("button[aria-label^='Edit address of']"),
+        ).toBeNull();
+        expect(sheet()?.querySelector('[role="note"]')).not.toBeNull();
+    });
+
+    it("with no location customers visit, says so and offers the registered address", async () => {
         save.mockResolvedValue({
             ok: true,
             data: business({ siteShowsRegisteredAddress: true }),
         });
         draw(NOTHING, business());
         await press(named("Edit address on your website"));
+        expect(sheet()?.textContent).toContain(
+            "An address shows on your website once a location customers visit has one. You have none yet.",
+        );
+        expect(sheet()?.querySelector("a")?.getAttribute("href")).toBe(
+            "/commerce/locations",
+        );
         const toggle =
             sheet()?.querySelector<HTMLButtonElement>('[role="switch"]');
         expect(toggle?.getAttribute("aria-checked")).toBe("false");
         expect(sheet()?.textContent).toContain(
             "Leave this off if it is your home.",
         );
+        // The map link is the shown address's: asked once it is shown.
+        expect(input("registeredAddressMapUrl")).toBeNull();
         await press(toggle);
-        // None on file yet: it says nothing will show until there is.
         expect(sheet()?.textContent).toContain(
             "You haven't added a registered address yet",
         );
+        await type(input("registeredAddressMapUrl"), "g.page/rye-bakery");
         await press(item("Save"));
         expect(save).toHaveBeenCalledWith({
             siteShowsRegisteredAddress: true,
+            registeredAddressMapUrl: "g.page/rye-bakery",
         });
         expect(showSuccess).toHaveBeenCalledWith(
             "Your website shows your registered address now",
         );
         expect(sheet()).toBeNull();
+    });
+
+    it("says a refused map link under its field, and keeps the sheet open", async () => {
+        save.mockResolvedValue({
+            ok: false,
+            error: "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.",
+            field: "registeredAddressMapUrl",
+        });
+        draw(NOTHING, business({ siteShowsRegisteredAddress: true }));
+        await press(named("Edit address on your website"));
+        await type(input("registeredAddressMapUrl"), "g.page/rye-bakery");
+        await press(item("Save"));
+        expect(sheet()).not.toBeNull();
+        expect(input("registeredAddressMapUrl")?.value).toBe(
+            "g.page/rye-bakery",
+        );
+        expect(
+            input("registeredAddressMapUrl")?.getAttribute("aria-invalid"),
+        ).toBe("true");
     });
 
     it("sends nothing when the choice is left as it was", async () => {

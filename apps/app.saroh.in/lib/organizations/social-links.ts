@@ -22,7 +22,7 @@ export type SocialDraft = Record<SocialNetwork, string>;
 /** The row when nothing is linked. */
 export const NO_SOCIAL_LINKS = "None yet";
 
-/** "Instagram, WhatsApp, Google Maps", or "None yet". */
+/** "Instagram, WhatsApp, YouTube", or "None yet". */
 export function socialRowSummary(
     links: SocialLinks | null | undefined,
 ): string {

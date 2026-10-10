@@ -184,6 +184,14 @@ export function PlaceSection({
                         >
                             {address ?? <Absent>No address yet</Absent>}
                         </span>
+                        {address && store.mapUrl ? (
+                            <span
+                                data-testid="location-map-link-summary"
+                                className="block text-[12.5px] text-muted-foreground"
+                            >
+                                Get directions opens your Google Maps link
+                            </span>
+                        ) : null}
                     </Row>
                 ) : null}
                 {shop ? (
