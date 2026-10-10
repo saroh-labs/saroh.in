@@ -283,27 +283,25 @@ export function StockSheet({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span>MRP</span>
+                        <span>MRP (optional)</span>
                         <Input
                             value={draft.mrp}
                             onChange={(e) =>
                                 setDraft((d) => ({ ...d, mrp: e.target.value }))
                             }
                             inputMode="decimal"
-                            placeholder="Optional"
                         />
                     </label>
                 </div>
             ) : may.canWrite ? (
                 <label className="mt-4 flex max-w-[50%] flex-col gap-1.5">
-                    <span>MRP</span>
+                    <span>MRP (optional)</span>
                     <Input
                         value={draft.mrp}
                         onChange={(e) =>
                             setDraft((d) => ({ ...d, mrp: e.target.value }))
                         }
                         inputMode="decimal"
-                        placeholder="Optional"
                     />
                 </label>
             ) : null}

@@ -59,15 +59,7 @@ export function SectionCard({
     const creating = mode === "create";
     const dirty = !creating && (state?.dirty ?? false);
     const problem = state?.problem ?? "";
-    const chip = creating
-        ? k === "basics" || k === "visibility"
-            ? null
-            : "optional"
-        : dirty
-          ? problem
-              ? "bad"
-              : "unsaved"
-          : null;
+    const chip = creating ? null : dirty ? (problem ? "bad" : "unsaved") : null;
     const busy = saving.includes(k);
     const note = problem || (state?.note ?? SAVES[k]);
     const noteBad = !!problem || !!state?.noteIsError;
@@ -141,28 +133,17 @@ export function SectionCard({
     );
 }
 
-export function SectionChip({
-    kind,
-}: {
-    kind: "unsaved" | "bad" | "optional";
-}) {
+export function SectionChip({ kind }: { kind: "unsaved" | "bad" }) {
     return (
         <span
             className={cn(
-                "shrink-0 rounded-full px-[7px] py-0.5 text-[11px]",
-                kind === "optional"
-                    ? "border border-dashed border-border-strong font-medium text-muted-foreground"
-                    : "font-semibold uppercase tracking-[0.04em]",
+                "shrink-0 rounded-full px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
                 kind === "unsaved" &&
                     "bg-brand-subtle text-brand-subtle-foreground",
                 kind === "bad" && "bg-destructive-subtle text-destructive",
             )}
         >
-            {kind === "optional"
-                ? "Optional"
-                : kind === "bad"
-                  ? "Needs a fix"
-                  : "Unsaved"}
+            {kind === "bad" ? "Needs a fix" : "Unsaved"}
         </span>
     );
 }

@@ -264,13 +264,13 @@ export function ServicesListFields({
              * The section's own button, under the list (#207), kept apart
              * from each service's: it goes wherever the merchant points it.
              */}
-            <Field label="Button below the list">
+            <Field optional label="Button below the list">
                 <Input
                     value={c.cta?.label ?? ""}
                     onChange={(e) =>
                         patch({ cta: withCtaLabel(c.cta, e.target.value) })
                     }
-                    placeholder="Book now. Optional."
+                    placeholder="Book now."
                 />
             </Field>
             {c.cta?.label.trim() ? (
@@ -320,7 +320,7 @@ function PriceCardFields({
                     placeholder="In person, or by video"
                 />
             </Field>
-            <Field label="Under the button">
+            <Field optional label="Under the button">
                 <Textarea
                     value={c.followUpLine ?? ""}
                     onChange={(e) =>
@@ -328,7 +328,7 @@ function PriceCardFields({
                     }
                     rows={2}
                     maxLength={300}
-                    placeholder="Optional. What a follow-up costs, and how often."
+                    placeholder="What a follow-up costs, and how often."
                 />
             </Field>
             <Field label="What it includes">

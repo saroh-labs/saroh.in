@@ -150,7 +150,7 @@ export function AddContactDialog({
                             <Label htmlFor={ids.phone}>
                                 Phone{" "}
                                 <span className="font-normal text-muted-foreground">
-                                    optional
+                                    (optional)
                                 </span>
                             </Label>
                             <Input
@@ -164,7 +164,7 @@ export function AddContactDialog({
                             <Label htmlFor={ids.company}>
                                 Company{" "}
                                 <span className="font-normal text-muted-foreground">
-                                    optional
+                                    (optional)
                                 </span>
                             </Label>
                             <Input

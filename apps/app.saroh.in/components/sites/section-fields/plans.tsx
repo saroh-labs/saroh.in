@@ -44,14 +44,14 @@ export function PlansFields({
                     placeholder="Plans"
                 />
             </Field>
-            <Field label="A line under it">
+            <Field optional label="A line under it">
                 <Textarea
                     value={c.intro ?? ""}
                     onChange={(e) =>
                         patch({ intro: e.target.value || undefined })
                     }
                     rows={2}
-                    placeholder="Optional. No joining fee, cancel any time."
+                    placeholder="No joining fee, cancel any time."
                 />
             </Field>
 

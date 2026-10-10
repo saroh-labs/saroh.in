@@ -284,7 +284,7 @@ export function AddLeadDialog({
                                         <Label htmlFor={ids.phone}>
                                             Phone{" "}
                                             <span className="font-normal text-muted-foreground">
-                                                optional
+                                                (optional)
                                             </span>
                                         </Label>
                                         <Input
@@ -327,7 +327,7 @@ export function AddLeadDialog({
                             <Label htmlFor={ids.worth}>
                                 Worth{" "}
                                 <span className="font-normal text-muted-foreground">
-                                    optional
+                                    (optional)
                                 </span>
                             </Label>
                             <Input

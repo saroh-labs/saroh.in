@@ -135,14 +135,13 @@ function CancelDraft({
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
+                            Say why (optional)
                             <Input
                                 dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
                                 className="w-full"
                             />
                         </label>

@@ -239,7 +239,7 @@ export function PersonFields({
                 </>
             )}
 
-            <Field label="About them">
+            <Field optional label="About them">
                 <Textarea
                     value={c.bio ?? ""}
                     onChange={(e) =>
@@ -247,7 +247,7 @@ export function PersonFields({
                     }
                     rows={4}
                     maxLength={PERSON_BIO_MAX}
-                    placeholder="A few lines in their own words. Optional."
+                    placeholder="A few lines in their own words."
                 />
             </Field>
 

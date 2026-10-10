@@ -211,7 +211,7 @@ export function ProductGridFieldsView({
                 }
                 note="Beside the title, counted from the products shown: “3 of 5 available”."
             />
-            <Field label="A line under the products">
+            <Field optional label="A line under the products">
                 <Textarea
                     value={c.note ?? ""}
                     onChange={(e) =>
@@ -219,7 +219,7 @@ export function ProductGridFieldsView({
                     }
                     rows={2}
                     maxLength={400}
-                    placeholder="Optional. Baked this morning; what is gone usually goes before ten."
+                    placeholder="Baked this morning; what is gone usually goes before ten."
                 />
             </Field>
         </div>

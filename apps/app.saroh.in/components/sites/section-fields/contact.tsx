@@ -93,12 +93,12 @@ export function ContactFields({
                     placeholder="With country code, e.g. +91 98765 43210"
                 />
             </Field>
-            <Field label="Map link">
+            <Field optional label="Map link">
                 <Input
                     type="url"
                     value={c.mapUrl ?? ""}
                     onChange={set("mapUrl")}
-                    placeholder="Optional. Otherwise the map searches for the address."
+                    placeholder="Otherwise the map searches for the address."
                 />
             </Field>
         </div>

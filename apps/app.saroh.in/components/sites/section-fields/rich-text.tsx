@@ -109,7 +109,7 @@ export function RichTextFields({
                 onChange={(on) => patch({ partLabels: on ? true : undefined })}
                 note="Sets the text's smaller headings as small capitals, to name the parts of a longer piece."
             />
-            <Field label="Box after the text">
+            <Field optional label="Box after the text">
                 <Textarea
                     value={c.callout?.text ?? ""}
                     onChange={(e) => {
@@ -123,7 +123,7 @@ export function RichTextFields({
                         });
                     }}
                     rows={2}
-                    placeholder="Optional. A result or the one thing to remember, set in a box."
+                    placeholder="A result or the one thing to remember, set in a box."
                 />
             </Field>
             {c.callout?.text.trim() ? (

@@ -222,7 +222,7 @@ export function CtaActionFields({
                             inputMode="email"
                         />
                     </Field>
-                    <Field label="Subject">
+                    <Field optional label="Subject">
                         <Input
                             value={action.subject ?? ""}
                             onChange={(e) =>
@@ -231,7 +231,6 @@ export function CtaActionFields({
                                     subject: e.target.value || undefined,
                                 })
                             }
-                            placeholder="Optional"
                         />
                     </Field>
                 </>

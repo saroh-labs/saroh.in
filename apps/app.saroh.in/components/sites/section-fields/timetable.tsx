@@ -57,14 +57,14 @@ export function TimetableFields({
                     placeholder="This week"
                 />
             </Field>
-            <Field label="A line under it">
+            <Field optional label="A line under it">
                 <Textarea
                     value={c.intro ?? ""}
                     onChange={(e) =>
                         patch({ intro: e.target.value || undefined })
                     }
                     rows={2}
-                    placeholder="Optional. Book a class from the timetable."
+                    placeholder="Book a class from the timetable."
                 />
             </Field>
 

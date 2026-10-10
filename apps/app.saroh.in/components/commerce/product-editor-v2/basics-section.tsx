@@ -161,9 +161,7 @@ export function BasicsSection({
 
     return (
         <SectionCard k="basics" title="Basics">
-            <FieldLabel htmlFor="pe-name" required={creating}>
-                Name
-            </FieldLabel>
+            <FieldLabel htmlFor="pe-name">Name</FieldLabel>
             <Input
                 id="pe-name"
                 {...form.register("name")}
@@ -251,9 +249,7 @@ export function BasicsSection({
 
             <div className="flex flex-wrap gap-3.5">
                 <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-price" required={creating}>
-                        Price
-                    </FieldLabel>
+                    <FieldLabel htmlFor="pe-price">Price</FieldLabel>
                     <MoneyBox symbol={symbol}>
                         <Input
                             id="pe-price"

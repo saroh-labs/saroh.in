@@ -714,7 +714,7 @@ function SecretField({
                 {label}{" "}
                 {optional ? (
                     <span className="font-normal text-muted-foreground">
-                        optional
+                        (optional)
                     </span>
                 ) : null}
             </Label>
