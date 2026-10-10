@@ -136,9 +136,7 @@ export function OverviewDescription({
                             }}
                         />
                     ) : (
-                        <p className="text-muted-foreground">
-                            No description yet.
-                        </p>
+                        <EmptyState size="inline" title="No description yet" />
                     )}
                     {product.keyPoints.length > 0 ? (
                         <ul className="mt-2.5 list-disc pl-5 text-neutral-700 dark:text-muted-foreground">

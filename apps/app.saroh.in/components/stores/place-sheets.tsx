@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import type { FormEventHandler, ReactNode } from "react";
@@ -209,11 +210,7 @@ export function PlaceKindSheet({
                     { value: "ONLINE", label: KIND_ANSWER.ONLINE },
                 ]}
             />
-            {error ? (
-                <p id="location-kind-error" role="alert" className={PROBLEM}>
-                    {error}
-                </p>
-            ) : null}
+            <Refusal id="location-kind-error">{error}</Refusal>
             <Note id="location-kind-note">
                 {KIND_FOLLOWS[kind]}
                 {before === "SHOP" && kind === "ONLINE"

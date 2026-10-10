@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
@@ -249,10 +250,10 @@ export function WhoTakesIt({
     return (
         <Section title="Who takes it">
             {staff === null ? (
-                <p role="alert" className={cn(HELP, "mt-0")}>
-                    Who takes it couldn&apos;t be loaded. Saving leaves it as it
-                    is.
-                </p>
+                <FailedRead
+                    things="who takes it"
+                    reassurance="Saving leaves it as it is."
+                />
             ) : people.length ? (
                 <>
                     <span id={id} className="sr-only">

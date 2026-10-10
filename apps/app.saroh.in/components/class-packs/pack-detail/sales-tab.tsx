@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import {
     EmptyState,
     FailedState,
@@ -14,7 +15,6 @@ import type {
     SaleRow,
 } from "@/lib/class-packs/pack-sales";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
-import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 
 const CARD =
@@ -122,10 +122,7 @@ export function SalesTab({
                             </div>
                         ))
                     ) : (
-                        <Notice role="alert" layout="banner" className="m-0">
-                            The price changes couldn&apos;t be loaded. Try again
-                            in a minute.
-                        </Notice>
+                        <FailedRead things="the price changes" />
                     )}
                     {history?.note ? (
                         <div className="mt-1.5 text-[12px] text-muted-foreground">

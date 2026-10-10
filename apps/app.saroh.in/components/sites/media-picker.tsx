@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ImagePlus } from "lucide-react";
@@ -436,11 +437,9 @@ export function MediaPicker({
                     label="Upload progress"
                 />
             ) : null}
-            {error ? (
-                <p role="alert" className="text-xs text-destructive">
-                    {error}
-                </p>
-            ) : null}
+            {/* Why the upload didn't go through: calm when the role
+                refused it, the error notice for anything else. */}
+            <Refusal>{error}</Refusal>
         </div>
     );
 }

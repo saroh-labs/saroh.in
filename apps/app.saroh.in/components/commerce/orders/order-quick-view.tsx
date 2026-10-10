@@ -1,5 +1,6 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -303,13 +304,10 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                 </Notice>
             ))}
             {order.attention === null ? (
-                <Notice role="status">
-                    <strong className="text-foreground">
-                        Needs attention: not available.
-                    </strong>{" "}
-                    It couldn&apos;t be read, so check with the customer before
-                    it goes out.
-                </Notice>
+                <PartialRead
+                    things="what needs attention"
+                    so="Check with the customer before it goes out."
+                />
             ) : null}
 
             <section

@@ -1,6 +1,8 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -195,12 +197,26 @@ export function SkuTab({
                     <span>Today</span>
                     <span>Suggested</span>
                 </div>
-                {rows.length === 0 ? (
-                    <p className="px-4 py-3 text-[12.5px] text-muted-foreground">
-                        {preview
-                            ? "No products yet — the first one gets the pattern."
-                            : "Couldn't load the preview. The pattern still saves."}
-                    </p>
+                {!preview ? (
+                    // The preview is this tab's own read, so Try again asks
+                    // for it again: refreshing the page would not.
+                    <FailedRead
+                        className="px-4 py-3"
+                        things="the preview"
+                        reassurance="The pattern still saves."
+                        onRetry={() => {
+                            void previewSkuPattern(pattern.trim()).then((p) => {
+                                if (p) setPreview(p);
+                            });
+                        }}
+                    />
+                ) : rows.length === 0 ? (
+                    <EmptyState
+                        size="inline"
+                        className="px-4 py-3"
+                        title="No products yet"
+                        description="The first one gets the pattern."
+                    />
                 ) : (
                     rows.slice(0, SHOWN).map((r, i) => (
                         <div

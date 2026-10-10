@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Popover,
@@ -183,9 +184,13 @@ export function SettingsSearch({
                         </button>
                     ))}
                     {hits.length === 0 ? (
-                        <p className="p-2.5 text-[13px] text-muted-foreground">
-                            Nothing called that in Settings.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            kind="no-results"
+                            things="settings"
+                            className="p-2.5"
+                            title="Nothing called that in Settings"
+                        />
                     ) : null}
                 </div>
             </PopoverContent>

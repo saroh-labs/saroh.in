@@ -7,6 +7,7 @@ import {
 } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -566,10 +567,11 @@ function MovePanel({
                     Finding free times…
                 </p>
             ) : slots.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    Nothing free in the next week. Open more hours on the
-                    calendar, or move it from the full booking.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="Nothing free in the next week"
+                    description="Open more hours on the calendar, or move it from the full booking."
+                />
             ) : (
                 <div className="flex flex-wrap gap-1.5">
                     {slots.map((s) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
 import {
     SOCIAL_INPUT_MAX,
@@ -225,14 +226,7 @@ export function SocialLinksSheet({
                     );
                 })}
             </div>
-            {refusal ? (
-                <p
-                    role="alert"
-                    className="text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    {refusal}
-                </p>
-            ) : null}
+            <Refusal>{refusal}</Refusal>
         </FormSheet>
     );
 }

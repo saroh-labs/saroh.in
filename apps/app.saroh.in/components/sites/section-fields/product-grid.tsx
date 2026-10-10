@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 
 import { resolveVariant } from "@saroh/block-contract";
@@ -268,13 +269,16 @@ function CollectionField({
     if (collections.length === 0) {
         return (
             <Field label="Collection">
-                <p className="text-sm text-muted-foreground">
-                    No collections yet.{" "}
-                    <TextLink href="/commerce/products?tab=collections">
-                        Make one in Sell › Products
-                    </TextLink>
-                    , then choose it here.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No collections yet"
+                    description="Make one in Sell › Products, then choose it here."
+                    action={
+                        <TextLink href="/commerce/products?tab=collections">
+                            New collection
+                        </TextLink>
+                    }
+                />
             </Field>
         );
     }
@@ -362,13 +366,16 @@ function PickedField({
     if (catalogue.products.length === 0 && productIds.length === 0) {
         return (
             <Field label="Products">
-                <p className="text-sm text-muted-foreground">
-                    No products yet.{" "}
-                    <TextLink href="/commerce/products">
-                        Add one in Sell › Products
-                    </TextLink>
-                    , then pick it here.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No products yet"
+                    description="Add one in Sell › Products, then pick it here."
+                    action={
+                        <TextLink href="/commerce/products">
+                            New product
+                        </TextLink>
+                    }
+                />
             </Field>
         );
     }

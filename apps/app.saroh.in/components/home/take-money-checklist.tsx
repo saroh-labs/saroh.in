@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { useCanChangePlan } from "@/components/billing/plan-way";
 import { PlanAsides, readyRows } from "@/components/settings/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist";
 import type { ReadyChecklist } from "@/lib/settings/ready";
@@ -89,6 +90,8 @@ export function TakeMoneyChecklist({
         () => isHidden(businessId),
         () => false,
     );
+    // A step that is the way to another plan is a plan prompt.
+    const canChangePlan = useCanChangePlan();
     const place = takeMoneyPlace(list, hidden);
     // Hidden, the foot keeps the way back. Finished, the top has the last
     // word. Otherwise each slot draws only its own.
@@ -104,7 +107,7 @@ export function TakeMoneyChecklist({
         <SetupChecklist
             name="home"
             {...checklistWords(list)}
-            rows={readyRows(list.steps)}
+            rows={readyRows(list.steps, canChangePlan)}
             hide={{
                 hidden,
                 onHide: () => setHidden(businessId, true),

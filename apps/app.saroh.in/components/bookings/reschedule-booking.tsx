@@ -2,6 +2,7 @@
 
 import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -130,11 +131,12 @@ export function RescheduleBooking({
                     Finding open times…
                 </p>
             ) : byDay.length === 0 ? (
-                <p className="py-6 text-sm text-muted-foreground">
-                    No open times in the next {weeks} weeks. Opening more hours
-                    on this service, in Services → availability, adds times
-                    here.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="py-6"
+                    title={`No open times in the next ${weeks} weeks`}
+                    description="Opening more hours for this service, in Bookings › Availability, adds times here."
+                />
             ) : (
                 <div className="grid gap-4">
                     {byDay.map(([day, daySlots]) => (

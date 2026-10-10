@@ -104,8 +104,23 @@ export function payOptions(input: {
      * the counter ways are the choices (R33). Absent: yes.
      */
     online?: boolean;
+    /**
+     * May record a payment with the order (the location's `takePayments`).
+     * Someone who takes orders at a location and not its money (a location
+     * Admin, Manager or Editor, DEC-106) is offered the one way with no
+     * money in it: the API refuses the rest. Absent: yes.
+     */
+    money?: boolean;
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);
+    const later = {
+        key: "LATER" as const,
+        label: "Pay on collection",
+        off: goesToAddress(input.way)
+            ? "Deliveries are paid before they go"
+            : null,
+    };
+    if (input.money === false) return [later];
     return [
         // One word each (UX-078); where it's taken is the note's to say.
         { key: "CASH", label: METHOD_WORD.CASH, off: null },
@@ -124,15 +139,30 @@ export function payOptions(input: {
                             : null,
                   },
               ]),
-        {
-            key: "LATER",
-            label: "Pay on collection",
-            off: goesToAddress(input.way)
-                ? "Deliveries are paid before they go"
-                : null,
-        },
+        later,
     ];
 }
+
+/**
+ * The chip in force: the one chosen, unless it went off (a delivery
+ * chosen, the phone removed) or isn't offered to this person. Then, as the
+ * design does, pay later hands over to card and anything else to cash,
+ * where those are offered. Where they aren't, the off chip stays and its
+ * reason stops the button.
+ */
+export function payInForce(
+    options: readonly { key: NewOrderPay; off: string | null }[],
+    chosen: NewOrderPay,
+): NewOrderPay {
+    const chip = options.find((o) => o.key === chosen);
+    if (!chip) return options[0]?.key ?? chosen;
+    if (!chip.off) return chosen;
+    const next = chosen === "LATER" ? "CARD" : "CASH";
+    return options.some((o) => o.key === next) ? next : chosen;
+}
+
+/** Why only one way to pay is offered, said under it. */
+export const NO_PAYMENTS_HERE = "Your role can't record payments.";
 
 /**
  * Whether "Handed over now" applies (UX-059): paid at the counter, now,
@@ -153,7 +183,12 @@ export function payNote(
     pay: NewOrderPay,
     total: string,
     reach: string | null,
+    /** May record a payment with the order. Absent: yes. */
+    money = true,
 ): string {
+    if (!money) {
+        return `Nothing taken now. It shows as unpaid until they pay at the counter. ${NO_PAYMENTS_HERE}`;
+    }
     switch (pay) {
         case "CASH":
             return "Paid now. It goes in the till, not a payout.";

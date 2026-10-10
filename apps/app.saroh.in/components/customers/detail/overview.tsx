@@ -1,7 +1,9 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -323,16 +325,16 @@ function ClassesLeft({
                         </Link>
                     ))}
                     {!m && !packs.length ? (
-                        <p className="mt-2 text-pretty text-[13px] text-muted-foreground">
-                            No membership or packs. Classes are paid one at a
-                            time until they buy one.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="mt-2"
+                            title="No membership or packs"
+                            description="Classes are paid one at a time until they buy one."
+                        />
                     ) : null}
                 </>
             ) : (
-                <p className="mt-2 text-[13px] text-muted-foreground">
-                    Classes left couldn&apos;t be read just now.
-                </p>
+                <FailedRead className="mt-2" things="classes left" />
             )}
         </section>
     );
@@ -362,9 +364,7 @@ function NextBooking({
         <section className={CARD} aria-label="Next booking">
             <div className={LABEL}>Next booking</div>
             {d.bookings === null ? (
-                <p className="mt-1.5 text-[13px] text-muted-foreground">
-                    Bookings couldn&apos;t be read just now.
-                </p>
+                <FailedRead className="mt-1.5" things="bookings" />
             ) : (
                 <>
                     <div className="mt-1.5 text-[15px] font-semibold">

@@ -1,8 +1,8 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
@@ -85,10 +85,10 @@ export function CollectionsPanel({
     if (collections === null) {
         return (
             <>
-                <PartialNotice>
-                    Collections couldn&apos;t be read just now, so they
-                    aren&apos;t shown here. The products below are current.
-                </PartialNotice>
+                <PartialRead
+                    things="collections"
+                    so="The products below are current."
+                />
                 {host}
             </>
         );

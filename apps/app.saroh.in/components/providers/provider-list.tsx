@@ -1,10 +1,7 @@
 "use client";
 
-import {
-    EmptyState,
-    PartialNotice,
-    ProviderDisconnectedState,
-} from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { EmptyState, ProviderDisconnectedState } from "@saroh/ui/data-state";
 import { useId } from "react";
 
 import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
@@ -15,7 +12,6 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
-import { TryAgainLink } from "@/components/shared/failed-read";
 import { BookingEmailsBlock } from "./booking-emails-block";
 import { DomainsRowView, ProviderRowView } from "./provider-row";
 
@@ -54,10 +50,10 @@ export function ProviderList({
     return (
         <div className="space-y-5">
             {view.unread.length > 0 ? (
-                <PartialNotice action={<TryAgainLink />}>
-                    Your {view.unread.map((k) => UNREAD[k]).join(" and ")}{" "}
-                    couldn&apos;t be loaded, so they are not listed here.
-                </PartialNotice>
+                <PartialRead
+                    things={`your ${view.unread.map((k) => UNREAD[k]).join(" and ")}`}
+                    so="They are not listed here."
+                />
             ) : null}
 
             {showConnected ? (

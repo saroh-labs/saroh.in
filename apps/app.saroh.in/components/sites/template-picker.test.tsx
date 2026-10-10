@@ -307,7 +307,9 @@ describe("the template picker (U12)", () => {
 describe("with no templates to choose from", () => {
     it("says a failed catalogue, offers a retry, and still creates the site", async () => {
         render({ templates: null });
-        expect(host.textContent).toContain("The templates couldn't be loaded.");
+        expect(host.textContent).toContain(
+            "Couldn't load the templates. You can still create the site.",
+        );
         await click(button("Try again"));
         expect(refresh).toHaveBeenCalled();
         await submit();

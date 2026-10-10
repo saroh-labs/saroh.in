@@ -314,10 +314,11 @@ function UnlinkedItem({
                         )}
                     </div>
                 ) : (
-                    <p className="text-muted-foreground">
-                        No contact holds their email yet. They get one the next
-                        time they pay.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No contact holds their email yet"
+                        description="They get one the next time they pay."
+                    />
                 )}
             </div>
         </li>

@@ -1,6 +1,8 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -28,7 +30,8 @@ export function LibraryPanel({
     const [items, setItems] = useState<LibraryItem[] | null | "loading">(
         "loading",
     );
-    // Read once, when the panel opens.
+    // Read when the panel opens, and again on Try again.
+    const [attempt, setAttempt] = useState(0);
     useEffect(() => {
         let live = true;
         void listLibrary().then((list) => {
@@ -37,7 +40,7 @@ export function LibraryPanel({
         return () => {
             live = false;
         };
-    }, []);
+    }, [attempt]);
     return (
         <div className="mt-3 rounded-[10px] bg-muted/50 p-3">
             <div className="mb-2.5 flex items-center gap-2.5">
@@ -56,14 +59,20 @@ export function LibraryPanel({
                     <Skeleton aria-hidden className="h-16 w-20" />
                 </div>
             ) : items === null ? (
-                <p role="alert" className="text-[12px] text-destructive">
-                    Couldn&apos;t load your photos. Close this and try again, or
-                    upload one.
-                </p>
+                <FailedRead
+                    things="your photos"
+                    reassurance="You can still upload one."
+                    onRetry={() => {
+                        setItems("loading");
+                        setAttempt((n) => n + 1);
+                    }}
+                />
             ) : items.length === 0 ? (
-                <p className="text-[12px] text-muted-foreground">
-                    No photos in your library yet — upload one.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No photos in your library yet"
+                    description="Upload one."
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
                     {items.map((item) => {

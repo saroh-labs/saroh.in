@@ -148,7 +148,7 @@ describe("the roster, read first", () => {
     it("one line of explanation, then each person as a row: name, email, role", () => {
         draw({ ...full, canManage: false, canInvite: false });
         expect(host.textContent).toContain(
-            "Who can see Hill Road's products and orders, and move its orders along. Everyone here is also on your team, under Team.",
+            "Who can see Hill Road's products and orders, and move its orders along. An Admin, Manager or Editor can also take orders here and change its name and description. Everyone here is also on your team, under Team.",
         );
         expect(rows("location-people")).toEqual([
             "Asha Raoasha.rao@example.comOwner",
@@ -322,7 +322,7 @@ describe("the tab's other states", () => {
         draw({ ...full, members: [owner], invitations: [] });
         expect(host.textContent).toContain("No one else works here yet");
         expect(host.textContent).toContain(
-            "Asha Rao (asha.rao@example.com) owns Hill Road. Invite someone to see its products and orders, and move its orders along.",
+            "Asha Rao (asha.rao@example.com) owns Hill Road. Invite someone to see its products and orders, and move its orders along. With a role above Viewer they can take orders here too.",
         );
         expect(
             host.querySelector('[data-testid="location-people"]'),

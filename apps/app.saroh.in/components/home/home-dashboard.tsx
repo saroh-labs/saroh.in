@@ -1,9 +1,6 @@
+import { PartialRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
-import {
-    EmptyState,
-    PartialNotice,
-    PermissionDeniedState,
-} from "@saroh/ui/data-state";
+import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
 
@@ -110,10 +107,12 @@ export function HomeDashboard({
                 "something went wrong" would not tell them whether the thing
                 they came to check is the thing that is missing. */}
             {home.unavailable.length > 0 ? (
-                <PartialNotice>
-                    {formatList(home.unavailable.map((part) => part.label))}{" "}
-                    could not be loaded, so this is not the whole picture.
-                </PartialNotice>
+                <PartialRead
+                    things={formatList(
+                        home.unavailable.map((part) => part.label),
+                    )}
+                    so="This is not the whole picture."
+                />
             ) : null}
 
             {/* The design's row: the work column, and beside it This week

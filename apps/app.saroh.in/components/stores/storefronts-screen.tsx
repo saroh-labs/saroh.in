@@ -14,6 +14,7 @@ import { SettingsColumns } from "@/components/shared/settings-columns";
 import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
+import { updateStore } from "@/lib/stores/actions";
 import { newStorefrontHref } from "@/lib/stores/links";
 import type { LocationDetails } from "@/lib/stores/location-details";
 import type { LocationTab } from "@/lib/stores/location-readiness";
@@ -71,10 +72,16 @@ export function StorefrontsScreen({
     site,
     canCreate,
     canEdit,
+    canUploadLogo = true,
     canClose,
     canLinkCustomers = false,
     notTakingOrders = [],
 }: {
+    /**
+     * May add an image to the library (`media:write`): a logo upload is
+     * offered only then. Absent: yes, and the API decides.
+     */
+    canUploadLogo?: boolean;
     businessName: string;
     storefronts: StorefrontSummary[];
     /** `null` when the chosen storefront could not be read. */
@@ -175,6 +182,7 @@ export function StorefrontsScreen({
                             businessName={businessName}
                             site={site}
                             canEdit={canEdit}
+                            canUploadLogo={canUploadLogo}
                             canClose={canClose}
                             canLinkCustomers={canEdit && canLinkCustomers}
                             notTakingOrders={notTakingOrders.includes(
@@ -196,6 +204,18 @@ export function StorefrontsScreen({
     );
 }
 
+/**
+ * Above the page for someone who may change the location's name and
+ * description (and its logo, with a role that adds images) and nothing
+ * else here: a location Admin, Manager or Editor.
+ */
+export function aboutOnlyNote(canUploadLogo: boolean): string {
+    const what = canUploadLogo
+        ? "name, description and logo"
+        : "name and description";
+    return `You can change this location's ${what}. Your role can read the rest but not change it.`;
+}
+
 function StorefrontDetail({
     store: initial,
     details,
@@ -203,11 +223,14 @@ function StorefrontDetail({
     businessName,
     site,
     canEdit,
+    canUploadLogo,
     canClose,
     canLinkCustomers,
     notTakingOrders,
     beside,
 }: {
+    /** May add an image to the library (`media:write`). */
+    canUploadLogo: boolean;
     store: StorefrontSettings;
     details: LocationDetails | undefined;
     people: LocationPeople | null;
@@ -257,6 +280,33 @@ function StorefrontDetail({
         });
     };
 
+    // What the location's own read says this person may change here: its
+    // name, description and logo, for a location Admin, Manager or Editor
+    // the business's settings route refuses.
+    const canEditAbout = !canEdit && details?.may?.edit === true;
+    /** The name, saved through the location's own route (`PUT /stores/:id`). */
+    const rename = (
+        name: string,
+        description: string | null,
+        said: string,
+        onSaved?: () => void,
+    ) => {
+        startTransition(async () => {
+            const res = await runAction(() =>
+                updateStore(store.id, { name, description }),
+            );
+            if (!res) return;
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            setStore((s) => ({ ...s, name }));
+            onSaved?.();
+            showSuccess(said);
+            router.refresh();
+        });
+    };
+
     // The open tab lives in the address (`?section=delivery`), as Settings ›
     // Business keeps its own, so a link opens it and Back returns to the
     // last one. Customers shows only where the API sends its setting; Pause
@@ -284,6 +334,7 @@ function StorefrontDetail({
         (which) =>
             placeSheetToOpen(which, {
                 canEdit,
+                canEditAbout,
                 kind: store.kind,
                 hasDetails: Boolean(details),
             }),
@@ -312,7 +363,15 @@ function StorefrontDetail({
         setJumps((n) => n + 1);
     };
 
-    const shared = { store, canEdit, pending, save, setStore, goTo };
+    const shared = {
+        store,
+        canEdit,
+        canEditAbout,
+        pending,
+        save,
+        setStore,
+        goTo,
+    };
 
     const readiness = locationReadiness(store, site, { notTakingOrders });
 
@@ -339,7 +398,13 @@ function StorefrontDetail({
                         {notTakingOrders ? (
                             <PausedNote>{pausedWords("location")}</PausedNote>
                         ) : null}
-                        {!canEdit ? <ReadOnlyNote className="mb-0" /> : null}
+                        {!canEdit ? (
+                            <ReadOnlyNote className="mb-0">
+                                {canEditAbout
+                                    ? aboutOnlyNote(canUploadLogo)
+                                    : undefined}
+                            </ReadOnlyNote>
+                        ) : null}
                     </>
                 ) : undefined
             }
@@ -370,6 +435,8 @@ function StorefrontDetail({
                         {...shared}
                         details={details}
                         sheets={sheets}
+                        rename={rename}
+                        canUploadLogo={canUploadLogo}
                     />
                 ) : null}
                 {tab === "payments" ? <PaymentsSection {...shared} /> : null}

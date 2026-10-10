@@ -20,6 +20,7 @@ import {
     clashText,
     EMPTY_ADDRESS,
     goesToAddress,
+    payInForce,
     payOptions,
     reachOf,
     sheetProblem,
@@ -31,6 +32,8 @@ import type {
 } from "@/lib/orders/new-order-service";
 import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
+
+const NOWHERE: readonly string[] = [];
 
 /** A typed amount off ("50", "49.50"); anything else is a code. */
 const AMOUNT = /^\d+(\.\d{1,2})?$/;
@@ -47,8 +50,14 @@ export function useNewOrder({
     online = true,
     canSearch,
     initialPick = null,
+    noMoneyAt = NOWHERE,
 }: {
     initialStoreId: string;
+    /**
+     * Locations where this person takes orders and not their money (a
+     * location role, DEC-106): there it is paid on collection.
+     */
+    noMoneyAt?: readonly string[];
     /** May make a pay link (`order:create`, B16). */
     canLink: boolean;
     /** The plan takes payment online (R33); else no link is offered. */
@@ -114,6 +123,8 @@ export function useNewOrder({
         ),
     ).sort();
     const linesKey = `${storeId}|${productIds.join(",")}`;
+    // Try again, for a read of the ways that failed: asked again as it is.
+    const [linesRetry, setLinesRetry] = useState(0);
     useEffect(() => {
         let live = true;
         const [store = "", ids = ""] = linesKey.split("|");
@@ -123,7 +134,7 @@ export function useNewOrder({
         return () => {
             live = false;
         };
-    }, [linesKey]);
+    }, [linesKey, linesRetry]);
     const linesNow = linesRead?.key === linesKey ? linesRead : null;
     const ways = linesNow?.read?.ways ?? [];
     const way = ways.some((w) => w.type === chosenWay)
@@ -175,19 +186,17 @@ export function useNewOrder({
         typedOff && !AMOUNT.test(typedOff) ? typedOff.toUpperCase() : "";
     const total = Math.max(0, subtotal + tax + fee - off);
 
+    const money = !noMoneyAt.includes(storeId);
     const options = payOptions({
         pick,
         way,
         canLink: canLink && !!data?.takesPayments,
         online,
+        money,
     });
     // A chip that went off (a delivery chosen, the phone removed) hands
     // over to one that isn't, as the design does: pay later → card.
-    const pay: NewOrderPay = options.find((o) => o.key === chosenPay)?.off
-        ? chosenPay === "LATER"
-            ? "CARD"
-            : "CASH"
-        : chosenPay;
+    const pay: NewOrderPay = payInForce(options, chosenPay);
     const change = cashChange(given, total);
     // Null where it doesn't apply: a delivery, a link, pay later.
     const handedOver = canHandOver(pay, way) ? handedOverChoice : null;
@@ -223,12 +232,17 @@ export function useNewOrder({
         ways,
         waysLoading: !linesNow,
         waysFailed: !!linesNow && linesNow.read === null,
+        retryWays: () => {
+            setLinesRead(null);
+            setLinesRetry((n) => n + 1);
+        },
         way,
         setWay,
         address,
         setAddress,
         options,
         pay,
+        money,
         setPay,
         given,
         setGiven,

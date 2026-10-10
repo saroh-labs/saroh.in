@@ -34,10 +34,16 @@ import { PlanAsides, readyRows } from "./ready-rows";
 export function ReadyChecklist({
     list,
     businessId,
+    canChangePlan = true,
 }: {
     list: Checklist;
     /** What the finished state is remembered by, in this browser. */
     businessId?: string;
+    /**
+     * Whether the reader may change the plan (`mayChangePlan`): a step
+     * that is the way to another plan is offered only then.
+     */
+    canChangePlan?: boolean;
 }) {
     if (!readyHasCard(list)) return null;
     const extras = (list.extras ?? []).filter((e) => !e.done);
@@ -63,7 +69,7 @@ export function ReadyChecklist({
             <SetupChecklist
                 name="business"
                 {...checklistWords(list)}
-                rows={readyRows(list.steps)}
+                rows={readyRows(list.steps, canChangePlan)}
                 foldKey={businessId ? `business:${businessId}` : undefined}
             >
                 {finished ? null : (

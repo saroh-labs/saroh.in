@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -240,9 +241,11 @@ export function OptionSheet({
                     Values
                 </p>
                 {kept.length + fresh.length === 0 ? (
-                    <p className="text-[12.5px] text-muted-foreground">
-                        No values yet. Add the ones your variants pick from.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No values yet"
+                        description="Add the ones your variants pick from."
+                    />
                 ) : (
                     <ul
                         aria-labelledby={`${id}-values`}

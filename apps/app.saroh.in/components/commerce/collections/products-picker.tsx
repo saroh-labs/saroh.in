@@ -14,7 +14,6 @@ import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
-import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * A hand-picked collection's products (#524): the ones picked, in the
@@ -211,11 +210,19 @@ export function ProductsPicker({
                                 Looking…
                             </p>
                         ) : found.items.length === 0 ? (
-                            <p className="text-[12px] text-muted-foreground">
-                                {q.trim()
-                                    ? noMatchLine("products", q)
-                                    : "No products yet."}
-                            </p>
+                            q.trim() ? (
+                                <EmptyState
+                                    size="inline"
+                                    kind="no-results"
+                                    things="products"
+                                    query={q}
+                                />
+                            ) : (
+                                <EmptyState
+                                    size="inline"
+                                    title="No products yet"
+                                />
+                            )
                         ) : (
                             <div className="flex flex-col gap-1.5">
                                 {found.items.map((p) => {

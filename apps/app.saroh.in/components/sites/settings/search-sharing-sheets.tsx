@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { ShareCards } from "@saroh/ui/share-cards";
@@ -206,9 +207,11 @@ export function ShareImageSheet({
                             Remove image
                         </Button>
                     ) : (
-                        <p className="text-muted-foreground">
-                            None yet. 1200×630 works everywhere.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            title="No image yet"
+                            description="1200×630 works everywhere."
+                        />
                     )}
                 </div>
             </div>

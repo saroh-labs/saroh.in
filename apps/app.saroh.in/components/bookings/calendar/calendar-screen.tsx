@@ -1,9 +1,10 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
-import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
@@ -604,10 +605,11 @@ export function CalendarScreen({
                 </div>
                 <Legend classes={hasClasses} />
                 {staff === null ? (
-                    <PartialNotice className="mb-3">
-                        Hours and time off could not be loaded, so free times
-                        aren&apos;t shown. The bookings below are complete.
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things="hours and time off"
+                        so="Free times aren't shown. The bookings below are complete."
+                    />
                 ) : null}
 
                 {staff !== null &&

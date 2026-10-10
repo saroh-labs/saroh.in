@@ -1,4 +1,4 @@
-import { PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -34,11 +34,12 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
     return (
         <div className="grid min-w-0 gap-5">
             {failed ? (
-                <PartialNotice>
-                    {formatList(home.unavailable.map((part) => part.label))}{" "}
-                    could not be loaded, so this may not be everything sent to
-                    you.
-                </PartialNotice>
+                <PartialRead
+                    things={formatList(
+                        home.unavailable.map((part) => part.label),
+                    )}
+                    so="This may not be everything sent to you."
+                />
             ) : null}
 
             <section

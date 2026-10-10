@@ -29,6 +29,8 @@ import {
     logoSource,
 } from "@/lib/stores/location-details";
 
+import { Refusal } from "@/components/shared/refusal";
+
 import { PlaceSheetFrame } from "./place-sheets";
 
 const formSchema = z.object({
@@ -44,6 +46,10 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const UPLOAD_RULE = "Square, under 1 MB. PNG, JPG or WebP.";
+
+/** Where the upload would be, for someone whose role can't add images. */
+const NO_LOGO_UPLOAD =
+    "Your role can't add images, so the logo stays as it is. An owner or admin can change it.";
 
 /** What sits under the logo's buttons, by the logo in the draft. */
 const LOGO_HINT: Record<LogoSource, string> = {
@@ -71,11 +77,18 @@ export function LocationDetailsSheet({
     storeId,
     name,
     details,
+    canUploadLogo = true,
     open,
     onClose,
     onSaved,
 }: {
     storeId: string;
+    /**
+     * May add an image to the library (`media:write`). Someone who may
+     * edit the location and not that (a location role) keeps the logo as
+     * it is and is told so: the upload would only be refused.
+     */
+    canUploadLogo?: boolean;
     /** The older route saves the name with them; it is sent back as it is. */
     name: string;
     details: LocationDetails;
@@ -182,38 +195,40 @@ export function LocationDetailsSheet({
                                 {LOGO_STATE[source]}
                             </p>
                         </div>
-                        <LogoUpload
-                            value={logo}
-                            onChange={(next) => {
-                                setRefusal(null);
-                                setLogo(next);
-                            }}
-                            name={name}
-                            disabled={isSubmitting}
-                            onBusy={setUploading}
-                            hint={LOGO_HINT[source]}
-                            standIn={
-                                details.businessLogo
-                                    ? {
-                                          url: details.businessLogo,
-                                          alt: "Your business logo",
-                                      }
-                                    : null
-                            }
-                            removeLabel={
-                                details.businessLogo
-                                    ? "Use your business logo"
-                                    : "Remove"
-                            }
-                        />
-                        {refusal ? (
+                        {canUploadLogo ? (
+                            <LogoUpload
+                                value={logo}
+                                onChange={(next) => {
+                                    setRefusal(null);
+                                    setLogo(next);
+                                }}
+                                name={name}
+                                disabled={isSubmitting}
+                                onBusy={setUploading}
+                                hint={LOGO_HINT[source]}
+                                standIn={
+                                    details.businessLogo
+                                        ? {
+                                              url: details.businessLogo,
+                                              alt: "Your business logo",
+                                          }
+                                        : null
+                                }
+                                removeLabel={
+                                    details.businessLogo
+                                        ? "Use your business logo"
+                                        : "Remove"
+                                }
+                            />
+                        ) : (
                             <p
-                                role="alert"
-                                className="text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground"
+                                data-testid="location-logo-no-upload"
+                                className="text-pretty text-[13px] leading-[1.5] text-muted-foreground"
                             >
-                                {refusal}
+                                {NO_LOGO_UPLOAD}
                             </p>
-                        ) : null}
+                        )}
+                        <Refusal>{refusal}</Refusal>
                     </div>
                 </div>
             </PlaceSheetFrame>

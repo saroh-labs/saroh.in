@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
@@ -125,14 +126,7 @@ export function AddPersonDialog({
                 className="mt-1"
                 autoComplete="off"
             />
-            {error ? (
-                <p
-                    role="alert"
-                    className="mt-2 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    {error}
-                </p>
-            ) : null}
+            <Refusal className="mt-2">{error}</Refusal>
         </FormDialog>
     );
 }

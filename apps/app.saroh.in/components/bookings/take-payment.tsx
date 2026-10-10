@@ -1,6 +1,7 @@
 "use client";
 
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -257,15 +258,20 @@ export function TakePayment({
                         <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                             {deskNote(choice, amount)}
                         </p>
-                        {(problem && (tried || given !== "")) || error ? (
+                        {/* What is wrong with the amount is the field's
+                            own line. Why the payment wasn't taken is the
+                            save's: calm when the role refused it. */}
+                        {problem && (tried || given !== "" || error) ? (
                             <p
                                 id={ids.error}
                                 role="alert"
                                 className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                             >
-                                {problem ?? error}
+                                {problem}
                             </p>
-                        ) : null}
+                        ) : (
+                            <Refusal>{error}</Refusal>
+                        )}
                     </div>
                 )}
                 {link ? null : (

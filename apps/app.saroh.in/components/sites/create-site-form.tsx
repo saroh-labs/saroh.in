@@ -1,9 +1,9 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
 import {
     Form,
     FormControl,
@@ -299,22 +299,11 @@ export function NoTemplates({
 }) {
     if (failed) {
         return (
-            <PartialNotice
-                action={
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onRetry}
-                    >
-                        Try again
-                    </Button>
-                }
-            >
-                The templates couldn&apos;t be loaded. You can still create the
-                site: it starts from the template for what you&apos;re setting
-                up.
-            </PartialNotice>
+            <PartialRead
+                things="the templates"
+                so="You can still create the site. It starts from the template for what you're setting up."
+                onRetry={onRetry}
+            />
         );
     }
     return (

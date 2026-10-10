@@ -173,12 +173,16 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 ) : null}
 
                                 {o.values.length === 0 ? (
-                                    <p className="mt-2.5 text-[12.5px] text-muted-foreground">
-                                        No values yet
-                                        {canWrite
-                                            ? ". Edit it to add some."
-                                            : "."}
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        className="mt-2.5"
+                                        title="No values yet"
+                                        description={
+                                            canWrite
+                                                ? "Edit it to add some."
+                                                : undefined
+                                        }
+                                    />
                                 ) : (
                                     <ul
                                         aria-label={`${o.name} values`}

@@ -4,6 +4,7 @@ import { FailedRead } from "@/components/shared/failed-read";
 import { count } from "@/lib/format/plural";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -136,11 +137,16 @@ export function RolesTab({
                 </ListSection>
                 <ListSection label={`Made for ${organizationName}`}>
                     {invented.length === 0 ? (
-                        <p className="border-t border-border px-[15px] py-3 text-[12px] leading-[1.5] text-muted-foreground">
-                            {canEdit && !rolesLock
-                                ? "None yet. A role of your own grants exactly what you tick — no more."
-                                : "None yet."}
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="border-t border-border px-[15px] py-3"
+                            title="No roles of your own yet"
+                            description={
+                                canEdit && !rolesLock
+                                    ? "A role of your own grants exactly what you tick, and no more."
+                                    : undefined
+                            }
+                        />
                     ) : (
                         invented.map((role) => (
                             <RoleRow

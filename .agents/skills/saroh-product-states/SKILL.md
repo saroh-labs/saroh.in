@@ -76,7 +76,10 @@ is no button and the sentence does not promise one.
   `router.refresh()`) or `retryHref`. Never "reload the page".
 - A part of a page the server couldn't read is `FailedRead`
   (`components/shared/failed-read.tsx`): one line, Try again refreshes the
-  page's reads and leaves the rest of the screen where it was.
+  page's reads and leaves the rest of the screen where it was. A page that
+  is drawn without one of its reads says so above with `PartialRead`
+  ("Couldn't load reviews. Their count shows as “—”."). For a read the
+  component made itself, both take `onRetry` and call that read again.
 - Every `error.tsx` renders `SectionError` with `retry` (Next 16.3: it
   refetches; `reset` only redraws), the page's `heading`, `things`, an
   optional `reassurance`, and the menu's name for the way back.

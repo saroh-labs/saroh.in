@@ -15,6 +15,7 @@ import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import { hoursSummary } from "@/lib/stores/opening-hours-summary";
 import type { PlaceSheet } from "@/lib/stores/place-rows";
 import {
+    ABOUT_SHEETS,
     addressLine,
     KIND_ANSWER,
     KIND_FOLLOWS,
@@ -24,7 +25,7 @@ import {
 
 import { Notice } from "@saroh/ui/notice";
 import { LocationDetailsSheet } from "./location-details-sheet";
-import type { SectionProps } from "./location-save";
+import type { Saver, SectionProps } from "./location-save";
 import {
     PlaceAddressSheet,
     PlaceHoursSheet,
@@ -51,15 +52,31 @@ import type { PlaceSheets } from "./use-place-sheets";
 export function PlaceSection({
     store,
     canEdit,
+    canEditAbout = false,
     pending,
     save,
     setStore,
     details,
     sheets,
+    rename,
+    canUploadLogo = true,
 }: SectionProps & {
     /** Left out when they couldn't be read: then there is no row. */
     details?: LocationDetails;
     sheets: PlaceSheets;
+    /**
+     * Saves the name through the location's own route, with the
+     * description it also writes, for someone who can't reach the
+     * business's settings route (`canEditAbout`).
+     */
+    rename?: (
+        name: string,
+        description: string | null,
+        said: string,
+        onSaved?: () => void,
+    ) => void;
+    /** May add an image to the library (`media:write`). */
+    canUploadLogo?: boolean;
 }) {
     const router = useRouter();
     // What the description and logo's sheet last saved, until the page has
@@ -85,9 +102,13 @@ export function PlaceSection({
         );
     };
 
+    // The location's own route saves the description with the name, so
+    // only with the description read is it offered.
+    const aboutOk = canEditAbout && Boolean(about) && Boolean(rename);
+
     /** A row's one action; `name` says what it edits to a screen reader. */
     const edit = (sheet: PlaceSheet, label: string, name?: string) =>
-        canEdit ? (
+        canEdit || (aboutOk && ABOUT_SHEETS.includes(sheet)) ? (
             <Button
                 id={placeEditId(sheet)}
                 size="sm"
@@ -101,7 +122,19 @@ export function PlaceSection({
             </Button>
         ) : null;
 
-    const editing = canEdit ? sheets.editing : null;
+    const editing = canEdit || aboutOk ? sheets.editing : null;
+    // Someone the business's settings route refuses saves the name through
+    // the location's own, which writes the description with it.
+    const saveName: Saver =
+        canEdit || !rename
+            ? save
+            : (input, said, _onFail, _inline, onSaved) =>
+                  rename(
+                      input.name ?? store.name,
+                      about?.description ?? null,
+                      said,
+                      onSaved,
+                  );
     const shared = {
         store,
         pending,
@@ -254,7 +287,11 @@ export function PlaceSection({
 
             {/* The open sheet, a fresh draft each time it opens. */}
             {editing?.which === "name" ? (
-                <PlaceNameSheet key={editing.opened} {...shared} />
+                <PlaceNameSheet
+                    key={editing.opened}
+                    {...shared}
+                    save={saveName}
+                />
             ) : null}
             {editing?.which === "kind" ? (
                 <PlaceKindSheet
@@ -288,6 +325,7 @@ export function PlaceSection({
                     storeId={store.id}
                     name={store.name}
                     details={about}
+                    canUploadLogo={canUploadLogo}
                     open={shared.open}
                     onClose={sheets.close}
                     onSaved={(next) => {

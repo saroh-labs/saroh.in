@@ -537,10 +537,15 @@ export function AvailabilityEditor({
                             })}
                         </ul>
                         {!extraMine.length ? (
-                            <p className="text-[12.5px] text-muted-foreground">
-                                None. Click closed time on the calendar to add
-                                some.
-                            </p>
+                            <EmptyState
+                                size="inline"
+                                title="No extra hours"
+                                description={
+                                    canEdit
+                                        ? "Click closed time on the calendar to add some."
+                                        : undefined
+                                }
+                            />
                         ) : null}
                     </section>
 

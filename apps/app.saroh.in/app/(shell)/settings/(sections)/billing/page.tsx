@@ -1,5 +1,7 @@
+import { PartialRead } from "@/components/shared/failed-read";
 import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
-import { PartialNotice, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
 import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
@@ -161,24 +163,17 @@ export default async function PlanBillingPage() {
 
     const addonList = addonsView ? addonRows(addonsView) : [];
     const missing = [
-        addons === null ? "Your add-ons" : null,
-        checkouts === null
-            ? addons === null
-                ? "a plan change waiting for payment"
-                : "A plan change waiting for payment"
-            : null,
+        addons === null ? "your add-ons" : null,
+        checkouts === null ? "any plan change waiting for payment" : null,
     ].filter((m): m is string => m !== null);
-    const partial =
-        missing.length === 0
-            ? null
-            : `${missing.join(" and any ")} couldn't be read just now, so ${
-                  addons === null ? "they aren't" : "it isn't"
-              } shown here. Nothing has changed.`;
+    const partial = missing.length === 0 ? null : missing.join(" and ");
 
     return (
         <SettingsPanel header={header}>
             <div className="grid gap-4">
-                {partial ? <PartialNotice>{partial}</PartialNotice> : null}
+                {partial ? (
+                    <PartialRead things={partial} so={NOTHING_CHANGED} />
+                ) : null}
                 {canChange ? null : (
                     <ReadOnlyNote className="mb-0">
                         Your role can read the plan but not change it.

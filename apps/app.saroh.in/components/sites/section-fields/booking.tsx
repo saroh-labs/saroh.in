@@ -1,7 +1,8 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
-import Link from "next/link";
+import { TextLink } from "@saroh/ui/text-link";
 
 import { Input } from "@saroh/ui/input";
 import {
@@ -51,16 +52,16 @@ export function BookingFields({
                 {load.status !== "ready" ? (
                     <ServicesLoadNotice load={load} />
                 ) : services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No services yet.{" "}
-                        <Link
-                            href="/services/new"
-                            className="underline hover:text-foreground"
-                        >
-                            Create a service
-                        </Link>{" "}
-                        first, then pick it here.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No services yet"
+                        description="Add one, then pick it here."
+                        action={
+                            <TextLink href="/services/new">
+                                New service
+                            </TextLink>
+                        }
+                    />
                 ) : (
                     <Select
                         value={c.serviceId ?? ""}

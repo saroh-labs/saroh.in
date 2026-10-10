@@ -1,5 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import { PageContainer } from "@/components/shared/page-container";
@@ -87,9 +88,10 @@ export function PostReadView({
                             <p key={index}>{paragraph}</p>
                         ))
                     ) : (
-                        <p className="text-muted-foreground">
-                            Nothing has been written in this post yet.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            title="Nothing has been written in this post yet"
+                        />
                     )}
                 </div>
                 <p className="mt-6 text-[12.5px] text-muted-foreground">

@@ -27,6 +27,7 @@ import {
     LOCATION_ROLES,
     onlyOwnerHere,
     onlyOwnerWords,
+    peopleNote,
     personName,
     roleLabel,
     shownInvitations,
@@ -182,11 +183,7 @@ export function PeopleSection({
             {/* The line, the action at its right, then the roster. On a
                 phone the action sits under the roster, where the thumb is. */}
             <div className="grid gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                <Note>
-                    Who can see {store.name}&apos;s products and orders, and
-                    move its orders along. Everyone here is also on your team,
-                    under Team.
-                </Note>
+                <Note>{peopleNote(store.name)}</Note>
                 {invite && !alone ? (
                     <div className="order-last sm:order-none">{invite}</div>
                 ) : null}

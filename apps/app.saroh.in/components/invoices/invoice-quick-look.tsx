@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -314,25 +315,14 @@ export function InvoiceQuickLook({
                 aria-busy={read.state === "loading"}
             >
                 {read.state === "failed" ? (
-                    <div
-                        role="alert"
-                        className="flex flex-wrap items-center gap-2 px-4 py-3 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        <span className="flex-1">
-                            The lines could not be loaded. {read.error}
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setRead({ state: "loading" });
-                                setAttempt((n) => n + 1);
-                            }}
-                        >
-                            Try again
-                        </Button>
-                    </div>
+                    <FailedRead
+                        className="px-4 py-3"
+                        things="the lines"
+                        onRetry={() => {
+                            setRead({ state: "loading" });
+                            setAttempt((n) => n + 1);
+                        }}
+                    />
                 ) : full?.lines ? (
                     full.lines.map((l) => (
                         <div

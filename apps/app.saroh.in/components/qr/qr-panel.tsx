@@ -1,7 +1,9 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { qrFileName, qrSvg } from "@saroh/ui/lib/qr-art";
+import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 import type { QrArtLogo } from "@saroh/ui/qr-art";
 import { QrArt } from "@saroh/ui/qr-art";
 import { showError } from "@saroh/ui/toast";
@@ -148,22 +150,14 @@ function Saved({
     }
     if (read.state === "failed") {
         return (
-            <div className="flex flex-col items-start gap-2.5">
-                <p role="alert" className={NOTE}>
-                    We couldn&apos;t load this QR code. Nothing was changed.
-                </p>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                        setRead(null);
-                        setAttempt((n) => n + 1);
-                    }}
-                >
-                    Try again
-                </Button>
-            </div>
+            <FailedRead
+                things="this QR code"
+                reassurance={NOTHING_CHANGED}
+                onRetry={() => {
+                    setRead(null);
+                    setAttempt((n) => n + 1);
+                }}
+            />
         );
     }
     if (read.state === "unavailable") {

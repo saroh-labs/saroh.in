@@ -5,6 +5,7 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
+import { Refusal } from "@/components/shared/refusal";
 import {
     formatClock,
     formatClockRange,
@@ -364,14 +365,7 @@ function Form({
                 <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
                     {payNote(payNow)}
                 </p>
-                {error ? (
-                    <p
-                        role="alert"
-                        className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
-                    >
-                        {error}
-                    </p>
-                ) : null}
+                <Refusal className="mt-2">{error}</Refusal>
 
                 {tried && !ready ? (
                     <p

@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { useEffect, useRef, useState } from "react";
 
@@ -72,7 +73,6 @@ export function LogoUpload({
             "Uploaded, but storage is not set up to serve images yet, so the logo cannot print.",
     });
     const [problem, setProblem] = useState<string | null>(null);
-    const said = problem ?? uploadError;
 
     useEffect(() => {
         onBusy?.(busy);
@@ -155,13 +155,18 @@ export function LogoUpload({
                         </Button>
                     ) : null}
                 </div>
-                {said ? (
+                {problem ? (
+                    // The file picked is the field's own problem.
                     <p
                         role="alert"
                         className="text-pretty text-[12.5px] text-destructive-subtle-foreground"
                     >
-                        {said}
+                        {problem}
                     </p>
+                ) : uploadError ? (
+                    // Why the upload didn't go through: calm when the
+                    // role refused it.
+                    <Refusal>{uploadError}</Refusal>
                 ) : (
                     <p className="text-pretty text-[12px] leading-[1.45] text-muted-foreground">
                         {hint}

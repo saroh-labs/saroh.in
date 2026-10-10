@@ -1,5 +1,6 @@
 "use client";
 
+import { isRoleRefusal } from "@/lib/api/role-denied";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -90,7 +91,9 @@ export function AddContactDialog({
         );
         if (!res) return;
         if (!res.ok) {
-            setError(res.error);
+            // A refusal by role says nothing about the email: the toast
+            // says it calmly, and the field stays unmarked.
+            if (!isRoleRefusal(res.error)) setError(res.error);
             if (!res.error.includes("already")) showError(res.error);
             return;
         }

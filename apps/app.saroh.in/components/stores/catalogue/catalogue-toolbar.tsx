@@ -1,6 +1,8 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -204,13 +206,13 @@ function ChoiceSub({
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
                 {choices === null ? (
-                    <p className="px-2 py-1.5 text-[12.5px] text-muted-foreground">
-                        Couldn&apos;t load these. Try again later.
-                    </p>
+                    <FailedRead className="px-2 py-1.5" things="these" />
                 ) : choices.length === 0 ? (
-                    <p className="px-2 py-1.5 text-[12.5px] text-muted-foreground">
-                        {empty}
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="px-2 py-1.5"
+                        title={empty}
+                    />
                 ) : (
                     <>
                         <DropdownMenuItem onSelect={() => onPick(null)}>

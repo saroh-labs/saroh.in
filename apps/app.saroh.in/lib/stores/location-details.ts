@@ -7,6 +7,9 @@
  * A location uses the business logo unless it has its own (DEC-123).
  */
 
+import type { LocationAbilities } from "./abilities";
+import { abilitiesOf } from "./abilities";
+
 /** A location's own logo: where it is served, and its library image. */
 export interface LocationLogo {
     url: string;
@@ -20,6 +23,11 @@ export interface LocationDetails {
     logo: LocationLogo | null;
     /** The business logo's address; `null` when the business has none. */
     businessLogo: string | null;
+    /**
+     * What this person may do at the location, from the same read. Left
+     * out by an API from before it said.
+     */
+    may?: LocationAbilities;
 }
 
 /** The description's limit, the API's own (`UpdateStoreDto`). */
@@ -83,6 +91,8 @@ export interface StoreLogos {
     logo?: string | null;
     ownLogo?: LocationLogo | null;
     businessLogo?: { url: string } | null;
+    /** What the caller may do there (`StoresService.abilities`). */
+    abilities?: unknown;
 }
 
 /**
@@ -97,9 +107,11 @@ export function detailsOf(store: StoreLogos): LocationDetails {
                 ? { url: typed, mediaId: null }
                 : null
             : store.ownLogo;
+    const may = abilitiesOf(store.abilities);
     return {
         description: store.description ?? null,
         logo: own,
         businessLogo: store.businessLogo?.url ?? null,
+        ...(may ? { may } : {}),
     };
 }

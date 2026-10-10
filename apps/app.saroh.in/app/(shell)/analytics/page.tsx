@@ -1,7 +1,6 @@
-import { Button } from "@saroh/ui/button";
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { forbidden } from "next/navigation";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
@@ -77,9 +76,15 @@ export default async function AnalyticsPage({
 
     const missing =
         takings?.status === "failed"
-            ? "Sales couldn't be loaded, so only your website's figures are shown."
+            ? {
+                  things: "sales",
+                  so: "Only your website's figures are shown.",
+              }
             : traffic.status === "failed"
-              ? "Your website's figures couldn't be loaded, so only sales are shown."
+              ? {
+                    things: "your website's figures",
+                    so: "Only sales are shown.",
+                }
               : null;
 
     return (
@@ -90,17 +95,7 @@ export default async function AnalyticsPage({
                 description="How this week is going, what the business took week by week, and how your website is doing."
             />
 
-            {missing ? (
-                <PartialNotice
-                    action={
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/analytics">Try again</Link>
-                        </Button>
-                    }
-                >
-                    {missing}
-                </PartialNotice>
-            ) : null}
+            {missing ? <PartialRead {...missing} /> : null}
 
             {takings ? <TakingsSection read={takings} /> : null}
 
