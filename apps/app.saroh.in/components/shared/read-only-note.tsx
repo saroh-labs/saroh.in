@@ -1,10 +1,11 @@
 import { cn } from "@saroh/ui/lib/utils";
 
 import { whoCanChangeLine } from "@/components/shared/who-can-change";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The one read-only treatment: a quiet note above what a role can see but not
- * change.
+ * change. A thin wrapper over `Notice`, kept for its wording.
  *
  * Promoted from product settings so every read-only screen says it the same
  * way (plan 2026-09-23-003, R20) — a note, not a disabled form: nothing on the
@@ -28,15 +29,8 @@ export function ReadOnlyNote({
     id?: string;
 }) {
     return (
-        <p
-            id={id}
-            role="note"
-            className={cn(
-                "mb-3.5 rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75",
-                className,
-            )}
-        >
+        <Notice id={id} icon={false} className={cn("mb-3.5", className)}>
             {children} {whoCanChangeLine(ownerOnly)}
-        </p>
+        </Notice>
     );
 }

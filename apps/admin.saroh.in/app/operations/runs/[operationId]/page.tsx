@@ -1,7 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Progress } from "@saroh/ui/progress";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin-shell";
@@ -98,13 +98,12 @@ export default async function OperationPage({
                 <Panel title={state}>
                     {() => (
                         <div className="grid gap-4">
-                            <Progress
-                                value={
-                                    operation.total === 0
-                                        ? 100
-                                        : (finished / operation.total) * 100
+                            <ProgressBar
+                                value={operation.total === 0 ? 1 : finished}
+                                max={
+                                    operation.total === 0 ? 1 : operation.total
                                 }
-                                aria-label={`${finished} of ${operation.total} handled`}
+                                label={`${finished} of ${operation.total} handled`}
                             />
                             <Facts
                                 rows={[

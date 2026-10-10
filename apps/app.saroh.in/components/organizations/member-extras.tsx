@@ -118,7 +118,7 @@ export function ExtrasCell({ labels }: { labels: string[] }) {
             {labels.map((label) => (
                 <li
                     key={label}
-                    className="whitespace-nowrap rounded-full bg-brand-subtle px-[9px] py-[3px] text-[11px] font-medium text-brand-subtle-foreground"
+                    className="whitespace-nowrap rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-foreground"
                 >
                     {label}
                 </li>
@@ -160,10 +160,7 @@ export function ExtraPermissions({
 }) {
     return (
         <section aria-labelledby="extra-permissions-title" className="mt-5">
-            <h3
-                id="extra-permissions-title"
-                className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h3 id="extra-permissions-title" className="label mb-1">
                 Extra permissions
             </h3>
             <p className="mb-[11px] text-pretty text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
@@ -179,7 +176,7 @@ export function ExtraPermissions({
                             aria-label={label}
                             className="flex flex-col gap-[5px]"
                         >
-                            <p className="px-[11px] pb-0.5 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground first:pt-1">
+                            <p className="label px-[11px] pb-0.5 pt-2 first:pt-1">
                                 {label}
                             </p>
                             {choices.map(({ capability, state }) => (

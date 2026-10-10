@@ -15,7 +15,6 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -24,7 +23,6 @@ import { z } from "zod";
 import type { MultiOption } from "@/components/shared/multi-select";
 import { MultiSelect } from "@/components/shared/multi-select";
 import { OptionSelect } from "@/components/shared/option-select";
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import {
     lostChanges,
     lostNew,
@@ -45,6 +43,7 @@ import type {
     DiscountReach,
 } from "@/lib/discounts/service";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
+import { Segmented } from "@saroh/ui/segmented";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
 
@@ -295,28 +294,21 @@ export function DiscountForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>What it takes off</FormLabel>
-                                <ToggleGroup
-                                    type="single"
+                                <Segmented
+                                    label="What it takes off"
                                     value={field.value}
-                                    onValueChange={(v) => {
-                                        if (v) field.onChange(v);
-                                    }}
-                                    aria-label="What it takes off"
-                                    className={SEGMENTED}
-                                >
-                                    <ToggleGroupItem
-                                        value="PERCENTAGE"
-                                        className={SEGMENT}
-                                    >
-                                        A percentage
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem
-                                        value="FIXED_AMOUNT"
-                                        className={SEGMENT}
-                                    >
-                                        An amount
-                                    </ToggleGroupItem>
-                                </ToggleGroup>
+                                    onValueChange={field.onChange}
+                                    options={[
+                                        {
+                                            value: "PERCENTAGE",
+                                            label: "A percentage",
+                                        },
+                                        {
+                                            value: "FIXED_AMOUNT",
+                                            label: "An amount",
+                                        },
+                                    ]}
+                                />
                             </FormItem>
                         )}
                     />
@@ -409,28 +401,16 @@ export function DiscountForm({
                         >
                             What it applies to
                         </span>
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="What it applies to"
+                            aria-labelledby="discount-reach"
                             value={mode}
                             onValueChange={(v) => {
-                                if (v) {
-                                    setMode(v as DiscountReach);
-                                    setTargetsError(null);
-                                }
+                                setMode(v);
+                                setTargetsError(null);
                             }}
-                            aria-labelledby="discount-reach"
-                            className={SEGMENTED}
-                        >
-                            {REACH.map((r) => (
-                                <ToggleGroupItem
-                                    key={r.value}
-                                    value={r.value}
-                                    className={SEGMENT}
-                                >
-                                    {r.label}
-                                </ToggleGroupItem>
-                            ))}
-                        </ToggleGroup>
+                            options={REACH}
+                        />
                         <p
                             id="discount-reach-note"
                             className="text-[11.5px] leading-[1.5] text-muted-foreground"

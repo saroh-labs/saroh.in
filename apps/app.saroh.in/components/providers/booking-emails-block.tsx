@@ -1,11 +1,11 @@
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { planLabel } from "@saroh/ui/lib/state-copy";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
 import { TryAgainLink } from "@/components/shared/failed-read";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { BookingEmails } from "@/lib/providers/booking-emails";
 import {
     CONTACT_EMAIL_HREF,
@@ -24,9 +24,9 @@ import {
 
 const PILL = {
     // Not green: green is for what the business connected itself.
-    sending: "bg-muted text-foreground/80",
-    near: "bg-highlight-subtle text-highlight-subtle-foreground",
-    paused: "bg-highlight-subtle text-highlight-subtle-foreground",
+    sending: "neutral",
+    near: "warning",
+    paused: "warning",
 } as const;
 
 export function BookingEmailsBlock({
@@ -51,10 +51,7 @@ export function BookingEmailsBlock({
     const variant = urgent ? "default" : "outline";
     return (
         <section aria-labelledby={id}>
-            <h3
-                id={id}
-                className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h3 id={id} className="label mb-2">
                 Booking emails
             </h3>
             <div className="overflow-hidden rounded-xl border border-border bg-card px-4 py-[13px] min-[760px]:px-[18px]">
@@ -64,14 +61,9 @@ export function BookingEmailsBlock({
                             <span className="text-[13.5px] font-semibold">
                                 {b.status}
                             </span>
-                            <span
-                                className={cn(
-                                    "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                    PILL[b.tone],
-                                )}
-                            >
+                            <StatusBadge tone={PILL[b.tone]}>
                                 {b.pill}
-                            </span>
+                            </StatusBadge>
                         </div>
                         <p className="text-[12.5px] tabular-nums text-foreground/80">
                             {b.usage}

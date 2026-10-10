@@ -40,9 +40,11 @@ export function TimingCard({
     return (
         <label
             className={cn(
-                "group relative flex min-w-0 flex-col gap-1 rounded-[10px] border px-3 py-2.5 transition-colors",
+                "group relative flex min-w-0 flex-col gap-1 rounded-[10px] border px-3 py-2.5 transition-colors duration-fast",
                 "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                checked ? "border-brand bg-brand/5" : "border-border bg-card",
+                checked
+                    ? "border-border-strong bg-foreground"
+                    : "border-border bg-card",
                 disabled
                     ? "cursor-default opacity-80"
                     : "cursor-pointer hover:border-foreground/30 hover:bg-muted/50 active:bg-muted",
@@ -63,11 +65,13 @@ export function TimingCard({
                     aria-hidden
                     className={cn(
                         "mt-[3px] grid size-4 shrink-0 place-items-center rounded-full border",
-                        checked ? "border-brand" : "border-foreground/40",
+                        checked
+                            ? "border-border-strong"
+                            : "border-foreground/40",
                     )}
                 >
                     {checked ? (
-                        <span className="size-2 rounded-full bg-brand" />
+                        <span className="size-2 rounded-full bg-foreground" />
                     ) : null}
                 </span>
                 <span className="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">

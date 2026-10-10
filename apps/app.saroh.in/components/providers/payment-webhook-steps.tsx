@@ -3,8 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
 
 import { FailedRead } from "@/components/shared/failed-read";
@@ -14,6 +13,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 import { generateWebhookSecret, WEBHOOK_PLACE } from "@/lib/providers/webhook";
+import { CopyButton } from "@saroh/ui/copy-button";
 
 /*
  * The payment setup dialog's webhook steps (DEC-063): tell the provider
@@ -21,14 +21,6 @@ import { generateWebhookSecret, WEBHOOK_PLACE } from "@/lib/providers/webhook";
  * both sides share. Without them a customer can pay and the order never
  * hears about it.
  */
-
-/** Copy text, and say so either way. */
-function copy(text: string, done: string) {
-    void navigator.clipboard.writeText(text).then(
-        () => showSuccess(done),
-        () => showError("Could not copy — select it instead."),
-    );
-}
 
 /** A numbered step's heading: "2  Tell Razorpay where…". */
 export function StepHeading({
@@ -89,7 +81,7 @@ export function WebhookAddressStep({
                 . Paste this address, tick the events below and save.
             </p>
             {testMode ? (
-                <p className="rounded-[10px] bg-highlight-subtle px-3 py-2 text-[12px] leading-[1.45] text-highlight-subtle-foreground">
+                <p className="rounded-[10px] bg-muted px-3 py-2 text-[12px] leading-[1.45] text-foreground">
                     Test mode — use {name}&apos;s test dashboard for the webhook
                     too.
                 </p>
@@ -106,17 +98,13 @@ export function WebhookAddressStep({
                                 className="min-w-0 flex-1 font-mono text-[12px]"
                                 onFocus={(e) => e.currentTarget.select()}
                             />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="shrink-0 cursor-pointer"
+                            <CopyButton
+                                value={url}
+                                label="Copy"
+                                thing="webhook URL"
                                 aria-label="Copy webhook URL"
-                                onClick={() => copy(url, "Webhook URL copied")}
-                            >
-                                <Copy aria-hidden className="size-4" />
-                                Copy
-                            </Button>
+                                className="shrink-0"
+                            />
                         </div>
                     </div>
                     <div className="grid gap-1.5">
@@ -215,20 +203,13 @@ export function WebhookSecretStep({
                         <RefreshCw aria-hidden className="size-4" />
                         Generate one
                     </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="cursor-pointer"
+                    <CopyButton
+                        value={() => value.trim()}
+                        label="Copy"
+                        thing="webhook secret"
                         aria-label="Copy webhook signing secret"
                         disabled={!value.trim()}
-                        onClick={() =>
-                            copy(value.trim(), "Webhook secret copied")
-                        }
-                    >
-                        <Copy aria-hidden className="size-4" />
-                        Copy
-                    </Button>
+                    />
                 </div>
                 <p
                     id={hintId}

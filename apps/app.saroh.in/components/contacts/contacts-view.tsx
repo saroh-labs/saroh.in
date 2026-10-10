@@ -257,10 +257,7 @@ export function ContactsView({
             cell: (c) => {
                 const label = c.source ? contactSourceLabel(c.source) : null;
                 return label ? (
-                    <Badge
-                        variant="secondary"
-                        className="whitespace-nowrap text-[11px] font-medium"
-                    >
+                    <Badge variant="secondary" size="sm">
                         {label}
                     </Badge>
                 ) : (
@@ -322,7 +319,7 @@ export function ContactsView({
                                 </p>
                             ) : null}
                             {c.openLeadCount > 0 ? (
-                                /* `text-foreground`, not `text-brand`. Brand is
+                                /* `text-foreground`, not `text-foreground`. Brand is
                                    the link colour everywhere else in the
                                    product, and this line sits INSIDE a link
                                    whose target is the whole card — colouring

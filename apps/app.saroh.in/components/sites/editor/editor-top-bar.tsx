@@ -3,7 +3,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { ChevronDown, ChevronLeft, Ellipsis } from "lucide-react";
+import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -32,6 +32,7 @@ import type {
     SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -220,15 +221,19 @@ export function EditorTopBar({
                  * the page menu. The business name is where you are, not a
                  * link; the way out is the Website crumb before it.
                  */}
-                <Link
-                    href={`/sites/${siteId}/pages`}
-                    aria-label="Back to Website"
-                    title={address ?? undefined}
-                    className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
-                >
-                    <ChevronLeft aria-hidden className="size-[15px] shrink-0" />
-                    Website
-                </Link>
+                <Tip label={address ?? undefined}>
+                    <Link
+                        href={`/sites/${siteId}/pages`}
+                        aria-label="Back to Website"
+                        className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors duration-fast hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                    >
+                        <ChevronLeft
+                            aria-hidden
+                            className="size-[15px] shrink-0"
+                        />
+                        Website
+                    </Link>
+                </Tip>
                 {/* A phone keeps the way out and the page; the name goes. */}
                 {phone ? null : (
                     <>
@@ -263,7 +268,7 @@ export function EditorTopBar({
                             aria-haspopup="listbox"
                             aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
                             className={cn(
-                                "flex h-[30px] min-w-0 cursor-pointer items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted data-[state=open]:bg-secondary coarse:h-11",
+                                "flex h-[30px] min-w-0 cursor-pointer items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted data-[state=open]:bg-secondary coarse:h-11",
                                 // On a phone a long page name gives way
                                 // before the menu beside it does.
                                 !phone && "shrink-0",
@@ -346,7 +351,8 @@ function StatusReadout({
                     [status.label, detail].filter(Boolean).join("\n") ||
                     undefined
                 }
-                className="ml-1 min-w-0 shrink truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em]"
+                size="sm"
+                className="ml-1 min-w-0 shrink truncate"
             >
                 <span className="truncate">{status.label}</span>
             </Badge>
@@ -382,9 +388,9 @@ function PhoneMenu({
                 <button
                     type="button"
                     aria-label="Status, view and publish"
-                    className="ml-auto grid size-11 shrink-0 place-items-center rounded-[9px] border bg-card text-muted-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="ml-auto grid size-11 shrink-0 place-items-center rounded-[9px] border bg-card text-muted-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                    <Ellipsis aria-hidden className="size-5" />
+                    <MoreHorizontal aria-hidden className="size-5" />
                 </button>
             </PopoverTrigger>
             <PopoverContent

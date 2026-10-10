@@ -1,5 +1,4 @@
 import { PageContainer } from "@/components/shared/page-container";
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -14,6 +13,7 @@ import { TakePayment } from "@/components/bookings/take-payment";
 import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { readOnlyLine } from "@/components/shared/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
@@ -221,7 +221,7 @@ export function BookingDetailView({
                         </p>
                     ) : null}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <StatusBadge status={booking.status} />
+                        <BookingStatus status={booking.status} />
                         {booking.outcome ? (
                             <OutcomeBadge outcome={booking.outcome} />
                         ) : past && !cancelled ? (
@@ -407,10 +407,11 @@ function Row({ label, value }: { label: string; value: string | null }) {
     );
 }
 
-function StatusBadge({ status }: { status: BookingDetail["status"] }) {
+function BookingStatus({ status }: { status: BookingDetail["status"] }) {
     return (
-        <Badge
-            variant={
+        <StatusBadge
+            size="default"
+            tone={
                 status === "CONFIRMED"
                     ? "success"
                     : status === "CANCELLED"
@@ -419,15 +420,18 @@ function StatusBadge({ status }: { status: BookingDetail["status"] }) {
             }
         >
             {bookingStatus(status)}
-        </Badge>
+        </StatusBadge>
     );
 }
 
 function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
     return (
-        <Badge variant={outcome === "ATTENDED" ? "success" : "warning"}>
+        <StatusBadge
+            size="default"
+            tone={outcome === "ATTENDED" ? "success" : "warning"}
+        >
             {outcome === "ATTENDED" ? "Attended" : "No-show"}
-        </Badge>
+        </StatusBadge>
     );
 }
 

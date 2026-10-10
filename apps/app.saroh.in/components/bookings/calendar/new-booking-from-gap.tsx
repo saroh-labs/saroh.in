@@ -40,6 +40,7 @@ import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Chip, Eyebrow } from "./parts";
 
 export interface GapTarget {
@@ -374,21 +375,19 @@ function Form({
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
                     {extra ? (
-                        <button
-                            type="button"
+                        <TextLink
                             onClick={() => void closeExtra()}
-                            className="text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground coarse:min-h-11"
+                            className="text-[12.5px] coarse:min-h-11"
                         >
                             Close these extra hours
-                        </button>
+                        </TextLink>
                     ) : null}
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => onBlock(target)}
-                        className="text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Block this time instead
-                    </button>
+                    </TextLink>
                 </div>
             </FormSheetBody>
             <FormSheetFoot

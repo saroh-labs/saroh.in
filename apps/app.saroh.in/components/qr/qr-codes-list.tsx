@@ -14,8 +14,7 @@ import {
     placeWords,
 } from "@/lib/qr/words";
 
-const HEAD =
-    "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const HEAD = "label";
 
 /** A cell's name: said to a screen reader at the desk, shown on a phone. */
 function CellName({ children }: { children: React.ReactNode }) {
@@ -180,7 +179,7 @@ export function QrCodesList({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-[13px] text-brand"
+                                                    className="text-[13px] text-foreground"
                                                     aria-label={`Change the ${placeWords(code)} code`}
                                                     onClick={() =>
                                                         onChange(code)
@@ -206,7 +205,7 @@ export function QrCodesList({
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-[13px] text-brand"
+                                                className="text-[13px] text-foreground"
                                                 aria-label={`View the ${placeWords(code)} code`}
                                                 onClick={() => onView(code)}
                                             >

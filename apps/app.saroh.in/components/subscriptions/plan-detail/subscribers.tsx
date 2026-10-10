@@ -3,10 +3,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Users } from "lucide-react";
 import Link from "next/link";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { SubscriberRow } from "@/lib/subscriptions/plan-detail";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
-
-import { Pill } from "../pill";
 
 /**
  * Plan Detail's Subscribers (D4): everyone on the plan, each opening their
@@ -69,9 +68,9 @@ export function PlanSubscribers({
                                 </span>
                             </span>
                             <span className="flex-[0_0_120px]">
-                                <Pill tone={r.status.tone}>
+                                <StatusBadge tone={r.status.tone}>
                                     {r.status.label}
-                                </Pill>
+                                </StatusBadge>
                             </span>
                             <span className="flex-[0_0_150px] text-[13px] tabular-nums">
                                 {r.price}

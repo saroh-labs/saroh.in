@@ -23,6 +23,8 @@ const VIEWS: readonly CatalogueView[] = [
     "inventory",
     "needs",
 ];
+/** The views that are tabs of the screen, written as `?tab=`. */
+const TAB_VIEWS: readonly CatalogueView[] = ["collections", "inventory"];
 const STATUSES: readonly ProductStatus[] = ["PUBLISHED", "DRAFT", "ARCHIVED"];
 
 function one(params: Params, key: string): string | undefined {
@@ -32,11 +34,15 @@ function one(params: Params, key: string): string | undefined {
 }
 
 /**
- * What the address asks for. An unknown chip is "All"; the old "Needs
- * restock" chip (`?view=restock`) is "Show only these".
+ * What the address asks for. Collections and Inventory are the screen's
+ * tabs, so they are `?tab=`; "Show only these" is the list's saved filter,
+ * `?view=needs`. A link from before the tabs moved (`?view=collections`)
+ * still lands on its tab. An unknown one is "All"; the old "Needs restock"
+ * chip (`?view=restock`) is "Show only these".
  */
 export function readListQuery(params: Params): ListQuery {
-    const view = one(params, "view");
+    const tab = one(params, "tab");
+    const view = TAB_VIEWS.find((v) => v === tab) ?? one(params, "view");
     const status = one(params, "status");
     return {
         view:
@@ -58,7 +64,8 @@ export function listHref(
 ): string {
     const next = { ...query, ...patch };
     const q = new URLSearchParams();
-    if (next.view !== "all") q.set("view", next.view);
+    if (TAB_VIEWS.includes(next.view)) q.set("tab", next.view);
+    else if (next.view !== "all") q.set("view", next.view);
     if (next.q) q.set("q", next.q);
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.status) q.set("status", next.status);

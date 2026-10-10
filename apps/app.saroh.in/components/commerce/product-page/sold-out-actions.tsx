@@ -14,7 +14,7 @@ import {
 } from "@/lib/products/tracking";
 
 const actionClass =
-    "rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11";
+    "rounded-sm text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11";
 
 /**
  * Mark an untracked product sold out by hand, or available again (#515),

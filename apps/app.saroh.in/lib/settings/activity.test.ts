@@ -594,7 +594,7 @@ describe("activityLine — the team", () => {
     it("opens the Team page on its people", () => {
         expect(
             activityLine(event({ action: "membership.remove" }))?.where.href,
-        ).toBe("/settings/people?view=people");
+        ).toBe("/settings/people?tab=people");
     });
 
     it("says so when the person is no longer there", () => {

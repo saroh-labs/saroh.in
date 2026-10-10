@@ -66,10 +66,10 @@ export const NEEDS_APPROVAL_HINT =
 /** The status pill's colour, by what it means (#335). */
 export const STATUS_BADGE: Record<
     EditorStatusTone,
-    "error" | "draft" | "neutral" | "success"
+    "error" | "warning" | "neutral" | "success"
 > = {
     danger: "error",
-    attention: "draft",
+    attention: "warning",
     quiet: "neutral",
     done: "success",
 };

@@ -1,8 +1,8 @@
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { dateLine, greeting, sinceLinks } from "@/lib/home/last-day";
 import type { HomeLastDay } from "@/lib/home/service";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Home's page header (round 2, F6), the one every screen draws: the greeting in the
@@ -46,20 +46,13 @@ export function HomeHeader({
                             aria-labelledby="home-last-24-hours"
                             className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
                         >
-                            <span
-                                id="home-last-24-hours"
-                                className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                            >
+                            <span id="home-last-24-hours" className="label">
                                 Last 24 hours
                             </span>
                             {links.map((link) => (
-                                <Link
-                                    key={link.key}
-                                    href={link.href}
-                                    className="rounded-sm underline decoration-border-strong underline-offset-[3px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                >
+                                <TextLink key={link.key} href={link.href}>
                                     {link.label}
-                                </Link>
+                                </TextLink>
                             ))}
                         </div>
                     ) : null}

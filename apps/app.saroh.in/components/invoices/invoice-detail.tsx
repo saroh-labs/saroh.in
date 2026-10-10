@@ -18,8 +18,6 @@ import {
     IssueDialog,
     RecordPaymentDialog,
 } from "@/components/invoices/invoice-actions";
-
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { useInvoiceSend } from "@/components/invoices/send-dialog";
 import {
@@ -31,6 +29,7 @@ import { QrButton } from "@/components/qr/qr-button";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog, sayRefusal } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
@@ -43,6 +42,8 @@ import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 import type { OnlineBlocker } from "@/lib/staff/types";
+import { copyText } from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 
 type Dialog =
     | "issue"
@@ -52,15 +53,6 @@ type Dialog =
     | "refund"
     | "newLink"
     | "newViewLink";
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 /**
  * One invoice, after "Saroh Invoice Detail": its number and status with
@@ -216,7 +208,7 @@ export function InvoiceDetail({
         setViewUrl(null);
         redraw();
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? `Pay link copied. Send it to ${invoice.who}.`
                 : "Pay link ready. Copy it from the Payment panel.",
         );
@@ -232,7 +224,7 @@ export function InvoiceDetail({
         if (!res.ok) return refusedResult(res);
         setViewUrl(res.data.url);
         showSuccess(
-            (await copy(res.data.url))
+            (await copyText(res.data.url))
                 ? s === "PAID"
                     ? `Link copied. Send it to ${invoice.who}: it shows the invoice, paid.`
                     : `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
@@ -242,7 +234,7 @@ export function InvoiceDetail({
 
     function copyShown() {
         if (!url) return;
-        void copy(url).then((ok) =>
+        void copyText(url).then((ok) =>
             ok
                 ? showSuccess(
                       urlKind === "view" ? "Link copied." : "Pay link copied.",
@@ -366,7 +358,9 @@ export function InvoiceDetail({
                     </span>
                 }
                 badge={
-                    <InvoicePill label={pill.label} variant={pill.variant} />
+                    <StatusBadge tone={pill.variant} size="default">
+                        {pill.label}
+                    </StatusBadge>
                 }
                 description={subline}
                 actions={
@@ -414,12 +408,9 @@ export function InvoiceDetail({
             ) : null}
 
             {late ? (
-                <div
-                    role="alert"
-                    className="mb-3.5 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3 text-[13px] font-semibold text-destructive-subtle-foreground print:hidden"
-                >
+                <Notice tone="error" className="mb-3.5 print:hidden">
                     {late}
-                </div>
+                </Notice>
             ) : null}
 
             <div className="flex flex-wrap items-start gap-4">
@@ -427,9 +418,7 @@ export function InvoiceDetail({
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3 print:hidden">
                     {connected}
                     <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-                        <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Payment
-                        </h2>
+                        <h2 className="label mb-1.5">Payment</h2>
                         <p className="text-[13px] leading-[1.5] text-foreground">
                             {payLine}
                         </p>

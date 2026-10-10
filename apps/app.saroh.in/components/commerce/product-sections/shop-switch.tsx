@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * Whether a detail shows on the shop, beside the detail itself. The team
@@ -64,43 +65,12 @@ export function ChoicePills<V extends string>({
     disabled?: boolean;
 }) {
     return (
-        <div
-            role="radiogroup"
-            aria-label={label}
-            className="flex w-fit flex-wrap rounded-[9px] bg-muted p-[3px]"
-            onKeyDown={(e) => {
-                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                e.preventDefault();
-                const i = options.findIndex((o) => o.value === value);
-                const step = e.key === "ArrowRight" ? 1 : -1;
-                const next = options.at(
-                    (i + step + options.length) % options.length,
-                );
-                if (next) onChange(next.value);
-            }}
-        >
-            {options.map((o) => {
-                const on = o.value === value;
-                return (
-                    <button
-                        key={o.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        tabIndex={on ? 0 : -1}
-                        disabled={disabled}
-                        onClick={() => onChange(o.value)}
-                        className={cn(
-                            "rounded-[7px] px-3 py-1.5 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11",
-                            on
-                                ? "bg-card text-foreground shadow-[0_1px_3px_rgba(28,28,26,0.12)]"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {o.label}
-                    </button>
-                );
-            })}
-        </div>
+        <Segmented
+            label={label}
+            value={value}
+            onValueChange={onChange}
+            options={options}
+            disabled={disabled}
+        />
     );
 }

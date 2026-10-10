@@ -21,6 +21,7 @@ import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { personHref } from "@/lib/contacts/person-href";
 import { invoiceMoney } from "@/lib/invoices/money";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { ClassPacksTabs } from "./class-packs-tabs";
 import { SellPackDialog } from "./sell-pack-dialog";
 
@@ -140,12 +141,12 @@ export function PurchasesScreen({
             width: "96px",
             cell: (p) =>
                 p.invoiceId ? (
-                    <Link
+                    <TextLink
                         href={`/billing/invoices/${p.invoiceId}`}
-                        className="text-[12.5px] font-medium underline underline-offset-4"
+                        className="text-[12.5px]"
                     >
                         Open
-                    </Link>
+                    </TextLink>
                 ) : (
                     <span className="text-[12.5px] text-muted-foreground">
                         None

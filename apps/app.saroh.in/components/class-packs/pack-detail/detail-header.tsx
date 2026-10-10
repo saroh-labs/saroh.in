@@ -6,9 +6,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { packCrumbs } from "../pack-editor/pack-crumbs";
 
-import { Pill } from "@/components/subscriptions/pill";
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 /** The page's gutter: the page container's own, 26px and 16px on a phone. */
 export const GUTTER = "px-4 sm:px-[26px]";
 
@@ -57,7 +58,7 @@ export function PackDetailHeader({
                     lead={
                         <div
                             aria-hidden
-                            className="flex size-[52px] flex-col items-center justify-center rounded-[12px] bg-brand-subtle text-brand-subtle-foreground"
+                            className="flex size-[52px] flex-col items-center justify-center rounded-[12px] bg-muted text-foreground"
                         >
                             <span className="font-display text-[20px] font-bold leading-none">
                                 {head.thumbN}
@@ -70,15 +71,21 @@ export function PackDetailHeader({
                     title={name}
                     badge={
                         <>
-                            <Pill tone={head.status.tone}>
+                            <StatusBadge tone={head.status.tone}>
                                 {head.status.label}
-                            </Pill>
-                            <Pill tone="off">{head.kindLabel}</Pill>
+                            </StatusBadge>
+                            <StatusBadge tone="off">
+                                {head.kindLabel}
+                            </StatusBadge>
                             {head.firstOnly ? (
-                                <Pill tone="accent">First pack only</Pill>
+                                <StatusBadge tone="accent">
+                                    First pack only
+                                </StatusBadge>
                             ) : null}
                             {head.pending ? (
-                                <Pill tone="accent">Changes not published</Pill>
+                                <StatusBadge tone="accent">
+                                    Changes not published
+                                </StatusBadge>
                             ) : null}
                         </>
                     }
@@ -147,31 +154,31 @@ export function PackDetailHeader({
                 />
             </div>
             {head.note ? (
-                <div
+                <Notice
                     id="pack-detail-note"
-                    role="note"
-                    className={cn(
-                        "flex flex-wrap items-center gap-2.5 border-b border-border bg-muted py-[11px]",
-                        GUTTER,
-                    )}
+                    layout="banner"
+                    icon={false}
+                    className={GUTTER}
                 >
-                    <span className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
-                        <strong className="text-foreground">
-                            {head.note.head}
-                        </strong>{" "}
-                        {head.note.body}
-                    </span>
-                    {head.archived && canWrite ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={busy}
-                            onClick={onRestore}
-                        >
-                            Sell again
-                        </Button>
-                    ) : null}
-                </div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
+                            <strong className="text-foreground">
+                                {head.note.head}
+                            </strong>{" "}
+                            {head.note.body}
+                        </span>
+                        {head.archived && canWrite ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busy}
+                                onClick={onRestore}
+                            >
+                                Sell again
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ) : null}
         </>
     );

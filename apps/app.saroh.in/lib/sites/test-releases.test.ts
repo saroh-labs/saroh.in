@@ -96,7 +96,7 @@ describe("a release's status copy", () => {
     it("ready: who made it and when", () => {
         expect(releaseStatusCopy(release(), KOLKATA, NOW)).toEqual({
             label: "Ready",
-            tone: "draft",
+            tone: "active",
             line: "Made today, 10:10am by Asha",
         });
     });

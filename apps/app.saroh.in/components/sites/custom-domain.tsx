@@ -27,6 +27,7 @@ import {
 import type { SiteDomain } from "@/lib/domains/service";
 import { exactDate } from "@/lib/sites/format-date";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * A merchant's own domain, on the site settings screen (#200, #861).
@@ -261,14 +262,13 @@ export function CustomDomain({
                         {view.liveUrl ? (
                             <p className="text-sm">
                                 Live at{" "}
-                                <a
+                                <TextLink
                                     href={view.liveUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium underline underline-offset-2 [overflow-wrap:anywhere] hover:text-muted-foreground active:text-foreground"
+                                    external
+                                    className="[overflow-wrap:anywhere]"
                                 >
                                     {domain.hostname}
-                                </a>
+                                </TextLink>
                             </p>
                         ) : null}
 

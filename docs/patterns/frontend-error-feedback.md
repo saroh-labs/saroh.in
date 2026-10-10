@@ -19,6 +19,13 @@
 3. **Toasts**: the outcome of something the user just did.
 4. **Field messages**: validation, and server errors that name a field
    (`frontend-forms.md`).
+5. **`Notice`** (`@saroh/ui/notice`): something to know beside the content
+   that is none of the above. A problem, a warning, a fact, a success that
+   should stay on screen. One component, five tones (`info`, `warning`,
+   `error`, `success`, `neutral`), as a card or an edge-to-edge banner. An
+   error is `role="alert"`, a neutral note `role="note"`, the rest
+   `role="status"`. Never a hand-built box with a role: the scan in
+   `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts` fails one.
 
 ## Rules
 
@@ -39,6 +46,12 @@
   forwards `error.message`.
 - **Adopted** — **Never put the only way to do something in a toast,** and keep
   error toasts on screen long enough to read (15 §5).
+- **Current** — **A copy is acknowledged by its button, not a toast.**
+  `CopyButton` says "Copied" for 1.6 seconds and comes back. A toast only
+  where the link was also just made (it says who to send it to). When the
+  browser refuses there is one sentence, `copyFailedMessage()`: "Couldn't
+  copy the link. Select it and copy it instead.", with the link shown
+  selected.
 - **Current** — **One Undo, ten seconds, and it says how it went** (UX
   audit, 10 Oct). `showUndo(message, undo, options?)` lasts ten seconds
   everywhere (`UNDO_MS`). No screen has a duration or a timer of its own

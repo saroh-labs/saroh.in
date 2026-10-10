@@ -25,6 +25,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<
     VersionBadgeTone,
@@ -170,7 +171,6 @@ export function SiteVersions({
                                             <Badge
                                                 key={b.label}
                                                 variant={BADGE[b.tone]}
-                                                className="whitespace-nowrap"
                                             >
                                                 {b.label}
                                             </Badge>
@@ -313,12 +313,9 @@ function RestoreConfirm({
                     : null}
             </p>
             {gate.kind === "override" ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note">
                     {RESTORE_OVERRIDE_LINE}
-                </p>
+                </Notice>
             ) : null}
         </div>
     );
@@ -366,10 +363,7 @@ function ScheduledList({
                                         <span className="text-sm font-medium [overflow-wrap:anywhere]">
                                             {releaseTitle(release)}
                                         </span>
-                                        <Badge
-                                            variant="info"
-                                            className="whitespace-nowrap"
-                                        >
+                                        <Badge variant="info">
                                             {status.label}
                                         </Badge>
                                     </div>

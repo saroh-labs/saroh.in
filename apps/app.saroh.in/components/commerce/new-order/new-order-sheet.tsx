@@ -20,6 +20,7 @@ import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
 
+import { Notice } from "@saroh/ui/notice";
 import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
@@ -209,9 +210,7 @@ function NewOrderBody({
             <FormSheetBody className="auto-rows-max gap-3.5">
                 {stores.length > 1 ? (
                     <div>
-                        <div className="mb-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Taken at
-                        </div>
+                        <div className="label mb-[7px]">Taken at</div>
                         <div
                             role="radiogroup"
                             aria-label="Location"
@@ -237,17 +236,11 @@ function NewOrderBody({
                     attention={o.attentionNote}
                 />
                 {o.loading ? (
-                    <p
-                        role="status"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-muted-foreground"
-                    >
+                    <Notice role="status">
                         Reading what {storeName} sells…
-                    </p>
+                    </Notice>
                 ) : !o.data ? (
-                    <p
-                        role="alert"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-destructive-subtle-foreground"
-                    >
+                    <Notice tone="error">
                         Couldn&apos;t read what {storeName} sells.{" "}
                         <button
                             type="button"
@@ -259,7 +252,7 @@ function NewOrderBody({
                         >
                             Try again
                         </button>
-                    </p>
+                    </Notice>
                 ) : (
                     <LinesStep
                         products={o.data.products}

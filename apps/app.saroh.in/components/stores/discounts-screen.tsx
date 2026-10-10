@@ -16,20 +16,20 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { describeDiscount } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 
-/** The design's three pills. Exhausted is drawn as Expired: it will not work now. */
+/** A code used up reads Ended, as one past its date does: it will not work now. */
 const STATE: Record<
     DiscountState,
     { label: string; variant: NonNullable<BadgeProps["variant"]> }
 > = {
-    ACTIVE: { label: "Active", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "warning" },
-    EXPIRED: { label: "Expired", variant: "neutral" },
-    EXHAUSTED: { label: "Used up", variant: "neutral" },
+    ACTIVE: { label: "Live", variant: "success" },
+    SCHEDULED: { label: "Scheduled", variant: "info" },
+    EXPIRED: { label: "Ended", variant: "neutral" },
+    EXHAUSTED: { label: "Ended", variant: "neutral" },
 };
 
 const FILTERS: DataFilter<Discount>[] = [
     { id: "all", label: "All" },
-    { id: "active", label: "Active", predicate: (d) => d.state === "ACTIVE" },
+    { id: "active", label: "Live", predicate: (d) => d.state === "ACTIVE" },
     {
         id: "scheduled",
         label: "Scheduled",

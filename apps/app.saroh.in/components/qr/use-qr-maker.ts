@@ -24,6 +24,7 @@ import type {
 import type { QrRefusalWords } from "@/lib/qr/words";
 import { defaultLabel, linkWords, refusalWords } from "@/lib/qr/words";
 
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import type { DownloadEnv, QrFormat, QrLogoChoice } from "./qr-download";
 import { BROWSER, downloadQr, qrFile } from "./qr-download";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -339,17 +340,13 @@ export function useQrMaker(input: UseQrMakerInput) {
 
     async function copy() {
         if (!bound?.link) return;
-        try {
-            await navigator.clipboard.writeText(bound.link);
-            setCopied(true);
-            if (copiedTimer.current) clearTimeout(copiedTimer.current);
-            copiedTimer.current = setTimeout(() => setCopied(false), 1600);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                bound.link,
-            );
+        if (!(await copyText(bound.link))) {
+            showError(copyFailedMessage(), bound.link);
+            return;
         }
+        setCopied(true);
+        if (copiedTimer.current) clearTimeout(copiedTimer.current);
+        copiedTimer.current = setTimeout(() => setCopied(false), 1600);
     }
 
     return {

@@ -7,6 +7,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { useId, useSyncExternalStore } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     ReadyAside,
     ReadyChecklist,
@@ -19,6 +20,7 @@ import {
     takeMoneyPlace,
     writeSetupHidden,
 } from "@/lib/settings/ready";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "Get ready to take money" on Home ("Saroh Home" design, F8): the same steps
@@ -99,13 +101,12 @@ export function TakeMoneyChecklist({
     if (place === "hidden") {
         if (slot !== "late") return null;
         return (
-            <button
-                type="button"
+            <TextLink
                 onClick={() => setHidden(businessId, false)}
-                className="justify-self-start text-left text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                className="justify-self-start text-left text-[12.5px] coarse:min-h-11"
             >
                 Show setup ({count})
-            </button>
+            </TextLink>
         );
     }
     if (place !== slot) return null;
@@ -194,7 +195,7 @@ function AsideRow({ item }: { item: ReadyAside }) {
     return (
         <Link
             href={item.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors duration-fast hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <span
                 aria-hidden
@@ -203,15 +204,13 @@ function AsideRow({ item }: { item: ReadyAside }) {
             <span className="grid min-w-0 flex-1 gap-0.5">
                 <span className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
                     {item.label}
-                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
-                        {item.comesWith}
-                    </span>
+                    <StatusBadge tone="neutral">{item.comesWith}</StatusBadge>
                 </span>
                 <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
                     {item.why}
                 </span>
             </span>
-            <span className="mt-px flex-none text-[12.5px] font-semibold text-brand">
+            <span className="mt-px flex-none text-[12.5px] font-semibold text-foreground">
                 {item.cta}
             </span>
         </Link>
@@ -222,7 +221,7 @@ function StepRow({ step }: { step: ReadyStep }) {
     return (
         <Link
             href={step.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors duration-fast hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <span
                 aria-hidden
@@ -235,9 +234,7 @@ function StepRow({ step }: { step: ReadyStep }) {
                           : "border-[1.5px] border-border-strong",
                 )}
             >
-                {step.done ? (
-                    <Check className="size-3" strokeWidth={3} />
-                ) : null}
+                {step.done ? <Check className="size-3" /> : null}
             </span>
             <span className="grid min-w-0 gap-0.5">
                 <span

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { ArrowUpRight, Check } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import type {
@@ -9,6 +9,7 @@ import type {
     LocationTab,
     ReadyItem,
 } from "@/lib/stores/location-readiness";
+import { doneOf, ProgressBar } from "@saroh/ui/progress-bar";
 
 /** Opens a tab of the page and puts the keyboard on a field there. */
 type Jump = (tab: LocationTab, focus?: string) => void;
@@ -59,12 +60,11 @@ export function LocationReadinessCard({
         );
     }
 
-    const pct = Math.round((100 * done) / total);
     return (
         <section
             aria-labelledby="location-ready-heading"
             data-testid="location-readiness"
-            className="grid gap-2.5 rounded-xl border border-highlight-border bg-brand-subtle px-4 py-3"
+            className="grid gap-2.5 rounded-xl border border-border-strong bg-muted px-4 py-3"
         >
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                 <h2
@@ -81,20 +81,12 @@ export function LocationReadinessCard({
                         · {note}
                     </span>
                 ) : null}
-                <div
-                    role="progressbar"
-                    aria-label={heading}
-                    aria-valuemin={0}
-                    aria-valuemax={total}
-                    aria-valuenow={done}
-                    aria-valuetext={`${done} of ${total} done`}
-                    className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-highlight"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={done}
+                    max={total}
+                    label={doneOf(done, total)}
+                    className="ml-auto max-w-[200px] flex-[1_1_120px] self-center"
+                />
             </div>
             <ul className="grid gap-2">
                 {items.map((item) => (
@@ -140,7 +132,7 @@ function Item({
         <li className="flex min-h-8 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px]">
             <span
                 aria-hidden
-                className="size-[7px] shrink-0 rounded-full bg-highlight"
+                className="size-[7px] shrink-0 rounded-full bg-foreground"
             />
             <span className="min-w-0 flex-[1_1_200px] font-medium">
                 <span className="sr-only">To do: </span>
@@ -177,7 +169,7 @@ function ViewLink({ view }: { view: { label: string; href: string } }) {
             className="inline-flex min-h-6 items-center gap-0.5 rounded-sm text-[12.5px] font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
         >
             {view.label}
-            <ArrowUpRight aria-hidden className="size-3.5" />
+            <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only">(opens in a new tab)</span>
         </a>
     );

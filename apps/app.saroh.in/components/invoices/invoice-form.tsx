@@ -20,6 +20,7 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { chipClass } from "@/components/shared/chip";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -45,6 +46,7 @@ import {
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { copyText } from "@saroh/ui/copy-button";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -120,15 +122,6 @@ function dueFrom(days: number): string {
         59,
         59,
     ).toISOString();
-}
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 /**
@@ -358,7 +351,7 @@ export function InvoiceForm({
                     `${number} issued, but no pay link was made: ${link.error}`,
                 );
             }
-        } else if (await copy(link.data.url)) {
+        } else if (await copyText(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
             );
@@ -416,14 +409,6 @@ export function InvoiceForm({
             </div>
         );
     }
-
-    const chip = (on: boolean) =>
-        cn(
-            "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
-            on
-                ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
-        );
 
     return (
         <>
@@ -549,7 +534,7 @@ export function InvoiceForm({
                                 <button
                                     type="button"
                                     onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                    className="mt-2 py-1 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     + Their GSTIN, state and address
                                 </button>
@@ -720,7 +705,7 @@ export function InvoiceForm({
                                     hsnSac: "",
                                 })
                             }
-                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                         >
                             + Add a line
                         </button>
@@ -744,7 +729,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === "kept"}
                                     onClick={() => form.setValue("due", "kept")}
-                                    className={chip(due === "kept")}
+                                    className={chipClass(due === "kept")}
                                 >
                                     <ViewerDate
                                         iso={draft.dueAt}
@@ -759,7 +744,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === d.days}
                                     onClick={() => form.setValue("due", d.days)}
-                                    className={chip(due === d.days)}
+                                    className={chipClass(due === d.days)}
                                 >
                                     {d.label}
                                 </button>
@@ -769,9 +754,7 @@ export function InvoiceForm({
                 </div>
 
                 <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Total
-                    </h2>
+                    <h2 className="label">Total</h2>
                     <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
                         {show(total)}
                     </p>
@@ -836,9 +819,7 @@ export function InvoiceForm({
 function Card({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );

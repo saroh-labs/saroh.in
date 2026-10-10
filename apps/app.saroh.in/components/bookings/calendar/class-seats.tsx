@@ -17,10 +17,12 @@ import {
     localDateOf,
     localMinuteOf,
     paidText,
+    STATE_LABEL,
     whoFor,
 } from "@/lib/services/diary";
 
-import { StatePill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { STATE_TONE } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,
@@ -81,9 +83,7 @@ export function ClassSeats({
     return (
         <div className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Booked by name
-                </span>
+                <span className="label">Booked by name</span>
                 {note ? (
                     <span className="ml-auto text-[11.5px] text-muted-foreground">
                         {note}
@@ -115,7 +115,7 @@ export function ClassSeats({
                                 {b.contact ? (
                                     <Link
                                         href={personHref(b.contact.id)}
-                                        className="text-[13px] font-semibold text-foreground hover:text-brand"
+                                        className="text-[13px] font-semibold text-foreground hover:underline"
                                     >
                                         {whoFor(b)}
                                     </Link>
@@ -136,12 +136,13 @@ export function ClassSeats({
                                 </div>
                             </div>
                             {pill ? (
-                                <StatePill
-                                    label={pill.label}
-                                    tone={pill.tone}
-                                />
+                                <StatusBadge tone={pill.tone}>
+                                    {pill.label}
+                                </StatusBadge>
                             ) : (
-                                <StatePill state={state} />
+                                <StatusBadge tone={STATE_TONE[state]}>
+                                    {STATE_LABEL[state]}
+                                </StatusBadge>
                             )}
                             {undo ? (
                                 <Button

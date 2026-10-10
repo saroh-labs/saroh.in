@@ -496,7 +496,10 @@ test.describe("customer detail on a 375px phone", () => {
             );
         expect(new Set(tops).size).toBe(1);
         expect(
-            await list.evaluate((el) => el.scrollWidth > el.clientWidth),
+            // The shared strip scrolls in the box around the tabs.
+            await list
+                .locator("xpath=..")
+                .evaluate((el) => el.scrollWidth > el.clientWidth),
         ).toBe(true);
         // Opened from the address, the chosen tab was scrolled into view.
         await expect.poll(() => whole(notes)).toBe(true);

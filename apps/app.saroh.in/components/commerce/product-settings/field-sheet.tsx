@@ -2,7 +2,6 @@
 
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
@@ -19,8 +18,10 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
+import { chipClass } from "@/components/shared/chip";
 import { FormSheet } from "@/components/shared/form-sheet";
-import { chipBtn, PROBLEM } from "./product-settings";
+import { Segmented } from "@saroh/ui/segmented";
+import { PROBLEM } from "./product-settings";
 
 export const FIELD_TYPES: { type: FieldType; label: string }[] = [
     { type: "TEXT", label: "Text" },
@@ -223,7 +224,7 @@ export function FieldSheet({
                                 aria-checked={type === t.type}
                                 disabled={busy}
                                 onClick={() => setType(t.type)}
-                                className={chipBtn(type === t.type)}
+                                className={chipClass(type === t.type)}
                             >
                                 {t.label}
                             </button>
@@ -236,33 +237,17 @@ export function FieldSheet({
                 <p id={`${id}-who`} className="text-sm font-medium">
                     Who sees it
                 </p>
-                <div
-                    role="radiogroup"
+                <Segmented
+                    label="Who sees it"
                     aria-labelledby={`${id}-who`}
-                    className="flex w-fit gap-0.5 rounded-[8px] bg-muted p-0.5"
-                >
-                    {WHO.map((o) => {
-                        const chosen = onShop === o.on;
-                        return (
-                            <button
-                                key={o.label}
-                                type="button"
-                                role="radio"
-                                aria-checked={chosen}
-                                disabled={busy}
-                                onClick={() => setOnShop(o.on)}
-                                className={cn(
-                                    "rounded-[6px] px-2.5 py-[5px] text-[12px] font-semibold disabled:cursor-not-allowed coarse:min-h-11",
-                                    chosen
-                                        ? "bg-card text-foreground shadow-[0_1px_3px_rgba(28,28,26,0.12)]"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                    value={onShop ? "shop" : "team"}
+                    onValueChange={(v) => setOnShop(v === "shop")}
+                    disabled={busy}
+                    options={WHO.map((o) => ({
+                        value: o.on ? "shop" : "team",
+                        label: o.label,
+                    }))}
+                />
                 <p className="text-[12px] text-muted-foreground">
                     {onShop
                         ? "Customers see it under the product's description."
@@ -302,7 +287,7 @@ export function FieldSheet({
                                                 : [...categoryIds, c.id],
                                         )
                                     }
-                                    className={chipBtn(on)}
+                                    className={chipClass(on)}
                                 >
                                     {c.name}
                                 </button>
@@ -311,10 +296,7 @@ export function FieldSheet({
                     </div>
                 )}
                 {categoryIds.length === 0 && categories.length > 0 ? (
-                    <p
-                        role="status"
-                        className="text-[11.5px] text-brand-subtle-foreground"
-                    >
+                    <p role="status" className="text-[11.5px] text-foreground">
                         In no category, so no product will ask for it.
                     </p>
                 ) : null}

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useClock } from "@/lib/hooks/use-clock";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS } from "./parts";
 
 export interface Hold {
@@ -58,24 +59,9 @@ export function HoldCard({
 
     const refund = hold.kind === "refund";
     return (
-        <div
-            role="status"
-            className={cn(
-                "rounded-[10px] border px-[13px] py-[11px]",
-                refund
-                    ? "border-destructive-subtle-foreground bg-destructive-subtle"
-                    : "border-highlight-border bg-brand-subtle",
-            )}
-        >
+        <Notice tone={refund ? "error" : "info"} role="status" icon={false}>
             <div className="flex flex-wrap items-center gap-2.5">
-                <span
-                    className={cn(
-                        "flex-[1_1_220px] text-[13px] font-semibold tabular-nums",
-                        refund
-                            ? "text-destructive-subtle-foreground"
-                            : "text-brand-subtle-foreground",
-                    )}
-                >
+                <span className="flex-[1_1_220px] font-semibold tabular-nums">
                     {title(Math.ceil(left / 1000))}
                 </span>
                 <button
@@ -86,7 +72,7 @@ export function HoldCard({
                         "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:h-11",
                         refund
                             ? "border-destructive-subtle-foreground"
-                            : "border-highlight-border",
+                            : "border-border-strong",
                     )}
                 >
                     {undoLabel}
@@ -99,7 +85,7 @@ export function HoldCard({
                         "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold hover:underline active:bg-card/60 coarse:h-11",
                         refund
                             ? "text-destructive-subtle-foreground"
-                            : "text-brand-subtle-foreground",
+                            : "text-foreground",
                     )}
                 >
                     {nowLabel}
@@ -119,14 +105,14 @@ export function HoldCard({
             >
                 <div
                     className={cn(
-                        "h-[3px] rounded-full transition-[width] duration-200 ease-linear",
+                        "h-[3px] rounded-full transition-[width] duration-slow ease-out",
                         refund
                             ? "bg-destructive-subtle-foreground"
-                            : "bg-highlight",
+                            : "bg-foreground",
                     )}
                     style={{ width: `${(left / HOLD_MS) * 100}%` }}
                 />
             </div>
-        </div>
+        </Notice>
     );
 }

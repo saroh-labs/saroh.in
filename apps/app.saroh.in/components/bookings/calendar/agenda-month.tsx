@@ -3,10 +3,17 @@
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { Block, LocalDate } from "@/lib/services/diary";
-import { blockLine, blockTitle, clock, monthDays } from "@/lib/services/diary";
+import {
+    blockLine,
+    blockTitle,
+    clock,
+    monthDays,
+    STATE_LABEL,
+} from "@/lib/services/diary";
 import { EmptyState } from "@saroh/ui/data-state";
 
-import { StatePill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { STATE_TONE } from "./parts";
 
 export interface FreeRow {
     key: string;
@@ -78,7 +85,9 @@ export function AgendaList({
                                 {blockLine(b)}
                             </div>
                         </div>
-                        <StatePill state={b.state} />
+                        <StatusBadge tone={STATE_TONE[b.state]}>
+                            {STATE_LABEL[b.state]}
+                        </StatusBadge>
                     </button>
                 </li>
             ))}
@@ -143,7 +152,7 @@ export function AgendaMonth({
                                     on
                                         ? "bg-primary font-bold text-primary-foreground"
                                         : d === today
-                                          ? "bg-brand-subtle font-medium"
+                                          ? "bg-muted font-medium"
                                           : "font-medium hover:bg-muted",
                                 )}
                             >
@@ -153,7 +162,7 @@ export function AgendaMonth({
                                     className={cn(
                                         "mx-auto mt-px block size-1 rounded-full",
                                         busy
-                                            ? "bg-highlight"
+                                            ? "bg-foreground"
                                             : "bg-transparent",
                                     )}
                                 />
@@ -163,7 +172,7 @@ export function AgendaMonth({
                 </div>
                 {free ? (
                     <div className="mt-2.5 border-t border-border/60 pt-2.5">
-                        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <div className="label mb-1.5">
                             {date === today ? "Free today" : "Free this day"}
                         </div>
                         {free.length === 0 ? (

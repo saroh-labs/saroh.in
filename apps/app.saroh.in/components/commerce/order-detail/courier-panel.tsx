@@ -16,13 +16,13 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
 
 const FIELD =
     "mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11";
@@ -142,13 +142,7 @@ function CourierDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => pickChip(c)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:border-border-strong hover:bg-accent active:bg-accent-active dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {c}
                             </button>

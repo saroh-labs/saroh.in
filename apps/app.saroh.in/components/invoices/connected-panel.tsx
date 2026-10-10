@@ -23,9 +23,7 @@ export function SidePanel({
 }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px] print:hidden">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );
