@@ -1,5 +1,6 @@
 "use client";
 
+import { authErrorCopy, authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
@@ -37,7 +38,7 @@ function ResetPasswordFormInner() {
             <div>
                 <AuthHeading
                     title="This link has expired"
-                    blurb="Nothing has changed — your old password still works."
+                    blurb="Nothing has changed. Your old password still works."
                 />
                 <AuthNote title="Expired or already used">
                     Links last an hour and work once. Ask for another and we
@@ -68,26 +69,26 @@ function ResetPasswordFormInner() {
         e.preventDefault();
         setError(null);
         if (newPassword !== confirmPassword) {
-            setError("Passwords do not match");
+            setError("Those two passwords don't match. Type them again.");
             return;
         }
         if (newPassword.length < 8) {
-            setError("Password must be at least 8 characters");
+            setError(authErrorCopy("PASSWORD_TOO_SHORT"));
             return;
         }
         if (!token) {
-            setError("This reset link is missing a token.");
+            setError(authErrorCopy("INVALID_TOKEN"));
             return;
         }
         setIsLoading(true);
-        const { error: err } = await resetPassword(
-            { newPassword, token },
-            {
-                onError: (ctx) => setError(ctx.error.message),
-            },
+        const { error: err } = await settle(() =>
+            resetPassword({ newPassword, token }),
         );
         setIsLoading(false);
-        if (err) return;
+        if (err) {
+            setError(authFailureCopy(err));
+            return;
+        }
         // A route, not a flash: ending every other session is consequential
         // enough that the person it happened to should be able to sit with the
         // page rather than watch it vanish on a timer.
@@ -145,8 +146,9 @@ function ResetPasswordFormInner() {
                  * read as a rule about that box.
                  */}
                 <p className="sa-rise text-muted-foreground mt-1 text-pretty text-[11.5px] leading-[1.45]">
-                    Saving a new password signs you out everywhere else — every
-                    other browser and device, including any you no longer have.
+                    Saving a new password signs you out everywhere else. That
+                    means every other browser and device, including any you no
+                    longer have.
                 </p>
                 <AuthSubmit disabled={isLoading}>
                     {isLoading ? "Saving…" : "Save new password"}
@@ -157,7 +159,7 @@ function ResetPasswordFormInner() {
                     href="/login"
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
-                    Back to log in
+                    Back to sign in
                 </Link>
             </AuthFooter>
         </div>
@@ -179,7 +181,7 @@ export function ResetPasswordForm() {
 }
 
 /**
- * The way out of a link that cannot be used: back to log in, or a new link.
+ * The way out of a link that cannot be used: back to sign in, or a new link.
  * Both states lead to the same two places, so they share one pair.
  */
 function LinkActions() {

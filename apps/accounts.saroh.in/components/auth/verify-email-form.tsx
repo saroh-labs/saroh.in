@@ -2,7 +2,9 @@
 
 import { AuthHeading } from "@/components/auth/field";
 import { OtpInput } from "@/components/auth/otp-input";
+import { verifiedLine, verifyBlurb } from "@/components/auth/panel-copy";
 import { getOnboardingUrl } from "@/lib/app-urls";
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { withCarry } from "@/lib/joining";
 import {
@@ -32,31 +34,10 @@ const SUCCESS_EXIT_AT_MS = 720;
 const SUCCESS_HOLD_MS = 1140;
 
 /**
- * Better Auth's own messages here are developer-facing ("Invalid OTP", "OTP
- * expired"). Each of these states has a different next action, so say what it
- * is rather than restating the failure.
- */
-const ERROR_COPY: Record<string, string> = {
-    INVALID_OTP: "That code isn't right. Check it and try again.",
-    OTP_EXPIRED: "That code has expired. Request a new one below.",
-    TOO_MANY_ATTEMPTS:
-        "Too many incorrect attempts. Request a new code below to keep going.",
-};
-
-function errorMessage(code: string | undefined, fallback: string | undefined) {
-    return (
-        (code && ERROR_COPY[code]) ??
-        fallback ??
-        "Something went wrong. Try again."
-    );
-}
-
-/**
- * `returnTo` is where a freshly verified account should land (#222) — the page
+ * `returnTo` is where a freshly verified account should land (#222): the page
  * they asked for before being bounced to sign in, already vetted by the server
  * component that renders this form. Null means there was nothing to return to,
- * and a new account belongs in onboarding rather than at a launcher full of
- * products that would bounce them straight back.
+ * and a new account belongs in setup, where it names its business.
  */
 export function VerifyEmailForm({
     returnTo = null,
@@ -93,21 +74,23 @@ export function VerifyEmailForm({
             setNotice(null);
             setIsVerifying(true);
 
-            const { error: err } = await authClient.emailOtp.verifyEmail({
-                email,
-                otp,
-            });
+            const { error: err } = await settle(() =>
+                authClient.emailOtp.verifyEmail({ email, otp }),
+            );
 
             if (err) {
                 setIsVerifying(false);
                 setCode("");
-                setError(errorMessage(err.code, err.message));
+                // Each code has its own next step in `lib/auth-error-copy.ts`
+                // (a wrong code, an expired one, too many tries). Better
+                // Auth's own message ("Invalid OTP") is never shown.
+                setError(authFailureCopy(err));
                 return;
             }
 
             // `autoSignInAfterVerification` means the session cookie is already
-            // set — the user goes straight into the product, never back to a
-            // login form. Play the confirmation, then hand off: a hard
+            // set: the user goes straight into the product, never back to a
+            // sign-in form. Play the confirmation, then hand off: a hard
             // navigation to another origin freezes the tab for a beat, and
             // landing that freeze AFTER a completed animation reads as
             // progress instead of as a hang.
@@ -126,16 +109,18 @@ export function VerifyEmailForm({
         setNotice(null);
         setIsResending(true);
 
-        const { error: err } = await authClient.emailOtp.sendVerificationOtp({
-            email,
-            type: "email-verification",
-        });
+        const { error: err } = await settle(() =>
+            authClient.emailOtp.sendVerificationOtp({
+                email,
+                type: "email-verification",
+            }),
+        );
 
         setIsResending(false);
         setCooldown(RESEND_COOLDOWN_SECONDS);
         if (err) {
             setError(
-                errorMessage(err.code, "Couldn't send a new code. Try again."),
+                authFailureCopy(err, "Couldn't send a new code. Try again."),
             );
             return;
         }
@@ -179,7 +164,7 @@ export function VerifyEmailForm({
                         You&apos;re verified
                     </p>
                     <p className="text-muted-foreground mt-1 text-sm">
-                        Taking you to your workspace…
+                        {verifiedLine(returnTo)}
                     </p>
                 </div>
             </div>
@@ -191,14 +176,14 @@ export function VerifyEmailForm({
     return (
         <div>
             {/*
-             * The design's verify step, in the split (#U4). The account was
-             * created at sign-up; what the code opens is the session, so the
-             * line says that rather than the design's "nothing has been
-             * created yet", which is not true of Better Auth.
+             * The design's verify step, in the split (#U4). The line says
+             * what to do and what comes next, in the person's terms. It
+             * used to explain that "the session starts once this code is
+             * accepted", which is how the sign-in system sees it.
              */}
             <AuthHeading
                 title="Check your email"
-                blurb="Not signed in yet. The session starts once this code is accepted."
+                blurb={verifyBlurb(returnTo)}
             />
             <form
                 onSubmit={(e) => {
@@ -273,6 +258,24 @@ export function VerifyEmailForm({
                     </Button>
                 </div>
 
+                {/*
+                 * The way out for someone who signed up with an address that
+                 * already has an account. Sign-up answers them exactly as it
+                 * answers a new address (it must not say who is registered),
+                 * so no code is coming and Resend sends none either. This
+                 * line is on the page for everyone, so it gives nothing away.
+                 */}
+                <p className="sa-rise text-muted-foreground mb-4 text-pretty text-[11.5px] leading-[1.45]">
+                    No code? You may already have an account.{" "}
+                    <Link
+                        href={withCarry("/login", returnTo, email)}
+                        className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
+                    >
+                        Sign in
+                    </Link>
+                    .
+                </p>
+
                 <div className="sa-rise flex gap-2">
                     <Button
                         asChild
@@ -289,8 +292,8 @@ export function VerifyEmailForm({
                         </Link>
                     </Button>
                     {/* The code submits itself on the sixth digit, so this is
-                        the fallback — and when it cannot be pressed, it says
-                        why rather than sitting inert. */}
+                        the fallback. When it cannot be pressed, it says why
+                        rather than sitting inert. */}
                     <Button
                         type="submit"
                         className="sa-cta h-10 flex-1 rounded-[9px] text-[13.5px] font-semibold"

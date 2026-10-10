@@ -10,6 +10,7 @@ import {
     AuthHeading,
     AuthSubmit,
 } from "@/components/auth/field";
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import Link from "next/link";
 
@@ -40,12 +41,14 @@ export function ForgotPasswordForm() {
             typeof window !== "undefined"
                 ? `${window.location.origin}/reset-password`
                 : undefined;
-        const { error: err } = await requestPasswordReset(
-            { email, redirectTo },
-            { onError: (ctx) => setError(ctx.error.message) },
+        const { error: err } = await settle(() =>
+            requestPasswordReset({ email, redirectTo }),
         );
         setIsLoading(false);
-        if (err) return;
+        if (err) {
+            setError(authFailureCopy(err));
+            return;
+        }
         router.push(`/forgot-password/sent?email=${encodeURIComponent(email)}`);
     }
 
@@ -79,7 +82,7 @@ export function ForgotPasswordForm() {
                     href="/login"
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
-                    Log in
+                    Sign in
                 </Link>
             </AuthFooter>
         </div>

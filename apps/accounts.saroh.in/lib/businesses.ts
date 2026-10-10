@@ -29,7 +29,7 @@ export interface Business {
 
 /** The line under a business whose door is paused for this person (#800). */
 export const PAUSED_DETAIL =
-    "Paused — this business's plan has no room for you right now. Nothing of yours is lost.";
+    "Paused. This business's plan has no room for you right now. Nothing of yours is lost.";
 
 /** The badge on a business's row: its paused door, else an operator's state. */
 export function businessBadge(
@@ -110,6 +110,6 @@ export const ROLE_LABEL: Record<BuiltInRole, string> = {
 export const ROLE_SHORT: Record<BuiltInRole, string> = {
     OWNER: "Can do everything, including billing and who has access",
     ADMIN: "Can change the business and invite people",
-    MEMBER: "Can see the business's work; changes little",
+    MEMBER: "Can see the business's work and change a little",
     REVIEWER: "Can read and comment on the pages they were invited to",
 };

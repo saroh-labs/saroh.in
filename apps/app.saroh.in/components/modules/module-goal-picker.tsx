@@ -390,7 +390,7 @@ export function ModuleGoalPicker({
                     >
                         {resolved.size === 0
                             ? "Continue"
-                            : "Set up my workspace"}
+                            : "Set up my business"}
                     </Button>
                 </div>
             </div>

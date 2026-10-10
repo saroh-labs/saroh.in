@@ -13,7 +13,7 @@ import {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
-import { getTrustedOrigins } from "./origins";
+import { getTrustedOrigins, isTrustedOrigin } from "./origins";
 
 // Re-export so existing consumers (api) keep importing it from @saroh/auth.
 export { getTrustedOrigins, isTrustedOrigin } from "./origins";
@@ -96,6 +96,25 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     sendResetPassword?: EmailSender;
     /**
+     * Tell the owner of an address that someone tried to sign up with it.
+     *
+     * With `requireEmailVerification` on, Better Auth answers a sign-up for an
+     * address that already has an account exactly as it answers a new one, so
+     * the screen cannot be used to find out who is registered. No code is
+     * sent, though, and the person is left reading "Check your email" with
+     * nothing arriving. This mail is the way out, and it reaches only the
+     * mailbox's owner: it says they already have an account and offers
+     * Sign in and Reset password.
+     */
+    sendExistingAccountNotice?: (args: {
+        to: string;
+        /**
+         * The sign-up page's own origin, when the request named a trusted
+         * one: where its Sign in and Reset password pages are.
+         */
+        origin?: string;
+    }) => Promise<void> | void;
+    /**
      * Approve an email change. Sent to the account's CURRENT address (not the
      * new one) — that is what makes the flow takeover-resistant: whoever holds
      * the existing mailbox authorizes the move. `newEmail` is included so the
@@ -109,6 +128,35 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
+}
+
+/**
+ * Better Auth's `emailAndPassword.onExistingUserSignUp` (1.6): called when a
+ * sign-up names an address that already has an account, and only while the
+ * duplicate answer is the generic one (`requireEmailVerification`).
+ *
+ * A failure to send must not change what the sign-up answers, or the two
+ * cases could be told apart again. So it is logged here and goes no further.
+ */
+export function existingUserSignUpHook(
+    send: CreateAuthOptions["sendExistingAccountNotice"],
+) {
+    return async (
+        { user }: { user: { email: string } },
+        request?: Request,
+    ): Promise<void> => {
+        if (!send) return;
+        const asked = request?.headers.get("origin") ?? undefined;
+        const origin = asked && isTrustedOrigin(asked) ? asked : undefined;
+        try {
+            await send({ to: user.email, ...(origin ? { origin } : {}) });
+        } catch (error) {
+            console.error(
+                "[auth] The existing-account email could not be sent.",
+                error instanceof Error ? error.name : "unknown error",
+            );
+        }
+    };
 }
 
 /**
@@ -160,7 +208,7 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
         throw new APIError("BAD_REQUEST", {
             message:
                 `You are the only owner of ${stranded.join(", ")}. Make someone else an owner, ` +
-                `or delete the organization first, then delete your account.`,
+                `or delete the business first, then delete your account.`,
         });
     }
 }
@@ -252,10 +300,16 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
             sendResetPassword: async ({ user, url, token }) => {
                 await opts.sendResetPassword?.({ to: user.email, url, token });
             },
+            // A second sign-up for an address that has an account: the
+            // screen says the same as for a new one, and the mailbox's owner
+            // is told how to get in.
+            onExistingUserSignUp: existingUserSignUpHook(
+                opts.sendExistingAccountNotice,
+            ),
         },
         emailVerification: {
             sendOnSignUp: true,
-            // Someone who signed up, missed the code and came back to log in
+            // Someone who signed up, missed the code and came back to sign in
             // gets a fresh one automatically — so the 403 below is always
             // actionable. The login form reads EMAIL_NOT_VERIFIED and forwards
             // them to the verify screen, where that code is already waiting.

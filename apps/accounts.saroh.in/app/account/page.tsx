@@ -5,6 +5,7 @@ import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { DeleteAccount } from "@/components/account/delete-account";
 import { ProfileForm } from "@/components/account/profile-form";
 import { SessionsList } from "@/components/account/sessions-list";
+import { getAppUrl } from "@/lib/app-urls";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import { Wordmark } from "@saroh/ui/wordmark";
@@ -12,9 +13,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 /**
- * Account settings — the user's own identity, owned by accounts.saroh.in
+ * Account settings: the user's own identity, owned by accounts.saroh.in
  * because this app is the single identity provider. The product apps
- * (app.saroh.in, admin) deliberately do NOT duplicate any of this; they link
+ * (app.saroh.in, admin) deliberately do NOT duplicate any of this. They link
  * here from their header user menu.
  *
  * Everything here acts on the SESSION USER only, never on an id from the URL,
@@ -35,7 +36,17 @@ export default function AccountPage() {
     if (error) {
         return (
             <main className="mx-auto max-w-2xl p-8">
-                <p className="text-destructive text-sm">{error.message}</p>
+                {/* The session could not be read. The library's own
+                    message is never shown (`lib/auth-error-copy.ts`). */}
+                <p role="alert" className="text-destructive text-sm">
+                    Couldn&apos;t load your account. Try again.
+                </p>
+                <a
+                    href="/account"
+                    className="active:text-muted-foreground mt-3 inline-block text-sm underline hover:decoration-2"
+                >
+                    Try again
+                </a>
             </main>
         );
     }
@@ -51,7 +62,7 @@ export default function AccountPage() {
                     href="/login"
                     className="active:text-muted-foreground text-sm underline hover:decoration-2"
                 >
-                    Go to login
+                    Sign in
                 </Link>
             </main>
         );
@@ -63,9 +74,9 @@ export default function AccountPage() {
         <main className="mx-auto grid max-w-2xl gap-6 p-6 sm:p-8">
             <header className="flex items-center justify-between gap-4">
                 <div className="grid gap-1">
-                    <Link href="/apps" aria-label="Saroh">
+                    <a href={getAppUrl()} aria-label="Go to Saroh">
                         <Wordmark />
-                    </Link>
+                    </a>
                     <h1 className="text-2xl font-semibold">Account</h1>
                     <p className="text-muted-foreground text-sm">
                         Manage how you sign in to Saroh.

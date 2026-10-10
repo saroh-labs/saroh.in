@@ -90,6 +90,71 @@ export function sendPasswordResetEmail(
     return Promise.resolve();
 }
 
+/**
+ * Where the sign-in pages are, for a link in an email: `ACCOUNTS_URL`, else
+ * the origin the request came from (already checked against the trusted
+ * list by the caller), else the local accounts app in development. Null
+ * when this instance cannot say, and the email goes without buttons.
+ */
+export function accountsBase(
+    source: { ACCOUNTS_URL?: string; NODE_ENV?: string },
+    origin?: string,
+): string | null {
+    const base =
+        source.ACCOUNTS_URL ??
+        origin ??
+        (source.NODE_ENV === "development"
+            ? "https://accounts.saroh.localhost"
+            : undefined);
+    return base ? base.replace(/\/$/, "") : null;
+}
+
+export const EXISTING_ACCOUNT_SUBJECT = "You already have a Saroh account";
+
+const BUTTON =
+    "display:inline-block;padding:10px 16px;text-decoration:none;border-radius:6px";
+
+/**
+ * What the owner of an address reads when someone signs up with it again
+ * (UX audit, 10 Oct). The sign-up screen says "Check your email" either
+ * way, so this is the only place that can say an account already exists:
+ * it reaches the mailbox's owner and nobody else.
+ */
+export function existingAccountEmail(to: string, base: string | null): string {
+    const buttons = base
+        ? `<p><a href="${esc(`${base}/login?email=${encodeURIComponent(to)}`)}" style="${BUTTON};background:#111;color:#fff">Sign in</a>
+  &nbsp;<a href="${esc(`${base}/forgot-password`)}" style="${BUTTON};border:1px solid #111;color:#111">Reset password</a></p>`
+        : "<p>Open Saroh and choose Sign in. If you have forgotten your password, choose Forgot it? on that page.</p>";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(EXISTING_ACCOUNT_SUBJECT)}</h2>
+  <p>Someone, probably you, just tried to sign up for Saroh with this email address. It already has an account, so no new one was made.</p>
+  <p>Sign in to carry on. If you have forgotten your password, reset it.</p>
+  ${buttons}
+  <p style="color:#666;font-size:12px">If this wasn't you, you can ignore this email. Nobody got into your account.</p>
+</div>`;
+}
+
+/** See {@link existingAccountEmail}. Console-only without SMTP, like its neighbours. */
+export function sendExistingAccountEmail(
+    to: string,
+    origin?: string,
+): Promise<void> {
+    const base = accountsBase(env, origin);
+    if (!transporter) {
+        console.info(
+            `[Existing account] (no SMTP) ${to}: ${base ? `${base}/login` : "no accounts address"}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: EXISTING_ACCOUNT_SUBJECT,
+        html: existingAccountEmail(to, base),
+    });
+    return Promise.resolve();
+}
+
 /** A code, rendered big and monospaced so it is easy to read off and retype. */
 function codeEmail(
     heading: string,

@@ -1,5 +1,6 @@
 "use client";
 
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -37,24 +38,31 @@ export function ChangePasswordForm() {
         setSuccess(false);
 
         if (newPassword !== confirmPassword) {
-            setError("New passwords do not match");
+            setError("Those two passwords don't match. Type them again.");
             return;
         }
         if (newPassword.length < 8) {
-            setError("Password must be at least 8 characters");
+            setError(authFailureCopy({ code: "PASSWORD_TOO_SHORT" }));
             return;
         }
 
         setIsLoading(true);
-        const { error: err } = await authClient.changePassword({
-            currentPassword,
-            newPassword,
-            revokeOtherSessions: revokeOthers,
-        });
+        const { error: err } = await settle(() =>
+            authClient.changePassword({
+                currentPassword,
+                newPassword,
+                revokeOtherSessions: revokeOthers,
+            }),
+        );
         setIsLoading(false);
 
         if (err) {
-            setError(err.message ?? "Could not change your password.");
+            setError(
+                authFailureCopy(
+                    err,
+                    "Couldn't change your password. Try again.",
+                ),
+            );
             return;
         }
         setSuccess(true);

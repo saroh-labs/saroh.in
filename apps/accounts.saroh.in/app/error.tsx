@@ -5,6 +5,8 @@ import { reportError } from "@saroh/ui/lib/report-error";
 import { Wordmark } from "@saroh/ui/wordmark";
 import { useEffect } from "react";
 
+import { getAppUrl } from "@/lib/app-urls";
+
 /**
  * App-root error boundary. Every screen here reads or writes the session
  * through api.saroh.in, so an api that is down or restarting is the most
@@ -33,7 +35,7 @@ export default function Error({
                 mark={<Wordmark style={{ fontSize: "1.75rem" }} />}
                 description="We couldn’t complete that. It’s usually temporary, so try again in a moment."
                 onRetry={retry}
-                home={{ href: "/apps", label: "Go to your apps" }}
+                home={{ href: getAppUrl(), label: "Go to Saroh" }}
                 digest={error.digest}
             />
         </main>

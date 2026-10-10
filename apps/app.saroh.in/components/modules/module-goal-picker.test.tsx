@@ -194,7 +194,7 @@ describe("ModuleGoalPicker by kind (DEC-070)", () => {
         );
         act(() => (bookings as HTMLElement).click());
         const go = Array.from(document.querySelectorAll("button")).find((b) =>
-            b.textContent.includes("Set up my workspace"),
+            b.textContent.includes("Set up my business"),
         );
         act(() => go?.click());
         expect(

@@ -279,6 +279,23 @@ what the API allows.
   `rejects.toMatchObject({ response: roleDenial("site:update") })`, not by
   reading the message. The app reads it in `lib/api/role-denied.ts`
   (`frontend-error-feedback.md`).
+- **Current** — **Signing in lands on the app, not on a list of Saroh's
+  hosts** (UX audit, 10 Oct). With no `?redirect=`, accounts sends a sign-in,
+  a Google sign-in, a signed-in visit to a sign-in page, `/` and its 404 and
+  error pages to `getAppUrl()` (`apps/accounts.saroh.in/lib/return-to.ts`);
+  the app's front door sends someone with no business to setup, opens the one
+  they have, or asks which. A new account goes straight to setup, by code or
+  by Google. `/apps` is for Saroh staff: the page asks the API
+  (`GET /admin/me`, `isStaff`), sends everyone else on to the app, and
+  nothing links to it.
+- **Current** — **A sign-up for an address that has an account says the
+  same as a new one** (`requireEmailVerification`), so the screen can't be
+  used to learn who is registered. No code is sent, so the owner of the
+  address is emailed "You already have a Saroh account" with Sign in and
+  Reset password (`onExistingUserSignUp` → `existingUserSignUpHook` in
+  `packages/auth/src/server.ts`, `sendExistingAccountEmail` in the API), and
+  the verify page offers "No code? You may already have an account. Sign in."
+  to everyone. A failed send never changes the sign-up's answer.
 - **Current** — **Derive the organization; never accept it.** `:organizationId`
   or `x-organization-id` is a hint the guard re-validates against real
   membership. Public routes derive the organization from the resource (a Site),

@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
+import type { InvitationAccept } from "@/lib/invitations/outcome";
 
 /**
  * Members + invitations data access for app.saroh.in. Like the stores client,
@@ -103,18 +104,31 @@ export function revokeInvitation(
     return mutate(`/stores/${storeId}/invitations/${invitationId}`, "DELETE");
 }
 
-/** Accept an invitation by token; returns the store id to redirect into. */
+/**
+ * Accept a location's invitation by token. Returns the store id to redirect
+ * into, or the failure with its status, which is what tells an API that did
+ * not answer from an invitation that is gone (`lib/invitations/outcome.ts`).
+ */
 export async function acceptInvitation(
     token: string,
-): Promise<{ ok: true; storeId: string } | { ok: false; error: string }> {
-    const res = await apiFetch(`/invitations/${token}/accept`, {
-        method: "POST",
-    });
+): Promise<InvitationAccept<{ storeId: string }>> {
+    let res: Response;
+    try {
+        res = await apiFetch(
+            `/invitations/${encodeURIComponent(token)}/accept`,
+            { method: "POST" },
+        );
+    } catch {
+        return { ok: false, error: "", status: null };
+    }
     const data: unknown = await res.json().catch(() => null);
     const storeId = (data as { storeId?: unknown } | null)?.storeId;
-    if (res.ok && typeof storeId === "string") return { ok: true, storeId };
+    if (res.ok && typeof storeId === "string") {
+        return { ok: true, data: { storeId } };
+    }
     return {
         ok: false,
-        error: toFailure(data, "Could not accept invitation").error,
+        error: toFailure(data, "That invitation could not be accepted.").error,
+        status: res.status,
     };
 }

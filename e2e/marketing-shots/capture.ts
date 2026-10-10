@@ -117,10 +117,12 @@ async function sessionFor(
     fs.mkdirSync(AUTH_DIR, { recursive: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true });
     const page = await context.newPage();
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
+    // To accounts' own page: a sign-in lands on the workspace by default,
+    // which would save its open-business cookie into every shot's session.
+    await page.goto(`${urls.ACCOUNTS_URL}/login?redirect=/account`);
     await page.getByLabel("Email").fill(ROLES[role]);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-    await page.getByRole("button", { name: "Log in" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL((u) => !u.pathname.startsWith("/login"), {
         timeout: 30_000,
     });

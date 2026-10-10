@@ -18,8 +18,10 @@ export default {
         (request, env, ctx) => handler.fetch(request, env, ctx),
         {
             brand: "saroh",
-            homeHref: "/apps",
-            homeLabel: "Go to your apps",
+            // "/" has no page of its own: the proxy sends a signed-in
+            // visitor on to Saroh and anyone else to sign in.
+            homeHref: "/",
+            homeLabel: "Go to Saroh",
         },
     ),
 };

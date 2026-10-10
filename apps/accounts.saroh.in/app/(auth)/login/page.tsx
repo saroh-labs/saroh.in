@@ -2,7 +2,7 @@ import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { LOGIN_PANEL } from "@/components/auth/panel-copy";
-import { safeReturnTo } from "@/lib/return-to";
+import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 
 /**
@@ -24,7 +24,7 @@ export default async function LoginPage({
     return (
         <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
             <LoginForm
-                returnTo={safeReturnTo(redirect)}
+                returnTo={safeDestination(redirect)}
                 invitedEmail={typeof email === "string" ? email : undefined}
                 providers={providers}
             />
