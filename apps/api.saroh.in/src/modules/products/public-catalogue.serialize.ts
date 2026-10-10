@@ -64,6 +64,11 @@ export interface PublicCatalogueCard {
     optionName: string | null;
     /** Two sentences at most of the description, as plain text. */
     blurb: string | null;
+    /**
+     * The category the merchant filed it under, by name; null for none.
+     * The shop offers these as chips to narrow the list by.
+     */
+    categoryName: string | null;
     /** Nothing offered here can be sold now. */
     soldOut: boolean;
     /** The listing at the site's storefront: what the bag holds (G13). */

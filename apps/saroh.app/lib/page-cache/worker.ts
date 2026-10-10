@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { PageCacheRecord } from "./record";
 import { newRecord, RECORD_STORE_KEY } from "./record";
-import { decideRequest, pageCacheKey } from "./request-rules";
+import { decideRequest, drawnRequest, pageCacheKey } from "./request-rules";
 import {
     REVALIDATE_SIGNATURE_HEADER,
     verifyPageRevalidation,
@@ -356,8 +356,11 @@ export function withPageCache<E extends PageCacheEnv, C extends WaitUntil>(
         }
 
         const record = newRecord(deps.now());
+        // Drawn for the address every visitor to this page shares: an
+        // ad's or a scan's tags are off it, as they are off the key.
+        const drawn = drawnRequest(request);
         const response = await recordStore().run(record, () =>
-            inner(request, env, ctx),
+            inner(drawn, env, ctx),
         );
         if (!keepableResponse(response) || !response.body) {
             return withStatus(response, "bypass");

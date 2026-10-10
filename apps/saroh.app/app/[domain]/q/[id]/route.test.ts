@@ -130,12 +130,33 @@ describe("GET /q/<code> on a merchant's address", () => {
         expect(res.headers.get("location")).toBe("https://rye.saroh.app/");
     });
 
-    it("is the site's 404 for a code it doesn't have", async () => {
+    it("sends a code the site doesn't have to the home page, never a bare Not found", async () => {
         answers({ error: { code: "NOT_FOUND" } }, 404);
         const res = await scan("zzz");
-        expect(res.status).toBe(404);
-        expect(res.headers.get("location")).toBeNull();
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("https://rye.saroh.app/");
         expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+
+    it("lands on the site's own domain when it has one, wherever the code was scanned", async () => {
+        state.site = { ...LIVE, primaryHost: "www.ryebakery.in" };
+        // Printed with the Saroh address: forwarded to the business's own.
+        expect((await scan("h7c")).headers.get("location")).toBe(
+            "https://www.ryebakery.in/book?src=qr-h7c",
+        );
+        answers({ kind: "home", counted: false });
+        expect((await scan("h7c")).headers.get("location")).toBe(
+            "https://www.ryebakery.in/",
+        );
+        answers({ error: {} }, 404);
+        expect((await scan("zzz")).headers.get("location")).toBe(
+            "https://www.ryebakery.in/",
+        );
+        // An answer can still never send a visitor to another site.
+        answers({ kind: "path", path: "//evil.example/x" });
+        expect((await scan("h7c")).headers.get("location")).toBe(
+            "https://www.ryebakery.in/",
+        );
     });
 
     it("never shows an error: an API that fails or is down forwards home", async () => {
@@ -151,9 +172,11 @@ describe("GET /q/<code> on a merchant's address", () => {
         expect(res.headers.get("location")).toBe("https://rye.saroh.app/");
     });
 
-    it("is a 404 without asking the API for a malformed code", async () => {
+    it("sends what can't be a code home, without asking the API", async () => {
         for (const id of ["h7", "toolong1", "h-7", "h7c.png"]) {
-            expect((await scan(id)).status).toBe(404);
+            const res = await scan(id);
+            expect(res.status).toBe(302);
+            expect(res.headers.get("location")).toBe("https://rye.saroh.app/");
         }
         expect(send).not.toHaveBeenCalled();
     });

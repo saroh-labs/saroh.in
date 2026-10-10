@@ -92,6 +92,14 @@ add or change there may be served to the next visitor without rendering.
   minutes) unless the API revalidates its tags: a new API write that
   changes what a published page shows queues `site.pages.revalidate`
   (`backend-jobs.md` → Site page cache).
+- **Where a visit came from is not part of the page.** The key drops
+  `utm_*`, `fbclid`, `gclid`, `igshid` and `src` (a QR scan's tag), and a
+  page that may be kept is drawn for the address without them
+  (`keyedSearch`, `drawnRequest` in `request-rules.ts`), so an ad click, a
+  shared link and a scan meet the kept page and nothing of one visitor's
+  click is in what the next is sent. A page must never read one of these
+  on the server; the browser reads `src` from its own address
+  (`qr-source.ts`).
 - **Outside the Worker** (`next dev`, a test) none of it runs: pages render
   per request, as before.
 
@@ -102,7 +110,9 @@ app; a phone (the browsers inside WhatsApp and Instagram above all) often
 loads the page again on the way back. So what the customer typed before
 that step is kept in `sessionStorage` and restored on mount: the bag's way,
 address, discount code and checkout key (`site-blocks/src/shop/bag-draft-store.ts`),
-and the sign-in sheet's email and step (`account/sign-in-draft.ts`).
+the sign-in sheet's email and step (`account/sign-in-draft.ts`), and the
+booking page's service, weeks, person, time, where, way to pay and phone
+(`booking-flow/booking-draft.ts`).
 
 - **`sessionStorage` only**: no cookie, never `localStorage` for anything
   typed. Every read is narrowed field by field and every call is wrapped;
@@ -111,7 +121,18 @@ and the sign-in sheet's email and step (`account/sign-in-draft.ts`).
 - **Cleared on success**: the order placed, the customer signed in.
 - **Never drawn on the server's render**: read it into state that draws
   nothing until a sheet opens, or in an effect.
-- The booking flow's chosen service, time and details are not kept yet.
+- **Never a note that may be about someone's health.** The booking's
+  "Anything we should know?" and the bag's "Note for ‹business›" stay in
+  the page's memory. Only that a booking note had been typed is kept, so
+  the page can say it wasn't; the bag's kept checkout print carries a
+  number worked out from its note, never the words.
+- **A kept time is checked before it is shown as chosen.** The booking page
+  brings a draft back only on the address it was made on, looks the time up
+  in the times free now, and says what it kept (or that the time went and
+  which it chose instead).
+- **A returning customer's delivery address is not a draft.** It is read
+  from their last placed order (`GET public/sites/:siteId/checkout/address`)
+  and nothing new is stored for it.
 
 ## If you think you need React Query
 

@@ -113,7 +113,7 @@ export interface StorefrontSettings extends StorefrontSummary {
     tipsEnabled: boolean;
     guestCheckout: boolean;
     /**
-     * "Pay when you collect" and "Pay on delivery" at the site's checkout,
+     * "Pay at pick-up" and "Pay on delivery" at the site's checkout,
      * beside paying online. Read only where the plan takes money online:
      * on a plan without it (`onlinePaymentsPlan` false) the checkout always
      * offers them, as the only way to pay.

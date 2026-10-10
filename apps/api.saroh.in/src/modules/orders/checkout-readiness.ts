@@ -16,7 +16,7 @@ import type { StorefrontFulfilmentType } from "./fulfilment";
  *   `payLinkProvider`), the storefront's chosen provider, else the
  *   business's first connection that can open one. A Razorpay connection
  *   missing its public key id counts as none (DEC-054).
- * - **On handover** — "Pay when you collect", "Pay on delivery" (the
+ * - **On handover** — "Pay at pick-up", "Pay on delivery" (the
  *   owner's rule, 2026-10-06: online needs a paid plan, Free takes money
  *   offline). On a plan without online payments it is always offered: it
  *   is the only way to pay there. On a plan with them it is offered only
@@ -89,9 +89,9 @@ export function paysOnHandover(way: StorefrontFulfilmentType): boolean {
     return way === "PICKUP" || way === "LOCAL_DELIVERY";
 }
 
-/** "Pay when you collect" or "Pay on delivery", for a way that has one. */
+/** "Pay at pick-up" or "Pay on delivery", for a way that has one. */
 export function onHandoverLabel(way: string): string | null {
-    if (way === "PICKUP") return "Pay when you collect";
+    if (way === "PICKUP") return "Pay at pick-up";
     if (way === "LOCAL_DELIVERY") return "Pay on delivery";
     return null;
 }

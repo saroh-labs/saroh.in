@@ -16,11 +16,6 @@ const quiet = cn(
 );
 const idle = "cursor-default opacity-60";
 
-/** "RAZORPAY" → "Razorpay". */
-function providerName(provider: string): string {
-    return `${provider.charAt(0)}${provider.slice(1).toLowerCase()}`;
-}
-
 /**
  * A pay-now hold while its booker pays (U19, E11). The business's provider
  * opens its own window — with the methods the business's account has on
@@ -81,11 +76,10 @@ export function PayingCard({
         until && now !== null
             ? Math.max(0, Math.ceil((Date.parse(until) - now) / 60_000))
             : null;
-    const provider = phase.handoff ? providerName(phase.handoff.provider) : "";
     const paying = checkout.status === "paid";
     const refused =
         checkout.status === "failed"
-            ? "The payment didn't go through — try again."
+            ? "The payment didn't go through. Try again."
             : checkout.status === "unavailable"
               ? "We couldn't open the payment window. Check your connection and try again."
               : null;
@@ -106,7 +100,7 @@ export function PayingCard({
                 <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                     It&apos;s held for you until {timeIn(until, zone)}
                     {minutesLeft !== null
-                        ? ` — ${minutesLeft} ${minutesLeft === 1 ? "minute" : "minutes"} left`
+                        ? `, ${minutesLeft} ${minutesLeft === 1 ? "minute" : "minutes"} left`
                         : ""}
                     . If it isn&apos;t paid by then, the time goes back on the
                     calendar and nothing is charged.
@@ -141,7 +135,9 @@ export function PayingCard({
                             >
                                 {busy
                                     ? "Booking…"
-                                    : "Book it to pay at the desk"}
+                                    : phase.booking.online
+                                      ? "Book it and pay later"
+                                      : "Book it to pay at the desk"}
                             </button>
                         ) : null}
                         <button
@@ -172,11 +168,11 @@ export function PayingCard({
                               ? "Paying…"
                               : checkout.status === "closed"
                                 ? "The payment window was closed before you paid"
-                                : `Pay online in the ${provider} window`}
+                                : "Pay online in the payment window"}
                     </p>
                     <p className="text-site-muted mt-1 text-[12.5px]">
                         {paying
-                            ? `${provider} is confirming your payment. This page moves on by itself — there's no need to pay again.`
+                            ? "We're confirming your payment. This page moves on by itself. There's no need to pay again."
                             : "This page moves on by itself once the payment has gone through."}
                     </p>
                     {checkout.status === "closed" ? (

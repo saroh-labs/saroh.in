@@ -94,7 +94,7 @@ describe("notice words (A14)", () => {
 
     it("tells an order's Ready by how it leaves, and its handover with the courier", () => {
         expect(noticeSentence({ kind: "ORDER_READY", order: order() })).toBe(
-            "Your order ORD-1019 is ready to collect.",
+            "Your order ORD-1019 is ready for pick-up.",
         );
         expect(
             noticeSentence({
@@ -183,7 +183,7 @@ describe("the notice email (A14)", () => {
         });
         expect(mail.body.startsWith("<p>Hello,</p>")).toBe(true);
         expect(mail.subject).toBe(
-            "Your order ORD-1019 from Rye & Co. is ready to collect",
+            "Your order ORD-1019 from Rye & Co. is ready for pick-up",
         );
     });
 
@@ -201,6 +201,53 @@ describe("the notice email (A14)", () => {
         expect(mail.body).not.toContain("<b>");
         expect(mail.body).toContain("&lt;script&gt;");
         expect(mail.body).toContain("Cut &amp; &quot;Style&quot;");
+    });
+
+    it("carries the way back to the order, and to their bookings, when there is one", () => {
+        const placed = renderNotice({
+            kind: "ORDER_PLACED",
+            placed: {
+                business: "Rye & Co.",
+                firstName: "Asha",
+                number: "ORD-1019",
+                fulfilment: "PICKUP",
+                payOnHandover: false,
+                link: "https://rye.saroh.app/shop/order/ord_1?a=1&b=2",
+            },
+        });
+        expect(placed.body).toContain(
+            '<p>See your order:<br><a href="https://rye.saroh.app/shop/order/ord_1?a=1&amp;b=2">https://rye.saroh.app/shop/order/ord_1?a=1&amp;b=2</a></p>',
+        );
+        const booked = renderNotice({
+            kind: "BOOKING_CONFIRMED",
+            booking: booking({
+                link: "https://kavidental.example/account/bookings",
+            }),
+        });
+        expect(booked.body).toContain(
+            '<p>See, move or cancel your booking:<br><a href="https://kavidental.example/account/bookings">',
+        );
+    });
+
+    it("has no link without one, for a cancelled booking, or for an address that isn't a web one", () => {
+        expect(
+            renderNotice({ kind: "BOOKING_CONFIRMED", booking: booking() })
+                .body,
+        ).not.toContain("<a ");
+        expect(
+            renderNotice({
+                kind: "BOOKING_CANCELLED",
+                booking: booking({
+                    link: "https://kavidental.example/account/bookings",
+                }),
+            }).body,
+        ).not.toContain("<a ");
+        expect(
+            renderNotice({
+                kind: "BOOKING_CONFIRMED",
+                booking: booking({ link: "javascript:alert(1)" }),
+            }).body,
+        ).not.toContain("javascript");
     });
 
     it("links a courier's tracking page only when it is a web address", () => {
@@ -268,7 +315,7 @@ describe("a website order placed (UX-042)", () => {
 
     it("says it's in, how it's paid, and only the steps they will hear of", () => {
         expect(noticeSentence(placed())).toBe(
-            "We have your order ORD-1019. You pay when you collect it. We'll tell you when it's ready to collect.",
+            "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
         );
         expect(noticeSentence(placed({ fulfilment: "LOCAL_DELIVERY" }))).toBe(
             "We have your order ORD-1019. You pay when it's delivered. We'll tell you when it's on its way.",

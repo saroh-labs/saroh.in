@@ -251,6 +251,9 @@ describe("booking signed in on the business's site", () => {
         });
 
         expect(res.status).toBe(201);
+        // No email provider and no account thread here: the page is told
+        // nothing is sent, so it promises no email.
+        expect(res.body).toMatchObject({ reach: "NONE" });
         expect(res.body).toMatchObject({
             state: "CONFIRMED",
             serviceName: "Check-up",

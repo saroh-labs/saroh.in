@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
 import { formatAmount } from "../lib/money";
+import type { NoticeReach } from "../lib/told";
+import { toldText } from "../lib/told";
 import { cn } from "../lib/utils";
 import { SoldByLine } from "../sold-by";
 
@@ -14,9 +16,11 @@ import { SoldByLine } from "../sold-by";
  * gave — then a way back to the shop and, with the account area, to their
  * Orders.
  *
- * It says nothing about a receipt email: none is sent when a site order is
- * placed, and the page never claims one that didn't go. Drawn in the
- * site's own tokens only; a merchant's site never wears Saroh's brand.
+ * It says what happens next: "We've emailed ‹address›" when the business's
+ * own email sends the order's notice (the API says, `reach`), and "It's
+ * saved in your account" otherwise. It never claims an email that didn't
+ * go. Drawn in the site's own tokens only; a merchant's site never wears
+ * Saroh's brand.
  */
 
 export interface OrderConfirmationLine {
@@ -55,6 +59,10 @@ export interface OrderConfirmationData {
      * collect" or "Pay on delivery". Null once paid, or paid online.
      */
     toPay: string | null;
+    /** How they hear about it; absent from an older API: nothing promised. */
+    reach?: NoticeReach | null;
+    /** The address an email goes to: the account's own. */
+    email?: string | null;
 }
 
 /**
@@ -179,7 +187,7 @@ function Handover({ order }: { order: OrderConfirmationData }) {
                 id="order-handover"
                 className="font-site-heading text-site-fg text-lg font-semibold"
             >
-                {pickup ? "Pick up from" : `${label} to`}
+                {pickup ? "Pick-up from" : `${label} to`}
             </h2>
             {pickup ? (
                 <address className="text-site-body mt-1.5 text-sm not-italic">
@@ -291,6 +299,11 @@ export function OrderConfirmation({
                       ? `${toPayLead(order.toPay)} ${businessName} will be in touch when it's ready.`
                       : `${businessName} will be in touch when it's ready.`}
             </p>
+            {order.refunded ? null : (
+                <p className="text-site-body mt-1 text-sm [overflow-wrap:anywhere]">
+                    {toldText(order.reach, order.email)}
+                </p>
+            )}
             <Summary order={order} />
             <Handover order={order} />
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -309,18 +322,18 @@ export function OrderConfirmation({
     );
 }
 
-/** "You'll pay when you collect your order.", said where it is placed. */
+/** "You'll pay at pick-up.", said where it is placed. */
 export function toPayLead(toPay: string): string {
     return toPay === "Pay on delivery"
         ? "You'll pay when your order is delivered."
-        : "You'll pay when you collect your order.";
+        : "You'll pay at pick-up.";
 }
 
 /** The total's label on an order still to be paid at the handover. */
 function toPayTotal(toPay: string): string {
     return toPay === "Pay on delivery"
         ? "To pay on delivery"
-        : "To pay when you collect";
+        : "To pay at pick-up";
 }
 
 /** Where a placed order's confirmation lives, on the business's site. */

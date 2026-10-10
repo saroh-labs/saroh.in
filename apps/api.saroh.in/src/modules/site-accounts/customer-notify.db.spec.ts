@@ -217,7 +217,7 @@ describe("an order's Ready (real database)", () => {
         expect(post).toMatchObject({
             author: "SYSTEM",
             event: "ORDER_READY",
-            body: `Your order ${order.orderId} is ready to collect.`,
+            body: `Your order ${order.orderId} is ready for pick-up.`,
         });
         const [message] = await prisma.message.findMany({
             where: { organizationId: b.owner.organizationId },

@@ -227,7 +227,7 @@ export async function defaultModuleSections(
                         formId: form.id,
                         title,
                         submitLabel: "Send",
-                        successMessage: "Thanks — we'll be in touch soon.",
+                        successMessage: "Thanks, we'll be in touch soon.",
                         fields: CONTACT_ENQUIRY_FIELDS.map((f) => ({ ...f })),
                     },
                 }),

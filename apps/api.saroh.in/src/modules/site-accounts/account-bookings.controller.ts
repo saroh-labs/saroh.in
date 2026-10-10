@@ -10,6 +10,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { prisma } from "@saroh/database";
 import { notTakingOrders } from "../billing/paused-errors";
 import type { PublicCredit } from "../bookings/booking-credit";
 import type { PublicBookingResult } from "../bookings/public-bookings.controller";
@@ -22,6 +23,8 @@ import type { CustomerContext } from "./customer-context.decorator";
 import { CurrentCustomer } from "./customer-context.decorator";
 import { CustomerSessionGuard } from "./customer-session.guard";
 import { AccountBookDto, AccountCreditQueryDto } from "./dto";
+import type { NoticeReach } from "./notice-reach";
+import { contactReach } from "./notice-reach";
 import type { SiteRelay } from "./site-relay";
 import { RelayContext } from "./site-relay";
 
@@ -52,7 +55,14 @@ export class AccountBookingsController {
         @RelayContext() relay: SiteRelay,
         @Body() dto: AccountBookDto,
     ): Promise<
-        PublicBookingResult & { payInstructions?: PayInstructionsView | null }
+        PublicBookingResult & {
+            payInstructions?: PayInstructionsView | null;
+            /**
+             * How they hear it is booked (A14's reach): the page says "We've
+             * emailed ‹address›" only when an email goes.
+             */
+            reach?: NoticeReach;
+        }
     > {
         // A website a move to a lower plan paused takes no bookings (#800).
         if (
@@ -92,7 +102,20 @@ export class AccountBookingsController {
                 siteId: customer.siteId,
             },
         );
-        const result = publicBookingResult(booking, payToken);
+        const result = {
+            ...publicBookingResult(booking, payToken),
+            // Never a reason to lose the answer: the booking is made. A
+            // read that fails promises no email.
+            ...(await contactReach(
+                prisma,
+                customer.organizationId,
+                customer.contactId,
+                undefined,
+                "BOOKING_CONFIRMED",
+            )
+                .then((reach) => ({ reach }))
+                .catch(() => ({}))),
+        };
         // Booked to pay at the desk (R32): how to pay the business ahead,
         // if it says — the customer's own booking, in the business the
         // session resolved to.

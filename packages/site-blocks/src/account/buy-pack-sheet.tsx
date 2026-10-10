@@ -258,7 +258,7 @@ function BuyPack({
                 </p>
                 <p className="text-site-body mt-1 text-sm leading-normal">
                     {late
-                        ? "This is taking longer than usual. You can close this — your pack shows on this page as soon as the payment is confirmed."
+                        ? "This is taking longer than usual. You can close this. Your pack shows on this page as soon as the payment is confirmed."
                         : "Hold on a moment while we confirm it with the payment provider."}
                 </p>
                 <p className="text-site-muted mt-3 text-sm">
@@ -302,7 +302,7 @@ function BuyPack({
     const windowOpen = windowStatus === "open";
     const windowProblem =
         windowStatus === "failed"
-            ? "The payment didn't go through. Nothing was taken — try again."
+            ? "The payment didn't go through. Nothing was taken. Try again."
             : windowStatus === "unavailable"
               ? "We couldn't open the payment window. Try again in a moment."
               : null;

@@ -37,7 +37,7 @@ import { asNewVisitor, signInOnSheet } from "./site-codes";
  *
  * What it owns. Its product (`LOOP_PRODUCT`, untracked, so it holds no stock
  * another test counts) and a new customer per run, with a new email and a
- * visitor address of their own. It turns on "Pay when you collect" and
+ * visitor address of their own. It turns on "Pay at pick-up" and
  * Pick-up at the storefront the site sells from, which every checkout on
  * Northwind reads, so it is `@serial` and puts both back as they were.
  *
@@ -166,7 +166,7 @@ test.describe("selling, end to end (#122)", () => {
                 // Offered beside paying online only when both are open;
                 // alone, it is the way and no choice is drawn.
                 const collect = bag.getByRole("radio", {
-                    name: "Pay when you collect",
+                    name: "Pay at pick-up",
                 });
                 if ((await collect.count()) > 0) {
                     await collect.click();
@@ -196,9 +196,7 @@ test.describe("selling, end to end (#122)", () => {
                     if (await place.isVisible()) await place.click();
                     await expect(placed).toBeVisible({ timeout: 3_000 });
                 }).toPass({ timeout: 30_000 });
-                await expect(placed).toContainText(
-                    "You'll pay when you collect your order.",
-                );
+                await expect(placed).toContainText("You'll pay at pick-up.");
                 const number =
                     /Order (\S+) ·/.exec(await placed.innerText())?.[1] ?? "";
                 expect(number, "the sheet names the order").not.toBe("");

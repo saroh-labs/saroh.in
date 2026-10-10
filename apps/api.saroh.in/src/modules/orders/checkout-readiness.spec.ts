@@ -3,7 +3,7 @@
  * how it may be paid, with the plan's say (`billing/online-payments-plan.ts`)
  * and the owner's rule of 2026-10-06: online needs a paid plan, Free takes
  * money offline. On a plan without online payments the checkout takes
- * payment at the handover ("Pay when you collect", "Pay on delivery"); on a
+ * payment at the handover ("Pay at pick-up", "Pay on delivery"); on a
  * plan with them it pays online, and at the handover too only where the
  * storefront turns it on. The database is a stub; `planMeter` is spied on.
  * Rows are made up.
@@ -157,7 +157,7 @@ describe("how an order leaving each way can be paid", () => {
     const paidOn = { online: true, onHandover: true };
 
     it("names paying at the handover by the way it leaves", () => {
-        expect(onHandoverLabel("PICKUP")).toBe("Pay when you collect");
+        expect(onHandoverLabel("PICKUP")).toBe("Pay at pick-up");
         expect(onHandoverLabel("LOCAL_DELIVERY")).toBe("Pay on delivery");
         // A courier takes no money for the business.
         expect(onHandoverLabel("SHIPPING")).toBeNull();
@@ -165,7 +165,7 @@ describe("how an order leaving each way can be paid", () => {
 
     it("offers only paying at the handover on a plan without online payments", () => {
         expect(payOptionsFor(free, "PICKUP")).toEqual([
-            { type: "ON_HANDOVER", label: "Pay when you collect" },
+            { type: "ON_HANDOVER", label: "Pay at pick-up" },
         ]);
         expect(payOptionsFor(free, "LOCAL_DELIVERY")).toEqual([
             { type: "ON_HANDOVER", label: "Pay on delivery" },
@@ -189,7 +189,7 @@ describe("how an order leaving each way can be paid", () => {
     it("offers both, online first, on a paid plan with the switch on", () => {
         expect(payOptionsFor(paidOn, "PICKUP")).toEqual([
             { type: "ONLINE", label: "Pay online" },
-            { type: "ON_HANDOVER", label: "Pay when you collect" },
+            { type: "ON_HANDOVER", label: "Pay at pick-up" },
         ]);
         expect(payOptionsFor(paidOn, "SHIPPING")).toEqual([
             { type: "ONLINE", label: "Pay online" },

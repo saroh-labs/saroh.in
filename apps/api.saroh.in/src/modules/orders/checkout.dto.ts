@@ -107,7 +107,7 @@ export class CheckoutStartDto {
     /**
      * How it is paid: online in the provider's window (the default, and
      * what a site from before offline checkout sends by leaving it out), or
-     * on handover — "Pay when you collect", "Pay on delivery".
+     * on handover — "Pay at pick-up", "Pay on delivery".
      */
     @IsOptional()
     @IsIn(CHECKOUT_PAYMENTS, { message: "Choose how you'll pay" })

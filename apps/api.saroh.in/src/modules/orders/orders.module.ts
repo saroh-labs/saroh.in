@@ -11,6 +11,8 @@ import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { StoresModule } from "../stores/stores.module";
 import { CheckoutConfirmationService } from "./checkout-confirmation";
 import { CheckoutConfirmationController } from "./checkout-confirmation.controller";
+import { CheckoutSavedAddressService } from "./checkout-saved-address";
+import { CheckoutSavedAddressController } from "./checkout-saved-address.controller";
 import {
     CLOSE_ABANDONED_CHECKOUT_TYPE,
     CloseAbandonedCheckoutHandler,
@@ -50,6 +52,8 @@ import { PublicCheckoutService } from "./public-checkout.service";
         PublicCheckoutController,
         // The site's order confirmation page (P4).
         CheckoutConfirmationController,
+        // The bag's "deliver to your last address".
+        CheckoutSavedAddressController,
     ],
     providers: [
         OrdersService,
@@ -59,6 +63,7 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrderCancelService,
         PublicCheckoutService,
         CheckoutConfirmationService,
+        CheckoutSavedAddressService,
         CloseAbandonedCheckoutHandler,
         OrderStageBatchService,
         OrderStageBatchCommitHandler,

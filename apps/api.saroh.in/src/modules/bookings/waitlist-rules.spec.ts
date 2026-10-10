@@ -36,7 +36,7 @@ describe("waitlist rules", () => {
 
     it("says the refusals as sentences", () => {
         expect(MAX_LIVE_ENTRIES).toBe(10);
-        expect(WAITLIST_WORDS.room).toBe("There's room — book it.");
+        expect(WAITLIST_WORDS.room).toBe("There's room. Book it.");
         expect(WAITLIST_WORDS.tooMany).toBe(
             "You're on 10 waitlists already. Leave one to join another.",
         );

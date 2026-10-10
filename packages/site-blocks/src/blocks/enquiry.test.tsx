@@ -207,7 +207,7 @@ describe("enquiryErrorMessage (UX-066)", () => {
                 fields,
             ),
         ).toBe(
-            "That email doesn't look right — check for a missing @ or a typo.",
+            "That email doesn't look right. Check for a missing @ or a typo.",
         );
     });
 

@@ -15,6 +15,10 @@ vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),
     getMovedTo: vi.fn(),
     shareImages: vi.fn(() => undefined),
+    siteOriginFor: (
+        resolved: { primaryHost?: string | null } | null,
+        host: string,
+    ) => `https://${resolved?.primaryHost ?? host}`,
 }));
 vi.mock("@/lib/site-head", () => ({
     NO_HEAD: { verifications: [], trackers: [], privacyUrl: null },

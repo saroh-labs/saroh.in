@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PublishedPage } from "@/components/published-page";
 import { businessJsonLdScript } from "@/lib/business-json-ld";
-import { findHomePage, getSiteForHost } from "@/lib/publication";
+import { findHomePage, getSiteForHost, siteOriginFor } from "@/lib/publication";
 import { getSiteContact } from "@/lib/site-contact";
+import { canonical } from "@/lib/site-meta";
 
 /**
  * Tenant site home (S2-006).
@@ -13,6 +15,22 @@ import { getSiteContact } from "@/lib/site-contact";
  * sections. A missing publication (or a snapshot with no pages) renders a clean
  * 404 — drafts are never reachable here, so there is no fallback content.
  */
+/**
+ * The home page's one address, on the site's primary host. Its title,
+ * description and share card are the layout's; a test release's host names
+ * none (it is never indexed).
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ domain: string }>;
+}): Promise<Metadata> {
+    const { domain } = await params;
+    const resolved = await getSiteForHost(domain);
+    if (resolved?.mode !== "live") return {};
+    return canonical(resolved, domain, "/");
+}
+
 export default async function SiteHomePage({
     params,
 }: {
@@ -38,7 +56,7 @@ export default async function SiteHomePage({
     const jsonLd = resolved.siteId
         ? businessJsonLdScript({
               name: resolved.snapshot.site.name,
-              origin: `https://${domain}`,
+              origin: siteOriginFor(resolved, domain),
               contact: await getSiteContact(resolved.siteId),
           })
         : null;

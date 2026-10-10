@@ -61,6 +61,7 @@ import type {
     PublicBooking,
     PublicBookingPage,
     PublicDays,
+    PublicDaysAsk,
     PublicService,
 } from "./public-booking-page";
 import {
@@ -203,9 +204,13 @@ export class PublicBookingsService {
         }));
     }
 
-    /** The booking page's next two weeks for one service — see {@link publicDays}. */
-    publicDays(serviceId: string, now: Date = new Date()): Promise<PublicDays> {
-        return publicDays(serviceId, now);
+    /** The booking page's two weeks of one service — see {@link publicDays}. */
+    publicDays(
+        serviceId: string,
+        now: Date = new Date(),
+        ask: PublicDaysAsk = {},
+    ): Promise<PublicDays> {
+        return publicDays(serviceId, now, undefined, ask);
     }
 
     /** What a site's booking page opens with — see {@link publicBookingPage}. */
@@ -457,7 +462,7 @@ export class PublicBookingsService {
             const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
+                    "Too many booking attempts. Please slow down and try again shortly",
                     429,
                 );
             }

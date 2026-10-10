@@ -3,6 +3,7 @@ import type {
     OrderConfirmationLine,
     OrderConfirmationLookup,
 } from "@saroh/site-blocks";
+import { reachOrNull } from "@saroh/site-blocks";
 
 /**
  * The order confirmation page's answer (round-2 P4), checked and rebuilt
@@ -105,6 +106,13 @@ export function confirmationOf(body: unknown): OrderConfirmationData | null {
         refunded: body.refunded,
         // Placed to be paid at the handover; absent from an older API.
         toPay: isString(body.toPay) ? body.toPay : null,
+        // How they hear about it, and at which address; absent from an
+        // older API, and then the page promises no email.
+        reach: reachOrNull(body.reach),
+        email:
+            isString(body.email) && body.email.length <= 254
+                ? body.email
+                : null,
     };
 }
 

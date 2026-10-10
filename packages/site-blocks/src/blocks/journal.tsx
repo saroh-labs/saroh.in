@@ -6,6 +6,7 @@ import type { RenderedJournal } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
@@ -619,7 +620,7 @@ function JournalCards({
                                         <img
                                             src={image}
                                             alt=""
-                                            loading="lazy"
+                                            {...siteImage()}
                                             className={listPhoto}
                                         />
                                     ) : null}
@@ -664,7 +665,7 @@ function JournalCards({
                                     <img
                                         src={image}
                                         alt=""
-                                        loading="lazy"
+                                        {...siteImage()}
                                         className="mb-1.5 h-[130px] w-full object-cover"
                                     />
                                 ) : null}

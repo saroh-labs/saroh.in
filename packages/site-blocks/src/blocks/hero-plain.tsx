@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { RenderedHero } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { siteImage } from "../lib/site-image";
 import { CtaButton } from "./cta";
 
 /**
@@ -25,9 +26,12 @@ import { CtaButton } from "./cta";
 export default function PlainHero({
     content,
     below,
+    priority = false,
 }: {
     content: RenderedHero;
     below?: ReactNode;
+    /** The page opens on this hero: its photo is fetched first. */
+    priority?: boolean;
 }) {
     /*
      * The look is declared now (#254). `resolveVariant` keeps this identical for
@@ -78,6 +82,7 @@ export default function PlainHero({
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
+                        {...siteImage(priority ? "first-hero" : "below")}
                         className="h-auto w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : null}

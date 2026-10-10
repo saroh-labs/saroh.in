@@ -56,7 +56,8 @@ const formSchema = z
             .min(2, { message: "At least 2 characters" })
             .max(32)
             .regex(/^[A-Za-z0-9_-]+$/, {
-                message: "Letters, digits, dashes or underscores — no spaces",
+                message:
+                    "Letters, digits, dashes or underscores, with no spaces",
             }),
         description: z.string().max(200),
         kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
@@ -104,7 +105,7 @@ const REACH_NOTE: Record<DiscountReach, string> = {
     BUSINESS: "Every order at every location.",
     STOREFRONT: "Every order at the locations you choose.",
     COLLECTION:
-        "Only the lines in the categories you choose — and the categories inside them.",
+        "Only the lines in the categories you choose, and the categories inside them.",
     PRODUCT: "Only the lines for the products you choose.",
 };
 
@@ -263,8 +264,8 @@ export function DiscountForm({
                                 </FormControl>
                                 <FormDescription>
                                     What a customer says or types. Letters,
-                                    digits, dashes — each code once per
-                                    business.
+                                    digits and dashes. Each code is used once
+                                    per business.
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -283,7 +284,7 @@ export function DiscountForm({
                                     />
                                 </FormControl>
                                 <FormDescription>
-                                    For you and your team; customers never see
+                                    For you and your team. Customers never see
                                     it.
                                 </FormDescription>
                                 <FormMessage />
@@ -297,7 +298,7 @@ export function DiscountForm({
                         control={form.control}
                         name="kind"
                         render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="grid justify-items-start gap-2 space-y-0">
                                 <FormLabel>What it takes off</FormLabel>
                                 <Segmented
                                     label="What it takes off"
@@ -391,6 +392,7 @@ export function DiscountForm({
                         <Segmented
                             label="What it applies to"
                             aria-labelledby="discount-reach"
+                            className="max-w-full justify-self-start"
                             value={mode}
                             onValueChange={(v) => {
                                 setMode(v);

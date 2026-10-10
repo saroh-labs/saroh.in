@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
+    modulePageTopOf,
     ModulePageUnavailable,
     NotTakingOrders,
     ShopListing,
@@ -10,11 +11,17 @@ import {
 
 import { PublishedPage } from "@/components/published-page";
 import { getCatalogue } from "@/lib/catalogue";
-import { isFreePage, moduleLabel, moduleRoute } from "@/lib/module-pages";
+import {
+    findModulePage,
+    isFreePage,
+    moduleLabel,
+    moduleRoute,
+} from "@/lib/module-pages";
 import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { canonical, shopDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
@@ -62,14 +69,29 @@ export async function generateMetadata({
     }
     // The Shop page's own title (G15), which is also its menu name.
     const label = moduleLabel(snapshot.pages, "SHOP", "Shop");
+    // What the shop is, for search: the Shop page's own lead, else what
+    // is sold there (the page's own cached read). Nothing when neither.
+    const catalogue = resolved.siteId
+        ? await getCatalogue(resolved.siteId)
+        : null;
+    const description = shopDescription({
+        lead: modulePageTopOf(findModulePage(snapshot.pages, "SHOP") ?? {})
+            ?.lead,
+        business: name,
+        products: catalogue?.ok
+            ? catalogue.data.products.map((p) => p.name)
+            : [],
+    });
     return shareable(resolved, {
         title: `${label} · ${name}`,
+        description,
         openGraph: {
             title: `${label} · ${name}`,
+            description,
             siteName: name,
             url: "/shop",
         },
-        metadataBase: new URL(`https://${domain}`),
+        ...canonical(resolved, domain, "/shop"),
     });
 }
 

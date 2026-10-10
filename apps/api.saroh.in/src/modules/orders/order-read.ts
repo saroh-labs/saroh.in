@@ -183,7 +183,7 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     placedOnline: boolean;
     /**
      * Placed at the site's checkout to be paid when it is collected or
-     * delivered ("Pay when you collect", "Pay on delivery"): staff take the
+     * delivered ("Pay at pick-up", "Pay on delivery"): staff take the
      * money at the handover and mark it paid.
      */
     payOnHandover: boolean;

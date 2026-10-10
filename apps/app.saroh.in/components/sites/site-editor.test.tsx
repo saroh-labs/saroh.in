@@ -365,7 +365,7 @@ function type(input: HTMLInputElement, value: string) {
 }
 
 /** The site's header link and footer on the canvas: what G17 draws. */
-const canvasHome = () => $("header a[aria-label$='— home']");
+const canvasHome = () => $("header a[aria-label$=', home']");
 const canvasFooter = () => $("footer");
 
 beforeEach(() => {
@@ -1244,7 +1244,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         type(field("Site name"), "Rye & Co.");
 
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Rye & Co. — home",
+            "Rye & Co., home",
         );
         expect($("nav[aria-label=Breadcrumb]")?.textContent).toContain(
             "Rye & Co.",
@@ -1282,7 +1282,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(field("Site name").getAttribute("aria-invalid")).toBe("true");
         // The canvas keeps the last name that could be saved.
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Flour & Ferment — home",
+            "Flour & Ferment, home",
         );
         await wait(1500);
         expect(actions.updateSiteSettings).not.toHaveBeenCalled();
@@ -1589,7 +1589,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         );
         type(field("Site name"), "Rye & Co.");
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Rye & Co. — home",
+            "Rye & Co., home",
         );
     });
 
