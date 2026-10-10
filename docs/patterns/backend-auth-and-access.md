@@ -11,17 +11,17 @@
 
 ## Who decides what — **Current**
 
-| Question                             | Decided by                      | Where                                                                                                          |
-| ------------------------------------ | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Is this a signed-in user?            | Better Auth, running in the API | `packages/auth/src/server.ts` (emailOTP, GitHub and Google sign-in, cross-subdomain cookie); `BetterAuthGuard` |
-| Which organization, with which role? | The API, from the session       | `OrganizationGuard` → `OrganizationContextService`                                                             |
-| May this role take this action?      | Policy                          | `authorize(ctx, action)` in `organization-policy.ts`                                                           |
-| Is the capability switched on?       | The API                         | `ModuleEnforcementGuard` and `@RequireModule` (ADR-003)                                                        |
-| Does the plan allow it?              | Entitlements                    | `EntitlementService` (`check`, `can`)                                                                          |
-| Is this person Saroh staff?          | The API                         | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                |
-| May this operator do this?           | The permission vocabulary       | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                  |
-| Is this business open for activity?  | Its lifecycle                   | `assertOrganizationOpen` (`organization-lifecycle.gate.ts`), in `OrganizationGuard` and public writes          |
-| What does its state close?           | The lifecycle table             | `organization-lifecycle.policy.ts` (#921): activity, billing, public site, members' door                       |
+| Question                              | Decided by                          | Where                                                                                                                                                                                             |
+| ------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Is this a signed-in user?             | Better Auth, running in the API     | `packages/auth/src/server.ts` (emailOTP, GitHub and Google sign-in, cross-subdomain cookie); `BetterAuthGuard`                                                                                    |
+| Which organization, with which role?  | The API, from the session           | `OrganizationGuard` → `OrganizationContextService`                                                                                                                                                |
+| May this role take this action?       | Policy                              | `authorize(ctx, action)` in `organization-policy.ts`                                                                                                                                              |
+| Is the capability switched on?        | The API                             | `ModuleEnforcementGuard` and `@RequireModule` (ADR-003)                                                                                                                                           |
+| Does the plan allow it?               | Entitlements                        | `EntitlementService` (`check`, `can`)                                                                                                                                                             |
+| Is this person Saroh staff?           | The API                             | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                                                                                                   |
+| May this operator do this?            | The permission vocabulary           | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                                                                                                     |
+| Is this business open for this write? | Its lifecycle, by the route's class | `assertWorkspaceWrite` (`organization-lifecycle.gate.ts`) in `OrganizationGuard` and `StoreLifecycleGuard`; `assertOrganizationOpen` / `assertOrganizationWindingDown` on public writes (DEC-120) |
+| What does its state close?            | The lifecycle table                 | `organization-lifecycle.policy.ts` (#921): activity, billing, public site, members' door                                                                                                          |
 
 The frontends, `admin.saroh.in` included, decide none of these. They render
 what the API allows.
@@ -435,6 +435,11 @@ orgId)` (`organizations/organization-kind.ts`).
   returns what decides whether to act — never a business's customers, orders
   or messages — and reads personal data only behind `organization:pii:read`.
   A tenant path never calls one.
+- **Current** (DEC-121) — **Customers' reports about a business** are read
+  with `organization:read` (the reporter's email only with
+  `organization:pii:read`) and marked done with `reports:resolve`, which
+  Platform Owners and Support hold. Closing a report changes nothing for
+  the business, so it never asks for `organization:lifecycle:write`.
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator
@@ -463,6 +468,47 @@ orgId)` (`organizations/organization-kind.ts`).
   `public/sites` controller). A new state, a new `public/sites` controller or
   a new membership door fails `organization-lifecycle.policy.spec.ts` until it
   is decided.
+- **Current** (DEC-120, owner 9 Oct) — **A closing business winds down;
+  every write route has a lifecycle class.** A route is `new` unless it
+  carries `@LifecycleWrite("wind-down")` (finishes, cancels or refunds
+  something already made, or takes money already owed) or
+  `@LifecycleWrite("takeout")` (the owner's data download).
+  `lifecycleAllows(status, class)` decides: ACTIVE takes all three,
+  `PENDING_DELETION` wind-down and takeout, SUSPENDED takeout only,
+  deleted none. `OrganizationGuard` asks on org-scoped writes and
+  `StoreLifecycleGuard` on `stores/:storeId/…` (every store-scoped
+  controller carries it; it tells only someone who works there).
+  `organizations/lifecycle-wind-down.spec.ts` names every write route of the
+  order, booking, payment, invoice, membership, class pack and course
+  controllers as wind-down or refused: **a new write route there adds its
+  name to one list.** Public writes ask `assertOrganizationOpen` (new) or
+  `assertOrganizationWindingDown` (paying an order or invoice already
+  sent, a customer signing in), and **a customer is never told why**: the
+  refusal names no state, and the site's shop, booking page, packs and plans
+  read the lifecycle through `orders/checkout-paused.ts`
+  (`takingNewActivity`) and say what a paused site says (#800).
+- **Current** (DEC-122) — **A legal hold keeps a business's data, in
+  every state.** `Organization.legalHoldAt`, read only through
+  `organizations/legal-hold.ts`. An operator places one with
+  `organization:lifecycle:write` — with the suspension, or on a business
+  already suspended, closing or deleted (`AdminLifecycleService
+.placeLegalHold`) — and only a Platform Owner lifts it
+  (`organization:legal-hold:lift`, which no other role carries), each with
+  a reason, on the admin ledger with it and on the business's history
+  without it. It is not a lifecycle state: `LEGAL_HOLD_DECISIONS` in
+  `organization-lifecycle.policy.ts` says, per state, whether a hold may be
+  placed and whether a held business may be moved there (never to active,
+  never towards deletion), and a new state is a compile error there too.
+  While held, a privacy removal and "Download your data" are refused with
+  `details.code` `LEGAL_HOLD` and the words "This business's data is on
+  hold. Write to contact@saroh.in.", each refusal audited DENIED; every
+  job that deletes leaves the business alone (`backend-jobs.md`).
+- **Current** (DEC-120) — **Download your data is the owner's, by role.**
+  `data-export/`: `POST`/`GET organizations/:org/data-exports` and
+  `POST …/:id/link`, `isOwner` in the service (no new permission, DEC-039),
+  one being made at a time, each ask and each link audited
+  (`organization.data_export.requested` / `.downloaded`). A link is signed
+  and short-lived; no key or link is ever stored on a view.
 - **Adopted** (2026-09-26, ADR-011) — **A business's customers are not
   users.** A customer account on a merchant site is a per-business
   `CustomerAccount` linked to a Contact, never a Better Auth `User`. Its

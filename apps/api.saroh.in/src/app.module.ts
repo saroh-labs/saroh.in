@@ -9,6 +9,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
+import { BusinessReportsModule } from "./modules/business-reports/business-reports.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CatalogueModule } from "./modules/catalogue/catalogue.module";
@@ -21,6 +22,7 @@ import { ContentModule } from "./modules/content/content.module";
 import { CoursesModule } from "./modules/courses/courses.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DataExportModule } from "./modules/data-export/data-export.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
@@ -93,6 +95,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProviderHealthModule,
         SavedViewsModule,
         OrganizationsModule,
+        DataExportModule,
         ProjectsModule,
         AuditModule,
         StoresModule,
@@ -135,6 +138,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         BillingModule,
         WaitlistModule,
         LinkPreviewModule,
+        BusinessReportsModule,
         SelfTestModule,
     ],
 })

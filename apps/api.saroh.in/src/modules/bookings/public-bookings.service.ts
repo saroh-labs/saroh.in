@@ -11,9 +11,10 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { notTakingOrders } from "../billing/paused-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { takingNewActivity } from "../orders/checkout-paused";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
 import {
@@ -347,7 +348,11 @@ export class PublicBookingsService {
         if (signedIn && service.organizationId !== signedIn.organizationId) {
             throw new NotFoundException("Service not found");
         }
-        await assertOrganizationOpen(service.organizationId);
+        // A business suspended or closing takes no new booking (DEC-120),
+        // and its booker hears what a paused site says (#800), never why.
+        if (!(await takingNewActivity(service.organizationId))) {
+            throw notTakingOrders("bookings");
+        }
         // The booker is the account's, never the page's (A9): its verified
         // email, and its contact's name and phone. A name typed on the page
         // is used only when the contact has none yet.

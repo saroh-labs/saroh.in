@@ -13,7 +13,7 @@ import {
 import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -212,7 +212,9 @@ export class SignInCodesService {
     ): Promise<CodeRequested> {
         const site = await resolveSiteHost(relay.host);
         return runInOrgContext(site.organizationId, async () => {
-            await assertOrganizationOpen(site.organizationId);
+            // Signing in to see, pay or cancel what they already have
+            // stays open while the business winds down (DEC-120).
+            await assertOrganizationWindingDown(site.organizationId);
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(
@@ -337,7 +339,9 @@ export class SignInCodesService {
     ): Promise<SessionIssued> {
         const site = await resolveSiteHost(relay.host);
         return runInOrgContext(site.organizationId, async () => {
-            await assertOrganizationOpen(site.organizationId);
+            // Signing in to see, pay or cancel what they already have
+            // stays open while the business winds down (DEC-120).
+            await assertOrganizationWindingDown(site.organizationId);
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
             const destinationHash = destinationHashFor(

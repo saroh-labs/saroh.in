@@ -76,11 +76,14 @@ export function FilterSelect({
     name,
     defaultValue,
     options,
+    anyLabel = "Any",
 }: {
     label: string;
     name: string;
     defaultValue?: string;
     options: { value: string; label: string }[];
+    /** What the empty choice says, when "Any" isn't what it shows. */
+    anyLabel?: string;
 }) {
     return (
         <div className="grid min-w-0 gap-1.5">
@@ -93,7 +96,7 @@ export function FilterSelect({
                 defaultValue={defaultValue ?? ""}
                 className="h-[38px] w-full min-w-0 rounded-md border border-input bg-field px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
             >
-                <option value="">Any</option>
+                <option value="">{anyLabel}</option>
                 {options.map((option) => (
                     <option key={option.value} value={option.value}>
                         {option.label}

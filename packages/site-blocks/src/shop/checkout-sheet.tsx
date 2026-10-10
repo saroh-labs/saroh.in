@@ -10,6 +10,7 @@ import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
+import { SoldByLine } from "../sold-by";
 import type {
     CheckoutStanding,
     CheckoutStarted,
@@ -53,11 +54,14 @@ export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
 export function OrderPlacedToPay({
     started,
     businessName,
+    soldBy = null,
     toPay,
     onClose,
 }: {
     started: CheckoutStarted;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
+    soldBy?: string | null;
     /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
     toPay: string;
     onClose: () => void;
@@ -82,6 +86,10 @@ export function OrderPlacedToPay({
             <button type="button" onClick={onClose} className={sheetAltButton}>
                 Done
             </button>
+            <SoldByLine
+                line={soldBy}
+                className="text-site-muted mt-3 text-center"
+            />
         </SheetFrame>
     );
 }
@@ -90,6 +98,7 @@ export function CheckoutPay({
     started,
     api,
     businessName,
+    soldBy = null,
     customer,
     delivery,
     onPlaced,
@@ -103,6 +112,8 @@ export function CheckoutPay({
     started: OnlineStarted;
     api: ShopCheckoutApi;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
+    soldBy?: string | null;
     customer: SignedInCustomer;
     /**
      * Where it goes, as typed in the bag: its name and phone fill the
@@ -231,6 +242,10 @@ export function CheckoutPay({
                     >
                         Done
                     </button>
+                    <SoldByLine
+                        line={soldBy}
+                        className="text-site-muted mt-3 text-center"
+                    />
                 </SheetFrame>
             );
         }

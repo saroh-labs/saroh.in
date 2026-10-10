@@ -432,6 +432,30 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(transaction).not.toHaveBeenCalled();
     });
 
+    it.each(["SUSPENDED", "PENDING_DELETION"])(
+        "a %s business takes no booking, in the paused words that name no state (DEC-120)",
+        async (lifecycleStatus) => {
+            const service = new PublicBookingsService();
+            serviceFindUnique.mockResolvedValue({
+                ...SERVICE,
+                availabilityRules: RULES,
+            });
+            const lifecycle = prisma.organization.findUnique as jest.Mock;
+            lifecycle.mockResolvedValue({ lifecycleStatus });
+            const err = await service
+                .book("svc_1", baseInput(), "iphash")
+                .catch((e: unknown) => e)
+                .finally(() => lifecycle.mockResolvedValue(null));
+            expect(err).toBeInstanceOf(ConflictException);
+            const body = (err as ConflictException).getResponse();
+            expect(body).toMatchObject({
+                details: { code: "NOT_TAKING_ORDERS" },
+            });
+            expect(JSON.stringify(body)).not.toMatch(/clos|delet|suspend/i);
+            expect(transaction).not.toHaveBeenCalled();
+        },
+    );
+
     it("404s a missing/soft-deleted service and 410s an archived one", async () => {
         const service = new PublicBookingsService();
 

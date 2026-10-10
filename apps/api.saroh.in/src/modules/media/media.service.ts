@@ -302,18 +302,32 @@ export class MediaService {
      * one loses it (`SetNull`); the invoices keep their records, printed
      * without the logo.
      *
-     * Run by `organization.deletion.cleanup` with no caller context, in
-     * batches; a storage failure leaves that row for the retry (and out of
-     * this run's next batch), the rest go on, and the call throws at the end.
+     * Run by `organization.retention.erase` (DEC-122), 180 days after the
+     * business was deleted, with no caller context, in batches; a storage
+     * failure leaves that row for the retry (and out of this run's next
+     * batch), the rest go on, and the call throws at the end. Until DEC-122
+     * the deletion clean-up ran it on day one.
+     *
+     * **Never for a business on legal hold.** `mayErase` is asked before
+     * every batch: the eraser passes its hold check, so a hold placed while
+     * the files are going stops them within a batch (`stopped`). Only a
+     * caller that has checked the hold itself may leave it out
+     * (`legal-hold.deletes.spec.ts` pins who calls this).
      */
     async removeAllForDeletedBusiness(
         organizationId: string,
-    ): Promise<{ removed: number; failed: number }> {
+        mayErase: () => Promise<boolean> = () => Promise.resolve(true),
+    ): Promise<{ removed: number; failed: number; stopped: boolean }> {
         // A row removed is gone from the next read; only failures are kept
         // out of it, so a batch that always fails can't loop.
         const failedIds: string[] = [];
         let removed = 0;
+        let stopped = false;
         for (;;) {
+            if (!(await mayErase())) {
+                stopped = true;
+                break;
+            }
             const batch = await prisma.media.findMany({
                 where: {
                     organizationId,
@@ -359,7 +373,7 @@ export class MediaService {
                 `media_remove_incomplete removed=${removed} failed=${failed}`,
             );
         }
-        return { removed, failed };
+        return { removed, failed, stopped };
     }
 
     /**

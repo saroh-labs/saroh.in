@@ -440,6 +440,15 @@ export type {
     SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";
+// Who a customer is buying from, in the business's own details (DEC-121).
+export {
+    SoldByBlock,
+    SoldByLine,
+    reportBusinessHref,
+    sellerLead,
+    soldByLine,
+} from "./sold-by";
+export type { SellerLead, SiteSeller } from "./sold-by";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
 // A module page's title and lead (DEC-073 #9).

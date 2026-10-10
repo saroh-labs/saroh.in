@@ -242,6 +242,20 @@
   and every personal-looking field on a model reachable from `Contact` or
   `Customer` needs an entry in `personal-data.ts` — a rule, or "kept" and
   why (`personal-data.spec.ts`).
+- **Current** — **What a removal keeps is decided again for a deleted
+  business** (DEC-122). 180 days after a business is deleted,
+  `organization.retention.erase` runs the privacy removal's own writes for
+  every contact, then erases what no single removal reaches (store
+  customers with no contact, a walk-in's name on an order) and the CRM a
+  removal leaves to the business. So a field marked "kept" in
+  `personal-data.ts`, or a relation `REMOVAL_RULES` keeps, also needs a
+  decision in `admin/retention-erase-plan.ts` (`KEPT_FIELD_DECISIONS`,
+  `KEPT_RELATION_DECISIONS`): erased at 180 days, or kept and why
+  (`retention-erase-plan.spec.ts`). Invoices, credit notes and an order's
+  lines, amounts and place of supply are never erased (ADR-008). A new
+  table holding a person's details that hangs off neither `Contact` nor
+  `Customer` adds its write to `retention-erase-writes.ts` and its line to
+  `RETENTION_ERASED`.
 
 ## Money — **Current**
 

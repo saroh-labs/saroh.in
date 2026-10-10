@@ -11,6 +11,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -275,6 +276,7 @@ export class BookingClassPackController {
     constructor(private readonly packs: ClassPacksService) {}
 
     @Post()
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     use(
         @OrgContext() ctx: OrganizationContext,
@@ -285,6 +287,7 @@ export class BookingClassPackController {
     }
 
     @Delete()
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     remove(
         @OrgContext() ctx: OrganizationContext,

@@ -6,6 +6,7 @@ import { OrderConfirmation } from "@saroh/site-blocks";
 import { accountAreaOn } from "@/lib/account-area";
 import { getSiteForHost } from "@/lib/publication";
 import { getOrderConfirmation } from "@/lib/shop-confirmation";
+import { getFooterFacts, soldByFor } from "@/lib/site-footer";
 
 /**
  * The order confirmation on a merchant's site (round-2 P4), at
@@ -34,7 +35,12 @@ export default async function ShopOrderPage({
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
 
-    const lookup = await getOrderConfirmation(resolved.siteId, orderId);
+    const [lookup, facts] = await Promise.all([
+        getOrderConfirmation(resolved.siteId, orderId),
+        // "Sold by ‹legal name›" (DEC-121): the footer's own read, shared
+        // with the layout's through `cache`.
+        getFooterFacts(resolved.siteId),
+    ]);
     const ordersHref =
         lookup.ok && accountAreaOn()
             ? `/account/orders?order=${encodeURIComponent(orderId)}`
@@ -44,6 +50,7 @@ export default async function ShopOrderPage({
         <OrderConfirmation
             lookup={lookup}
             businessName={resolved.snapshot.site.name}
+            soldBy={soldByFor(facts, resolved.snapshot.site.name, true)}
             ordersHref={ordersHref}
         />
     );

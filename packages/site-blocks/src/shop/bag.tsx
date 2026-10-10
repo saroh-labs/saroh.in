@@ -71,6 +71,8 @@ export interface ShopBagProps {
     /** The site the bag belongs to (its id). */
     site: string;
     businessName: string;
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
+    soldBy?: string | null;
     api: ShopCheckoutApi;
     account: {
         customer: SignedInCustomer | null;
@@ -89,6 +91,7 @@ export interface ShopBagProps {
 export function ShopBag({
     site,
     businessName,
+    soldBy = null,
     api,
     account,
     openCheckout,
@@ -308,6 +311,7 @@ export function ShopBag({
                 <OrderPlacedToPay
                     started={step.started}
                     businessName={businessName}
+                    soldBy={soldBy}
                     toPay={step.toPay}
                     onClose={close}
                 />
@@ -318,6 +322,7 @@ export function ShopBag({
                     started={step.started}
                     api={api}
                     businessName={businessName}
+                    soldBy={soldBy}
                     customer={customer}
                     delivery={step.request.address}
                     onPlaced={placed}

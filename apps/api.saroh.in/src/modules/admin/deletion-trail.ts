@@ -3,11 +3,16 @@ import { prisma } from "@saroh/database";
 import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
 import type { OutstandingRefundStage } from "../payments/refunds-outstanding";
 import { refundsOutstanding } from "../payments/refunds-outstanding";
+import {
+    LEGAL_HOLD_LIFTED_ACTION,
+    LEGAL_HOLD_PLACED_ACTION,
+} from "./admin-lifecycle.service";
 import { ORGANIZATION_DELETION_CLEANUP_ACTION } from "./organization-deletion-cleanup.handler";
 import {
     ORGANIZATION_DELETED_ACTION,
     ORGANIZATION_DELETION_WAITING_ACTION,
 } from "./organization-deletion.handler";
+import { ORGANIZATION_RETENTION_ERASE_ACTION } from "./organization-retention-erase.handler";
 
 /**
  * A business's way out, as the console shows it (#921, owner 9 Oct): the
@@ -29,7 +34,18 @@ export const DELETION_TRAIL_ACTIONS = [
     ORGANIZATION_DELETION_WAITING_ACTION,
     ORGANIZATION_DELETED_ACTION,
     ORGANIZATION_DELETION_CLEANUP_ACTION,
+    // 180 days on: its files and personal data erased (DEC-122).
+    ORGANIZATION_RETENTION_ERASE_ACTION,
+    // A legal hold stops every step above (DEC-122).
+    LEGAL_HOLD_PLACED_ACTION,
+    LEGAL_HOLD_LIFTED_ACTION,
 ] as const;
+
+/** The trail rows that carry each step's result. */
+const STEPPED_ACTIONS: readonly string[] = [
+    ORGANIZATION_DELETION_CLEANUP_ACTION,
+    ORGANIZATION_RETENTION_ERASE_ACTION,
+];
 
 /** At most this many trail rows: a clean-up retried for days is many. */
 const TRAIL_ROWS = 40;
@@ -81,8 +97,10 @@ export interface DeletionTrailRow {
         count: number;
         owedMinorByCurrency: Record<string, number>;
     } | null;
-    /** A clean-up run: each step's result. */
+    /** A clean-up or an erase run: each step's result (ok, failed, held). */
     steps: { step: string; result: string }[] | null;
+    /** An erase run that isn't finished: `more`, `failed` or `held`. */
+    state: string | null;
 }
 
 /** The deletion trail, newest first. */
@@ -109,9 +127,10 @@ export async function deletionTrail(
             row.action === ORGANIZATION_DELETION_WAITING_ACTION
                 ? refundsOf(metadata)
                 : null,
-        steps:
-            row.action === ORGANIZATION_DELETION_CLEANUP_ACTION
-                ? stepsOf(metadata)
+        steps: STEPPED_ACTIONS.includes(row.action) ? stepsOf(metadata) : null,
+        state:
+            row.action === ORGANIZATION_RETENTION_ERASE_ACTION
+                ? stateOf(metadata)
                 : null,
     }));
 }
@@ -173,6 +192,12 @@ function refundsOf(metadata: unknown): DeletionTrailRow["refunds"] {
         count: typeof m.count === "number" ? m.count : 0,
         owedMinorByCurrency: owed,
     };
+}
+
+function stateOf(metadata: unknown): string | null {
+    if (typeof metadata !== "object" || metadata === null) return null;
+    const state = (metadata as { state?: unknown }).state;
+    return typeof state === "string" ? state : null;
 }
 
 function stepsOf(metadata: unknown): DeletionTrailRow["steps"] {

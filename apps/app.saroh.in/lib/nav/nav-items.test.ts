@@ -184,6 +184,7 @@ describe("what each role is offered", () => {
             "/settings/profile",
             "/settings/activity",
             "/settings/providers",
+            "/settings/data",
         ]);
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_2");
@@ -1255,7 +1256,16 @@ describe("settings tabs — owner only, and everyone's", () => {
             "Your profile",
             "Activity",
             "Providers",
+            "Your data",
         ]);
+    });
+
+    it("keeps Your data to the owner (DEC-120)", () => {
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/data");
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/data");
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["org:settings:read"] }),
+        ).not.toContain("/settings/data");
     });
 
     it("offers Activity to whoever the API lets read the audit stream", () => {

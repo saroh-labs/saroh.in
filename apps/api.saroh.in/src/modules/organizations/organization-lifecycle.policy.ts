@@ -10,9 +10,13 @@
  * This table is that decision, one row per state, and every place reads it
  * rather than its own list of names:
  *
- * - `activity`: new activity in the business — a workspace write, an
- *   enquiry, booking or payment from its pages
- *   (`organization-lifecycle.gate.ts`).
+ * - `activity`: activity in the business — a workspace write, an enquiry,
+ *   booking or payment from its pages (`organization-lifecycle.gate.ts`).
+ *   `open` takes anything; `wind-down` (DEC-120) takes nothing new but lets
+ *   the business finish what it already started — progress, cancel and
+ *   refund existing orders, bookings and memberships, and take payment for
+ *   ones already owed; `closed` takes nothing. Which workspace write is
+ *   which is its {@link LifecycleWriteClass}.
  * - `billing`: anything that charges or renews — Saroh's own plan (a
  *   checkout, an add-on, a renewal sent to the provider) and the business's
  *   charges to its own customers (a membership renewal, an autopay debit).
@@ -25,6 +29,12 @@
  * until it has a row, and `organization-lifecycle.policy.spec.ts` checks the
  * database's CHECK constraint names no state this table lacks and that each
  * consumer still asks it.
+ *
+ * **A legal hold is not a state** (DEC-122, `legal-hold.ts`): a held
+ * business keeps the row it is in. What the hold adds is decided here too,
+ * per state, in {@link LEGAL_HOLD_DECISIONS}: whether a hold may be placed
+ * on a business in that state, and whether a held business may be moved
+ * *to* it. A new state is a compile error there as well.
  */
 export const OrganizationLifecycleStatus = {
     Active: "ACTIVE",
@@ -37,7 +47,7 @@ export type OrganizationLifecycleStatus =
     (typeof OrganizationLifecycleStatus)[keyof typeof OrganizationLifecycleStatus];
 
 export interface LifecycleDecision {
-    activity: "open" | "closed";
+    activity: "open" | "wind-down" | "closed";
     billing: "charges" | "refused";
     publicSite: "online" | "offline";
     members: "open" | "closed";
@@ -62,9 +72,10 @@ export const LIFECYCLE_DECISIONS: Readonly<
     },
     // The window (owner, 9 Oct, #921): no renewal is charged and nothing new
     // can start, but it can still be reinstated, so the site and the door
-    // stay as they were.
+    // stay as they were. It winds down (owner, 9 Oct, DEC-120): what was
+    // already started can be finished, cancelled or refunded.
     PENDING_DELETION: {
-        activity: "closed",
+        activity: "wind-down",
         billing: "refused",
         publicSite: "online",
         members: "open",
@@ -83,6 +94,54 @@ export const ORGANIZATION_LIFECYCLE_STATES = Object.keys(
     LIFECYCLE_DECISIONS,
 ) as OrganizationLifecycleStatus[];
 
+export interface LegalHoldDecision {
+    /** May an operator place a hold on a business in this state? */
+    place: boolean;
+    /** May a business on legal hold be moved to this state? */
+    enter: boolean;
+}
+
+/**
+ * What a legal hold means for each state (DEC-122, owner 10 Oct). The hold
+ * keeps a business's data "even if deletion was requested", so a held
+ * business never moves towards deletion; and it is never active, so its
+ * workspace takes no write that could delete a record.
+ */
+export const LEGAL_HOLD_DECISIONS: Readonly<
+    Record<OrganizationLifecycleStatus, LegalHoldDecision>
+> = {
+    // An active business is suspended with the hold, never held as it is;
+    // and a held one isn't reinstated until the hold is lifted.
+    ACTIVE: { place: false, enter: false },
+    // Where a hold normally sits: suspended for what the law prohibits.
+    SUSPENDED: { place: true, enter: true },
+    // A hold may land on a business already closing (the sweep then leaves
+    // it); a held business's deletion can't be scheduled.
+    PENDING_DELETION: { place: true, enter: false },
+    // A hold may land on a deleted business inside its 180 days (the
+    // clean-up and the eraser then leave it); the sweep never deletes a
+    // held one.
+    DELETED_RETAINED: { place: true, enter: false },
+};
+
+/** May a hold be placed on a business in this state? Unknown: no. */
+export function legalHoldMayBePlaced(status: string): boolean {
+    return (
+        (LEGAL_HOLD_DECISIONS as Partial<Record<string, LegalHoldDecision>>)[
+            status
+        ]?.place ?? false
+    );
+}
+
+/** May a business on legal hold be moved to this state? Unknown: no. */
+export function legalHoldAllowsMoveTo(status: string): boolean {
+    return (
+        (LEGAL_HOLD_DECISIONS as Partial<Record<string, LegalHoldDecision>>)[
+            status
+        ]?.enter ?? false
+    );
+}
+
 /**
  * The row for a stored state. A value the table doesn't know (the column is
  * text) is treated as the most closed row: refused, offline, closed.
@@ -98,6 +157,52 @@ export function lifecycleDecision(status: string): LifecycleDecision {
 /** May the business take new activity? */
 export function activityOpen(status: string): boolean {
     return lifecycleDecision(status).activity === "open";
+}
+
+/**
+ * Is the business winding down (DEC-120)? Nothing new, but what it already
+ * started can be finished.
+ */
+export function windingDown(status: string): boolean {
+    return lifecycleDecision(status).activity === "wind-down";
+}
+
+/**
+ * What a write in the workspace does, for the lifecycle (owner, 9 Oct,
+ * DEC-120). Every route is `new` unless it says otherwise
+ * (`@LifecycleWrite`, `common/decorators/lifecycle-write.decorator.ts`):
+ *
+ * - `new`: starts or changes something — an order, a booking, a sale, a
+ *   product, a setting, an invitation. Open only while `activity` is open.
+ * - `wind-down`: finishes, cancels or refunds something already started,
+ *   or takes the money already owed for it. Open while the business is
+ *   open or winding down.
+ * - `takeout`: the business taking its own data away ("Download your
+ *   data"). Open in every state whose members may open the business.
+ */
+export type LifecycleWriteClass = "new" | "wind-down" | "takeout";
+
+export const LIFECYCLE_WRITE_CLASSES: readonly LifecycleWriteClass[] = [
+    "new",
+    "wind-down",
+    "takeout",
+];
+
+/** May a write of this class go ahead in this state? */
+export function lifecycleAllows(
+    status: string,
+    writeClass: LifecycleWriteClass,
+): boolean {
+    const decision = lifecycleDecision(status);
+    if (decision.members === "closed") return false;
+    switch (writeClass) {
+        case "takeout":
+            return true;
+        case "wind-down":
+            return decision.activity !== "closed";
+        case "new":
+            return decision.activity === "open";
+    }
 }
 
 /** May anything charge or renew for this business? */

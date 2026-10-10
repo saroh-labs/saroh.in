@@ -15,6 +15,7 @@ import { PublishedPage } from "@/components/published-page";
 import { accountAreaOn, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
+import { getCatalogue } from "@/lib/catalogue";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import {
     isBookingDeepLink,
@@ -24,6 +25,7 @@ import {
 import { dontCachePage } from "@/lib/page-cache/site-rules";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getFooterFacts, soldByFor } from "@/lib/site-footer";
 import { shareable } from "@/lib/test-metadata";
 
 import {
@@ -157,13 +159,18 @@ export default async function BookPage({
         );
     }
 
-    const [lookup, visit, customer, options] = await Promise.all([
-        getBookingPage(resolved.siteId),
-        // The header's place, hours and phone (E6); null never blocks booking.
-        getBookingVisit(resolved.siteId),
-        getSignedInCustomer().catch((): SignedInCustomer | null => null),
-        getSignInOptions().catch((): SignInOptions | null => null),
-    ]);
+    const [lookup, visit, customer, options, facts, catalogue] =
+        await Promise.all([
+            getBookingPage(resolved.siteId),
+            // The header's place, hours and phone (E6); null never blocks booking.
+            getBookingVisit(resolved.siteId),
+            getSignedInCustomer().catch((): SignedInCustomer | null => null),
+            getSignInOptions().catch((): SignInOptions | null => null),
+            // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-121):
+            // the layout's own reads, shared through `cache`.
+            getFooterFacts(resolved.siteId),
+            getCatalogue(resolved.siteId),
+        ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         // A failed read is not kept by the page cache (#863).
@@ -196,6 +203,7 @@ export default async function BookPage({
                 },
             }}
             apiUrl={publicApiUrl()}
+            soldBy={soldByFor(facts, resolved.snapshot.site.name, catalogue.ok)}
             initialServiceId={typeof service === "string" ? service : null}
             initialDate={initialDateOf(date)}
             initialStart={initialTimeOf(start)}

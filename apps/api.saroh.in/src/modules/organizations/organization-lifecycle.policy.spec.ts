@@ -15,12 +15,18 @@ import type { LifecycleDecision } from "./organization-lifecycle.policy";
 import {
     activityOpen,
     billingMayCharge,
+    LEGAL_HOLD_DECISIONS,
+    legalHoldAllowsMoveTo,
+    legalHoldMayBePlaced,
     LIFECYCLE_DECISIONS,
+    LIFECYCLE_WRITE_CLASSES,
+    lifecycleAllows,
     lifecycleDecision,
     membersMayOpen,
     ORGANIZATION_LIFECYCLE_STATES,
     OrganizationLifecycleStatus,
     publicSiteOnline,
+    windingDown,
 } from "./organization-lifecycle.policy";
 
 const SRC = join(__dirname, "..", "..");
@@ -80,7 +86,7 @@ describe("the lifecycle decision table (#921)", () => {
         "%s is decided for activity, billing, the public site and members",
         (state) => {
             const row: LifecycleDecision = LIFECYCLE_DECISIONS[state];
-            expect(["open", "closed"]).toContain(row.activity);
+            expect(["open", "wind-down", "closed"]).toContain(row.activity);
             expect(["charges", "refused"]).toContain(row.billing);
             expect(["online", "offline"]).toContain(row.publicSite);
             expect(["open", "closed"]).toContain(row.members);
@@ -105,7 +111,7 @@ describe("the lifecycle decision table (#921)", () => {
                 members: "open",
             },
             PENDING_DELETION: {
-                activity: "closed",
+                activity: "wind-down",
                 billing: "refused",
                 publicSite: "online",
                 members: "open",
@@ -124,11 +130,32 @@ describe("the lifecycle decision table (#921)", () => {
         (state) => {
             const row = LIFECYCLE_DECISIONS[state];
             expect(activityOpen(state)).toBe(row.activity === "open");
+            expect(windingDown(state)).toBe(row.activity === "wind-down");
             expect(billingMayCharge(state)).toBe(row.billing === "charges");
             expect(publicSiteOnline(state)).toBe(row.publicSite === "online");
             expect(membersMayOpen(state)).toBe(row.members === "open");
         },
     );
+
+    // DEC-120 (owner, 9 Oct): a business winding down starts nothing new,
+    // finishes what it started, and can always take its data away.
+    it.each([
+        ["ACTIVE", { new: true, "wind-down": true, takeout: true }],
+        ["SUSPENDED", { new: false, "wind-down": false, takeout: true }],
+        ["PENDING_DELETION", { new: false, "wind-down": true, takeout: true }],
+        [
+            "DELETED_RETAINED",
+            { new: false, "wind-down": false, takeout: false },
+        ],
+        ["ARCHIVED", { new: false, "wind-down": false, takeout: false }],
+    ] as const)("%s allows writes by class", (state, expected) => {
+        for (const cls of LIFECYCLE_WRITE_CLASSES) {
+            expect([cls, lifecycleAllows(state, cls)]).toEqual([
+                cls,
+                expected[cls],
+            ]);
+        }
+    });
 
     it("treats a state it doesn't know as closed everywhere", () => {
         expect(lifecycleDecision("ARCHIVED")).toEqual(
@@ -153,6 +180,12 @@ const CONSUMERS: Record<
     activity: [
         {
             file: "modules/organizations/organization-lifecycle.gate.ts",
+            asks: /\blifecycleAllows\(/,
+        },
+        // The site's shop, booking page, packs and plans say the business
+        // isn't taking orders or bookings when it isn't (DEC-120).
+        {
+            file: "modules/orders/checkout-paused.ts",
             asks: /\bactivityOpen\(/,
         },
     ],
@@ -244,6 +277,65 @@ const CONSUMERS: Record<
         },
     ],
 };
+
+describe("a legal hold is decided for every state (DEC-122)", () => {
+    it("has a row for every state, and no other", () => {
+        expect(Object.keys(LEGAL_HOLD_DECISIONS).sort()).toEqual(
+            [...ORGANIZATION_LIFECYCLE_STATES].sort(),
+        );
+    });
+
+    it("says what the owner decided on 10 Oct", () => {
+        expect(LEGAL_HOLD_DECISIONS).toEqual({
+            // Suspended with the hold; never held while active.
+            ACTIVE: { place: false, enter: false },
+            SUSPENDED: { place: true, enter: true },
+            // Kept "even if deletion was requested".
+            PENDING_DELETION: { place: true, enter: false },
+            DELETED_RETAINED: { place: true, enter: false },
+        });
+    });
+
+    it("never lets a held business reach a state that takes new activity or moves it towards deletion", () => {
+        for (const state of ORGANIZATION_LIFECYCLE_STATES) {
+            if (!legalHoldAllowsMoveTo(state)) continue;
+            // The only state a held business may be moved to takes no
+            // workspace write but the data download (itself refused under
+            // a hold), so none of its people can delete a record.
+            expect(lifecycleAllows(state, "new")).toBe(false);
+            expect(lifecycleAllows(state, "wind-down")).toBe(false);
+            expect(membersMayOpen(state)).toBe(true);
+        }
+        expect(legalHoldAllowsMoveTo("PENDING_DELETION")).toBe(false);
+        expect(legalHoldAllowsMoveTo("DELETED_RETAINED")).toBe(false);
+        expect(legalHoldAllowsMoveTo("ACTIVE")).toBe(false);
+    });
+
+    it("treats a state it doesn't know as taking no hold and no held business", () => {
+        expect(legalHoldMayBePlaced("ARCHIVED")).toBe(false);
+        expect(legalHoldAllowsMoveTo("ARCHIVED")).toBe(false);
+    });
+
+    it("is asked by everything that moves or removes a business", () => {
+        // The operator's commands ask the table…
+        const lifecycle = read("modules/admin/admin-lifecycle.service.ts");
+        expect(lifecycle).toContain("legalHoldMayBePlaced(");
+        expect(lifecycle).toContain("legalHoldAllowsMoveTo(");
+        // …and each job on a business's way out reads the hold itself
+        // (`legal-hold.deletes.spec.ts` covers every other deleting job).
+        for (const rel of [
+            "modules/admin/organization-deletion.handler.ts",
+            "modules/admin/organization-deletion-cleanup.handler.ts",
+            "modules/admin/organization-retention-erase.handler.ts",
+            "modules/data-export/data-export.service.ts",
+            "modules/customer-workspace/privacy-removal.service.ts",
+        ]) {
+            expect(
+                `${rel}: ${read(rel).includes('organizations/legal-hold"')}`,
+            ).toBe(`${rel}: true`);
+        }
+    });
+});
 
 describe("every consumer asks the table (#921)", () => {
     const rows = Object.entries(CONSUMERS).flatMap(([decision, list]) =>

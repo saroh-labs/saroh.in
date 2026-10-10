@@ -104,6 +104,13 @@ purchase yet; one added would be wind-down.
 `capabilities/history-reads.gate.spec.ts` names every handler of those
 controllers as a history read, wind-down or gated.
 
+**The lifecycle's wind-down is a second, wider list** (DEC-120): a business
+scheduled for deletion may also progress, take payment for and refund what
+it already has, with its modules on. That list is
+`organizations/lifecycle-wind-down.spec.ts`, marked on the route with
+`@LifecycleWrite("wind-down")`; a new write route in these controllers is
+named in both specs.
+
 Public booking is the exception to "keep working": it stays unannotated, but
 `BookingsService` answers **410** on availability and booking when the
 Organization's `APPOINTMENTS` row exists and is not `ENABLED`

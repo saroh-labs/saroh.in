@@ -151,7 +151,9 @@ export function deleteContact(
 
 /** Why a privacy removal can't go ahead yet (the API's `RemovalRefusal`). */
 export interface RemovalRefusal {
-    reason: "open-order" | "live-subscription" | "autopay";
+    // `legal-hold` (DEC-122): the business's data is on hold; the message
+    // says to write to Saroh.
+    reason: "open-order" | "live-subscription" | "autopay" | "legal-hold";
     message: string;
 }
 

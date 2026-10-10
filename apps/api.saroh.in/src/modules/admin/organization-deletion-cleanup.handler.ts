@@ -5,9 +5,14 @@ import { prisma } from "@saroh/database";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { DeletedBusinessBilling } from "../billing/business-closing";
 import { BILLING_PROVIDER_CANCEL_TYPE } from "../billing/provider-cancel.job";
+import { DATA_EXPORT_EXPIRE_TYPE } from "../data-export/data-export-types";
 import { DomainsService } from "../domains/domains.service";
-import { MediaService } from "../media/media.service";
 import { logDeletionProviderCall } from "../organizations/deletion-provider-log";
+import {
+    NOT_ON_LEGAL_HOLD,
+    onLegalHold,
+    onLegalHoldLocked,
+} from "../organizations/legal-hold";
 import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
 import { activeMandatesByProvider } from "../payments/provider-memberships";
 import { refundsOutstanding } from "../payments/refunds-outstanding";
@@ -29,9 +34,9 @@ export const ORGANIZATION_DELETION_CLEANUP_ACTION =
     "organization.deletion.cleanup";
 
 /**
- * What a deleted business leaves behind is cleared (owner, 9 Oct, #921):
- * the step after the deletion sweep marks it `DELETED_RETAINED`, queued on
- * the same transaction (the outbox), one job per business.
+ * A deleted business's access is shut off (owner, 9 Oct, #921; 10 Oct,
+ * DEC-122): the step after the deletion sweep marks it `DELETED_RETAINED`,
+ * queued on the same transaction (the outbox), one job per business.
  */
 export const ORGANIZATION_DELETION_CLEANUP_TYPE =
     "organization.deletion.cleanup";
@@ -60,6 +65,9 @@ export const CLEANUP_KEEPS_JOB_TYPES: readonly string[] = [
     BILLING_PROVIDER_CANCEL_TYPE,
     SUBSCRIPTION_CHARGE_TYPE,
     SEND_REFUND_TYPE,
+    // A data export's zip is deleted on its day whatever became of the
+    // business (DEC-120): called off, the file would never go.
+    DATA_EXPORT_EXPIRE_TYPE,
 ];
 
 /**
@@ -77,17 +85,34 @@ export const UNFINISHED_CLEANUP_JOB = {
 } satisfies Prisma.JobWhereInput;
 
 export type CleanupStep =
-    "jobs" | "billing" | "domains" | "media" | "memberships" | "keys";
+    "jobs" | "billing" | "domains" | "memberships" | "keys";
 
-/** Every step, in the order a run takes them. */
+/**
+ * Every step, in the order a run takes them. There is no `media` step
+ * since DEC-122: a deleted business's files are kept with its data for 180
+ * days and erased by `organization.retention.erase`.
+ */
 export const CLEANUP_STEPS: readonly CleanupStep[] = [
     "jobs",
     "billing",
     "domains",
-    "media",
     "memberships",
     "keys",
 ];
+
+/**
+ * The steps that remove something of the business's: none of them runs
+ * while it is on legal hold (DEC-122).
+ */
+export const CLEANUP_DESTRUCTIVE_STEPS: readonly CleanupStep[] = [
+    "jobs",
+    "domains",
+    "keys",
+];
+
+/** What the ledger says of a run that stood aside for a legal hold. */
+export const CLEANUP_HELD_REASON =
+    "On legal hold: nothing was removed. The clean-up runs again when the hold is lifted";
 
 /**
  * Keys are kept while a customer is still owed a refund (owner, 9 Oct):
@@ -103,10 +128,15 @@ export class RefundsStillOwedError extends Error {
 }
 
 export interface CleanupResult {
-    /** False when the business wasn't `DELETED_RETAINED` (nothing done). */
+    /**
+     * False when the business wasn't `DELETED_RETAINED`, or was on legal
+     * hold when the run started (nothing done).
+     */
     ran: boolean;
     counts: Record<string, number>;
     failed: CleanupStep[];
+    /** Steps not taken because the business is on legal hold (DEC-122). */
+    held: CleanupStep[];
 }
 
 export async function enqueueDeletionCleanup(
@@ -124,8 +154,11 @@ export async function enqueueDeletionCleanup(
 }
 
 /**
- * Clears a deleted business (#921). Each step is idempotent, re-reads what
- * it acts on, and is tried whatever the others did:
+ * Shuts off a deleted business's access (#921). **Its data and files stay**
+ * (DEC-122, owner 10 Oct): the Privacy Policy keeps them 180 days after
+ * deletion, and `organization.retention.erase` removes them then. Until
+ * DEC-122 this run deleted the files on day one. Each step is idempotent,
+ * re-reads what it acts on, and is tried whatever the others did:
  *
  * 1. **jobs** — its pending jobs are cancelled (`CANCELLED`, as an operator
  *    cancels one), but for {@link CLEANUP_KEEPS_JOB_TYPES}.
@@ -133,16 +166,23 @@ export async function enqueueDeletionCleanup(
  *    then recorded CANCELLED (`DeletedBusinessBilling`).
  * 3. **domains** — custom hostnames deleted at Cloudflare and the claims
  *    released (`DomainsService.releaseForDeletedBusiness`).
- * 4. **media** — every object out of storage, then its row
- *    (`MediaService.removeAllForDeletedBusiness`).
- * 5. **memberships** — its customers' active autopay mandates read and
+ * 4. **memberships** — its customers' active autopay mandates read and
  *    logged per provider: deletion doesn't cancel them there (owner, 9 Oct;
  *    the workspace said so during the window).
- * 6. **keys** — its payment and messaging credentials deleted: its own
- *    connections (`MerchantPaymentProvider`, `CommunicationProvider` for
- *    email and WhatsApp) and the storefronts' older ones
- *    (`StorePaymentConfig`, `IntegrationSecret`) — never while a customer
- *    is still owed a refund.
+ * 5. **keys** — its payment and messaging credentials deleted, at once:
+ *    they are secrets, not records, and are never kept for the 180 days.
+ *    Its own connections (`MerchantPaymentProvider`,
+ *    `CommunicationProvider` for email and WhatsApp) and the storefronts'
+ *    older ones (`StorePaymentConfig`, `IntegrationSecret`) — never while a
+ *    customer is still owed a refund.
+ *
+ * **On legal hold it removes nothing** (DEC-122): a run that finds the
+ * business held stands aside whole, notes it on the ledger and ends without
+ * failing; lifting the hold queues the clean-up again
+ * (`AdminLifecycleService.liftLegalHold`). A hold placed while a run is
+ * under way stops every destructive step after it
+ * ({@link CLEANUP_DESTRUCTIVE_STEPS}): each asks again before it starts,
+ * and the keys' transaction asks under the business's row lock.
  *
  * Its pending jobs never include a refund on its way: `payments.send-refund`
  * is left to run. Every provider call logs one
@@ -150,9 +190,10 @@ export async function enqueueDeletionCleanup(
  * and each run is one `organization.deletion.cleanup` row on the admin
  * ledger with each step's result, for the console's deletion trail.
  *
- * Kept, as records (ADR-008, GST): orders, invoices, credit notes,
- * customers, payments and refunds, Saroh's invoices to it, and both audit
- * trails.
+ * Kept for the 180 days: everything else the business holds — customers,
+ * bookings, messages, its files. Kept after them too, as records (ADR-008,
+ * GST): orders, invoices, credit notes, payments and refunds, Saroh's
+ * invoices to it, and both audit trails.
  *
  * The run first checks the business is `DELETED_RETAINED`, a state nothing
  * leaves; the steps that write in a transaction (billing, keys) check again
@@ -169,7 +210,6 @@ export class OrganizationDeletionCleanupHandler {
     constructor(
         private readonly billing: DeletedBusinessBilling,
         private readonly domains: DomainsService,
-        private readonly media: MediaService,
     ) {}
 
     readonly handle = async (job: Job): Promise<void> => {
@@ -198,17 +238,45 @@ export class OrganizationDeletionCleanupHandler {
             this.logger.warn(
                 `organization_deletion_cleanup_skipped org=${organizationId} reason=not-deleted`,
             );
-            return { ran: false, counts: {}, failed: [] };
+            return { ran: false, counts: {}, failed: [], held: [] };
+        }
+        // On legal hold nothing is removed (DEC-122): the run stands aside
+        // whole, says so on the ledger, and ends without failing. Lifting
+        // the hold queues the clean-up again.
+        if (await onLegalHold(prisma, organizationId)) {
+            this.logger.warn(
+                `organization_deletion_cleanup_held org=${organizationId} reason=legal-hold`,
+            );
+            const held = [...CLEANUP_STEPS];
+            await this.recordTrail(organizationId, jobId, {}, [], held);
+            return { ran: false, counts: {}, failed: [], held };
         }
         const counts: Record<string, number> = {};
         const failed: CleanupStep[] = [];
+        const held: CleanupStep[] = [];
         const step = async (
             name: CleanupStep,
             work: () => Promise<Record<string, number>>,
         ) => {
             try {
+                // A hold placed since the run started stops every step that
+                // removes something.
+                if (
+                    CLEANUP_DESTRUCTIVE_STEPS.includes(name) &&
+                    (await onLegalHold(prisma, organizationId))
+                ) {
+                    held.push(name);
+                    this.logger.warn(
+                        `organization_deletion_cleanup_step_held org=${organizationId} step=${name} reason=legal-hold`,
+                    );
+                    return;
+                }
                 Object.assign(counts, await work());
             } catch (error) {
+                if (error instanceof HeldMidStepError) {
+                    held.push(name);
+                    return;
+                }
                 failed.push(name);
                 this.logger.error(
                     `organization_deletion_cleanup_step_failed org=${organizationId} step=${name} error=${errorName(error)}`,
@@ -234,11 +302,6 @@ export class OrganizationDeletionCleanupHandler {
                 await this.domains.releaseForDeletedBusiness(organizationId)
             ).released,
         }));
-        await step("media", async () => ({
-            mediaRemoved: (
-                await this.media.removeAllForDeletedBusiness(organizationId)
-            ).removed,
-        }));
         await step("memberships", async () => ({
             mandatesLeftAtProvider: await this.readMandates(organizationId),
         }));
@@ -250,10 +313,10 @@ export class OrganizationDeletionCleanupHandler {
             .map(([k, v]) => `${k}=${v}`)
             .join(" ");
         this.logger.log(
-            `organization_deletion_cleanup org=${organizationId} ${line} failed=${failed.join(",") || "none"}`,
+            `organization_deletion_cleanup org=${organizationId} ${line} failed=${failed.join(",") || "none"} held=${held.join(",") || "none"}`,
         );
-        await this.recordTrail(organizationId, jobId, counts, failed);
-        return { ran: true, counts, failed };
+        await this.recordTrail(organizationId, jobId, counts, failed, held);
+        return { ran: true, counts, failed, held };
     }
 
     /**
@@ -266,7 +329,9 @@ export class OrganizationDeletionCleanupHandler {
         jobId: string | undefined,
         counts: Record<string, number>,
         failed: CleanupStep[],
+        held: CleanupStep[],
     ): Promise<void> {
+        const done = failed.length === 0 && held.length === 0;
         try {
             const attempt = jobId
                 ? ((
@@ -284,23 +349,28 @@ export class OrganizationDeletionCleanupHandler {
                     targetType: "organization",
                     targetId: organizationId,
                     organizationId,
-                    reason:
-                        failed.length === 0
-                            ? "What the deleted business left behind was cleared"
-                            : "The clean-up didn't finish; it is tried again",
-                    outcome:
-                        failed.length === 0
-                            ? AdminAuditOutcome.Success
-                            : AdminAuditOutcome.Failure,
+                    reason: done
+                        ? "The deleted business's access was shut off; its data is kept for the retention period"
+                        : held.length > 0
+                          ? CLEANUP_HELD_REASON
+                          : "The clean-up didn't finish; it is tried again",
+                    outcome: done
+                        ? AdminAuditOutcome.Success
+                        : AdminAuditOutcome.Failure,
                     idempotencyKey: jobId
                         ? `organization-deletion-cleanup:${jobId}:${attempt}`
                         : undefined,
                     metadata: {
                         steps: CLEANUP_STEPS.map((name) => ({
                             step: name,
-                            result: failed.includes(name) ? "failed" : "ok",
+                            result: held.includes(name)
+                                ? "held"
+                                : failed.includes(name)
+                                  ? "failed"
+                                  : "ok",
                         })),
                         counts,
+                        ...(held.length > 0 ? { legalHold: true } : {}),
                     },
                 }),
             });
@@ -356,6 +426,8 @@ export class OrganizationDeletionCleanupHandler {
         const cancelled = await prisma.job.updateMany({
             where: {
                 organizationId,
+                // Fenced on the hold in the write itself (DEC-122).
+                organization: NOT_ON_LEGAL_HOLD,
                 status: "PENDING",
                 type: { notIn: [...CLEANUP_KEEPS_JOB_TYPES] },
                 ...(jobId ? { id: { not: jobId } } : {}),
@@ -391,6 +463,11 @@ export class OrganizationDeletionCleanupHandler {
             throw new RefundsStillOwedError(owed.count);
         }
         const removed = await prisma.$transaction(async (tx) => {
+            // Under the business's row lock: a hold placed now waits for
+            // this transaction, and one already placed stops it (DEC-122).
+            if (await onLegalHoldLocked(tx, organizationId)) {
+                throw new HeldMidStepError();
+            }
             if (!(await this.deleted(organizationId, tx))) return [];
             const [payments, messaging, storefront, secrets] =
                 await Promise.all([
@@ -444,6 +521,14 @@ export class OrganizationDeletionCleanupHandler {
             });
         }
         return removed.length;
+    }
+}
+
+/** A legal hold found inside a step's own transaction: the step is held. */
+class HeldMidStepError extends Error {
+    constructor() {
+        super("The business is on legal hold");
+        this.name = "HeldMidStepError";
     }
 }
 
