@@ -9,11 +9,12 @@ import { useId, useState } from "react";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
 import { invoiceMoney } from "@/lib/invoices/money";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** What the dialog reads of a course: a list row or a course page's detail. */
 export type EnrolCourse = Pick<
@@ -90,12 +91,17 @@ export function EnrolDialog({
         if (!course) return showError("Choose a course.");
         if (!contactId) return showError("Choose who is enrolling.");
         if (!priceOk) return showError("Give a price like 240 or 240.50.");
-        setBusy(true);
-        const res = await enrol(course.id, {
-            contactId,
-            ...(price.trim() !== course.price ? { price: price.trim() } : {}),
-        });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                enrol(course.id, {
+                    contactId,
+                    ...(price.trim() !== course.price
+                        ? { price: price.trim() }
+                        : {}),
+                }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             `${person?.name ?? "They"} enrolled${choosing ? ` on ${course.name}` : ""}.`,

@@ -53,6 +53,29 @@ describe("NotificationsService.list", () => {
         });
     });
 
+    it("says what every row opens: the kind of thing, and its id", async () => {
+        findMany.mockResolvedValue([
+            { id: "n1", type: "order.new", orderId: "ord_1" },
+            { id: "n2", type: "booking.moved", bookingId: "bk_1" },
+            { id: "n3", type: "payment.failed", invoiceId: "inv_1" },
+            { id: "n4", type: "site.live", siteId: "site_1" },
+            { id: "n5", type: "enquiry.new", leadId: "lead_1" },
+            { id: "n6", type: "team.joined" },
+            // Written before its column existed: the kind's list opens.
+            { id: "n7", type: "order.new", orderId: null },
+        ]);
+        const rows = await new NotificationsService().list(ctx());
+        expect(rows.map((r) => r.target)).toEqual([
+            { kind: "order", id: "ord_1" },
+            { kind: "booking", id: "bk_1" },
+            { kind: "invoice", id: "inv_1" },
+            { kind: "site", id: "site_1" },
+            { kind: "lead", id: "lead_1" },
+            { kind: "team", id: null },
+            { kind: "order", id: null },
+        ]);
+    });
+
     it("filters to unread when unreadOnly is set", async () => {
         findMany.mockResolvedValue([]);
         await new NotificationsService().list(ctx(), { unreadOnly: true });
@@ -146,12 +169,66 @@ describe("NotificationsService.markAllRead", () => {
             where: { organizationId: "org_1", readAt: null },
             data: { readAt: expect.any(Date) },
         });
-        expect(res).toEqual({ updated: 3 });
+        // The instant it stamped, for its Undo.
+        const stamped = updateMany.mock.calls[0][0].data.readAt as Date;
+        expect(res).toEqual({ updated: 3, readAt: stamped.toISOString() });
     });
 
     it("denies a MEMBER before any I/O", async () => {
         await expect(
             new NotificationsService().markAllRead(ctx({ role: "MEMBER" })),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("NotificationsService.undoMarkAllRead", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("makes unread again only what that press stamped, in the ctx org", async () => {
+        updateMany.mockResolvedValue({ count: 3 });
+        const at = "2026-10-10T09:30:00.123Z";
+
+        const res = await new NotificationsService().undoMarkAllRead(ctx(), at);
+
+        expect(updateMany).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", readAt: new Date(at) },
+            data: { readAt: null },
+        });
+        expect(res).toEqual({ updated: 3 });
+    });
+
+    it("leaves alone what this person doesn't see, as the press did", async () => {
+        updateMany.mockResolvedValue({ count: 0 });
+        prefFindMany.mockResolvedValueOnce([
+            { event: "order", channel: "bell", enabled: false },
+        ]);
+
+        await new NotificationsService().undoMarkAllRead(
+            ctx(),
+            "2026-10-10T09:30:00.123Z",
+        );
+
+        expect(updateMany.mock.calls[0][0].where.type.notIn).toEqual(
+            expect.arrayContaining(["order.new", "order.uncollected"]),
+        );
+    });
+
+    it("changes nothing for an instant that isn't one", async () => {
+        const res = await new NotificationsService().undoMarkAllRead(
+            ctx(),
+            "yesterday",
+        );
+        expect(res).toEqual({ updated: 0 });
+        expect(updateMany).not.toHaveBeenCalled();
+    });
+
+    it("denies a MEMBER before any I/O", async () => {
+        await expect(
+            new NotificationsService().undoMarkAllRead(
+                ctx({ role: "MEMBER" }),
+                "2026-10-10T09:30:00.123Z",
+            ),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(updateMany).not.toHaveBeenCalled();
     });

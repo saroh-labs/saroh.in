@@ -13,6 +13,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Boxes } from "lucide-react";
 
 import { chipClass } from "@/components/shared/chip";
+import { runAction } from "@/lib/api/run-action";
 import { ListSearch } from "@saroh/ui/list-search";
 import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
@@ -105,15 +106,21 @@ export function LevelsPanel({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
             setLoadError(null);
-            const res = await loadLevelsPage({
-                storefront: storefrontView ? show : undefined,
-                q: q || undefined,
-                needs: show === "needs",
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            if (!cursor) return;
+            const res = await runAction(
+                () =>
+                    loadLevelsPage({
+                        storefront: storefrontView ? show : undefined,
+                        q: q || undefined,
+                        needs: show === "needs",
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;
@@ -210,10 +217,11 @@ export function LevelsPanel({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                     <span className="text-[12px] text-muted-foreground">
                         {`${new Set(loaded.rows.map((r) => r.productId)).size} products shown`}

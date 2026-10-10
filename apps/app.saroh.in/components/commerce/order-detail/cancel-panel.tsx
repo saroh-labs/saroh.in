@@ -1,9 +1,9 @@
 "use client";
 
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
-
-import { OptionSelect } from "@/components/shared/option-select";
 
 import { refundableQuantity } from "@/lib/orders/lifecycle";
 import type { OrderReadLine } from "@/lib/orders/read";
@@ -25,12 +25,7 @@ import { FOCUS } from "./parts";
 export interface CancelChoice {
     reason: string | null;
     tell: boolean;
-}
-
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
-/**
+} /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
  * refund sheet with every line ticked (the design's option B): a cancel
  * refunds what is left on the order, so there is no "another amount" and
@@ -124,23 +119,24 @@ function CancelDraft({
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
                         <OptionSelect<RefundReason | "">
+                            size="sm"
                             value={reason}
                             onValueChange={setReason}
                             placeholder="Choose a reason"
                             options={REFUND_REASONS}
-                            className="h-8 w-full min-w-[150px] rounded-lg text-[12.5px] coarse:h-11"
+                            className="w-full min-w-[150px]"
                         />
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
-                            <input
+                            Say why (optional)
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
                         </label>
                     ) : null}

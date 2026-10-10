@@ -366,7 +366,7 @@ describe("the Title sheet", () => {
         await press(edit("Edit title"));
         type(title(), "Rye bakery");
         await press(item("Save"));
-        expect(item("Saving…")?.disabled).toBe(true);
+        expect(item("Saving…")?.getAttribute("aria-busy")).toBe("true");
         expect(item("Cancel")?.disabled).toBe(true);
         await pressEscape();
         expect(sheetName()).toBe("Title");

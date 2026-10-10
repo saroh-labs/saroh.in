@@ -35,6 +35,7 @@ import type {
 import { payRows } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
@@ -108,8 +109,9 @@ export function PlanDetail({
         const to = plan.status !== "ARCHIVED";
         setBusy(true);
         start(async () => {
-            const res = await setPlanArchived(plan.id, to);
+            const res = await runAction(() => setPlanArchived(plan.id, to));
             setBusy(false);
+            if (!res) return;
             if (!res.ok) {
                 // A plan without memberships refuses Sell again: its notice.
                 reportFailure(res);
@@ -122,7 +124,10 @@ export function PlanDetail({
                 archiveToast(plan, to),
                 () =>
                     start(async () => {
-                        const back = await setPlanArchived(plan.id, !to);
+                        const back = await runAction(() =>
+                            setPlanArchived(plan.id, !to),
+                        );
+                        if (!back) return;
                         if (!back.ok) reportFailure(back);
                         setOlder([]);
                         router.refresh();
@@ -138,8 +143,9 @@ export function PlanDetail({
         setLoadingMore(true);
         setMoreFailed(false);
         start(async () => {
-            const res = await loadPlanEvents(plan.id, cursor);
+            const res = await runAction(() => loadPlanEvents(plan.id, cursor));
             setLoadingMore(false);
+            if (!res) return;
             if (res.state !== "ok") {
                 setMoreFailed(true);
                 return;

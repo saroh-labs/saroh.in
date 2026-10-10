@@ -1,11 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useMemo, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { stockWords } from "@/lib/products/catalogue";
 import { addQuickStock } from "@/lib/products/list-actions";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/products/quick-look";
 import { addedWords } from "@/lib/stock/levels";
 
+import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
 import { TONE_TEXT } from "./tones";
 
@@ -96,7 +98,7 @@ export function StockBlock({
                                     value: p.storeId,
                                     label: p.storeName,
                                 }))}
-                                className="h-[30px] w-auto min-w-[140px] rounded-[7px] text-[12.5px] coarse:h-11"
+                                className="w-auto min-w-[140px]"
                             />
                         </label>
                     ) : null}
@@ -157,15 +159,18 @@ function ShelfRow({
 
     async function add() {
         if (units === null || storeId === null || saving) return;
-        setSaving(true);
-        const res = await addQuickStock({
-            storeId,
-            productId,
-            variantId: shelf.variantId,
-            units,
-            idempotencyKey: key,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                addQuickStock({
+                    storeId,
+                    productId,
+                    variantId: shelf.variantId,
+                    units,
+                    idempotencyKey: key,
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError("The stock didn't change.", res.error);
             return;
@@ -189,7 +194,8 @@ function ShelfRow({
             </div>
             {canStock ? (
                 <>
-                    <input
+                    <Input
+                        dense
                         type="text"
                         inputMode="numeric"
                         value={draft}
@@ -204,11 +210,10 @@ function ShelfRow({
                         }}
                         aria-label={`Add stock to ${shelf.title}`}
                         placeholder="+0"
-                        className="h-[30px] w-[52px] rounded-[7px] border border-border bg-card px-2 text-right text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                        className="w-[52px] text-right"
                     />
                     <Button
                         size="sm"
-                        className="h-[30px] px-2.5 coarse:h-11"
                         disabled={off}
                         onClick={() => void add()}
                         aria-label={`Add to ${shelf.title}`}

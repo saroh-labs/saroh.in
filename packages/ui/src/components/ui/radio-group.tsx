@@ -27,7 +27,9 @@ const RadioGroupItem = React.forwardRef<
         <RadioGroupPrimitive.Item
             ref={ref}
             className={cn(
-                "aspect-square h-4 w-4 cursor-pointer rounded-full border border-primary text-primary ring-offset-background transition-colors duration-fast hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-50",
+                // The checkbox's resting edge, hover, pressed, disabled and
+                // touch area, on a circle: see `checkbox.tsx`.
+                "relative aspect-square size-4 shrink-0 cursor-pointer rounded-full border-[1.5px] border-input text-primary ring-offset-background transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:!border-disabled-border disabled:!bg-disabled disabled:!text-disabled-foreground data-[state=checked]:border-primary data-[state=unchecked]:bg-field hover:data-[state=unchecked]:border-foreground active:data-[state=unchecked]:bg-accent-active coarse:after:absolute coarse:after:-inset-4 coarse:after:content-[''] dark:data-[state=unchecked]:bg-transparent",
                 className,
             )}
             {...props}

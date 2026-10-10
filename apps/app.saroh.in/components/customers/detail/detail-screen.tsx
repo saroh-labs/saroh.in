@@ -36,6 +36,7 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     AttentionCard,
     AttentionEditor,
@@ -197,9 +198,10 @@ export function CustomerDetailScreen({
     };
 
     async function stop() {
-        setStopping(true);
-        const res = await stopOffersAction(d.contact.id);
-        setStopping(false);
+        const res = await runAction(() => stopOffersAction(d.contact.id), {
+            setBusy: setStopping,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         router.refresh();
         const said = `Recorded: no more offers to ${name}.`;

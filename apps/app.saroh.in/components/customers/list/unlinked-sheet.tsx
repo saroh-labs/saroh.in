@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { personHref } from "@/lib/contacts/person-href";
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";
 import { loadUnlinkedCustomers } from "@/lib/customers/actions";
@@ -228,10 +229,10 @@ function UnlinkedItem({
     function link() {
         if (!holder || !holderName) return;
         start(async () => {
-            const res = await linkCustomerAction(
-                holder.contactId,
-                c.customerId,
+            const res = await runAction(() =>
+                linkCustomerAction(holder.contactId, c.customerId),
             );
+            if (!res) return;
             if (res.ok) {
                 showSuccess(`Linked to ${holderName}.`);
                 onLinked(holderName);
@@ -299,10 +300,11 @@ function UnlinkedItem({
                             <Button
                                 type="button"
                                 size="sm"
-                                disabled={pending}
                                 onClick={link}
+                                busy={pending}
+                                busyLabel="Linking…"
                             >
-                                {pending ? "Linking…" : `Link to ${holderName}`}
+                                {`Link to ${holderName}`}
                             </Button>
                         ) : (
                             <p className="w-full text-muted-foreground">

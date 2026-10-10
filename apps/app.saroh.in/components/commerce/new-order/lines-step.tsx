@@ -1,7 +1,7 @@
 "use client";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
@@ -15,7 +15,7 @@ import {
 import type { NewOrderProduct } from "@/lib/orders/new-order-service";
 
 import { Tip } from "@saroh/ui/tooltip";
-import { FIELD, SMALL_BUTTON } from "./parts";
+import { FIELD } from "./parts";
 
 /**
  * New order's Items (B13): the lines, each with − and +, its total and,
@@ -85,17 +85,12 @@ export function LinesStep({
                                     </div>
                                 ) : null}
                             </div>
-                            <button
-                                type="button"
+                            <IconButton
+                                label={`One fewer ${title}`}
+                                icon={<span>−</span>}
+                                variant="outline"
                                 onClick={() => onBump(line.key, -1)}
-                                aria-label={`One fewer ${title}`}
-                                className={cn(
-                                    SMALL_BUTTON,
-                                    "size-8 text-[15px] font-normal coarse:size-11",
-                                )}
-                            >
-                                −
-                            </button>
+                            />
                             <span
                                 aria-label={`${line.quantity} of ${title}`}
                                 className="min-w-[22px] text-center font-semibold tabular-nums"
@@ -109,18 +104,13 @@ export function LinesStep({
                                         : undefined
                                 }
                             >
-                                <button
-                                    type="button"
+                                <IconButton
+                                    label={`One more ${title}`}
+                                    icon={<span>+</span>}
+                                    variant="outline"
                                     onClick={() => onBump(line.key, 1)}
                                     disabled={room === 0}
-                                    aria-label={`One more ${title}`}
-                                    className={cn(
-                                        SMALL_BUTTON,
-                                        "size-8 text-[15px] font-normal coarse:size-11",
-                                    )}
-                                >
-                                    +
-                                </button>
+                                />
                             </Tip>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {format(s.priceCents * line.quantity)}

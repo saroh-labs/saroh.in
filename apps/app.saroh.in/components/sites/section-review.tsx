@@ -1,8 +1,10 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,6 +12,7 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import { createComment } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
@@ -193,14 +196,17 @@ function SectionSlot({
         e.preventDefault();
         const text = body.trim();
         if (text.length === 0) return;
-        setSaving(true);
-        const res = await createComment(siteId, {
-            pageId,
-            sectionKey: section.key,
-            body: text,
-            ...(testReleaseId ? { testReleaseId } : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createComment(siteId, {
+                    pageId,
+                    sectionKey: section.key,
+                    body: text,
+                    ...(testReleaseId ? { testReleaseId } : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -309,7 +315,11 @@ function SectionSlot({
                         </ul>
                     ) : null}
 
-                    <form onSubmit={submit} className="grid gap-2">
+                    <form
+                        onKeyDown={submitOnModEnter}
+                        onSubmit={submit}
+                        className="grid gap-2"
+                    >
                         <label
                             htmlFor={`note-${section.key}`}
                             className="text-xs font-medium"
@@ -319,7 +329,7 @@ function SectionSlot({
                                 SECTION_NAME[section.type] ??
                                 "this section"}
                         </label>
-                        <textarea
+                        <Textarea
                             id={`note-${section.key}`}
                             autoFocus
                             rows={3}
@@ -327,15 +337,17 @@ function SectionSlot({
                             onChange={(e) => setBody(e.target.value)}
                             disabled={saving}
                             placeholder="What should change here?"
-                            className="w-full rounded-md border border-input bg-background p-2 text-sm"
+                            className="w-full"
                         />
                         <div className="flex gap-2">
                             <Button
                                 type="submit"
                                 size="sm"
-                                disabled={saving || body.trim().length === 0}
+                                disabled={body.trim().length === 0}
+                                busy={saving}
+                                busyLabel="Adding…"
                             >
-                                {saving ? "Adding…" : "Add note"}
+                                Add note
                             </Button>
                             <Button
                                 type="button"

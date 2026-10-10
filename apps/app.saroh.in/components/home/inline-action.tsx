@@ -1,6 +1,8 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef } from "react";
@@ -32,7 +34,7 @@ const FOCUS =
 
 /** The row's quiet 34px outline, as a button or a link. */
 const QUIET =
-    "inline-flex h-[34px] flex-none cursor-pointer items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color] duration-fast hover:border-foreground hover:bg-accent active:bg-accent-active disabled:cursor-wait disabled:opacity-60 coarse:min-h-11";
+    "inline-flex h-[34px] flex-none cursor-pointer items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color] duration-fast hover:border-foreground hover:bg-accent active:bg-accent-active disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11";
 
 /**
  * A step the row opens where it is taken (D14's "Send a set-up link"): the
@@ -60,16 +62,18 @@ export function InlineButton({
     buttonRef: RefObject<HTMLButtonElement | null>;
 }) {
     return (
-        <button
+        <Button
+            variant="outline"
+            size="sm"
             ref={buttonRef}
             type="button"
             onClick={onOpen}
             disabled={busy}
             aria-haspopup="dialog"
-            className={cn(QUIET, FOCUS)}
+            className="flex-none"
         >
             {inline.label}
-        </button>
+        </Button>
     );
 }
 
@@ -79,16 +83,15 @@ export function InlineDone({ row }: { row: DoneRow }) {
         <span className="flex flex-wrap items-center gap-2.5 text-[12.5px] font-semibold text-success-subtle-foreground">
             <span role="status">{row.text}</span>
             {row.undo ? (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={row.undo}
-                    className={cn(
-                        "cursor-pointer rounded text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-70 coarse:min-h-11",
-                        FOCUS,
-                    )}
+                    className="cursor-pointer rounded text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-70"
                 >
                     Undo
-                </button>
+                </Button>
             ) : null}
             {row.link ? <CopyLink url={row.link} /> : null}
         </span>
@@ -149,7 +152,7 @@ export function InlineConfirm({
         >
             {isReply ? (
                 <div className="mt-2.5 grid gap-2">
-                    <textarea
+                    <Textarea
                         ref={boxRef}
                         rows={2}
                         value={draft}
@@ -159,10 +162,7 @@ export function InlineConfirm({
                         }
                         aria-label={replyLabel(need)}
                         placeholder="Write your reply"
-                        className={cn(
-                            "w-full resize-y rounded-[9px] border border-border bg-card px-[11px] py-[9px] text-[13.5px] leading-[1.45] text-foreground transition-colors duration-fast placeholder:text-muted-foreground hover:border-foreground/40",
-                            FOCUS,
-                        )}
+                        className="w-full resize-y"
                     />
                 </div>
             ) : null}
@@ -174,28 +174,23 @@ export function InlineConfirm({
                 <span className="flex-[1_1_220px] text-pretty text-[13px] leading-[1.45] text-foreground">
                     {inline.confirm}
                 </span>
-                <button
+                <Button
+                    size="sm"
                     ref={yesRef}
                     type="button"
                     onClick={() => actions.confirm(need)}
                     disabled={off}
-                    className={cn(
-                        "h-[34px] cursor-pointer rounded-lg bg-foreground px-3.5 text-[12.5px] font-semibold text-background transition-[opacity,transform] duration-fast hover:opacity-90 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:opacity-100 disabled:active:scale-100 coarse:min-h-11",
-                        FOCUS,
-                    )}
                 >
                     {inline.yes}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={close}
-                    className={cn(
-                        "h-[34px] cursor-pointer rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-[border-color,background-color] duration-fast hover:border-foreground hover:bg-accent active:bg-accent-active coarse:min-h-11 dark:text-neutral-300",
-                        FOCUS,
-                    )}
                 >
                     Cancel
-                </button>
+                </Button>
             </div>
         </div>
     );

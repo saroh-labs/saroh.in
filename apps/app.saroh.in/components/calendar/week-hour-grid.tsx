@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -155,14 +156,16 @@ export function WeekHourGrid({
                                 </Tip>
                             ))}
                             {allDayMore > 0 ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => onPick(col.date)}
                                     aria-haspopup="dialog"
-                                    className="cursor-pointer rounded-[4px] px-0.5 text-left text-[11px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
+                                    className="cursor-pointer px-0.5 text-left text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
                                     {allDayMore} more — open the day
-                                </button>
+                                </Button>
                             ) : null}
                         </div>
                     ))}

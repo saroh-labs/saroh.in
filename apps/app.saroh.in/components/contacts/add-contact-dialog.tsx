@@ -9,6 +9,7 @@ import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { createContact } from "@/lib/contacts/create";
 import { personHref } from "@/lib/contacts/person-href";
 
@@ -72,17 +73,22 @@ export function AddContactDialog({
         }
         setError(null);
         const [firstName, ...rest] = fields.name.trim().split(/\s+/);
-        setSaving(true);
-        const res = await createContact({
-            email: fields.email.trim(),
-            ...(firstName ? { firstName } : {}),
-            ...(rest.length ? { lastName: rest.join(" ") } : {}),
-            ...(fields.phone.trim() ? { phone: fields.phone.trim() } : {}),
-            ...(fields.company.trim()
-                ? { company: fields.company.trim() }
-                : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createContact({
+                    email: fields.email.trim(),
+                    ...(firstName ? { firstName } : {}),
+                    ...(rest.length ? { lastName: rest.join(" ") } : {}),
+                    ...(fields.phone.trim()
+                        ? { phone: fields.phone.trim() }
+                        : {}),
+                    ...(fields.company.trim()
+                        ? { company: fields.company.trim() }
+                        : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             setError(res.error);
             if (!res.error.includes("already")) showError(res.error);

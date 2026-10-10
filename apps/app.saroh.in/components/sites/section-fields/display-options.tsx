@@ -1,11 +1,10 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 
 import { ChoiceField, SHOW_HIDE } from "@/components/sites/choice-field";
 import type { ListLayout } from "@/lib/sites/service";
-
-import { Field } from "./field";
 
 /** A switch that is on unless the merchant hid it. */
 interface Shown {

@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";
 import type {
     DuplicateSuggestion,
@@ -46,7 +47,10 @@ export function IdentityLinkDialog({
 
     const confirm = (customerId: string) => {
         startTransition(async () => {
-            const result = await linkCustomerAction(contactId, customerId);
+            const result = await runAction(() =>
+                linkCustomerAction(contactId, customerId),
+            );
+            if (!result) return;
             if (result.ok) {
                 showSuccess("Customer linked.");
                 setOpen(false);

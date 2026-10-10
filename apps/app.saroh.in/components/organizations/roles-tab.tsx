@@ -17,6 +17,7 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
@@ -591,13 +592,17 @@ function RoleSheet({
     async function save() {
         setTried(true);
         if (label.trim().length === 0) return;
-        setPending(true);
         setRefusal(null);
-        const res = await updateRole(role.key, {
-            ...(labelChanged ? { label: label.trim() } : {}),
-            ...(actionsChanged ? { actions: Array.from(granted) } : {}),
-        });
-        setPending(false);
+        const res = await runAction(
+            () =>
+                updateRole(role.key, {
+                    ...(labelChanged ? { label: label.trim() } : {}),
+                    ...(actionsChanged ? { actions: Array.from(granted) } : {}),
+                }),
+            // Said in the sheet, beside what was typed.
+            { setBusy: setPending, quiet: true, onUnreached: setRefusal },
+        );
+        if (!res) return;
         if (!res.ok) {
             setRefusal(
                 res.error.trim()
@@ -719,10 +724,13 @@ function NewRoleSheet({
     async function create() {
         setTried(true);
         if (label.trim().length === 0) return;
-        setPending(true);
         setError(null);
-        const res = await createRole({ label: label.trim(), actions });
-        setPending(false);
+        const res = await runAction(
+            () => createRole({ label: label.trim(), actions }),
+            // Said in the sheet, beside what was typed.
+            { setBusy: setPending, quiet: true, onUnreached: setError },
+        );
+        if (!res) return;
         if (!res.ok) {
             // Custom roles aren't in the plan (U13): the way up, from
             // its own notice once this sheet is out of the way.

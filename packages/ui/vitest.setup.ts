@@ -9,6 +9,8 @@ import "@testing-library/jest-dom/vitest";
  * seconds on this Mac and timed it out on CI's runner (DEV_LEARNINGS).
  * Nothing is ever in the top layer here, so the answer is false at once.
  */
+// Called with `this` below, so the method is never used unbound.
+// eslint-disable-next-line @typescript-eslint/unbound-method
 const matches = Element.prototype.matches;
 Element.prototype.matches = function (this: Element, selector: string) {
     if (selector === ":modal" || selector === ":popover-open") return false;

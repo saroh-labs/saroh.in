@@ -251,7 +251,7 @@ export default async function PersonPage({
     }
     if (acts.newInvoice && detail.invoices !== undefined && !removed) {
         actions.inv = (
-            <Button size="sm" variant="outline" className="coarse:h-11" asChild>
+            <Button size="sm" variant="outline" asChild>
                 <Link
                     href={`/billing/invoices/new?contactId=${encodeURIComponent(contactId)}`}
                 >

@@ -4,6 +4,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { fieldFocus, fieldStates } from "./input";
 
 const Select = SelectPrimitive.Root;
 
@@ -18,7 +19,16 @@ const SelectTrigger = React.forwardRef<
     <SelectPrimitive.Trigger
         ref={ref}
         className={cn(
-            "flex h-[38px] w-full cursor-pointer items-center justify-between rounded-md border border-input bg-field px-3 py-2 text-left text-sm ring-offset-background transition-colors duration-fast placeholder:text-muted-foreground hover:border-border-strong focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle coarse:h-11 [&>span]:line-clamp-1",
+            // The same box and the same states as `Input`, so a select and
+            // the field beside it are one control family. The ring is for
+            // the keyboard only (`focus-visible`): a mouse click that opens
+            // the list paints none. `data-readonly` is the read-only look on
+            // a trigger that is also `disabled` so it can't open: a value
+            // to read, at full contrast, not a refused control.
+            "flex h-[38px] w-full cursor-pointer items-center justify-between rounded-md border border-input bg-field px-3 py-2 text-left text-sm placeholder:text-muted-foreground coarse:h-11 coarse:text-base [&>span]:line-clamp-1",
+            fieldFocus,
+            fieldStates,
+            "data-[readonly]:cursor-auto data-[readonly]:border-border data-[readonly]:bg-transparent data-[readonly]:text-foreground data-[readonly]:[&>svg]:hidden",
             className,
         )}
         {...props}
@@ -117,7 +127,7 @@ const SelectItem = React.forwardRef<
     <SelectPrimitive.Item
         ref={ref}
         className={cn(
-            "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground active:bg-accent-active data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground",
+            "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground active:bg-accent-active data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground coarse:min-h-11",
             className,
         )}
         {...props}

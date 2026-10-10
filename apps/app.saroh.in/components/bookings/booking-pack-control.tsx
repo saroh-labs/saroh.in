@@ -5,11 +5,12 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import {
     payBookingWithPack,
     takePackOffBooking,
 } from "@/lib/class-packs/actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * How a booking is paid, when a class pack is in it (ADR-007): "Paid with
@@ -41,9 +42,11 @@ export function BookingPackControl({
     async function use() {
         const chosen = usable.find((p) => p.id === pick);
         if (!chosen) return;
-        setBusy(true);
-        const res = await payBookingWithPack(bookingId, chosen.id);
-        setBusy(false);
+        const res = await runAction(
+            () => payBookingWithPack(bookingId, chosen.id),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             router.refresh();
@@ -56,9 +59,10 @@ export function BookingPackControl({
     }
 
     async function takeOff() {
-        setBusy(true);
-        const res = await takePackOffBooking(bookingId);
-        setBusy(false);
+        const res = await runAction(() => takePackOffBooking(bookingId), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             res.data.returned
@@ -82,10 +86,11 @@ export function BookingPackControl({
                         variant="outline"
                         size="sm"
                         className="justify-self-start"
-                        disabled={busy}
                         onClick={() => void takeOff()}
+                        busy={busy}
+                        busyLabel="Taking it off…"
                     >
-                        {busy ? "Taking it off…" : "Take the pack off"}
+                        Take the pack off
                     </Button>
                 ) : null}
             </div>
@@ -118,10 +123,12 @@ export function BookingPackControl({
                 type="button"
                 size="sm"
                 className="justify-self-start"
-                disabled={busy || !pick}
+                disabled={!pick}
                 onClick={() => void use()}
+                busy={busy}
+                busyLabel="Using it…"
             >
-                {busy ? "Using it…" : "Use a class pack"}
+                Use a class pack
             </Button>
         </div>
     );

@@ -2,6 +2,7 @@
 
 import { MediaPicker } from "@/components/sites/media-picker";
 import { resolveVariant } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
@@ -15,7 +16,6 @@ import {
     withCtaAction,
     withCtaLabel,
 } from "./cta-action-fields";
-import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 import type { SectionFieldsProps } from "./props";
 

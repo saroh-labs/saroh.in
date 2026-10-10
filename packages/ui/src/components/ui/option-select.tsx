@@ -1,13 +1,13 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { cn } from "../../lib/utils";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@saroh/ui/select";
+} from "./select";
 
 /**
  * Radix reserves the empty string (it means "cleared"), so an option whose
@@ -40,10 +40,14 @@ export function radixValue<V extends string>(
 }
 
 /**
- * A shadcn Select over a flat list of options, for the places that were a
- * native `<select>`. The native control drew the operating system's menu —
- * a different one per browser, unstyled, and in dark mode often a white list
- * on a dark page — next to fields that all use the product's own.
+ * The standard select: a `Select` over a flat list of options, for every
+ * place that would be a native `<select>`. The native control drew the
+ * operating system's menu — a different one per browser, unstyled, and in
+ * dark mode often a white list on a dark page — next to fields that all use
+ * the product's own.
+ *
+ * `readOnly` shows the chosen value as something to read: it can't be
+ * opened, and it is drawn as a read-only field, not a disabled one.
  */
 export function OptionSelect<V extends string>({
     value,
@@ -51,6 +55,7 @@ export function OptionSelect<V extends string>({
     options,
     id,
     disabled,
+    readOnly,
     placeholder,
     className,
     size = "default",
@@ -61,6 +66,7 @@ export function OptionSelect<V extends string>({
     options: readonly Option<V>[];
     id?: string;
     disabled?: boolean;
+    readOnly?: boolean;
     placeholder?: string;
     className?: string;
     /** `sm` for toolbars and table rows. */
@@ -75,14 +81,18 @@ export function OptionSelect<V extends string>({
             onValueChange={(v) => {
                 onValueChange((v === NONE ? "" : v) as V);
             }}
-            disabled={disabled}
+            disabled={Boolean(disabled) || Boolean(readOnly)}
         >
             <SelectTrigger
                 id={id}
                 aria-label={aria["aria-label"]}
                 aria-describedby={aria["aria-describedby"]}
                 aria-invalid={aria["aria-invalid"]}
-                className={cn(size === "sm" && "h-8 text-xs", className)}
+                data-readonly={readOnly ? "" : undefined}
+                className={cn(
+                    size === "sm" && "h-8 text-[0.8125rem]",
+                    className,
+                )}
             >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>

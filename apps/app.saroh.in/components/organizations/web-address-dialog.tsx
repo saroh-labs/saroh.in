@@ -219,7 +219,7 @@ function ChangeForm({
                                         type="button"
                                         variant="link"
                                         size="sm"
-                                        className="h-auto p-0 text-[12px] font-medium"
+                                        className="h-auto p-0 font-medium"
                                         onClick={() => use(suggestion)}
                                     >
                                         Use {addressHost(suggestion, suffix)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
@@ -265,15 +266,16 @@ export function VariantsSection({
                         product&apos;s description and category, and gets its
                         own stock count.
                     </p>
-                    <button
+                    <Button
+                        variant="outline"
                         type="button"
                         disabled={locked}
                         onClick={() => setAdding(true)}
-                        className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
+                        className="gap-[7px]"
                     >
                         <Plus aria-hidden className="size-3.5" />
                         Add variants
-                    </button>
+                    </Button>
                 </>
             ) : (
                 <>

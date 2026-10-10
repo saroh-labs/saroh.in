@@ -72,7 +72,6 @@ export function VerdictControls({
                         if (problem) setProblem(null);
                     }}
                     placeholder="The opening hours on Home are last season's."
-                    className="text-sm"
                 />
                 {problem ? (
                     <p
@@ -86,10 +85,11 @@ export function VerdictControls({
                     <Button
                         type="button"
                         size={size}
-                        disabled={recording}
                         onClick={() => void send()}
+                        busy={recording}
+                        busyLabel="Sending…"
                     >
-                        {recording ? "Sending…" : "Ask for changes"}
+                        Ask for changes
                     </Button>
                     <Button
                         type="button"

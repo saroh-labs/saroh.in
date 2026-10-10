@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { holdLiveRefresh } from "@/lib/live/refresh";
 import { onLeaveRequest } from "@/lib/nav/leave-request";
 
 /** The one question every create and edit flow asks before work is lost. */
@@ -103,6 +104,11 @@ export function useLeaveGuard({
     // Clean again (saved, or put back as it was): the next edit asks anew.
     useEffect(() => {
         if (!dirty) going.current = false;
+    }, [dirty]);
+    // Unsaved work: the page doesn't read itself again under it
+    // (`useLiveRefresh`), until it is saved, put back or left.
+    useEffect(() => {
+        if (dirty) return holdLiveRefresh();
     }, [dirty]);
 
     const go = useCallback(
@@ -280,11 +286,12 @@ export function LeaveDialog({
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={saving}
                             className={button}
                             onClick={onSaveAndLeave}
+                            busy={saving}
+                            busyLabel="Saving…"
                         >
-                            {saving ? "Saving…" : "Save and leave"}
+                            Save and leave
                         </Button>
                     ) : null}
                     <Button

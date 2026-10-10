@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
+import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
@@ -121,11 +122,10 @@ export function SiteVersions({
     function onRestore(publicationId: string) {
         const override = gate.kind === "override";
         startTransition(async () => {
-            const res = await restorePublication(
-                siteId,
-                publicationId,
-                override,
+            const res = await runAction(() =>
+                restorePublication(siteId, publicationId, override),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 // The setting was turned on since this page was read: the
@@ -228,16 +228,14 @@ export function SiteVersions({
                                                         ? "destructive"
                                                         : "brand"
                                                 }
-                                                disabled={pending}
                                                 onClick={() => onRestore(p.id)}
+                                                busy={pending}
+                                                busyLabel="Restoring…"
                                             >
-                                                {pending
-                                                    ? "Restoring…"
-                                                    : gate.kind ===
-                                                            "override" ||
-                                                        changesRequested
-                                                      ? "Restore without approval"
-                                                      : "Yes, restore"}
+                                                {gate.kind === "override" ||
+                                                changesRequested
+                                                    ? "Restore without approval"
+                                                    : "Yes, restore"}
                                             </Button>
                                             <Button
                                                 size="sm"

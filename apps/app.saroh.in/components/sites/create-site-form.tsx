@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
@@ -122,7 +123,6 @@ export function CreateSiteForm({
     const [suggestion, setSuggestion] = useState<string | null>(null);
     const { isSubmitting, isDirty } = form.formState;
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("site") });
-    const name = form.watch("name");
     const address = form.watch("subdomain");
 
     async function onSubmit(values: FormValues) {
@@ -158,6 +158,7 @@ export function CreateSiteForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid min-w-0 max-w-2xl gap-5"
             >
@@ -271,9 +272,10 @@ export function CreateSiteForm({
                 <Button
                     type="submit"
                     className="wk-press w-fit"
-                    disabled={isSubmitting || !name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create site"}
+                    Create site
                 </Button>
             </form>
             {guard.dialog}

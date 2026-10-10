@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { PreviewLinks } from "@/components/sites/preview-links";
 import { VerdictControls } from "@/components/sites/verdict-controls";
+import { runAction } from "@/lib/api/run-action";
 import {
     createApproval,
     requestReview,
@@ -97,9 +98,11 @@ export function ReviewPanel({
         outcome: ReviewerVerdict,
         reason?: string,
     ): Promise<boolean> {
-        setRecording(true);
-        const res = await createApproval(siteId, outcome, release?.id, reason);
-        setRecording(false);
+        const res = await runAction(
+            () => createApproval(siteId, outcome, release?.id, reason),
+            { setBusy: setRecording },
+        );
+        if (!res) return false;
         if (!res.ok) {
             showError(res.error);
             return false;
@@ -115,9 +118,10 @@ export function ReviewPanel({
 
     /** Take the draft's request back (UX-068): it no longer reads In review. */
     async function withdraw() {
-        setAsking(true);
-        const res = await withdrawReview(siteId);
-        setAsking(false);
+        const res = await runAction(() => withdrawReview(siteId), {
+            setBusy: setAsking,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -135,9 +139,10 @@ export function ReviewPanel({
      * still works, and is recorded as a bypass.
      */
     async function ask() {
-        setAsking(true);
-        const res = await requestReview(siteId, release?.id);
-        setAsking(false);
+        const res = await runAction(() => requestReview(siteId, release?.id), {
+            setBusy: setAsking,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -195,13 +200,14 @@ export function ReviewPanel({
                     {release ? null : (
                         <Button
                             type="button"
-                            size="sm"
+                            size="xs"
                             variant="ghost"
-                            className="mt-1 h-7 px-2 text-xs"
-                            disabled={asking}
+                            className="mt-1"
                             onClick={() => void withdraw()}
+                            busy={asking}
+                            busyLabel="Withdrawing…"
                         >
-                            {asking ? "Withdrawing…" : "Withdraw the request"}
+                            Withdraw the request
                         </Button>
                     )}
                 </>
@@ -212,10 +218,11 @@ export function ReviewPanel({
                         size="sm"
                         variant="outline"
                         className="w-full"
-                        disabled={asking}
                         onClick={() => void ask()}
+                        busy={asking}
+                        busyLabel="Asking…"
                     >
-                        {asking ? "Asking…" : "Ask for a review"}
+                        Ask for a review
                     </Button>
                     {review.approvalIsStale && !release ? (
                         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -232,13 +239,16 @@ export function ReviewPanel({
     const shown = showResolved ? comments : open;
 
     async function toggle(comment: SiteCommentView) {
-        setBusy(comment.id);
-        const res = await setCommentResolved(
-            siteId,
-            comment.id,
-            comment.resolvedAt === null,
+        const res = await runAction(
+            () =>
+                setCommentResolved(
+                    siteId,
+                    comment.id,
+                    comment.resolvedAt === null,
+                ),
+            { setBusy: (on) => setBusy(on ? comment.id : null) },
         );
-        setBusy(null);
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -320,13 +330,15 @@ export function ReviewPanel({
                           : `${open.length} notes open`}
                 </span>
                 {comments.length > open.length ? (
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         onClick={() => setShowResolved((v) => !v)}
-                        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        className="text-muted-foreground"
                     >
                         {showResolved ? "Hide settled" : "Show settled"}
-                    </button>
+                    </Button>
                 ) : null}
             </div>
 
@@ -438,8 +450,8 @@ function Note({
                     <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className="h-6 px-1.5 text-[0.6875rem]"
+                        size="xs"
+                        className="px-1.5 text-[0.6875rem]"
                         onClick={() => onJump(pageId, note.sectionKey)}
                     >
                         Go to section
@@ -449,9 +461,9 @@ function Note({
                     <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="xs"
                         disabled={busy}
-                        className="ml-auto h-6 px-1.5 text-[0.6875rem]"
+                        className="ml-auto px-1.5 text-[0.6875rem]"
                         onClick={onToggle}
                     >
                         {settled ? "Reopen" : "Mark settled"}

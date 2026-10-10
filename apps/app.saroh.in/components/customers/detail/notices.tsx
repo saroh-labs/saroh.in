@@ -46,9 +46,10 @@ export function PossibleMatch({
                 </span>
                 {canLink ? (
                     <Button
+                        size="sm"
                         variant="outline"
                         onClick={onLink}
-                        className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                        className="border-border-strong"
                     >
                         Review and link
                     </Button>
@@ -93,9 +94,9 @@ export function DuplicateNotice({
                         </span>
                         {onMerge ? (
                             <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={() => onMerge(dup)}
-                                className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                             >
                                 Merge…
                             </Button>
@@ -136,12 +137,13 @@ export function PartialNotice({
                     has changed.
                 </span>
                 <Button
+                    size="sm"
                     variant="outline"
-                    disabled={pending}
                     onClick={() => start(() => router.refresh())}
-                    className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                    busy={pending}
+                    busyLabel="Trying…"
                 >
-                    {pending ? "Trying…" : "Try again"}
+                    Try again
                 </Button>
             </div>
         </Notice>

@@ -4,6 +4,7 @@ import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage } from "@/lib/orders/read";
@@ -29,7 +30,10 @@ export function useOrderStep(onDone?: () => void) {
         to: KitchenStage;
     }) =>
         startTransition(async () => {
-            const res = await moveStage(order.id, { to: order.to });
+            const res = await runAction(() =>
+                moveStage(order.id, { to: order.to }),
+            );
+            if (!res) return router.refresh();
             if (!res.ok) {
                 showError(res.error);
                 router.refresh();
@@ -45,10 +49,10 @@ export function useOrderStep(onDone?: () => void) {
                     said,
                     () =>
                         startTransition(async () => {
-                            const back = await undoStage(
-                                order.id,
-                                data.eventId,
+                            const back = await runAction(() =>
+                                undoStage(order.id, data.eventId),
                             );
+                            if (!back) return;
                             if (!back.ok) {
                                 showError(back.error);
                             } else {

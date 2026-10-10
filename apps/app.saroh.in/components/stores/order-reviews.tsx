@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
+import { runAction } from "@/lib/api/run-action";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import {
     invitationSentence,
@@ -42,7 +43,8 @@ export function OrderReviews({
 
     const invite = () => {
         startTransition(async () => {
-            const res = await inviteReviews([orderId]);
+            const res = await runAction(() => inviteReviews([orderId]));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -83,10 +85,12 @@ export function OrderReviews({
                     <Button
                         variant="outline"
                         size="sm"
-                        disabled={pending || state.blocked !== null}
+                        disabled={state.blocked !== null}
                         onClick={invite}
+                        busy={pending}
+                        busyLabel="Sending…"
                     >
-                        {pending ? "Sending…" : verb}
+                        {verb}
                     </Button>
                 </Tip>
             ) : null}

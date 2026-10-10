@@ -9,6 +9,7 @@ import {
     enquiryPreview,
     readableAnswers,
 } from "../forms/enquiry-entries";
+import { noticeOf } from "./notice-target";
 
 /** The `type` this handler is registered under (matches the enquiry producer). */
 export const ENQUIRY_NOTIFY_TYPE = "enquiry.notify";
@@ -84,10 +85,11 @@ export class EnquiryNotifyHandler {
             await prisma.notification.create({
                 data: {
                     organizationId: lead.organizationId,
-                    type: ENQUIRY_NEW_NOTIFICATION_TYPE,
+                    ...noticeOf(ENQUIRY_NEW_NOTIFICATION_TYPE, {
+                        leadId: lead.id,
+                    }),
                     title,
                     body,
-                    leadId: lead.id,
                 },
             });
         } catch (err) {

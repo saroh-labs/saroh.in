@@ -22,7 +22,6 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     connectCommsProvider,
     connectPaymentProvider,
@@ -44,7 +43,9 @@ import type {
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
 import { EmptyState } from "@saroh/ui/data-state";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     StepHeading,
     WebhookAddressStep,
@@ -266,23 +267,25 @@ function PaymentsForm({
     async function submit() {
         setTried(true);
         if (incomplete) return;
-        setSaving(true);
         // Online payments are invoiced: the registered address first
         // (DEC-068), asked here, then the keys are saved.
-        const res = await details.run(() =>
-            connectPaymentProvider({
-                provider,
-                keyId: keyId.trim(),
-                keySecret: keySecret.trim(),
-                ...(!razorpay && publicKey.trim()
-                    ? { publicKey: publicKey.trim() }
-                    : {}),
-                ...(secretRequired && webhookSecret.trim()
-                    ? { webhookSecret: webhookSecret.trim() }
-                    : {}),
-            }),
+        const res = await runAction(
+            () =>
+                details.run(() =>
+                    connectPaymentProvider({
+                        provider,
+                        keyId: keyId.trim(),
+                        keySecret: keySecret.trim(),
+                        ...(!razorpay && publicKey.trim()
+                            ? { publicKey: publicKey.trim() }
+                            : {}),
+                        ...(secretRequired && webhookSecret.trim()
+                            ? { webhookSecret: webhookSecret.trim() }
+                            : {}),
+                    }),
+                ),
+            { setBusy: setSaving },
         );
-        setSaving(false);
         if (!res) return;
         // At the plan's connections limit (U13): its notice, not a toast.
         if (!res.ok) return reportFailure(res);
@@ -508,19 +511,24 @@ function MessagingForm({
     async function submit() {
         setTried(true);
         if (missing) return;
-        setSaving(true);
         const credentials: Record<string, string> = {};
         for (const f of spec.fields) {
             const v = (values[f.key] ?? "").trim();
             if (v) credentials[f.key] = v;
         }
-        const res = await connectCommsProvider({
-            channel,
-            provider,
-            credentials,
-            ...(fromAddress.trim() ? { fromAddress: fromAddress.trim() } : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                connectCommsProvider({
+                    channel,
+                    provider,
+                    credentials,
+                    ...(fromAddress.trim()
+                        ? { fromAddress: fromAddress.trim() }
+                        : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) return reportFailure(res);
         showSuccess(
             `${labelOfComms(channel, provider)} connected.`,
@@ -744,7 +752,7 @@ function SecretField({
                 {label}{" "}
                 {optional ? (
                     <span className="font-normal text-muted-foreground">
-                        optional
+                        (optional)
                     </span>
                 ) : null}
             </Label>
@@ -754,7 +762,7 @@ function SecretField({
                 autoComplete="off"
                 spellCheck={false}
                 value={value}
-                className="font-mono text-[12.5px]"
+                className="font-mono"
                 aria-invalid={invalid ? true : undefined}
                 aria-describedby={describedBy ?? (hint ? hintId : undefined)}
                 onChange={(e) => onChange(e.target.value)}

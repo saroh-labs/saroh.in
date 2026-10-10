@@ -92,7 +92,7 @@ const CommandInput = React.forwardRef<
         <CommandPrimitive.Input
             ref={ref}
             className={cn(
-                "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground",
+                "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:text-base",
                 className,
             )}
             {...props}
@@ -166,7 +166,7 @@ const CommandItem = React.forwardRef<
     <CommandPrimitive.Item
         ref={ref}
         className={cn(
-            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none active:bg-accent-active aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:text-disabled-foreground",
+            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none active:bg-accent-active aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:text-disabled-foreground coarse:min-h-11",
             className,
         )}
         {...props}

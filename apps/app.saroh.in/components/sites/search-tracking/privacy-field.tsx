@@ -15,6 +15,7 @@ import {
 } from "@/components/sites/settings/settings-sheet";
 import { PRIVACY_NOTE, PRIVACY_URL_PROBLEM } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SaveSection } from "./parts";
 import { LineRow } from "./parts";
 
@@ -40,7 +41,8 @@ export function PrivacyField({
 
     function submit(next: string | null) {
         startTransition(async () => {
-            const res = await save({ privacyUrl: next });
+            const res = await runAction(() => save({ privacyUrl: next }));
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === "privacyUrl") setServerError(res.error);
                 return;

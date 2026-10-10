@@ -105,8 +105,7 @@ export function PublishBanner({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
-                                    className="h-7 rounded-[8px] px-2.5 text-[12.5px] font-semibold"
+                                    size="xs"
                                     onClick={handlers.onRetry}
                                 >
                                     Try again
@@ -116,8 +115,7 @@ export function PublishBanner({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
-                                    className="h-7 rounded-[8px] px-2.5 text-[12.5px] font-semibold"
+                                    size="xs"
                                     disabled={busy}
                                     onClick={handlers.onReload}
                                 >

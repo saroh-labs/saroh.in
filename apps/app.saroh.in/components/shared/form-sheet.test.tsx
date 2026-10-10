@@ -281,7 +281,7 @@ describe.each([
             expect(onClose).not.toHaveBeenCalled();
             expect(dialog()).not.toBe(null);
             expect(button("Cancel").disabled).toBe(true);
-            expect(button("Sending…").disabled).toBe(true);
+            expect(button("Sending…").getAttribute("aria-busy")).toBe("true");
         });
     });
 
@@ -408,7 +408,7 @@ describe("a sheet that draws its own parts", () => {
         await press(button("Add note"));
         expect(onSubmit).toHaveBeenCalledTimes(1);
         // The draft holds the save: nothing closes it meanwhile.
-        expect(button("Adding…").disabled).toBe(true);
+        expect(button("Adding…").getAttribute("aria-busy")).toBe("true");
         await escape();
         expect(onClose).not.toHaveBeenCalled();
     });

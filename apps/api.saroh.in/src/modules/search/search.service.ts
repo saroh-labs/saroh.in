@@ -3,8 +3,22 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { contactEmailForDisplay } from "../contacts/contact-email";
+import { orderLocationWhere } from "../orders/order-location";
 import { orderPartyName } from "../orders/walk-in";
 import { allows } from "../organizations/organization-policy";
+import type { SearchHit } from "./search-kinds";
+import {
+    PER_KIND,
+    personName,
+    searchBookings,
+    searchInvoices,
+    searchProducts,
+    searchServices,
+    searchSubscriptions,
+    terms,
+} from "./search-kinds";
+
+export type { SearchHit, SearchKind } from "./search-kinds";
 
 /**
  * Cross-entity quick search for the command palette.
@@ -21,7 +35,9 @@ import { allows } from "../organizations/organization-policy";
  *
  * ## Shape
  *
- * One request, three capped reads, run only for the entities the actor may read.
+ * One request, one capped read per kind of thing (people, leads, orders, and
+ * since 10 Oct 2026 products, services, bookings, invoices and subscriptions,
+ * `search-kinds.ts`), run only for the entities the actor may read.
  * Every result carries the `href` the client should navigate to, so the palette
  * never has to know how a URL is built for an entity type — the same reason
  * Home's actions carry theirs.
@@ -32,63 +48,13 @@ import { allows } from "../organizations/organization-policy";
  * the need for. When one merchant's contacts outgrow this, the endpoint changes
  * and its contract does not.
  */
-export type SearchKind = "contact" | "lead" | "order";
-
-export interface SearchHit {
-    kind: SearchKind;
-    id: string;
-    /** The line the merchant recognises: a person's name, a lead's title. */
-    title: string;
-    /** Disambiguates two hits with the same title. */
-    subtitle: string | null;
-    href: string;
-}
-
 export interface SearchResult {
     query: string;
     hits: SearchHit[];
 }
 
-/**
- * Per-entity cap. Five is enough to recognise the one you meant without the
- * palette becoming the list screen it should be sending you to.
- */
-const PER_KIND = 5;
-
 /** Below this a query matches most of the database and helps nobody. */
 const MIN_QUERY = 2;
-
-/**
- * Split a query into words that must ALL match, each anywhere on the record.
- *
- * Matching the whole string against each column separately looks right and
- * fails on the most natural thing a person types: "ananya rao" matched neither
- * `firstName` ("Ananya") nor `lastName` ("Rao") nor the email, so searching
- * someone's full name returned nothing while their first name alone worked.
- * Requiring every word to appear SOMEWHERE on the row fixes that without
- * loosening the search — "ananya rao" still cannot match a different Ananya.
- *
- * Capped so a paragraph pasted into the box cannot become a forty-clause query.
- */
-const MAX_TERMS = 6;
-
-function terms(query: string): string[] {
-    return query.split(/\s+/).filter(Boolean).slice(0, MAX_TERMS);
-}
-
-/** A person's display name, falling back to the email. */
-function personName(person: {
-    firstName?: string | null;
-    lastName?: string | null;
-    email?: string | null;
-}): string {
-    const full = [person.firstName, person.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-    if (full) return full;
-    return contactEmailForDisplay(person.email)?.trim() ?? "Unknown";
-}
 
 @Injectable()
 export class SearchService {
@@ -103,19 +69,22 @@ export class SearchService {
         // "search" permission. A palette is a read surface like any other, and
         // it must not become the one place where a role sees rows the list
         // screens would have refused it.
-        const [contacts, leads, orders] = await Promise.all([
-            allows(ctx, "contact:read")
-                ? this.contacts(ctx.organizationId, query)
-                : [],
-            allows(ctx, "lead:read")
-                ? this.leads(ctx.organizationId, query)
-                : [],
-            allows(ctx, "order:read")
-                ? this.orders(ctx.organizationId, query)
+        const org = ctx.organizationId;
+        const groups = await Promise.all([
+            allows(ctx, "contact:read") ? this.contacts(org, query) : [],
+            allows(ctx, "lead:read") ? this.leads(org, query) : [],
+            allows(ctx, "order:read") ? this.orders(ctx, query) : [],
+            // The catalogue is read with the storefronts (`ProductAccess`).
+            allows(ctx, "store:read") ? searchProducts(org, query) : [],
+            allows(ctx, "booking:read") ? searchBookings(ctx, query) : [],
+            allows(ctx, "invoice:read") ? searchInvoices(org, query) : [],
+            allows(ctx, "service:read") ? searchServices(org, query) : [],
+            allows(ctx, "subscription:read")
+                ? searchSubscriptions(org, query)
                 : [],
         ]);
 
-        return { query, hits: [...contacts, ...leads, ...orders] };
+        return { query, hits: groups.flat() };
     }
 
     private async contacts(
@@ -125,13 +94,19 @@ export class SearchService {
         const rows = await prisma.contact.findMany({
             where: {
                 organizationId,
-                // Every word must appear somewhere on the contact.
+                // Never a merge's tombstone or a privacy removal: lists and
+                // search leave them out (`backend-data-and-money.md`).
+                mergedIntoId: null,
+                removedAt: null,
+                // Every word must appear somewhere on the contact. The
+                // phone too: a customer who rings is found by their number.
                 AND: terms(query).map((term) => ({
                     OR: [
                         { firstName: { contains: term, mode: "insensitive" } },
                         { lastName: { contains: term, mode: "insensitive" } },
                         { email: { contains: term, mode: "insensitive" } },
                         { company: { contains: term, mode: "insensitive" } },
+                        { phone: { contains: term } },
                     ],
                 })),
             },
@@ -225,12 +200,14 @@ export class SearchService {
     }
 
     private async orders(
-        organizationId: string,
+        ctx: OrganizationContext,
         query: string,
     ): Promise<SearchHit[]> {
         const rows = await prisma.order.findMany({
             where: {
-                organizationId,
+                organizationId: ctx.organizationId,
+                // A location's own people find their location's orders.
+                ...orderLocationWhere(ctx),
                 AND: terms(query).map((term) => ({
                     OR: [
                         { orderId: { contains: term, mode: "insensitive" } },

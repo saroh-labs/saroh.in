@@ -14,6 +14,7 @@ import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import { wordDomain } from "./domain-alerts";
+import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
@@ -32,11 +33,11 @@ export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
 /** The inbox notice types F14's alerts write (see `ALERT_NOTIFICATION_TYPES`). */
-export const ORDER_NEW_NOTIFICATION_TYPE = "order.new";
-export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
-export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
-export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
-export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
+export const ORDER_NEW_NOTIFICATION_TYPE = "order.new" as const;
+export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed" as const;
+export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined" as const;
+export const SITE_LIVE_NOTIFICATION_TYPE = "site.live" as const;
+export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live" as const;
 
 type Tx = Prisma.TransactionClient;
 
@@ -175,7 +176,9 @@ export async function tellTeam(
         const notification = await tx.notification.create({
             data: {
                 organizationId,
-                type: alert.type,
+                // The type with what it opens; throws for a notice that
+                // would open nothing.
+                ...noticeHeadOf(alert),
                 title: alert.title,
                 body: alert.body,
             },
@@ -396,7 +399,7 @@ async function wordOrder(
         event: "order",
         eventKey: `team:order:${order.id}`,
         notificationId: null,
-        type: ORDER_NEW_NOTIFICATION_TYPE,
+        ...noticeOf(ORDER_NEW_NOTIFICATION_TYPE, { orderId: order.id }),
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
         body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         // Not who it's from: a customer typed that.
@@ -406,7 +409,6 @@ async function wordOrder(
         },
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
-        orderId: order.id,
         // Taken by someone on the team (the counter, New order): no bell
         // notice (#874). The bell is one notice for everyone, so it rang
         // for the person who just made the sale; whoever chose email for
@@ -462,7 +464,9 @@ async function wordFailed(
         event: "failed",
         eventKey: `team:failed:${p.paymentIntentId}`,
         notificationId: null,
-        type: PAYMENT_FAILED_NOTIFICATION_TYPE,
+        ...noticeOf(PAYMENT_FAILED_NOTIFICATION_TYPE, {
+            invoiceId: invoice.id,
+        }),
         title: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
         // An autopay charge (D13) has no link they tried: the merchant retries.
         body: intent.viaMandateId
@@ -503,7 +507,7 @@ async function wordJoined(
         event: "team",
         eventKey: `team:joined:${p.invitationId}`,
         notificationId: null,
-        type: TEAM_JOINED_NOTIFICATION_TYPE,
+        ...noticeOf(TEAM_JOINED_NOTIFICATION_TYPE, {}),
         title: `${who} joined the team`,
         body: `They accepted your invitation, as ${label}.`,
         mail: {
@@ -574,7 +578,9 @@ async function wordSite(
         if (!release.wentLiveAt) return null;
         return {
             ...base,
-            type: SITE_LIVE_NOTIFICATION_TYPE,
+            ...noticeOf(SITE_LIVE_NOTIFICATION_TYPE, {
+                siteId: release.siteId,
+            }),
             title: `${release.name} is live on ${release.site.name}`,
             body: "It went live at the time it was scheduled for.",
             mail: {
@@ -586,7 +592,9 @@ async function wordSite(
     }
     return {
         ...base,
-        type: SITE_NOT_LIVE_NOTIFICATION_TYPE,
+        ...noticeOf(SITE_NOT_LIVE_NOTIFICATION_TYPE, {
+            siteId: release.siteId,
+        }),
         title: `${release.name} didn't go live on ${release.site.name}`,
         body: p.reason ?? "Go live now, or schedule it again.",
         mail: {

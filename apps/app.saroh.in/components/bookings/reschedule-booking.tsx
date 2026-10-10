@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { listAvailability, rescheduleBooking } from "@/lib/services/actions";
 import { deadlineText } from "@/lib/services/booking-money";
@@ -77,7 +78,10 @@ export function RescheduleBooking({
 
     const move = (startAt: string) => {
         startTransition(async () => {
-            const res = await rescheduleBooking(bookingId, startAt);
+            const res = await runAction(() =>
+                rescheduleBooking(bookingId, startAt),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // The api refuses a slot taken between this list loading and
                 // the click. Saying so plainly beats a generic failure.
@@ -164,7 +168,8 @@ export function RescheduleBooking({
                     variant="ghost"
                     size="sm"
                     className="justify-self-start"
-                    disabled={pending}
+                    busy={pending}
+                    busyLabel="Looking…"
                     onClick={() => setWeeks((w) => w + INITIAL_WEEKS)}
                 >
                     Look further ahead

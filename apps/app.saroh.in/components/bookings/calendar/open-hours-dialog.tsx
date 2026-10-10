@@ -24,6 +24,7 @@ import {
 } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { Chip, Eyebrow } from "./parts";
 
 export interface HoursTarget {
@@ -145,12 +146,16 @@ function Form({
         const range = `${clock(from)}–${clock(to)}`;
         if (block) {
             const startAt = zonedInstant(date, from, timezone).toISOString();
-            const res = await addTimeOff(staff.id, {
-                startAt,
-                endAt: zonedInstant(date, to, timezone).toISOString(),
-                reason: "Blocked from the calendar",
-            });
-            setSaving(false);
+            const res = await runAction(
+                () =>
+                    addTimeOff(staff.id, {
+                        startAt,
+                        endAt: zonedInstant(date, to, timezone).toISOString(),
+                        reason: "Blocked from the calendar",
+                    }),
+                { setBusy: setSaving },
+            );
+            if (!res) return;
             if (!res.ok) return showError(res.error);
             const added = res.data.staff.timeOff.find(
                 (t) => Date.parse(t.startAt) === Date.parse(startAt),
@@ -170,15 +175,19 @@ function Form({
         }
         if (scope === "week") {
             const before = staff.hours;
-            const res = await replaceStaffHours(staff.id, [
-                ...before,
-                {
-                    dayOfWeek: weekdayOf(date),
-                    startMinute: from,
-                    endMinute: to,
-                },
-            ]);
-            setSaving(false);
+            const res = await runAction(
+                () =>
+                    replaceStaffHours(staff.id, [
+                        ...before,
+                        {
+                            dayOfWeek: weekdayOf(date),
+                            startMinute: from,
+                            endMinute: to,
+                        },
+                    ]),
+                { setBusy: setSaving },
+            );
+            if (!res) return;
             if (!res.ok) return showError(res.error);
             onClose();
             router.refresh();
@@ -192,12 +201,16 @@ function Form({
             );
             return;
         }
-        const res = await addExtraHours(staff.id, {
-            date,
-            startMinute: from,
-            endMinute: to,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                addExtraHours(staff.id, {
+                    date,
+                    startMinute: from,
+                    endMinute: to,
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         const added = res.data.extraHours.find(
             (x) =>

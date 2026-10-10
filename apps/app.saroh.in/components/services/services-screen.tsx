@@ -11,6 +11,7 @@ import { useState } from "react";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
@@ -30,9 +31,6 @@ import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock } from "lucide-react";
-
-const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
-
 /**
  * Bookings › Services (U16, E2, the design's `?view=services`): what people
  * can book, as cards — kind, price, length and the gap after, where, places,
@@ -80,11 +78,14 @@ export function ServicesScreen({
 
     async function toggle(s: Service) {
         const wasOn = s.status === "ACTIVE";
-        setBusy(s.id);
-        const res = await updateService(s.id, {
-            status: wasOn ? "ARCHIVED" : "ACTIVE",
-        });
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                updateService(s.id, {
+                    status: wasOn ? "ARCHIVED" : "ACTIVE",
+                }),
+            { setBusy: (on) => setBusy(on ? s.id : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         router.refresh();
         showUndo(takingToast(s.name, wasOn), async () => {
@@ -236,11 +237,7 @@ export function ServicesScreen({
                                     )}
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        className={btn}
-                                    >
+                                    <Button asChild variant="outline">
                                         <Link
                                             href={`/services/${s.id}`}
                                             aria-label={`${canEdit ? "Edit" : "View"} ${s.name}`}
@@ -251,7 +248,6 @@ export function ServicesScreen({
                                     {canEdit ? (
                                         <Button
                                             variant="outline"
-                                            className={btn}
                                             disabled={busy === s.id}
                                             onClick={() => void toggle(s)}
                                         >

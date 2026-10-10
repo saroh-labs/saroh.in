@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -82,7 +83,11 @@ export function AddCustomerForm() {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <form
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="grid gap-4"
+            >
                 <FormField
                     control={form.control}
                     name="email"
@@ -166,8 +171,12 @@ export function AddCustomerForm() {
                     )}
                 />
                 <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Adding…" : "Add customer"}
+                    <Button
+                        type="submit"
+                        busy={isSubmitting}
+                        busyLabel="Adding…"
+                    >
+                        Add customer
                     </Button>
                     <Button asChild variant="outline">
                         <Link href="/commerce/customers">Cancel</Link>

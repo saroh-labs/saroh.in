@@ -167,10 +167,11 @@ export function Overview({
                             }
                         >
                             <Button
+                                size="sm"
                                 variant="outline"
                                 disabled={!canConsent || stopping}
                                 onClick={onStop}
-                                className="mt-2.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                                className="mt-2.5"
                             >
                                 They asked to stop
                             </Button>
@@ -396,9 +397,10 @@ function NextBooking({
                 ))}
             </div>
             <Button
+                size="sm"
                 variant="outline"
                 onClick={onAll}
-                className="mt-3.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                className="mt-3.5"
             >
                 See all bookings
             </Button>

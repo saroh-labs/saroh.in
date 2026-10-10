@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
+import { arrivalProps, useArrivals } from "@/components/shared/use-arrivals";
 import { openTotal } from "@/lib/home/inline-actions";
 import { EmptyState } from "@saroh/ui/data-state";
 
@@ -66,6 +67,10 @@ export function NeedsYou({
     const { rows, more } = shownNeeds(needs, expanded);
     const actions = useInlineActions();
     const doneHere = needs.filter((n) => n.id in actions.done).length;
+    // Something that started needing you while Home was open (live
+    // refresh): its row enters, and wears an edge until touched. Judged on
+    // the whole list, so "See all" opening the rest marks nothing.
+    const arrivals = useArrivals(needs.map((n) => n.id));
 
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
@@ -108,6 +113,8 @@ export function NeedsYou({
                             first={i === 0}
                             actions={actions}
                             done={actions.done[need.id] ?? null}
+                            arrived={arrivals.isNew(need.id)}
+                            onTouch={() => arrivals.touch(need.id)}
                         />
                     ))}
                 </ul>
@@ -131,22 +138,31 @@ function NeedRow({
     first,
     actions,
     done,
+    arrived,
+    onTouch,
 }: {
     need: HomeNeed;
     first: boolean;
     actions: InlineActions;
     done: DoneRow | null;
+    /** It began needing you while Home was open: it enters, with an edge. */
+    arrived: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch: () => void;
 }) {
     const line = needLine(need);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const inline = need.inline;
     const open = inline !== undefined && actions.open === need.id && !done;
+    const arrival = arrivalProps(arrived && !done, onTouch);
     return (
         <li
+            {...arrival}
             className={cn(
                 "px-4 py-[13px] transition-colors duration-fast",
                 done ? "bg-muted" : "bg-card",
                 !first && "border-t border-border",
+                arrival.className,
             )}
         >
             <div className="flex flex-wrap items-start gap-3">

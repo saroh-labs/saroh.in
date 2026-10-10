@@ -71,7 +71,6 @@ export function PayLinkPanel({
                             readOnly
                             value={link.url}
                             onFocus={(e) => e.currentTarget.select()}
-                            className="h-9 rounded-[9px] text-[12.5px]"
                         />
                     </div>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
@@ -96,12 +95,7 @@ export function PayLinkPanel({
                 </p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onDone}
-                >
+                <Button type="button" variant="outline" onClick={onDone}>
                     Done
                 </Button>
                 {link.ok ? (
@@ -114,8 +108,6 @@ export function PayLinkPanel({
                 ) : link.plan ? null : (
                     <Button
                         type="button"
-                        disabled={trying}
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
                         onClick={() => {
                             setTrying(true);
                             void makePayLink(bookingId).then((next) => {
@@ -123,8 +115,10 @@ export function PayLinkPanel({
                                 setTrying(false);
                             });
                         }}
+                        busy={trying}
+                        busyLabel="Trying again…"
                     >
-                        {trying ? "Trying…" : "Try again"}
+                        Try again
                     </Button>
                 )}
             </div>

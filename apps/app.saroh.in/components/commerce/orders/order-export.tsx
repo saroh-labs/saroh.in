@@ -75,11 +75,13 @@ export function OrderExport({
     return (
         <Button
             variant="outline"
-            disabled={total === 0 || busy}
+            disabled={total === 0}
             onClick={() => void run()}
             aria-live="polite"
+            busy={busy}
+            busyLabel={`Exporting… ${read} of ${total}`}
         >
-            {busy ? `Exporting… ${read} of ${total}` : "Export"}
+            Export
         </Button>
     );
 }

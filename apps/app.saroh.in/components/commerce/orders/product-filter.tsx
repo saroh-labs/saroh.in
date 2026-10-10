@@ -74,13 +74,14 @@ export function ProductFilter({
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    size="sm"
                     type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
                     aria-label={`Product: ${value ? label : "any product"}. Change it.`}
                     className={cn(
-                        "h-[34px] max-w-[220px] gap-1.5 rounded-[9px] px-2.5 text-[12.5px] font-normal coarse:h-11",
+                        "max-w-[220px] gap-1.5 font-normal",
                         value && "border-foreground",
                         className,
                     )}

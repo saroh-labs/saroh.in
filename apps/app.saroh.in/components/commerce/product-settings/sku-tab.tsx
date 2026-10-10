@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -13,9 +14,10 @@ import {
 import { patternProblem } from "@/lib/products/sku-pattern";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Tip } from "@saroh/ui/tooltip";
-import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
+import { TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
     { t: "{NAME3}", what: "first 3 letters of the name" },
@@ -87,7 +89,10 @@ export function SkuTab({
         if (problem || !dirty) return;
         const before = saved;
         start(async () => {
-            const res = await saveSkuPattern(pattern.trim(), suggest);
+            const res = await runAction(() =>
+                saveSkuPattern(pattern.trim(), suggest),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -98,10 +103,10 @@ export function SkuTab({
                 `Pattern saved. The editor suggests ${rows[0]?.next ?? "it"}-style SKUs.`,
                 () =>
                     start(async () => {
-                        const undo = await saveSkuPattern(
-                            before.pattern,
-                            before.suggest,
+                        const undo = await runAction(() =>
+                            saveSkuPattern(before.pattern, before.suggest),
                         );
+                        if (!undo) return;
                         if (!undo.ok) return showError(undo.error);
                         setSaved(before);
                         setPattern(before.pattern);
@@ -260,25 +265,28 @@ export function SkuTab({
                                 ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
                                 : "The editor stops suggesting SKUs.")}
                     </span>
-                    <button
+                    <Button
+                        variant="outline"
+                        size="sm"
                         type="button"
                         disabled={pending}
                         onClick={() => {
                             setPattern(saved.pattern);
                             setSuggest(saved.suggest);
                         }}
-                        className={smallBtn}
                     >
                         Discard
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        size="sm"
                         type="button"
-                        disabled={!!problem || pending}
+                        disabled={!!problem}
                         onClick={save}
-                        className={primaryBtn}
+                        busy={pending}
+                        busyLabel="Saving…"
                     >
-                        {pending ? "Saving…" : "Save pattern"}
-                    </button>
+                        Save pattern
+                    </Button>
                 </div>
             ) : null}
         </section>

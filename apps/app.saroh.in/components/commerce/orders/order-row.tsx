@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { BusinessDate } from "@/components/shared/business-zone";
+import { arrivalProps } from "@/components/shared/use-arrivals";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -192,6 +193,8 @@ function PaidWord({ paid }: { paid: string | null }) {
     );
 }
 
+const NO_TOUCH = () => undefined;
+
 /** A link whose hit area is the whole (relative) row around it. */
 const ROW_LINK =
     "rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring";
@@ -203,9 +206,15 @@ export function OrderGridRow({
     onOpen,
     menu,
     select,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6); absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -216,13 +225,16 @@ export function OrderGridRow({
     menu?: ReactNode;
 }) {
     const v = rowView(row, showStore);
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "relative border-b border-border py-[11px] transition-colors duration-fast last:rounded-b-[11px] last:border-b-0 hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
                 (open === true || select?.checked === true) &&
                     "bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {select ? (
@@ -317,7 +329,13 @@ export function OrderCardFrame({
     footer,
     lead,
     highlighted = false,
+    arrived = false,
+    onTouch,
 }: {
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     title: ReactNode;
     /** Where the card goes; ignored when `onOpen` is given. */
     href: string;
@@ -337,11 +355,14 @@ export function OrderCardFrame({
     // positioned here, the truncated link clips them. Left to the card,
     // their place past a long title widened the page on a phone.
     const words = <span className="relative">{title}</span>;
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
                 highlighted && "border-border-strong bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {lead}
@@ -382,9 +403,15 @@ export function OrderCard({
     select,
     open,
     onOpen,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6), the design's 24px one; absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -398,6 +425,8 @@ export function OrderCard({
             title={v.customer}
             href={v.href}
             onOpen={onOpen}
+            arrived={arrived}
+            onTouch={onTouch}
             highlighted={open === true || select?.checked === true}
             lead={
                 select ? (

@@ -214,7 +214,7 @@ export function CustomerPicker({
                 }
                 aria-label="Find the customer"
                 autoComplete="off"
-                className="mb-2 h-9 rounded-[9px] text-[13px]"
+                className="mb-2"
             />
             {attentionNote ? (
                 <Notice tone="error" role="note" className="mb-2">

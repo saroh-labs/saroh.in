@@ -1,5 +1,6 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
 
@@ -181,6 +183,8 @@ export function EditorShell<V extends Record<string, unknown>>(
     if (refused) errors[refused.field] = refused.message;
 
     const settled = isSettled(save);
+    // It saves by itself, so Cmd/Ctrl+S saves what is waiting now.
+    useSaveShortcut(() => void editor.flush(), canEdit);
     // It saves by itself, so a way out saves what is waiting first and
     // asks only when that save fails (or the record is in a conflict).
     const guard = useLeaveGuard({
@@ -244,7 +248,8 @@ export function EditorShell<V extends Record<string, unknown>>(
 
     async function remove(): Promise<ConfirmResult> {
         setBusy(true);
-        const res = await editor.remove();
+        // Stays busy while it leaves; anything else gives the control back.
+        const res = await runAction(() => editor.remove());
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);

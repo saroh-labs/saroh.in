@@ -88,7 +88,7 @@ export function QuickLook({
                 side={side}
                 closeButton={false}
                 className={cn(
-                    "flex w-full flex-col gap-0 bg-background p-0 focus:outline-none",
+                    "flex w-full flex-col gap-0 bg-background p-0 outline-none",
                     side === "bottom"
                         ? "max-h-[85dvh] overflow-hidden rounded-t-2xl"
                         : "sm:max-w-[460px]",
@@ -128,7 +128,7 @@ export function QuickLook({
                     {status}
                     <SheetClose
                         className={cn(
-                            "grid shrink-0 cursor-pointer place-items-center ring-offset-background transition-colors duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11",
+                            "grid shrink-0 cursor-pointer place-items-center outline-none ring-offset-background transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11",
                             close === "plain"
                                 ? "size-8 rounded-lg bg-transparent text-neutral-700 hover:bg-muted hover:text-foreground active:bg-secondary-hover dark:text-muted-foreground"
                                 : "size-[34px] rounded-[9px] bg-muted text-muted-foreground hover:bg-secondary-hover hover:text-foreground",

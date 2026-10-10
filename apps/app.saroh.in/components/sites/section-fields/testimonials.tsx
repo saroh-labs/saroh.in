@@ -1,11 +1,11 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { TestimonialsContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
 
@@ -57,11 +57,11 @@ export function TestimonialsFields({
                                 placeholder="Who said it — a quote needs a name"
                             />
                         </Field>
-                        <Field label="Role or detail">
+                        <Field optional label="Role or detail">
                             <Input
                                 value={item.role ?? ""}
                                 onChange={(e) => set({ role: e.target.value })}
-                                placeholder="Customer since 2019. Optional."
+                                placeholder="Customer since 2019."
                             />
                         </Field>
                     </>

@@ -1,10 +1,12 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { patchProduct } from "@/lib/products/actions";
 import { Notice } from "@saroh/ui/notice";
 
@@ -29,9 +31,12 @@ export function ArchivedBanner({
 
     function restore() {
         start(async () => {
-            const res = await patchProduct(storeId, productId, {
-                status: "DRAFT",
-            });
+            const res = await runAction(() =>
+                patchProduct(storeId, productId, {
+                    status: "DRAFT",
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -39,9 +44,12 @@ export function ArchivedBanner({
             router.refresh();
             showUndo("Restored as a draft. Publish it when it is ready.", () =>
                 start(async () => {
-                    const undo = await patchProduct(storeId, productId, {
-                        status: "ARCHIVED",
-                    });
+                    const undo = await runAction(() =>
+                        patchProduct(storeId, productId, {
+                            status: "ARCHIVED",
+                        }),
+                    );
+                    if (!undo) return;
                     if (!undo.ok) showError(undo.error);
                     router.refresh();
                 }),
@@ -71,14 +79,15 @@ export function ArchivedBanner({
                     reviews and stock history are kept below.
                 </p>
                 {canWrite ? (
-                    <button
+                    <Button
+                        size="sm"
                         type="button"
-                        disabled={pending}
                         onClick={restore}
-                        className="h-8 rounded-[9px] bg-foreground px-3 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:opacity-60 coarse:h-11"
+                        busy={pending}
+                        busyLabel="Restoring…"
                     >
-                        {pending ? "Restoring…" : "Restore as a draft"}
-                    </button>
+                        Restore as a draft
+                    </Button>
                 ) : null}
             </div>
         </Notice>

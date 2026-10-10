@@ -20,6 +20,7 @@ import {
 } from "@/lib/customer-workspace/details";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 
+import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddressFields, TextField } from "./edit-fields";
 
@@ -81,9 +82,11 @@ export function EditSheet({
     async function save() {
         setTried(true);
         if (blocked || saving) return;
-        setSaving(true);
-        const res = await saveDetailsAction(contact.id, patch);
-        setSaving(false);
+        const res = await runAction(
+            () => saveDetailsAction(contact.id, patch),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             if (res.field && res.field in initial) {
                 setRefusal({

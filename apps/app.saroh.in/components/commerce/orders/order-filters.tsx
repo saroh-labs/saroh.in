@@ -1,8 +1,8 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import type { OrdersDate, OrdersPayment } from "@/lib/orders/list-filters";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
 import { ProductFilter } from "./product-filter";
@@ -185,13 +186,15 @@ export function OrderFilters({
                 />
             </div>
             {filtersActive(query) && !stacked ? (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => go({ ...NO_FILTERS })}
-                    className="rounded-sm px-1 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                    className="rounded-sm px-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                 >
                     Clear filters
-                </button>
+                </Button>
             ) : null}
         </div>
     );

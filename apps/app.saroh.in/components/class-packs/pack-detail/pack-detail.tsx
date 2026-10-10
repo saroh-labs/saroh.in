@@ -52,6 +52,7 @@ import { SellPackDialog } from "../sell-pack-dialog";
 import { ActivityTab } from "./activity-tab";
 import { CustomerView } from "./customer-view";
 
+import { runAction } from "@/lib/api/run-action";
 import type { Lens } from "./detail-header";
 import { GUTTER, PackDetailHeader } from "./detail-header";
 import type { ExtendTarget } from "./extend-dialog";
@@ -168,8 +169,9 @@ export function PackDetailScreen({
     function restore() {
         setBusy(true);
         start(async () => {
-            const res = await setPackArchived(pack.id, false);
+            const res = await runAction(() => setPackArchived(pack.id, false));
             setBusy(false);
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -178,7 +180,10 @@ export function PackDetailScreen({
             dismissToasts();
             showUndo(archiveToast(pack, false), () =>
                 start(async () => {
-                    const back = await setPackArchived(pack.id, true);
+                    const back = await runAction(() =>
+                        setPackArchived(pack.id, true),
+                    );
+                    if (!back) return;
                     if (!back.ok) showError(back.error);
                     router.refresh();
                 }),

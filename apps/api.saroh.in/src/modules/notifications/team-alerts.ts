@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 import type { AlertEvent } from "./alert-preferences";
+import type { NoticeColumns } from "./notice-target";
 
 /**
  * The team's alerts (round-2 F14): what a producer writes, inside its own
@@ -114,12 +115,18 @@ export async function enqueueTeamAlert(
  * An alert, worded. Here rather than in the handler so a wording module
  * (`uncollected-alert.ts`) can use it without importing the handler back.
  */
-export interface WordedAlert {
+export interface WordedAlert extends NoticeColumns {
     event: AlertEvent;
     /** Unique per business: claimed once, so the alert goes out once. */
     eventKey: string;
     /** The inbox notice already written (a booking's), or null to write one. */
     notificationId: string | null;
+    /**
+     * The notice's type, with what it opens beside it (`orderId`,
+     * `invoiceId`, `siteId`…): build both with `noticeOf`, which makes the
+     * target required for the type (`notice-target.ts`). An alert with no
+     * bell (`noBell`) writes no notice and names its type plainly.
+     */
     type: string;
     title: string;
     body: string;
@@ -154,5 +161,4 @@ export interface WordedAlert {
     emailReviewersOf?: string;
     /** The email's button; "Open it in Saroh" when not said. */
     cta?: string;
-    orderId?: string;
 }

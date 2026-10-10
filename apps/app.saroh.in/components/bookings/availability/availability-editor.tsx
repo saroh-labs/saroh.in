@@ -46,6 +46,8 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
 import { chipClass } from "@/components/shared/chip";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
@@ -186,23 +188,37 @@ export function AvailabilityEditor({
         ]);
         let failed: string | null = null;
         for (const op of ops) {
-            const res =
-                op.kind === "hours"
-                    ? await replaceStaffHours(op.staffId, op.hours)
-                    : op.kind === "addOff"
-                      ? op.off.staffId
-                          ? await addTimeOff(op.off.staffId, rangeOf(op.off))
-                          : await addClosure({
-                                ...rangeOf(op.off),
-                                fromDate: op.off.fromDate,
-                            })
-                      : op.kind === "removeOff"
-                        ? await removeTimeOffMany(op.staffId, op.before.ids)
-                        : op.kind === "removeClosure"
-                          ? await removeClosures(op.before.ids)
-                          : op.kind === "removeExtra"
-                            ? await removeExtraHours(op.staffId, op.before.id)
-                            : await updateBookingRules(op.rules);
+            const res = await runAction(
+                async () =>
+                    op.kind === "hours"
+                        ? await replaceStaffHours(op.staffId, op.hours)
+                        : op.kind === "addOff"
+                          ? op.off.staffId
+                              ? await addTimeOff(
+                                    op.off.staffId,
+                                    rangeOf(op.off),
+                                )
+                              : await addClosure({
+                                    ...rangeOf(op.off),
+                                    fromDate: op.off.fromDate,
+                                })
+                          : op.kind === "removeOff"
+                            ? await removeTimeOffMany(op.staffId, op.before.ids)
+                            : op.kind === "removeClosure"
+                              ? await removeClosures(op.before.ids)
+                              : op.kind === "removeExtra"
+                                ? await removeExtraHours(
+                                      op.staffId,
+                                      op.before.id,
+                                  )
+                                : await updateBookingRules(op.rules),
+                // Said below, with what did save.
+                { quiet: true },
+            );
+            if (!res) {
+                failed = UNREACHED;
+                break;
+            }
             if (!res.ok) {
                 failed = res.error;
                 break;
@@ -307,18 +323,17 @@ export function AvailabilityEditor({
             </span>
             <Button
                 variant="outline"
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
                 disabled={saving}
                 onClick={() => setDraft(null)}
             >
                 Discard
             </Button>
             <Button
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                disabled={saving}
                 onClick={() => void save()}
+                busy={saving}
+                busyLabel="Saving…"
             >
-                {saving ? "Saving…" : "Save changes"}
+                Save changes
             </Button>
         </div>
     ) : null;

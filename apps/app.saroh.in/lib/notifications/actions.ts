@@ -11,6 +11,7 @@ import {
     getAlertPreferences,
     markAllNotificationsRead as markAllApi,
     markNotificationRead as markReadApi,
+    undoMarkAllNotificationsRead as undoReadAllApi,
     updateAlert,
 } from "./service";
 
@@ -22,16 +23,33 @@ import {
  * UI is decoupled from where the data lives.
  */
 
+/**
+ * Opening a row is reading it. The bell's count is drawn by the shell, so
+ * the shell is read again: the count is right on the page the row opens.
+ */
 export async function markNotificationRead(
     id: string,
 ): Promise<NotificationsResult<{ id: string }>> {
-    return markReadApi(id);
+    const result = await markReadApi(id);
+    if (result.ok) revalidatePath("/", "layout");
+    return result;
 }
 
 export async function markAllNotificationsRead(): Promise<
-    NotificationsResult<{ updated: number }>
+    NotificationsResult<{ updated: number; readAt: string | null }>
 > {
-    return markAllApi();
+    const result = await markAllApi();
+    if (result.ok) revalidatePath("/", "layout");
+    return result;
+}
+
+/** Undo of "Mark all as read", for the instant that press answered with. */
+export async function undoMarkAllNotificationsRead(
+    readAt: string,
+): Promise<NotificationsResult<{ updated: number }>> {
+    const result = await undoReadAllApi(readAt);
+    if (result.ok) revalidatePath("/", "layout");
+    return result;
 }
 
 /**

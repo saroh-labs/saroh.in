@@ -154,10 +154,16 @@
         --ring: 60 4% 11%;
 
         /* ---- disabled: one treatment for every variant ----
-           Disabled text is not lighter text. Ink 500 on Sunken clears 4.76:1;
-           the WCAG exemption for disabled text is declined on purpose. */
-        --disabled: 42 22% 91%;
-        --disabled-foreground: 42 9% 39%;
+           Its own three tokens, not the muted pair. Disabled was Sunken with
+           the placeholder's colour, so a disabled button on a muted panel
+           had no edge and a disabled value read as an empty field. The fill
+           is a step below Sunken (#E4E1D8), the edge is Ink 300 (1.63:1 on
+           Sunken, so the control keeps its shape there) and the label is
+           darker than a placeholder: 5.47:1 on the fill. The WCAG exemption
+           for disabled text is declined on purpose. */
+        --disabled: 44 18% 87%;
+        --disabled-foreground: 42 9% 33%;
+        --disabled-border: 45 11% 71%;
 
         /* ---- brand: Saffron that can carry text ----
            `--brand` is the INTERACTIVE accent — links, emphasis, the active
@@ -334,6 +340,7 @@
            own step: #9E9A8F on #33332E, 4.52:1. */
         --disabled: 60 5% 19%;
         --disabled-foreground: 44 7% 59%;
+        --disabled-border: 51 5% 28%; /* 1.60:1 on Inset */
 
         --brand: 38 87% 55%; /* Saffron 400 */
         --brand-foreground: 60 4% 11%;
@@ -796,6 +803,7 @@
     --field: var(--background);
     --disabled: var(--muted);
     --disabled-foreground: var(--muted-foreground);
+    --disabled-border: var(--input);
     --success-subtle: var(--muted);
     --success-subtle-foreground: var(--foreground);
     --destructive-subtle: var(--muted);

@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
@@ -108,6 +109,7 @@ export function ReviewList({
 
                             {replyingTo === r.id ? (
                                 <form
+                                    onKeyDown={submitOnModEnter}
                                     className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -124,22 +126,24 @@ export function ReviewList({
                                         }
                                         placeholder="Shown under the review, on the shop"
                                         disabled={pending}
-                                        className="min-h-0 rounded-[8px] px-2.5 py-2 text-[13px] leading-[1.5]"
+                                        className="min-h-0 px-2.5 py-2 leading-[1.5]"
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
+                                            size="sm"
                                             type="submit"
-                                            disabled={pending || !draft.trim()}
-                                            className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold"
+                                            disabled={!draft.trim()}
+                                            busy={pending}
+                                            busyLabel="Posting…"
                                         >
                                             Post reply
                                         </Button>
                                         <Button
+                                            size="sm"
                                             type="button"
                                             variant="outline"
                                             onClick={cancelReply}
                                             disabled={pending}
-                                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
@@ -157,23 +161,25 @@ export function ReviewList({
                                         <TextLink
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className="text-[12.5px] disabled:opacity-50 coarse:min-h-11"
+                                            className="text-[12.5px] disabled:text-disabled-foreground coarse:min-h-11"
                                         >
                                             Reply
                                         </TextLink>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="link"
+                                        size="inline"
                                         type="button"
                                         onClick={() =>
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className="text-[12.5px] text-muted-foreground hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                        className="text-muted-foreground"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : null}
                         </Card>

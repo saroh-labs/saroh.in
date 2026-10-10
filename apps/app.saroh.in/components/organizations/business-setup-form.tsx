@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@saroh/auth/client";
 import { Button } from "@saroh/ui/button";
@@ -301,6 +302,7 @@ export function BusinessSetupForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid gap-5"
                 noValidate
@@ -531,7 +533,7 @@ export function BusinessSetupForm({
 
                 <div className="flex gap-2 pt-1">
                     {backTo ? (
-                        <Button asChild variant="outline" className="h-10">
+                        <Button asChild variant="outline">
                             <Link href={backTo}>Back</Link>
                         </Button>
                     ) : null}
@@ -544,14 +546,14 @@ export function BusinessSetupForm({
                     >
                         <Button
                             type="submit"
-                            className="wk-press h-10 flex-1 font-semibold"
-                            disabled={busy || taken}
+                            className="wk-press flex-1"
+                            disabled={taken}
+                            busy={busy}
+                            busyLabel="Setting up…"
                         >
-                            {busy
-                                ? "Setting up…"
-                                : kind === "BUSINESS"
-                                  ? "Create the business"
-                                  : "Set it up"}
+                            {kind === "BUSINESS"
+                                ? "Create the business"
+                                : "Set it up"}
                         </Button>
                     </Tip>
                 </div>
@@ -559,9 +561,10 @@ export function BusinessSetupForm({
                 <p className="text-[12px] text-muted-foreground">
                     Signed in as{" "}
                     <span className="text-foreground">{email}</span> ·{" "}
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
-                        className="text-foreground underline-offset-4 hover:underline active:text-muted-foreground"
                         onClick={() => {
                             void authClient.signOut().then(() => {
                                 window.location.href = accountsLoginUrl;
@@ -569,7 +572,7 @@ export function BusinessSetupForm({
                         }}
                     >
                         Sign out
-                    </button>
+                    </Button>
                 </p>
             </form>
         </Form>

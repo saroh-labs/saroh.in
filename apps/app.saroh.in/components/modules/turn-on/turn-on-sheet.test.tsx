@@ -269,7 +269,7 @@ describe("Bookings", () => {
         );
         expect(byLabel("First service").value).toBe("Consultation");
         expect(byLabel("Takes (minutes)").value).toBe("30");
-        expect(byLabel("Price (₹)").value).toBe("500.00");
+        expect(byLabel("Price").value).toBe("500.00");
         // Mon–Sat open, Sunday closed.
         const days = Array.from(
             sheet().querySelectorAll<HTMLButtonElement>('[role="checkbox"]'),

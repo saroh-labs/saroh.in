@@ -583,13 +583,15 @@ function MovePanel({
                     })}
                 </div>
             )}
-            <button
+            <Button
+                variant="link"
+                size="inline"
                 type="button"
                 onClick={onKeep}
-                className="mt-2 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground active:bg-accent-active"
+                className="mt-2 text-muted-foreground"
             >
                 Keep the current time
-            </button>
+            </Button>
         </div>
     );
 }

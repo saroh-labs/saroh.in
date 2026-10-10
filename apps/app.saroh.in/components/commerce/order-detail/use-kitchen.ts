@@ -30,6 +30,7 @@ import type {
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
+import { runAction } from "@/lib/api/run-action";
 import type { Hold } from "./hold-card";
 import type { Panel } from "./panel";
 import type { RefundChoice } from "./refund-panel";
@@ -107,7 +108,8 @@ export function useKitchen({
     const undo = useCallback(
         (eventId: string, back: KitchenStage) => {
             startTransition(async () => {
-                const res = await undoStage(order.id, eventId);
+                const res = await runAction(() => undoStage(order.id, eventId));
+                if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                     return;
@@ -127,8 +129,15 @@ export function useKitchen({
         new Promise<void>((resolve) => {
             startTransition(async () => {
                 const from = order.stage;
-                const res = await moveStage(order.id, { to, ...extra });
+                const res = await runAction(() =>
+                    moveStage(order.id, { to, ...extra }),
+                );
                 resolve();
+                if (!res) {
+                    // The reply may have been lost after it moved.
+                    refresh();
+                    return;
+                }
                 if (!res.ok) {
                     showError(res.error);
                     refresh();
@@ -198,14 +207,21 @@ export function useKitchen({
             run: () =>
                 new Promise<void>((resolve) => {
                     startTransition(async () => {
-                        const res = await refundLines(order.id, {
-                            lines: choice.lines,
-                            putBack: choice.putBack,
-                            reason: choice.reason,
-                            goodwill: choice.goodwill,
-                            idempotencyKey: key,
-                        });
+                        const res = await runAction(() =>
+                            refundLines(order.id, {
+                                lines: choice.lines,
+                                putBack: choice.putBack,
+                                reason: choice.reason,
+                                goodwill: choice.goodwill,
+                                idempotencyKey: key,
+                            }),
+                        );
                         resolve();
+                        if (!res) {
+                            // The reply may have been lost after it went.
+                            refresh();
+                            return;
+                        }
                         if (!res.ok) {
                             showError(res.error);
                             refresh();
@@ -249,7 +265,10 @@ export function useKitchen({
     /** Ask again about a refund the provider hasn't answered for. */
     const retryRefund = (refundId: string) => {
         startTransition(async () => {
-            const res = await retryRefundAction(order.id, refundId);
+            const res = await runAction(() =>
+                retryRefundAction(order.id, refundId),
+            );
+            if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
                 refresh();
@@ -293,7 +312,10 @@ export function useKitchen({
             return;
         }
         startTransition(async () => {
-            const res = await saveCourierAction(order.id, fields);
+            const res = await runAction(() =>
+                saveCourierAction(order.id, fields),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -311,7 +333,10 @@ export function useKitchen({
 
     const saveEdit = (input: EditOrderInput) => {
         startTransition(async () => {
-            const res = await editBeforePreparing(order.id, input);
+            const res = await runAction(() =>
+                editBeforePreparing(order.id, input),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -371,7 +396,10 @@ export function useKitchen({
      */
     const recordPayment = (kind: CounterPayment) => {
         startTransition(async () => {
-            const res = await recordPaymentAction(order.id, kind);
+            const res = await runAction(() =>
+                recordPaymentAction(order.id, kind),
+            );
+            if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
                 refresh();

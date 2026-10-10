@@ -3,7 +3,6 @@
 import { ListSearch } from "@saroh/ui/list-search";
 
 import { chipClass } from "@/components/shared/chip";
-import { OptionSelect } from "@/components/shared/option-select";
 import type {
     CustomerChip,
     CustomerSort,
@@ -12,6 +11,7 @@ import type {
 } from "@/lib/customers/list";
 import { chipsFor, SORT_LABEL, sortsFor } from "@/lib/customers/list";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const ALL_STORES = "all";
 
@@ -52,6 +52,7 @@ export function Filters({
                 />
                 {storefronts.length > 1 ? (
                     <OptionSelect
+                        size="sm"
                         aria-label="Location"
                         value={query.store ?? ALL_STORES}
                         onValueChange={(v) =>
@@ -64,10 +65,11 @@ export function Filters({
                                 label: `Bought at ${s.name}`,
                             })),
                         ]}
-                        className="h-[34px] w-auto min-w-[150px] max-w-full rounded-[9px] text-[13px] coarse:h-11"
+                        className="w-auto min-w-[150px] max-w-full"
                     />
                 ) : null}
                 <OptionSelect<CustomerSort>
+                    size="sm"
                     aria-label="Sort"
                     value={query.sort ?? page.sort}
                     onValueChange={(sort) => go({ sort })}
@@ -75,7 +77,7 @@ export function Filters({
                         value: s,
                         label: SORT_LABEL[s],
                     }))}
-                    className="h-[34px] w-auto min-w-[150px] rounded-[9px] text-[13px] coarse:h-11"
+                    className="w-auto min-w-[150px]"
                 />
             </div>
             <div

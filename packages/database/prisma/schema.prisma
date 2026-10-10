@@ -4306,6 +4306,14 @@ model Notification {
   // the message that raised it. Informational, no FK, like leadId.
   contactId String?
   messageId String?
+  // Or an order, a booking, an invoice or the website (10 Oct 2026): every
+  // notice opens the thing it is about, so every writer sets the one its
+  // type requires (`notifications/notice-target.ts` in the API).
+  // Informational, no FK, like leadId.
+  orderId   String?
+  bookingId String?
+  invoiceId String?
+  siteId    String?
 
   readAt DateTime? // null = unread
 

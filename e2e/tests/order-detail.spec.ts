@@ -315,7 +315,9 @@ test.describe("order detail", () => {
         await expect(
             panel.getByText("Say why you're refunding this amount."),
         ).toBeVisible();
-        await panel.getByLabel("Why").selectOption({ label: "Late" });
+        // The product's own select: open it, then pick from its list.
+        await panel.getByLabel("Why").click();
+        await page.getByRole("option", { name: "Late", exact: true }).click();
         await expect(go).toHaveText("Refund ₹1");
         await go.click();
         await expect(panel).toBeHidden();
@@ -347,13 +349,14 @@ test.describe("order detail", () => {
         // The first of the seed's own products on offer that isn't sold out:
         // never another test's "E2E …" product, which it may be taking away
         // at this moment, nor the line the order already has.
-        const choice = await add
-            .locator("option:not([disabled]):not([value=''])")
-            .filter({ hasNotText: /^E2E / })
-            .first()
-            .getAttribute("value");
-        expect(choice).toBeTruthy();
-        await add.selectOption(choice ?? "");
+        await add.click();
+        const choice = page
+            .getByRole("option")
+            .filter({ hasNotText: /^(E2E |Choose a product)/ })
+            .and(page.locator(":not([data-disabled])"))
+            .first();
+        await expect(choice).toBeVisible();
+        await choice.click();
         await expect(panel.getByText("· added")).toBeVisible();
         await panel.getByRole("button", { name: /^Save/ }).click();
         await expect(panel).toBeHidden();
@@ -634,7 +637,8 @@ test.describe("change and cancel on order detail (B9)", () => {
         await expect(
             sheet.getByText(/It stays on record as cancelled, never deleted/),
         ).toBeVisible();
-        await sheet.getByLabel("Why").selectOption({ label: "Late" });
+        await sheet.getByLabel("Why").click();
+        await page.getByRole("option", { name: "Late", exact: true }).click();
         await sheet.getByRole("button", { name: "Cancel order" }).click();
         // The sheet closes into the ten-second hold on the page.
         await expect(sheet).toBeHidden();

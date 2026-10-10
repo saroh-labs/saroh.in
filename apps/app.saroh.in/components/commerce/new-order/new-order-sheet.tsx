@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { Button } from "@saroh/ui/button";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -20,12 +20,12 @@ import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
 
+import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
 import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
 import { LinkMade } from "./link-made";
-import { FOCUS } from "./parts";
 import { PayStep } from "./pay-step";
 import type { NewOrderState } from "./use-new-order";
 import { useNewOrder } from "./use-new-order";
@@ -157,13 +157,12 @@ function NewOrderBody({
     async function create() {
         setTried(true);
         if (o.problem || saving || !o.pick || !o.way) return;
-        setSaving(true);
         // A pay link waits for the registered address (DEC-068): asked in
         // place, then the order is made.
-        const res = await details.run(() =>
-            makeNewOrder(o.storeId, request(o)),
+        const res = await runAction(
+            () => details.run(() => makeNewOrder(o.storeId, request(o))),
+            { setBusy: setSaving },
         );
-        setSaving(false);
         if (!res) return;
         if (!res.ok) {
             // At the plan's orders-a-month limit (U13): its notice too.
@@ -242,16 +241,14 @@ function NewOrderBody({
                 ) : !o.data ? (
                     <Notice tone="error">
                         Couldn&apos;t read what {storeName} sells.{" "}
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={o.retryCatalogue}
-                            className={cn(
-                                FOCUS,
-                                "cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:text-foreground",
-                            )}
                         >
                             Try again
-                        </button>
+                        </Button>
                     </Notice>
                 ) : (
                     <LinesStep

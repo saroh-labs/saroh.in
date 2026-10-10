@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import {
     confirmAttentionAction,
     removeAttentionAction,
@@ -51,7 +52,7 @@ interface Choice {
 }
 
 const CHOICE =
-    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11";
+    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:h-11";
 
 /**
  * Notes from the customer (C12, "Saroh Customer Detail" › patient notes):
@@ -218,7 +219,7 @@ function SuggestionCard({
             toSuggestionInput(draft, choices),
         ).catch(() => ({
             ok: false as const,
-            error: "The connection dropped before it was added.",
+            error: UNREACHED,
             field: undefined,
         }));
         setSaving(false);
@@ -296,6 +297,7 @@ function SuggestionCard({
                             Short label for the team
                         </Label>
                         <Input
+                            dense
                             id={`${id}-label`}
                             value={draft.label}
                             maxLength={SUGGESTION_LABEL_MAX}
@@ -307,7 +309,7 @@ function SuggestionCard({
                             onChange={(e) =>
                                 change({ ...draft, label: e.target.value })
                             }
-                            className="h-[34px] min-w-0 rounded-[8px] px-2.5 text-[13px]"
+                            className="min-w-0 px-2.5"
                         />
                     </div>
                 )}
@@ -382,19 +384,22 @@ function SuggestionCard({
             ) : null}
             <div className="flex flex-wrap gap-2">
                 <Button
+                    size="sm"
                     type="button"
                     onClick={() => void add()}
-                    disabled={saving || problem !== null}
-                    className="h-[34px] rounded-[8px] px-3.5 text-[12.5px] font-semibold coarse:h-11"
+                    disabled={problem !== null}
+                    busy={saving}
+                    busyLabel="Adding…"
                 >
-                    {saving ? "Adding…" : "Add to Needs attention"}
+                    Add to Needs attention
                 </Button>
                 <Button
+                    size="sm"
                     type="button"
                     variant="outline"
                     onClick={onSetAside}
                     disabled={saving}
-                    className="h-[34px] rounded-[8px] px-3 text-[12.5px] font-semibold text-foreground/75 coarse:h-11"
+                    className="text-foreground/75"
                 >
                     Nothing to add
                 </Button>
