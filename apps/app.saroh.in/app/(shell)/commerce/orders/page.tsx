@@ -4,11 +4,13 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
 import { arrivalContactId } from "@/lib/customers/prefill";
 import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { ordersListMoment } from "@/lib/moments/read";
 import {
     orderPowers,
     ordersAccess,
@@ -132,13 +134,19 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
+    // The business's first, 10th or 100th order (wave G), said once: only
+    // on the whole list's first page, where the count is every order.
+    const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
+    const moment = await ordersListMoment(page, {
+        plain: unnarrowed && !query.storefront && !query.cursor,
+        viewer: organization,
+    });
     // No orders yet: share the online shop while it is live, else the
     // website (B7's first run; DEC-069, L8), on the business's own origin.
     // Only then is the web address read, and a read that fails (or a role
     // it isn't shown to) just leaves the button out.
     const share =
-        page.rows.length === 0 &&
-        ordersEmptyCopy(query, null).kind === "first-run"
+        page.rows.length === 0 && unnarrowed
             ? shareLink(await readWebAddressLinks(), ORDERS_FIRST_RUN)
             : null;
 
@@ -147,6 +155,7 @@ export default async function OrdersPage({
             {/* B17: storefronts still on the 2-hour Pick-up default. */}
             <LateRuleNotice />
             <PlanLimitNotice moduleId="orders" className="mb-4" />
+            {moment ? <Moment moment={moment} className="mb-4" /> : null}
             <OrdersScreen
                 query={query}
                 page={page}

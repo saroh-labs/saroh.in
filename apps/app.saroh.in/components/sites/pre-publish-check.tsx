@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import type { WentLive as WentLiveFacts } from "@/components/sites/editor/use-publish";
 import {
     APPROVAL_LINE,
     goesLive,
     TYPE_LABEL,
 } from "@/components/sites/pre-publish-words";
+import { WentLive } from "@/components/sites/went-live";
 import type {
     Flag,
     FlagType,
@@ -59,6 +61,7 @@ export function PrePublishCheck({
     needsApproval = false,
     canOverride = false,
     scheduledWarning = null,
+    wentLive = null,
     onPublish,
     onClose,
     onJump,
@@ -96,6 +99,11 @@ export function PrePublishCheck({
      * won't (KTD-14): said before, not discovered after.
      */
     scheduledWarning?: string | null;
+    /**
+     * The site just went live for the first time (wave G): the check shows
+     * its finished state, the address and how to pass it on.
+     */
+    wentLive?: WentLiveFacts | null;
     onPublish: () => void;
     onClose: () => void;
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
@@ -126,6 +134,12 @@ export function PrePublishCheck({
             flags: rest.filter((f) => f.pageId === page.id),
         }))
         .filter((g) => g.flags.length > 0);
+
+    if (wentLive) {
+        return (
+            <WentLive siteName={siteName} live={wentLive} onClose={onClose} />
+        );
+    }
 
     const total = flags.length;
     // What the API will refuse to publish past (L5): the button waits.

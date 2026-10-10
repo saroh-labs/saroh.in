@@ -20,6 +20,16 @@ export interface DraftReadiness {
 }
 
 /**
+ * The first time a site goes live (wave G): what the check's finished state
+ * says. `record` is the line about approval, when the publish left one.
+ */
+export interface WentLive {
+    /** "flour.saroh.app"; null when this person isn't shown the address. */
+    address: string | null;
+    record: string | null;
+}
+
+/**
  * Publishing: the site's flags, what publishing would change, the pre-publish
  * check and the publish itself, including publishing past a review (#278).
  * Moved out of `site-editor.tsx` unchanged (#260).
@@ -97,6 +107,12 @@ export function usePublish({
      * publishing.
      */
     const [neverPublished, setNeverPublished] = useState(initialNeverPublished);
+    /*
+     * The site's first publish (wave G). It happens once, so the check
+     * stays open on a finished state that says where the site is and how
+     * to pass it on, where every later publish closes with a toast.
+     */
+    const [wentLive, setWentLive] = useState<WentLive | null>(null);
 
     /*
      * One counter for the flags re-read. It fires from several places — every
@@ -223,7 +239,9 @@ export function usePublish({
             showError(res.error);
             return;
         }
-        setChecking(false);
+        // Whether this was the first time anything went live (wave G).
+        const first = neverPublished;
+        if (!first) setChecking(false);
         /*
          * The live state names the business and its address, per the spec —
          * "Flour & Ferment is live at flour-and-ferment.saroh.app". A bare
@@ -233,15 +251,17 @@ export function usePublish({
             address === null || address === undefined
                 ? `${siteName} is live.`
                 : `${siteName} is live at ${address}.`;
-        showSuccess(
-            // Bypassing is recorded, not prevented (#199) — and said, so the
-            // record is never a surprise in version history later.
-            override
-                ? `${live} Recorded as gone live without approval.`
-                : res.data.bypassed
-                  ? `${live} Recorded as published without approval.`
-                  : live,
-        );
+        // Bypassing is recorded, not prevented (#199) — and said, so the
+        // record is never a surprise in version history later.
+        const record = override
+            ? "Recorded as gone live without approval."
+            : res.data.bypassed
+              ? "Recorded as published without approval."
+              : null;
+        // The first publish says it in the check's finished state instead,
+        // with the address as a link and a way to share it.
+        if (first) setWentLive({ address: address ?? null, record });
+        else showSuccess(record ? `${live} ${record}` : live);
         /*
          * Everything the bar counted just went live, so the count is zero —
          * set here rather than left for the next autosave to recount, which
@@ -279,7 +299,15 @@ export function usePublish({
         await Promise.all([refreshFlags(), refreshReview()]);
     }
 
+    /** Leave the check, and its finished state with it. */
+    function closeCheck() {
+        setChecking(false);
+        setWentLive(null);
+    }
+
     return {
+        wentLive,
+        closeCheck,
         needsApproval,
         canOverride,
         recordWentLive,

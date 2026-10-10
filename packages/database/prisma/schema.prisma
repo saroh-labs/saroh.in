@@ -325,6 +325,13 @@ model Organization {
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
 
+  // The moments this business has seen (wave G): a first order, a first
+  // booking, a tenth order. One key per moment, with the time someone put
+  // it away or opened what it pointed at, so it is said once for the whole
+  // business, on every device. The keys are the API's fixed list
+  // (`organizations/moments.ts`). Never a count or anyone's details.
+  momentsSeen Json @default("{}")
+
   // The business's referral code (DEC-102, #812): the `?ref=` its site's
   // "Made with Saroh" credit links with on Free. 8 characters a reader can't
   // confuse, never the business name. Null until the credit is first
