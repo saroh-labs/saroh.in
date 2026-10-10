@@ -22,6 +22,7 @@ import {
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { Field, FieldError } from "@saroh/ui/field";
 import { DepositField } from "./deposit-field";
 import type { Edit } from "./fields";
@@ -74,26 +75,15 @@ export function WhatItIs({ draft, set, problem, leave }: Edit) {
             <Eyebrow id={ids.kind} className="mt-3">
                 Kind
             </Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.kind}
-                className="flex flex-wrap gap-1.5"
-            >
-                <Chip
-                    on={draft.kind === "one"}
-                    className={CHIP}
-                    onClick={() => set({ kind: "one" })}
-                >
-                    One-to-one
-                </Chip>
-                <Chip
-                    on={draft.kind === "class"}
-                    className={CHIP}
-                    onClick={() => set({ kind: "class" })}
-                >
-                    Class
-                </Chip>
-            </div>
+            <ChipGroup
+                labelledBy={ids.kind}
+                value={draft.kind}
+                onChange={(kind) => set({ kind })}
+                choices={[
+                    { value: "one", label: "One-to-one" },
+                    { value: "class", label: "Class" },
+                ]}
+            />
             <p className={HELP}>
                 A class runs at set times with a number of places.
             </p>

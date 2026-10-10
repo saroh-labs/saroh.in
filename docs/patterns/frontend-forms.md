@@ -29,6 +29,22 @@ strip, what Save sends and the leave dialog's section names are pure
 functions in `lib/services/service-editor.ts`, tested with vitest. It
 replaced the service dialog and the two react-hook-form service forms.
 
+**Current** — **One Save may be several calls, and says so when one
+fails** (10 Oct). The Service Editor's Save sends the service, then who
+takes it, then its own weekly hours (`PUT …/rules`, which replaces the
+set). The hours are rows of the same draft
+(`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
+"Save availability". A new service starts from the business's opening
+hours where its own hours are what gives it times (nobody on the diary
+takes it, or it is a class); a one-to-one someone takes starts with none,
+because its own hours only narrow that person's. When the service is saved
+and its hours are not, the page says exactly that in a notice with Try
+again, keeps the hours typed, stays where it is (a new service is not sent
+to its own page until all of it is saved) and Try again sends only what is
+left: `changedParts` compares the draft with what the server now has. Do
+the same for any Save that spans calls: the first call is the record, each
+later one is idempotent, and `saved` is moved forward one call at a time.
+
 **Current** — **A published record's editor autosaves on the shared shell**
 (D6, DEC-043): `components/editor-shell/editor-shell.tsx`, for the Plan
 Editor (D7) and the Pack Editor (E18), and Courses later. The record type
@@ -79,7 +95,9 @@ The sheet and the dialog share one set of rules
   then the overlay's own button (ink), on the right. On a phone they stack
   full width with the button on top. **This replaces "Save then Cancel on
   the left".**
-- **Labels.** "Save" for an edit. Verb and thing for a create or an action
+- **Labels.** "Save" for an edit, on a page as in an overlay (the Service
+  Editor, the discount code form, Availability, the QR maker). Verb and
+  thing for a create or an action
   ("Add note", "Send invite"). Never "Save changes", "Update" or "Done",
   except `doneOnly` on a sheet that only lists things. The way out is
   "Cancel", or "Keep order" beside a button that cancels (`cancelLabel`).
@@ -289,10 +307,23 @@ preview under its fields, from the draft.
 - **Current** — **Only what is optional is marked,** as "(optional)" in the
   label (`optional` on `Field`). Never the word "Required", an "Optional"
   chip, an "Optional." hint or an "Optional" placeholder.
-- **Adopted** — **A page checks a field on leaving it and on submit, and
-  puts the keyboard on the first one in error** (`focusFirstError`). A
-  sheet checks when its Save is pressed. Gap: the product editor still
-  checks as you type, and most forms only on submit.
+- **Current** — **A page checks a field on leaving it and on submit, and
+  puts the keyboard on the first one in error.** A sheet checks when its
+  Save is pressed. With react-hook-form it is two words
+  (`lib/hooks/page-form.ts`):
+  `useForm({ resolver, ...PAGE_FORM, defaultValues })` and
+  `form.handleSubmit(onSubmit, toFirstError)`. `PAGE_FORM` is `onTouched`
+  (the first blur, then every change) and turns the library's own focus
+  off, since it only knows fields it holds a ref for; `toFirstError` goes
+  to the first `aria-invalid` field in the form, a select or a chip set
+  included. On it: New customer, the business setup form, the invoice
+  form, New location, the discount code form, New site and the course
+  form. A draft that is not react-hook-form keeps a set of fields that
+  have been left and shows a field's problem from then on (the Service
+  Editor: `serviceFieldProblems`, `problemFor`), and calls
+  `focusFirstError(form)` when Save is pressed. The product editor's Basics
+  says what is wrong once a field is left (`seen`). Gap: its Details,
+  Description and Made-by sections still check as you type.
 - **Current** — **A main button is never off without saying why.** A short
   form keeps it on and explains on submit (Create location, Create site,
   Add service). Where it must wait for something, the reason is beside it
@@ -301,9 +332,12 @@ preview under its fields, from the draft.
   `{ currency, value, onValueChange, allowDecimals? }`. The sign is a fixed
   prefix inside the box (never "Price (₹)" in the label or a "₹" that
   vanishes with the first digit), the keyboard is the decimal pad, and the
-  currency is the business's: a form never asks which. Gaps: the product
-  editor's own `MoneyBox`, and Order Detail's refund and delivery-charge
-  boxes, which are not told the order's currency.
+  currency is the business's: a form never asks which. Order Detail's
+  sheets are handed the order's currency (`OrderSheets currency`), and a
+  label never says "in rupees". Where the currency can be unknown for a
+  moment (a new order before its location is read) the box is a plain
+  decimal `Input` until it is. Gap: a lead's Worth has no sign, because a
+  lead has no currency (the Leads list draws none either).
 - **Current** — **Saving from the keyboard**
   (`lib/hooks/keyboard-save.ts`): Cmd/Ctrl+Enter sends the form the
   keyboard is in (`submitOnModEnter` on a `<form>`; the overlay frames
@@ -334,9 +368,35 @@ preview under its fields, from the draft.
   `FormField`, not `register`.
 - **Current** — **Form primitives, not raw inputs.** ESLint fails a raw
   `<input>`, `<textarea>`, `<select>`, `<button>` or `<label>` in
-  `app.saroh.in` (`frontend-design-system.md`). No native `<select>` or
-  text `<textarea>` is left. Gap: 64 files still wrap a control in a raw
-  `<label>` instead of `Field`, on the lint's list.
+  `app.saroh.in` (`frontend-design-system.md`). No native `<select>`,
+  text `<textarea>` or raw `<label>` is left but one (the autopay timing
+  card, a radio card with a timeline in it). A label is `Field`, or
+  `Label` with `htmlFor` where it sits beside its control in one row.
+- **Current** — **A choice is one of five pieces, by what is chosen**
+  (10 Oct). All but the tick are a radio group to a screen reader and a
+  keyboard: one tab stop, and the arrows move the choice.
+
+    | Piece         | For                                              | File                                 |
+    | ------------- | ------------------------------------------------ | ------------------------------------ |
+    | `Segmented`   | A two- or three-way switch of view or mode       | `@saroh/ui/segmented`                |
+    | `ChipGroup`   | A short list of short names (a kind, a courier)  | `components/shared/choice-group.tsx` |
+    | `RadioCards`  | Choices that are a sentence, or carry a note     | `components/shared/choice-group.tsx` |
+    | `ChoiceGroup` | The same group drawn the screen's own way        | `components/shared/choice-group.tsx` |
+    | `CheckRow`    | A tick with its words (`SwitchRow` for a switch) | `components/shared/check-row.tsx`    |
+
+    `ChoiceGroup` is for what the first three can't draw (colour swatches,
+    photo thumbnails, times under day headings with `layout`, a card with
+    its own contents); it carries the keyboard, the names and the off
+    state, and the caller only the look. A filter that is on or off is
+    `Chip as="toggle"`. Never a hand-made `role="radio"`, `role="checkbox"`
+    or `role="switch"` button.
+
+- **Current** — **The label is above a choice strip, and the strip is as
+  wide as its words.** `Segmented` is a block of its own (`flex w-fit`),
+  so after a label it drops to the next line and in a grid or a stacked
+  form it does not stretch; `block` is the one way to fill the row. It is
+  never wider than its parent, and its options wrap on a phone.
+  `ChipGroup` wraps the same way.
 - **Current** — **Controls meet the touch target on a phone,** and fields
   are 16px there (`frontend-design-system.md`).
 

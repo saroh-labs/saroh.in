@@ -17,8 +17,7 @@ import {
 } from "@/components/bookings/pay-link-panel";
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import { CheckRow } from "@/components/shared/check-row";
-import { Chip } from "@/components/shared/chip";
-import { ChoiceGroup } from "@/components/shared/choice-group";
+import { ChipGroup, ChoiceGroup } from "@/components/shared/choice-group";
 import {
     FormSheet,
     FormSheetBody,
@@ -546,21 +545,15 @@ export function NewBookingDialog({
                                 >
                                     Payment
                                 </div>
-                                <div
-                                    role="radiogroup"
-                                    aria-labelledby={ids.pay}
-                                    className="flex flex-wrap gap-1.5"
-                                >
-                                    {payChoices(offerLink).map((c) => (
-                                        <Chip
-                                            key={c.key}
-                                            on={payNow === c.key}
-                                            onClick={() => setPay(c.key)}
-                                        >
-                                            {c.label}
-                                        </Chip>
-                                    ))}
-                                </div>
+                                <ChipGroup
+                                    labelledBy={ids.pay}
+                                    value={payNow}
+                                    onChange={setPay}
+                                    choices={payChoices(offerLink).map((c) => ({
+                                        value: c.key,
+                                        label: c.label,
+                                    }))}
+                                />
                                 <p className="text-[12px] leading-[1.5] text-muted-foreground">
                                     {payNote(payNow)}
                                 </p>

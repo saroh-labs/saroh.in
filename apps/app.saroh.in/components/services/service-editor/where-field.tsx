@@ -3,10 +3,11 @@
 import { Input } from "@saroh/ui/input";
 import { useId } from "react";
 
-import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
+import { Eyebrow } from "@/components/bookings/calendar/parts";
 import type { LocationType } from "@/lib/services/service";
 import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
+import { ChipGroup } from "@/components/shared/choice-group";
 import { Field } from "@saroh/ui/field";
 import { HELP } from "./fields";
 
@@ -42,21 +43,12 @@ export function WhereField({
             <Eyebrow id={ids.label} className="mt-3">
                 Where
             </Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.label}
-                className="flex flex-wrap gap-1.5"
-            >
-                {WHERE.map(([value, label]) => (
-                    <Chip
-                        key={value}
-                        on={where === value}
-                        onClick={() => onChange({ where: value })}
-                    >
-                        {label}
-                    </Chip>
-                ))}
-            </div>
+            <ChipGroup
+                labelledBy={ids.label}
+                value={where}
+                onChange={(next) => onChange({ where: next })}
+                choices={WHERE.map(([value, label]) => ({ value, label }))}
+            />
             <p className={HELP}>{whereNote(where)}</p>
             {needsMeetingLink(where) ? (
                 <Field
