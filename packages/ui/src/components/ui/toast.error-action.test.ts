@@ -1,8 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const error = vi.fn();
+interface Options {
+    id?: string;
+    duration?: number;
+    action?: {
+        label: string;
+        onClick: (event: { preventDefault: () => void }) => void;
+    };
+}
+const error = vi.fn<(message: string, options?: Options) => void>();
 vi.mock("sonner", () => ({
-    toast: { error: (...a: unknown[]) => error(...a) },
+    toast: {
+        error: (message: string, options?: Options) => error(message, options),
+    },
 }));
 
 import { setErrorAction, showError } from "./toast";
@@ -34,14 +44,15 @@ describe("an error sentence with a way out (setErrorAction)", () => {
 
         const first = error.mock.calls[0]?.[1];
         const second = error.mock.calls[1]?.[1];
-        expect(first.action.label).toBe("Sign in");
-        expect(first.duration).toBe(Number.POSITIVE_INFINITY);
+        expect(first?.action?.label).toBe("Sign in");
+        expect(first?.duration).toBe(Number.POSITIVE_INFINITY);
         // The same id both times: the second replaces the first.
-        expect(first.id).toBe(second.id);
+        expect(first?.id).toBeTruthy();
+        expect(first?.id).toBe(second?.id);
 
         // Pressing it runs the way out and leaves the toast up.
         const event = { preventDefault: vi.fn() };
-        first.action.onClick(event);
+        first?.action?.onClick(event);
         expect(signIn).toHaveBeenCalledTimes(1);
         expect(event.preventDefault).toHaveBeenCalled();
 
@@ -54,7 +65,7 @@ describe("an error sentence with a way out (setErrorAction)", () => {
             onClick: vi.fn(),
         });
         showError("Couldn't save", SENTENCE);
-        expect(error.mock.calls[0]?.[1].action.label).toBe("Sign in");
+        expect(error.mock.calls[0]?.[1]?.action?.label).toBe("Sign in");
         off();
     });
 
@@ -65,6 +76,6 @@ describe("an error sentence with a way out (setErrorAction)", () => {
         });
         off();
         showError(SENTENCE);
-        expect(error.mock.calls[0]?.[1].action).toBeUndefined();
+        expect(error.mock.calls[0]?.[1]?.action).toBeUndefined();
     });
 });
