@@ -167,7 +167,9 @@ describe("a real decoder reads the code back (jsQR)", () => {
                         ).toBe(text);
                     }
                 }
-            });
+                // Eight versions by five colours through a real decoder:
+                // about 5s on CI's runners, over vitest's default.
+            }, 30_000);
         }
     }
 

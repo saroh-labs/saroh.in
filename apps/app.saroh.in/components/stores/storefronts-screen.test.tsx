@@ -119,8 +119,9 @@ const text = (html: string) =>
     html
         .replace(/<[^>]+>/g, " ")
         .replace(/&#x27;/g, "'")
-        .replace(/&amp;/g, "&")
         .replace(/&quot;/g, '"')
+        // Last, so "&amp;quot;" reads as the text "&quot;", not a quote.
+        .replace(/&amp;/g, "&")
         .replace(/\s+/g, " ");
 
 /** The open tab's panel, without the page above it. */

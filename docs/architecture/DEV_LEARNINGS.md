@@ -3880,3 +3880,18 @@ middleware's matcher and answered per host.
 `public/favicon.ico`; `app/[domain]/layout.test.ts` and
 `favicon.ico/route.test.ts` pin the three cases.
 **Category**: merchant sites · `apps/saroh.app/lib/site-icon.ts`
+
+## A test that is quick locally times out at 5s on CI
+
+**Symptom**: PR #925's "Unit tests" failed on three cases in
+`packages/ui/src/lib/qr-art.decode.test.ts` with "Test timed out in
+5000ms". `pnpm prepush --all` had passed on the same tree.
+**Cause**: each case draws eight QR versions in five colours and reads every
+one back through a real decoder. Run alone on the laptop that is under a
+second. On CI's runners, beside every other package's tests, it took 5.3 to
+5.6s, past vitest's 5s default.
+**Fix**: the three cases carry their own 30s limit, with a comment saying why.
+**Rule**: a test that does real work in a loop (decoding, rasterising,
+hashing many inputs) gets an explicit timeout. CI ran this one six times
+slower than the laptop, so the local time says little.
+**Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
