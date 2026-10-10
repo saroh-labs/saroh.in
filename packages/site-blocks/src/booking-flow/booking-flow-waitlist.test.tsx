@@ -151,7 +151,7 @@ function account(over: Partial<BookingAccount> = {}): BookingAccount {
     };
 }
 
-async function pickFullSession(label = /Full — join waitlist/) {
+async function pickFullSession(label = /Full. Join the waitlist/) {
     fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
     fireEvent.click(await screen.findByRole("radio", { name: label }));
 }
@@ -192,7 +192,9 @@ describe("the waitlist's words", () => {
 
     it("labels a full session by where the customer stands", () => {
         const zone = "Asia/Kolkata";
-        expect(fullSessionText(undefined, zone)).toBe("Full — join waitlist");
+        expect(fullSessionText(undefined, zone)).toBe(
+            "Full. Join the waitlist",
+        );
         expect(
             fullSessionText(
                 {
@@ -280,9 +282,6 @@ describe("a full class on the booking page (A12)", () => {
             />,
         );
         await pickFullSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(confirmButton(/Continue to sign in/));
         expect(wl.join).not.toHaveBeenCalled();
         const sheet = await screen.findByRole("dialog");
@@ -307,7 +306,7 @@ describe("a full class on the booking page (A12)", () => {
                 Promise.resolve({
                     ok: false,
                     status: 409,
-                    message: "There's room — book it.",
+                    message: "There's room. Book it.",
                     reason: "room",
                 }),
         });
@@ -322,7 +321,7 @@ describe("a full class on the booking page (A12)", () => {
         const reads = vi.mocked(globalThis.fetch).mock.calls.length;
         fireEvent.click(confirmButton(/Join the waitlist/));
         expect(
-            await screen.findByText("There's room — book it."),
+            await screen.findByText("There's room. Book it."),
         ).toBeInTheDocument();
         await waitFor(() =>
             expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(
@@ -369,7 +368,7 @@ describe("a full class on the booking page (A12)", () => {
         const acc = account({ waitlist: wl });
         render(<BookingFlow page={PAGE} account={acc} apiUrl="x" />);
         await pickFullSession(/Held for you until 15:00/);
-        fireEvent.click(confirmButton(/Book — pay at the desk/));
+        fireEvent.click(confirmButton(/Book and pay at the desk/));
         expect(
             await screen.findByRole("heading", {
                 name: "You're booked, Asha.",
@@ -411,7 +410,7 @@ describe("a full class on the booking page (A12)", () => {
             await screen.findByText("You've left the waitlist for that class."),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("radio", { name: /Full — join waitlist/ }),
+            screen.getByRole("radio", { name: /Full. Join the waitlist/ }),
         ).toBeInTheDocument();
     });
 });

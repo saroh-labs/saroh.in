@@ -1,6 +1,7 @@
 import type { RenderedPerson } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { siteImage } from "../lib/site-image";
 import { CtaButton } from "./cta";
 
 /**
@@ -85,7 +86,7 @@ export default function PersonSection({
                         alt={content.image?.alt ?? ""}
                         width={content.image?.width}
                         height={content.image?.height}
-                        loading="lazy"
+                        {...siteImage()}
                         className="aspect-[4/5] w-full max-w-sm rounded-[calc(var(--site-radius)*1.4)] object-cover"
                     />
                 ) : null}
@@ -209,7 +210,7 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
                                 alt={content.image?.alt ?? ""}
                                 width={content.image?.width}
                                 height={content.image?.height}
-                                loading="lazy"
+                                {...siteImage()}
                                 className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                             />
                         ) : null}
@@ -285,7 +286,7 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
                                         <img
                                             src={src}
                                             alt={m.image?.alt ?? ""}
-                                            loading="lazy"
+                                            {...siteImage()}
                                             className="h-full w-full object-cover"
                                         />
                                     ) : null}

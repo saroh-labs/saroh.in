@@ -596,10 +596,10 @@ describe("a class credit (A10)", () => {
 
     it("says what is left once used: never below none, and the class's month", () => {
         expect(creditUsedText(PACK)).toBe(
-            "Used 1 credit from your 10 classes pack — 0 left, use by 12 Nov.",
+            "Used 1 credit from your 10 classes pack. 0 left, use by 12 Nov.",
         );
         expect(creditUsedText(MEMBER)).toBe(
-            "Used 1 credit from your membership — 7 left in December.",
+            "Used 1 credit from your membership. 7 left in December.",
         );
     });
 });

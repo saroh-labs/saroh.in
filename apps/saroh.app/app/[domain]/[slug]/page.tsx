@@ -13,6 +13,7 @@ import {
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
+import { canonical, titled } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 /**
@@ -47,7 +48,7 @@ export async function generateMetadata({
                 siteName: name,
                 url: `/${slug}`,
             },
-            metadataBase: new URL(`https://${domain}`),
+            ...canonical(resolved, domain, `/${slug}`),
         });
     }
 
@@ -61,11 +62,13 @@ export async function generateMetadata({
     // this route did not read them. It inherits both, and names its own
     // address so a share of /about is cached as /about.
     const { name, seoDescription } = snapshot.site;
+    // "About · Rye & Co.": the page, then whose site it is. The share
+    // card keeps the page's own name, with the site's beside it.
     const title = page.title ?? name;
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
     return shareable(resolved, {
-        title,
+        title: titled(page.title, name),
         description,
         openGraph: {
             title,
@@ -80,7 +83,7 @@ export async function generateMetadata({
             description,
             images,
         },
-        metadataBase: new URL(`https://${domain}`),
+        ...canonical(resolved, domain, `/${slug}`),
     });
 }
 

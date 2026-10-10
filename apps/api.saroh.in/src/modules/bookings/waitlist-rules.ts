@@ -39,7 +39,7 @@ export function offeredUntil(startAt: Date, now: Date): Date {
 /** The words a customer hears when they can't join, with their reason. */
 export const WAITLIST_WORDS = {
     /** A place is free: book it instead (plan A12, 409). */
-    room: "There's room — book it.",
+    room: "There's room. Book it.",
     /** Past {@link MAX_LIVE_ENTRIES}. */
     tooMany: `You're on ${MAX_LIVE_ENTRIES} waitlists already. Leave one to join another.`,
     /** Inside the last hour, or already started. */

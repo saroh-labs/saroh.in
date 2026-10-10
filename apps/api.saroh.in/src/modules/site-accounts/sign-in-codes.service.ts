@@ -87,7 +87,7 @@ const VERIFY_TRIES_PER_ADDRESS = 60;
 const ADDRESS_WINDOW_MS = 10 * 60_000;
 
 export const UNAVAILABLE_MESSAGE =
-    "We couldn't send your code — try again in a few minutes";
+    "We couldn't send your code. Try again in a few minutes";
 
 function hmac(parts: string[]): string {
     return createHmac("sha256", siteCodeSecret())

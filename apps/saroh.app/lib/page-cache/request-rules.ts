@@ -125,10 +125,44 @@ async function sha256(text: string): Promise<string> {
 }
 
 /**
+ * Query parameters that say where a visit came from and change nothing
+ * the server draws: an ad's or a share's tags, and the tag a QR code's
+ * scan adds (`?src=qr-…`, read from the address by the page's own script,
+ * `qr-source.ts`). Left in the key, every ad click, shared link and scan
+ * was a page of its own and never met a kept one.
+ */
+const TRACKING_PARAMS: ReadonlySet<string> = new Set([
+    "fbclid",
+    "gclid",
+    "igshid",
+    "src",
+]);
+
+/** Whether a query parameter is only about where the visit came from. */
+export function isTrackingParam(name: string): boolean {
+    const key = name.toLowerCase();
+    return key.startsWith("utm_") || TRACKING_PARAMS.has(key);
+}
+
+/**
+ * A request's query as the key reads it: without the tracking parameters,
+ * everything else as it came and in the order it came.
+ */
+export function keyedSearch(search: string): string {
+    const kept = new URLSearchParams();
+    new URLSearchParams(search).forEach((value, name) => {
+        if (!isTrackingParam(name)) kept.append(name, value);
+    });
+    const query = kept.toString();
+    return query ? `?${query}` : "";
+}
+
+/**
  * The key a page is kept under: its host (so one site never answers for
- * another), its path and query, the build that drew it (a new deploy's
- * pages name new script files, so an old page is never served after one),
- * and a digest of the headers Next varies on.
+ * another), its path and query (less the tracking parameters,
+ * {@link keyedSearch}), the build that drew it (a new deploy's pages name
+ * new script files, so an old page is never served after one), and a
+ * digest of the headers Next varies on.
  */
 export async function pageCacheKey(
     request: Request,
@@ -141,7 +175,24 @@ export async function pageCacheKey(
     ).join("\n");
     const key = new URL(`https://${host}/`);
     key.pathname = url.pathname;
-    key.search = url.search;
+    key.search = keyedSearch(url.search);
     key.searchParams.set("__page_cache", `${version}.${await sha256(vary)}`);
     return key.toString();
+}
+
+/**
+ * The request the page is drawn from when it may be kept: the same one,
+ * with the tracking parameters off its address. A kept page answers every
+ * visitor to that page, so it is drawn for the address they share: nothing
+ * of one visitor's ad click or scan is in what the next one is sent. The
+ * visitor's own address is untouched (the browser keeps it, and the page's
+ * script reads the QR tag from there). Unchanged when there is nothing to
+ * take off.
+ */
+export function drawnRequest(request: Request): Request {
+    const url = new URL(request.url);
+    const search = keyedSearch(url.search);
+    if (search === url.search) return request;
+    url.search = search;
+    return new Request(url.toString(), request);
 }

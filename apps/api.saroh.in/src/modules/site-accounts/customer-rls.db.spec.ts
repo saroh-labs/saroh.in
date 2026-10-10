@@ -189,7 +189,7 @@ describe("the customer session on a site", () => {
 
         const first = await me(kavi.host, token);
         expect(first.status).toBe(200);
-        expect(first.body).toEqual({ email, name: null });
+        expect(first.body).toEqual({ email, name: null, phone: null });
         // A reload is the same token again.
         expect((await me(kavi.host, token)).status).toBe(200);
 
@@ -205,7 +205,7 @@ describe("the customer session on a site", () => {
         expect(row.revokedAt).not.toBeNull();
     });
 
-    it("shows the contact's name once there is one, and nothing else", async () => {
+    it("shows the contact's name and phone once there are any, and nothing else", async () => {
         const kavi = await business("Kavi");
         const { email, token } = await signIn(kavi.host);
         const account = await prisma.customerAccount.findFirstOrThrow({
@@ -216,7 +216,11 @@ describe("the customer session on a site", () => {
             data: { firstName: "Farah", lastName: "Khan", phone: "999" },
         });
         const seen = await me(kavi.host, token);
-        expect(seen.body).toEqual({ email, name: "Farah Khan" });
+        expect(seen.body).toEqual({
+            email,
+            name: "Farah Khan",
+            phone: "999",
+        });
     });
 
     it("refuses a token carried to another business's site", async () => {

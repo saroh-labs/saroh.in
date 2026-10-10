@@ -70,7 +70,7 @@ const DETAIL: AccountOrderDetail = {
         {
             label: "Ready",
             state: "now",
-            line: "Now · At the counter — show #1019",
+            line: "Now · At the counter. Show #1019",
             at: null,
         },
         { label: "Collected", state: "next", line: "Picked up", at: null },
@@ -171,7 +171,7 @@ describe("Track", () => {
         expect(steps.map((s) => s.textContent)).toEqual([
             "✓ Done: New2 Oct 2026",
             "✓ Done: PreparingDone",
-            "● Now: ReadyNow · At the counter — show #1019",
+            "● Now: ReadyNow · At the counter. Show #1019",
             "○ Next: CollectedPicked up",
         ]);
         expect(steps[2]).toHaveAttribute("aria-current", "step");
@@ -199,7 +199,7 @@ describe("Track", () => {
             },
         });
         const sheet = screen.getByRole("dialog", { name: "Order #1019" });
-        expect(sheet).toHaveTextContent("Collect from 12 Hill Road, Bandra");
+        expect(sheet).toHaveTextContent("Pick-up from 12 Hill Road, Bandra");
         expect(sheet).toHaveTextContent("Open Mon–Sat 10:00–19:00, Sun closed");
     });
 

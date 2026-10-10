@@ -10,8 +10,8 @@
  *   order made from that page sends back; the home page a retired code
  *   falls back to does not.
  * - The visitor is never shown an error: when the API can't be reached or
- *   answers anything unexpected, the scan forwards to the home page,
- *   uncounted. Only a code the site doesn't have is a 404.
+ *   answers anything unexpected, or the site has no such code, the scan
+ *   forwards to the home page, uncounted.
  */
 
 /** What a code is made of, as a link may carry it (the API's rule). */
@@ -33,7 +33,7 @@ export type QrScan =
     | { kind: "path"; path: string }
     /** A retired code, or one whose target is gone: the home page. */
     | { kind: "home" }
-    /** The site has no such code: its 404. */
+    /** The site has no such code: the home page, nothing counted. */
     | { kind: "missing" }
     /** The API couldn't say: the home page, nothing counted. */
     | { kind: "failed" };

@@ -5,6 +5,7 @@
  */
 
 import { siteMoney } from "../lib/money";
+import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
 
 /** Where a service happens (E7): the customer chooses for EITHER. */
@@ -118,12 +119,45 @@ export interface BookingDay {
     starts: BookingStart[];
 }
 
-/** One service's next two weeks: `GET /public/services/:id/days`. */
+/** One service's two weeks: `GET /public/services/:id/days`. */
 export interface BookingDays {
     timezone: string;
     kind: "one" | "class";
     capacity: number;
     days: BookingDay[];
+    /**
+     * Who takes a one-to-one, when each has their own times: the page
+     * offers "With: Anyone" or one of them when there is more than one.
+     * Absent from an older API.
+     */
+    staff?: BookingPerson[];
+}
+
+/** A person who takes a service: a display name and an opaque id. */
+export interface BookingPerson {
+    id: string;
+    name: string;
+}
+
+/** How many days the page shows at a time. */
+export const DAYS_WINDOW = 14;
+/** The furthest "Show later dates" goes: the API's own cap. */
+export const MAX_DAYS_SKIP = 70;
+
+/**
+ * Where "Show later dates" goes from a window starting `skip` days from
+ * today, or null when there is nothing later to show: past the business's
+ * own book-ahead rule nothing can be booked, and the API stops at twelve
+ * weeks.
+ */
+export function laterSkip(
+    skip: number,
+    bookAheadDays: number | null,
+): number | null {
+    const next = skip + DAYS_WINDOW;
+    if (next > MAX_DAYS_SKIP) return null;
+    if (bookAheadDays !== null && next > bookAheadDays) return null;
+    return next;
 }
 
 export type HoldState = "HELD" | "CONFIRMED" | "RELEASED" | "CANCELLED";
@@ -145,6 +179,12 @@ export interface BookResult {
      * a desk booking.
      */
     payInstructions?: PayInstructions | null;
+    /**
+     * How they hear it is booked (the API's notice reach): the booked card
+     * says "We've emailed ‹address›" only when an email goes. Absent from
+     * an older API, which promises nothing.
+     */
+    reach?: NoticeReach | null;
 }
 
 /** Where a pay-now hold stands: `GET /public/services/holds/:token`. */
@@ -242,7 +282,12 @@ export function isBookingDays(v: unknown): v is BookingDays {
                 (d.closed === undefined || typeof d.closed === "boolean") &&
                 Array.isArray(d.starts) &&
                 d.starts.every(isStart),
-        )
+        ) &&
+        (v.staff === undefined ||
+            (Array.isArray(v.staff) &&
+                v.staff.every(
+                    (p: unknown) => isObj(p) && isStr(p.id) && isStr(p.name),
+                )))
     );
 }
 
@@ -415,13 +460,13 @@ export function creditUsedText(credit: OfferedCredit): string {
     const left = Math.max(0, credit.left - 1);
     const from = creditSource(credit).toLowerCase();
     if (credit.kind === "PACK") {
-        return `Used 1 credit from your ${from} — ${left} left, use by ${dateText(credit.useBy)}.`;
+        return `Used 1 credit from your ${from}. ${left} left, use by ${dateText(credit.useBy)}.`;
     }
     const month = new Intl.DateTimeFormat("en-GB", {
         month: "long",
         timeZone: "UTC",
     }).format(new Date(civil(credit.resetsOn).getTime() - 86_400_000));
-    return `Used 1 credit from your ${from} — ${left} left in ${month}.`;
+    return `Used 1 credit from your ${from}. ${left} left in ${month}.`;
 }
 
 /**
@@ -456,13 +501,14 @@ export function payChoices(
         label: isClass
             ? `Pay ${price} for this class`
             : `Pay ${price}${forAll} now`,
-        sub: "Online — booked straight away",
+        sub: "Online, booked straight away",
         amount: price,
     };
+    const words = laterWords(service, business);
     const desk: PayChoice = {
         pay: "DESK",
-        label: "Pay at the desk",
-        sub: "Held for you; pay when you arrive",
+        label: words.label,
+        sub: words.sub,
         amount: price,
     };
     const deposit = service.depositCents ?? null;
@@ -488,6 +534,54 @@ export function payChoices(
         ];
     }
     return [...(online ? [payNow] : []), ...(atDesk ? [desk] : [])];
+}
+
+/**
+ * The words for paying after booking, by where the service happens. A
+ * service customers attend in person is paid "at the desk", when they
+ * arrive. One that is online only has no desk to pay at: it is paid
+ * "later", to the business directly. (A service offered either way keeps
+ * the desk's words: the page doesn't know, when it offers the choice,
+ * which way this booking will be had.)
+ */
+export interface LaterWords {
+    /** The pay step's choice, and the summary's line: "Pay at the desk". */
+    label: string;
+    /** Under the choice. */
+    sub: string;
+    /** The button: "Book and pay at the desk". */
+    confirm: string;
+}
+
+export function laterWords(
+    service: Pick<BookingService, "online"> | null | undefined,
+    business: string,
+): LaterWords {
+    return service?.online
+        ? {
+              label: "Pay later",
+              sub: `Held for you. Pay ${business} directly.`,
+              confirm: "Book and pay later",
+          }
+        : {
+              label: "Pay at the desk",
+              sub: "Held for you. Pay when you arrive.",
+              confirm: "Book and pay at the desk",
+          };
+}
+
+/**
+ * What the booked card says is still to pay: at the front desk for a visit
+ * in person, to the business directly for one held online.
+ */
+export function payLaterText(
+    price: string,
+    online: boolean,
+    business: string,
+): string {
+    return online
+        ? `Pay ${price} to ${business} directly.`
+        : `Pay ${price} at the front desk when you arrive.`;
 }
 
 /**
@@ -848,4 +942,32 @@ export function buildIcs(input: {
         "END:VCALENDAR",
         "",
     ].join("\r\n");
+}
+
+/**
+ * The booking as a link that opens Google Calendar with it filled in, for
+ * the customer who keeps their diary there. Times in UTC, as the calendar
+ * file's are. Nothing is sent to anyone until they press Save there.
+ */
+export function googleCalendarHref(input: {
+    title: string;
+    startAt: string;
+    endAt: string;
+    description: string;
+    /** Where it happens, when the page knows. */
+    location?: string | null;
+}): string {
+    const stamp = (iso: string) =>
+        new Date(iso)
+            .toISOString()
+            .replace(/[-:]/g, "")
+            .replace(/\.\d{3}/, "");
+    const params = new URLSearchParams({
+        action: "TEMPLATE",
+        text: input.title,
+        dates: `${stamp(input.startAt)}/${stamp(input.endAt)}`,
+        details: input.description,
+    });
+    if (input.location?.trim()) params.set("location", input.location.trim());
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }

@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 import type { PublicVisit } from "../blocks/visit-us";
 import { weekSummary } from "../lib/opening-hours";
 import type {
@@ -9,24 +7,6 @@ import type {
     BookPay,
 } from "./model";
 import { dateIn, dateText, timeIn } from "./model";
-
-// ── The phone breakpoint, read without a render-time window ─────────────
-
-const PHONE_QUERY = "(max-width: 699px)";
-
-function subscribePhone(onChange: () => void): () => void {
-    const mq = window.matchMedia(PHONE_QUERY);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-}
-
-export function usePhone(): boolean {
-    return useSyncExternalStore(
-        subscribePhone,
-        () => window.matchMedia(PHONE_QUERY).matches,
-        () => false,
-    );
-}
 
 export function newKey(): string {
     return typeof crypto !== "undefined" && "randomUUID" in crypto

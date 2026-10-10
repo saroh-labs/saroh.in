@@ -24,6 +24,11 @@ export interface SignedInCustomer {
     email: string;
     /** Null until the customer gives a name. */
     name: string | null;
+    /**
+     * The phone the business has for them, or null. The booking page fills
+     * its optional "Phone" with it. Absent from an older API.
+     */
+    phone?: string | null;
 }
 
 export type CodeRequestResult =
@@ -71,7 +76,7 @@ export function retryText(seconds: number): string {
 
 /** The sentence when a code can't be sent (R4; user, 2026-09-27). */
 export const UNAVAILABLE_TEXT =
-    "We couldn't send your code — try again in a few minutes";
+    "We couldn't send your code. Try again in a few minutes";
 
 /** "Or call ‹Business› on ‹phone›", or null when there's no phone. */
 export function callLine(

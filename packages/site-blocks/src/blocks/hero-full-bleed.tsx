@@ -5,6 +5,7 @@ import type { RenderedHero } from "@saroh/block-contract";
 import { DEFAULT_API_URL } from "../api-url";
 import { openState, openStateText } from "../lib/opening-hours";
 import type { PublicVisit } from "../lib/public-visit";
+import { siteImage } from "../lib/site-image";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 import { CtaButton } from "./cta";
@@ -41,8 +42,11 @@ export default function FullBleedHero({
     apiUrl = DEFAULT_API_URL,
     visit,
     now,
+    priority = false,
 }: {
     content: RenderedHero;
+    /** The page opens on this hero: its photo is fetched first. */
+    priority?: boolean;
     /** The live site, for the open line's read. See `SectionRenderer`. */
     siteId?: string | null;
     apiUrl?: string;
@@ -82,6 +86,7 @@ export default function FullBleedHero({
                     alt={content.image?.alt ?? ""}
                     width={content.image?.width}
                     height={content.image?.height}
+                    {...siteImage(priority ? "first-hero" : "below")}
                     className="absolute inset-0 -z-20 size-full object-cover"
                 />
             ) : null}

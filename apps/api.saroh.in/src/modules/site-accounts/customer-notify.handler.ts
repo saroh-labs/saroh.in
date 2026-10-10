@@ -11,6 +11,7 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { holdsOnPayment } from "../orders/online-checkout";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
 import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
+import { noticeLink } from "./notice-link";
 import { hasLiveAccount, threadLive } from "./notice-reach";
 import type { NoticeVars } from "./notify-templates";
 import { noticeSentence } from "./notify-templates";
@@ -134,12 +135,21 @@ export class CustomerNotifyService {
 
         let messageId: string | null = null;
         if (account && route.route !== null) {
+            // The email carries the way back to the order or the booking
+            // on the business's own site; the thread's sentence doesn't
+            // need one, since it is read there.
+            const link = await noticeLink(tx, organizationId, {
+                kind: payload.kind,
+                contactId: contact.id,
+                orderId: subject.orderId,
+                bookingId: subject.bookingId,
+            });
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
                 {
                     template: payload.kind,
-                    notice: subject.vars,
+                    notice: withLink(subject.vars, link),
                     route,
                     // Saroh's cap per booking counts by it (DEC-086).
                     ...(subject.bookingId
@@ -193,6 +203,18 @@ export class CustomerNotifyHandler {
             ),
         );
     };
+}
+
+/** The notice with its link back, on the kinds whose email carries one. */
+export function withLink(vars: NoticeVars, link: string | null): NoticeVars {
+    if (!link) return vars;
+    if (vars.kind === "ORDER_PLACED") {
+        return { ...vars, placed: { ...vars.placed, link } };
+    }
+    if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
+        return { ...vars, booking: { ...vars.booking, link } };
+    }
+    return vars;
 }
 
 function payloadOf(value: unknown): CustomerNotifyPayload | null {

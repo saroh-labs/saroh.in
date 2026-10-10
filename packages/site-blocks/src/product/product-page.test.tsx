@@ -111,13 +111,13 @@ describe("ProductPage", () => {
 
     it("a sold-out variant can be looked at but not bought", () => {
         render(<ProductPage product={dress} />);
-        fireEvent.click(screen.getByRole("button", { name: "S — sold out" }));
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
         expect(screen.getByRole("button", { name: "Sold out" })).toBeDisabled();
     });
 
     it("in preview, the basket says nothing was added", () => {
         render(<ProductPage product={dress} action={<p>Never shown</p>} />);
-        fireEvent.click(screen.getByRole("button", { name: "Add to basket" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
         expect(screen.getByRole("status")).toHaveTextContent(/preview/);
         // The action slot belongs to the live page only.
         expect(screen.queryByText("Never shown")).not.toBeInTheDocument();
@@ -224,7 +224,7 @@ describe("ProductPage on the live site (G11)", () => {
         render(<ProductPage product={dress} preview={false} markers />);
         expect(screen.queryByLabelText("Note 1")).not.toBeInTheDocument();
         expect(
-            screen.queryByRole("button", { name: "Add to basket" }),
+            screen.queryByRole("button", { name: "Add to bag" }),
         ).not.toBeInTheDocument();
         // The product itself is all there.
         expect(screen.getByText("Linen Wrap Dress")).toBeInTheDocument();
@@ -250,7 +250,7 @@ describe("ProductPage on the live site (G11)", () => {
         expect(screen.getByTestId("probe")).toHaveTextContent("m 2499.00 on");
         fireEvent.click(screen.getByRole("button", { name: "L" }));
         expect(screen.getByTestId("probe")).toHaveTextContent("l 2699.00 on");
-        fireEvent.click(screen.getByRole("button", { name: "S — sold out" }));
+        fireEvent.click(screen.getByRole("button", { name: "S (sold out)" }));
         expect(screen.getByTestId("probe")).toHaveTextContent("s 2499.00 off");
         expect(screen.getByText("Sold out")).toBeInTheDocument();
     });
@@ -258,5 +258,41 @@ describe("ProductPage on the live site (G11)", () => {
     it("reads nothing outside a product page", () => {
         render(<SelectionProbe />);
         expect(screen.getByTestId("probe")).toHaveTextContent("outside");
+    });
+});
+
+describe("the facts under the price", () => {
+    it("says every price includes its taxes, with an MRP or without", () => {
+        const { unmount } = render(<ProductPage product={dress} />);
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+        unmount();
+        render(
+            <ProductPage
+                product={{ ...dress, mrp: null, variants: [] }}
+                preview={false}
+            />,
+        );
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+    });
+
+    it("says what it costs to receive, in the body colour, when the shop takes orders", () => {
+        render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                facts="Pick-up free · Local delivery ₹40 · Free delivery from ₹999"
+            />,
+        );
+        const line = screen.getByText(
+            "Pick-up free · Local delivery ₹40 · Free delivery from ₹999",
+        );
+        expect(line.className).toContain("text-site-body");
+        expect(line.className).toContain("text-sm");
+        expect(line.className).not.toContain("text-site-muted");
+    });
+
+    it("says nothing about delivery when the page was given nothing", () => {
+        render(<ProductPage product={dress} preview={false} />);
+        expect(screen.queryByText(/Pick-up|delivery/i)).toBeNull();
     });
 });

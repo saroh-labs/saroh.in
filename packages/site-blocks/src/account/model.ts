@@ -332,8 +332,8 @@ export function planLine(plan: AccountPlan): string {
     const day = (iso: string) => accountDate(iso, plan.timezone);
     if (plan.status === "PAUSED") {
         return plan.pausedUntil
-            ? `Paused until ${day(plan.pausedUntil)} — nothing is charged till then`
-            : "Paused — nothing is charged until you resume";
+            ? `Paused until ${day(plan.pausedUntil)}. Nothing is charged till then`
+            : "Paused. Nothing is charged until you resume";
     }
     if (plan.endsAt) return `Ends ${day(plan.endsAt)}`;
     if (plan.renewsAt) return `Next payment ${day(plan.renewsAt)}`;

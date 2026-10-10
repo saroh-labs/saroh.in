@@ -59,8 +59,27 @@ export interface PublicService {
     currency: string | null;
 }
 
-/** How many days the booking page offers (U19). */
+/** How many days the booking page offers at a time (U19). */
 const PUBLIC_DAYS = 14;
+
+/**
+ * The furthest "Show later dates" goes: the page's two weeks may start up
+ * to this many days from today (twelve weeks in all). The business's own
+ * book-ahead rule still decides what can be booked inside them.
+ */
+export const MAX_DAYS_SKIP = 70;
+
+/** Which two weeks of a service, and with whom. */
+export interface PublicDaysAsk {
+    /** Days from today the window starts: "Show later dates". */
+    skip?: number;
+    /**
+     * One of the people who take it (`PublicDays.staff`): only their
+     * times. Anyone else's id, or one for a service with no people of its
+     * own, is the same as none: whoever is free.
+     */
+    staffId?: string | null;
+}
 
 /** A start on the booking page (U19). `placesLeft` is a class's only. */
 export interface PublicStart {
@@ -95,6 +114,13 @@ export interface PublicDays {
     kind: "one" | "class";
     capacity: number;
     days: PublicDay[];
+    /**
+     * Who takes a one-to-one, by display name and opaque id, when each has
+     * their own times: the page offers "With: Anyone" or one of them when
+     * there is more than one. Empty for a class, or a service with no
+     * people of its own.
+     */
+    staff: { id: string; name: string }[];
 }
 
 /** What a site's booking page opens with (U19). No internal fields. */
@@ -168,6 +194,7 @@ export async function publicDays(
     now: Date = new Date(),
     /** How many days from today. On today (G18) reads one. */
     span: number = PUBLIC_DAYS,
+    ask: PublicDaysAsk = {},
 ): Promise<PublicDays> {
     const { service, rules } = await loadBookableService(serviceId, {
         bookingPage: true,
@@ -177,7 +204,13 @@ export async function publicDays(
         businessTimezone(prisma, service.organizationId),
         loadStaffing(service),
     ]);
-    const first = DateTime.fromJSDate(now, { zone }).startOf("day");
+    const skip = Math.min(
+        MAX_DAYS_SKIP,
+        Math.max(0, Math.floor(ask.skip ?? 0)),
+    );
+    const first = DateTime.fromJSDate(now, { zone })
+        .startOf("day")
+        .plus({ days: skip });
     const from = first.toJSDate();
     const to = first.plus({ days: span }).toJSDate();
     const names = new Map(staffing.people.map((p) => [p.id, p.name]));
@@ -191,16 +224,21 @@ export async function publicDays(
     // A day the business is closed is closed on the page, not Full (E3):
     // closures are public, unlike a person's time off.
     const closed = await loadClosures(prisma, service.organizationId, from, to);
-    const people =
-        staffing.perPerson && staffing.zone
-            ? await loadPeople(
-                  prisma,
-                  service.organizationId,
-                  staffing.people.map((p) => p.id),
-                  from,
-                  to,
-              )
-            : [];
+    // Each has their own times: the booker may ask for one of them.
+    const ownTimes = staffing.perPerson && staffing.zone !== null;
+    const asked =
+        ownTimes && ask.staffId
+            ? (staffing.people.find((p) => p.id === ask.staffId) ?? null)
+            : null;
+    const people = ownTimes
+        ? await loadPeople(
+              prisma,
+              service.organizationId,
+              (asked ? [asked] : staffing.people).map((p) => p.id),
+              from,
+              to,
+          )
+        : [];
     // The buffers' width beyond the range too (DEC-052).
     const reach = guarded({ startAt: from, endAt: to }, availService);
     const busy =
@@ -320,7 +358,16 @@ export async function publicDays(
             starts: starts.filter((start) => inDay(start.startAt)),
         });
     }
-    return { timezone: zone, kind, capacity: service.capacity, days };
+    return {
+        timezone: zone,
+        kind,
+        capacity: service.capacity,
+        days,
+        staff:
+            ownTimes && kind === "one"
+                ? staffing.people.map((p) => ({ id: p.id, name: p.name }))
+                : [],
+    };
 }
 
 /**

@@ -19,6 +19,7 @@ import type {
     CheckoutQuote,
     CheckoutStanding,
     CheckoutStarted,
+    DeliveryAddress,
     ShopCheckoutApi,
     ShopResult,
     StartCheckout,
@@ -92,7 +93,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         expect(readBag(SITE)).toEqual([
             { listingId: "l-bread", variantId: "v-small", quantity: 1 },
         ]);
@@ -100,7 +103,7 @@ describe("Add to bag on the product page", () => {
             "Sourdough (Small) added to your bag.",
         );
         expect(
-            screen.getByRole("button", { name: "Add another" }),
+            screen.getByRole("button", { name: "Add another · ₹180" }),
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "View bag" }),
@@ -122,7 +125,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         expect(readBag(SITE)).toHaveLength(MAX_BAG_ITEMS);
         expect(screen.getByRole("status")).toHaveTextContent(
             "Your bag is full. Take something out to add this.",
@@ -144,7 +149,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         const off = screen.getByRole("button", {
             name: "The last one is in your bag",
         });
@@ -168,6 +175,49 @@ describe("Add to bag on the product page", () => {
         expect(off).toBeDisabled();
         fireEvent.click(off);
         expect(readBag(SITE)).toEqual([]);
+    });
+
+    it("is a bar pinned to the foot of a phone, by CSS alone, with room kept under the page", () => {
+        render(
+            <ProductPage
+                product={bread}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        const button = screen.getByRole("button", {
+            name: "Add to bag · ₹180",
+        });
+        const bar = button.closest("[data-bag-bar]");
+        expect(bar?.className).toContain("max-[699px]:fixed");
+        expect(bar?.className).toContain("max-[699px]:bottom-[");
+        // One button, one message: the same block, moved.
+        expect(
+            screen.getAllByRole("button", { name: /^Add to bag/ }),
+        ).toHaveLength(1);
+        expect(bar?.querySelector("style")?.textContent).toMatch(
+            /max-width:699px.*padding-bottom/,
+        );
+    });
+
+    it("says the price of the option picked on the button", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    variants: [
+                        bread.variants[0],
+                        { ...bread.variants[1], stock: "IN_STOCK" },
+                    ],
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: /Large/ }));
+        expect(
+            screen.getByRole("button", { name: "Add to bag · ₹250" }),
+        ).toBeEnabled();
     });
 });
 
@@ -316,6 +366,8 @@ function setup(
         outcome?: CheckoutOutcome;
         /** Drawn on a test release (DEC-071, T6). */
         testRelease?: boolean;
+        /** The signed-in customer's last delivery; none when left out. */
+        saved?: DeliveryAddress;
     } = {},
 ) {
     const quote = vi.fn(() =>
@@ -338,7 +390,10 @@ function setup(
             },
         ),
     );
-    const api: ShopCheckoutApi = { quote, start, standing };
+    const savedAddress = vi.fn(() =>
+        Promise.resolve({ ok: true as const, data: over.saved ?? null }),
+    );
+    const api: ShopCheckoutApi = { quote, start, standing, savedAddress };
     const signIn: SignInApi = {
         requestCode: vi.fn(() =>
             Promise.resolve({ ok: true as const, resendAfterSeconds: 30 }),
@@ -383,7 +438,7 @@ function setup(
             bag
         ),
     );
-    return { quote, start, standing, openCheckout, signIn };
+    return { quote, start, standing, openCheckout, signIn, savedAddress };
 }
 
 async function openTheBag() {
@@ -465,7 +520,7 @@ describe("the header's bag", () => {
                     total: "500.00",
                     currency: "INR",
                     message:
-                        "Sorry, it sold out while you were paying — your money is on its way back",
+                        "Sorry, it sold out while you were paying. Your money is on its way back",
                 },
             },
         });
@@ -516,6 +571,233 @@ describe("the header's bag", () => {
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: /^Pay · / }));
         expect(openCheckout).toHaveBeenCalledTimes(2);
+    });
+
+    it("shows each line's photo, what one costs and a Subtotal", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            image: {
+                                url: "https://img.test/loaf.jpg",
+                                alt: "A loaf",
+                            },
+                        },
+                    ],
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                    delivery: "60.00",
+                    total: "560.00",
+                }),
+            },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        const photo = sheet.querySelector("img");
+        expect(photo).toHaveAttribute("src", "https://img.test/loaf.jpg");
+        expect(photo).toHaveAttribute("width", "56");
+        expect(photo).toHaveAttribute("height", "56");
+        expect(screen.getByText("₹250 each")).toBeVisible();
+        expect(screen.getByText("Subtotal").parentElement).toHaveTextContent(
+            "Subtotal₹500",
+        );
+        expect(screen.getByText("Total").parentElement).toHaveTextContent(
+            "Total₹560",
+        );
+    });
+
+    it("pins the total and the button to the sheet's foot, and holds the page still", async () => {
+        setup({ signedIn: true });
+        expect(document.body.style.overflow).toBe("");
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        const footer = sheet.querySelector("[data-sheet-footer]");
+        const scroll = sheet.querySelector("[data-sheet-scroll]");
+        expect(footer).not.toBeNull();
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(footer).toContainElement(place);
+        expect(footer).toContainElement(screen.getByText("Total"));
+        // The lines scroll above it, never the footer with them.
+        expect(scroll).toContainElement(screen.getByText("Sourdough"));
+        expect(scroll).not.toContainElement(place);
+        expect(scroll?.className).toContain("overflow-y-auto");
+        // As tall as the screen is now, where the browser knows.
+        expect(sheet.className).toContain(
+            "supports-[height:100dvh]:max-h-[88dvh]",
+        );
+        // 44px under a finger.
+        expect(
+            screen.getByRole("button", { name: "Close" }).className,
+        ).toContain("coarse:size-11");
+        expect(
+            screen.getByRole("button", { name: "One more Sourdough" })
+                .className,
+        ).toContain("coarse:size-11");
+
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        expect(document.body.style.overflow).toBe("");
+    });
+
+    it("keeps the page still while signing in opens over the bag, until both have closed", async () => {
+        setup();
+        await openTheBag();
+        fireEvent.click(
+            await screen.findByRole("button", { name: /^Sign in and pay/ }),
+        );
+        await screen.findByLabelText("Email");
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await screen.findByText("Sourdough");
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        expect(document.body.style.overflow).toBe("");
+    });
+
+    it("stops − at one: the last one never leaves by a slip of the thumb", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [{ ...quoteOf().lines[0], quantity: 1 }],
+                }),
+            },
+        });
+        await openTheBag();
+        const fewer = screen.getByRole("button", {
+            name: "One fewer Sourdough",
+        });
+        expect(fewer).toBeDisabled();
+        fireEvent.click(fewer);
+        expect(readBag(SITE)).toHaveLength(1);
+    });
+
+    it("takes a line out only on Remove, and puts it back on Undo", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Remove Sourdough" }),
+        );
+        expect(readBag(SITE)).toEqual([]);
+        // The bag is empty now, and still offers the line back.
+        expect(
+            screen.getByText("Your bag is empty. Add something from the shop."),
+        ).toBeVisible();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Sourdough removed.",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: null, quantity: 2 },
+        ]);
+        await screen.findByText("Sourdough");
+        expect(screen.queryByText("Sourdough removed.")).toBeNull();
+    });
+
+    it("says the returns rule again above the button, where a product has one", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            returns: "Exchange within 7 days, tags on",
+                        },
+                    ],
+                }),
+            },
+        });
+        await openTheBag();
+        const rule = screen.getByText(
+            "Returns: Exchange within 7 days, tags on",
+        );
+        expect(rule.className).toContain("text-site-body");
+        expect(rule.className).not.toContain("text-site-muted");
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(
+            rule.compareDocumentPosition(place) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+    });
+
+    it("says nothing about returns when no product in the bag has a rule", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        expect(screen.queryByText(/^Returns/)).toBeNull();
+    });
+
+    it("sends an optional note for the business with the order, and never keeps it for the visit", async () => {
+        const { start } = setup({ signedIn: true });
+        await openTheBag();
+        const note = screen.getByLabelText(/^Note for Rye & Co\./);
+        expect(note).not.toBeRequired();
+        expect(note).toHaveAttribute("maxlength", "500");
+        expect(note.className).toContain("text-base");
+        fireEvent.change(note, { target: { value: "  No nuts, please  " } });
+        expect(JSON.stringify({ ...window.sessionStorage })).not.toContain(
+            "No nuts",
+        );
+        // Closed and opened again on the same page: still there.
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await openTheBag();
+        expect(screen.getByLabelText(/^Note for Rye & Co\./)).toHaveValue(
+            "  No nuts, please  ",
+        );
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0].notes).toBe("No nuts, please");
+    });
+
+    it("keeps the checkout's key for the visit without the note's words, and a new key for a new note", async () => {
+        const { start } = setup({ signedIn: true, outcome: "closed" });
+        await openTheBag();
+        const place = async () => {
+            fireEvent.click(
+                await screen.findByRole("button", { name: /^Place order/ }),
+            );
+            fireEvent.click(
+                await screen.findByRole("button", {
+                    name: "Back to your bag",
+                }),
+            );
+            await screen.findByText("Sourdough");
+        };
+        fireEvent.change(screen.getByLabelText(/^Note for Rye & Co\./), {
+            target: { value: "No nuts, please" },
+        });
+        await place();
+        // The key is kept for the visit; the note's words are not.
+        const kept = window.sessionStorage.getItem(`saroh.bag-draft.${SITE}`);
+        expect(kept).toContain(start.mock.calls[0][0].key);
+        expect(kept).not.toContain("No nuts");
+        await place();
+        expect(start.mock.calls[1][0].key).toBe(start.mock.calls[0][0].key);
+        fireEvent.change(screen.getByLabelText(/^Note for Rye & Co\./), {
+            target: { value: "Nuts are fine" },
+        });
+        await place();
+        expect(start.mock.calls[2][0].key).not.toBe(start.mock.calls[0][0].key);
+    });
+
+    it("sends no note when none was typed", async () => {
+        const { start } = setup({ signedIn: true });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0]).not.toHaveProperty("notes");
     });
 
     it("holds the button while a line can't be sold, and says why", async () => {
@@ -571,7 +853,7 @@ describe("the header's bag", () => {
         expect(
             screen.getByText("12 Hill Road, Bandra", { exact: false }),
         ).toBeInTheDocument();
-        expect(screen.getByText("Collect from")).toBeInTheDocument();
+        expect(screen.getByText("Pick-up from")).toBeInTheDocument();
         expect(
             screen.getByText("Mon–Sat 10:00–19:00, Sun closed"),
         ).toBeInTheDocument();
@@ -620,6 +902,7 @@ describe("the header's bag", () => {
         });
         expect(place).toBeDisabled();
         for (const [label, value] of [
+            ["Phone", "98450 12345"],
             ["Address", "12 Hill Road"],
             ["Town or city", "Mumbai"],
             ["PIN code", "400050"],
@@ -632,6 +915,213 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeEnabled();
+        // State is a choice of India's states and union territories.
+        const state = screen.getByLabelText(/^State/);
+        expect(state.tagName).toBe("SELECT");
+        expect(state.querySelectorAll("option")).toHaveLength(37);
+    });
+
+    it("needs a phone for a delivery, and says so beside the button", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        for (const [label, value] of [
+            ["Address", "12 Hill Road"],
+            ["Town or city", "Mumbai"],
+            ["PIN code", "400050"],
+            ["State", "Maharashtra"],
+        ] as const) {
+            fireEvent.change(
+                await screen.findByLabelText(new RegExp(`^${label}`)),
+                { target: { value } },
+            );
+        }
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(place).toBeDisabled();
+        expect(place).toHaveAccessibleDescription(
+            "Add a phone number for the delivery.",
+        );
+        const phone = screen.getByLabelText(/^Phone/);
+        expect(phone).toBeRequired();
+        fireEvent.change(phone, { target: { value: "call me" } });
+        expect(place).toHaveAccessibleDescription("Check the phone number.");
+        expect(phone).toHaveAttribute("aria-invalid", "true");
+        fireEvent.change(phone, { target: { value: "98450 12345" } });
+        expect(
+            screen.getByRole("button", { name: /^Place order/ }),
+        ).toBeEnabled();
+    });
+
+    it("asks for no phone for a pick-up", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        expect(screen.queryByLabelText(/^Phone/)).toBeNull();
+        expect(
+            await screen.findByRole("button", { name: /^Place order/ }),
+        ).toBeEnabled();
+    });
+
+    it("reads out a returning customer's last address, and sends it", async () => {
+        const { start, savedAddress } = setup({
+            signedIn: true,
+            saved: {
+                name: "Asha Rao",
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                line2: "Flat 4",
+                city: "Mumbai",
+                state: "maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        await screen.findByText("12 Hill Road");
+        expect(screen.getByText("Mumbai, Maharashtra 400050")).toBeVisible();
+        expect(screen.getByText("98450 12345")).toBeVisible();
+        expect(savedAddress).toHaveBeenCalledTimes(1);
+        // Nothing to type: no field is drawn.
+        expect(screen.queryByLabelText(/^Address/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0].address).toEqual({
+            name: "Asha Rao",
+            phone: "98450 12345",
+            line1: "12 Hill Road",
+            line2: "Flat 4",
+            city: "Mumbai",
+            state: "Maharashtra",
+            postalCode: "400050",
+        });
+    });
+
+    it("empties it on Use a different address, and never fills it in again", async () => {
+        const { savedAddress } = setup({
+            signedIn: true,
+            saved: {
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        fireEvent.click(
+            await screen.findByRole("button", {
+                name: "Use a different address",
+            }),
+        );
+        expect(screen.getByLabelText(/^Address/)).toHaveValue("");
+        expect(screen.getByLabelText(/^Phone/)).toHaveValue("");
+        expect(
+            screen.getByRole("button", { name: /^Place order/ }),
+        ).toBeDisabled();
+        // Closed and opened again: still theirs to type.
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await openTheBag();
+        expect(await screen.findByLabelText(/^Address/)).toHaveValue("");
+        expect(savedAddress).toHaveBeenCalledTimes(1);
+    });
+
+    it("fills the fields in, to be finished, when the last address has no phone", async () => {
+        setup({
+            signedIn: true,
+            saved: {
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        expect(await screen.findByLabelText(/^Address/)).toHaveValue(
+            "12 Hill Road",
+        );
+        expect(screen.getByLabelText(/^State/)).toHaveValue("Maharashtra");
+        expect(
+            screen.queryByRole("button", { name: "Use a different address" }),
+        ).toBeNull();
+    });
+
+    it("asks nobody's last address while signed out, or for a pick-up", async () => {
+        const { savedAddress } = setup({
+            saved: {
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        await screen.findByLabelText(/^Address/);
+        expect(savedAddress).not.toHaveBeenCalled();
     });
 
     it("fills the payment window with the name and phone typed in the bag", async () => {
@@ -702,6 +1192,7 @@ describe("the header's bag", () => {
         await openTheBag();
         fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
         for (const [label, value] of [
+            ["Phone", "98450 12345"],
             ["Address", "12 Hill Road"],
             ["Town or city", "Mumbai"],
             ["PIN code", "400050"],
@@ -858,7 +1349,7 @@ describe("the bag on a test release (DEC-071, T6)", () => {
 describe("paying at the handover (2026-10-06: Free takes money offline)", () => {
     const COLLECT = {
         type: "ON_HANDOVER" as const,
-        label: "Pay when you collect",
+        label: "Pay at pick-up",
     };
     const ONLINE = { type: "ONLINE" as const, label: "Pay online" };
     const PLACED_TO_PAY: CheckoutStarted = {
@@ -905,9 +1396,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         expect(
             screen.getByRole("button", { name: "Sign in and pay · ₹500" }),
         ).toBeEnabled();
-        fireEvent.click(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
-        );
+        fireEvent.click(screen.getByRole("radio", { name: "Pay at pick-up" }));
         expect(
             screen.getByRole("button", {
                 name: "Sign in and place order · ₹500",
@@ -915,7 +1404,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         ).toBeEnabled();
     });
 
-    it("offers only paying when they collect, places it with nothing to pay, and says it's unpaid", async () => {
+    it("offers only paying at pick-up, places it with nothing to pay, and says it's unpaid", async () => {
         const { start, openCheckout } = setup({
             signedIn: true,
             quote: { ok: true, data: quoteOf({ payments: [COLLECT] }) },
@@ -924,7 +1413,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         await openTheBag();
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Your order is placed now.",
+                "You'll pay at pick-up. Your order is placed now.",
             ),
         ).toBeInTheDocument();
         // One way to pay: nothing to choose.
@@ -934,9 +1423,7 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
             screen.getByRole("button", { name: /^Place order · / }),
         );
         await screen.findByRole("heading", { name: "Order placed" });
-        expect(
-            screen.getByText(/You'll pay when you collect your order\./),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/You'll pay at pick-up\./)).toBeInTheDocument();
         expect(
             screen.getByRole("link", { name: "See your order" }),
         ).toHaveAttribute("href", `/shop/order/${STARTED.orderId}`);
@@ -962,15 +1449,13 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
             screen.getByText(/You pay online in a secure window/),
         ).toBeInTheDocument();
 
-        fireEvent.click(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
-        );
+        fireEvent.click(screen.getByRole("radio", { name: "Pay at pick-up" }));
         expect(
-            screen.getByRole("radio", { name: "Pay when you collect" }),
+            screen.getByRole("radio", { name: "Pay at pick-up" }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Your order is placed now.",
+                "You'll pay at pick-up. Your order is placed now.",
             ),
         ).toBeInTheDocument();
         fireEvent.click(
@@ -1122,7 +1607,7 @@ describe("the QR code an order came from", () => {
                 payments: [
                     {
                         type: "ON_HANDOVER" as const,
-                        label: "Pay when you collect",
+                        label: "Pay at pick-up",
                     },
                 ],
             }),
@@ -1231,7 +1716,8 @@ describe("the bag's delivery fields on a phone", () => {
         const fields = Array.from(
             document.querySelectorAll("input, select, textarea"),
         );
-        expect(fields).toHaveLength(8);
+        // The address's seven, the code, and the note for the business.
+        expect(fields).toHaveLength(9);
         for (const field of fields) {
             expect(field.className).toMatch(/\btext-base\b/);
             expect(field.className).not.toMatch(/text-\[1[0-5](\.\d)?px\]/);
@@ -1379,5 +1865,24 @@ describe("parseBagDraft", () => {
         expect(draft.code).toBeNull();
         expect(draft.checkout).toBeNull();
         expect(draft).not.toHaveProperty("source");
+        expect(draft.saved).toBeNull();
+    });
+
+    it("keeps whether the address is their last one, and reads a typed state as the list names it", () => {
+        const draft = parseBagDraft(
+            JSON.stringify({
+                saved: "shown",
+                address: { line1: "12 Hill Road", state: " orissa" },
+            }),
+        );
+        expect(draft.saved).toBe("shown");
+        expect(draft.address.state).toBe("Odisha");
+        expect(
+            parseBagDraft(JSON.stringify({ saved: "yes" })).saved,
+        ).toBeNull();
+        expect(
+            parseBagDraft(JSON.stringify({ address: { state: "Atlantis" } }))
+                .address.state,
+        ).toBe("");
     });
 });
