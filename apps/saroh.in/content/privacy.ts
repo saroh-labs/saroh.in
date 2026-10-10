@@ -2,7 +2,7 @@
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
  * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct;
  * merchants' own trackers, owner's wording 8 Oct, rev 44; Vercel removed,
- * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (and rev 68: a business's duty for a child's data, under Age): Data
+ * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (rev 68: a business's duty for a child's data, under Age; rev 69: PostHog, for errors and setup steps): Data
  * Fiduciary and Data Processor named, security logs kept 1 year, 180 days
  * after closing, suspended accounts, and "If there's a breach"). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
@@ -44,6 +44,7 @@ If your website uses analytics or advertising tools that you connect (such as Go
 | Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
+| Product usage | Which setup steps your business has completed (a first product, a first order), and errors that happen while you use Saroh. Never your customers' details | To fix problems and make Saroh easier to use |
 
 ## Why we're allowed to
 
@@ -62,6 +63,7 @@ Only the companies that help us run Saroh, each for its own job, and only what t
 | Hostinger | Running our servers and database |
 | Cloudflare | Serving our websites and apps, network security and speed |
 | Google Analytics | Visits to saroh.in |
+| PostHog | Finding and fixing errors in Saroh, and seeing which setup steps businesses complete. Stored in the EU |
 
 We don't sell personal data. We share it with authorities only when the law requires it.
 
