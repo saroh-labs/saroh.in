@@ -3,7 +3,10 @@
  * Policy and Terms": the 4 Oct text, with the 5 Oct changes for the 12-month
  * term, the introductory month and moving to a lower plan, and the 7 Oct
  * change to the term's end: a request to pay, not a one-tap renewal,
- * DEC-100; and the 8 Oct paragraph on merchants' own trackers, DEC-108). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
+ * DEC-100; the 8 Oct paragraph on merchants' own trackers, DEC-108; and
+ * the 9 Oct additions, rev 46: "Your customers and your business", suspending
+ * at once for illegal use or fraud, "Fair use", and the line in "Liability"
+ * on businesses' goods and disputes). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
  *
@@ -53,6 +56,10 @@ Saroh opens in early access on 17 October 2026. It works, and it may still have 
 
 Your customers pay you through your own payment account (Razorpay or Cashfree). The money goes straight to you; Saroh never holds it. Your payment provider's own terms apply to that account. You're responsible for the prices, taxes, refunds and GST details you set for your customers.
 
+## Your customers and your business
+
+Saroh is software a business uses to run its shop, bookings and website. Each business sells its own goods and services, sets its own prices and policies, and deals with its own customers. Saroh isn't a party to those sales. We don't check or guarantee any business, what it sells or what it says, and we don't verify a business's identity, licences or registrations. You're responsible for your orders, bookings, refunds and complaints, and for the laws that apply to your business. We're responsible for Saroh itself.
+
 ## Your data and content
 
 What you put into Saroh stays yours: your products, photos, bookings, customer records and website. You let us store, process and show it only to run Saroh for you. You can download your orders yourself, and we'll send you a copy of everything else if you ask at contact@saroh.in. When you close your account we delete it as the Privacy Policy says, except invoices the law makes us keep.
@@ -70,6 +77,12 @@ Don't use Saroh to:
 - get around a plan's limits or someone else's access.
 
 We may remove content or suspend an account that does these things. Where we can, we'll tell you first and give you a chance to fix it.
+
+We may suspend or close an account at once, without notice, and stop the people behind it from using Saroh again, if we reasonably believe it's used for something illegal, for fraud or to harm customers, or if the law or a payment provider requires it. We may report it to the authorities.
+
+## Fair use
+
+Plans with "no limit", or with large allowances, are for the normal running of one business. Don't resell Saroh, run several businesses' worth of traffic or storage on one account, send automated bulk messages, or use Saroh as file hosting. If an account uses far more than a typical business on its plan, or puts Saroh at risk for others, we'll contact you to agree a way forward before limiting anything, unless we need to act at once to keep Saroh running.
 
 ## Your website and domain
 
@@ -92,6 +105,8 @@ You can close your account at any time. We may close it if you seriously or repe
 ## Liability
 
 Saroh is provided as it is. To the extent the law allows, we're not liable for lost profits or indirect losses. Our total liability for any claim is limited to what you paid us in the 3 months before it arose. Nothing here limits liability that the law doesn't allow us to limit.
+
+We're not responsible for the goods, services, conduct or content of any business that uses Saroh, or for disputes between a business and its customers.
 
 ## Changes to these terms
 

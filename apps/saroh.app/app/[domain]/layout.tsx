@@ -40,7 +40,7 @@ import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
-import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
+import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { SITE_FACES } from "@/lib/site-fonts";
 import {
@@ -380,6 +380,11 @@ export default async function SiteLayout({
                             credit={footerFacts?.credit ?? null}
                             // "Cookie choices" while a tracker asks (DEC-108).
                             cookieChoices={asksConsent}
+                            // Who runs this site, on every plan, with a link
+                            // to report the business (Terms rev 46).
+                            responsibility={{
+                                reportHref: reportBusinessHref(test.host),
+                            }}
                         />
                     }
                 >

@@ -71,6 +71,9 @@ const REFUSED = [
     // saroh.in's server calls either, never a merchant's test release.
     "POST public/tools/link-preview",
     "POST public/tools/link-preview/report",
+    // saroh.in/customers' report about a business: stored for staff; only
+    // saroh.in's server sends one, never a merchant's test release.
+    "POST public/business-reports",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

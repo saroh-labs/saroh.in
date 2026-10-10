@@ -108,6 +108,9 @@ module.exports = {
         // $transaction) — the public submit command's acceptance + security
         // cases (isolation, idempotency, validation, rate-limit); no DB, no net.
         "<rootDir>/src/modules/enquiry/**/*.spec.ts",
+        // Terms rev 46: customers' reports about a business — the address
+        // rules, the DTO and the public write, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/business-reports/**/*.spec.ts",
         // S3-005 CRM: ContactsService, PipelinesService, and LeadsService specs
         // with a jest-mocked Prisma (incl. $transaction) — org-scoped reads,
         // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and

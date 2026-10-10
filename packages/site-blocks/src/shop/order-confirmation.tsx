@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import { BusinessResponsibility } from "../business-responsibility";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 
@@ -288,6 +289,11 @@ export function OrderConfirmation({
                     </Link>
                 ) : null}
             </div>
+            {/* Who is responsible for the order (Terms rev 46). */}
+            <BusinessResponsibility
+                businessName={businessName}
+                className="text-site-muted mt-6"
+            />
         </Frame>
     );
 }

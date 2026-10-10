@@ -258,6 +258,12 @@ const NEVER: Record<string, string> = {
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":
         "saroh.in's public link preview tool, not a tenant surface",
+    // Terms rev 46 (9 Oct): a customer reports a business at
+    // saroh.in/customers, with no account and whatever it has switched on.
+    "business-reports/public-business-reports.controller.ts":
+        "saroh.in's report-a-business form, not a tenant surface",
+    "admin/admin-business-reports.controller.ts":
+        "staff control plane (customers' reports), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

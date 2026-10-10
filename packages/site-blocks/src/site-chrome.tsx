@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
+import { BusinessResponsibility } from "./business-responsibility";
 import { CookieChoicesButton } from "./consent-banner";
 import { phoneText } from "./lib/phone";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
@@ -85,6 +86,14 @@ export interface SiteCredit {
     href: string;
 }
 
+/**
+ * Who runs the site, as the footer says it (Terms rev 46): the business,
+ * with a link for a customer to report it to Saroh (`reportBusinessHref`).
+ */
+export interface SiteResponsibility {
+    reportHref: string | null;
+}
+
 /** Where "Made with Saroh" links: saroh.in with the business's code. */
 export function madeWithSarohHref(referralCode: string): string {
     return `https://saroh.in/?ref=${encodeURIComponent(referralCode)}`;
@@ -124,6 +133,7 @@ export function SiteFooter({
     contact = null,
     credit = null,
     cookieChoices = false,
+    responsibility = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
@@ -137,11 +147,26 @@ export function SiteFooter({
      * visitor (DEC-108). Off draws nothing.
      */
     cookieChoices?: boolean;
+    /**
+     * "‹Name› runs this website and is responsible for its orders and
+     * bookings." with "Report this business" (Terms rev 46), on every plan.
+     * The renderer passes it for a published site; null draws none (the
+     * editor's canvas, the catalog).
+     */
+    responsibility?: SiteResponsibility | null;
 }) {
     const phone = nonBlank(contact?.phone);
     const email = nonBlank(contact?.email);
     const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
+    const owner = responsibility ? (
+        <BusinessResponsibility
+            businessName={name}
+            reportHref={responsibility.reportHref}
+            className={footer?.layout === "left" ? "mt-3 text-left" : "mt-2"}
+            linkClassName={FOOTER_LINK}
+        />
+    ) : null;
     if (footer?.layout === "left") {
         return (
             <LeftFooter
@@ -149,6 +174,7 @@ export function SiteFooter({
                 name={name}
                 credit={credit}
                 cookieChoices={cookieChoices}
+                owner={owner}
             />
         );
     }
@@ -217,6 +243,7 @@ export function SiteFooter({
                         {cookieChoices ? <CookieChoicesButton /> : null}
                     </p>
                 ) : null}
+                {owner}
             </div>
         </footer>
     );
@@ -263,11 +290,14 @@ function LeftFooter({
     name,
     credit,
     cookieChoices,
+    owner,
 }: {
     written: SiteFooterContent | null;
     name: string;
     credit: SiteCredit | null;
     cookieChoices: boolean;
+    /** Who runs the site, under the row (Terms rev 46); null draws none. */
+    owner: ReactNode;
 }) {
     const line = written ? footerLine(written) : null;
     return (
@@ -313,6 +343,7 @@ function LeftFooter({
                         />
                     ) : null}
                 </div>
+                {owner}
             </div>
         </footer>
     );

@@ -8,6 +8,7 @@ import { destructiveAlertClasses } from "../alert";
 import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import { BusinessResponsibility } from "../business-responsibility";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type {
@@ -82,6 +83,7 @@ export function OrderPlacedToPay({
             <button type="button" onClick={onClose} className={sheetAltButton}>
                 Done
             </button>
+            <PlacedOwner businessName={businessName} />
         </SheetFrame>
     );
 }
@@ -231,6 +233,7 @@ export function CheckoutPay({
                     >
                         Done
                     </button>
+                    <PlacedOwner businessName={businessName} />
                 </SheetFrame>
             );
         }
@@ -325,5 +328,15 @@ export function CheckoutPay({
                 Back to your bag
             </button>
         </SheetFrame>
+    );
+}
+
+/** Who is responsible for a placed order (Terms rev 46): one quiet line. */
+function PlacedOwner({ businessName }: { businessName: string }) {
+    return (
+        <BusinessResponsibility
+            businessName={businessName}
+            className="text-site-muted mt-3 text-center"
+        />
     );
 }

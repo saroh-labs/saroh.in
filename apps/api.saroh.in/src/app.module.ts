@@ -9,6 +9,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
+import { BusinessReportsModule } from "./modules/business-reports/business-reports.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CatalogueModule } from "./modules/catalogue/catalogue.module";
@@ -135,6 +136,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         BillingModule,
         WaitlistModule,
         LinkPreviewModule,
+        BusinessReportsModule,
         SelfTestModule,
     ],
 })

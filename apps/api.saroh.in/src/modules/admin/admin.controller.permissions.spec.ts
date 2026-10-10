@@ -236,6 +236,26 @@ describe("Waitlist permissions", () => {
     );
 });
 
+describe("Business report permissions", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it("reads customers' reports with Organization read", () => {
+        expect(perms("listBusinessReports")).toEqual([
+            AdminPermission.OrganizationRead,
+        ]);
+    });
+
+    it("needs Organization read and lifecycle write to mark one done", () => {
+        expect(perms("markBusinessReportDone")).toEqual([
+            AdminPermission.OrganizationRead,
+            AdminPermission.OrganizationLifecycleWrite,
+        ]);
+    });
+});
+
 describe("Pricing permissions", () => {
     const perms = (name: string) => {
         const route = routeHandlers().find((r) => r.name === name);

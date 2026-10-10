@@ -204,6 +204,20 @@ describe("OrderConfirmation (P4)", () => {
         ).toHaveAttribute("href", "/shop");
     });
 
+    it("says who is responsible for a placed order (Terms rev 46)", () => {
+        render(
+            <OrderConfirmation
+                lookup={{ ok: true, order: ORDER }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByText(
+                "Rye & Co. runs this website and is responsible for its orders and bookings.",
+            ),
+        ).toHaveClass("text-site-muted");
+    });
+
     it("keeps the customer on the business's own site", () => {
         expect(orderConfirmationHref("ord_1")).toBe("/shop/order/ord_1");
         expect(orderConfirmationHref("a/b")).toBe("/shop/order/a%2Fb");

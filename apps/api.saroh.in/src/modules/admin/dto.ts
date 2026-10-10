@@ -416,6 +416,21 @@ export class ListWaitlistDto {
 /** Remove one entry when its owner asks (U30, KTD-17). */
 export class DeleteWaitlistDto extends OperatorReasonDto {}
 
+/** Customers' reports (saroh.in/customers), newest first. */
+export class ListBusinessReportsDto {
+    @IsOptional()
+    @IsIn(["open", "done", "all"])
+    status?: "open" | "done" | "all";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+/** Marking a report done carries a reason, as every operator write does. */
+export class MarkBusinessReportDoneDto extends OperatorReasonDto {}
+
 /**
  * A catalogue override on one business (plans catalogue U11): grant or
  * remove a catalogue row, or set its limit up or down. `expiresAt` is

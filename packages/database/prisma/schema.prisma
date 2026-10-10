@@ -180,6 +180,8 @@ model Organization {
   siteVerifications    SiteVerification[]
   siteTrackers         SiteTracker[]
   siteTrackingSettings SiteTrackingSettings[]
+  // What customers reported about this business at saroh.in/customers.
+  businessReports      BusinessReport[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -7207,4 +7209,33 @@ model SarohInvoiceSequence {
   series    String   @id
   last      Int
   updatedAt DateTime @updatedAt
+}
+
+// A report a customer sent at saroh.in/customers about a business that uses
+// Saroh: the site's address as they gave it, what happened, and an email if
+// they left one. `organizationId` is set when the address is a Saroh site,
+// else null. Staff read it in the admin console (organization:read; the
+// reporter's email only with organization:pii:read) and mark it done
+// (organization:lifecycle:write). Kept when the business is deleted.
+model BusinessReport {
+  id             String               @id @default(cuid())
+  organizationId String?
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  // The host as typed and normalised ("shop.example.com"), not a full URL.
+  siteHost       String
+  message        String
+  reporterEmail  String?
+  // A digest of the reporter's address, as the waitlist keeps one; never the address.
+  ipHash         String?
+  status         BusinessReportStatus @default(OPEN)
+  doneAt         DateTime?
+  createdAt      DateTime             @default(now())
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+enum BusinessReportStatus {
+  OPEN
+  DONE
 }

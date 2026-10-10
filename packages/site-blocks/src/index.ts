@@ -438,7 +438,14 @@ export type {
     SiteContact,
     SiteCredit,
     SiteFooterContent,
+    SiteResponsibility,
 } from "./site-chrome";
+// Who runs a merchant's site and is responsible for its sales (Terms rev 46).
+export {
+    BusinessResponsibility,
+    reportBusinessHref,
+    responsibilityLine,
+} from "./business-responsibility";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
 // A module page's title and lead (DEC-073 #9).

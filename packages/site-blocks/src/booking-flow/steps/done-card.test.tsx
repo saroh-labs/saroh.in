@@ -108,3 +108,14 @@ describe("the confirmation's way to change it (UX-055)", () => {
         expect(document.body.textContent).not.toMatch(/Get in touch/);
     });
 });
+
+describe("who is responsible for the booking (Terms rev 46)", () => {
+    it("says the business runs the site, in one quiet line", () => {
+        done();
+        expect(
+            screen.getByText(
+                "Rye runs this website and is responsible for its orders and bookings.",
+            ),
+        ).toHaveClass("text-site-muted");
+    });
+});

@@ -103,8 +103,9 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         line: "The agreement for using Saroh.",
         href: "/terms",
         // 7 Oct: the term ends with a request to pay (DEC-100). 8 Oct:
-        // merchants' own trackers (DEC-108).
-        publishOn: "2026-10-08",
+        // merchants' own trackers (DEC-108). 9 Oct: the business is
+        // responsible for its sales, suspending at once, fair use (rev 46).
+        publishOn: "2026-10-09",
     },
     {
         id: "refunds",

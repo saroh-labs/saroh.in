@@ -1,4 +1,5 @@
 import { BOOKINGS_HREF } from "../../account/bookings-model";
+import { BusinessResponsibility } from "../../business-responsibility";
 import { cn } from "../../lib/utils";
 import { payInstructionsOf, payWaysText } from "../../pay-instructions/model";
 import { PayInstructionsCard } from "../../pay-instructions/pay-instructions";
@@ -165,6 +166,11 @@ export function DoneCard({
                 </a>
                 .{changeRules(rules, phase.paid)}
             </p>
+            {/* Who is responsible for the booking (Terms rev 46). */}
+            <BusinessResponsibility
+                businessName={business}
+                className="text-site-muted mt-2"
+            />
         </div>
     );
 }
