@@ -1,10 +1,10 @@
-import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState, PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Users } from "lucide-react";
 import Link from "next/link";
 
 import type { SubscriberRow } from "@/lib/subscriptions/plan-detail";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { Pill } from "../pill";
 
@@ -27,13 +27,10 @@ export function PlanSubscribers({
     if (!rows) {
         return (
             <FailedState
-                title="Subscribers could not be loaded"
-                description="This tab couldn't read who's on the plan. Nothing has changed — their subscriptions still renew."
-                action={
-                    <Button variant="outline" onClick={onRetry}>
-                        Try again
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("subscribers")}
+                description={nothingChanged("Their subscriptions still renew.")}
+                onRetry={onRetry}
             />
         );
     }
@@ -41,7 +38,8 @@ export function PlanSubscribers({
         return (
             <EmptyState
                 icon={<Users />}
-                title="Nobody's on this plan yet"
+                size="panel"
+                title="No one is on this plan yet"
                 description={emptyText}
             />
         );

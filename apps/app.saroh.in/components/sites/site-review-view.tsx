@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { FailedRead } from "@/components/shared/failed-read";
 import { SectionReview } from "@/components/sites/section-review";
 import { VerdictControls } from "@/components/sites/verdict-controls";
 import { createApproval } from "@/lib/sites/actions";
@@ -207,10 +208,10 @@ function ReleasesToReview({
     if (releases === null) return null;
     if (releases.state === "failed") {
         return (
-            <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                Couldn&apos;t check for test releases to review. Reload to try
-                again.
-            </p>
+            <FailedRead
+                things="test releases to review"
+                className="rounded-lg border bg-muted px-4 py-3"
+            />
         );
     }
     const open = releases.releases.filter(

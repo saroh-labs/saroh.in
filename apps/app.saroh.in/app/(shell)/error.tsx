@@ -8,10 +8,10 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
-    return <SectionError error={error} reset={reset} />;
+    return <SectionError error={error} retry={retry} />;
 }

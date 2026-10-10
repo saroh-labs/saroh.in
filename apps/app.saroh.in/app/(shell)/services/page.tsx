@@ -1,11 +1,9 @@
-import { Button } from "@saroh/ui/button";
 import {
     FailedState,
     PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
@@ -24,6 +22,7 @@ import { readServices } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 import { readBookingPayment } from "@/lib/staff/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Services (U16, E2): what people can book, as the design's
@@ -72,13 +71,8 @@ export default async function ServicesPage() {
                         <PermissionDeniedState {...await servicesDenied()} />
                     ) : (
                         <FailedState
-                            title="Couldn't load your services"
-                            description="Nothing has been changed. Try again in a moment."
-                            action={
-                                <Button asChild variant="outline">
-                                    <Link href="/services">Try again</Link>
-                                </Button>
-                            }
+                            title={couldntLoad("services")}
+                            retryHref="/services"
                         />
                     )}
                 </div>

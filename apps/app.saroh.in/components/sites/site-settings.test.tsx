@@ -226,7 +226,7 @@ describe("the two save models, made visible (UX-081, the audit)", () => {
             ),
         );
         expect(draft).toContain(
-            "Your site isn't published yet. Nobody can reach it until you publish. Review and publish",
+            "Your website isn't live yet. Nobody can reach it until you publish. Review and publish",
         );
     });
 

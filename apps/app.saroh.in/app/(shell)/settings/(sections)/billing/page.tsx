@@ -10,6 +10,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
 import type { Cycle } from "@/lib/saroh-billing/plan-view";
@@ -51,9 +52,7 @@ export const metadata = { title: "Plan and billing" };
 
 const DENIED = (
     <PermissionDeniedState
-        title="Plan and billing is the owner's"
-        description="What Saroh charges this business, and its invoices, are kept to the owner."
-        note="Ask the owner if you need to know which plan the business is on."
+        {...whoCanChange({ thing: "Plan and billing", ownerOnly: true })}
     />
 );
 

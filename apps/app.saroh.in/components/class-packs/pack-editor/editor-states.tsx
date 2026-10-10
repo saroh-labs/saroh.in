@@ -1,10 +1,17 @@
 import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@saroh/ui/button";
-import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import {
+    EmptyState,
+    FailedState,
+    PermissionDeniedState,
+} from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { NotFound } from "@saroh/ui/not-found";
 import { PageHeader } from "@saroh/ui/page-header";
+import { Archive } from "lucide-react";
 import Link from "next/link";
 
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { readOnlyLine, whoCanChange } from "@/components/shared/who-can-change";
 import { packCrumbs } from "./pack-crumbs";
 
 export type PackEditorStateKind =
@@ -20,6 +27,9 @@ const BACK_TO_PACKS = { href: "/class-packs", label: "Back to Packs" };
  * that says who can — the design locks the whole editor rather than
  * drawing a form that can't be used.
  */
+/** The one sentence for a denial (`whoCanChange`). */
+const DENIED = whoCanChange({ thing: "Class packs" });
+
 export function PackEditorState({
     state,
     retryHref,
@@ -39,59 +49,66 @@ export function PackEditorState({
             />
             {state === "missing" || state === "archived" ? (
                 <div>
-                    <div className="max-w-[480px] rounded-[12px] border border-dashed border-border-strong px-5 py-8 text-center">
-                        <h2 className="m-0 text-[15px] font-semibold">
-                            {state === "missing"
-                                ? "That pack isn't here"
-                                : "This pack is archived"}
-                        </h2>
-                        {state === "archived" ? (
-                            <p className="mx-auto mt-1.5 max-w-[46ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                                Nobody can buy it, and everyone holding one
-                                keeps using it. Put it back on sale from Packs
-                                to change it.
-                            </p>
-                        ) : null}
-                        <Link
-                            href={BACK_TO_PACKS.href}
-                            className="mt-2 inline-block rounded-[4px] text-[13px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70 coarse:min-h-11 coarse:pt-3"
-                        >
-                            Back to packs
-                        </Link>
-                    </div>
+                    {state === "missing" ? (
+                        <NotFound
+                            variant="card"
+                            title="Class pack not found"
+                            description="The link may be old, or the draft was deleted."
+                            primary={{
+                                href: BACK_TO_PACKS.href,
+                                label: BACK_TO_PACKS.label,
+                            }}
+                        />
+                    ) : (
+                        <EmptyState
+                            icon={<Archive />}
+                            title="This pack is archived"
+                            description="Nobody can buy it, and everyone holding one keeps using it."
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <Link href={BACK_TO_PACKS.href}>
+                                        {BACK_TO_PACKS.label}
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    )}
                 </div>
             ) : (
                 <div>
                     {state === "failed" ? (
                         <FailedState
-                            title="Couldn't load this pack"
-                            description="The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
+                            title={couldntLoad("this pack")}
+                            retryHref={retryHref}
                             action={
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    <Button asChild>
-                                        <Link href={retryHref}>Try again</Link>
-                                    </Button>
-                                    <Button asChild variant="outline">
-                                        <Link href={BACK_TO_PACKS.href}>
-                                            {BACK_TO_PACKS.label}
-                                        </Link>
-                                    </Button>
-                                </div>
+                                <Button
+                                    asChild
+                                    variant="ghost"
+                                    className="wk-press"
+                                >
+                                    <Link href={BACK_TO_PACKS.href}>
+                                        {BACK_TO_PACKS.label}
+                                    </Link>
+                                </Button>
                             }
                         />
                     ) : (
                         <PermissionDeniedState
                             title={
                                 state === "forbidden"
-                                    ? "You can't open packs"
-                                    : "Your role can't change packs"
+                                    ? DENIED.title
+                                    : "You can't change class packs"
                             }
                             description={
                                 state === "forbidden"
-                                    ? "Your role doesn't reach class packs."
-                                    : "You can see packs and who holds them, but not make or change one."
+                                    ? DENIED.description
+                                    : readOnlyLine("class packs", true)
                             }
-                            note={WHO_CAN_CHANGE}
+                            note={DENIED.note}
                             action={
                                 <Button asChild variant="outline">
                                     {state === "forbidden" ? (

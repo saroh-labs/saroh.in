@@ -346,7 +346,7 @@ describe("the Contact and social rows", () => {
         draw(null, null);
         const alert = group()?.querySelector('[role="alert"]');
         expect(alert?.textContent).toContain(
-            "Your contact details couldn't be loaded",
+            "Couldn't load your contact details",
         );
         expect(group()?.textContent).not.toContain("None");
     });

@@ -1,15 +1,19 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import {
+    EmptyState,
+    FailedState,
+    PermissionDeniedState,
+} from "@saroh/ui/data-state";
 import Link from "next/link";
 
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import type {
     MonthRow,
     PriceHistory,
     SaleRow,
 } from "@/lib/class-packs/pack-sales";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 const CARD =
     "min-w-0 rounded-[12px] border border-border bg-card px-[18px] py-4";
@@ -50,22 +54,20 @@ export function SalesTab({
     if (denied) {
         return (
             <PermissionDeniedState
-                title="You can't see this pack's sales"
-                description="Your role doesn't reach what the pack has taken."
-                note={WHO_CAN_CHANGE}
+                size="panel"
+                {...whoCanChange({ thing: "this pack's sales" })}
             />
         );
     }
     if (!sales) {
         return (
             <FailedState
-                title="Sales could not be loaded"
-                description="This tab couldn't read the pack's sales. Nothing has changed — every sale and receipt is as it was."
-                action={
-                    <Button variant="outline" onClick={onRetry}>
-                        Try again
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("this pack's sales")}
+                description={nothingChanged(
+                    "Every sale and receipt is as it was.",
+                )}
+                onRetry={onRetry}
             />
         );
     }
@@ -159,9 +161,11 @@ export function SalesTab({
                     How it was paid is what the desk recorded.
                 </div>
                 {sales.length === 0 ? (
-                    <p className="m-0 border-t border-border/70 py-2 text-[13px] text-muted-foreground">
-                        Nobody has bought it yet.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="border-t border-border/70 py-2"
+                        title="No sales yet."
+                    />
                 ) : (
                     <ul className="m-0 grid list-none p-0">
                         {sales.map((s) => (

@@ -174,7 +174,7 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             // A pack nobody holds: the empty state, with Sell this pack.
             await page.goto(`/class-packs/${emptyId}?tab=who`);
             await expect(
-                page.getByText("Nobody has this pack yet"),
+                page.getByText("No one has this pack yet"),
             ).toBeVisible();
             await page.getByRole("button", { name: "Sell this pack" }).click();
             await expect(

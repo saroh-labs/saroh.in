@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ import {
 } from "@/lib/stock/log";
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { chipClass, pillClass, TEXT_TONE } from "./tones";
 
@@ -162,17 +163,12 @@ export function LogList({
             <div>
                 {filters}
                 <FailedState
-                    title="The stock log couldn't be loaded"
-                    description="Nothing is lost — every change is still recorded. Saroh just couldn't read the log right now."
-                    action={
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("the stock log")}
+                    description={nothingChanged(
+                        "Every change is still recorded.",
+                    )}
+                    onRetry={() => router.refresh()}
                 />
             </div>
         );
@@ -328,13 +324,28 @@ export function LogList({
                     </section>
                 ))}
                 {days.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        {filter.kind === "all" &&
-                        filter.store === "all" &&
-                        !filter.product
-                            ? "No stock changes yet. Counts, sales, deliveries and moves show here as they happen."
-                            : "Nothing matches these filters."}
-                    </div>
+                    filter.kind === "all" &&
+                    filter.store === "all" &&
+                    !filter.product ? (
+                        <EmptyState
+                            size="panel"
+                            title="No stock changes yet"
+                            description="Counts, sales, deliveries and moves show here as they happen."
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="stock changes"
+                            cause="filters"
+                            title="No stock changes match these filters"
+                            clearHref={href({
+                                kind: undefined,
+                                store: undefined,
+                                product: undefined,
+                            })}
+                        />
+                    )
                 ) : null}
             </div>
             {loaded.next ? (

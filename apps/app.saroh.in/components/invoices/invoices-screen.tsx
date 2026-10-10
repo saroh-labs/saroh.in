@@ -291,7 +291,7 @@ export function InvoicesScreen({
                     <EmptyState
                         icon={<ReceiptText />}
                         title="No invoices yet"
-                        description="Orders and subscription renewals make their invoice themselves. For trade and one-off work, write one by hand."
+                        description="Orders and renewals are invoiced for you, and you can write one by hand."
                         action={
                             canWrite ? (
                                 <Button asChild>
@@ -303,11 +303,23 @@ export function InvoicesScreen({
                         }
                     />
                 ) : shown.length === 0 ? (
-                    <div className="rounded-[12px] border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
-                        {scope && mine.length === 0
+                    <EmptyState
+                        kind="no-results"
+                        things="invoices"
+                        cause="view"
+                        icon={<ReceiptText />}
+                        title={(scope && mine.length === 0
                             ? scopeEmptyLine(scope)
-                            : chipEmptyLine(tabLabel, scope ? "all" : chip)}
-                    </div>
+                            : chipEmptyLine(tabLabel, scope ? "all" : chip)
+                        ).replace(/\.$/, "")}
+                        onClear={
+                            tab !== "all"
+                                ? () => pick("all")
+                                : !scope && chip !== "all"
+                                  ? () => pickChip("all")
+                                  : undefined
+                        }
+                    />
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {shown.map((i) => (

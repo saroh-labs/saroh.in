@@ -59,7 +59,7 @@ components/shared/             app shell, navigation, command menu
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A
-  section's `layout.tsx` renders `ModuleGate` (`CapabilityOffState` when the
+  section's `layout.tsx` renders `ModuleGate` (`ModuleOffState` when the
   module is off, so a deep link is covered once), and nav groups carry a
   `moduleKey`. Both fail open when availability is unknown; the API enforces.
   See `saroh-product.md` and `.agents/skills/saroh-module-capability/SKILL.md`.

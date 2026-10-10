@@ -7,6 +7,7 @@ import {
     PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
@@ -74,28 +75,16 @@ export function OrdersFailed({
             <OrdersHeading />
             <FailedState
                 className="my-6"
-                title="Couldn't load orders"
-                description="Something went wrong on our side, so this is not the whole picture. Orders that were placed are still there and nothing has been changed — this screen simply could not read them."
+                title={couldntLoad("orders")}
+                description={nothingChanged(
+                    "Orders that were placed are still there.",
+                )}
+                onRetry={onRetry}
+                reference={reference}
                 action={
-                    <div className="mt-1.5 flex flex-col items-center gap-3">
-                        <div className="flex flex-wrap justify-center gap-2">
-                            <Button onClick={onRetry} className="wk-press">
-                                Try again
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="wk-press"
-                            >
-                                <Link href="/">Back to Home</Link>
-                            </Button>
-                        </div>
-                        {reference ? (
-                            <p className="font-mono text-xs text-muted-foreground">
-                                Reference: {reference}
-                            </p>
-                        ) : null}
-                    </div>
+                    <Button asChild variant="ghost" className="wk-press">
+                        <Link href="/">{backTo("Home")}</Link>
+                    </Button>
                 }
             />
         </>
@@ -188,6 +177,7 @@ export function OrdersEmpty({
     options = null,
     go,
     share = null,
+    onNew,
 }: {
     query: OrdersQuery;
     storeName: string | null;
@@ -201,6 +191,12 @@ export function OrdersEmpty({
      * there is nothing to share yet.
      */
     share?: ShareLink | null;
+    /**
+     * Opens New order, for someone who may take one: the header's own
+     * action, under the same label. Left out for anyone else, and the
+     * sentence promises nothing.
+     */
+    onNew?: () => void;
 }) {
     const copy = ordersEmptyCopy(query, storeName, options);
     const offer = copy.kind === "first-run" ? share : null;
@@ -225,7 +221,7 @@ export function OrdersEmpty({
               : copy.action === "clear-since"
                 ? { label: "Show all orders", patch: { since: null } }
                 : copy.action === "show-all"
-                  ? { label: "View all orders", patch: { tab: "all" as const } }
+                  ? { label: "Show all orders", patch: { tab: "all" as const } }
                   : null;
     return (
         <EmptyState
@@ -242,8 +238,15 @@ export function OrdersEmpty({
                     >
                         {action.label}
                     </Button>
-                ) : offer ? (
-                    <ShareLinkButton link={offer} />
+                ) : copy.kind === "first-run" && (onNew || offer) ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {onNew ? (
+                            <Button type="button" onClick={onNew}>
+                                New order
+                            </Button>
+                        ) : null}
+                        {offer ? <ShareLinkButton link={offer} /> : null}
+                    </div>
                 ) : undefined
             }
         />

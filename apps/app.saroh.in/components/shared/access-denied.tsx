@@ -35,6 +35,7 @@ export function AccessDenied({
     note = STANDARD.note,
     backHref = "/",
     backLabel = "Back to Home",
+    bare = false,
 }: {
     title?: ReactNode;
     description?: ReactNode;
@@ -42,19 +43,20 @@ export function AccessDenied({
     note?: ReactNode;
     backHref?: string;
     backLabel?: string;
+    /** The card alone, for a page that draws its own frame around it. */
+    bare?: boolean;
 }) {
-    return (
-        <PageContainer>
-            <PermissionDeniedState
-                title={title}
-                description={description}
-                note={note}
-                action={
-                    <Button asChild variant="outline" className="wk-press">
-                        <Link href={backHref}>{backLabel}</Link>
-                    </Button>
-                }
-            />
-        </PageContainer>
+    const card = (
+        <PermissionDeniedState
+            title={title}
+            description={description}
+            note={note}
+            action={
+                <Button asChild variant="outline" className="wk-press">
+                    <Link href={backHref}>{backLabel}</Link>
+                </Button>
+            }
+        />
     );
+    return bare ? card : <PageContainer>{card}</PageContainer>;
 }

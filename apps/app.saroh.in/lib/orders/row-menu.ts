@@ -1,3 +1,4 @@
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 import type { OrderRow } from "./business-service";
 import { STEP_LABEL } from "./lifecycle";
 import { orderHref } from "./links";
@@ -252,7 +253,7 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
             disabled: !owed
                 ? "Nothing is owed on it."
                 : !can.payOnline
-                  ? "Connect a payment provider first."
+                  ? `${providerDisconnected.title("payment")}.`
                   : null,
         });
     }

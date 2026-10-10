@@ -19,11 +19,9 @@ import { isDenial } from "@/lib/api/errors";
  */
 export default function Error({
     error,
-    reset,
     retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
     retry: () => void;
 }) {
     const denied = isDenial(error);
@@ -37,7 +35,7 @@ export default function Error({
         }
     }, [denied, error]);
 
-    if (denied) return <SectionError error={error} reset={reset} />;
+    if (denied) return <SectionError error={error} retry={retry} />;
 
     return (
         <PageContainer width="full">

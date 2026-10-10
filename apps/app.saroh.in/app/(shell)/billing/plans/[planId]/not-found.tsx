@@ -23,9 +23,9 @@ export default function NotFoundPage() {
             <div>
                 <NotFound
                     variant="card"
-                    title="That plan isn't here"
+                    title="Plan not found"
                     description="The link may be old, or the draft was deleted."
-                    primary={{ href: PLANS_HREF, label: "Back to plans" }}
+                    primary={{ href: PLANS_HREF, label: "Back to Plans" }}
                 />
             </div>
         </PageContainer>

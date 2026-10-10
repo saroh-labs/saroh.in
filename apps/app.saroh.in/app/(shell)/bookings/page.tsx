@@ -1,7 +1,5 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
@@ -41,6 +39,7 @@ import { requireSession } from "@/lib/session";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
 import { withClosures } from "@/lib/staff/time-off";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Calendar (U15). The day by person by default, the week, or the
@@ -144,15 +143,8 @@ export default async function BookingsPage({
                 />
                 <div>
                     <FailedState
-                        title="Couldn't load the calendar"
-                        description="Nothing has been changed. Try again in a moment."
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href={calendarHref(layout, date)}>
-                                    Try again
-                                </Link>
-                            </Button>
-                        }
+                        title={couldntLoad("the calendar")}
+                        retryHref={calendarHref(layout, date)}
                     />
                 </div>
             </PageContainer>

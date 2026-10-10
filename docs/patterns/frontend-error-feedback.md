@@ -9,9 +9,13 @@
 ## One layer presents each failure — **Current**
 
 1. **Segment boundaries** (`error.tsx`): a read that threw.
-2. **Named states** from `@saroh/ui/data-state`: `EmptyState`,
-   `CapabilityOffState`, `PermissionDeniedState`, `FailedState`,
-   `PartialNotice`, `LoadingState`.
+2. **Named states** from `@saroh/ui/data-state`: `EmptyState` (first run and
+   no results), `ModuleOffState`, `PlanLockedState`, `LimitReachedState`,
+   `ProviderDisconnectedState`, `NotPublishedNotice`, `PermissionDeniedState`,
+   `PausedState`, `SignedOutState`, `FailedState`, `PartialNotice`,
+   `LoadingState`. Each comes in `page`, `panel` and `inline` size and takes
+   its words from `@saroh/ui/lib/state-copy`
+   (`.agents/skills/saroh-product-states/SKILL.md`).
 3. **Toasts**: the outcome of something the user just did.
 4. **Field messages**: validation, and server errors that name a field
    (`frontend-forms.md`).
@@ -72,8 +76,18 @@ Before the split, one API restart signed out every user.
   handler in `withCrashPage` (`@saroh/ui/lib/crash-page`), so a throw before
   Next renders is the same page as static HTML, not Cloudflare's screen.
   Merchant sites use `SiteError` (`apps/saroh.app/components/site-error.tsx`)
-  and the `neutral` crash page, never Saroh's brand. New boundaries take
-  Next 16.3's `retry` (re-fetches), not `reset`.
+  and the `neutral` crash page, never Saroh's brand.
+- **Current** (10 Oct 2026) — **A segment boundary passes what it knows, not a
+  sentence.** Every `error.tsx` in `app.saroh.in` renders `SectionError`
+  (`components/shared/section-error.tsx`; a settings tab,
+  `SettingsSectionError`) with Next 16.3's `retry`, which reads the segment
+  again. `reset` only redraws the failed read, and no boundary takes it.
+  It passes `heading` (the page's title, kept above the card), `things`
+  ("Couldn't load {things}"), an optional `reassurance` (one true sentence
+  after "Nothing has been changed."), and `backHref` with `place`, the
+  menu's name ("Back to Orders"). A 403 draws the denial and a 401 the
+  signed-out card. The eight `not-found.tsx` are titled "{Thing} not found".
+  `states-scan.test.ts` fails a boundary that words its own.
 - **Current** — **Say nothing was lost only when it is true.** A failed read
   leaves saved work alone ("Anything you'd already saved is safe"); a
   boundary a write can reach doesn't promise it.
@@ -118,9 +132,12 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
       `reportFailure` shows a denied result with `showInfo`, not the red
       error. Gap: most screens still call `showError(res.error)` directly,
       so they show the readable sentence in the error style.
-- **Current** — **Calm, recoverable copy**: it is usually temporary, and **Try
-  again** calls `reset`. In accounts it never hints at whether an account or a
-  password was right.
+- **Current** — **Calm, recoverable copy**: "Couldn't load {things}", "Nothing
+  has been changed.", and **Try again** reads again (`retry`, a refetch or
+  `router.refresh()`), never "reload the page" and never "Retry". A part of
+  a page that couldn't be read is `FailedRead`
+  (`components/shared/failed-read.tsx`). In accounts it never hints at
+  whether an account or a password was right.
 - **Current** — **Accounts never shows the auth library's message.** Every
   failed `authClient` call goes through `authErrorCopy(code)`
   (`apps/accounts.saroh.in/lib/auth-error-copy.ts`): a sentence for a wrong
@@ -172,11 +189,25 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   (DEC-075, `backend-jobs.md`). Its takings show "No takings
   yet" only when the read came back and the business has never been paid.
 - **Adopted** — **Every important workflow handles** loading, empty, partial,
-  error, permission denial, capability off, provider disconnected, provider
+  error, permission denial, module off, provider disconnected, provider
   error, stale information and retry (PRODUCT_STRATEGY §30), and the activation
   gate adds setup, attention and forbidden (`docs/design-system/18_ACTIVATION_RELEASE_GATE.md`).
-  `@saroh/ui/data-state` has no named state yet for provider-disconnected or
-  stale data.
+  `@saroh/ui/data-state` has no named state yet for stale data.
+- **Current** (10 Oct 2026) — **One empty card.** `EmptyState` in three sizes
+  and two kinds. A page-size first run has an icon, "No {things} yet", one
+  sentence and the header's own action ("New {thing}"), or no button and no
+  promise of one for someone who may not create. No results keeps the full
+  card and offers "Clear search", "Clear filters" or "Show all {things}".
+  `DataView` draws it. A picker says `noMatchLine(things, q)`.
+- **Current** (10 Oct 2026) — **A plan prompt has one label**, `planLabel`:
+  "See {Plan}" when one plan unlocks the thing, "See plans" otherwise.
+  Someone who can't change the plan reads who can, as text. Gap: most
+  prompts don't yet know whether the reader may change the plan and show
+  the link to everyone; the Plan and billing page then turns away anyone
+  but the owner.
+- **Gap** — About 55 lines inside a page still word a partial failure by
+  hand ("Reviews couldn't be read just now, so …"). They are true and say
+  what is missing. They don't yet read `couldntLoadLine`.
 
 ### Silent catches and API errors
 

@@ -8,6 +8,7 @@ import {
     CommandItem,
     CommandList,
 } from "@saroh/ui/command";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -110,9 +111,7 @@ export function ContactPicker({
                 >
                     <CommandInput placeholder="Search by name or email" />
                     <CommandList>
-                        <CommandEmpty>
-                            No one by that name or email.
-                        </CommandEmpty>
+                        <CommandEmpty>{noMatchLine("contacts")}</CommandEmpty>
                         {contacts.map((c) => (
                             <CommandItem
                                 key={c.id}

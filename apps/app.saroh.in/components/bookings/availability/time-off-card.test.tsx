@@ -184,7 +184,7 @@ describe("Time off, read first", () => {
 
     it("says none are booked, and still offers the button", () => {
         draw();
-        expect(host.textContent).toContain("None booked.");
+        expect(host.textContent).toContain("No time off booked.");
         expect(button("Add time off", host)).toBeDefined();
     });
 

@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { LimitReachedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
 import Link from "next/link";
@@ -96,11 +96,11 @@ export default async function NewSitePage({
                     ]}
                     title="Create a site"
                 />
-                <EmptyState
+                <LimitReachedState
                     icon={<Globe />}
-                    title={`${name} is this business's website`}
+                    title="You already have a website"
                     description="A business has one website. Its pages, posts, look and address are all changed from Website."
-                    action={
+                    secondary={
                         <Button asChild variant="outline">
                             <Link href={`/sites/${existing.id}/pages`}>
                                 Go to {name}

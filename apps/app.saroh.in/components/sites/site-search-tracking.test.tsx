@@ -695,12 +695,12 @@ describe("switched off by Saroh", () => {
 });
 
 describe("states", () => {
-    it("draws a failed read as a failure with Retry, never an empty form", async () => {
+    it("draws a failed read as a failure with Try again, never an empty form", async () => {
         render({ ok: false });
         expect(host.querySelector('[role="alert"]')).not.toBe(null);
-        expect(text()).toContain("Tracking couldn't be loaded");
+        expect(text()).toContain("Couldn't load tracking");
         expect(host.querySelector("input, textarea")).toBe(null);
-        await click(buttonIn(host, "Retry"));
+        await click(buttonIn(host, "Try again"));
         expect(refresh).toHaveBeenCalled();
     });
 

@@ -167,8 +167,8 @@ export function PacksScreen({
             {ordered.length === 0 ? (
                 <EmptyState
                     icon={<Ticket />}
-                    title="No packs yet"
-                    description="A pack is a number of classes for one price, used within a set time. Customers see it when they book a class."
+                    title="No class packs yet"
+                    description="A pack is a number of classes for one price, used within a set time."
                     action={
                         canWrite ? (
                             <Button asChild>

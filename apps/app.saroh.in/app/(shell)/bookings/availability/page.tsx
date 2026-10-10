@@ -1,7 +1,5 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState, PartialNotice } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
@@ -29,6 +27,7 @@ import {
     listStaff,
     readBookingPayment,
 } from "@/lib/staff/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Availability (U16): each person's weekly hours, time off and
@@ -76,15 +75,8 @@ export default async function AvailabilityPage() {
                 />
                 <div>
                     <FailedState
-                        title="Couldn't load everyone's hours"
-                        description="Nothing has been changed. Try again in a moment."
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href="/bookings/availability">
-                                    Try again
-                                </Link>
-                            </Button>
-                        }
+                        title={couldntLoad("everyone's hours")}
+                        retryHref="/bookings/availability"
                     />
                 </div>
             </PageContainer>

@@ -121,6 +121,7 @@ export function CustomersList({
                     empty={
                         <NoMatch
                             title={emptyTitle(query)}
+                            searched={Boolean(query.q)}
                             onClear={() =>
                                 go({ q: "", chip: "all", store: null })
                             }

@@ -214,7 +214,7 @@ describe("QrCodesList", () => {
     it("says there are none yet, and who makes them", () => {
         expect(list({ codes: [] }).textContent).toContain("No QR codes yet");
         expect(list({ codes: [], canChange: false }).textContent).toContain(
-            "An owner or admin makes them.",
+            "They are listed here with their scans once there are some.",
         );
     });
 });
@@ -337,7 +337,7 @@ describe("QrShare", () => {
         await draw({ ...s, view: { ...s.view, live: false } });
         const note = host.querySelector("[data-qr-not-live]");
         expect(note?.textContent).toContain(
-            "You can make codes now; they open once it is.",
+            "Your website isn't live yet. Codes you make now open once it is.",
         );
         expect(note?.querySelector("a")?.getAttribute("href")).toBe(
             "/sites/site_1",

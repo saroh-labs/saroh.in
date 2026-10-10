@@ -27,6 +27,8 @@ import {
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
+import { CalendarClock } from "lucide-react";
 
 const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
 
@@ -127,13 +129,22 @@ export function ServicesScreen({
                 </ReadOnlyNote>
             )}
             {services.length === 0 ? (
-                <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                    <p className="text-[14px] font-semibold">No services yet</p>
-                    <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                        Add what people can book — a one-to-one session or a
-                        class — and it shows on your booking page.
-                    </p>
-                </div>
+                <EmptyState
+                    icon={<CalendarClock />}
+                    title="No services yet"
+                    description={
+                        canEdit
+                            ? "Add what customers can book: a one-to-one or a class."
+                            : "What customers can book shows here: a one-to-one or a class."
+                    }
+                    action={
+                        canEdit ? (
+                            <Button asChild>
+                                <Link href="/services/new">New service</Link>
+                            </Button>
+                        ) : undefined
+                    }
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-3">
                     {services.map((s) => {

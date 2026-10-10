@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -13,6 +12,7 @@ import { QrButton } from "@/components/qr/qr-button";
 import { BusinessDate } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
+import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
 import { actionClass } from "./parts";
 
@@ -121,17 +121,12 @@ export function PayLinkBlock({
 }) {
     if (!ready) {
         return (
-            <p className="mt-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                Connect a payment provider to send a pay link.{" "}
-                {canManage ? (
-                    <Link
-                        href="/settings/providers"
-                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                    >
-                        Connect one
-                    </Link>
-                ) : null}
-            </p>
+            <ProviderDisconnectedState
+                size="inline"
+                provider="payment"
+                canConnect={canManage}
+                className="mt-2"
+            />
         );
     }
     if (link.url) {

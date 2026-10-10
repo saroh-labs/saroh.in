@@ -322,7 +322,7 @@ export function SubscriptionsScreen({
                             <EmptyState
                                 icon={<Repeat />}
                                 title="No one is subscribed yet"
-                                description="Put someone on a plan and their first invoice is issued at once; each renewal after that invoices itself."
+                                description="Put a customer on a plan and their first invoice goes out straight away."
                                 action={
                                     canSubscribe ? (
                                         <Button
@@ -334,11 +334,23 @@ export function SubscriptionsScreen({
                                 }
                             />
                         ) : rows.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
-                                {needle
-                                    ? `No ${TAB_LABEL[tab].toLowerCase()} subscriptions match “${query.trim()}”.`
-                                    : `No ${TAB_LABEL[tab].toLowerCase()} subscriptions.`}
-                            </div>
+                            needle ? (
+                                <EmptyState
+                                    kind="no-results"
+                                    things={`${TAB_LABEL[tab].toLowerCase()} subscriptions`}
+                                    cause="search"
+                                    query={query}
+                                    onClear={() => setQuery("")}
+                                />
+                            ) : (
+                                <EmptyState
+                                    kind="no-results"
+                                    things="subscriptions"
+                                    cause="view"
+                                    icon={<Repeat />}
+                                    title={`No ${TAB_LABEL[tab].toLowerCase()} subscriptions`}
+                                />
+                            )
                         ) : (
                             <ul className="flex flex-col gap-2">
                                 {rows.map((s) => (

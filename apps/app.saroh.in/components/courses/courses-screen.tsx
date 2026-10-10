@@ -146,7 +146,7 @@ export function CoursesScreen({
                 emptyState={{
                     icon: <GraduationCap />,
                     title: "No courses yet",
-                    note: "A course is a run of dated sessions with seats and a price, like a six-week class. Enrolling someone books every session and invoices them.",
+                    note: "A course is a run of dated sessions with seats and a price, like a six-week class.",
                     action: canWrite ? (
                         <Button asChild>
                             <Link href="/courses/new">New course</Link>

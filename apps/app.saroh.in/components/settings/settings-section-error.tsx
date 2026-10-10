@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { reportError } from "@saroh/ui/lib/report-error";
+import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -18,7 +19,7 @@ import { SECTION_FAILURE } from "@/lib/settings/section-failure";
 /**
  * One settings tab that couldn't be read ("Saroh Settings" design, F12): its
  * own heading, what couldn't be read and that nothing changed, Try again and
- * Back to Home — on that tab only. The tabs beside it stay, so the rest of
+ * Back to Home, on that tab only. The tabs beside it stay, so the rest of
  * Settings is a click away (each tab has its own `error.tsx`).
  *
  * Try again is `retry`, which reads the tab from the server again; `reset`
@@ -28,12 +29,10 @@ import { SECTION_FAILURE } from "@/lib/settings/section-failure";
 export function SettingsSectionError({
     section,
     error,
-    reset,
     retry,
 }: {
     section: SettingsSection;
     error: Error & { digest?: string };
-    reset: () => void;
     retry: () => void;
 }) {
     const denied = isDenial(error);
@@ -48,34 +47,20 @@ export function SettingsSectionError({
         }
     }, [denied, error, section]);
 
-    if (denied) return <SectionError error={error} reset={reset} />;
+    if (denied) return <SectionError error={error} retry={retry} />;
 
     return (
         <SettingsPanel header={<SettingsPanelHeader title={copy.heading} />}>
             <FailedState
                 className="max-w-[760px]"
-                title={copy.title}
-                description={copy.body}
+                title={couldntLoad(copy.things)}
+                description={nothingChanged(copy.reassurance)}
+                onRetry={retry}
+                reference={error.digest}
                 action={
-                    <div className="mt-1 flex flex-col items-center gap-3">
-                        <div className="flex flex-wrap justify-center gap-2">
-                            <Button onClick={retry} className="wk-press">
-                                Try again
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="wk-press"
-                            >
-                                <Link href="/">Back to Home</Link>
-                            </Button>
-                        </div>
-                        {error.digest ? (
-                            <p className="font-mono text-xs text-muted-foreground">
-                                Reference: {error.digest}
-                            </p>
-                        ) : null}
-                    </div>
+                    <Button asChild variant="ghost" className="wk-press">
+                        <Link href="/">{backTo("Home")}</Link>
+                    </Button>
                 }
             />
         </SettingsPanel>

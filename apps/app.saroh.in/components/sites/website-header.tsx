@@ -321,7 +321,7 @@ export function SiteAddressLink({
                     href={previewHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={`Preview ${siteName}'s website, not published yet (opens in a new tab)`}
+                    aria-label={`Preview ${siteName}'s website, not live yet (opens in a new tab)`}
                     data-site-preview
                     className={cn(ADDRESS_LINK, "font-medium")}
                 >

@@ -1,4 +1,5 @@
 import { Button } from "@saroh/ui/button";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -45,7 +46,7 @@ export function PlanEndingBanner({
                 on {ending.nextPlanName}, and everything you made is kept.
             </p>
             <Button asChild size="sm" className="shrink-0">
-                <Link href={upgradeHref()}>Choose a plan</Link>
+                <Link href={upgradeHref()}>{planLabel()}</Link>
             </Button>
         </div>
     );

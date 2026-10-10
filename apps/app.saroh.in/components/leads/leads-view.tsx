@@ -17,6 +17,7 @@ import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
+import { Inbox } from "lucide-react";
 
 /**
  * The pipeline as a register.
@@ -163,7 +164,11 @@ export function LeadsView({
             // Leads | Follow-ups is the page's tab row; status narrows the list.
             filterStyle="segmented"
             searchableColumnIds={["title", "contact", "stage"]}
-            empty="Leads appear here as enquiries come in, or when you add one."
+            emptyState={{
+                icon: <Inbox />,
+                title: "No leads yet",
+                note: "They show here as enquiries come in, or when you add one.",
+            }}
             renderCard={(l) => (
                 <Link href={`/leads/${l.id}`} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a

@@ -87,7 +87,7 @@ lines (`runbooks/MODULE_ROLLOUT.md`, step 3).
 
 `ModuleGate` at a section's `layout.tsx`, so a deep link to a detail page is
 covered by one check rather than each page remembering. It renders
-`CapabilityOffState`, visibly distinct from an empty list, because "Commerce
+`ModuleOffState`, visibly distinct from an empty list, because "Commerce
 is turned off" and "you have no orders" are different facts
 ([[saroh-product-states]]).
 

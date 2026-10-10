@@ -1,6 +1,10 @@
 "use client";
 
-import { PartialNotice } from "@saroh/ui/data-state";
+import {
+    EmptyState,
+    PartialNotice,
+    ProviderDisconnectedState,
+} from "@saroh/ui/data-state";
 import { useId } from "react";
 
 import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
@@ -11,6 +15,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import { TryAgainLink } from "@/components/shared/failed-read";
 import { BookingEmailsBlock } from "./booking-emails-block";
 import { DomainsRowView, ProviderRowView } from "./provider-row";
 
@@ -49,10 +54,9 @@ export function ProviderList({
     return (
         <div className="space-y-5">
             {view.unread.length > 0 ? (
-                <PartialNotice>
-                    Your {view.unread.map((k) => UNREAD[k]).join(" and ")} could
-                    not be read, so they are not listed here. Reload the page to
-                    try again.
+                <PartialNotice action={<TryAgainLink />}>
+                    Your {view.unread.map((k) => UNREAD[k]).join(" and ")}{" "}
+                    couldn&apos;t be loaded, so they are not listed here.
                 </PartialNotice>
             ) : null}
 
@@ -66,12 +70,19 @@ export function ProviderList({
                                 {...dialogs}
                             />
                         ))
+                    ) : offersPayments && !view.paymentsLocked ? (
+                        <ProviderDisconnectedState
+                            size="inline"
+                            provider="payment"
+                            className="px-4 py-[13px] min-[760px]:px-[18px]"
+                            href={null}
+                        />
                     ) : (
-                        <p className="text-pretty px-4 py-[13px] text-[13px] leading-[1.45] text-muted-foreground min-[760px]:px-[18px]">
-                            {offersPayments && !view.paymentsLocked
-                                ? "Nothing connected yet — connect a payment provider to take payments online."
-                                : "Nothing connected yet."}
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="px-4 py-[13px] min-[760px]:px-[18px]"
+                            title="Nothing connected yet."
+                        />
                     )}
                 </Group>
             ) : null}

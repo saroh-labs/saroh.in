@@ -9,6 +9,7 @@ import { searchTargets } from "@/lib/qr/targets";
 import type { QrPlace } from "@/lib/qr/types";
 import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 import type { Choice } from "./choice-group";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
@@ -125,7 +126,7 @@ export function QrTargetPicker({
                             ) : null}
                             {found.length === 0 ? (
                                 <p className="text-[13px] text-muted-foreground">
-                                    Nothing matches “{query.trim()}”.
+                                    {noMatchLine("products or pages", query)}
                                 </p>
                             ) : (
                                 <ul

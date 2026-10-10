@@ -1,3 +1,5 @@
+import { FailedRead } from "@/components/shared/failed-read";
+import { EmptyState } from "@saroh/ui/data-state";
 import type { ReactNode } from "react";
 
 /**
@@ -41,17 +43,16 @@ export function ContactPanelSection({
             </div>
             {aside}
             {count === null ? (
-                <p
-                    role="alert"
-                    className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground"
-                >
-                    {failed} could not be loaded just now. Nothing has been
-                    changed — reload the page to try again.
-                </p>
+                <FailedRead
+                    things={failed.charAt(0).toLowerCase() + failed.slice(1)}
+                    className="px-4 py-3.5"
+                />
             ) : count === 0 ? (
-                <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-                    {empty}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="px-4 py-3.5"
+                    title={empty}
+                />
             ) : (
                 children
             )}

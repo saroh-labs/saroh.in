@@ -8,7 +8,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
-import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
@@ -26,6 +26,7 @@ import {
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listCheckoutProviders } from "@/lib/stores/storefronts";
+import { Plug } from "lucide-react";
 
 /**
  * Settings → Providers (#123). One OWNER/ADMIN surface for the services
@@ -125,14 +126,13 @@ export default async function ProvidersSettingsPage() {
                 different facts about the same screen (#177, §30). */}
             {result.status === "denied" ? (
                 <PermissionDeniedState
-                    title="You can't open provider health"
-                    description="It can name the credentials a business depends on, so it is kept to the roles that manage them."
-                    note={WHO_CAN_CHANGE}
+                    {...whoCanChange({ thing: "Providers" })}
                 />
             ) : !view?.any ? (
                 <EmptyState
+                    icon={<Plug />}
                     title="No providers connected yet"
-                    description="Payments, messaging and domains appear here once a module that needs them is set up."
+                    description="Payments, messaging and domains show here once a module that needs them is set up."
                 />
             ) : (
                 <ProviderList

@@ -186,7 +186,7 @@ describe("ordersEmptyCopy", () => {
     it("says No orders yet only for an empty business", () => {
         expect(ordersEmptyCopy(first, "Hill Road")).toMatchObject({
             title: "No orders yet",
-            note: "The first order in Hill Road appears here the moment someone checks out.",
+            note: "Orders from your website and counter show here.",
             action: null,
         });
     });

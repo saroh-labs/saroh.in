@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Globe, Plus } from "lucide-react";
+import { Globe } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -61,8 +61,8 @@ export default async function SitesPage() {
             : {
                   title: "No website yet",
                   description: mayCreate
-                      ? "Pages, posts and an address — make one and it is yours to edit before anyone can see it."
-                      : "An owner or admin creates the first one.",
+                      ? "Make one and it is yours to edit before anyone can see it."
+                      : "Its pages and posts show here once there is one.",
               };
 
     return (
@@ -80,10 +80,7 @@ export default async function SitesPage() {
                     action={
                         mayCreate ? (
                             <Button asChild>
-                                <Link href="/sites/new">
-                                    <Plus className="mr-1.5 size-4" />
-                                    New site
-                                </Link>
+                                <Link href="/sites/new">New site</Link>
                             </Button>
                         ) : undefined
                     }

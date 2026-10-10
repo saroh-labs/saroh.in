@@ -5,6 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { backTo, couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * The Service Editor when there is nothing to edit (E2, after the design):
@@ -53,19 +54,18 @@ export function ServiceEditorState({
                 <div>
                     {state === "failed" ? (
                         <FailedState
-                            title="Couldn't load this service"
-                            description="The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
+                            title={couldntLoad("this service")}
+                            retryHref={retryHref}
                             action={
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    <Button asChild>
-                                        <Link href={retryHref}>Try again</Link>
-                                    </Button>
-                                    <Button asChild variant="outline">
-                                        <Link href="/services">
-                                            Back to services
-                                        </Link>
-                                    </Button>
-                                </div>
+                                <Button
+                                    asChild
+                                    variant="ghost"
+                                    className="wk-press"
+                                >
+                                    <Link href="/services">
+                                        {backTo("Services")}
+                                    </Link>
+                                </Button>
                             }
                         />
                     ) : (

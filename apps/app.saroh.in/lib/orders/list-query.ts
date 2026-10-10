@@ -242,7 +242,7 @@ export function ordersEmptyCopy(
     return {
         kind: "first-run",
         title: "No orders yet",
-        note: `The first order in ${storeName ?? "your locations"} appears here the moment someone checks out.`,
+        note: "Orders from your website and counter show here.",
         action: null,
     };
 }

@@ -39,8 +39,7 @@ import type { ShareLink } from "@/lib/sites/share-links";
  * explicitly and why the zone travels on every row.
  */
 
-const EMPTY_NOTE =
-    "Bookings appear here as visitors reserve slots on your services.";
+const EMPTY_NOTE = "They show here when a customer books, or when you add one.";
 
 const FILTERS: DataFilter<BookingWithService>[] = [
     // Upcoming leads, because the schedule is mostly read forwards. "Needs an
@@ -236,17 +235,12 @@ export function BookingsView({
             filters={FILTERS}
             initialFilterId={initialView ?? "upcoming"}
             searchableColumnIds={["service", "booker"]}
-            empty={EMPTY_NOTE}
-            emptyState={
-                share
-                    ? {
-                          icon: <CalendarDays />,
-                          title: "No bookings yet",
-                          note: EMPTY_NOTE,
-                          action: <ShareLinkButton link={share} />,
-                      }
-                    : undefined
-            }
+            emptyState={{
+                icon: <CalendarDays />,
+                title: "No bookings yet",
+                note: EMPTY_NOTE,
+                action: share ? <ShareLinkButton link={share} /> : undefined,
+            }}
             rowActions={(b) =>
                 // Not for an appointment that already happened: cancelling one
                 // is meaningless, and the detail screen offers an outcome

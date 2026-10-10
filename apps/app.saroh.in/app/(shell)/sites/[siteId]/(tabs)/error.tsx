@@ -8,19 +8,20 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="This tab couldn't be loaded"
-            description="Nothing has changed and nothing is lost — your published site is unaffected."
+            retry={retry}
+            heading="Website"
+            things="this tab"
+            reassurance="Your published site is unaffected."
             backHref="/sites"
-            backLabel="Back to Website"
+            place="Website"
         />
     );
 }

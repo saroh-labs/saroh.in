@@ -30,6 +30,7 @@ import {
     roleLabel,
     shownInvitations,
 } from "@/lib/stores/people";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
@@ -85,13 +86,9 @@ export function PeopleSection({
     if (!people) {
         return frame(
             <FailedState
-                title="The people here could not be loaded"
-                description="Who works at this location could not be read, so nobody is shown rather than guessed. Nothing has been changed."
-                action={
-                    <Button variant="outline" onClick={() => router.refresh()}>
-                        Try again
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("the people here")}
+                onRetry={() => router.refresh()}
             />,
         );
     }
@@ -185,6 +182,7 @@ export function PeopleSection({
 
                     {alone ? (
                         <EmptyState
+                            size="panel"
                             title="No one else works here yet"
                             description={onlyOwnerWords(people, store.name)}
                             action={invite ?? undefined}

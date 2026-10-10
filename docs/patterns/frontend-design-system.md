@@ -201,6 +201,13 @@
   replaced; `max-[760px]:` overlapped by a pixel and is gone.
 - **Current** — **`--warning` is a fill;** text on a pale tint uses
   `--warning-subtle-foreground`.
+- **Current** (10 Oct 2026) — **A state has one look.** Nothing here, couldn't
+  load, you can't, turned off, comes with a plan, limit reached, not
+  connected and not published are the named states in
+  `@saroh/ui/data-state`, each at `page`, `panel` or `inline` size. Dashed
+  is a space to fill, solid a wall, red an alert. Never a dashed box, a red
+  line or a grey sentence drawn by hand (`frontend-error-feedback.md`,
+  `.agents/skills/saroh-product-states/SKILL.md`).
 
 ## Touch, reflow and accessibility
 

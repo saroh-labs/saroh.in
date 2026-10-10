@@ -63,7 +63,7 @@ export function ListFirstRun({
         <EmptyState
             icon={<Users />}
             title="No customers yet"
-            description="Customers are people who've paid, signed in on your website or been added here. Everyone else is in Contacts."
+            description="People who've paid, signed in on your website or been added here show up as customers."
             action={
                 <div className="flex flex-wrap justify-center gap-2">
                     <Button asChild variant="outline">
@@ -75,9 +75,7 @@ export function ListFirstRun({
                     </Button>
                     {hasStorefront ? null : (
                         <Button asChild>
-                            <Link href={newStorefrontHref}>
-                                Create a location
-                            </Link>
+                            <Link href={newStorefrontHref}>New location</Link>
                         </Button>
                     )}
                 </div>

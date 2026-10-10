@@ -17,6 +17,7 @@ import {
     sameRows,
     variantProblem,
 } from "@/lib/products/variant-rows";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
@@ -359,10 +360,12 @@ export function VariantsSection({
                             </ol>
                         </>
                     ) : (
-                        <div className="mb-3 text-pretty rounded-[10px] border border-dashed border-border-strong p-3.5 text-[12px] leading-[1.5] text-foreground/75">
-                            No variants. It is sold as itself, at the price in
-                            Basics. Add one for each {opt}.
-                        </div>
+                        <EmptyState
+                            size="inline"
+                            className="mb-3"
+                            title="No variants yet"
+                            description={`It is sold as itself, at the price in Basics. Add one for each ${opt}.`}
+                        />
                     )}
 
                     <VariantAddRow

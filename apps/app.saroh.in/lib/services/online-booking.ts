@@ -1,4 +1,5 @@
 import type { BookingPaymentView } from "@/lib/staff/types";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { DepositMode } from "./service";
 
@@ -48,7 +49,7 @@ const PROVIDER_FIX: OnlineFix = {
 /** Where a plan without online payments is changed (#821, #835). */
 export const PLAN_FIX: OnlineFix = {
     href: "/settings/billing#change-plan",
-    label: "See plans",
+    label: planLabel(),
 };
 const PAYMENTS_FIX: OnlineFix = {
     href: "/settings/modules",
