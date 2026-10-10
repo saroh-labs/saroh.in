@@ -1,10 +1,10 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
     FailedState,
-    PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
@@ -99,24 +99,12 @@ export function OrdersFailed({
  */
 export function OrdersAttentionPartial({ onRetry }: { onRetry: () => void }) {
     return (
-        <PartialNotice
+        <PartialRead
             className="mb-3.5"
-            action={
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onRetry}
-                    className="wk-press flex-none border-border-strong bg-card text-foreground"
-                >
-                    Try again
-                </Button>
-            }
-        >
-            Needs attention couldn&apos;t be read, so allergies and other notes
-            show as &ldquo;Not available&rdquo;. The orders below arrived
-            normally. Check with the customer before an order goes out.
-        </PartialNotice>
+            things="what needs attention"
+            so="Allergies and other notes show as “Not available”. The orders below arrived normally. Check with the customer before an order goes out."
+            onRetry={onRetry}
+        />
     );
 }
 

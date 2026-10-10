@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { Layers, Pencil } from "lucide-react";
@@ -203,11 +204,11 @@ export function ProductCollectionsTab({
                     )}
                 </div>
                 {collections === null ? (
-                    <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground">
-                        The business&apos;s collections couldn&apos;t be read
-                        just now, so their sizes aren&apos;t shown and they
-                        can&apos;t be changed here. Try again in a moment.
-                    </p>
+                    <FailedRead
+                        className="mt-2"
+                        things="the business's collections"
+                        reassurance="Their sizes aren't shown and they can't be changed here."
+                    />
                 ) : null}
             </section>
             <section aria-labelledby="on-website">

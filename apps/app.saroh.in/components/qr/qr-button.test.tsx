@@ -371,8 +371,8 @@ describe("QrPanel — a saved link", () => {
             .mockResolvedValueOnce(ready({ code: siteCode() }));
         await draw(<QrButton link={SITE} env={env} />);
         await click(trigger());
-        expect(q('[role="dialog"] [role="alert"]')?.textContent).toBe(
-            "We couldn't load this QR code. Nothing was changed.",
+        expect(q('[role="dialog"] [role="alert"]')?.textContent).toContain(
+            "Couldn't load this QR code. Nothing has been changed.",
         );
         // Never "no code yet", and nothing to make from a failure.
         expect(panelButton("Make this code")).toBeUndefined();

@@ -1,3 +1,4 @@
+import { FailedRead } from "@/components/shared/failed-read";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -138,38 +139,22 @@ export function LinkedLines({ lines }: { lines: readonly string[] }) {
     );
 }
 
-/** A panel that didn't arrive, or that this role may not see. */
+/**
+ * A panel that didn't arrive, or that this role may not see. One that
+ * didn't arrive offers Try again, which reads the page's panels again.
+ */
 export function PanelLine({
     status,
     what,
-    retryHref,
 }: {
     status: "failed" | "forbidden";
     what: string;
-    retryHref?: string;
 }) {
     return status === "failed" ? (
-        <>
-            <p
-                role="alert"
-                className="text-pretty text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-            >
-                Couldn&apos;t load {what}. Everything else on this page is
-                current.
-            </p>
-            {retryHref ? (
-                <Link
-                    href={retryHref}
-                    scroll={false}
-                    className={cn(
-                        FOCUS,
-                        "inline-flex h-8 items-center self-start rounded-lg border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted coarse:min-h-11",
-                    )}
-                >
-                    Try again
-                </Link>
-            ) : null}
-        </>
+        <FailedRead
+            things={what}
+            reassurance="Everything else on this page is current."
+        />
     ) : (
         <p className="text-[12px] text-muted-foreground">
             Your role can&apos;t see {what}.

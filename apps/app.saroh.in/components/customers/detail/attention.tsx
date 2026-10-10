@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -158,10 +159,11 @@ export function AttentionCard({
                 ) : null}
             </div>
             {!state.read ? (
-                <p className="mt-1.5 text-[13px] text-muted-foreground">
-                    Needs attention couldn&apos;t be read just now. Nothing on
-                    it has changed.
-                </p>
+                <FailedRead
+                    className="mt-1.5"
+                    things="what needs attention"
+                    reassurance="Nothing on it has changed."
+                />
             ) : (
                 <>
                     {state.entries.map((e) => (

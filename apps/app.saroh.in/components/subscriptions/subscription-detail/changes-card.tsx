@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
@@ -40,6 +41,15 @@ export function ChangesCard({
     const [cursor, setCursor] = useState(first?.nextCursor ?? null);
     const [everything, setEverything] = useState(false);
     const [loading, setLoading] = useState(false);
+    // The card keeps the pages it has read. A first page that failed and
+    // then arrived (Try again reads the page again) starts it from that
+    // page, or the card would draw "ok" with nothing in it.
+    const [arrived, setArrived] = useState(first !== null);
+    if (first && !arrived) {
+        setArrived(true);
+        setEvents(first.events);
+        setCursor(first.nextCursor);
+    }
 
     const all = changeRows(events, sub, viewerId, now);
     const rows = everything ? all : all.slice(0, FIRST_CHANGES);
@@ -68,14 +78,14 @@ export function ChangesCard({
             <h2 id="changes-title" className={cn(TITLE, "mb-2")}>
                 Changes
             </h2>
-            {page.state !== "ok" ? (
-                <p
-                    role={page.state === "failed" ? "alert" : "note"}
-                    className="text-[12.5px] text-muted-foreground"
-                >
-                    {page.state === "denied"
-                        ? "Your role can't see what changed on this subscription."
-                        : "The changes couldn't be loaded. Everything else on this page is up to date."}
+            {page.state === "failed" ? (
+                <FailedRead
+                    things="the changes"
+                    reassurance="Everything else on this page is up to date."
+                />
+            ) : page.state !== "ok" ? (
+                <p role="note" className="text-[12.5px] text-muted-foreground">
+                    Your role can&apos;t see what changed on this subscription.
                 </p>
             ) : (
                 <>

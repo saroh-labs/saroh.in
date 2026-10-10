@@ -1,8 +1,5 @@
-import {
-    FailedState,
-    PartialNotice,
-    PermissionDeniedState,
-} from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { ServicesScreen } from "@/components/services/services-screen";
@@ -92,13 +89,16 @@ export default async function ServicesPage() {
         <PageContainer width="full">
             <div>
                 {staffList && usage ? null : (
-                    <PartialNotice className="mb-3">
-                        {!staffList && !usage
-                            ? "Who takes each service and how each is used could not be loaded."
-                            : !staffList
-                              ? "Who takes each service could not be loaded."
-                              : "How much each service is booked could not be loaded."}
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things={
+                            !staffList && !usage
+                                ? "who takes each service or how much each is booked"
+                                : !staffList
+                                  ? "who takes each service"
+                                  : "how much each service is booked"
+                        }
+                    />
                 )}
                 <ServicesScreen
                     services={services}

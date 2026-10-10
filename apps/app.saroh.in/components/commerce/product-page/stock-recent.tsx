@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { formatDateTime, viewerTimeZone } from "@/lib/format/datetime";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
@@ -105,13 +106,11 @@ export function RecentChanges({
                 </TextLink>
             </div>
             {log === null ? (
-                <p
-                    role="alert"
-                    className="px-[18px] pb-4 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    Couldn&apos;t load the stock log. The numbers above are
-                    still right — they come from the shelves.
-                </p>
+                <FailedRead
+                    className="px-[18px] pb-4"
+                    things="the stock log"
+                    reassurance="The numbers above are still right. They come from the shelves."
+                />
             ) : log.length === 0 ? (
                 <EmptyState
                     size="inline"

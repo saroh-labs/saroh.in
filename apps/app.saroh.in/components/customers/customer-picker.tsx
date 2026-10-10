@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useRef, useState } from "react";
 
@@ -24,7 +25,6 @@ import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
 
 import { Notice } from "@saroh/ui/notice";
-import { TextLink } from "@saroh/ui/text-link";
 import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 
 /** How long typing settles before the search runs. */
@@ -222,15 +222,11 @@ export function CustomerPicker({
                 </Notice>
             ) : null}
             {failed ? (
-                <p
-                    role="alert"
-                    className="mb-2 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    Couldn&apos;t search customers — try again.{" "}
-                    <TextLink onClick={() => setRetry((n) => n + 1)}>
-                        Try again
-                    </TextLink>
-                </p>
+                <FailedRead
+                    className="mb-2"
+                    things="customers"
+                    onRetry={() => setRetry((n) => n + 1)}
+                />
             ) : null}
             {forbidden && canSearch ? (
                 <p className="mb-2 text-[11.5px] text-muted-foreground">

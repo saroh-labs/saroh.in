@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { FailedRead } from "@/components/shared/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -246,17 +246,10 @@ function NewOrderBody({
                         Reading what {storeName} sells…
                     </Notice>
                 ) : !o.data ? (
-                    <Notice tone="error">
-                        Couldn&apos;t read what {storeName} sells.{" "}
-                        <Button
-                            variant="link"
-                            size="inline"
-                            type="button"
-                            onClick={o.retryCatalogue}
-                        >
-                            Try again
-                        </Button>
-                    </Notice>
+                    <FailedRead
+                        things={`what ${storeName} sells`}
+                        onRetry={o.retryCatalogue}
+                    />
                 ) : (
                     <LinesStep
                         products={o.data.products}
@@ -276,6 +269,7 @@ function NewOrderBody({
                     onAddress={o.setAddress}
                     format={o.format}
                     failed={o.waysFailed}
+                    onRetry={o.retryWays}
                     loading={o.waysLoading}
                 />
                 <PayStep

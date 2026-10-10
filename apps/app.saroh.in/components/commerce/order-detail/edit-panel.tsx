@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
@@ -222,11 +223,11 @@ function EditDraft({
                     );
                 })}
                 {addable === "unavailable" ? (
-                    <p className="mt-2.5 text-[12px] text-muted-foreground">
-                        The products couldn&apos;t be loaded, so nothing can be
-                        added right now. Quantities and the address still
-                        change.
-                    </p>
+                    <FailedRead
+                        className="mt-2.5"
+                        things="the products"
+                        reassurance="Nothing can be added until they load. Quantities and the address still change."
+                    />
                 ) : addable && addable.length > 0 ? (
                     <label className="mt-2.5 block text-[12px] font-medium">
                         Add an item

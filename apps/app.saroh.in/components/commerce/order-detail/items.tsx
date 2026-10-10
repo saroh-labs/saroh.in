@@ -1,3 +1,4 @@
+import { PartialRead } from "@/components/shared/failed-read";
 import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -149,15 +150,10 @@ export function AllergyBanner({
 }) {
     if (unchecked) {
         return (
-            <Notice role="status">
-                <div className="text-[13.5px] font-bold">
-                    Couldn&apos;t check {first}&apos;s allergies
-                </div>
-                <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
-                    Their Needs attention didn&apos;t load, so nothing here was
-                    checked against it. Ask {first} before it goes out.
-                </p>
-            </Notice>
+            <PartialRead
+                things={`${first}'s allergies`}
+                so={`Nothing here was checked against them. Ask ${first} before it goes out.`}
+            />
         );
     }
     if (named.length === 0) return null;

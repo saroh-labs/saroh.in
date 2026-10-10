@@ -1,3 +1,4 @@
+import { FailedRead } from "@/components/shared/failed-read";
 import { plural } from "@/lib/format/plural";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -142,9 +143,10 @@ export function ConnectedPanel({
                 </ul>
             )}
             {others === null && who.contactId ? (
-                <p className="mt-2 text-[12px] text-muted-foreground">
-                    {first}&apos;s other invoices could not be counted just now.
-                </p>
+                <FailedRead
+                    className="mt-2"
+                    things={`${first}'s other invoices`}
+                />
             ) : null}
         </SidePanel>
     );

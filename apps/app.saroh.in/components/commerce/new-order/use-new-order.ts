@@ -123,6 +123,8 @@ export function useNewOrder({
         ),
     ).sort();
     const linesKey = `${storeId}|${productIds.join(",")}`;
+    // Try again, for a read of the ways that failed: asked again as it is.
+    const [linesRetry, setLinesRetry] = useState(0);
     useEffect(() => {
         let live = true;
         const [store = "", ids = ""] = linesKey.split("|");
@@ -132,7 +134,7 @@ export function useNewOrder({
         return () => {
             live = false;
         };
-    }, [linesKey]);
+    }, [linesKey, linesRetry]);
     const linesNow = linesRead?.key === linesKey ? linesRead : null;
     const ways = linesNow?.read?.ways ?? [];
     const way = ways.some((w) => w.type === chosenWay)
@@ -230,6 +232,10 @@ export function useNewOrder({
         ways,
         waysLoading: !linesNow,
         waysFailed: !!linesNow && linesNow.read === null,
+        retryWays: () => {
+            setLinesRead(null);
+            setLinesRetry((n) => n + 1);
+        },
         way,
         setWay,
         address,

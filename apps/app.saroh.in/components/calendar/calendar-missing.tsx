@@ -1,9 +1,6 @@
 "use client";
 
-import { plural } from "@/lib/format/plural";
-import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
-import { useRouter } from "next/navigation";
+import { PartialRead } from "@/components/shared/failed-read";
 
 import type { CalendarMonth } from "@/lib/calendar/types";
 
@@ -25,29 +22,17 @@ export function CalendarMissing({
     /** "month" or "week": what the rest is still here for. */
     span: string;
 }) {
-    const router = useRouter();
     const missing = data.unavailable.map((u) => u.label);
     if (missing.length === 0) return null;
     const money = data.takings !== undefined;
+    const noMoney =
+        data.money?.total === null || (money && data.takings?.total === null);
     return (
-        <PartialNotice
-            action={
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.refresh()}
-                >
-                    Try again
-                </Button>
-            }
-        >
-            {listed(missing)} couldn&apos;t be loaded, so{" "}
-            {plural(missing.length, "it is", "they are")} missing from this{" "}
-            {span} — everything else is here.
-            {data.money?.total === null ||
-            (money && data.takings?.total === null)
-                ? " Money is left out while part of it is missing."
-                : ""}
-        </PartialNotice>
+        <PartialRead
+            things={listed(missing)}
+            so={`Everything else in this ${span} is here.${
+                noMoney ? " Money is left out while part of it is missing." : ""
+            }`}
+        />
     );
 }

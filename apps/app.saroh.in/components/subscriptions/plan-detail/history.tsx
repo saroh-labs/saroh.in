@@ -1,3 +1,4 @@
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -75,12 +76,7 @@ export function PlanHistory({
                         Show earlier changes
                     </Button>
                     {moreFailed ? (
-                        <p
-                            role="alert"
-                            className="text-[12.5px] text-destructive"
-                        >
-                            Earlier changes couldn&apos;t be loaded. Try again.
-                        </p>
+                        <FailedRead things="earlier changes" onRetry={onMore} />
                     ) : null}
                 </div>
             ) : null}

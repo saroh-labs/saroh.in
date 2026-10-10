@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
@@ -264,14 +265,21 @@ function Body({
                             title="No charges yet."
                         />
                     )
+                ) : charges.state === "failed" ? (
+                    // The charges are the list page's read, handed down:
+                    // Try again reads the page again and they arrive here.
+                    <FailedRead
+                        className="border-t border-border/70 py-2"
+                        things="the charges"
+                        reassurance="The rest is up to date."
+                    />
                 ) : (
                     <p
-                        role={charges.state === "failed" ? "alert" : "note"}
+                        role="note"
                         className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground"
                     >
-                        {charges.state === "denied"
-                            ? "Your role can't see invoices, so charges aren't shown."
-                            : "Charges couldn't be loaded. The rest is up to date."}
+                        Your role can&apos;t see invoices, so charges
+                        aren&apos;t shown.
                     </p>
                 )}
             </QuickLookCard>

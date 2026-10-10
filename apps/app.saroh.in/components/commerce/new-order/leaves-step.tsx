@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 
 import { Chip } from "@/components/shared/chip";
@@ -21,8 +22,11 @@ export function LeavesStep({
     onAddress,
     format,
     failed,
+    onRetry,
     loading,
 }: {
+    /** Asks again for the ways these items can leave. */
+    onRetry: () => void;
     ways: NewOrderWay[];
     way: NewOrderWay["type"] | null;
     onWay: (type: NewOrderWay["type"]) => void;
@@ -38,13 +42,10 @@ export function LeavesStep({
     return (
         <StepCard title="How it leaves">
             {failed ? (
-                <p
-                    role="alert"
-                    className="text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    Couldn&apos;t read how these items can leave. Change an item
-                    to try again.
-                </p>
+                <FailedRead
+                    things="how these items can leave"
+                    onRetry={onRetry}
+                />
             ) : ways.length === 0 && !loading ? (
                 <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                     These items have no way to leave together here. Take one

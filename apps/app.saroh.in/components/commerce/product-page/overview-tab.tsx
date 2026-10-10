@@ -134,11 +134,7 @@ export function ProductOverviewTab({
                             />
                         </>
                     ) : (
-                        <PanelLine
-                            status={orders.status}
-                            what="orders"
-                            retryHref={href("overview")}
-                        />
+                        <PanelLine status={orders.status} what="orders" />
                     )}
                 </LinkedCard>
                 <LinkedCard title="Discounts" href={href("discounts")}>

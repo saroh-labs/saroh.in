@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -321,7 +322,8 @@ function LibraryPanel({
     const [items, setItems] = useState<LibraryItem[] | null | "loading">(
         "loading",
     );
-    // Read once, when the panel opens.
+    // Read when the panel opens, and again on Try again.
+    const [attempt, setAttempt] = useState(0);
     useEffect(() => {
         let live = true;
         void listLibrary().then((list) => {
@@ -330,7 +332,7 @@ function LibraryPanel({
         return () => {
             live = false;
         };
-    }, []);
+    }, [attempt]);
     return (
         <div className="rounded-[10px] bg-muted p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -354,10 +356,14 @@ function LibraryPanel({
                     <Skeleton aria-hidden className="h-16 w-20" />
                 </div>
             ) : items === null ? (
-                <p role="alert" className="text-[12.5px] text-destructive">
-                    Couldn&apos;t load your photos. Close this and try again, or
-                    add one by address.
-                </p>
+                <FailedRead
+                    things="your photos"
+                    reassurance="You can still add one by address."
+                    onRetry={() => {
+                        setItems("loading");
+                        setAttempt((n) => n + 1);
+                    }}
+                />
             ) : items.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
                     No photos in your library yet — upload one, or add one by

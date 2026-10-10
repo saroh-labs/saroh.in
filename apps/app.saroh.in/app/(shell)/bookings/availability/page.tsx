@@ -1,4 +1,5 @@
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -149,10 +150,11 @@ export default async function AvailabilityPage() {
         <PageContainer width="full">
             <div>
                 {calendar ? null : (
-                    <PartialNotice className="mb-3">
-                        Bookings could not be loaded, so the hours below
-                        can&apos;t say which bookings they would leave out.
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things="bookings"
+                        so="The hours below can't say which bookings they would leave out."
+                    />
                 )}
                 {/* Everyone who takes bookings uses a team seat (DEC-105). */}
                 {may("service:write") ? (

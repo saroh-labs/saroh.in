@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -330,9 +331,7 @@ function ClassesLeft({
                     ) : null}
                 </>
             ) : (
-                <p className="mt-2 text-[13px] text-muted-foreground">
-                    Classes left couldn&apos;t be read just now.
-                </p>
+                <FailedRead className="mt-2" things="classes left" />
             )}
         </section>
     );
@@ -362,9 +361,7 @@ function NextBooking({
         <section className={CARD} aria-label="Next booking">
             <div className={LABEL}>Next booking</div>
             {d.bookings === null ? (
-                <p className="mt-1.5 text-[13px] text-muted-foreground">
-                    Bookings couldn&apos;t be read just now.
-                </p>
+                <FailedRead className="mt-1.5" things="bookings" />
             ) : (
                 <>
                     <div className="mt-1.5 text-[15px] font-semibold">

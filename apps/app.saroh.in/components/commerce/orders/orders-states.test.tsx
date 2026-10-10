@@ -45,7 +45,7 @@ describe("OrdersAttentionPartial (B15)", () => {
 
     it("says what is missing, that the rows are whole, and offers a retry", () => {
         expect(html).toContain('role="status"');
-        expect(html).toContain("Needs attention couldn&#x27;t be read");
+        expect(html).toContain("Couldn&#x27;t load what needs attention.");
         expect(html).toContain("Not available");
         expect(html).toContain("arrived normally");
         expect(html).toContain("Try again");
