@@ -15,7 +15,8 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { actionClass, FOCUS, PanelTitle } from "./parts";
+import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import { FOCUS } from "./parts";
 
 const FIELD =
     "block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
@@ -36,22 +37,34 @@ interface AddressDraft {
  *
  * "Tell ‹first›" posts a note in their messages when that reaches them
  * (A13); otherwise it says nothing is sent, so the team tells them.
+ *
+ * A side sheet over the order: what saving does to the money stays at the
+ * foot with Save, and a refusal leaves it open with what was typed.
  */
 export function FulfilmentPanel({
-    current,
-    options,
-    first,
-    shipping,
-    address,
-    paid,
-    refundTo,
-    linkable,
-    canTell,
-    format,
-    busy,
-    onCancel,
-    onSave,
-}: {
+    open,
+    returnFocus,
+    ...draft
+}: FulfilmentProps & {
+    open: boolean;
+    /** Put the keyboard back on the button that opened it. */
+    returnFocus?: () => void;
+}) {
+    return (
+        <OrderSheet
+            open={open}
+            title="Change how it's fulfilled"
+            description="It can change until the order is handed over."
+            busy={draft.busy}
+            onClose={draft.onCancel}
+            returnFocus={returnFocus}
+        >
+            <FulfilmentDraft {...draft} />
+        </OrderSheet>
+    );
+}
+
+interface FulfilmentProps {
     current: FulfilmentType;
     options: { type: FulfilmentType; label: string }[];
     first: string;
@@ -69,7 +82,23 @@ export function FulfilmentPanel({
     busy: boolean;
     onCancel: () => void;
     onSave: (input: ChangeFulfilmentInput) => void;
-}) {
+}
+
+/** What is chosen in the sheet: a fresh one each time it opens. */
+function FulfilmentDraft({
+    current,
+    options,
+    first,
+    shipping,
+    address,
+    paid,
+    refundTo,
+    linkable,
+    canTell,
+    format,
+    busy,
+    onSave,
+}: FulfilmentProps) {
     const ids = useId();
     const [pick, setPick] = useState<FulfilmentType>(current);
     const [charge, setCharge] = useState("");
@@ -117,147 +146,145 @@ export function FulfilmentPanel({
     const warn = moved && (typed.kind === "bad" || addressMissing);
 
     return (
-        <section
-            role="dialog"
-            aria-labelledby={`${ids}-title`}
-            className="min-w-0 rounded-xl border border-border bg-card px-4 py-3.5 shadow-[0_8px_22px_rgba(28,28,26,0.10)]"
-        >
-            <PanelTitle id={`${ids}-title`}>
-                Change how it&apos;s fulfilled
-            </PanelTitle>
-            <div
-                role="radiogroup"
-                aria-label="Fulfilment"
-                className="mt-2.5 flex flex-wrap gap-1.5"
-            >
-                {options.map((o) => {
-                    const on = pick === o.type;
-                    return (
-                        <button
-                            key={o.type}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => choose(o.type)}
-                            className={cn(
-                                FOCUS,
-                                "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
-                            )}
-                        >
-                            {o.label}
-                        </button>
-                    );
-                })}
-            </div>
-            {moved && delivery ? (
-                <fieldset className="mt-2.5">
-                    <legend className="text-[12px] font-medium">Address</legend>
-                    <input
-                        aria-label="Street and number"
-                        value={addr.line1}
-                        onChange={(e) =>
-                            setAddr((a) => ({ ...a, line1: e.target.value }))
-                        }
-                        className={cn(FOCUS, FIELD, "mt-1")}
-                    />
-                    <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                        <input
-                            aria-label="Town or city"
-                            placeholder="Town or city"
-                            value={addr.city}
-                            onChange={(e) =>
-                                setAddr((a) => ({ ...a, city: e.target.value }))
-                            }
-                            className={cn(FOCUS, FIELD)}
-                        />
-                        <input
-                            aria-label="State"
-                            placeholder="State"
-                            value={addr.state}
-                            onChange={(e) =>
-                                setAddr((a) => ({
-                                    ...a,
-                                    state: e.target.value,
-                                }))
-                            }
-                            className={cn(FOCUS, FIELD)}
-                        />
-                        <input
-                            aria-label="PIN code"
-                            placeholder="PIN"
-                            inputMode="numeric"
-                            value={addr.postalCode}
-                            onChange={(e) =>
-                                setAddr((a) => ({
-                                    ...a,
-                                    postalCode: e.target.value,
-                                }))
-                            }
-                            className={cn(FOCUS, FIELD)}
-                        />
-                    </div>
-                </fieldset>
-            ) : null}
-            {moved ? (
-                <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
-                    Delivery charge
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        value={charge}
-                        onChange={(e) => setCharge(e.target.value)}
-                        placeholder="₹"
-                        aria-invalid={typed.kind === "bad" || undefined}
-                        aria-describedby={`${ids}-note`}
-                        className={cn(FOCUS, FIELD, "tabular-nums")}
-                    />
-                </label>
-            ) : null}
-            <p
-                id={`${ids}-note`}
-                aria-live="polite"
-                className={cn(
-                    "mt-2.5 text-pretty text-[12.5px] leading-[1.5]",
-                    warn
-                        ? "text-destructive-subtle-foreground"
-                        : "text-neutral-700 dark:text-muted-foreground",
-                )}
-            >
-                {note}
-            </p>
-            {moved ? (
-                canTell ? (
-                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
-                        <input
-                            type="checkbox"
-                            checked={tell}
-                            onChange={(e) => setTell(e.target.checked)}
-                            className={cn(FOCUS, "size-4 cursor-pointer")}
-                        />
-                        Tell {first} in their messages
-                    </label>
-                ) : (
-                    <p className="mt-2 text-[12px] text-muted-foreground">
-                        Nothing is sent to {first} — let them know by email or
-                        phone.
-                    </p>
-                )
-            ) : null}
-            <div className="mt-3 flex justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={onCancel}
+        <>
+            <OrderSheetBody>
+                <div
+                    role="radiogroup"
+                    aria-label="Fulfilment"
+                    className="flex flex-wrap gap-1.5"
                 >
-                    Cancel
-                </Button>
+                    {options.map((o) => {
+                        const on = pick === o.type;
+                        return (
+                            <button
+                                key={o.type}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                onClick={() => choose(o.type)}
+                                className={cn(
+                                    FOCUS,
+                                    "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
+                                    on
+                                        ? "border-foreground bg-foreground font-semibold text-background"
+                                        : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
+                                )}
+                            >
+                                {o.label}
+                            </button>
+                        );
+                    })}
+                </div>
+                {moved && delivery ? (
+                    <fieldset className="mt-2.5">
+                        <legend className="text-[12px] font-medium">
+                            Address
+                        </legend>
+                        <input
+                            aria-label="Street and number"
+                            value={addr.line1}
+                            onChange={(e) =>
+                                setAddr((a) => ({
+                                    ...a,
+                                    line1: e.target.value,
+                                }))
+                            }
+                            className={cn(FOCUS, FIELD, "mt-1")}
+                        />
+                        <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
+                            <input
+                                aria-label="Town or city"
+                                placeholder="Town or city"
+                                value={addr.city}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        city: e.target.value,
+                                    }))
+                                }
+                                className={cn(FOCUS, FIELD)}
+                            />
+                            <input
+                                aria-label="State"
+                                placeholder="State"
+                                value={addr.state}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        state: e.target.value,
+                                    }))
+                                }
+                                className={cn(FOCUS, FIELD)}
+                            />
+                            <input
+                                aria-label="PIN code"
+                                placeholder="PIN"
+                                inputMode="numeric"
+                                value={addr.postalCode}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        postalCode: e.target.value,
+                                    }))
+                                }
+                                className={cn(FOCUS, FIELD)}
+                            />
+                        </div>
+                    </fieldset>
+                ) : null}
+                {moved ? (
+                    <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
+                        Delivery charge
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={charge}
+                            onChange={(e) => setCharge(e.target.value)}
+                            placeholder="₹"
+                            aria-invalid={typed.kind === "bad" || undefined}
+                            aria-describedby={`${ids}-note`}
+                            className={cn(FOCUS, FIELD, "tabular-nums")}
+                        />
+                    </label>
+                ) : null}
+                {moved ? (
+                    canTell ? (
+                        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
+                            <input
+                                type="checkbox"
+                                checked={tell}
+                                onChange={(e) => setTell(e.target.checked)}
+                                className={cn(FOCUS, "size-4 cursor-pointer")}
+                            />
+                            Tell {first} in their messages
+                        </label>
+                    ) : (
+                        <p className="mt-2 text-[12px] text-muted-foreground">
+                            Nothing is sent to {first} — let them know by email
+                            or phone.
+                        </p>
+                    )
+                ) : null}
+            </OrderSheetBody>
+            <OrderSheetFoot
+                busy={busy}
+                note={
+                    <p
+                        id={`${ids}-note`}
+                        aria-live="polite"
+                        className={cn(
+                            "text-pretty text-[12.5px] leading-[1.5]",
+                            warn
+                                ? "text-destructive-subtle-foreground"
+                                : "text-neutral-700 dark:text-muted-foreground",
+                        )}
+                    >
+                        {note}
+                    </p>
+                }
+            >
                 <Button
                     type="button"
-                    className={actionClass("primary")}
                     disabled={off}
                     onClick={() => {
                         if (cents === null) return;
@@ -290,7 +317,7 @@ export function FulfilmentPanel({
                           })
                         : "Save"}
                 </Button>
-            </div>
-        </section>
+            </OrderSheetFoot>
+        </>
     );
 }
