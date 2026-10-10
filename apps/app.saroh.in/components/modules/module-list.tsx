@@ -7,6 +7,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -411,9 +412,11 @@ function ModuleRow({
                         <span className="text-pretty text-[12.5px] text-foreground/80">
                             {planLock.line}
                         </span>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={planLock.href}>{planLock.cta}</Link>
-                        </Button>
+                        <PlanWay>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={planLock.href}>{planLock.cta}</Link>
+                            </Button>
+                        </PlanWay>
                     </div>
                 ) : null}
                 {step ? (

@@ -6,6 +6,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
 import { Notice } from "@saroh/ui/notice";
+import { PlanWay } from "./plan-way";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -45,9 +46,11 @@ export function PlanEndingBanner({
                     you&rsquo;re on {ending.nextPlanName}, and everything you
                     made is kept.
                 </p>
-                <Button asChild size="sm" className="shrink-0">
-                    <Link href={upgradeHref()}>{planLabel()}</Link>
-                </Button>
+                <PlanWay className="text-foreground/80">
+                    <Button asChild size="sm" className="shrink-0">
+                        <Link href={upgradeHref()}>{planLabel()}</Link>
+                    </Button>
+                </PlanWay>
             </div>
         </Notice>
     );

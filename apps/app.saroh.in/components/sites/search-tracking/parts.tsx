@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
@@ -122,9 +123,16 @@ export function LockNotice({ lock }: { lock: TrackersLock }) {
             className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
         >
             <span className="min-w-0">{lock.line}</span>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link href={lock.href}>{lock.cta}</Link>
-            </Button>
+            <PlanWay>
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                >
+                    <Link href={lock.href}>{lock.cta}</Link>
+                </Button>
+            </PlanWay>
         </div>
     );
 }

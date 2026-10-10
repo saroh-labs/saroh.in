@@ -11,6 +11,8 @@ import type { DepositMode } from "@/lib/services/service";
 import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
+import { PlanWay } from "@/components/billing/plan-way";
+import { isPlanHref } from "@/lib/billing/plan-access";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { HELP } from "./fields";
@@ -119,9 +121,14 @@ export function DepositField({
                     className="mt-2"
                 >
                     {problem.text}{" "}
-                    <TextLink href={problem.fix.href}>
-                        {problem.fix.label}
-                    </TextLink>
+                    <PlanWay
+                        when={isPlanHref(problem.fix.href)}
+                        className="text-[length:inherit] text-inherit"
+                    >
+                        <TextLink href={problem.fix.href}>
+                            {problem.fix.label}
+                        </TextLink>
+                    </PlanWay>
                 </Notice>
             ) : null}
         </>

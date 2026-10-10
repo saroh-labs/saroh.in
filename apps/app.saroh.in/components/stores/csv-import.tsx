@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { PlanWay } from "@/components/billing/plan-way";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -557,15 +558,17 @@ export function CsvImport({
                                                 ? `Import the first ${room.fits}, or upgrade for more.`
                                                 : "Upgrade to bring them in."}
                                         </p>
-                                        <Button
-                                            asChild
-                                            variant="outline"
-                                            size="sm"
-                                        >
-                                            <Link href={meter.href}>
-                                                {planLabel(meter.upgradeTo)}
-                                            </Link>
-                                        </Button>
+                                        <PlanWay className="text-foreground/80">
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <Link href={meter.href}>
+                                                    {planLabel(meter.upgradeTo)}
+                                                </Link>
+                                            </Button>
+                                        </PlanWay>
                                     </div>
                                 </Notice>
                             ) : null}

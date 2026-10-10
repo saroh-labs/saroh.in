@@ -3,7 +3,6 @@ import {
     EmptyState,
     PartialNotice,
     PermissionDeniedState,
-    PlanLockedState,
 } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
@@ -23,6 +22,7 @@ import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
+import { PlanLockedCard } from "@/components/billing/plan-way";
 import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
@@ -216,11 +216,10 @@ function FirstRun({
     // that has it; anyone else, who changes it.
     if (heldByPlan(modules)) {
         return (
-            <PlanLockedState
+            <PlanLockedCard
                 name="What's turned on"
                 title="What's turned on isn't in your plan"
                 href={upgradeHref()}
-                canChangePlan={manages}
             />
         );
     }

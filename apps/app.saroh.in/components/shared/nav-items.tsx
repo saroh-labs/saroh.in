@@ -121,7 +121,11 @@ export type NavAction =
     | "booking:write"
     | "store:write"
     | "contact:write"
-    | "discount:write";
+    | "discount:write"
+    // Settings › Plan and billing: what Saroh costs the business and its
+    // invoices. Owner and Admin by default, as the API has it; changing the
+    // plan is `billing:manage`, which the page asks (`plan-access.ts`).
+    | "billing:read";
 
 /**
  * Role → what it may reach here.
@@ -168,6 +172,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "discount:write",
         "lead:read",
         "pipeline:read",
+        "billing:read",
     ],
     ADMIN: [
         "org:read",
@@ -204,6 +209,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "discount:write",
         "lead:read",
         "pipeline:read",
+        "billing:read",
     ],
     MEMBER: [
         "org:read",
@@ -1153,8 +1159,10 @@ export function isNavSectionActive(
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
  * everyone signed in may (Your profile is about the person, not the
- * business). `ownerOnly` narrows it further to the business's owner, by role:
- * a plan and its invoices are the owner's to see, as the design has it.
+ * business). `ownerOnly` narrows it further to the business's owner, by role,
+ * where the API does too ("Your data", DEC-120). Plan and billing is not one
+ * of those: the API reads it to `billing:read`, which an Admin holds, and
+ * the tab follows the API (10 Oct 2026).
  */
 export interface SettingsPage {
     href: string;
@@ -1200,8 +1208,7 @@ export const SETTINGS_PAGES = [
         label: "Plan and billing",
         description: "What Saroh costs and your invoices",
         icon: CreditCard,
-        action: "org:settings:read",
-        ownerOnly: true,
+        action: "billing:read",
     },
     {
         href: "/settings/profile",

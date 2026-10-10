@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import Link from "next/link";
+import { PlanWay } from "./plan-way";
 
 /**
  * The limit notice every screen shares ("Saroh Settings" design, Team): the
@@ -9,7 +10,8 @@ import Link from "next/link";
  * from 80%, the destructive tint at 100% — and the words say which, never
  * the colour alone. A soft cap never stops anything, so at 100% it keeps
  * the saffron tint: it informs, it doesn't refuse. Words come from
- * `limitNotice` (`@saroh/pricing-catalog`).
+ * `limitNotice` (`@saroh/pricing-catalog`). The way to more is offered to
+ * someone who may change the plan (`PlanWay`); anyone else reads who can.
  *
  * Presentational: server pages pass it the notice (`PlanLimitNotice`), the
  * refusal dialog a 403's (`PlanRefusalHost`).
@@ -44,9 +46,11 @@ export function LimitNoticeBlock({
             title={title}
             className={className}
             action={
-                <Button asChild size="sm" className="shrink-0">
-                    <Link href={href}>{cta}</Link>
-                </Button>
+                <PlanWay className="text-foreground/80">
+                    <Button asChild size="sm" className="shrink-0">
+                        <Link href={href}>{cta}</Link>
+                    </Button>
+                </PlanWay>
             }
         >
             {pct ? (

@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { PlanWay } from "@/components/billing/plan-way";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -157,9 +158,11 @@ export function RolesTab({
                         />
                         <p>
                             {rolesLock.line}{" "}
-                            <TextLink href={rolesLock.href}>
-                                {rolesLock.cta}
-                            </TextLink>
+                            <PlanWay className="text-[length:inherit]">
+                                <TextLink href={rolesLock.href}>
+                                    {rolesLock.cta}
+                                </TextLink>
+                            </PlanWay>
                         </p>
                     </div>
                 ) : canEdit ? (

@@ -13,6 +13,7 @@ import {
 } from "@/lib/qr/print";
 import type { QrCodeView } from "@/lib/qr/types";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { Notice } from "@saroh/ui/notice";
 import { QrPrintThumb } from "./qr-print-thumb";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -147,13 +148,15 @@ function PrintSection({
                     className="text-[13px] text-foreground/80"
                 >
                     {lock.line}{" "}
-                    <Link
-                        href={lock.href}
-                        aria-label={lock.cta}
-                        className={linkClass}
-                    >
-                        {lock.plan}
-                    </Link>
+                    <PlanWay fallback={lock.plan}>
+                        <Link
+                            href={lock.href}
+                            aria-label={lock.cta}
+                            className={linkClass}
+                        >
+                            {lock.plan}
+                        </Link>
+                    </PlanWay>
                     .
                 </p>
             ) : null}

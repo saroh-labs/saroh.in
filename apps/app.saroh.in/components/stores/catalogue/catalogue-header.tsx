@@ -13,6 +13,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronDown, Store } from "lucide-react";
 import Link from "next/link";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { meterBeside } from "@/lib/billing/meter";
 import { newProductHref, productSettingsHref } from "@/lib/products/links";
@@ -88,11 +89,13 @@ export function CatalogueHeader({
                         </Button>
                         <span className="sr-only">{meter.reason}</span>
                         {beside.upgrade ? (
-                            <Button asChild variant="outline">
-                                <Link href={meter.href}>
-                                    {planLabel(meter.upgradeTo)}
-                                </Link>
-                            </Button>
+                            <PlanWay fallback={null}>
+                                <Button asChild variant="outline">
+                                    <Link href={meter.href}>
+                                        {planLabel(meter.upgradeTo)}
+                                    </Link>
+                                </Button>
+                            </PlanWay>
                         ) : null}
                     </>
                 ) : many && !here ? (

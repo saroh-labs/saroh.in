@@ -34,6 +34,7 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
@@ -326,9 +327,11 @@ function EditorBody({
                     // everyone, and why, not "you're viewing as …".
                     <ReadOnlyNote>
                         {pausedWords("product")}{" "}
-                        <TextLink href={PLAN_AND_BILLING_HREF}>
-                            {planLabel()}
-                        </TextLink>
+                        <PlanWay fallback={null}>
+                            <TextLink href={PLAN_AND_BILLING_HREF}>
+                                {planLabel()}
+                            </TextLink>
+                        </PlanWay>
                     </ReadOnlyNote>
                 ) : !canWrite ? (
                     <ReadOnlyNote>

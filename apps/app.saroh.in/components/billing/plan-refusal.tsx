@@ -9,13 +9,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { planLabel } from "@saroh/ui/lib/state-copy";
+import { planLabel, WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { showError, showRefusal } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { useCanChangePlan } from "./plan-way";
 
 /**
  * A write the business's plan refused, shown as the notice it is (plans
@@ -93,6 +94,8 @@ export function PlanRefusalHost() {
     }, []);
 
     const full = refusal?.code === "PLAN_LIMIT_REACHED";
+    // Someone who can't change the plan reads who can, and closes it.
+    const canChangePlan = useCanChangePlan();
     return (
         <Dialog
             open={refusal !== null}
@@ -115,22 +118,40 @@ export function PlanRefusalHost() {
                         <div className="h-full w-full rounded-full bg-destructive" />
                     </div>
                 ) : null}
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setRefusal(null)}
+                {canChangePlan ? null : (
+                    <p
+                        data-plan-who
+                        className="text-pretty text-[13px] leading-[1.55] text-foreground/80"
                     >
-                        Not now
-                    </Button>
-                    <Button asChild>
-                        <Link
-                            href={upgradeHref(refusal?.upgradeTo?.planId)}
-                            onClick={() => setRefusal(null)}
-                        >
-                            {refusal?.cta ?? planLabel()}
-                        </Link>
-                    </Button>
+                        {WHO_CAN_CHANGE_PLAN}
+                    </p>
+                )}
+                <DialogFooter>
+                    {canChangePlan ? (
+                        <>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRefusal(null)}
+                            >
+                                Not now
+                            </Button>
+                            <Button asChild>
+                                <Link
+                                    href={upgradeHref(
+                                        refusal?.upgradeTo?.planId,
+                                    )}
+                                    onClick={() => setRefusal(null)}
+                                >
+                                    {refusal?.cta ?? planLabel()}
+                                </Link>
+                            </Button>
+                        </>
+                    ) : (
+                        <Button type="button" onClick={() => setRefusal(null)}>
+                            Close
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

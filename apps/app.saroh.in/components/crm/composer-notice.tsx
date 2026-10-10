@@ -1,7 +1,7 @@
+import { PlanLockedCard } from "@/components/billing/plan-way";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import {
     ModuleOffState,
-    PlanLockedState,
     ProviderDisconnectedState,
 } from "@saroh/ui/data-state";
 
@@ -26,14 +26,13 @@ export function ComposerNotice({ gate }: { gate: ComposerGate }) {
         );
     }
     return gate.kind === "plan" ? (
-        <PlanLockedState
+        <PlanLockedCard
             size="inline"
             name="Sending from here"
             title={gate.title}
             description={null}
             plan={gate.plan}
             href={gate.href}
-            canChangePlan
         />
     ) : (
         <ProviderDisconnectedState
