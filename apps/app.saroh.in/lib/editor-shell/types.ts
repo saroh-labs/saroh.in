@@ -93,7 +93,7 @@ export interface EditorAdapter<V> {
 export interface EditorCopy {
     /** "plan", "pack": in "Priya changed this plan". */
     noun: string;
-    /** The pill for a live record: "Open" (plan), "On sale" (pack). */
+    /** The pill for a live record: "Live", for every kind of thing. */
     liveLabel: string;
     /** "Open to new sign-ups · no changes". */
     liveClean: string;

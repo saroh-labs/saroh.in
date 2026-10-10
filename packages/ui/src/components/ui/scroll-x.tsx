@@ -59,46 +59,15 @@ export function revealOffset(
 }
 
 /**
- * The fade of `ScrollX` for a row that scrolls itself (UX-079): a tab strip
- * on a phone, where a wrapping box would add nothing. Put the returned
- * `style` on the scrolling element; it fades the side with more, and moves
- * as the merchant scrolls. `current` (a selector inside the strip) is
- * scrolled into view on mount and whenever `revealKey` changes, so the open
- * tab is never the one hidden off the edge.
- *
- * Sideways only: a strip that turns into a column at a wider width measures
- * as fitting there, and gets no fade.
+ * Keeps a strip's current item in view: on mount, whenever `revealKey`
+ * changes, and while widths are still settling (web fonts, late styles),
+ * until the person scrolls the strip themselves.
  */
-export function useEdgeFade<T extends HTMLElement>(
+function useReveal<T extends HTMLElement>(
     ref: React.RefObject<T | null>,
-    { current, revealKey }: { current?: string; revealKey?: unknown } = {},
-): React.CSSProperties | undefined {
-    const [edges, setEdges] = React.useState({ left: false, right: false });
-
-    React.useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        const measure = () => {
-            const next = overflowEdges(el);
-            setEdges((prev) =>
-                prev.left === next.left && prev.right === next.right
-                    ? prev
-                    : next,
-            );
-        };
-        const ro =
-            typeof ResizeObserver === "undefined"
-                ? null
-                : new ResizeObserver(measure);
-        ro?.observe(el);
-        measure();
-        el.addEventListener("scroll", measure, { passive: true });
-        return () => {
-            ro?.disconnect();
-            el.removeEventListener("scroll", measure);
-        };
-    }, [ref]);
-
+    current: string | undefined,
+    revealKey: unknown,
+) {
     React.useEffect(() => {
         const el = ref.current;
         if (!el || !current) return;
@@ -142,6 +111,50 @@ export function useEdgeFade<T extends HTMLElement>(
             el.removeEventListener("keydown", stop);
         };
     }, [ref, current, revealKey]);
+}
+
+/**
+ * The fade of `ScrollX` for a row that scrolls itself (UX-079): a tab strip
+ * on a phone, where a wrapping box would add nothing. Put the returned
+ * `style` on the scrolling element; it fades the side with more, and moves
+ * as the merchant scrolls. `current` (a selector inside the strip) is
+ * scrolled into view on mount and whenever `revealKey` changes, so the open
+ * tab is never the one hidden off the edge.
+ *
+ * Sideways only: a strip that turns into a column at a wider width measures
+ * as fitting there, and gets no fade.
+ */
+export function useEdgeFade<T extends HTMLElement>(
+    ref: React.RefObject<T | null>,
+    { current, revealKey }: { current?: string; revealKey?: unknown } = {},
+): React.CSSProperties | undefined {
+    const [edges, setEdges] = React.useState({ left: false, right: false });
+
+    React.useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const measure = () => {
+            const next = overflowEdges(el);
+            setEdges((prev) =>
+                prev.left === next.left && prev.right === next.right
+                    ? prev
+                    : next,
+            );
+        };
+        const ro =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(measure);
+        ro?.observe(el);
+        measure();
+        el.addEventListener("scroll", measure, { passive: true });
+        return () => {
+            ro?.disconnect();
+            el.removeEventListener("scroll", measure);
+        };
+    }, [ref]);
+
+    useReveal(ref, current, revealKey);
 
     const mask = edgeMask(edges);
     return mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined;
@@ -170,6 +183,18 @@ export interface ScrollXProps extends React.HTMLAttributes<HTMLDivElement> {
      * sits outside it, under the frame.
      */
     className?: string;
+    /**
+     * A selector inside the scroller for the item to keep in view (a tab
+     * strip's open tab), revealed again whenever `revealKey` changes.
+     */
+    current?: string;
+    revealKey?: unknown;
+    /**
+     * For content that is a landmark of its own with focusable children (a
+     * tab strip): no region role, no focus stop and no scrollbar. The fade
+     * and the hint still say there is more.
+     */
+    bare?: boolean;
 }
 
 /**
@@ -199,10 +224,14 @@ export interface ScrollXProps extends React.HTMLAttributes<HTMLDivElement> {
 export function ScrollX({
     label,
     className,
+    current,
+    revealKey,
+    bare = false,
     children,
     ...props
 }: ScrollXProps) {
     const ref = React.useRef<HTMLDivElement>(null);
+    useReveal(ref, current, revealKey);
     const [edges, setEdges] = React.useState({ left: false, right: false });
     const [hint, setHint] = React.useState(false);
 
@@ -246,16 +275,20 @@ export function ScrollX({
             <div className={className}>
                 <div
                     ref={ref}
-                    role="region"
-                    aria-label={label}
+                    role={bare ? undefined : "region"}
+                    aria-label={bare ? undefined : label}
                     data-scroll-x=""
-                    tabIndex={overflowing ? 0 : undefined}
+                    tabIndex={overflowing && !bare ? 0 : undefined}
                     style={
                         mask
                             ? { maskImage: mask, WebkitMaskImage: mask }
                             : undefined
                     }
-                    className="overflow-x-auto rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className={
+                        bare
+                            ? "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            : "overflow-x-auto rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    }
                 >
                     {children}
                 </div>

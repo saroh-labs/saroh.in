@@ -349,7 +349,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
     const tabsOf = (html: string) =>
         Array.from(
             html.matchAll(
-                /role="tab" aria-selected="(true|false)"[^>]*>([^<]+)</g,
+                /role="tab" aria-selected="(true|false)"[^>]*>(?:<span[^>]*>)*([^<]+)</g,
             ),
             (m: RegExpMatchArray) => [m[2], m[1]],
         );

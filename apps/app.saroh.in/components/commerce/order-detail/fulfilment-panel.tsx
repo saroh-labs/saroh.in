@@ -14,6 +14,7 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -167,13 +168,7 @@ function FulfilmentDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => choose(o.type)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {o.label}
                             </button>

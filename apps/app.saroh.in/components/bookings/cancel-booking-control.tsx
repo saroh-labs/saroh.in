@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -11,6 +10,7 @@ import { useHold } from "@/components/shared/use-hold";
 import { cancelBooking } from "@/lib/services/actions";
 import type { BookingMoney, CancelPlan } from "@/lib/services/booking-money";
 import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Cancel a single booking (S4-003). Calls the `cancelBooking` server action
@@ -133,12 +133,11 @@ export function CancelBookingControl({
                         {plan?.treatmentOrderId && canReadOrder ? (
                             <>
                                 {" "}
-                                <Link
+                                <TextLink
                                     href={`/commerce/orders/${encodeURIComponent(plan.treatmentOrderId)}`}
-                                    className="cursor-pointer font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
                                 >
                                     Open the order
-                                </Link>
+                                </TextLink>
                             </>
                         ) : null}
                     </>

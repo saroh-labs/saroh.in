@@ -1,5 +1,6 @@
 "use client";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { showInfo } from "@saroh/ui/toast";
 
 /**
@@ -12,17 +13,16 @@ import { showInfo } from "@saroh/ui/toast";
  */
 export function ChangePaymentMethod() {
     return (
-        <button
-            type="button"
+        <TextLink
             onClick={() =>
                 showInfo(
                     "Changing how you pay Saroh isn't switched on yet",
                     "Until it is, nothing about how you pay changes.",
                 )
             }
-            className="rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+            className="text-[12px]"
         >
             Change
-        </button>
+        </TextLink>
     );
 }

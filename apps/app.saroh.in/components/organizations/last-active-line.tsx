@@ -24,9 +24,7 @@ export function LastActiveLine({ at }: { at: string | null | undefined }) {
         <p
             className={cn(
                 "mt-px text-[11.5px]",
-                seen.stale
-                    ? "text-brand-subtle-foreground"
-                    : "text-muted-foreground",
+                seen.stale ? "text-foreground" : "text-muted-foreground",
             )}
         >
             {seen.text}

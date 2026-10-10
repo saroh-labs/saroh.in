@@ -26,7 +26,7 @@ const BAND: Record<Band, string> = {
 };
 
 /** The best week: Saffron 700, the design's accent-deep; 400 on dark. */
-const PEAK = "bg-brand-700 dark:bg-brand-400";
+const PEAK = "bg-foreground ";
 
 /** The week in progress: hatched, so it never reads as a whole week. */
 export const SO_FAR =

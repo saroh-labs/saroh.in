@@ -237,7 +237,7 @@ describe("the Product grid's fields (G12)", () => {
         render({ source: "collection" }, { ...READY, collections: [] });
         const link = byText("a", "Make one in Sell › Products");
         expect(link.getAttribute("href")).toBe(
-            "/commerce/products?view=collections",
+            "/commerce/products?tab=collections",
         );
     });
 

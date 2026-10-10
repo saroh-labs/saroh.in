@@ -11,6 +11,7 @@ import {
 } from "@saroh/ui/alert-dialog";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
 import type { LucideIcon } from "lucide-react";
 import { CircleHelp, Trash2 } from "lucide-react";
@@ -171,12 +172,9 @@ export function ConfirmDialog({
                     <div className="px-[22px] pt-2">{children}</div>
                 ) : null}
                 {refusal ? (
-                    <p
-                        role="alert"
-                        className="mx-[22px] mt-2 rounded-lg bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
+                    <Notice tone="error" className="mx-[22px] mt-2">
                         {refusal}
-                    </p>
+                    </Notice>
                 ) : null}
                 <AlertDialogFooter className="px-[22px] py-[18px]">
                     <AlertDialogCancel disabled={busy}>

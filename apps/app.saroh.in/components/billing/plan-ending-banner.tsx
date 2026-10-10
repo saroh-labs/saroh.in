@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
+import { Notice } from "@saroh/ui/notice";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -33,21 +34,21 @@ export function PlanEndingBanner({
     if (!ending) return null;
     const days = daysLeft(ending.endsAt, now);
     return (
-        <div
-            role="status"
-            className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-brand-300 bg-brand-subtle px-4 py-2.5 dark:border-brand-700 sm:px-6"
-        >
-            <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
-                <span className="font-semibold">
-                    Your {ending.planName} plan ends in {days}{" "}
-                    {days === 1 ? "day" : "days"}
-                </span>
-                , on <ViewerDate iso={ending.endsAt} />. After that you&rsquo;re
-                on {ending.nextPlanName}, and everything you made is kept.
-            </p>
-            <Button asChild size="sm" className="shrink-0">
-                <Link href={upgradeHref()}>{planLabel()}</Link>
-            </Button>
-        </div>
+        <Notice tone="info" layout="banner">
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+                <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
+                    <span className="font-semibold">
+                        Your {ending.planName} plan ends in {days}{" "}
+                        {days === 1 ? "day" : "days"}
+                    </span>
+                    , on <ViewerDate iso={ending.endsAt} />. After that
+                    you&rsquo;re on {ending.nextPlanName}, and everything you
+                    made is kept.
+                </p>
+                <Button asChild size="sm" className="shrink-0">
+                    <Link href={upgradeHref()}>{planLabel()}</Link>
+                </Button>
+            </div>
+        </Notice>
     );
 }

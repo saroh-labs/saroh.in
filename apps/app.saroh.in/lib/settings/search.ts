@@ -39,7 +39,7 @@ export function settingsPageLabel(
 
 /** The query a settings page reads its own tab from. */
 export { BUSINESS_TAB_PARAM };
-export const TEAM_TAB_PARAM = "view";
+export const TEAM_TAB_PARAM = "tab";
 
 export interface SettingsEntry {
     label: string;

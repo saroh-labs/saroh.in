@@ -41,6 +41,8 @@ import {
     takeLaunchOfferAfterOnboarding,
 } from "@/lib/saroh-billing/checkout-actions";
 
+import { chipClass } from "@/components/shared/chip";
+import { Tip } from "@saroh/ui/tooltip";
 import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
@@ -451,7 +453,7 @@ export function BusinessSetupForm({
                                                     )
                                                 }
                                                 className={cn(
-                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                     on
                                                         ? "border-foreground bg-muted"
                                                         : "border-input hover:bg-muted active:bg-accent-active",
@@ -499,12 +501,7 @@ export function BusinessSetupForm({
                                         setOtherCountry(false);
                                         form.setValue("country", c.code);
                                     }}
-                                    className={cn(
-                                        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        on
-                                            ? "border-foreground bg-foreground text-background"
-                                            : "border-input hover:bg-muted active:bg-accent-active",
-                                    )}
+                                    className={chipClass(on)}
                                 >
                                     <span className="font-mono text-[11px] opacity-70">
                                         {c.code}
@@ -518,12 +515,7 @@ export function BusinessSetupForm({
                             role="radio"
                             aria-checked={otherCountry}
                             onClick={() => setOtherCountry(true)}
-                            className={cn(
-                                "inline-flex h-8 items-center rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                otherCountry
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-input hover:bg-muted active:bg-accent-active",
-                            )}
+                            className={chipClass(otherCountry)}
                         >
                             Another country
                         </button>
@@ -551,22 +543,25 @@ export function BusinessSetupForm({
                             <Link href={backTo}>Back</Link>
                         </Button>
                     ) : null}
-                    <Button
-                        type="submit"
-                        className="wk-press h-10 flex-1 font-semibold"
-                        disabled={busy || taken}
-                        title={
+                    <Tip
+                        label={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
                     >
-                        {busy
-                            ? "Setting up…"
-                            : kind === "BUSINESS"
-                              ? "Create the business"
-                              : "Set it up"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            className="wk-press h-10 flex-1 font-semibold"
+                            disabled={busy || taken}
+                        >
+                            {busy
+                                ? "Setting up…"
+                                : kind === "BUSINESS"
+                                  ? "Create the business"
+                                  : "Set it up"}
+                        </Button>
+                    </Tip>
                 </div>
 
                 <p

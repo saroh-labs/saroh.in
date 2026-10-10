@@ -11,6 +11,7 @@ import { FIELD_LABEL } from "@/components/sites/section-fields/constants";
 import { updatePage } from "@/lib/sites/actions";
 import { fixedAddress } from "@/lib/sites/page-menu";
 import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The open page's own settings, in the editor's page menu (G16): its title,
@@ -140,7 +141,7 @@ export function PageSettings({
                     ) : (
                         <>
                             {unseen ? (
-                                <p className="text-xs leading-relaxed text-highlight">
+                                <p className="text-xs leading-relaxed text-foreground">
                                     {unseen}
                                 </p>
                             ) : null}
@@ -158,28 +159,27 @@ export function PageSettings({
                 </div>
 
                 {refusal ? (
-                    <div
-                        role="alert"
-                        className="grid gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-2 text-xs leading-relaxed text-destructive"
-                    >
-                        <p>{refusal.message}</p>
-                        {refusal.suggestion ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 justify-self-start px-2 text-xs text-foreground"
-                                onClick={() => {
-                                    if (refusal.suggestion) {
-                                        setPath(refusal.suggestion);
-                                    }
-                                    setRefusal(null);
-                                }}
-                            >
-                                {`Use ${refusal.suggestion}`}
-                            </Button>
-                        ) : null}
-                    </div>
+                    <Notice tone="error">
+                        <div className="grid gap-1.5">
+                            <p>{refusal.message}</p>
+                            {refusal.suggestion ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 justify-self-start px-2 text-xs text-foreground"
+                                    onClick={() => {
+                                        if (refusal.suggestion) {
+                                            setPath(refusal.suggestion);
+                                        }
+                                        setRefusal(null);
+                                    }}
+                                >
+                                    {`Use ${refusal.suggestion}`}
+                                </Button>
+                            ) : null}
+                        </div>
+                    </Notice>
                 ) : null}
 
                 {readOnly ? null : (

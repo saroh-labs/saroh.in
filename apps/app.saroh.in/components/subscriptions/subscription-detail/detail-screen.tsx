@@ -37,7 +37,8 @@ import {
     sortCharges,
 } from "@/lib/subscriptions/view";
 
-import { Pill } from "../pill";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-dialogs";
 import { ActionDialog } from "./action-dialogs";
@@ -277,7 +278,11 @@ export function SubscriptionDetail({
                         name,
                     ]}
                     title={name}
-                    badge={<Pill tone={head.pill.tone}>{head.pill.label}</Pill>}
+                    badge={
+                        <StatusBadge tone={head.pill.tone}>
+                            {head.pill.label}
+                        </StatusBadge>
+                    }
                     description={[
                         sub.plan.name,
                         longPrice(sub.price, sub.currency, sub.interval),
@@ -292,9 +297,7 @@ export function SubscriptionDetail({
                     className="flex flex-wrap items-end gap-5 rounded-xl border border-border-strong bg-card px-5 py-[18px]"
                 >
                     <div className="min-w-0 flex-[1_1_300px]">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Next charge
-                        </div>
+                        <div className="label">Next charge</div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
                             {head.big}
                         </div>
@@ -339,10 +342,7 @@ export function SubscriptionDetail({
                 ) : null}
 
                 {tab === "failed" ? (
-                    <div
-                        role="alert"
-                        className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
-                    >
+                    <Notice tone="error">
                         <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                             {failWhy(sub, now)}
                         </div>
@@ -356,12 +356,12 @@ export function SubscriptionDetail({
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />
                         ) : null}
-                    </div>
+                    </Notice>
                 ) : null}
 
                 {pending && canWrite ? (
-                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5">
-                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-brand-subtle-foreground">
+                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5">
+                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-foreground">
                             Changes to {pending.name} (
                             {money(pending.price, pending.currency)}) from{" "}
                             {dayText(pending.from, tz, now)}. No part-payment.
@@ -370,7 +370,7 @@ export function SubscriptionDetail({
                             variant="outline"
                             disabled={busy}
                             onClick={keepCurrentPlan}
-                            className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Keep current plan
                         </Button>

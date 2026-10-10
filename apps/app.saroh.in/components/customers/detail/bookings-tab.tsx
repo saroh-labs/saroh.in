@@ -12,7 +12,8 @@ import {
     bookingRow,
 } from "@/lib/customer-workspace/view";
 
-import { Chips, Empty, ROW_LINK, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Chips, Empty, ROW_LINK } from "./parts";
 
 /**
  * Their bookings: upcoming, past, and the no-shows and late cancels on
@@ -45,7 +46,6 @@ export function BookingsTab({
                 value={filter}
                 onChange={setFilter}
                 chips={chips}
-                height={32}
             />
             {!list.length ? <Empty>{BOOKINGS_EMPTY[filter]}</Empty> : null}
             <div className="flex flex-col gap-2">
@@ -85,9 +85,9 @@ export function BookingsTab({
                             >
                                 {r.pay}
                             </div>
-                            <RowPill tone={r.state.tone}>
+                            <StatusBadge tone={r.state.tone}>
                                 {r.state.label}
-                            </RowPill>
+                            </StatusBadge>
                         </Link>
                     );
                 })}

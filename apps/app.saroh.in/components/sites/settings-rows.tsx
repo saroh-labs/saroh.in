@@ -1,4 +1,4 @@
-import { Badge } from "@saroh/ui/badge";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Card, CardContent } from "@saroh/ui/card";
 
 /**
@@ -83,13 +83,9 @@ export function Section({
 /** The quiet mark on a row whose change waits for the next publish. */
 export function NextPublishPill() {
     return (
-        <Badge
-            variant="neutral"
-            data-saves="publish"
-            className="shrink-0 px-2 py-0 text-[11px]"
-        >
-            {NEXT_PUBLISH}
-        </Badge>
+        <span data-saves="publish" className="contents">
+            <StatusBadge tone="neutral">{NEXT_PUBLISH}</StatusBadge>
+        </span>
     );
 }
 

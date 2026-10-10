@@ -44,6 +44,7 @@ import {
 } from "@/lib/services/booking-pay";
 import type { Slot } from "@/lib/services/service";
 import type { VisitToBook } from "@/lib/services/treatment";
+import { Notice } from "@saroh/ui/notice";
 
 const WINDOW_DAYS = 14;
 
@@ -441,9 +442,7 @@ export function NewBookingDialog({
                                 >
                                     {byDay.map(([day, daySlots]) => (
                                         <div key={day}>
-                                            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                                {day}
-                                            </div>
+                                            <div className="label">{day}</div>
                                             <div className="mt-1.5 flex flex-wrap gap-1.5">
                                                 {daySlots.map((slot) => (
                                                     <button
@@ -568,12 +567,7 @@ export function NewBookingDialog({
                             </div>
                         )}
                         {packRefusal ? (
-                            <p
-                                role="alert"
-                                className="rounded-[10px] border border-destructive/50 bg-destructive/10 px-3.5 py-3 text-[12.5px] leading-[1.55] text-destructive-subtle-foreground"
-                            >
-                                {packRefusal}
-                            </p>
+                            <Notice tone="error">{packRefusal}</Notice>
                         ) : null}
                     </FormSheetBody>
                     <FormSheetFoot

@@ -21,6 +21,8 @@ import {
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 import { rememberRail } from "@/lib/nav/rail-cookie";
+import { CountBadge } from "@saroh/ui/count-badge";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * Primary navigation: a calm, goal-grouped rail.
@@ -176,7 +178,7 @@ export function AppSidebar({
                             )}
                         >
                             {showsGroupLabel(group) && (
-                                <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
+                                <p className="label px-2.5 pb-1 pt-3 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
                                     {group.label}
                                 </p>
                             )}
@@ -246,101 +248,100 @@ export function AppSidebar({
                                             }}
                                         >
                                             <PopoverAnchor asChild>
-                                                <Link
-                                                    href={item.href}
-                                                    // On the icon rail a section opens its
-                                                    // flyout instead of navigating: its
-                                                    // children have no other path there.
-                                                    onClick={(e) => {
-                                                        if (
-                                                            !iconRail ||
-                                                            !hasChildren
-                                                        )
-                                                            return;
-                                                        e.preventDefault();
-                                                        setFlyoutFor(
-                                                            flyoutOpen
-                                                                ? null
-                                                                : item.href,
-                                                        );
-                                                    }}
-                                                    aria-expanded={
-                                                        iconRail && hasChildren
-                                                            ? flyoutOpen
-                                                            : undefined
-                                                    }
-                                                    title={item.label}
-                                                    aria-current={
-                                                        active &&
-                                                        !childIsCurrent
-                                                            ? "page"
-                                                            : undefined
-                                                    }
-                                                    className={cn(
-                                                        // Tighter rows than the drawer's: this
-                                                        // rail is `lg`-and-up only, so it is
-                                                        // always driven by a pointer, and the
-                                                        // 44px touch target the tab bar needs
-                                                        // would only spread twelve items over a
-                                                        // screen's worth of height here.
-                                                        // `wk-nav` grows a brand bar on the
-                                                        // leading edge when this row is the
-                                                        // current page (workspace.css). It
-                                                        // scales from the centre rather than
-                                                        // fading, so changing page reads as the
-                                                        // marker travelling down the rail.
-                                                        "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
-                                                        // The icon rail stacks the glyph over
-                                                        // a small label ("Saroh Settings"
-                                                        // design, 2026-09-25) and drops the
-                                                        // marker's gutter.
-                                                        "max-[1100px]:flex-col max-[1100px]:justify-center max-[1100px]:gap-[3px] max-[1100px]:px-0.5 max-[1100px]:py-[7px] max-[1100px]:before:hidden",
-                                                        "group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px] group-data-[collapsed=true]/rail:before:hidden",
-                                                        // The design system's ring, not
-                                                        // Chrome's default blue: the focus ring
-                                                        // is a keyboard user's cursor, and it
-                                                        // was inconsistent in exactly the place
-                                                        // navigation happens most.
-                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                                        isPage
-                                                            ? "bg-card font-semibold text-foreground shadow-xs"
-                                                            : isSection
-                                                              ? "font-semibold text-brand hover:bg-accent"
-                                                              : // Idle rows sit a step back
-                                                                // from Ink, so the section and
-                                                                // the page read louder.
-                                                                "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
-                                                    )}
-                                                >
-                                                    <Icon
-                                                        className="size-[19px] shrink-0"
-                                                        strokeWidth={1.9}
-                                                    />
-                                                    <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
-                                                        {item.label}
-                                                    </span>
-                                                    {locked.includes(
-                                                        item.href,
-                                                    ) ? (
-                                                        <Lock
-                                                            role="img"
-                                                            aria-label="Not in your plan"
-                                                            className="size-3.5 shrink-0 text-muted-foreground group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden"
-                                                        />
-                                                    ) : null}
-                                                    {waiting > 0 ? (
-                                                        /* The brand file's waiting count: a
-                                               Saffron-tinted pill with 700 text.
-                                               It is a count, not a status, so it
-                                               does not borrow Warning's hue. */
-                                                        <span
-                                                            aria-label={`${waiting} waiting`}
-                                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
-                                                        >
-                                                            {waiting}
+                                                <Tip label={item.label}>
+                                                    <Link
+                                                        href={item.href}
+                                                        // On the icon rail a section opens its
+                                                        // flyout instead of navigating: its
+                                                        // children have no other path there.
+                                                        onClick={(e) => {
+                                                            if (
+                                                                !iconRail ||
+                                                                !hasChildren
+                                                            )
+                                                                return;
+                                                            e.preventDefault();
+                                                            setFlyoutFor(
+                                                                flyoutOpen
+                                                                    ? null
+                                                                    : item.href,
+                                                            );
+                                                        }}
+                                                        aria-expanded={
+                                                            iconRail &&
+                                                            hasChildren
+                                                                ? flyoutOpen
+                                                                : undefined
+                                                        }
+                                                        aria-current={
+                                                            active &&
+                                                            !childIsCurrent
+                                                                ? "page"
+                                                                : undefined
+                                                        }
+                                                        className={cn(
+                                                            // Tighter rows than the drawer's: this
+                                                            // rail is `lg`-and-up only, so it is
+                                                            // always driven by a pointer, and the
+                                                            // 44px touch target the tab bar needs
+                                                            // would only spread twelve items over a
+                                                            // screen's worth of height here.
+                                                            // `wk-nav` grows a brand bar on the
+                                                            // leading edge when this row is the
+                                                            // current page (workspace.css). It
+                                                            // scales from the centre rather than
+                                                            // fading, so changing page reads as the
+                                                            // marker travelling down the rail.
+                                                            "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
+                                                            // The icon rail stacks the glyph over
+                                                            // a small label ("Saroh Settings"
+                                                            // design, 2026-09-25) and drops the
+                                                            // marker's gutter.
+                                                            "max-[1100px]:flex-col max-[1100px]:justify-center max-[1100px]:gap-[3px] max-[1100px]:px-0.5 max-[1100px]:py-[7px] max-[1100px]:before:hidden",
+                                                            "group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px] group-data-[collapsed=true]/rail:before:hidden",
+                                                            // The design system's ring, not
+                                                            // Chrome's default blue: the focus ring
+                                                            // is a keyboard user's cursor, and it
+                                                            // was inconsistent in exactly the place
+                                                            // navigation happens most.
+                                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                                            isPage
+                                                                ? "bg-card font-semibold text-foreground shadow-xs"
+                                                                : isSection
+                                                                  ? "font-semibold text-brand hover:bg-accent"
+                                                                  : // Idle rows sit a step back
+                                                                    // from Ink, so the section and
+                                                                    // the page read louder.
+                                                                    "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
+                                                        )}
+                                                    >
+                                                        <Icon className="size-[19px] shrink-0" />
+                                                        <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
+                                                            {item.label}
                                                         </span>
-                                                    ) : null}
-                                                </Link>
+                                                        {locked.includes(
+                                                            item.href,
+                                                        ) ? (
+                                                            <Lock
+                                                                role="img"
+                                                                aria-label="Not in your plan"
+                                                                className="size-3.5 shrink-0 text-muted-foreground group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden"
+                                                            />
+                                                        ) : null}
+                                                        {waiting > 0 ? (
+                                                            /* The brand file's waiting count: a
+                                                   Saffron-tinted pill with 700 text.
+                                                   It is a count, not a status, so it
+                                                   does not borrow Warning's hue. */
+                                                            <CountBadge
+                                                                count={waiting}
+                                                                tone="strong"
+                                                                aria-label={`${waiting} waiting`}
+                                                                className="group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
+                                                            />
+                                                        ) : null}
+                                                    </Link>
+                                                </Tip>
                                             </PopoverAnchor>
                                             {item.children?.length ? (
                                                 <NavFlyout
@@ -383,28 +384,29 @@ export function AppSidebar({
              * button that did nothing would be a promise the rail can't keep.
              */}
             <div className="shrink-0 border-t border-border px-2.5 py-2 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:hidden">
-                <button
-                    type="button"
-                    onClick={toggleCollapsed}
-                    aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-                    title={collapsed ? "Expand menu" : "Collapse menu"}
-                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active group-data-[collapsed=true]/rail:h-auto group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px]"
-                >
-                    {collapsed ? (
-                        <PanelLeftOpen
-                            aria-hidden
-                            className="size-4 shrink-0"
-                        />
-                    ) : (
-                        <PanelLeftClose
-                            aria-hidden
-                            className="size-4 shrink-0"
-                        />
-                    )}
-                    <span className="group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2]">
-                        {collapsed ? "Expand menu" : "Collapse menu"}
-                    </span>
-                </button>
+                <Tip label={collapsed ? "Expand menu" : "Collapse menu"}>
+                    <button
+                        type="button"
+                        onClick={toggleCollapsed}
+                        aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+                        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active group-data-[collapsed=true]/rail:h-auto group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px]"
+                    >
+                        {collapsed ? (
+                            <PanelLeftOpen
+                                aria-hidden
+                                className="size-4 shrink-0"
+                            />
+                        ) : (
+                            <PanelLeftClose
+                                aria-hidden
+                                className="size-4 shrink-0"
+                            />
+                        )}
+                        <span className="group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2]">
+                            {collapsed ? "Expand menu" : "Collapse menu"}
+                        </span>
+                    </button>
+                </Tip>
             </div>
         </aside>
     );
@@ -461,9 +463,7 @@ function NavFlyout({
                 "bg-primary text-primary-foreground dark:bg-popover dark:text-popover-foreground",
             )}
         >
-            <p className="px-[9px] pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] opacity-70">
-                {label}
-            </p>
+            <p className="label px-[9px] pb-1.5 pt-1 opacity-70">{label}</p>
             {rows.map((child) => {
                 const on = isNavChildCurrent(pathname, child.href, rows);
                 return (
@@ -474,7 +474,7 @@ function NavFlyout({
                         aria-current={on ? "page" : undefined}
                         className={cn(
                             "relative flex items-center rounded-[7px] py-2 pl-4 pr-3 text-[12.5px] transition-colors duration-fast",
-                            "before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
+                            "duration-fast before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
                             // A Paper wash over the Ink, never a white
                             // fill — which on this surface would read as a
                             // second card (brand file §13).
@@ -487,12 +487,12 @@ function NavFlyout({
                             {child.create ? `+ ${child.label}` : child.label}
                         </span>
                         {(counts?.[child.href] ?? 0) > 0 ? (
-                            <span
+                            <CountBadge
+                                count={counts?.[child.href] ?? 0}
+                                tone="strong"
                                 aria-label={`${counts?.[child.href]} waiting`}
-                                className="ml-2 inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                            >
-                                {counts?.[child.href]}
-                            </span>
+                                className="ml-2 shrink-0"
+                            />
                         ) : null}
                     </Link>
                 );
@@ -593,12 +593,12 @@ function SiteTree({
                                use — a count is a count wherever it sits, and
                                giving the child a second treatment would
                                suggest it meant something different. */
-                            <span
+                            <CountBadge
+                                count={waiting}
+                                tone="strong"
                                 aria-label={`${waiting} waiting`}
-                                className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                            >
-                                {waiting}
-                            </span>
+                                className="shrink-0"
+                            />
                         ) : null}
                     </Link>
                 );

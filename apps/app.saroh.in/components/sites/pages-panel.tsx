@@ -189,7 +189,7 @@ export function PagesPanel({
                                 {page.title}
                             </span>
                             {marks.unseen ? (
-                                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                                     Can&apos;t be seen
                                 </span>
                             ) : marks.notInMenu ? (
@@ -200,7 +200,6 @@ export function PagesPanel({
                             {current ? (
                                 <Check
                                     aria-hidden
-                                    strokeWidth={2.2}
                                     className="size-3.5 shrink-0 text-foreground"
                                 />
                             ) : null}
@@ -327,14 +326,14 @@ function Disclosure({
             <span className="shrink-0 text-muted-foreground">{icon}</span>
             <span className="min-w-0 flex-1 truncate">{label}</span>
             {hint ? (
-                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                     {hint}
                 </span>
             ) : null}
             <ChevronRight
                 aria-hidden
                 className={cn(
-                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform duration-fast",
                     open && "rotate-90",
                 )}
             />

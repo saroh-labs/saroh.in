@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import type { QrStyle } from "@/lib/qr/types";
 import { linkWords, TOO_LIGHT } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
 import type { QrLogoChoice } from "./qr-download";
 import { artOf } from "./qr-download";
 
@@ -108,14 +109,7 @@ export function QrCodeCard({
                         : `A sample for now${opens ? `, for ${opens}` : ""}. Its short link is made with the code.`}
                 </span>
             </div>
-            {tooLight ? (
-                <span
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                >
-                    {TOO_LIGHT}
-                </span>
-            ) : null}
+            {tooLight ? <Notice tone="error">{TOO_LIGHT}</Notice> : null}
             {children}
             <span className="max-w-[34ch] text-center text-[12.5px] leading-normal text-muted-foreground">
                 {UPI_LINE}

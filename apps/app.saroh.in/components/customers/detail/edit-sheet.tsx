@@ -2,7 +2,6 @@
 
 import { FormSheet } from "@/components/shared/form-sheet";
 import { showError, showUndo } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -21,6 +20,7 @@ import {
 } from "@/lib/customer-workspace/details";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { AddressFields, TextField } from "./edit-fields";
 
 interface Refusal {
@@ -114,23 +114,18 @@ export function EditSheet({
             // The same person twice (C10): offer the merge, which lets them
             // pick this email for the record that stays. What was typed here
             // can't be saved as it stands, so the sheet makes way for it.
-            <button
-                type="button"
+            <TextLink
                 onClick={() => {
                     close();
                     onMerge(holder);
                 }}
-                className="cursor-pointer rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
             >
                 Merge with {holder.name ?? "their record"}
-            </button>
+            </TextLink>
         ) : holder ? (
-            <Link
-                href={personHref(holder.contactId)}
-                className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
-            >
+            <TextLink href={personHref(holder.contactId)}>
                 See {holder.name ?? "their record"}
-            </Link>
+            </TextLink>
         ) : signsInWith ? (
             signInNote(signsInWith)
         ) : (

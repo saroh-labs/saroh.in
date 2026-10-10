@@ -19,6 +19,7 @@ import type {
 } from "@/lib/organizations/service";
 import { listOrganizations } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata: Metadata = {
     title: "Which business?",
@@ -103,12 +104,9 @@ export default async function ChoosePage({
                 You can change this whenever you like.
             </p>
             {notice ? (
-                <p
-                    role="status"
-                    className="sa-rise -mt-2.5 mb-[22px] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[13px] leading-[1.55] text-foreground"
-                >
+                <Notice role="status" className="sa-rise -mt-2.5 mb-[22px]">
                     {notice}
-                </p>
+                </Notice>
             ) : null}
 
             {owned.length > 0 ? (
@@ -143,7 +141,7 @@ export default async function ChoosePage({
                 Starting something new?{" "}
                 <Link
                     href="/onboarding"
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground underline-offset-4 transition-colors duration-fast hover:underline"
                 >
                     Add a business
                 </Link>
@@ -178,9 +176,7 @@ function Group({
     if (closedDoor) {
         return (
             <div className={spaced ? "mt-5" : undefined}>
-                <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </p>
+                <p className="label sa-rise mb-2">{label}</p>
                 {note ? (
                     <p className="sa-rise -mt-1 mb-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         {note}
@@ -217,9 +213,7 @@ function Group({
     }
     return (
         <div className={spaced ? "mt-5" : undefined}>
-            <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label sa-rise mb-2">{label}</p>
             {note ? (
                 <p className="sa-rise -mt-1 mb-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                     {note}

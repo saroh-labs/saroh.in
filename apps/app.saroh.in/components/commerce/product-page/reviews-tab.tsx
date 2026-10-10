@@ -53,7 +53,7 @@ export function ProductReviewsTab({
                     {summary.average ? (
                         <span
                             aria-hidden
-                            className="tracking-[1px] text-highlight"
+                            className="tracking-[1px] text-foreground"
                         >
                             {"★".repeat(Math.round(summary.average))}
                             {"☆".repeat(5 - Math.round(summary.average))}
@@ -80,7 +80,7 @@ export function ProductReviewsTab({
                             <span>{bar.stars}★</span>
                             <span className="h-1.5 overflow-hidden rounded-full bg-muted">
                                 <span
-                                    className="block h-full rounded-full bg-highlight"
+                                    className="block h-full rounded-full bg-foreground"
                                     style={{ width: `${bar.percent}%` }}
                                 />
                             </span>

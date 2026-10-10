@@ -3,10 +3,10 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { chipClass } from "@/components/shared/chip";
 import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
-
-import { chipBtn } from "./product-settings";
+import { Notice } from "@saroh/ui/notice";
 
 type Category = CatalogueView["categories"][number];
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
@@ -84,21 +84,18 @@ export function CategoryMergeSheet({
                             aria-checked={to === t.id}
                             disabled={busy}
                             onClick={() => setTo(t.id)}
-                            className={chipBtn(to === t.id)}
+                            className={chipClass(to === t.id)}
                         >
                             {t.name}
                         </button>
                     ))}
                 </div>
             </div>
-            <p
-                role="status"
-                className="text-pretty rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75"
-            >
+            <Notice role="status">
                 {into === null
                     ? "Pick where its products should go."
                     : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
-            </p>
+            </Notice>
         </FormSheet>
     );
 }

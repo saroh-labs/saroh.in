@@ -19,7 +19,7 @@ import {
 } from "@/lib/stock/screen";
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 
-import { chipClass } from "./tones";
+import { chipClass } from "@/components/shared/chip";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**

@@ -7,6 +7,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The Style panel (#189) — colour and spacing for a whole site.
@@ -127,9 +128,7 @@ export function StylePanel({
                     older API that serves no pairs shows no choice. */}
                 {fontPairs.length > 0 ? (
                     <section className="space-y-3">
-                        <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Typeface
-                        </h3>
+                        <h3 className="label">Typeface</h3>
                         <div
                             role="radiogroup"
                             aria-label="Typeface"
@@ -171,9 +170,7 @@ export function StylePanel({
                         fontPairs.length > 0 && "border-t pt-4",
                     )}
                 >
-                    <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Colour
-                    </h3>
+                    <h3 className="label">Colour</h3>
                     {colourways.length > 0 ? (
                         <div
                             role="radiogroup"
@@ -248,43 +245,49 @@ export function StylePanel({
                                         row.key === "text" &&
                                         !textReadable(swatch.hsl);
                                     return (
-                                        <button
-                                            key={swatch.key}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={active}
-                                            // The swatch is the label: a name
-                                            // like "Clay" means nothing without
-                                            // the colour, and the colour means
-                                            // nothing to a screen reader without
-                                            // the name.
-                                            aria-label={swatch.label}
-                                            disabled={unreadable}
-                                            title={
+                                        <Tip
+                                            label={
                                                 unreadable
                                                     ? `${swatch.label} — too close to the page colour to read`
                                                     : swatch.label
                                             }
-                                            onClick={() =>
-                                                setColour(row.key, swatch.key)
-                                            }
-                                            style={{
-                                                background: `hsl(${swatch.hsl})`,
-                                            }}
-                                            className={cn(
-                                                "h-7 w-7 rounded border transition-[box-shadow]",
-                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                                                active
-                                                    ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
-                                                    : "border-border hover:ring-2 hover:ring-border",
-                                                // Struck through rather than
-                                                // hidden: the option still
-                                                // exists, it just does not work
-                                                // with this page colour.
-                                                unreadable &&
-                                                    "cursor-not-allowed opacity-30",
-                                            )}
-                                        />
+                                        >
+                                            <button
+                                                key={swatch.key}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={active}
+                                                // The swatch is the label: a name
+                                                // like "Clay" means nothing without
+                                                // the colour, and the colour means
+                                                // nothing to a screen reader without
+                                                // the name.
+                                                aria-label={swatch.label}
+                                                disabled={unreadable}
+                                                onClick={() =>
+                                                    setColour(
+                                                        row.key,
+                                                        swatch.key,
+                                                    )
+                                                }
+                                                style={{
+                                                    background: `hsl(${swatch.hsl})`,
+                                                }}
+                                                className={cn(
+                                                    "h-7 w-7 rounded border transition-[box-shadow] duration-fast",
+                                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                                    active
+                                                        ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                                                        : "border-border hover:ring-2 hover:ring-border",
+                                                    // Struck through rather than
+                                                    // hidden: the option still
+                                                    // exists, it just does not work
+                                                    // with this page colour.
+                                                    unreadable &&
+                                                        "cursor-not-allowed opacity-30",
+                                                )}
+                                            />
+                                        </Tip>
                                     );
                                 })}
                             </div>
@@ -293,9 +296,7 @@ export function StylePanel({
                 </section>
 
                 <section className="space-y-3 border-t pt-4">
-                    <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Spacing and shape
-                    </h3>
+                    <h3 className="label">Spacing and shape</h3>
                     {options.scalars.map((scalar) => {
                         const value = style.scalars[scalar.key] ?? scalar.min;
                         // A template may set a value under the merchant's

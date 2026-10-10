@@ -359,6 +359,7 @@ export function CatalogueScreen({
                             go={go}
                             storefronts={data.storefronts}
                             choices={choices}
+                            searching={navigating}
                         />
                     }
                     onRowClick={(r) => setOpenId(r.id)}

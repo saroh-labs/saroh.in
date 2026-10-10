@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -24,6 +23,8 @@ import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
@@ -218,9 +219,12 @@ export function MadeBySection({
                         <FieldLabel
                             htmlFor="pe-supplier-code"
                             aside={
-                                <span className="shrink-0 rounded-full bg-muted px-[7px] py-px text-[11px] font-semibold text-muted-foreground">
+                                <StatusBadge
+                                    tone="neutral"
+                                    className="shrink-0"
+                                >
                                     Team only
-                                </span>
+                                </StatusBadge>
                             }
                         >
                             Supplier&apos;s product code
@@ -396,12 +400,9 @@ function MoreAboutIt({
                 <span className="text-[11.5px] text-muted-foreground">
                     Asked of everything in {categoryName}.
                 </span>
-                <Link
-                    href={manageHref}
-                    className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
+                <TextLink href={manageHref} className="ml-auto text-[12px]">
                     Manage fields
-                </Link>
+                </TextLink>
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
                 {fields.map((f) => {
@@ -413,16 +414,11 @@ function MoreAboutIt({
                             <FieldLabel
                                 htmlFor={f.type === "YES_NO" ? undefined : id}
                                 aside={
-                                    <span
-                                        className={cn(
-                                            "shrink-0 rounded-full px-[7px] py-px text-[11px] font-semibold",
-                                            f.onShop
-                                                ? "bg-success-subtle text-success-subtle-foreground"
-                                                : "bg-muted text-muted-foreground",
-                                        )}
+                                    <StatusBadge
+                                        tone={f.onShop ? "success" : "neutral"}
                                     >
                                         {f.onShop ? "On the shop" : "Team only"}
-                                    </span>
+                                    </StatusBadge>
                                 }
                             >
                                 {f.name}

@@ -2,13 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useId } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { RichTextContent } from "@/lib/sites/service";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 
@@ -127,31 +126,18 @@ export function TextPhotoFields({
                         </p>
                     </div>
                     <Field label="Photo side">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Photo side"
                             value={side}
-                            onValueChange={(v) => {
-                                if (
-                                    v === "left" ||
-                                    v === "right" ||
-                                    v === "above"
-                                ) {
-                                    onChange({ image, imageSide: v });
-                                }
-                            }}
-                            aria-label="Photo side"
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="left" className={SEGMENT}>
-                                Left
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="right" className={SEGMENT}>
-                                Right
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="above" className={SEGMENT}>
-                                Above
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            onValueChange={(v) =>
+                                onChange({ image, imageSide: v })
+                            }
+                            options={[
+                                { value: "left", label: "Left" },
+                                { value: "right", label: "Right" },
+                                { value: "above", label: "Above" },
+                            ]}
+                        />
                     </Field>
                 </>
             ) : null}

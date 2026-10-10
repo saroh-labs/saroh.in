@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Skeleton } from "@saroh/ui/skeleton";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -25,6 +24,8 @@ import {
 import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
 import { Section } from "./field";
 import { ConnectChoice, SellFields, WebsiteFields } from "./setup-fields";
@@ -165,9 +166,7 @@ function TurnOnBody({
             <FormSheetBody className="gap-5">
                 {comes.length > 0 ? (
                     <section className="grid gap-1.5">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            What comes with it
-                        </h3>
+                        <h3 className="label">What comes with it</h3>
                         <ul className="grid gap-1 text-pretty text-[12.5px] leading-normal text-foreground">
                             {comes.map((line) => (
                                 <li key={line}>{line}</li>
@@ -177,12 +176,9 @@ function TurnOnBody({
                 ) : null}
 
                 {t.hidden.length > 0 ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px]"
-                    >
+                    <Notice role="alert">
                         {BLOCKER_COPY.ROLLOUT_DISABLED}
-                    </p>
+                    </Notice>
                 ) : !draft ? (
                     <div className="grid gap-3" aria-label="Loading">
                         <Skeleton className="h-4 w-32" />
@@ -275,14 +271,7 @@ function TurnOnBody({
                     </>
                 )}
 
-                {t.failure ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] border border-destructive-subtle-foreground/40 bg-destructive-subtle px-3 py-2.5 text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {t.failure}
-                    </p>
-                ) : null}
+                {t.failure ? <Notice tone="error">{t.failure}</Notice> : null}
             </FormSheetBody>
             <FormSheetFoot
                 saveLabel="Turn on"
@@ -322,12 +311,9 @@ function ConnectLocked({
     return (
         <div className="grid gap-2 rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
             <p className="text-pretty">{connectLockLine(moduleKey, lock)}</p>
-            <Link
-                href={lock.href}
-                className="justify-self-start font-semibold text-foreground underline underline-offset-2"
-            >
+            <TextLink href={lock.href} className="justify-self-start">
                 {lock.cta}
-            </Link>
+            </TextLink>
         </div>
     );
 }

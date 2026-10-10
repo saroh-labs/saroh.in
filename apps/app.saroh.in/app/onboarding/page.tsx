@@ -23,6 +23,7 @@ import {
 } from "@/lib/saroh-billing/plan-checkout";
 import { readPlanIntent } from "@/lib/saroh-billing/plan-intent";
 import { requireSession } from "@/lib/session";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata: Metadata = { title: "Set up Saroh" };
 
@@ -123,12 +124,9 @@ export default async function OnboardingPage({
                     : "Last step. You can change all of this later, and you pick what Saroh does for you once you are inside."}
             </p>
             {left ? (
-                <p
-                    role="status"
-                    className="-mt-2.5 mb-[22px] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[13px] leading-[1.55] text-foreground"
-                >
+                <Notice role="status" className="-mt-2.5 mb-[22px]">
                     {left}
-                </p>
+                </Notice>
             ) : null}
             {note ? (
                 <p

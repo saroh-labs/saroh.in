@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { TextLink } from "@saroh/ui/text-link";
 import type { ReactNode } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -72,14 +72,14 @@ export function QuickSheet({
             }
             extra={
                 fullEditorHref || moreLink ? (
-                    <Link
+                    <TextLink
                         href={fullEditorHref ?? moreLink?.href ?? ""}
-                        className="text-[12.5px] text-foreground underline underline-offset-4 transition-colors hover:decoration-2 active:text-muted-foreground coarse:flex coarse:min-h-11 coarse:items-center"
+                        className="text-[12.5px] coarse:flex coarse:min-h-11 coarse:items-center"
                     >
                         {fullEditorHref
                             ? "More in the full editor"
                             : moreLink?.label}
-                    </Link>
+                    </TextLink>
                 ) : null
             }
             onClose={() => onOpenChange(false)}

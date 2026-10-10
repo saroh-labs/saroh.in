@@ -23,6 +23,8 @@ import {
 import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
 
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 
 /** How long typing settles before the search runs. */
@@ -215,12 +217,9 @@ export function CustomerPicker({
                 className="mb-2 h-9 rounded-[9px] text-[13px]"
             />
             {attentionNote ? (
-                <div
-                    role="note"
-                    className="mb-2 rounded-lg bg-destructive-subtle px-2.5 py-[7px] text-[12.5px] leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note" className="mb-2">
                     {attentionNote}
-                </div>
+                </Notice>
             ) : null}
             {failed ? (
                 <p
@@ -228,13 +227,9 @@ export function CustomerPicker({
                     className="mb-2 text-[12.5px] text-destructive-subtle-foreground"
                 >
                     Couldn&apos;t search customers — try again.{" "}
-                    <button
-                        type="button"
-                        onClick={() => setRetry((n) => n + 1)}
-                        className="font-semibold underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
-                    >
+                    <TextLink onClick={() => setRetry((n) => n + 1)}>
                         Try again
-                    </button>
+                    </TextLink>
                 </p>
             ) : null}
             {forbidden && canSearch ? (
@@ -288,7 +283,7 @@ export function CustomerPicker({
                             setWalkIn(false);
                             setAdding(draftFromTyped(query));
                         }}
-                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
+                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
                     >
                         {addLabel(query)}
                     </button>

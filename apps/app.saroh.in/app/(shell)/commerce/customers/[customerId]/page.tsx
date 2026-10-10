@@ -24,9 +24,9 @@ export const metadata = { title: "Customer" };
 
 const STANDING: Record<
     OrderStanding,
-    { label: string; variant: "draft" | "success" | "neutral" }
+    { label: string; variant: "active" | "success" | "neutral" }
 > = {
-    UNFULFILLED: { label: "Unfulfilled", variant: "draft" },
+    UNFULFILLED: { label: "Unfulfilled", variant: "active" },
     FULFILLED: { label: "Fulfilled", variant: "success" },
     REFUNDED: { label: "Refunded", variant: "neutral" },
     CANCELLED: { label: "Cancelled", variant: "neutral" },
@@ -281,9 +281,7 @@ function Card({
     return (
         <section className="overflow-hidden rounded-[12px] border border-border bg-card">
             <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-muted px-4 py-1.5">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </h2>
+                <h2 className="label">{title}</h2>
                 {action}
             </div>
             {children}

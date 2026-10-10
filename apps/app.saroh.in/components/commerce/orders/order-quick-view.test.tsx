@@ -113,14 +113,14 @@ describe("OrderQuickView — close (DEC-073)", () => {
 });
 
 describe("QuickViewBody — the customer (DEC-073)", () => {
-    it("names them as a Saffron link to Customer Detail", () => {
+    it("names them as an Ink, underlined link to Customer Detail", () => {
         const html = renderToStaticMarkup(<QuickViewBody order={order()} />);
         const link = /<a[^>]*href="\/contacts\/ct_1"[^>]*>([^<]*)<\/a>/.exec(
             html,
         );
         expect(link?.[1]).toBe("Priya Raman");
-        expect(link?.[0]).toContain("text-brand");
-        expect(link?.[0]).toContain("hover:text-foreground");
+        expect(link?.[0]).toContain("underline");
+        expect(link?.[0]).not.toContain("text-brand");
         expect(link?.[0]).toContain("focus-visible:ring-2");
     });
 
@@ -134,7 +134,7 @@ describe("QuickViewBody — the customer (DEC-073)", () => {
             />,
         );
         expect(html).toContain("Walk-in · Asha");
-        expect(html).not.toContain("text-brand");
+        expect(html).not.toContain('href="/contacts/');
     });
 });
 

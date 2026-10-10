@@ -6,6 +6,7 @@ import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel } from "./parts";
 
 export function initials(name: string): string {
@@ -162,15 +163,12 @@ export function CustomerCard({
 function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
     if (attention === null) {
         return (
-            <div
-                role="status"
-                className="mt-2.5 rounded-lg bg-muted px-2.5 py-2 text-[12.5px] leading-[1.45] text-muted-foreground"
-            >
+            <Notice role="status" className="mt-2.5">
                 <span className="font-semibold text-foreground">
                     Needs attention: not available.
                 </span>{" "}
                 Check with them before it goes out.
-            </div>
+            </Notice>
         );
     }
     const card = cardAttention(attention);

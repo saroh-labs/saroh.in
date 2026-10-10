@@ -75,7 +75,7 @@ export function ReviewsView({
                     <span className="flex items-center gap-2">
                         <span
                             aria-label={`${r.rating} out of 5 stars`}
-                            className="text-[13px] tracking-[1px] text-highlight"
+                            className="text-[13px] tracking-[1px] text-foreground"
                         >
                             {stars(r.rating)}
                         </span>
@@ -310,7 +310,7 @@ function ReviewSheet({
                         <div>
                             <p
                                 aria-label={`${review.rating} out of 5 stars`}
-                                className="text-[18px] tracking-[2px] text-highlight"
+                                className="text-[18px] tracking-[2px] text-foreground"
                             >
                                 {stars(review.rating)}
                             </p>

@@ -13,6 +13,8 @@ import type { ProductOverview } from "@/lib/products/overview";
 import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
+import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
     PanelForbidden,
@@ -84,12 +86,7 @@ export function ProductOrdersTab({
                             href={f === "open" ? here : `${here}&orders=recent`}
                             scroll={false}
                             aria-current={f === filter ? "true" : undefined}
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-3 text-[12.5px] coarse:h-11",
-                                f === filter
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-                            )}
+                            className={chipClass(f === filter)}
                         >
                             {f === "open"
                                 ? `Open · ${data.openCount}`
@@ -102,12 +99,9 @@ export function ProductOrdersTab({
                         ? heldBy(data.recent, product.name)
                         : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
                 </p>
-                <Link
-                    href="/commerce/orders"
-                    className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
+                <TextLink href="/commerce/orders" className="text-[12.5px]">
                     All orders for it in Orders →
-                </Link>
+                </TextLink>
             </div>
 
             {rows.length === 0 ? (
@@ -131,7 +125,7 @@ export function ProductOrdersTab({
                                 <tr
                                     className={cn(
                                         grid,
-                                        "border-b border-border pb-[7px] pt-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
+                                        "label border-b border-border pb-[7px] pt-2.5 text-left text-muted-foreground/80",
                                     )}
                                 >
                                     <th scope="col">Order</th>
@@ -152,24 +146,23 @@ export function ProductOrdersTab({
                                         )}
                                     >
                                         <td>
-                                            <Link
+                                            <TextLink
                                                 href={orderHref(storeId, o.id)}
-                                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                className="font-mono text-[12px]"
                                             >
                                                 {o.orderNumber}
-                                            </Link>
+                                            </TextLink>
                                         </td>
                                         <td className="truncate">
                                             {o.customerId ? (
-                                                <Link
+                                                <TextLink
                                                     href={customerHref(
                                                         storeId,
                                                         o.customerId,
                                                     )}
-                                                    className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                                 >
                                                     {o.customer}
-                                                </Link>
+                                                </TextLink>
                                             ) : (
                                                 // A walk-in (B13): no record to open.
                                                 o.customer
@@ -194,7 +187,7 @@ export function ProductOrdersTab({
                                                         ? "warning"
                                                         : "neutral"
                                                 }
-                                                className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                size="sm"
                                             >
                                                 {ORDER_STATUS_LABEL[o.status] ??
                                                     o.status}
@@ -224,7 +217,8 @@ export function ProductOrdersTab({
                                 aside={
                                     <Badge
                                         variant={o.open ? "warning" : "neutral"}
-                                        className="flex-none whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                        size="sm"
+                                        className="flex-none"
                                     >
                                         {ORDER_STATUS_LABEL[o.status] ??
                                             o.status}

@@ -254,7 +254,7 @@ export function AddTimeOffSheet({
                     note.tone === "danger"
                         ? "font-medium text-destructive-subtle-foreground"
                         : note.tone === "warn"
-                          ? "text-brand-subtle-foreground"
+                          ? "text-foreground"
                           : "text-muted-foreground",
                 )}
             >

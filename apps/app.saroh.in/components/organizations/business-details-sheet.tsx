@@ -41,6 +41,7 @@ import {
     readBusinessDetails,
     saveOrganizationSettings,
 } from "@/lib/organizations/settings-actions";
+import { Notice } from "@saroh/ui/notice";
 
 const FIELDS = [
     "addressLine1",
@@ -277,14 +278,7 @@ function DetailsForm({
                     saveLabel={continueLabel}
                     pending={saving}
                     note={
-                        refusal ? (
-                            <p
-                                role="alert"
-                                className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
-                            >
-                                {refusal}
-                            </p>
-                        ) : null
+                        refusal ? <Notice tone="error">{refusal}</Notice> : null
                     }
                     onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
                 />

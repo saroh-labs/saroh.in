@@ -32,11 +32,13 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
 import { DetailsSection } from "./details-section";
-import { NextSteps, ReadOnlyNote, StatusPill } from "./editor-parts";
+import { NextSteps, ReadOnlyNote } from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
@@ -249,11 +251,7 @@ function EditorBody({
                         href={PRODUCTS_HREF}
                         className="flex items-center gap-[7px] rounded-[8px] px-[9px] py-1.5 text-[12.5px] text-foreground/75 hover:bg-muted hover:text-foreground"
                     >
-                        <ChevronLeft
-                            aria-hidden
-                            className="size-[15px]"
-                            strokeWidth={2}
-                        />
+                        <ChevronLeft aria-hidden className="size-[15px]" />
                         Products
                     </Link>
                     <span
@@ -269,7 +267,13 @@ function EditorBody({
                               ? product.name
                               : "Untitled product"}
                     </span>
-                    <StatusPill status={product?.status ?? null} />
+                    {/* A fact about what customers can see, so it follows
+                        the SAVED status. */}
+                    {product ? (
+                        <StatusBadge thing="product" status={product.status} />
+                    ) : (
+                        <StatusBadge tone="draft">Not created yet</StatusBadge>
+                    )}
                     <div className="ml-auto flex flex-wrap items-center gap-2.5 max-[480px]:ml-0">
                         <span
                             role="status"
@@ -312,12 +316,9 @@ function EditorBody({
                     // everyone, and why, not "you're viewing as …".
                     <ReadOnlyNote>
                         {pausedWords("product")}{" "}
-                        <Link
-                            href={PLAN_AND_BILLING_HREF}
-                            className="font-medium underline underline-offset-2"
-                        >
+                        <TextLink href={PLAN_AND_BILLING_HREF}>
                             {planLabel()}
-                        </Link>
+                        </TextLink>
                     </ReadOnlyNote>
                 ) : !canWrite ? (
                     <ReadOnlyNote>
@@ -345,7 +346,7 @@ function EditorBody({
                                         "size-[7px] rounded-full",
                                         problems[k]
                                             ? "bg-destructive"
-                                            : "bg-highlight",
+                                            : "bg-foreground",
                                     )}
                                 />
                             ) : null}

@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
@@ -23,6 +22,7 @@ import {
     SETTINGS_TAB_PARAM,
 } from "@/lib/sites/settings-page";
 
+import { SectionList } from "@/components/shared/section-list";
 import { ShareChecklist } from "./share-checklist";
 
 /**
@@ -140,25 +140,6 @@ export function SettingsSections({
         else setFocusOn(step.anchor);
     }
 
-    const index = ids.indexOf(open);
-    const onKeyDown = (e: React.KeyboardEvent) => {
-        const n = ids.length;
-        const next =
-            e.key === "ArrowDown"
-                ? (index + 1) % n
-                : e.key === "ArrowUp"
-                  ? (index - 1 + n) % n
-                  : e.key === "Home"
-                    ? 0
-                    : e.key === "End"
-                      ? n - 1
-                      : null;
-        if (next === null) return;
-        e.preventDefault();
-        setOpen(ids[next]);
-        document.getElementById(`settings-tab-${ids[next]}`)?.focus();
-    };
-
     // The rows' measure and where the checklist sits are the one layout
     // Sell › Location and Settings › Business use. Once everything is
     // set the checklist is a line, which stays above the rows.
@@ -175,37 +156,19 @@ export function SettingsSections({
 
     return (
         <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1fr)]">
-            <div
-                role="tablist"
-                aria-label="Settings sections"
-                aria-orientation="vertical"
-                onKeyDown={onKeyDown}
-                className="sticky top-20 hidden flex-col gap-0.5 lg:flex"
-            >
-                {groups.map((g) => {
-                    const on = g.id === open;
-                    return (
-                        <button
-                            key={g.id}
-                            id={`settings-tab-${g.id}`}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            aria-controls={`settings-panel-${g.id}`}
-                            tabIndex={on ? 0 : -1}
-                            onClick={() => setOpen(g.id)}
-                            className={cn(
-                                "rounded-md px-3 py-2 text-left text-sm transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                on
-                                    ? "bg-muted font-semibold text-foreground"
-                                    : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {g.label}
-                        </button>
-                    );
-                })}
-            </div>
+            <SectionList
+                label="Settings sections"
+                idPrefix="settings-tab"
+                phone="hidden"
+                value={open}
+                onValueChange={setOpen}
+                className="sticky top-20"
+                items={groups.map((g) => ({
+                    value: g.id,
+                    label: g.label,
+                    controls: `settings-panel-${g.id}`,
+                }))}
+            />
 
             <SettingsColumns
                 beside
