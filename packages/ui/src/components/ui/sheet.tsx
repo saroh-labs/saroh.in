@@ -21,7 +21,9 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <SheetPrimitive.Overlay
         className={cn(
-            "fixed inset-0 z-50 bg-[hsl(var(--shadow-color)/0.45)] duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            // Never on paper: a page printed with a sheet open (an order's
+            // packing slip from "Hand to courier") prints the page.
+            "fixed inset-0 z-50 bg-[hsl(var(--shadow-color)/0.45)] duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 print:hidden",
             className,
         )}
         {...props}

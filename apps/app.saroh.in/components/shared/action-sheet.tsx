@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
 import {
     SheetClose,
     SheetContent,
@@ -22,22 +23,31 @@ import {
  * While something is typed (`dirty`) a press outside the sheet doesn't
  * close it: a stray tap must not throw a half-written note away. Cancel,
  * the close button and Escape still do, each a deliberate act.
+ *
+ * A sheet opened from more than one button has no single trigger; it says
+ * where the keyboard goes back to with `onCloseAutoFocus`. `className`
+ * widens it where a list of lines needs the room.
  */
 export function ActionSheetContent({
     title,
     description,
     dirty = false,
+    className,
+    onCloseAutoFocus,
     children,
 }: {
     title: string;
     description: React.ReactNode;
     /** Something is typed and not saved. */
     dirty?: boolean;
+    className?: string;
+    onCloseAutoFocus?: (event: Event) => void;
     children: React.ReactNode;
 }) {
     return (
         <SheetContent
-            className="flex w-full flex-col sm:max-w-md"
+            className={cn("flex w-full flex-col sm:max-w-md", className)}
+            onCloseAutoFocus={onCloseAutoFocus}
             onInteractOutside={(event) => {
                 if (dirty) event.preventDefault();
             }}

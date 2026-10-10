@@ -40,23 +40,20 @@ import type { OrderPaymentsSummary } from "@/lib/payments/service";
 import { changeAccess } from "@/lib/orders/fulfilment-change";
 
 import { ChangeCard, PaymentBanner } from "./change-panels";
-import { ChangeSheets } from "./change-sheets";
-import { CourierPanel } from "./courier-panel";
 import { CustomerCard } from "./customer-card";
-import { EditPanel } from "./edit-panel";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
 import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
 import { OrderCrumbs, OrderHeading } from "./order-header";
+import { useOrderPanel } from "./order-sheet";
+import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
 import { actionClass } from "./parts";
 import { PayLinkBlock, usePayLink } from "./pay-link";
-import { RefundPanel } from "./refund-panel";
 import { KitchenStepper } from "./stepper";
 import { OrderTimeline } from "./timeline";
 import { useArrival } from "./use-arrival";
-import type { Panel } from "./use-kitchen";
 import { useKitchen } from "./use-kitchen";
 import { useOrderChanges } from "./use-order-changes";
 import { VisitsSection } from "./visits-card";
@@ -108,8 +105,10 @@ const firstName = (name: string | null | undefined) =>
 /**
  * Order Detail, layout 1d — the two-column desk (the "Saroh Order Detail"
  * design). The kitchen stepper leads, the allergy check sits above Items,
- * the change panels under Items, the timeline below them; the right column is
- * the customer and — for a money role only — the money.
+ * "Change this order" under Items, the timeline below it; the right column is
+ * the customer and — for a money role only — the money. The page is read
+ * first: every change (courier, tracking, edit, refund, fulfilment, cancel)
+ * opens in a side sheet, one at a time (`OrderSheets`).
  *
  * Every rule comes from the API's order read (`next`: which stages, whether
  * Undo is still open, whether items can change); this screen only says it.
@@ -142,7 +141,8 @@ export function OrderDetail({
     /** Opened from the Orders list to refund, hand over or print (B5). */
     arrival?: Arrival;
 }) {
-    const [panel, setPanel] = useState<Panel>(null);
+    const { panel, setPanel, opening, openPanel, closePanel, returnFocus } =
+        useOrderPanel();
     const [menu, setMenu] = useState<OrderMenuPending | null>(null);
     const clock = useClock(30_000);
 
@@ -231,7 +231,7 @@ export function OrderDetail({
 
     const advance = () => {
         if (!next || hold) return;
-        if (next === "HANDED_TO_COURIER") setPanel("courier");
+        if (next === "HANDED_TO_COURIER") openPanel("courier");
         else if (next === "READY") kitchen.holdReady();
         else void kitchen.move(next);
     };
@@ -396,7 +396,7 @@ export function OrderDetail({
                         uncollectedDays={order.uncollectedDays}
                         onCancel={
                             change.cancel === null && !hold
-                                ? () => setPanel("cancel")
+                                ? () => openPanel("cancel")
                                 : undefined
                         }
                     />
@@ -473,75 +473,6 @@ export function OrderDetail({
                             clashes={check.lines}
                             money={money ? format : null}
                         />
-                        {panel === "courier" ? (
-                            <CourierPanel
-                                mode="handover"
-                                to={to}
-                                first={first}
-                                busy={busy}
-                                onPrint={print}
-                                onCancel={() => setPanel(null)}
-                                onSave={(fields) =>
-                                    void kitchen.handOver(fields)
-                                }
-                            />
-                        ) : null}
-                        {panel === "tracking" && shipment ? (
-                            <CourierPanel
-                                mode="change"
-                                to={to}
-                                first={first}
-                                busy={busy}
-                                before={shipment}
-                                onCancel={() => setPanel(null)}
-                                onSave={kitchen.saveCourier}
-                            />
-                        ) : null}
-                        {panel === "edit" ? (
-                            <EditPanel
-                                number={number}
-                                first={first}
-                                lines={order.items}
-                                address={order.deliveryAddress}
-                                delivery={delivery}
-                                refundTo={refundTo}
-                                format={money ? format : null}
-                                addable={addable}
-                                busy={busy}
-                                onCancel={() => setPanel(null)}
-                                onSave={kitchen.saveEdit}
-                            />
-                        ) : null}
-                        {panel === "refund" && money ? (
-                            <RefundPanel
-                                lines={order.items}
-                                remaining={remaining}
-                                shipping={Number(money.shipping)}
-                                how={
-                                    money.recordedByHand
-                                        ? "Give it back from the till."
-                                        : `Back to ${refundTo}, in 3–5 days.`
-                                }
-                                format={format}
-                                onCancel={() => setPanel(null)}
-                                onRefund={kitchen.startRefund}
-                            />
-                        ) : null}
-                        {panel === "fulfilment" || panel === "cancel" ? (
-                            <ChangeSheets
-                                panel={panel}
-                                order={order}
-                                number={number}
-                                first={first}
-                                refundTo={refundTo}
-                                linkable={
-                                    can.payLink && (can.payOnline ?? false)
-                                }
-                                format={money ? format : null}
-                                changes={changes}
-                                onClose={() => setPanel(null)}
-                            />
-                        ) : null}
                         {can.edit || can.refund ? (
                             <ChangeCard
                                 canEdit={can.edit}
@@ -553,10 +484,10 @@ export function OrderDetail({
                                         ? "A change is on its way."
                                         : change.cancel
                                 }
-                                onEdit={() => setPanel("edit")}
-                                onRefund={() => setPanel("refund")}
-                                onFulfilment={() => setPanel("fulfilment")}
-                                onCancel={() => setPanel("cancel")}
+                                onEdit={() => openPanel("edit")}
+                                onRefund={() => openPanel("refund")}
+                                onFulfilment={() => openPanel("fulfilment")}
+                                onCancel={() => openPanel("cancel")}
                                 note={
                                     appointment
                                         ? TREATMENT_CHANGE_NOTE
@@ -586,7 +517,7 @@ export function OrderDetail({
                                         : null
                                 }
                                 shipment={shipment}
-                                onChangeTracking={() => setPanel("tracking")}
+                                onChangeTracking={() => openPanel("tracking")}
                                 orderNote={order.notes}
                             />
                         ) : (
@@ -595,7 +526,7 @@ export function OrderDetail({
                                 contact={can.contact ?? true}
                                 address={delivery ? addressText : null}
                                 shipment={shipment}
-                                onChangeTracking={() => setPanel("tracking")}
+                                onChangeTracking={() => openPanel("tracking")}
                                 orderNote={order.notes}
                             />
                         )}
@@ -642,6 +573,26 @@ export function OrderDetail({
                 </div>
             </div>
             {payLink.dialog}
+            <OrderSheets
+                panel={panel}
+                opening={opening}
+                order={order}
+                number={number}
+                first={first}
+                to={to}
+                delivery={delivery}
+                refundTo={refundTo}
+                shipment={shipment}
+                remaining={remaining}
+                addable={addable}
+                linkable={can.payLink && (can.payOnline ?? false)}
+                format={money ? format : null}
+                kitchen={kitchen}
+                changes={changes}
+                onPrint={print}
+                onClose={closePanel}
+                returnFocus={returnFocus}
+            />
         </main>
     );
 }

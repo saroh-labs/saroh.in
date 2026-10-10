@@ -9,10 +9,23 @@ import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 import { actionClass, Panel, PanelTitle } from "./parts";
 
 /**
+ * The Change card's buttons, by the sheet each opens: where the keyboard
+ * goes back to when that sheet closes and no other button opened it (an
+ * arrival from the Orders list).
+ */
+export const CHANGE_BUTTON_ID: Partial<Record<string, string>> = {
+    edit: "od-change-edit",
+    refund: "od-change-refund",
+    fulfilment: "od-change-fulfilment",
+    cancel: "od-change-cancel",
+};
+
+/**
  * "Change this order", under Items where the controls sit by what they
  * change: edit items or address (only before preparing), refund by line,
  * and — until it is handed over — change how it's fulfilled and cancel as
- * a refund in full (B9). Only for someone who may change or refund orders:
+ * a refund in full (B9). Each opens its own side sheet; nothing is edited
+ * in the page. Only for someone who may change or refund orders:
  * a Member's page has none of it (DEC-024), so it is not drawn for them at
  * all rather than drawn disabled. Each button says why when it can't.
  */
@@ -72,6 +85,7 @@ export function ChangeCard({
                             ? "Edit items or address"
                             : "Items are locked once preparing starts"
                     }
+                    id={CHANGE_BUTTON_ID.edit}
                     onClick={onEdit}
                 >
                     Edit items or address
@@ -82,6 +96,7 @@ export function ChangeCard({
                     className={actionClass("ghost")}
                     disabled={canRefund !== null}
                     title={canRefund ?? "Refund by line"}
+                    id={CHANGE_BUTTON_ID.refund}
                     onClick={onRefund}
                 >
                     Refund…
@@ -93,6 +108,7 @@ export function ChangeCard({
                         className={actionClass("ghost")}
                         disabled={fulfilment !== null}
                         title={fulfilment ?? undefined}
+                        id={CHANGE_BUTTON_ID.fulfilment}
                         onClick={onFulfilment}
                     >
                         Change how it&apos;s fulfilled…
@@ -109,6 +125,7 @@ export function ChangeCard({
                         )}
                         disabled={cancel !== null}
                         title={cancel ?? undefined}
+                        id={CHANGE_BUTTON_ID.cancel}
                         onClick={onCancel}
                     >
                         Cancel order…

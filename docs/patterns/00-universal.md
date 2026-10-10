@@ -120,9 +120,11 @@ each with why it stops there:
   intent) shares one private refund core and provider call; B9 added only
   a thin `refundOrderForCancel` onto that core and the cancel's finish in
   `recordRefundTaken`. Refunds as their own service is the seam.
-- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (579
-  after B8, B11, B9, B13 and B14) — the page's panels share its one `panel` and hold
-  state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
+- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (598
+  after B8, B11, B9, B13 and B14) — the page's cards share its one `panel` and hold
+  state. Its six side sheets (courier, tracking, edit, refund, fulfilment,
+  cancel) are drawn by `order-sheets.tsx` in the frame `order-sheet.tsx`
+  (which also holds which is open, `useOrderPanel`); B9's own went to `fulfilment-panel.tsx`,
   `cancel-panel.tsx` and `use-order-changes.ts`, B13's walk-in card to
   `walk-in-card.tsx`; B14's Visits card, its
   stepper and next action to `visits-card.tsx` and `visits-next.tsx`, their

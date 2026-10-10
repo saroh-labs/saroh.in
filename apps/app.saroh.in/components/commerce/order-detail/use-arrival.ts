@@ -8,7 +8,7 @@ import type { Panel } from "./use-kitchen";
 
 /**
  * What Order Detail was opened to do, from the Orders list's row menu and
- * quick view (plan B, B5; `arrivalOf`): open the refund or courier panel,
+ * quick view (plan B, B5; `arrivalOf`): open the refund or courier sheet,
  * or print the ticket. Each happens once, only when the order allows it
  * (`allows`), and the address then drops the ask, so a reload or Back
  * doesn't do it again.

@@ -1,5 +1,8 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { act } from "react";
+import type { Root } from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { OrderReadLine } from "@/lib/orders/read";
 
@@ -8,7 +11,8 @@ import { RefundPanel } from "./refund-panel";
 /**
  * The refund sheet as the design draws it (B8): the lines, then Why (the
  * design's reasons) beside "Or another amount", the way the money goes back,
- * and Refund — which does nothing until something is chosen.
+ * and Refund — which does nothing until something is chosen. It is a side
+ * sheet, drawn in a portal, so it is read off the document.
  */
 const line = (over: Partial<OrderReadLine>): OrderReadLine => ({
     id: "l1",
@@ -24,19 +28,41 @@ const line = (over: Partial<OrderReadLine>): OrderReadLine => ({
     ...over,
 });
 
+let root: Root;
+let host: HTMLDivElement;
+
+beforeEach(() => {
+    (
+        globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+});
+
+afterEach(() => {
+    act(() => root.unmount());
+    document.body.innerHTML = "";
+});
+
 const noop = () => undefined;
-const html = (lines: OrderReadLine[]) =>
-    renderToStaticMarkup(
-        <RefundPanel
-            lines={lines}
-            remaining={480}
-            shipping={0}
-            how="Back to Razorpay, in 3–5 days."
-            format={(n) => `₹${n}`}
-            onCancel={noop}
-            onRefund={noop}
-        />,
+const html = (lines: OrderReadLine[]) => {
+    act(() =>
+        root.render(
+            <RefundPanel
+                open
+                lines={lines}
+                remaining={480}
+                shipping={0}
+                how="Back to Razorpay, in 3–5 days."
+                format={(n) => `₹${n}`}
+                onCancel={noop}
+                onRefund={noop}
+            />,
+        ),
     );
+    return document.body.querySelector("[role=dialog]")?.innerHTML ?? "";
+};
 
 describe("RefundPanel", () => {
     it("draws the lines, Why with the design's reasons, and Or another amount", () => {
