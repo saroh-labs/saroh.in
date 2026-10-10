@@ -86,12 +86,22 @@ describe("qrArt", () => {
         const art = qrArt(LINK, { style: "branded", logo: true });
         const n = art.n;
         expect(art.dots).toMatch(
-            /^(M[\d.]+ [\d.]+a\.42 \.42 0 1 0 \.84 0a\.42 \.42 0 1 0 -\.84 0z)+$/,
+            /^(M[\d.]+ [\d.]+a0\.42 0\.42 0 1 0 0\.84 0a0\.42 0\.42 0 1 0 -0\.84 0z)+$/,
         );
         // 7, 5 and 3 module shapes with radii 2, 1.3 and 0.9.
         expect(art.eyes).toContain("M2 0h3a2 2 0 0 1 2 2");
         expect(art.eyes).toContain("M2.3 1h2.4a1.3 1.3 0 0 1 1.3 1.3");
         expect(art.eyes).toContain("M2.9 2h1.2a0.9 0.9 0 0 1 0.9 0.9");
+        // The alignment pattern (version 4: centred on module 26) is one
+        // small eye, 5, 3 and 1 modules, not dots: a weak scanner needs it
+        // solid (QR_ALIGNMENT_RADII).
+        expect(n).toBe(33);
+        expect(marks(art.eyes)).toBe(12);
+        expect(art.eyes).toContain("M25.4 24h2.2a1.4 1.4 0 0 1 1.4 1.4");
+        expect(art.eyes).toContain("M25.8 25h1.4a0.8 0.8 0 0 1 0.8 0.8");
+        expect(art.eyes).toContain("M26.5 26h0a0.5 0.5 0 0 1 0.5 0.5");
+        // Plain leaves it to the squares.
+        expect(marks(qrArt(LINK, { logo: true }).eyes)).toBe(9);
 
         // L = round(n * 0.22), odd; the box is L + 2, centred.
         let tile = Math.round(n * 0.22);
@@ -194,12 +204,18 @@ describe("qrArt", () => {
     it("branded dots sit on the same modules as the plain squares", () => {
         const plain = qrArt(LINK, { style: "plain", logo: true });
         const branded = qrArt(LINK, { style: "branded", logo: true });
-        const squares = rects(plain.dots).map(([x, y]) => `${x},${y}`);
+        // All but the alignment pattern (modules 24 to 28), which branded
+        // draws as a small eye.
+        const inAlignment = (v: number) => v >= 24 && v <= 28;
+        const squares = rects(plain.dots)
+            .filter(([x, y]) => !(inAlignment(x) && inAlignment(y)))
+            .map(([x, y]) => `${x},${y}`);
         const dots = Array.from(
             branded.dots.matchAll(/M([\d.]+) ([\d.]+)a/g),
             (m) => `${Math.round(Number(m[1]) - 0.08)},${Number(m[2]) - 0.5}`,
         );
         expect(dots).toEqual(squares);
+        expect(rects(plain.dots).length - squares.length).toBe(17);
     });
 });
 
