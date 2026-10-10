@@ -17,7 +17,7 @@ import { z } from "zod";
 
 import { FormSheet } from "@/components/shared/form-sheet";
 import { inviteMember } from "@/lib/members/actions";
-import { LOCATION_ROLES, roleLabel } from "@/lib/stores/people";
+import { LOCATION_ROLES, roleLabel, roleLine } from "@/lib/stores/people";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 const formSchema = z.object({
@@ -42,11 +42,12 @@ const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
  * Location team unless they're on it already (DEC-048, F16), which the
  * sheet says in a line.
  *
- * The sentence under the title promises only what all four roles get in
- * this app today: the location's products and orders to read, and its
- * orders to move along (DEC-074). The API lets an Admin, Manager or Editor
- * do more at their location than the app offers them yet; until it does,
- * the invitation doesn't say so.
+ * The sentence under the title promises what all four roles get: the
+ * location's products and orders to read, and its orders to move along
+ * (DEC-074). Under the role is what the one picked adds (`roleLine`): an
+ * Admin, Manager or Editor also takes orders there and changes its name
+ * and description, which the app now offers them from the location's own
+ * read (`lib/stores/abilities.ts`). Never more than the API takes.
  *
  * An invite tells someone, so it waits ten seconds with Undo (`useHold`):
  * the sheet closes, keeping what was typed, and a refusal or an Undo opens
@@ -166,6 +167,13 @@ export function InvitePersonSheet({
                                     className="w-full"
                                 />
                             </FormControl>
+                            <p
+                                data-testid="location-role-line"
+                                aria-live="polite"
+                                className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                            >
+                                {roleLine(field.value)}
+                            </p>
                             <FormMessage />
                         </FormItem>
                     )}

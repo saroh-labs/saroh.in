@@ -25,6 +25,12 @@ export type Saver = (
 export interface SectionProps {
     store: StorefrontSettings;
     canEdit: boolean;
+    /**
+     * May change its name, description and logo, and nothing else here (a
+     * location Admin, Manager or Editor; the location's `abilities.edit`).
+     * Only asked where `canEdit` is false.
+     */
+    canEditAbout?: boolean;
     pending: boolean;
     save: Saver;
     setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;

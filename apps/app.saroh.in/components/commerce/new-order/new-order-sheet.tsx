@@ -54,12 +54,15 @@ export function NewOrderSheet({
     online = true,
     canSearch,
     initialPick = null,
+    noMoneyAt,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    /** Locations where the order is taken and its money isn't (DEC-106). */
+    noMoneyAt?: readonly string[];
     /** The plan takes payment online (R33); else no link is offered. */
     online?: boolean;
     canSearch: boolean;
@@ -91,6 +94,7 @@ export function NewOrderSheet({
                     online={online}
                     canSearch={canSearch}
                     initialPick={initialPick}
+                    noMoneyAt={noMoneyAt}
                     onClose={close}
                 />
             ) : null}
@@ -105,11 +109,13 @@ function NewOrderBody({
     online,
     canSearch,
     initialPick,
+    noMoneyAt,
     onClose,
 }: {
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    noMoneyAt?: readonly string[];
     online: boolean;
     canSearch: boolean;
     initialPick: CustomerPick | null;
@@ -122,6 +128,7 @@ function NewOrderBody({
         online,
         canSearch,
         initialPick,
+        noMoneyAt,
     });
     const [saving, setSaving] = useState(false);
     // What is missing is said once the button is pressed.
@@ -279,7 +286,7 @@ function NewOrderBody({
                     onGiven={o.setGiven}
                     change={o.change}
                     total={total}
-                    note={payNote(o.pay, total, o.reach)}
+                    note={payNote(o.pay, total, o.reach, o.money)}
                     format={o.format}
                     discount={o.discount}
                     onDiscount={o.setDiscount}

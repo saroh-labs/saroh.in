@@ -22,8 +22,10 @@ import {
     pageRange,
     previousPageHref,
 } from "@/lib/orders/list-query";
+import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
+import type { OrderPlace } from "@/lib/stores/abilities";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
@@ -132,6 +134,14 @@ export function OrdersScreen({
          * order arrives with `?new=1&contactId=`. Null starts it empty.
          */
         initialPick?: CustomerPick | null;
+        /**
+         * For someone whose business role takes no orders and whose
+         * location role does (a location Admin, Manager or Editor): the
+         * locations whose own read says they may, and whether their money
+         * too. New order is then offered there, in the kitchen's view as
+         * well. Absent: the business role decides, at every location.
+         */
+        places?: readonly OrderPlace[];
     } | null;
 }) {
     const router = useRouter();
@@ -144,11 +154,14 @@ export function OrdersScreen({
     const money = !kitchen && rows.some((r) => r.total !== undefined);
     // The row whose quick view is open (B5).
     const [peekId, setPeekId] = useState<string | null>(null);
+    // Where New order may be taken: every location for someone the business
+    // role lets (never in the kitchen's view), else the ones whose own read
+    // says so (`newOrder.places`, a location Admin, Manager or Editor).
+    const orderStores = newOrderStores(stores, kitchen, newOrder?.places);
     const [newOpen, setNewOpen] = useState(
         newOrder?.openOnArrival === true &&
             !newOrder.blocked &&
-            stores.length > 0 &&
-            !kitchen,
+            orderStores.length > 0,
     );
     const peek = rows.find((r) => r.id === peekId) ?? null;
     // Bulk moves (B6): whoever moves kitchen steps; the API decides again.
@@ -193,7 +206,8 @@ export function OrdersScreen({
                     other: "orders",
                 })}
                 actions={
-                    stores.length > 0 && !kitchen ? (
+                    stores.length > 0 &&
+                    (!kitchen || orderStores.length > 0) ? (
                         <>
                             {/* A file of every order leaves Saroh: its own
                                 power (`order:export`, B16). */}
@@ -204,7 +218,7 @@ export function OrdersScreen({
                                     storeName={store?.name}
                                 />
                             ) : null}
-                            {newOrder ? (
+                            {newOrder && orderStores.length > 0 ? (
                                 <>
                                     {newOrder.blocked ? (
                                         <span
@@ -304,7 +318,9 @@ export function OrdersScreen({
                         go={go}
                         share={share}
                         onNew={
-                            newOrder && !newOrder.blocked
+                            newOrder &&
+                            !newOrder.blocked &&
+                            orderStores.length > 0
                                 ? () => setNewOpen(true)
                                 : undefined
                         }
@@ -375,7 +391,7 @@ export function OrdersScreen({
                 }}
             />
 
-            {newOrder && stores.length > 0 && !kitchen ? (
+            {newOrder && orderStores.length > 0 ? (
                 <NewOrderSheet
                     open={newOpen}
                     onOpenChange={(open) => {
@@ -388,9 +404,15 @@ export function OrdersScreen({
                             });
                         }
                     }}
-                    stores={stores}
+                    stores={orderStores}
                     // The storefront in view, else the first.
-                    initialStoreId={store?.id ?? stores[0].id}
+                    initialStoreId={
+                        orderStores.find((s) => s.id === store?.id)?.id ??
+                        orderStores[0].id
+                    }
+                    noMoneyAt={newOrder.places
+                        ?.filter((p) => !p.money)
+                        .map((p) => p.id)}
                     // A new order's pay link is `order:create`'s (B16).
                     canLink={can.create}
                     online={newOrder.online ?? true}

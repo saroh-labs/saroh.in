@@ -24,6 +24,29 @@ export const LOCATION_ROLES: readonly MemberRole[] = [
 /** A role in words: "Viewer", not "VIEWER". */
 export const roleLabel = (role: string) => formatStatus(role);
 
+/** What everyone at a location gets, whatever their role there (DEC-074). */
+export const EVERYONE_HERE =
+    "see its products and orders, and move its orders along";
+
+/**
+ * What a location role adds, in one line, as the app now offers it (UX
+ * audit, 10 Oct 2026): the API's own answer for that role, read from the
+ * location (`lib/stores/abilities.ts`). An Admin, a Manager and an Editor
+ * get the same today, and the line says so rather than hint at a
+ * difference. Never payments or refunds, which follow the team role's
+ * permissions (DEC-106).
+ */
+export function roleLine(role: string): string {
+    return role === "VIEWER"
+        ? "Sees this location's products and orders and moves its orders along. Changes nothing else."
+        : "Also takes new orders here, to be paid on collection, and changes the location's name and description. Never payments or refunds. Admin, Manager and Editor do the same today.";
+}
+
+/** The People tab's line: what being at this location means, by role. */
+export function peopleNote(locationName: string): string {
+    return `Who can see ${locationName}'s products and orders, and move its orders along. An Admin, Manager or Editor can also take orders here and change its name and description. Everyone here is also on your team, under Team.`;
+}
+
 /** What the tab draws: the roster, and what this person may do with it. */
 export interface LocationPeople {
     members: Member[];
@@ -98,6 +121,6 @@ export function onlyOwnerWords(
             ? `${owners.join("")} owns ${locationName}.`
             : `${owners.slice(0, -1).join(", ")} and ${owners.at(-1)} own ${locationName}.`;
     return people.canInvite
-        ? `${who} Invite someone to see its products and orders, and move its orders along.`
+        ? `${who} Invite someone to ${EVERYONE_HERE}. With a role above Viewer they can take orders here too.`
         : who;
 }
