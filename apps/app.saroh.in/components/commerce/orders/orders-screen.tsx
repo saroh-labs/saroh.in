@@ -292,6 +292,11 @@ export function OrdersScreen({
                         options={filterOptions}
                         go={go}
                         share={share}
+                        onNew={
+                            newOrder && !newOrder.blocked
+                                ? () => setNewOpen(true)
+                                : undefined
+                        }
                     />
                 ) : (
                     <>

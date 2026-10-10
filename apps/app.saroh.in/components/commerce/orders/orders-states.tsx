@@ -259,6 +259,7 @@ export function OrdersEmpty({
     options = null,
     go,
     share = null,
+    onNew,
 }: {
     query: OrdersQuery;
     storeName: string | null;
@@ -272,6 +273,12 @@ export function OrdersEmpty({
      * there is nothing to share yet.
      */
     share?: ShareLink | null;
+    /**
+     * Opens New order, for someone who may take one: the header's own
+     * action, under the same label. Left out for anyone else, and the
+     * sentence promises nothing.
+     */
+    onNew?: () => void;
 }) {
     const copy = ordersEmptyCopy(query, storeName, options);
     const offer = copy.kind === "first-run" ? share : null;
@@ -296,7 +303,7 @@ export function OrdersEmpty({
               : copy.action === "clear-since"
                 ? { label: "Show all orders", patch: { since: null } }
                 : copy.action === "show-all"
-                  ? { label: "View all orders", patch: { tab: "all" as const } }
+                  ? { label: "Show all orders", patch: { tab: "all" as const } }
                   : null;
     return (
         <EmptyState
@@ -313,8 +320,15 @@ export function OrdersEmpty({
                     >
                         {action.label}
                     </Button>
-                ) : offer ? (
-                    <ShareLinkButton link={offer} />
+                ) : copy.kind === "first-run" && (onNew || offer) ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {onNew ? (
+                            <Button type="button" onClick={onNew}>
+                                New order
+                            </Button>
+                        ) : null}
+                        {offer ? <ShareLinkButton link={offer} /> : null}
+                    </div>
                 ) : undefined
             }
         />

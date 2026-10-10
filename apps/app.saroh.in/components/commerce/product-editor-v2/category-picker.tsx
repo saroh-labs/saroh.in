@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { createCategory } from "@/lib/products/actions";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 export interface CategoryChoice {
     id: string;
@@ -103,7 +104,7 @@ export function CategoryPicker({
                     />
                     <CommandList>
                         <CommandEmpty className="px-2 py-2 text-[12.5px] text-muted-foreground">
-                            No category by that name.
+                            {noMatchLine("categories")}
                         </CommandEmpty>
                         {[{ id: "", name: "Uncategorized" }, ...categories].map(
                             (c) => (

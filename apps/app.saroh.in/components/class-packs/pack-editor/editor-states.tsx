@@ -44,34 +44,34 @@ export function PackEditorState({
             <PackCrumbs here={here} />
             {state === "missing" || state === "archived" ? (
                 <div className="px-6 py-10 max-[759px]:px-4">
-                    (state === "missing" ? (
-                    <NotFound
-                        variant="card"
-                        title="Class pack not found"
-                        description="The link may be old, or the draft was deleted."
-                        primary={{
-                            href: BACK_TO_PACKS.href,
-                            label: BACK_TO_PACKS.label,
-                        }}
-                    />
+                    {state === "missing" ? (
+                        <NotFound
+                            variant="card"
+                            title="Class pack not found"
+                            description="The link may be old, or the draft was deleted."
+                            primary={{
+                                href: BACK_TO_PACKS.href,
+                                label: BACK_TO_PACKS.label,
+                            }}
+                        />
                     ) : (
-                    <EmptyState
-                        icon={<Archive />}
-                        title="This pack is archived"
-                        description="Nobody can buy it, and everyone holding one keeps using it."
-                        action={
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="wk-press"
-                            >
-                                <Link href={BACK_TO_PACKS.href}>
-                                    {BACK_TO_PACKS.label}
-                                </Link>
-                            </Button>
-                        }
-                    />
-                    ))
+                        <EmptyState
+                            icon={<Archive />}
+                            title="This pack is archived"
+                            description="Nobody can buy it, and everyone holding one keeps using it."
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <Link href={BACK_TO_PACKS.href}>
+                                        {BACK_TO_PACKS.label}
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    )}
                 </div>
             ) : (
                 <div className="px-[22px] py-[60px] max-[759px]:px-4">

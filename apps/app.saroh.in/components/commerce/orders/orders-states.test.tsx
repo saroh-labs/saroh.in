@@ -115,6 +115,24 @@ describe("OrdersEmpty", () => {
             "Orders from your website and counter show here.",
         );
         expect(html).not.toContain('role="alert"');
+        // Nobody who may not take an order is offered the button.
+        expect(html).not.toContain("New order");
+    });
+
+    it("offers the header's New order on the first run, to someone who may", () => {
+        const first = (params: Record<string, string>) =>
+            renderToStaticMarkup(
+                <OrdersEmpty
+                    query={readOrdersQuery(params)}
+                    storeName="Hill Road"
+                    go={noop}
+                    onNew={noop}
+                />,
+            );
+        expect(first({})).toMatch(/<button[^>]*>New order<\/button>/);
+        // A search that found nothing offers the way back, not a new order.
+        expect(first({ q: "zzz" })).not.toContain("New order");
+        expect(first({ q: "zzz" })).toContain("Clear search");
     });
 
     it("shares the online shop, else the website, on the first run only (L8)", () => {
@@ -153,13 +171,13 @@ describe("OrdersEmpty", () => {
             links("https://rye.saroh.app/shop", "https://rye.saroh.app"),
         );
         expect(open).not.toContain("Share your");
-        expect(open).toContain("View all orders");
+        expect(open).toContain("Show all orders");
     });
 
     it("says what each tab would hold, with the way back to All", () => {
         const open = empty({ tab: "open" }, null);
         expect(open).toContain("Nothing left to fulfil");
-        expect(open).toContain("View all orders");
+        expect(open).toContain("Show all orders");
         const refunded = empty({ tab: "refunded" }, null);
         expect(refunded).toContain("No refunds");
         expect(refunded).not.toContain("No orders yet");
