@@ -70,6 +70,20 @@ field, a merge), each opened by its own trigger so the keyboard returns to
 it, and `ConfirmDialog` (`returnFocusTo`) before a delete. No row turns
 into a form, and the task finishes inside what opened.
 
+A record's page is the same rule: Order Detail
+(`components/commerce/order-detail/`) shows status, items, payments and
+the timeline, and each change (hand to courier, tracking, edit, refund,
+how it's fulfilled, cancel) opens its own sheet, one at a time.
+`OrderSheet` in `order-sheet.tsx` is that frame, built on
+`components/shared/action-sheet.tsx`: the fields scroll
+(`OrderSheetBody`) and what the change does to the money stays at the
+foot with the button that makes it (`OrderSheetFoot`), wider
+(`sm:max-w-lg`) where a list of lines needs it. A sheet opened from more
+than one button has no single trigger, so `useOrderPanel` remembers the
+button pressed and gives the keyboard back to it. A change that is held
+ten seconds (a refund, a cancel) closes its sheet into the hold card on
+the page, where its Undo is.
+
 The same goes for adding to a list: the list, then one button that opens
 the sheet, never fields left open under the rows. Where the screen has its
 own Save bar (Availability's Time off, `add-time-off-sheet.tsx`), the
