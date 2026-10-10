@@ -1,5 +1,6 @@
 import {
     act,
+    cleanup,
     fireEvent,
     render,
     screen,
@@ -24,6 +25,8 @@ import type {
 } from "./api";
 import { askAboutHref, AskAboutOrdering } from "./ask-about-ordering";
 import { ShopBag } from "./bag";
+import { parseBagDraft, readBagDraft } from "./bag-draft-store";
+import { EMPTY_DRAFT } from "./bag-sheet";
 import { addToBag, MAX_BAG_ITEMS, readBag } from "./bag-store";
 
 /**
@@ -380,7 +383,7 @@ function setup(
             bag
         ),
     );
-    return { quote, start, standing, openCheckout };
+    return { quote, start, standing, openCheckout, signIn };
 }
 
 async function openTheBag() {
@@ -407,7 +410,10 @@ describe("the header's bag", () => {
     it("signs in at the last step, then places the order and pays, placed only once the server says so", async () => {
         const { start, standing, openCheckout } = setup();
         await openTheBag();
-        fireEvent.click(screen.getByRole("button", { name: /^Continue · / }));
+        // Paid online: the button says where it leads.
+        fireEvent.click(
+            screen.getByRole("button", { name: "Sign in and pay · ₹500" }),
+        );
         expect(
             await screen.findByText(
                 "Last step: confirm it's you, then we'll finish. No password.",
@@ -419,11 +425,9 @@ describe("the header's bag", () => {
         act(() => {
             fireEvent.click(screen.getByRole("button", { name: "Send code" }));
         });
+        // The sixth digit sends the code: no button to press.
         fireEvent.change(await screen.findByLabelText("Code"), {
             target: { value: "123456" },
-        });
-        act(() => {
-            fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
         });
 
         await screen.findByRole("heading", { name: "Order placed" });
@@ -797,7 +801,9 @@ describe("the bag on a test release (DEC-071, T6)", () => {
         });
         await openTheBag();
         expect(quote).toHaveBeenCalled();
-        fireEvent.click(screen.getByRole("button", { name: /^Continue · / }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Sign in and pay · ₹500" }),
+        );
 
         const stop = await screen.findByRole("dialog", {
             name: "This is a test release",
@@ -860,6 +866,54 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         payBy: "ON_HANDOVER",
         payment: null,
     };
+
+    it("signed out, the button says the order is placed: the code is the last step", async () => {
+        const { start, openCheckout } = setup({
+            quote: { ok: true, data: quoteOf({ payments: [COLLECT] }) },
+            start: { ok: true, data: PLACED_TO_PAY },
+        });
+        await openTheBag();
+        expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Sign in and place order · ₹500",
+            }),
+        );
+        fireEvent.change(await screen.findByLabelText("Email"), {
+            target: { value: "asha@example.in" },
+        });
+        act(() => {
+            fireEvent.click(screen.getByRole("button", { name: "Send code" }));
+        });
+        fireEvent.change(await screen.findByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        // Nothing more is asked: it is placed, as the button said.
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start).toHaveBeenCalledTimes(1);
+        expect(openCheckout).not.toHaveBeenCalled();
+    });
+
+    it("signed out with both ways, the button follows the way picked", async () => {
+        setup({
+            quote: {
+                ok: true,
+                data: quoteOf({ payments: [ONLINE, COLLECT] }),
+            },
+        });
+        await openTheBag();
+        expect(
+            screen.getByRole("button", { name: "Sign in and pay · ₹500" }),
+        ).toBeEnabled();
+        fireEvent.click(
+            screen.getByRole("radio", { name: "Pay when you collect" }),
+        );
+        expect(
+            screen.getByRole("button", {
+                name: "Sign in and place order · ₹500",
+            }),
+        ).toBeEnabled();
+    });
 
     it("offers only paying when they collect, places it with nothing to pay, and says it's unpaid", async () => {
         const { start, openCheckout } = setup({
@@ -1138,5 +1192,192 @@ describe("the QR code an order came from", () => {
         window.history.pushState({}, "", "/shop?src=qr-h7c");
         await placeIt();
         expect(start.mock.calls[0][0]).not.toHaveProperty("source");
+    });
+});
+
+// ── What was typed, kept for the visit ────────────────────────────────────
+
+describe("the bag's delivery fields on a phone", () => {
+    const DELIVERY = quoteOf({
+        ways: [
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: "60.00" },
+        ],
+        fulfilment: "LOCAL_DELIVERY",
+    });
+
+    it("are 16px so iOS doesn't zoom, with the keyboard and autofill each needs", async () => {
+        setup({ signedIn: true, quote: { ok: true, data: DELIVERY } });
+        await openTheBag();
+        const pin = await screen.findByLabelText(/^PIN code/);
+        expect(pin).toHaveAttribute("inputmode", "numeric");
+        expect(pin).toHaveAttribute("maxlength", "6");
+        expect(pin).toHaveAttribute("autocomplete", "postal-code");
+        const phone = screen.getByLabelText(/^Phone/);
+        expect(phone).toHaveAttribute("type", "tel");
+        expect(phone).toHaveAttribute("inputmode", "tel");
+        expect(phone).toHaveAttribute("autocomplete", "tel");
+        for (const [label, auto] of [
+            ["Name", "name"],
+            ["Address", "address-line1"],
+            ["Flat, floor or landmark", "address-line2"],
+            ["Town or city", "address-level2"],
+            ["State", "address-level1"],
+        ] as const) {
+            expect(
+                screen.getByLabelText(new RegExp(`^${label}`)),
+            ).toHaveAttribute("autocomplete", auto);
+        }
+        fireEvent.click(screen.getByRole("button", { name: "Have a code?" }));
+        const fields = Array.from(
+            document.querySelectorAll("input, select, textarea"),
+        );
+        expect(fields).toHaveLength(8);
+        for (const field of fields) {
+            expect(field.className).toMatch(/\btext-base\b/);
+            expect(field.className).not.toMatch(/text-\[1[0-5](\.\d)?px\]/);
+        }
+    });
+});
+
+describe("the bag through a reload (the email code is read in another app)", () => {
+    const BOTH = quoteOf({
+        ways: [
+            { type: "PICKUP", label: "Pick-up", fee: null },
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: "60.00" },
+        ],
+        fulfilment: "LOCAL_DELIVERY",
+        discount: { code: "SAVE10", applied: true, amount: "50.00" },
+    });
+    const TYPED = [
+        ["Name", "Kavya Iyer"],
+        ["Phone", "98450 12345"],
+        ["Address", "12 Hill Road"],
+        ["Town or city", "Mumbai"],
+        ["PIN code", "400050"],
+        ["State", "Maharashtra"],
+    ] as const;
+
+    async function fillTheBag() {
+        fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
+        for (const [label, value] of TYPED) {
+            fireEvent.change(
+                await screen.findByLabelText(new RegExp(`^${label}`)),
+                { target: { value } },
+            );
+        }
+        fireEvent.click(screen.getByRole("button", { name: "Have a code?" }));
+        fireEvent.change(screen.getByLabelText("Discount code"), {
+            target: { value: "save10" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+        await screen.findByText("SAVE10 applied.");
+    }
+
+    it("finds the way, the address, the code and the checkout's key as they were", async () => {
+        const first = setup({ quote: { ok: true, data: BOTH } });
+        await openTheBag();
+        await fillTheBag();
+        // On to the email code, where the customer leaves for their inbox.
+        fireEvent.click(
+            await screen.findByRole("button", { name: /^Sign in and pay/ }),
+        );
+        await screen.findByLabelText("Email");
+        expect(first.start).not.toHaveBeenCalled();
+        const kept = readBagDraft(SITE);
+        expect(kept.checkout?.key).toMatch(/^[A-Za-z0-9_-]+$/);
+
+        // The page loads again: a new page, the same tab. (`setup` puts
+        // the same two loaves in the bag, so it is emptied first.)
+        cleanup();
+        window.localStorage.clear();
+        const second = setup({
+            signedIn: true,
+            quote: { ok: true, data: BOTH },
+        });
+        await openTheBag();
+        expect(
+            await screen.findByRole("radio", { name: /Local delivery/ }),
+        ).toHaveAttribute("aria-checked", "true");
+        for (const [label, value] of TYPED) {
+            expect(screen.getByLabelText(new RegExp(`^${label}`))).toHaveValue(
+                value,
+            );
+        }
+        expect(screen.getByLabelText("Discount code")).toHaveValue("SAVE10");
+        expect(await screen.findByText("SAVE10 applied.")).toBeInTheDocument();
+
+        // The same bag placed is the same order: the key came back too.
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(second.start.mock.calls[0][0]).toMatchObject({
+            key: kept.checkout?.key,
+            fulfilment: "LOCAL_DELIVERY",
+            discountCode: "SAVE10",
+            address: { line1: "12 Hill Road", postalCode: "400050" },
+        });
+    });
+
+    it("forgets it all once the order is placed", async () => {
+        setup({ signedIn: true, quote: { ok: true, data: BOTH } });
+        await openTheBag();
+        await fillTheBag();
+        expect(readBagDraft(SITE).address.line1).toBe("12 Hill Road");
+        fireEvent.click(
+            await screen.findByRole("button", { name: /^Place order/ }),
+        );
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(readBagDraft(SITE)).toEqual(EMPTY_DRAFT);
+        expect(window.sessionStorage.getItem(`saroh.bag-draft.${SITE}`)).toBe(
+            null,
+        );
+    });
+
+    it("keeps it in the tab only: no cookie, nothing in localStorage but the bag", async () => {
+        setup({ quote: { ok: true, data: BOTH } });
+        await openTheBag();
+        await fillTheBag();
+        expect(document.cookie).toBe("");
+        expect(JSON.stringify({ ...window.localStorage })).not.toContain(
+            "Hill Road",
+        );
+        expect(Object.keys(window.sessionStorage)).toEqual([
+            `saroh.bag-draft.${SITE}`,
+        ]);
+    });
+});
+
+describe("parseBagDraft", () => {
+    it("reads nothing kept, and anything strange, as an empty draft", () => {
+        expect(parseBagDraft(null)).toEqual(EMPTY_DRAFT);
+        expect(parseBagDraft("not json")).toEqual(EMPTY_DRAFT);
+        expect(parseBagDraft("[1,2]")).toEqual(EMPTY_DRAFT);
+        expect(parseBagDraft('"text"')).toEqual(EMPTY_DRAFT);
+    });
+
+    it("keeps only what it knows, field by field", () => {
+        const draft = parseBagDraft(
+            JSON.stringify({
+                way: "TELEPORT",
+                pay: "ON_HANDOVER",
+                address: {
+                    line1: "12 Hill Road",
+                    city: 7,
+                    postalCode: "4".repeat(500),
+                    extra: "no",
+                },
+                code: "save 10!",
+                checkout: { print: "{}", key: "not a key" },
+                source: "qr-h7c",
+            }),
+        );
+        expect(draft.way).toBeNull();
+        expect(draft.pay).toBe("ON_HANDOVER");
+        expect(draft.address.line1).toBe("12 Hill Road");
+        expect(draft.address.city).toBe("");
+        expect(draft.address.postalCode).toHaveLength(200);
+        expect(draft.address).not.toHaveProperty("extra");
+        expect(draft.code).toBeNull();
+        expect(draft.checkout).toBeNull();
+        expect(draft).not.toHaveProperty("source");
     });
 });

@@ -25,9 +25,10 @@ import { sheetButton, SheetFrame } from "./sheet-frame";
 /**
  * "Your bag" (round-2 G13), as the Customer Site design's cart sheet draws
  * it: each line with − and + and its amount, how it leaves (Pick-up, Local
- * delivery or Shipping, with the fee), the total, and one button — "Place
- * order · ₹560" when signed in, "Continue · ₹560" when the last step is
- * signing in.
+ * delivery or Shipping, with the fee), the total, and one button, named for
+ * what it does (`placeLabel`): "Place order · ₹560" when signed in, and when
+ * the last step is signing in, "Sign in and pay · ₹560" or "Sign in and
+ * place order · ₹560".
  *
  * Every amount is the server's quote, fetched again whenever the bag or the
  * way changes: a price that moved since the item was added shows before
@@ -191,8 +192,9 @@ export function holdReason(input: {
     return null;
 }
 
+// 16px: under it, iOS Safari zooms the page when a field takes focus.
 const field = cn(
-    "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-[15px]",
+    "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-base",
     inputFill,
     focusRing,
 );
@@ -744,12 +746,36 @@ export function BagSheet({
                 aria-describedby={held && !problem ? `${site}-held` : undefined}
                 className={sheetButton(!canPlace)}
             >
-                {busy
-                    ? "Starting…"
-                    : `${signedIn ? "Place order" : "Continue"}${total ? ` · ${total}` : ""}`}
+                {placeLabel({ signedIn, busy, pay: pay?.type ?? null, total })}
             </button>
         </SheetFrame>
     );
+}
+
+/**
+ * What the bag's button reads, by what pressing it does. Signed out, the
+ * email code is the last step and nothing else is asked after it: an order
+ * paid at the handover is placed there and then, so the button says "Sign
+ * in and place order", and one paid online goes on to the payment window,
+ * "Sign in and pay". Never a bare "Continue".
+ */
+export function placeLabel(input: {
+    signedIn: boolean;
+    busy: boolean;
+    /** How it will be paid; null until the quote says. */
+    pay: ShopPayment | null;
+    /** "₹560", or "" while the bag is being priced. */
+    total: string;
+}): string {
+    if (input.busy) return "Starting…";
+    const does = input.signedIn
+        ? "Place order"
+        : input.pay === "ONLINE"
+          ? "Sign in and pay"
+          : input.pay === "ON_HANDOVER"
+            ? "Sign in and place order"
+            : "Sign in to order";
+    return input.total ? `${does} · ${input.total}` : does;
 }
 
 /** How the quote's chosen way can be paid; online for an older API. */
@@ -803,6 +829,16 @@ function AddressFields({
             {required ? <span aria-hidden="true"> *</span> : null}
             <input
                 type={name === "phone" ? "tel" : "text"}
+                // The keyboard each needs: digits for a PIN code (six of
+                // them), the phone pad for a phone.
+                inputMode={
+                    name === "postalCode"
+                        ? "numeric"
+                        : name === "phone"
+                          ? "tel"
+                          : undefined
+                }
+                maxLength={name === "postalCode" ? 6 : undefined}
                 autoComplete={auto}
                 required={required}
                 value={address[name] ?? ""}

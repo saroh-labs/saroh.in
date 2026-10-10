@@ -323,7 +323,9 @@ test.describe("flows stop short on a test release (T6)", () => {
         ).toBeVisible();
         const pickUp = bag.getByRole("radio", { name: /Pick-up/ });
         if (await pickUp.isVisible()) await pickUp.click();
-        const cont = bag.getByRole("button", { name: /^Continue · / });
+        const cont = bag.getByRole("button", {
+            name: /^Sign in and (pay|place order) · /,
+        });
         await expect(cont).toBeEnabled({ timeout: 15_000 });
         const total = ((await cont.innerText()).split("·")[1] ?? "").trim();
 
