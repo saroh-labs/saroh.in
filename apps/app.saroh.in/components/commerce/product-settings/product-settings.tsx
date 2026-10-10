@@ -120,6 +120,10 @@ export function TabIntro({
     );
 }
 
+/** A problem under a field, or at the foot of a sheet. */
+export const PROBLEM =
+    "text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground";
+
 /** The design's small buttons: 28px row actions, 30px and 36px primaries. */
 export const rowBtn =
     "inline-flex h-7 items-center rounded-[7px] border border-border bg-card px-2.5 text-[12px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:text-muted-foreground/60 coarse:h-11";

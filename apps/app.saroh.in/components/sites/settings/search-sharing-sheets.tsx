@@ -7,11 +7,12 @@ import { ShareCards } from "@saroh/ui/share-cards";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { updateSiteSettings } from "@/lib/sites/actions";
 import { settingsEditId } from "@/lib/sites/settings-edit";
 
-import { NOTE, SettingsSheetFrame } from "./settings-sheet";
+import { NOTE } from "./settings-sheet";
 import { ShareImageThumb } from "./share-image-thumb";
 import type { ShareImage } from "./use-share-image";
 import { useShareImage } from "./use-share-image";
@@ -93,7 +94,7 @@ export function TitleSheet({
     const [title, setTitle] = useState(saved.seoTitle);
     return (
         <SettingsSheetFrame
-            editId={settingsEditId("title")}
+            returnFocusTo={settingsEditId("title")}
             title="Title"
             description="What search results and shared links call your site."
             open={open}
@@ -132,7 +133,7 @@ export function DescriptionSheet({
     const [description, setDescription] = useState(saved.seoDescription);
     return (
         <SettingsSheetFrame
-            editId={settingsEditId("description")}
+            returnFocusTo={settingsEditId("description")}
             title="Description"
             description="A line or two under the title in search results and shared links."
             open={open}
@@ -179,7 +180,7 @@ export function ShareImageSheet({
     const image = useShareImage(saved.image);
     return (
         <SettingsSheetFrame
-            editId={settingsEditId("image")}
+            returnFocusTo={settingsEditId("image")}
             title="Share image"
             description="The picture apps show beside your link when it is shared."
             open={open}

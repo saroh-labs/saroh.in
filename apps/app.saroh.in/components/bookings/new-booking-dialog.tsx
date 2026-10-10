@@ -27,6 +27,10 @@ import {
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import { Chip } from "@/components/shared/chip";
 import { OptionSelect } from "@/components/shared/option-select";
+import {
+    draftWatch,
+    useDraftChanged,
+} from "@/components/shared/use-draft-changed";
 import { packsFor } from "@/lib/class-packs/actions";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { PackPurchase } from "@/lib/class-packs/service";
@@ -123,6 +127,11 @@ export function NewBookingDialog({
     openOnArrival?: boolean;
 }) {
     const router = useRouter();
+    const {
+        attach: draftRef,
+        touch: draftTouch,
+        changed: draftChanged,
+    } = useDraftChanged();
     const [open, setOpen] = useState(
         openOnArrival && services.length > 0 && !visit,
     );
@@ -356,7 +365,24 @@ export function NewBookingDialog({
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="max-h-[86vh] overflow-y-auto sm:max-w-[500px]">
+            <DialogContent
+                className="max-h-[86vh] overflow-y-auto sm:max-w-[500px]"
+                // A stray press outside must not drop a booking half
+                // made: once someone or a time is chosen, only Close,
+                // Escape and the close button leave. As every sheet does
+                // (`components/shared/settings-sheet-frame.tsx`).
+                onInteractOutside={(e) => {
+                    if (
+                        saving ||
+                        (!done &&
+                            (picked !== null ||
+                                who !== initialWho ||
+                                draftChanged()))
+                    ) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
                         {visit
@@ -379,7 +405,11 @@ export function NewBookingDialog({
                     />
                 ) : (
                     <>
-                        <div className="grid gap-4">
+                        <div
+                            ref={draftRef}
+                            {...draftWatch(draftTouch)}
+                            className="grid gap-4"
+                        >
                             {visit ? null : (
                                 <>
                                     <div className="grid gap-1.5">

@@ -20,6 +20,10 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import {
+    draftWatch,
+    useDraftChanged,
+} from "@/components/shared/use-draft-changed";
 import { createLead } from "@/lib/leads/actions";
 
 export interface LeadContactOption {
@@ -60,6 +64,11 @@ export function AddLeadDialog({
     size?: "default" | "sm";
 }) {
     const router = useRouter();
+    const {
+        attach: draftRef,
+        touch: draftTouch,
+        changed: draftChanged,
+    } = useDraftChanged();
     const [open, setOpen] = useState(false);
     const [who, setWho] = useState<"known" | "new">(
         contacts.length > 0 ? "known" : "new",
@@ -152,8 +161,22 @@ export function AddLeadDialog({
                     {label}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[460px]">
-                <form onSubmit={(e) => void submit(e)} className="space-y-4">
+            <DialogContent
+                className="max-w-[460px]"
+                // A stray press outside must not drop a lead half
+                // written: once something is typed, only Cancel, Escape
+                // and the close button leave. As every sheet does
+                // (`components/shared/settings-sheet-frame.tsx`).
+                onInteractOutside={(e) => {
+                    if (saving || draftChanged()) e.preventDefault();
+                }}
+            >
+                <form
+                    ref={draftRef}
+                    {...draftWatch(draftTouch)}
+                    onSubmit={(e) => void submit(e)}
+                    className="space-y-4"
+                >
                     <DialogHeader>
                         <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
                             Add a lead

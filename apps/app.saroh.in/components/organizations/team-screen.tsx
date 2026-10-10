@@ -49,6 +49,10 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import {
+    draftWatch,
+    useDraftChanged,
+} from "@/components/shared/use-draft-changed";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
 import {
@@ -1261,6 +1265,11 @@ function InviteDialog({
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
+    const {
+        attach: draftRef,
+        touch: draftTouch,
+        changed: draftChanged,
+    } = useDraftChanged();
     const role = useWatch({ control: form.control, name: "role" });
     const staffId = useWatch({ control: form.control, name: "staffId" });
     // Someone already on the diary takes bookings, so holds a seat
@@ -1329,9 +1338,23 @@ function InviteDialog({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="max-w-[440px] gap-0 overflow-hidden p-0 sm:rounded-[14px]">
+            <DialogContent
+                className="max-w-[440px] gap-0 overflow-hidden p-0 sm:rounded-[14px]"
+                // A stray press outside must not drop an invite half
+                // written: once something is typed or picked, only
+                // Cancel, Escape and the close button leave. As every
+                // sheet does (`components/shared/settings-sheet-frame.tsx`).
+                onInteractOutside={(e) => {
+                    if (sending || draftChanged()) e.preventDefault();
+                }}
+            >
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(submit)} noValidate>
+                    <form
+                        ref={draftRef}
+                        {...draftWatch(draftTouch)}
+                        onSubmit={form.handleSubmit(submit)}
+                        noValidate
+                    >
                         <DialogHeader className="space-y-1 px-[22px] pb-1 pt-[18px] text-left">
                             <DialogTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
                                 Invite to {organizationName}

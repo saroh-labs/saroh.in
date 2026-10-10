@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
 import {
     Form,
     FormControl,
@@ -11,20 +10,13 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel } from "@/lib/stores/people";
 
@@ -52,9 +44,11 @@ const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
  *
  * A refusal keeps the sheet open with what was typed: under the email when
  * the API names it, else in a toast. Sent, it closes and the page reads the
- * roster again, so the invitation shows under Invited. It can't be
- * dismissed while it is sending; closed any other way, what was typed is
- * dropped.
+ * roster again, so the invitation shows under Invited. It is drawn in the
+ * app's one sheet frame (`components/shared/settings-sheet-frame.tsx`): it
+ * can't be dismissed while it is sending, Cancel, Escape and the close
+ * button drop what was typed, and a press outside does nothing once an
+ * email is typed.
  */
 export function InvitePersonSheet({
     storeId,
@@ -97,99 +91,63 @@ export function InvitePersonSheet({
     }
 
     return (
-        <Sheet
-            open={open}
-            onOpenChange={(o) => {
-                if (o) onOpenChange(true);
-                else if (!isSubmitting) close();
-            }}
-        >
-            <SheetContent
-                className="flex w-full flex-col sm:max-w-md"
+        <Form {...form}>
+            <SettingsSheetFrame
+                id="invite-person"
                 // Back to the button that opened it.
-                onCloseAutoFocus={(e) => {
-                    e.preventDefault();
-                    document.getElementById("invite-someone")?.focus();
-                }}
+                returnFocusTo="invite-someone"
+                title="Invite someone"
+                description={`They can work on ${locationName}'s catalogue, orders and customers once they accept.`}
+                open={open}
+                pending={isSubmitting}
+                saveLabel="Send invite"
+                savingLabel="Sending…"
+                fieldsClassName="gap-4"
+                onClose={close}
+                onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
             >
-                <SheetHeader>
-                    <SheetTitle>Invite someone</SheetTitle>
-                    <SheetDescription>
-                        They can work on {locationName}&apos;s catalogue, orders
-                        and customers once they accept.
-                    </SheetDescription>
-                </SheetHeader>
-                <Form {...form}>
-                    <form
-                        id="invite-person"
-                        noValidate
-                        onSubmit={form.handleSubmit(onSubmit)}
-                        className="mt-5 flex min-h-0 flex-1 flex-col"
-                    >
-                        <div className="-mx-1 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-1 pb-1">
-                            <FormField
-                                control={form.control}
-                                name="email"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Email</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="email"
-                                                autoComplete="email"
-                                                disabled={isSubmitting}
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="role"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Role</FormLabel>
-                                        <FormControl>
-                                            <OptionSelect
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                                disabled={isSubmitting}
-                                                options={ROLE_OPTIONS}
-                                                className="w-full"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                                They also join your team as Location team,
-                                unless they are on it already.
-                            </p>
-                        </div>
-
-                        <SheetFooter className="mt-4 flex-row flex-wrap items-center gap-2 border-t border-border pt-4 sm:justify-start sm:space-x-0">
-                            <Button
-                                type="submit"
-                                variant="brand"
-                                disabled={isSubmitting}
-                            >
-                                {isSubmitting ? "Sending…" : "Send invite"}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                disabled={isSubmitting}
-                                onClick={close}
-                            >
-                                Cancel
-                            </Button>
-                        </SheetFooter>
-                    </form>
-                </Form>
-            </SheetContent>
-        </Sheet>
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="email"
+                                    autoComplete="email"
+                                    disabled={isSubmitting}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <FormControl>
+                                <OptionSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    disabled={isSubmitting}
+                                    options={ROLE_OPTIONS}
+                                    className="w-full"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                    They also join your team as Location team, unless they are
+                    on it already.
+                </p>
+            </SettingsSheetFrame>
+        </Form>
     );
 }

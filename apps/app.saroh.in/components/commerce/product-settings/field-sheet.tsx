@@ -19,8 +19,8 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { chipBtn } from "./product-settings";
-import { PROBLEM, SettingsSheet } from "./settings-sheet";
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { chipBtn, PROBLEM } from "./product-settings";
 
 export const FIELD_TYPES: { type: FieldType; label: string }[] = [
     { type: "TEXT", label: "Text" },
@@ -155,13 +155,15 @@ export function FieldSheet({
     }
 
     return (
-        <SettingsSheet
+        <SettingsSheetFrame
             trigger={trigger}
             open={open}
-            onOpenChange={(o) => {
-                if (o) reset();
-                setOpen(o);
+            onOpen={() => {
+                reset();
+                setOpen(true);
             }}
+            onClose={() => setOpen(false)}
+            fieldsClassName="gap-4"
             title={field ? "Edit field" : "Add field"}
             description={
                 field
@@ -169,8 +171,8 @@ export function FieldSheet({
                     : "Something extra a product records, such as Skin type for serums or Fabric care for dresses."
             }
             pending={busy}
-            submitLabel={field ? "Save" : "Add field"}
-            busyLabel={field ? "Saving…" : "Adding…"}
+            saveLabel={field ? "Save" : "Add field"}
+            savingLabel={field ? "Saving…" : "Adding…"}
             onSubmit={(e) => {
                 e.preventDefault();
                 setTried(true);
@@ -319,6 +321,6 @@ export function FieldSheet({
                     </p>
                 ) : null}
             </div>
-        </SettingsSheet>
+        </SettingsSheetFrame>
     );
 }

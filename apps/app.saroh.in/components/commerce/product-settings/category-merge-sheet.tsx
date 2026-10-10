@@ -3,10 +3,10 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type { CatalogueView } from "@/lib/products/settings";
 
 import { chipBtn } from "./product-settings";
-import { SettingsSheet } from "./settings-sheet";
 
 type Category = CatalogueView["categories"][number];
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
@@ -42,19 +42,21 @@ export function CategoryMergeSheet({
         to === null ? null : (targets.find((t) => t.id === to)?.name ?? "");
 
     return (
-        <SettingsSheet
+        <SettingsSheetFrame
             trigger={trigger}
             open={open}
-            onOpenChange={(o) => {
-                if (o) setTo(null);
-                setOpen(o);
+            onOpen={() => {
+                setTo(null);
+                setOpen(true);
             }}
+            onClose={() => setOpen(false)}
+            fieldsClassName="gap-4"
             title={`Merge ${category.name}`}
             description="Its products move to the category you pick, and it goes away. You can undo it."
             pending={busy}
-            submitLabel="Merge category"
-            busyLabel="Merging…"
-            canSubmit={to !== null}
+            saveLabel="Merge category"
+            savingLabel="Merging…"
+            saveOff={to === null}
             onSubmit={(e) => {
                 e.preventDefault();
                 if (to === null || into === null) return;
@@ -97,6 +99,6 @@ export function CategoryMergeSheet({
                     ? "Pick where its products should go."
                     : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
             </p>
-        </SettingsSheet>
+        </SettingsSheetFrame>
     );
 }
