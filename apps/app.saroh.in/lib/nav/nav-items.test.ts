@@ -1200,37 +1200,44 @@ describe("the person page sits in the section that holds people (#869)", () => {
 });
 
 describe("settings tabs — owner only, and everyone's", () => {
-    it("keeps Plan and billing to the owner, by role", () => {
-        // An admin holds org:settings:read and every other business tab, and
-        // is still not offered what Saroh charges the business.
-        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/billing");
-        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/organization");
+    it("offers Plan and billing to whoever the API reads it to: billing:read", () => {
+        // Owner and Admin by default, as the API's own map has it.
         expect(tabsFor({ role: "OWNER" })).toContain("/settings/billing");
-        // Resolved permissions do not make an invented role the owner.
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/billing");
+        expect(tabsFor({ role: "MEMBER" })).not.toContain("/settings/billing");
+        expect(tabsFor({ role: "REVIEWER" })).not.toContain(
+            "/settings/billing",
+        );
+        // By permission, never the role's name: a role the business made
+        // that holds it is offered the tab, and an owner's stale list
+        // without it is not.
         expect(
-            tabsFor({
-                role: "MEMBER",
-                actions: ["org:settings:read", "billing:read"],
-            }),
+            tabsFor({ role: "MEMBER", actions: ["billing:read"] }),
+        ).toContain("/settings/billing");
+        expect(
+            tabsFor({ role: "OWNER", actions: ["org:settings:read"] }),
         ).not.toContain("/settings/billing");
     });
 
-    it("still needs the page's action as well as the role", () => {
-        const billing = SETTINGS_PAGES.find(
-            (page) => page.href === "/settings/billing",
+    it("keeps Your data to the owner, by role, as the API does", () => {
+        const data = SETTINGS_PAGES.find(
+            (page) => page.href === "/settings/data",
         );
-        expect(billing).toBeDefined();
-        if (!billing) return;
+        expect(data).toBeDefined();
+        if (!data) return;
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/data");
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/data");
+        // It still needs the page's action as well as the role.
         expect(
             mayOpenSettingsPage(
                 { role: "OWNER", actions: ["member:read"] },
-                billing,
+                data,
             ),
         ).toBe(false);
         expect(
             mayOpenSettingsPage(
                 { role: "OWNER", actions: ["org:settings:read"] },
-                billing,
+                data,
             ),
         ).toBe(true);
     });

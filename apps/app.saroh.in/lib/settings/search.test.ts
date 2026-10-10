@@ -186,7 +186,7 @@ describe("searchSettings", () => {
         ).toEqual(["/settings/organization?section=pay"]);
     });
 
-    it("finds the plan for the owner alone, and alerts for anyone", () => {
+    it("finds the plan for whoever may open it, and alerts for anyone", () => {
         expect(searchSettings("invoices from", owner)).toEqual([
             {
                 label: "Invoices from Saroh",
@@ -194,7 +194,18 @@ describe("searchSettings", () => {
                 href: "/settings/billing",
             },
         ]);
-        expect(searchSettings("plan", { role: "ADMIN" })).toEqual([]);
+        // An Admin opens Plan and billing, as the API reads it to them.
+        expect(
+            searchSettings("plan", { role: "ADMIN" }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Change plan", "Invoices from Saroh"]);
+        expect(searchSettings("plan", member)).toEqual([]);
+        // Read but not change: the page, never "Change plan".
+        expect(
+            searchSettings("plan", {
+                role: "MEMBER",
+                actions: ["billing:read"],
+            }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
         for (const actor of [owner, member, { role: "REVIEWER" as const }]) {
             expect(searchSettings("alerts", actor)[0]?.href).toBe(
                 "/settings/profile",

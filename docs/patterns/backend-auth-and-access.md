@@ -265,6 +265,23 @@ what the API allows.
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
   no role→action map can express it.
+- **Current** (DEC-128, 10 Oct 2026) — **Anyone in a business can leave it.**
+  `POST organizations/:id/leave` (`OrganizationMembersService.leave`) asks
+  no permission, only membership, which `OrganizationGuard` has proven: the
+  membership removed is the caller's own, in the context's organization,
+  never an id from the request. It takes what a removal takes (`detach`,
+  shared with `remove`: the sites they review, their share links, their
+  location roles and any location invitation still waiting) and writes
+  `membership.remove` with `metadata.left`, which Activity reads as "left
+  the team". The last Owner is refused (400, `LAST_OWNER_CANT_LEAVE`), with
+  the check repeated inside the transaction. It is a wind-down write, so a
+  closing business lets its people go. `remove` still asks `member:remove`.
+  `organization-leave.db.spec.ts`.
+- **Current** (DEC-128) — **Plan and billing follows its two permissions.**
+  The API reads it to `billing:read` and changes it with `billing:manage`
+  (Owner and Admin by default; `organization-policy.spec.ts` pins both).
+  The app's Settings tab, the page and every plan prompt ask the same two
+  (`lib/billing/plan-access.ts`), never the role's name.
 
 ## Rules
 

@@ -116,7 +116,7 @@ describe("only the owner here", () => {
 
     it("names who owns it, and offers the invite only to someone who may", () => {
         expect(onlyOwnerWords(people({ members: [owner] }), "Hill Road")).toBe(
-            "Asha Rao (asha.rao@example.com) owns Hill Road. Invite someone to work on its catalogue, orders and customers.",
+            "Asha Rao (asha.rao@example.com) owns Hill Road. Invite someone to see its products and orders, and move its orders along.",
         );
         expect(
             onlyOwnerWords(

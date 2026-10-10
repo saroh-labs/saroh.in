@@ -25,6 +25,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { StatusTone } from "@/components/shared/status-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { CopyButton } from "@saroh/ui/copy-button";
@@ -194,11 +195,13 @@ export function ProviderRowView({
                             <StatusBadge tone="neutral">
                                 {entry.lock.comesWith}
                             </StatusBadge>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href={entry.lock.href}>
-                                    {entry.lock.cta}
-                                </Link>
-                            </Button>
+                            <PlanWay>
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={entry.lock.href}>
+                                        {entry.lock.cta}
+                                    </Link>
+                                </Button>
+                            </PlanWay>
                         </>
                     ) : !connected && !attention ? (
                         setupDialog("Connect", false)

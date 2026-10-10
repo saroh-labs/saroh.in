@@ -469,7 +469,7 @@ describe("the People tab", () => {
         expect(tabsOf(html).open).toBe("People");
         const t = text(panel(html));
         expect(t).toContain(
-            "Who can work on Hill Road's catalogue, orders and customers. Everyone here is also on your team, under Team.",
+            "Who can see Hill Road's products and orders, and move its orders along. Everyone here is also on your team, under Team.",
         );
         expect(t).toContain("Asha Rao asha.rao@example.com Owner");
         expect(t).toContain("Dev Shah dev.shah@example.com");

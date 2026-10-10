@@ -8,10 +8,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
+import { isPlanHref } from "@/lib/billing/plan-access";
 import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
@@ -225,9 +227,14 @@ export function ServicesScreen({
                                 {problem ? (
                                     <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
                                         {problem.line}{" "}
-                                        <TextLink href={problem.fix.href}>
-                                            {problem.fix.label}
-                                        </TextLink>
+                                        <PlanWay
+                                            when={isPlanHref(problem.fix.href)}
+                                            className="text-[length:inherit] text-inherit"
+                                        >
+                                            <TextLink href={problem.fix.href}>
+                                                {problem.fix.label}
+                                            </TextLink>
+                                        </PlanWay>
                                     </p>
                                 ) : null}
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">

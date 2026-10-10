@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
 import { EditStoreCustomer } from "@/components/customers/edit-store-customer";
+import { FailedRead } from "@/components/shared/failed-read";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
@@ -143,10 +144,11 @@ export default async function CustomerPage({
                     <div className="flex min-w-0 flex-col gap-4">
                         <Card title="Orders">
                             {orders === null ? (
-                                <p className="px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                                    Their orders could not be read just now.
-                                    Nothing about them has changed.
-                                </p>
+                                <FailedRead
+                                    things="their orders"
+                                    reassurance="Nothing about them has changed."
+                                    className="px-4 py-3.5"
+                                />
                             ) : theirs.length === 0 ? (
                                 <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     No orders at {store.name} yet. An order

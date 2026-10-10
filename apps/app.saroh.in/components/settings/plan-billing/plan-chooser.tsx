@@ -47,7 +47,7 @@ export function PlanChooser({
     rows: Record<Cycle, PickerRow[]> | null;
     yearly: { on: false } | { on: true; freeMonths: number };
     initialCycle: Cycle;
-    /** `billing:manage`: changing plan is the owner's. */
+    /** `billing:manage`: who may change the plan. */
     canChange: boolean;
     /** The Add-ons card, between the picker and the coupon, as drawn. */
     addons: ReactNode;
@@ -133,7 +133,7 @@ export function PlanChooser({
                     <span className="flex-[1_1_260px] text-[12.5px] text-muted-foreground">
                         {canChange
                             ? "Monthly is autopay for 12 months and yearly is one payment; before either ends, we ask you to pay for the next term. Upgrades start today; downgrades from your next charge."
-                            : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
+                            : "These are Saroh's plans and what each is for."}
                     </span>
                     {yearly.on && rows ? (
                         <Segmented

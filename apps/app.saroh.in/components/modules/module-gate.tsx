@@ -130,7 +130,6 @@ export async function ModuleGate({
                     <PlanLocked
                         moduleKey={access.module.key}
                         label={access.module.label}
-                        canManage={access.module.canManage}
                     />
                 </PageContainer>
             );

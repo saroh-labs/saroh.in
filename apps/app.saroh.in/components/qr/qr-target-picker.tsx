@@ -11,7 +11,7 @@ import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
-import { Notice } from "@saroh/ui/notice";
+import { Refusal } from "@/components/shared/refusal";
 import { TextLink } from "@saroh/ui/text-link";
 import type { Choice } from "./choice-group";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
@@ -96,7 +96,7 @@ export function QrTargetPicker({
                 className="flex flex-col gap-2.5"
                 itemClassName={(on) => cardClass(on)}
             />
-            {problem ? <Notice tone="error">{problem}</Notice> : null}
+            <Refusal>{problem}</Refusal>
             {targets.more.length > 0 ? (
                 <div className="flex flex-col gap-2">
                     <TextLink

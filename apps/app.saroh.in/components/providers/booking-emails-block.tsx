@@ -4,6 +4,7 @@ import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 import { useId } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { TryAgainLink } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { BookingEmails } from "@/lib/providers/booking-emails";
@@ -80,9 +81,13 @@ export function BookingEmailsBlock({
                         </div>
                     ) : b.own === "upgrade" ? (
                         <div className="shrink-0">
-                            <Button asChild size="sm" variant={variant}>
-                                <Link href={SEE_PLANS_HREF}>{planLabel()}</Link>
-                            </Button>
+                            <PlanWay>
+                                <Button asChild size="sm" variant={variant}>
+                                    <Link href={SEE_PLANS_HREF}>
+                                        {planLabel()}
+                                    </Link>
+                                </Button>
+                            </PlanWay>
                         </div>
                     ) : null}
                 </div>

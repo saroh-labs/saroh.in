@@ -170,6 +170,13 @@ export interface InvitationView {
  *    `SiteReviewer` is what narrows it. A REVIEWER with no grants can reach no
  *    site at all, which is the safe direction for a mistake to fall.
  */
+/**
+ * What the only Owner reads when they try to leave (S1-006): why not, and
+ * what to do first. The app says the same before it asks (`leave-business.ts`).
+ */
+export const LAST_OWNER_CANT_LEAVE =
+    "You're the only owner of this business, and it always needs one. Make someone else an owner first, then leave.";
+
 @Injectable()
 export class OrganizationMembersService {
     constructor(private readonly audit: AuditService) {}
@@ -1045,74 +1052,11 @@ export class OrganizationMembersService {
             mustExist: false,
             extras: membership.extraActions,
         });
-        if (membership.role === "OWNER") {
-            await this.assertNotLastOwner(ctx.organizationId, userId, "remove");
-        }
-
-        const { revokedLinks, storefrontRoles } = await prisma.$transaction(
-            async (tx) => {
-                if (membership.role === "OWNER") {
-                    // Again inside the transaction: two owners removing each
-                    // other at once must not both pass.
-                    await this.assertNotLastOwner(
-                        ctx.organizationId,
-                        userId,
-                        "remove",
-                        tx,
-                    );
-                }
-                await tx.membership.delete({
-                    where: {
-                        organizationId_userId: {
-                            organizationId: ctx.organizationId,
-                            userId,
-                        },
-                    },
-                });
-                await tx.siteReviewer.deleteMany({
-                    where: { organizationId: ctx.organizationId, userId },
-                });
-                const { count } = await tx.sitePreviewLink.updateMany({
-                    where: {
-                        organizationId: ctx.organizationId,
-                        createdByUserId: userId,
-                        revokedAt: null,
-                    },
-                    data: { revokedAt: new Date() },
-                });
-                // Closed storefronts included: a storefront reopened later
-                // must not bring a removed person back with it.
-                const storefronts = await tx.storeMembers.deleteMany({
-                    where: {
-                        userId,
-                        store: { organizationId: ctx.organizationId },
-                    },
-                });
-                // Their storefront invites still waiting go too: accepting
-                // one would put them back on the team (F16).
-                const person = await tx.user.findUnique({
-                    where: { id: userId },
-                    select: { email: true },
-                });
-                if (person?.email) {
-                    await tx.storeInvitation.updateMany({
-                        where: {
-                            status: "PENDING",
-                            email: {
-                                equals: person.email,
-                                mode: "insensitive",
-                            },
-                            store: { organizationId: ctx.organizationId },
-                        },
-                        data: { status: "REVOKED" },
-                    });
-                }
-                return {
-                    revokedLinks: count,
-                    storefrontRoles: storefronts.count,
-                };
-            },
-            { isolationLevel: "Serializable" },
+        const { revokedLinks, storefrontRoles } = await this.detach(
+            ctx.organizationId,
+            userId,
+            membership.role,
+            "remove",
         );
 
         await this.audit.record({
@@ -1129,7 +1073,138 @@ export class OrganizationMembersService {
         return { removed: true, revokedLinks, storefrontRoles };
     }
 
+    /**
+     * Leave the organization: the caller's own membership, and nothing else.
+     *
+     * Being a member is all it asks. `remove` needs `member:remove`, which
+     * only an Owner or Admin holds, so a Member, a Reviewer, someone on a
+     * location's team or a diary person with a login had no way out of a
+     * business they had joined (UX audit, 10 Oct 2026). Nobody needs a
+     * permission to stop being somewhere, and there is no reach check: it is
+     * their own membership.
+     *
+     * The one refusal is the last Owner (S1-006): a business always has one,
+     * so they make someone else an Owner first. What goes with them is what
+     * goes with a removed person (`detach`): their share links, the sites
+     * they review, their location roles and any location invitation still
+     * waiting. Their work stays. Coming back needs a new invitation.
+     */
+    async leave(ctx: OrganizationContext) {
+        const userId = ctx.userId;
+        const membership = await this.requireMembership(ctx, userId);
+
+        const { revokedLinks, storefrontRoles } = await this.detach(
+            ctx.organizationId,
+            userId,
+            membership.role,
+            "leave",
+        );
+
+        await this.audit.record({
+            action: AuditAction.MembershipRemove,
+            actorUserId: userId,
+            actorRoleKey: ctx.roleKey,
+            organizationId: ctx.organizationId,
+            targetType: "membership",
+            targetId: userId,
+            outcome: AuditOutcome.Success,
+            // `left`: Activity says "left the team", not "removed".
+            metadata: {
+                role: membership.role,
+                revokedLinks,
+                storefrontRoles,
+                left: true,
+            },
+        });
+
+        return { left: true, revokedLinks, storefrontRoles };
+    }
+
     // -----------------------------------------------------------------------
+
+    /**
+     * Take one person off the organization, with everything that goes with
+     * them, in one serializable transaction: the membership, the sites they
+     * review, the share links they made, their storefront roles and any
+     * storefront invitation still waiting. `remove` and `leave` both end
+     * here, so someone who leaves is exactly as gone as someone removed.
+     */
+    private async detach(
+        organizationId: string,
+        userId: string,
+        role: string,
+        what: "remove" | "leave",
+    ): Promise<{ revokedLinks: number; storefrontRoles: number }> {
+        if (role === "OWNER") {
+            await this.assertNotLastOwner(organizationId, userId, what);
+        }
+
+        return prisma.$transaction(
+            async (tx) => {
+                if (role === "OWNER") {
+                    // Again inside the transaction: two owners removing each
+                    // other, or leaving, at once must not both pass.
+                    await this.assertNotLastOwner(
+                        organizationId,
+                        userId,
+                        what,
+                        tx,
+                    );
+                }
+                await tx.membership.delete({
+                    where: {
+                        organizationId_userId: {
+                            organizationId,
+                            userId,
+                        },
+                    },
+                });
+                await tx.siteReviewer.deleteMany({
+                    where: { organizationId, userId },
+                });
+                const { count } = await tx.sitePreviewLink.updateMany({
+                    where: {
+                        organizationId,
+                        createdByUserId: userId,
+                        revokedAt: null,
+                    },
+                    data: { revokedAt: new Date() },
+                });
+                // Closed storefronts included: a storefront reopened later
+                // must not bring a removed person back with it.
+                const storefronts = await tx.storeMembers.deleteMany({
+                    where: {
+                        userId,
+                        store: { organizationId },
+                    },
+                });
+                // Their storefront invites still waiting go too: accepting
+                // one would put them back on the team (F16).
+                const person = await tx.user.findUnique({
+                    where: { id: userId },
+                    select: { email: true },
+                });
+                if (person?.email) {
+                    await tx.storeInvitation.updateMany({
+                        where: {
+                            status: "PENDING",
+                            email: {
+                                equals: person.email,
+                                mode: "insensitive",
+                            },
+                            store: { organizationId },
+                        },
+                        data: { status: "REVOKED" },
+                    });
+                }
+                return {
+                    revokedLinks: count,
+                    storefrontRoles: storefronts.count,
+                };
+            },
+            { isolationLevel: "Serializable" },
+        );
+    }
 
     private async requireMembership(ctx: OrganizationContext, userId: string) {
         const membership = await prisma.membership.findUnique({
@@ -1163,13 +1238,17 @@ export class OrganizationMembersService {
     private async assertNotLastOwner(
         organizationId: string,
         userId: string,
-        what: "demote" | "remove",
+        what: "demote" | "remove" | "leave",
         db: Pick<typeof prisma, "membership"> = prisma,
     ) {
         const otherOwners = await db.membership.count({
             where: { organizationId, role: "OWNER", userId: { not: userId } },
         });
         if (otherOwners === 0) {
+            // Said to the owner themselves: why, and what to do first.
+            if (what === "leave") {
+                throw new BadRequestException(LAST_OWNER_CANT_LEAVE);
+            }
             throw new BadRequestException(
                 `This is the workspace's only owner. Make someone else an owner first, then ${what} this one.`,
             );
