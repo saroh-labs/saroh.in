@@ -119,7 +119,7 @@ export default async function OnboardingPage({
             </h1>
             <p className="mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
                 {hasOrgs
-                    ? "It sits beside the ones you have, and you switch between them from the top of the workspace."
+                    ? "It sits beside the ones you have, and you switch between them from the top of the screen."
                     : "Last step. You can change all of this later, and you pick what Saroh does for you once you are inside."}
             </p>
             {left ? (
