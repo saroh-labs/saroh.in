@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const getJson = vi.fn(async () => null);
+const getJson = vi.fn(() => Promise.resolve(null));
 vi.mock("./control-plane", () => ({ getJson }));
 
 const { listBusinessReports, reportStatus } =

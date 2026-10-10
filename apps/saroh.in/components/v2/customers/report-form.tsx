@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { CUSTOMERS } from "@/content/customers";
 import type { ReportResult } from "@/lib/business-report";
@@ -26,6 +26,9 @@ const FIELD_MESSAGE: Record<Field, string> = {
     email: copy.badEmail,
 };
 
+/** The address in the URL doesn't change while the page is open. */
+const noChange = () => () => undefined;
+
 const INPUT =
     "min-w-0 rounded-[10px] border bg-white px-3.5 font-sans text-[15px] text-foreground transition-colors duration-fast ease-out placeholder:text-muted-foreground hover:border-foreground focus:ring-0 focus:ring-offset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
 
@@ -38,15 +41,18 @@ const INPUT =
  * site.
  */
 export function ReportForm() {
-    const [site, setSite] = useState("");
+    // The link's address until they type their own: read in the browser
+    // (the server draws the field empty), so the page stays static.
+    const given = useSyncExternalStore(
+        noChange,
+        () => prefilledSite(window.location.search),
+        () => "",
+    );
+    const [typed, setSite] = useState<string | null>(null);
+    const site = typed ?? given;
     const [message, setMessage] = useState("");
     const [email, setEmail] = useState("");
     const [state, setState] = useState<State>({ at: "idle" });
-
-    useEffect(() => {
-        const given = prefilledSite(window.location.search);
-        if (given) setSite((current) => current || given);
-    }, []);
 
     const clear = () => {
         if (state.at === "error") setState({ at: "idle" });
