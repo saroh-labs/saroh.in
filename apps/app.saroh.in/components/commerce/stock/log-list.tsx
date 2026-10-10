@@ -229,9 +229,7 @@ export function LogList({
                         aria-label={d.label}
                         className="min-w-0"
                     >
-                        <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            {d.label}
-                        </h3>
+                        <h3 className="label pb-1.5">{d.label}</h3>
                         <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
                             <ul className={cn(grid, "px-4")}>
                                 {d.rows.map((e, i) => {

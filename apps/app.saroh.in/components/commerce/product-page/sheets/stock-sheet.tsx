@@ -218,10 +218,7 @@ export function StockSheet({
         >
             <div
                 aria-hidden
-                className={cn(
-                    counts ? ROW : PRICE_ROW,
-                    "pb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
-                )}
+                className={cn(counts ? ROW : PRICE_ROW, "label pb-1.5")}
             >
                 <span>{product.option?.name ?? "Size"}</span>
                 <span>Price</span>

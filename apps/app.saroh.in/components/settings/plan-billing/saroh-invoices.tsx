@@ -56,10 +56,7 @@ export function SarohInvoices({
                         <span className="tabular-nums">
                             {formatInr(invoice.totalPaise)}
                         </span>
-                        <Badge
-                            variant="success"
-                            className="px-2 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                        >
+                        <Badge variant="success" size="sm">
                             Paid
                         </Badge>
                         <Button asChild variant="ghost" size="sm">

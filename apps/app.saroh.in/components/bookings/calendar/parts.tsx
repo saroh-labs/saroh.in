@@ -1,13 +1,12 @@
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import type { StatusTone } from "@/components/shared/status-badge";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import type { DiaryState } from "@/lib/services/diary";
-import { STATE_LABEL } from "@/lib/services/diary";
 
 /**
  * Small pieces the Bookings screens share (the "Saroh Bookings" design):
@@ -104,44 +103,19 @@ export function BookingsLocked({
     );
 }
 
-const PILL: Record<
-    DiaryState,
-    ComponentPropsWithoutRef<typeof Badge>["variant"]
-> = {
-    booked: "draft",
-    pending: "draft",
+/**
+ * The badge each diary state wears: always the word (`STATE_LABEL`), the
+ * hue only helps. Drawn with `StatusBadge`.
+ */
+export const STATE_TONE: Record<DiaryState, StatusTone> = {
+    booked: "active",
+    pending: "active",
     in: "success",
     noshow: "error",
     cancelled: "neutral",
     open: "success",
     full: "error",
 };
-
-/** A booking's state as a filled pill: always the word, the hue only helps. */
-export function StatePill({
-    state,
-    label,
-    tone,
-    className,
-}: {
-    state?: DiaryState;
-    /** Overrides the state's word ("Late cancel", "Credit back"). */
-    label?: string;
-    tone?: ComponentPropsWithoutRef<typeof Badge>["variant"];
-    className?: string;
-}) {
-    return (
-        <Badge
-            variant={tone ?? (state ? PILL[state] : "neutral")}
-            className={cn(
-                "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                className,
-            )}
-        >
-            {label ?? (state ? STATE_LABEL[state] : "")}
-        </Badge>
-    );
-}
 
 /**
  * The choice chip lives in `components/shared/chip.tsx` since the customer
@@ -161,13 +135,7 @@ export function Eyebrow({
     id?: string;
 }) {
     return (
-        <div
-            id={id}
-            className={cn(
-                "mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
-                className,
-            )}
-        >
+        <div id={id} className={cn("label mb-1.5", className)}>
             {children}
         </div>
     );

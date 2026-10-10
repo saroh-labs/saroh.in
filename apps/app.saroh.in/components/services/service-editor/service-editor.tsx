@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
@@ -39,6 +38,7 @@ import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -262,7 +262,9 @@ export function ServiceEditor({
                         <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">
                             {title}
                         </h1>
-                        <StatePill label={pill.label} tone={pill.tone} />
+                        <StatusBadge tone={pill.tone} hint={pill.hint}>
+                            {pill.label}
+                        </StatusBadge>
                     </div>
                     <div
                         role="status"

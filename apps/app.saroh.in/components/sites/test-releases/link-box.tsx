@@ -23,9 +23,7 @@ export async function copyLink(url: string): Promise<boolean> {
 export function LinkBox({ url, label }: { url: string; label: string }) {
     return (
         <div className="grid gap-2 rounded-lg border bg-muted px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label">{label}</p>
             <code
                 data-release-link=""
                 className="font-mono text-[12px] leading-relaxed [overflow-wrap:anywhere]"

@@ -45,10 +45,7 @@ export function HomeHeader({
                     aria-labelledby="home-last-24-hours"
                     className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
                 >
-                    <span
-                        id="home-last-24-hours"
-                        className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                    >
+                    <span id="home-last-24-hours" className="label">
                         Last 24 hours
                     </span>
                     {links.map((link) => (

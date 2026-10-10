@@ -109,16 +109,13 @@ export function QuickLook({
                         <div className="flex items-center gap-2.5 border-b border-muted px-[18px] py-4">
                             <Badge
                                 variant={STATUS_VARIANT[row.status]}
-                                className="px-[9px] py-[3px] text-[11px] font-medium"
+                                size="sm"
                             >
                                 {STATUS_LABEL[row.status]}
                             </Badge>
                             {row.paused ? (
                                 // Past the plan's products limit (#800).
-                                <Badge
-                                    variant="warning"
-                                    className="px-[9px] py-[3px] text-[11px] font-medium"
-                                >
+                                <Badge variant="warning" size="sm">
                                     Paused
                                 </Badge>
                             ) : null}

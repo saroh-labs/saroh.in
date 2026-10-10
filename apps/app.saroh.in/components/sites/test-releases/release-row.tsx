@@ -37,6 +37,7 @@ import {
 const BADGE = {
     success: "success",
     draft: "draft",
+    active: "active",
     neutral: "neutral",
     error: "error",
     info: "info",
@@ -121,10 +122,7 @@ export function ReleaseRow({
                         {status.line}
                     </p>
                 </div>
-                <Badge
-                    variant={BADGE[status.tone]}
-                    className="shrink-0 whitespace-nowrap"
-                >
+                <Badge variant={BADGE[status.tone]} className="shrink-0">
                     {status.label}
                 </Badge>
             </div>

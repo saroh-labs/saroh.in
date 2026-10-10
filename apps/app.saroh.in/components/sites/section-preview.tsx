@@ -427,7 +427,7 @@ function CanvasBlock({
                     onSelect();
                 }}
                 className={cn(
-                    "absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-highlight px-2 py-0.5 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-highlight-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "label absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-highlight px-2 py-0.5 font-sans text-highlight-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     selected
                         ? "opacity-100"
                         : "opacity-0 group-hover/block:opacity-100",

@@ -762,9 +762,7 @@ export function InvoiceForm({
                 </div>
 
                 <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Total
-                    </h2>
+                    <h2 className="label">Total</h2>
                     <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
                         {show(total)}
                     </p>
@@ -829,9 +827,7 @@ export function InvoiceForm({
 function Card({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );

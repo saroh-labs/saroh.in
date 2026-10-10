@@ -255,7 +255,7 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                             href={t.href}
                             className="group flex h-full flex-col rounded-[11px] border border-border px-[13px] py-3 transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <span className="flex items-center justify-between gap-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+                            <span className="label flex items-center justify-between gap-1">
                                 {t.label}
                                 <ChevronRight
                                     aria-hidden

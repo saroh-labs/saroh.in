@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
@@ -34,8 +34,9 @@ import type {
 } from "@/lib/subscriptions/service";
 import { payRows } from "@/lib/subscriptions/view";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TabStrip } from "@saroh/ui/tabs";
 import { PaymentsCrumbs } from "../payments-crumbs";
-import { Pill } from "../pill";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
 import { PlanAutopayTiming } from "./plan-autopay-timing";
@@ -85,7 +86,6 @@ export function PlanDetail({
     const [older, setOlder] = useState<PlanEventsPage[]>([]);
     const [loadingMore, setLoadingMore] = useState(false);
     const [moreFailed, setMoreFailed] = useState(false);
-    const tabs = useRef<HTMLDivElement>(null);
 
     const head = planHeader(plan, withClasses);
     const included = includedText(plan, withClasses);
@@ -100,19 +100,6 @@ export function PlanDetail({
         if (next === "overview") url.searchParams.delete("tab");
         else url.searchParams.set("tab", next);
         window.history.replaceState(null, "", url.pathname + url.search);
-    }
-
-    function keys(e: React.KeyboardEvent) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        const order: DetailTab[] = ["overview", "subscribers", "history"];
-        const i = order.indexOf(tab);
-        const n = (i + (e.key === "ArrowRight" ? 1 : order.length - 1)) % 3;
-        pick(order[n]);
-        tabs.current
-            ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-            .item(n)
-            .focus();
     }
 
     function archive() {
@@ -191,9 +178,13 @@ export function PlanDetail({
                         <h1 className="font-display text-[26px] font-semibold tracking-[-0.03em]">
                             {plan.name}
                         </h1>
-                        <Pill tone={head.state.tone}>{head.state.label}</Pill>
+                        <StatusBadge tone={head.state.tone}>
+                            {head.state.label}
+                        </StatusBadge>
                         {head.unpublished ? (
-                            <Pill tone="accent">Unpublished changes</Pill>
+                            <StatusBadge tone="accent">
+                                Unpublished changes
+                            </StatusBadge>
                         ) : null}
                     </div>
                     <p className="mt-1 text-[13.5px] text-foreground/75">
@@ -240,37 +231,19 @@ export function PlanDetail({
                 </ReadOnlyNote>
             ) : null}
 
-            <div
-                ref={tabs}
-                role="tablist"
-                aria-label="Plan"
-                onKeyDown={keys}
-                className="flex flex-wrap gap-0.5 border-b border-border px-6 pt-3.5"
-            >
-                {TABS.map((t) => {
-                    const on = t.key === tab;
-                    return (
-                        <button
-                            key={t.key}
-                            type="button"
-                            role="tab"
-                            id={`plan-tab-${t.key}`}
-                            aria-selected={on}
-                            aria-controls="plan-panel"
-                            tabIndex={on ? 0 : -1}
-                            onClick={() => pick(t.key)}
-                            className={cn(
-                                "-mb-px border-b-2 px-3 pb-2.5 pt-2 text-[13.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "border-foreground font-semibold text-foreground"
-                                    : "border-transparent font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {t.label}
-                        </button>
-                    );
-                })}
-            </div>
+            <TabStrip
+                label="Plan"
+                idPrefix="plan-tab"
+                value={tab}
+                onValueChange={pick}
+                className="mt-3.5"
+                listClassName="px-6"
+                tabs={TABS.map((t) => ({
+                    value: t.key,
+                    label: t.label,
+                    controls: "plan-panel",
+                }))}
+            />
 
             <div
                 id="plan-panel"

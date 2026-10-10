@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import type { SectionKey } from "@/lib/products/editor-sections";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { useEditor } from "./editor-state";
 
 /** What each section's bar says it will save, when nothing needs a fix. */
@@ -144,22 +145,20 @@ export function SectionChip({
     kind: "unsaved" | "bad" | "optional";
 }) {
     return (
-        <span
-            className={cn(
-                "shrink-0 rounded-full px-[7px] py-0.5 text-[11px]",
+        <StatusBadge
+            tone={
                 kind === "optional"
-                    ? "border border-dashed border-border-strong font-medium text-muted-foreground"
-                    : "font-semibold uppercase tracking-[0.04em]",
-                kind === "unsaved" &&
-                    "bg-brand-subtle text-brand-subtle-foreground",
-                kind === "bad" && "bg-destructive-subtle text-destructive",
-            )}
+                    ? "draft"
+                    : kind === "bad"
+                      ? "error"
+                      : "active"
+            }
         >
             {kind === "optional"
                 ? "Optional"
                 : kind === "bad"
                   ? "Needs a fix"
                   : "Unsaved"}
-        </span>
+        </StatusBadge>
     );
 }

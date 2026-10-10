@@ -14,7 +14,8 @@ import type {
 import type { Kind } from "@/lib/customer-workspace/view";
 import { invoiceRow, isPayable, subRow } from "@/lib/customer-workspace/view";
 
-import { Empty, ROW_LINK, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Empty, ROW_LINK } from "./parts";
 
 /**
  * Subscriptions (a shop) or Membership (a bookings business): each one
@@ -58,7 +59,7 @@ export function SubscriptionsTab({
                                 {r.when}
                             </div>
                         </div>
-                        <RowPill tone={r.tone}>{r.status}</RowPill>
+                        <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
                         <span className="font-semibold tabular-nums">
                             {r.price}
                         </span>
@@ -128,7 +129,7 @@ export function InvoicesTab({
                             <div className="min-w-0 flex-[2_1_160px] text-[12.5px] text-muted-foreground">
                                 {r.from}
                             </div>
-                            <RowPill tone={r.tone}>{r.status}</RowPill>
+                            <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {r.total}
                             </span>

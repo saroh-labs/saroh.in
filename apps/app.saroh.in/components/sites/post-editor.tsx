@@ -569,9 +569,7 @@ function Field({
 }) {
     return (
         <div className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                {label}
-            </span>
+            <span className="label">{label}</span>
             {children}
             {hint ? (
                 <p className="text-xs text-muted-foreground">{hint}</p>

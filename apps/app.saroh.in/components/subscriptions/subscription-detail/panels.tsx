@@ -6,16 +6,14 @@ import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
 
-import { Pill } from "../pill";
-
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /** Next collections, each with Skip — or Undo skip — while it is running. */
 export function CollectionsCard({
@@ -67,7 +65,7 @@ export function CollectionsCard({
                             </span>
                         ) : null}
                     </span>
-                    <Pill tone={u.tone}>{u.state}</Pill>
+                    <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                     {canWrite && u.canSkip ? (
                         <button
                             type="button"
@@ -133,7 +131,7 @@ export function ChargesCard({
                         <span className="w-16 shrink-0 text-[12.5px] text-muted-foreground">
                             {c.date}
                         </span>
-                        <Pill tone={c.tone}>{c.result}</Pill>
+                        <StatusBadge tone={c.tone}>{c.result}</StatusBadge>
                         <span className="min-w-0 flex-[1_1_140px] text-[12.5px] text-muted-foreground">
                             {c.note}
                         </span>

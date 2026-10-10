@@ -58,11 +58,7 @@ export function Section({
 }) {
     return (
         <section className="grid min-w-0 gap-3.5">
-            {title ? (
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </h3>
-            ) : null}
+            {title ? <h3 className="label">{title}</h3> : null}
             {children}
         </section>
     );

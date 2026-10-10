@@ -1,8 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 
 import { chipClass } from "@/components/shared/chip";
-import { Pill } from "@/components/subscriptions/pill";
-import type { Tone } from "@/lib/customer-workspace/view";
 
 /** The design's white card: border-first, 12px corners, 14px by 16px. */
 export const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
@@ -13,24 +11,6 @@ export const LABEL = "text-[12.5px] text-muted-foreground";
 /** A row that opens a record: the whole card is the target. */
 export const ROW_LINK =
     "flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-foreground transition-colors duration-fast hover:border-border-strong active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-/** A state pill in a row: sentence case, as the design draws them. */
-export function RowPill({
-    tone,
-    children,
-}: {
-    tone: Tone;
-    children: React.ReactNode;
-}) {
-    return (
-        <Pill
-            tone={tone}
-            className="text-[11.5px] normal-case leading-[1.4] tracking-normal"
-        >
-            {children}
-        </Pill>
-    );
-}
 
 /** A tab whose part of the read failed: said so, never an empty tab. */
 export function Failed({ what }: { what: string }) {

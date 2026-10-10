@@ -22,7 +22,7 @@ import type { ListQuery } from "@/lib/products/list-query";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
-    PUBLISHED: "Published",
+    PUBLISHED: "Live",
     DRAFT: "Draft",
     ARCHIVED: "Archived",
 };
@@ -129,9 +129,7 @@ function FilterMenu({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Status
-                </DropdownMenuLabel>
+                <DropdownMenuLabel className="label">Status</DropdownMenuLabel>
                 {statuses.map((s) => (
                     <DropdownMenuItem
                         key={s ?? "any"}

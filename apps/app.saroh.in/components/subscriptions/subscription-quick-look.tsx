@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     Optional,
     Plan,
@@ -29,10 +30,7 @@ import {
     TAB_TONE,
 } from "@/lib/subscriptions/view";
 
-import { Pill } from "./pill";
-
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /** The steps a quick look offers, by where the subscription stands. */
 const EDITS = {
@@ -177,7 +175,9 @@ function Body({
         <>
             <QuickLookCard className="py-3.5">
                 <div className="flex items-center gap-2">
-                    <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                    <StatusBadge tone={TAB_TONE[tab]}>
+                        {TAB_LABEL[tab]}
+                    </StatusBadge>
                     <span className="flex-1" />
                     <span className="text-[12px] text-muted-foreground">
                         Since {dayText(sub.startedAt, tz, now)}
@@ -227,7 +227,7 @@ function Body({
                             <span className="flex-1 text-[13px] font-semibold">
                                 {u.label}
                             </span>
-                            <Pill tone={u.tone}>{u.state}</Pill>
+                            <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                         </div>
                     ))}
                 </QuickLookCard>
@@ -247,7 +247,9 @@ function Body({
                                 <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
                                     {c.date}
                                 </span>
-                                <Pill tone={c.tone}>{c.result}</Pill>
+                                <StatusBadge tone={c.tone}>
+                                    {c.result}
+                                </StatusBadge>
                                 <span className="flex-1" />
                                 <span className="font-semibold tabular-nums">
                                     {c.amount}

@@ -111,9 +111,7 @@ export function SiteReviewView({
             <ReleasesToReview siteId={site.id} releases={releases} />
 
             <p className="flex items-baseline gap-2 border-b pb-2">
-                <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                    Reviewing
-                </span>
+                <span className="label">Reviewing</span>
                 <span data-review-subject className="text-sm font-medium">
                     {reviewSubject(null)}
                 </span>
@@ -219,9 +217,7 @@ function ReleasesToReview({
     if (open.length === 0) return null;
     return (
         <section aria-label="Test releases" className="space-y-2">
-            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                Test releases
-            </h3>
+            <h3 className="label">Test releases</h3>
             <ul className="grid gap-2">
                 {open.map((release) => {
                     const approved =

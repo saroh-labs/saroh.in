@@ -41,7 +41,7 @@ function Tile({
 }) {
     const body = (
         <>
-            <span className="flex items-center justify-between gap-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground sm:text-[11px]">
+            <span className="label flex items-center justify-between gap-1 sm:text-[11px]">
                 {label}
                 {href ? (
                     <ChevronRight

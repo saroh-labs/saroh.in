@@ -31,11 +31,12 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
 import { DetailsSection } from "./details-section";
-import { NextSteps, ReadOnlyNote, StatusPill } from "./editor-parts";
+import { NextSteps, ReadOnlyNote } from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
@@ -268,7 +269,13 @@ function EditorBody({
                               ? product.name
                               : "Untitled product"}
                     </span>
-                    <StatusPill status={product?.status ?? null} />
+                    {/* A fact about what customers can see, so it follows
+                        the SAVED status. */}
+                    {product ? (
+                        <StatusBadge thing="product" status={product.status} />
+                    ) : (
+                        <StatusBadge tone="draft">Not created yet</StatusBadge>
+                    )}
                     <div className="ml-auto flex flex-wrap items-center gap-2.5 max-[480px]:ml-0">
                         <span
                             role="status"

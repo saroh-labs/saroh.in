@@ -128,10 +128,7 @@ function Group({
     const id = useId();
     return (
         <section aria-labelledby={id}>
-            <h3
-                id={id}
-                className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h3 id={id} className="label mb-2">
                 {title}
             </h3>
             <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border bg-card">

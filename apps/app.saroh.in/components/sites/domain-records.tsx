@@ -33,9 +33,7 @@ async function copy(text: string): Promise<boolean> {
 function CopyField({ label, value }: { label: string; value: string }) {
     return (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1 sm:grid-cols-[6rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-3">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                {label}
-            </span>
+            <span className="label">{label}</span>
             <code
                 className="min-w-0 truncate rounded border bg-muted/40 px-2 py-1 text-xs"
                 title={value}

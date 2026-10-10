@@ -129,9 +129,7 @@ export function DeliveryWaySheet({
 
             {draft.on && paid ? (
                 <fieldset className="grid min-w-0 gap-2.5">
-                    <legend className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        What customers pay
-                    </legend>
+                    <legend className="label mb-1">What customers pay</legend>
                     <div className="flex flex-wrap items-center gap-3">
                         <Segmented
                             label={`What customers pay for ${label.toLowerCase()}`}
@@ -221,9 +219,7 @@ export function DeliveryWaySheet({
 
             {draft.on ? (
                 <fieldset className="grid min-w-0 gap-2.5">
-                    <legend className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        For your team
-                    </legend>
+                    <legend className="label mb-1">For your team</legend>
                     <p
                         id={`${id}-late-label`}
                         className="text-[13px] font-medium"

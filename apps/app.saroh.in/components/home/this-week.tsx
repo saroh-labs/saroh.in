@@ -20,10 +20,7 @@ export function ThisWeek({ rows }: { rows: WeekRow[] }) {
             aria-labelledby={headingId}
             className="grid min-w-0 flex-[1_1_100%] content-start gap-[9px] min-[1100px]:flex-[0_0_300px]"
         >
-            <h2
-                id={headingId}
-                className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h2 id={headingId} className="label">
                 This week
             </h2>
             <ul className="overflow-hidden rounded-xl border border-border bg-card">

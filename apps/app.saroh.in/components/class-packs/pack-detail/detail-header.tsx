@@ -4,9 +4,9 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { Pill } from "@/components/subscriptions/pill";
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { GUTTER } from "./detail-crumbs";
 
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
@@ -69,13 +69,19 @@ export function PackDetailHeader({
                         <h1 className="m-0 font-display text-[24px] font-semibold tracking-[-0.025em]">
                             {name}
                         </h1>
-                        <Pill tone={head.status.tone}>{head.status.label}</Pill>
-                        <Pill tone="off">{head.kindLabel}</Pill>
+                        <StatusBadge tone={head.status.tone}>
+                            {head.status.label}
+                        </StatusBadge>
+                        <StatusBadge tone="off">{head.kindLabel}</StatusBadge>
                         {head.firstOnly ? (
-                            <Pill tone="accent">First pack only</Pill>
+                            <StatusBadge tone="accent">
+                                First pack only
+                            </StatusBadge>
                         ) : null}
                         {head.pending ? (
-                            <Pill tone="accent">Changes not published</Pill>
+                            <StatusBadge tone="accent">
+                                Changes not published
+                            </StatusBadge>
                         ) : null}
                     </div>
                     <p className="m-0 mt-1 text-pretty text-[13px] text-muted-foreground">

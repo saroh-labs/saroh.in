@@ -1,10 +1,7 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
-
-import type { ProductStatus } from "@/lib/products/service";
 
 /*
  * The editor shell's smaller pieces, after the Editor design: the saved
@@ -12,35 +9,6 @@ import type { ProductStatus } from "@/lib/products/service";
  * product exists. Leaving with unsaved changes asks through the app's one
  * guard (`components/shared/use-leave-guard.tsx`).
  */
-
-/** A fact about what customers can see, so it follows the SAVED status. */
-export function StatusPill({ status }: { status: ProductStatus | null }) {
-    if (!status) {
-        return (
-            <span className="shrink-0 rounded-full border border-dashed border-border-strong px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                Not created yet
-            </span>
-        );
-    }
-    return (
-        <span
-            className={cn(
-                "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                status === "PUBLISHED"
-                    ? "bg-success-subtle text-success-subtle-foreground"
-                    : status === "DRAFT"
-                      ? "bg-brand-subtle text-brand-subtle-foreground"
-                      : "bg-muted text-foreground/75",
-            )}
-        >
-            {status === "PUBLISHED"
-                ? "Published"
-                : status === "DRAFT"
-                  ? "Draft"
-                  : "Archived"}
-        </span>
-    );
-}
 
 /** Under the header for someone who can't change (all of) the product. */
 export function ReadOnlyNote({ children }: { children: ReactNode }) {

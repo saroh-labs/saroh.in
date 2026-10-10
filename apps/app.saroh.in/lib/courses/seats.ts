@@ -40,17 +40,17 @@ export function courseTab(
 }
 
 export const TAB_LABEL: Record<CourseTab, string> = {
-    OPEN: "Open",
+    OPEN: "Live",
     FULL: "Full",
-    CLOSED: "Closed",
+    CLOSED: "Paused",
     DRAFT: "Draft",
     PAST: "Past",
 };
 
 export const STATUS_LABEL: Record<CourseStatus, string> = {
     DRAFT: "Draft",
-    OPEN: "Open",
-    CLOSED: "Closed",
+    OPEN: "Live",
+    CLOSED: "Paused",
     ARCHIVED: "Archived",
 };
 

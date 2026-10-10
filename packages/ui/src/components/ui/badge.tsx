@@ -47,6 +47,10 @@ const badgeVariants = cva(
                 error: "border-transparent bg-destructive-subtle text-destructive-subtle-foreground",
                 info: "border-transparent bg-info-subtle text-info-subtle-foreground",
                 draft: "border-dashed border-border-strong bg-transparent text-neutral-600 dark:text-muted-foreground",
+                // In play and yours to act on (a new order, a booking not
+                // yet confirmed, an open lead): a solid Ink edge. It was a
+                // Saffron tint; the accent is the menu's marker now.
+                active: "border-foreground bg-transparent text-foreground",
                 tag: "rounded border-border-strong bg-transparent text-foreground",
                 // A state with no hue of its own: cancelled, archived, not
                 // connected. Present, but asking nothing of anyone.

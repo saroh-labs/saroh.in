@@ -99,10 +99,7 @@ function SheetGroup({
     const headingId = useId();
     return (
         <div role="group" aria-labelledby={headingId}>
-            <p
-                id={headingId}
-                className="px-2.5 pb-[5px] pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <p id={headingId} className="label px-2.5 pb-[5px] pt-3">
                 {group.label}
             </p>
             {group.rows.map((row) => (

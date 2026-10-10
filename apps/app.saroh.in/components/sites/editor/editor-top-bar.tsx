@@ -346,7 +346,8 @@ function StatusReadout({
                     [status.label, detail].filter(Boolean).join("\n") ||
                     undefined
                 }
-                className="ml-1 min-w-0 shrink truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.04em]"
+                size="sm"
+                className="ml-1 min-w-0 shrink truncate"
             >
                 <span className="truncate">{status.label}</span>
             </Badge>

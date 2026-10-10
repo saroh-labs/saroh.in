@@ -1,13 +1,12 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";
+import { TabStrip } from "@saroh/ui/tabs";
 
 const LABEL: Record<SettingsTab, string> = {
     categories: "Categories",
@@ -53,38 +52,16 @@ export function ProductSettings({
 
     return (
         <UnsavedContext.Provider value={{ setDirty }}>
-            <div
-                role="tablist"
-                aria-label="Product settings"
-                className="flex flex-wrap gap-0.5 border-b border-border max-[760px]:flex-nowrap max-[760px]:overflow-x-auto"
-            >
-                {tabs.map(({ key, count }) => {
-                    const on = key === tab;
-                    const href = productSettingsHref(key);
-                    return (
-                        <Link
-                            key={key}
-                            href={href}
-                            role="tab"
-                            aria-selected={on}
-                            scroll={false}
-                            className={cn(
-                                "inline-flex shrink-0 items-center whitespace-nowrap px-3.5 py-2.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {LABEL[key]}
-                            {count !== undefined ? (
-                                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-px text-[11px] font-semibold text-muted-foreground">
-                                    {count}
-                                </span>
-                            ) : null}
-                        </Link>
-                    );
-                })}
-            </div>
+            <TabStrip
+                label="Product settings"
+                value={tab}
+                tabs={tabs.map(({ key, count }) => ({
+                    value: key,
+                    label: LABEL[key],
+                    href: productSettingsHref(key),
+                    count,
+                }))}
+            />
             <div className="pt-5">{children}</div>
 
             {guard.dialog}

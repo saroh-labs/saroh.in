@@ -110,9 +110,7 @@ function Group({
 }) {
     return (
         <section aria-label={label} className="space-y-1.5">
-            <h3 className="px-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                {label}
-            </h3>
+            <h3 className="label px-2">{label}</h3>
             <ul className="space-y-1.5">{children}</ul>
         </section>
     );

@@ -161,7 +161,8 @@ export function VariantDrawer({
                                         </div>
                                         <Badge
                                             variant={WORD_BADGE[openLine.word]}
-                                            className="mt-2.5 rounded-full px-2 text-[11.5px] font-semibold"
+                                            size="sm"
+                                            className="mt-2.5"
                                         >
                                             Customers see:{" "}
                                             {customersSee(openLine)}
@@ -223,7 +224,7 @@ export function VariantDrawer({
                                                                     ? "success"
                                                                     : "draft"
                                                             }
-                                                            className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                            size="sm"
                                                         >
                                                             {ORDER_STATUS_LABEL[
                                                                 o.status
@@ -334,9 +335,7 @@ function DrawerSection({
 }) {
     return (
         <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {title}
-            </h3>
+            <h3 className="label mb-2">{title}</h3>
             {children}
         </section>
     );

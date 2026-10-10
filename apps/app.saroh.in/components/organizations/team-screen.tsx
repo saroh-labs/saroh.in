@@ -571,7 +571,7 @@ function PeopleTab({
                 <div
                     className={cn(
                         grid,
-                        "hidden h-[38px] border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground xl:grid",
+                        "label hidden h-[38px] border-b border-border bg-muted px-4 xl:grid",
                     )}
                 >
                     <span>Person</span>
@@ -780,7 +780,7 @@ function PendingInvites({
             aria-label="Invited, not joined yet"
             className="overflow-hidden rounded-xl border border-border"
         >
-            <p className="flex h-[38px] items-center border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="label flex h-[38px] items-center border-b border-border bg-muted px-4">
                 Invited · not joined yet
             </p>
             <ul>
@@ -997,7 +997,7 @@ function MemberDrawer({
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-[18px]">
-                            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            <p className="label mb-2.5">
                                 Role in {organizationName}
                             </p>
                             <div

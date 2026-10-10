@@ -104,9 +104,7 @@ export function LeadsView({
             sortValue: (l) => l.stage?.order ?? Number.MAX_SAFE_INTEGER,
             cell: (l) =>
                 l.stage ? (
-                    <Badge variant="secondary" className="font-normal">
-                        {l.stage.name}
-                    </Badge>
+                    <Badge variant="secondary">{l.stage.name}</Badge>
                 ) : (
                     <Missing />
                 ),

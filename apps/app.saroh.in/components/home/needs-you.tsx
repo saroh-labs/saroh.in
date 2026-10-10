@@ -68,10 +68,7 @@ export function NeedsYou({
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
             <div className="flex items-baseline gap-[9px]">
-                <h2
-                    id={headingId}
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id={headingId} className="label">
                     Needs you
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
@@ -175,7 +172,8 @@ function NeedRow({
                 {need.tag && !done ? (
                     <Badge
                         variant={TONE_BADGE[need.tone]}
-                        className="shrink-0 self-center whitespace-nowrap px-[9px] py-[3px] text-[11.5px] font-semibold"
+                        size="sm"
+                        className="shrink-0 self-center"
                     >
                         {need.tag}
                     </Badge>

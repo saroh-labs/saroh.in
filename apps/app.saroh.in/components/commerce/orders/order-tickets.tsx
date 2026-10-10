@@ -152,9 +152,7 @@ function Ticket({ order }: { order: OrderRead }) {
                     before it goes out.
                 </div>
             ) : null}
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {order.ticketName}
-            </p>
+            <p className="label">{order.ticketName}</p>
             <h2 className="font-display text-[22px] font-semibold">
                 #{order.orderId}
             </h2>

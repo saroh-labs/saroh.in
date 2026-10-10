@@ -18,7 +18,6 @@ import {
     RecordPaymentDialog,
 } from "@/components/invoices/invoice-actions";
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { SendDialog } from "@/components/invoices/send-dialog";
 import {
@@ -29,6 +28,7 @@ import { useBusinessDetailsStep } from "@/components/organizations/use-business-
 import { QrButton } from "@/components/qr/qr-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
@@ -348,10 +348,9 @@ export function InvoiceDetail({
                         <h1 className="font-mono text-[26px] font-medium leading-[1.2] tracking-[-0.02em]">
                             {invoice.number ?? "Draft"}
                         </h1>
-                        <InvoicePill
-                            label={pill.label}
-                            variant={pill.variant}
-                        />
+                        <StatusBadge tone={pill.variant} size="default">
+                            {pill.label}
+                        </StatusBadge>
                     </div>
                     <p className="mt-1 text-[12.5px] text-muted-foreground">
                         {subline}
@@ -414,9 +413,7 @@ export function InvoiceDetail({
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3 print:hidden">
                     {connected}
                     <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-                        <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Payment
-                        </h2>
+                        <h2 className="label mb-1.5">Payment</h2>
                         <p className="text-[13px] leading-[1.5] text-foreground">
                             {payLine}
                         </p>

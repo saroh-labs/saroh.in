@@ -7,13 +7,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
 import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { readInvoice } from "@/lib/invoices/actions";
@@ -219,7 +219,7 @@ export function InvoiceQuickLook({
                     )}
                 </>
             }
-            status={<InvoicePill label={pill.label} variant={pill.variant} />}
+            status={<StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>}
             description={`${paperTitle(i)} for ${who.name}, ${money(i.total)}.`}
             footer={
                 <>

@@ -129,7 +129,7 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                     <div
                         role="row"
                         className={cn(
-                            "grid items-center px-[18px] py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                            "label grid items-center px-[18px] py-2",
                             cols,
                         )}
                     >

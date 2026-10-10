@@ -1,6 +1,5 @@
 "use client";
 
-import { badgeVariants } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -28,6 +27,7 @@ import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { TabStrip } from "@saroh/ui/tabs";
 import { PostCategoriesSheet } from "./post-categories-sheet";
 
@@ -204,13 +204,9 @@ export function WebsiteHeader({
                         ) : null}
                         <StateBadge state={site.state} />
                         {site.paused ? (
-                            <span
-                                className={badgeVariants({
-                                    variant: "warning",
-                                })}
-                            >
+                            <StatusBadge size="default" tone="warning">
                                 Paused
-                            </span>
+                            </StatusBadge>
                         ) : null}
                     </span>
                 }
@@ -309,29 +305,25 @@ export function SiteAddressLink({
     );
 }
 
-/**
- * The site's ranked state as a pill. A span drawn with the badge's own styles,
- * not `<Badge>` (a div), so it can sit in the header's description paragraph
- * directly under the title.
- */
+/** The site's ranked state: live, needing someone, or neither. */
 export function StateBadge({
     state,
 }: {
     state: { label: string; tone: SiteStateTone };
 }) {
     return (
-        <span
-            className={badgeVariants({
-                variant:
-                    state.tone === "live"
-                        ? "success"
-                        : state.tone === "attention"
-                          ? "warning"
-                          : "neutral",
-            })}
+        <StatusBadge
+            size="default"
+            tone={
+                state.tone === "live"
+                    ? "success"
+                    : state.tone === "attention"
+                      ? "warning"
+                      : "neutral"
+            }
         >
             {state.label}
-        </span>
+        </StatusBadge>
     );
 }
 
@@ -410,7 +402,7 @@ function SitePicker({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[250px]">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <DropdownMenuLabel className="label">
                     Websites in this business
                 </DropdownMenuLabel>
                 {sites.map((s) => {

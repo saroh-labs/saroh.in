@@ -24,6 +24,7 @@ import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { useEditor, useSection } from "./editor-state";
 import { boxClass, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
@@ -218,9 +219,12 @@ export function MadeBySection({
                         <FieldLabel
                             htmlFor="pe-supplier-code"
                             aside={
-                                <span className="shrink-0 rounded-full bg-muted px-[7px] py-px text-[11px] font-semibold text-muted-foreground">
+                                <StatusBadge
+                                    tone="neutral"
+                                    className="shrink-0"
+                                >
                                     Team only
-                                </span>
+                                </StatusBadge>
                             }
                         >
                             Supplier&apos;s product code

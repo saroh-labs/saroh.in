@@ -166,11 +166,7 @@ export function OverviewDescription({
                                 {contains.length > 0 ? (
                                     <span className="flex flex-wrap gap-1.5">
                                         {contains.map((a) => (
-                                            <Badge
-                                                key={a.id}
-                                                variant="draft"
-                                                className="rounded-full px-[9px] py-0.5 text-[12px] font-semibold"
-                                            >
+                                            <Badge key={a.id} variant="draft">
                                                 {a.name}
                                             </Badge>
                                         ))}

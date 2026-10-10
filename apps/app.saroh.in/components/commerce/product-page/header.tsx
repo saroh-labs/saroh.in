@@ -13,7 +13,7 @@ import { priceLabel } from "@/lib/products/overview-rules";
 import { whereItSells } from "@/lib/products/overview-words";
 
 export const STATUS_BADGE = {
-    PUBLISHED: { label: "Published", variant: "success" },
+    PUBLISHED: { label: "Live", variant: "success" },
     DRAFT: { label: "Draft", variant: "draft" },
     ARCHIVED: { label: "Archived", variant: "neutral" },
 } as const;
@@ -246,17 +246,11 @@ export function ProductHeader({
                     <h1 className="min-w-0 break-words font-display text-[24px] font-semibold leading-[1.15] tracking-[-0.025em]">
                         {product.name}
                     </h1>
-                    <Badge
-                        variant={status.variant}
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                    >
+                    <Badge variant={status.variant} size="sm">
                         {status.label}
                     </Badge>
                     {paused ? (
-                        <Badge
-                            variant="warning"
-                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                        >
+                        <Badge variant="warning" size="sm">
                             Paused
                         </Badge>
                     ) : null}

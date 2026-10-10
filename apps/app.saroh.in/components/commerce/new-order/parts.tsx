@@ -40,9 +40,7 @@ export function StepCard({
             {...props}
         >
             <div className="mb-2 flex items-baseline">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </h3>
+                <h3 className="label flex-1">{title}</h3>
                 {aside ? (
                     <span className="text-[12px] text-muted-foreground">
                         {aside}

@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
     readModuleImpactAction,
     setModuleStatusAction,
@@ -507,18 +508,7 @@ function ModuleSwitch({
  */
 function StateTag({ module, needs }: { module: ModuleView; needs?: string }) {
     const tag = (text: string, tone: "accent" | "quiet" | "error") => (
-        <span
-            className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                tone === "accent" &&
-                    "bg-highlight-subtle text-highlight-subtle-foreground",
-                tone === "quiet" && "bg-muted text-foreground/80",
-                tone === "error" &&
-                    "bg-destructive-subtle text-destructive-subtle-foreground",
-            )}
-        >
-            {text}
-        </span>
+        <StatusBadge tone={tone}>{text}</StatusBadge>
     );
     if (module.lifecycle === "ENABLED") {
         if (module.readiness === "ATTENTION_REQUIRED") {

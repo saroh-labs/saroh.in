@@ -176,7 +176,7 @@ export function AppSidebar({
                             )}
                         >
                             {showsGroupLabel(group) && (
-                                <p className="px-2.5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
+                                <p className="label px-2.5 pb-1 pt-3 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
                                     {group.label}
                                 </p>
                             )}
@@ -461,9 +461,7 @@ function NavFlyout({
                 "bg-primary text-primary-foreground dark:bg-popover dark:text-popover-foreground",
             )}
         >
-            <p className="px-[9px] pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] opacity-70">
-                {label}
-            </p>
+            <p className="label px-[9px] pb-1.5 pt-1 opacity-70">{label}</p>
             {rows.map((child) => {
                 const on = isNavChildCurrent(pathname, child.href, rows);
                 return (

@@ -44,10 +44,7 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
                 aria-labelledby="home-reviews"
                 className="grid min-w-0 gap-[9px]"
             >
-                <h2
-                    id="home-reviews"
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id="home-reviews" className="label">
                     Sent to you for review
                 </h2>
                 {rows.length > 0 ? (

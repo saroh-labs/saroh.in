@@ -83,9 +83,7 @@ export function WeekColumns({
                             )}
                         >
                             <span className="flex items-baseline gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                    {col.dow}
-                                </span>
+                                <span className="label">{col.dow}</span>
                                 <span
                                     className={cn(
                                         "font-display text-[17px] font-semibold",

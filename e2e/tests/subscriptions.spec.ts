@@ -301,7 +301,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             page.getByRole("heading", { level: 1, name: PLAN }),
         ).toBeVisible();
         await expect(
-            page.getByRole("main").getByText("Open", { exact: true }),
+            page.getByRole("main").getByText("Live", { exact: true }),
         ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "Who pays what" }),

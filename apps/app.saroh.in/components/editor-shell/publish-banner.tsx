@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useRef } from "react";
 
-import { Pill } from "@/components/subscriptions/pill";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     ShellActions,
     ShellTone,
@@ -64,7 +64,7 @@ export function PublishBanner({
                         <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">
                             {title}
                         </h1>
-                        <Pill tone={pill.tone}>{pill.label}</Pill>
+                        <StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                         <div

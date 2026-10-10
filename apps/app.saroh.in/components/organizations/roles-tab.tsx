@@ -22,6 +22,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
@@ -241,9 +242,7 @@ function ListSection({
 }) {
     return (
         <div className="border-b border-border last:border-b-0">
-            <p className="px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label px-[15px] py-[11px]">{label}</p>
             {children}
         </div>
     );
@@ -406,13 +405,13 @@ function RoleDetail({
                         {role.label}
                     </h2>
                     {role.system ? null : (
-                        <span className="ml-auto rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                        <StatusBadge tone="neutral" className="ml-auto">
                             {held === 0
                                 ? "Nobody holds it yet"
                                 : held === 1
                                   ? "1 person holds it"
                                   : `${held} people hold it`}
-                        </span>
+                        </StatusBadge>
                     )}
                 </div>
                 <p className="mt-[9px] text-[12.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
@@ -446,7 +445,7 @@ function RoleDetail({
                         return (
                             <section key={group} className="pt-3">
                                 <div className="flex items-baseline justify-between pb-1.5">
-                                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                    <h3 className="label">
                                         {GROUP_LABEL[group] ?? group}
                                     </h3>
                                     <span className="text-[11px] tabular-nums text-muted-foreground">

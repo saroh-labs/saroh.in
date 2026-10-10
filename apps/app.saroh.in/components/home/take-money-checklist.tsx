@@ -7,6 +7,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { useId, useSyncExternalStore } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     ReadyAside,
     ReadyChecklist,
@@ -203,9 +204,7 @@ function AsideRow({ item }: { item: ReadyAside }) {
             <span className="grid min-w-0 flex-1 gap-0.5">
                 <span className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
                     {item.label}
-                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
-                        {item.comesWith}
-                    </span>
+                    <StatusBadge tone="neutral">{item.comesWith}</StatusBadge>
                 </span>
                 <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
                     {item.why}

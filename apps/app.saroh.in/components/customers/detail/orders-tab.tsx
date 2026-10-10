@@ -15,7 +15,8 @@ import {
 } from "@/lib/customer-workspace/view";
 import { money } from "@/lib/subscriptions/view";
 
-import { Chips, Empty, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Chips, Empty } from "./parts";
 
 const COLS =
     "grid grid-cols-[70px_minmax(0,1.6fr)_90px_90px_100px_90px] gap-2.5";
@@ -66,7 +67,7 @@ export function OrdersTab({
             <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5 max-[759px]:hidden">
                 <div className="min-w-[560px]">
                     <div
-                        className={`${COLS} border-b border-foreground/10 pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground`}
+                        className={`${COLS} label border-b border-border pb-[7px] pt-2.5`}
                     >
                         <span>Order</span>
                         <span>What</span>
@@ -101,9 +102,9 @@ export function OrdersTab({
                                 {whenText(o.placedAt, timeZone, now)}
                             </span>
                             <span>
-                                <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                <StatusBadge tone={isOpen(o) ? "ok" : "off"}>
                                     {orderStatus(o)}
-                                </RowPill>
+                                </StatusBadge>
                             </span>
                         </div>
                     ))}
@@ -145,9 +146,11 @@ export function OrdersTab({
                                     <span className="font-mono">
                                         #{o.number}
                                     </span>
-                                    <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                    <StatusBadge
+                                        tone={isOpen(o) ? "ok" : "off"}
+                                    >
                                         {orderStatus(o)}
-                                    </RowPill>
+                                    </StatusBadge>
                                 </>
                             }
                             footer={

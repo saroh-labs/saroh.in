@@ -14,8 +14,7 @@ import {
     placeWords,
 } from "@/lib/qr/words";
 
-const HEAD =
-    "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const HEAD = "label";
 
 /** A cell's name: said to a screen reader at the desk, shown on a phone. */
 function CellName({ children }: { children: React.ReactNode }) {

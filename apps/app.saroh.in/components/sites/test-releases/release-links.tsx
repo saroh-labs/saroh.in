@@ -69,9 +69,7 @@ export function ReleaseLinks({
 
     return (
         <section aria-label="Links" className="grid gap-1.5">
-            <h4 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Links
-            </h4>
+            <h4 className="label">Links</h4>
             {fresh?.url ? (
                 <LinkBox url={fresh.url} label="New link — shown once" />
             ) : null}

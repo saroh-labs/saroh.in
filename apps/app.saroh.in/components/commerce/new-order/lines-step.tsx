@@ -52,9 +52,7 @@ export function LinesStep({
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="flex items-baseline px-3.5 pb-2 pt-[13px]">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Items
-                </h3>
+                <h3 className="label flex-1">Items</h3>
                 <span className="text-[12px] text-muted-foreground">
                     {itemCount(lines)}
                 </span>

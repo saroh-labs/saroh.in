@@ -52,7 +52,7 @@ export function AttentionTags({
 }
 
 const PILL =
-    "inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-semibold uppercase tracking-[0.04em]";
+    "inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-semibold";
 
 /** One tag: the design's danger pill, uppercase, with its kind in words. */
 export function AttentionTag({

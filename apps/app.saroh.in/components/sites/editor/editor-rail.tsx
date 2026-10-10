@@ -136,7 +136,7 @@ export function EditorRail({
                         />
                     ) : (
                         <>
-                            <p className="px-4 pb-1 pt-4 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                            <p className="label px-4 pb-1 pt-4">
                                 {`${sections.length + 2} blocks`}
                             </p>
                             <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pl-4">
@@ -327,7 +327,7 @@ export function EditorRail({
                                                 <span
                                                     id={`${railId}-hidden-${index}`}
                                                     title="Not shown on the site"
-                                                    className="shrink-0 rounded bg-muted px-1.5 py-px text-[0.625rem] font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+                                                    className="label shrink-0 rounded bg-muted px-1.5 py-px"
                                                 >
                                                     Hidden
                                                 </span>

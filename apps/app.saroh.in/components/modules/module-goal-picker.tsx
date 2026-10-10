@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
@@ -303,9 +304,9 @@ export function ModuleGoalPicker({
                                             {goal.title}
                                         </span>
                                         {goal.moduleKey === suggested ? (
-                                            <span className="rounded-full bg-highlight-subtle px-2 py-0.5 text-[11px] font-medium text-highlight-subtle-foreground">
+                                            <StatusBadge tone="active">
                                                 Suggested
-                                            </span>
+                                            </StatusBadge>
                                         ) : null}
                                     </span>
                                     <span
@@ -330,9 +331,7 @@ export function ModuleGoalPicker({
 
             {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
-                    <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Already on
-                    </h2>
+                    <h2 className="label">Already on</h2>
                     <ul className="flex flex-wrap gap-2">
                         {available
                             .filter((g) => alreadyOn.has(g.moduleKey))

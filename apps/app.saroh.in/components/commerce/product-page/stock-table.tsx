@@ -1,11 +1,11 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { ProductDetail } from "@/lib/products/service";
 import type {
     ProductStock,
@@ -14,13 +14,13 @@ import type {
 } from "@/lib/stock/product-stock";
 import { shelfName, warnsAt } from "@/lib/stock/product-stock";
 
-/** The design's pills: in stock green, "Only N left" saffron, short or sold out red. */
+/** In stock green, "Only N left" the warning tint, short or sold out red. */
 export const TONE_BADGE: Record<
     ShelfTone,
-    "success" | "draft" | "error" | "neutral"
+    "success" | "warning" | "error" | "neutral"
 > = {
     ok: "success",
-    low: "draft",
+    low: "warning",
     bad: "error",
     muted: "neutral",
 };
@@ -80,7 +80,7 @@ export function StockTable({
                             role="row"
                             className={cn(
                                 GRID,
-                                "border-b border-border pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+                                "label border-b border-border pb-[7px] pt-2.5",
                             )}
                         >
                             <span role="columnheader">
@@ -511,12 +511,5 @@ export function StockCards({
 }
 
 export function ShelfBadge({ tone, text }: { tone: ShelfTone; text: string }) {
-    return (
-        <Badge
-            variant={TONE_BADGE[tone]}
-            className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-        >
-            {text}
-        </Badge>
-    );
+    return <StatusBadge tone={TONE_BADGE[tone]}>{text}</StatusBadge>;
 }

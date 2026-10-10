@@ -188,7 +188,7 @@ export function DayPanel({
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
                     <section key={layer.key} className="mt-2">
-                        <h3 className="mb-1 flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <h3 className="label mb-1 flex items-center gap-[7px]">
                             <span
                                 aria-hidden
                                 className={cn(
@@ -246,7 +246,8 @@ export function DayPanel({
                                                             ? "error"
                                                             : "draft"
                                                     }
-                                                    className="shrink-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                                                    size="sm"
+                                                    className="shrink-0"
                                                 >
                                                     {line.flag.label}
                                                 </Badge>

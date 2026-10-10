@@ -2,7 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 
-import { InvoicePill } from "@/components/invoices/invoice-pill";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { Invoice } from "@/lib/invoices/service";
@@ -79,7 +79,7 @@ export function InvoiceRow({
                 </span>
             </span>
             <span className="min-w-0">
-                <InvoicePill label={pill.label} variant={pill.variant} />
+                <StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>
                 <span
                     className={cn(
                         "mt-[3px] block text-[12px]",

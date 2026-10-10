@@ -115,7 +115,7 @@ export function CatalogueHeader({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            <DropdownMenuLabel className="label">
                                 Add it to
                             </DropdownMenuLabel>
                             {stores.map((s) => (

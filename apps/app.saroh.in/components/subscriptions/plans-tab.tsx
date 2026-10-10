@@ -20,9 +20,9 @@ import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
 import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
-import { Pill } from "./pill";
 
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 
@@ -216,10 +216,14 @@ function PlanCard({
                 >
                     {card.name}
                 </Link>
-                {card.archived ? <Pill tone="off">Archived</Pill> : null}
-                {card.draft ? <Pill tone="off">Draft</Pill> : null}
+                {card.archived ? (
+                    <StatusBadge tone="off">Archived</StatusBadge>
+                ) : null}
+                {card.draft ? (
+                    <StatusBadge tone="off">Draft</StatusBadge>
+                ) : null}
                 {card.unpublished ? (
-                    <Pill tone="accent">Unpublished changes</Pill>
+                    <StatusBadge tone="accent">Unpublished changes</StatusBadge>
                 ) : null}
             </div>
             <p className="mt-[3px] min-h-9 text-[12.5px] text-muted-foreground">

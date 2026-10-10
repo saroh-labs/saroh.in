@@ -193,9 +193,7 @@ export function SplitPanel({
     return (
         <>
             {eyebrow ? (
-                <p className="mb-[15px] text-[11px] font-semibold uppercase tracking-[0.1em] opacity-70">
-                    {eyebrow}
-                </p>
+                <p className="label mb-[15px] opacity-70">{eyebrow}</p>
             ) : null}
             <p className="mb-3.5 text-pretty font-display text-[25px] font-semibold leading-[1.25] tracking-[-0.025em]">
                 {heading}

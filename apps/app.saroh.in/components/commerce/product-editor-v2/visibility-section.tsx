@@ -20,7 +20,7 @@ import { SectionCard } from "./section-card";
 
 const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
     { value: "DRAFT", label: "Draft", note: "Only the team can see it." },
-    { value: "PUBLISHED", label: "Published", note: "Customers can buy it." },
+    { value: "PUBLISHED", label: "Live", note: "Customers can buy it." },
     {
         value: "ARCHIVED",
         label: "Archived",

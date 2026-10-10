@@ -181,9 +181,7 @@ function TurnOnBody({
             >
                 {comes.length > 0 ? (
                     <section className="grid gap-1.5">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            What comes with it
-                        </h3>
+                        <h3 className="label">What comes with it</h3>
                         <ul className="grid gap-1 text-pretty text-[12.5px] leading-normal text-foreground">
                             {comes.map((line) => (
                                 <li key={line}>{line}</li>

@@ -35,8 +35,8 @@ import {
     sortCharges,
 } from "@/lib/subscriptions/view";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { PaymentsCrumbs } from "../payments-crumbs";
-import { Pill } from "../pill";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
 import { ActionSheet } from "./action-sheets";
@@ -282,7 +282,9 @@ export function SubscriptionDetail({
                             <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em]">
                                 {name}
                             </h1>
-                            <Pill tone={head.pill.tone}>{head.pill.label}</Pill>
+                            <StatusBadge tone={head.pill.tone}>
+                                {head.pill.label}
+                            </StatusBadge>
                         </div>
                         <p className="mt-1 text-[12.5px] text-muted-foreground">
                             {[
@@ -300,9 +302,7 @@ export function SubscriptionDetail({
                         </p>
                     </div>
                     <div className="flex-[0_1_auto] text-right">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Next charge
-                        </div>
+                        <div className="label">Next charge</div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
                             {head.big}
                         </div>

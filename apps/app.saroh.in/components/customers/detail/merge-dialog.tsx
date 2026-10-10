@@ -234,7 +234,7 @@ export function MergeDialog({
                             {COLUMNS.map((c) => (
                                 <span
                                     key={c}
-                                    className="min-w-0 break-words text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+                                    className="label min-w-0 break-words"
                                 >
                                     {columnHeading(
                                         loaded.previews,

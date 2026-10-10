@@ -90,7 +90,7 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
             ? { label: "Draft", tone: "off" }
             : archived
               ? { label: "Archived", tone: "off" }
-              : { label: "Open", tone: "ok" },
+              : { label: "Live", tone: "ok" },
         subline: parts.join(" · "),
         archiveLabel: draft
             ? "Finish draft"

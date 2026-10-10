@@ -8,7 +8,8 @@ import { howWords } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
 import type { OrderRead } from "@/lib/orders/read";
 
-import { FOCUS, StatusPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { FOCUS } from "./parts";
 
 /** "‹ Orders / #1063" — the bar above the order, back to the list. */
 export function OrderCrumbs({ number }: { number: string }) {
@@ -72,9 +73,9 @@ export function OrderHeading({
                     <h1 className="m-0 font-display text-[28px] font-semibold tracking-[-0.03em]">
                         {number}
                     </h1>
-                    <StatusPill tone={standing.tone}>
+                    <StatusBadge size="default" tone={standing.tone}>
                         {standing.label}
-                    </StatusPill>
+                    </StatusBadge>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
                     {age ? (

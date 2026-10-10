@@ -21,10 +21,10 @@ import {
 } from "./panel-state";
 
 const STATE = {
-    ACTIVE: { label: "Applies now", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "neutral" },
+    ACTIVE: { label: "Live", variant: "success" },
+    SCHEDULED: { label: "Scheduled", variant: "info" },
     EXPIRED: { label: "Ended", variant: "neutral" },
-    EXHAUSTED: { label: "Used up", variant: "neutral" },
+    EXHAUSTED: { label: "Ended", variant: "neutral" },
 } as const;
 
 /**
@@ -89,10 +89,7 @@ export function ProductDiscountsTab({
                                     <span className="font-mono text-[13px] font-medium">
                                         {d.code}
                                     </span>
-                                    <Badge
-                                        variant={state.variant}
-                                        className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-                                    >
+                                    <Badge variant={state.variant} size="sm">
                                         {state.label}
                                     </Badge>
                                     <Link

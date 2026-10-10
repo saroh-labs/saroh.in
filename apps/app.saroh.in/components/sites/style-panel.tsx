@@ -127,9 +127,7 @@ export function StylePanel({
                     older API that serves no pairs shows no choice. */}
                 {fontPairs.length > 0 ? (
                     <section className="space-y-3">
-                        <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Typeface
-                        </h3>
+                        <h3 className="label">Typeface</h3>
                         <div
                             role="radiogroup"
                             aria-label="Typeface"
@@ -171,9 +169,7 @@ export function StylePanel({
                         fontPairs.length > 0 && "border-t pt-4",
                     )}
                 >
-                    <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Colour
-                    </h3>
+                    <h3 className="label">Colour</h3>
                     {colourways.length > 0 ? (
                         <div
                             role="radiogroup"
@@ -293,9 +289,7 @@ export function StylePanel({
                 </section>
 
                 <section className="space-y-3 border-t pt-4">
-                    <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Spacing and shape
-                    </h3>
+                    <h3 className="label">Spacing and shape</h3>
                     {options.scalars.map((scalar) => {
                         const value = style.scalars[scalar.key] ?? scalar.min;
                         // A template may set a value under the merchant's

@@ -178,9 +178,7 @@ function Group({
     if (closedDoor) {
         return (
             <div className={spaced ? "mt-5" : undefined}>
-                <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </p>
+                <p className="label sa-rise mb-2">{label}</p>
                 {note ? (
                     <p className="sa-rise -mt-1 mb-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         {note}
@@ -217,9 +215,7 @@ function Group({
     }
     return (
         <div className={spaced ? "mt-5" : undefined}>
-            <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label sa-rise mb-2">{label}</p>
             {note ? (
                 <p className="sa-rise -mt-1 mb-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                     {note}

@@ -145,9 +145,7 @@ export function RescheduleBooking({
                     <div className="grid gap-4">
                         {byDay.map(([day, daySlots]) => (
                             <div key={day}>
-                                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                    {day}
-                                </h3>
+                                <h3 className="label">{day}</h3>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {daySlots.map((slot) => (
                                         <button

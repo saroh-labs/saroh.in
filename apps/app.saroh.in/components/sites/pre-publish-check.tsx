@@ -340,7 +340,7 @@ function Group({
 }) {
     return (
         <section>
-            <h2 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="label flex items-baseline gap-2">
                 {title}
                 {note === undefined ? null : (
                     <span className="font-mono text-[11px] normal-case tracking-normal opacity-70">

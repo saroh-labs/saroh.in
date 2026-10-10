@@ -72,10 +72,7 @@ export function PayLinkPanel({
             {link.ok ? (
                 <>
                     <div>
-                        <label
-                            htmlFor={id}
-                            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                        >
+                        <label htmlFor={id} className="label mb-1.5 block">
                             Pay link
                         </label>
                         <Input

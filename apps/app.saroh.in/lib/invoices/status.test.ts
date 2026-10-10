@@ -220,7 +220,7 @@ function inv(over: Partial<Invoice> = {}): Invoice {
 
 describe("the Invoices design's words", () => {
     it("says Due for an issued invoice and Overdue once past its date", () => {
-        expect(invoicePill(inv())).toEqual({ label: "Due", variant: "draft" });
+        expect(invoicePill(inv())).toEqual({ label: "Due", variant: "active" });
         expect(invoicePill(inv({ standing: "OVERDUE" }))).toEqual({
             label: "Overdue",
             variant: "error",

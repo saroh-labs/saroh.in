@@ -38,6 +38,7 @@ import {
     localDateOf,
     localMinuteOf,
     paidText,
+    STATE_LABEL,
     whoFor,
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
@@ -51,8 +52,9 @@ import {
     visitToBook,
 } from "@/lib/services/treatment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ClassSeats } from "./class-seats";
-import { Eyebrow, StatePill } from "./parts";
+import { Eyebrow, STATE_TONE } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,
@@ -165,7 +167,9 @@ function Body({
                             {staff ? ` · ${staff.name}` : ""}
                         </SheetDescription>
                     </div>
-                    <StatePill state={block.state} />
+                    <StatusBadge tone={STATE_TONE[block.state]}>
+                        {STATE_LABEL[block.state]}
+                    </StatusBadge>
                 </div>
             </SheetHeader>
             <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-[18px] py-4">

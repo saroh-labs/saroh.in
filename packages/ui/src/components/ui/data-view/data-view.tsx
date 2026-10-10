@@ -243,7 +243,7 @@ export function DataView<TRow>({
                     <thead>
                         {/* A faint head fill and a stronger rule, as the
                                 applied Products screen draws it. */}
-                        <tr className="h-10 border-b border-border bg-foreground/[0.03]">
+                        <tr className="h-10 border-b border-border bg-muted">
                             {selectable ? (
                                 <th
                                     scope="col"
@@ -291,7 +291,7 @@ export function DataView<TRow>({
                                                 : undefined
                                         }
                                         className={cn(
-                                            "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                                            "label whitespace-nowrap px-[14px] text-left",
                                             col.numeric && "text-right",
                                         )}
                                     >
@@ -308,7 +308,7 @@ export function DataView<TRow>({
                                                     // harness found these;
                                                     // reading the filter row
                                                     // by hand did not.
-                                                    "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
+                                                    "inline-flex items-center gap-1 rounded-sm [font:inherit] [letter-spacing:inherit] [text-transform:inherit] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
                                                     active && "text-foreground",
                                                 )}
                                             >

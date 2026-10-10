@@ -127,7 +127,7 @@ export function ProductOrdersTab({
                                 <tr
                                     className={cn(
                                         grid,
-                                        "border-b border-border pb-[7px] pt-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
+                                        "label border-b border-border pb-[7px] pt-2.5 text-left text-muted-foreground/80",
                                     )}
                                 >
                                     <th scope="col">Order</th>
@@ -190,7 +190,7 @@ export function ProductOrdersTab({
                                                         ? "warning"
                                                         : "neutral"
                                                 }
-                                                className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                size="sm"
                                             >
                                                 {ORDER_STATUS_LABEL[o.status] ??
                                                     o.status}
@@ -220,7 +220,8 @@ export function ProductOrdersTab({
                                 aside={
                                     <Badge
                                         variant={o.open ? "warning" : "neutral"}
-                                        className="flex-none whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                        size="sm"
+                                        className="flex-none"
                                     >
                                         {ORDER_STATUS_LABEL[o.status] ??
                                             o.status}

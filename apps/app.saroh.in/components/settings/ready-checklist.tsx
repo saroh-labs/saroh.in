@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     ReadyChecklist as Checklist,
     ReadyStep,
@@ -113,9 +114,9 @@ function Steps({ list }: { list: Checklist }) {
                             <span className="grid min-w-0 flex-[1_1_220px] gap-px">
                                 <span className="flex flex-wrap items-center gap-2">
                                     {item.label}
-                                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
+                                    <StatusBadge tone="neutral">
                                         {item.comesWith}
-                                    </span>
+                                    </StatusBadge>
                                 </span>
                                 <span className="text-pretty text-[12.5px] leading-[1.45] text-foreground/80">
                                     {item.why}

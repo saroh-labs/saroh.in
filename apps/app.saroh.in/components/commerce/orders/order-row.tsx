@@ -72,7 +72,7 @@ export function OrderGridHead({
         <div
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
-                "h-10 rounded-t-[11px] border-b border-border bg-muted text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                "label h-10 rounded-t-[11px] border-b border-border bg-muted",
             )}
         >
             {select ? (

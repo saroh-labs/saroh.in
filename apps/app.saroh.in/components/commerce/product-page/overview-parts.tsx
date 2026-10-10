@@ -1,9 +1,9 @@
-import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { DetailTag } from "@/lib/products/overview-words";
 
 /** Small pieces the product page's Overview is built from, at the design's sizes. */
@@ -179,23 +179,18 @@ export function PanelLine({
 
 /** On the shop · Team only · Hidden until filled in. */
 export function ShownTag({ tag }: { tag: DetailTag }) {
-    if (tag === "Hidden until filled in") {
-        return (
-            <Badge
-                variant="tag"
-                className="shrink-0 whitespace-nowrap rounded-full border-dashed px-[7px] py-px text-[11px] font-semibold text-muted-foreground"
-            >
-                {tag}
-            </Badge>
-        );
-    }
     return (
-        <Badge
-            variant={tag === "On the shop" ? "success" : "neutral"}
-            className="shrink-0 whitespace-nowrap rounded-full px-[7px] py-px text-[11px] font-semibold"
+        <StatusBadge
+            tone={
+                tag === "Hidden until filled in"
+                    ? "draft"
+                    : tag === "On the shop"
+                      ? "success"
+                      : "neutral"
+            }
         >
             {tag}
-        </Badge>
+        </StatusBadge>
     );
 }
 

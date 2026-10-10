@@ -68,7 +68,7 @@ export function LevelsTable({
                 <div
                     className={cn(
                         DESK_GRID,
-                        "gap-3 border-b border-border py-[11px] pb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground max-[759px]:hidden",
+                        "label gap-3 border-b border-border py-[11px] pb-2 max-[759px]:hidden",
                     )}
                 >
                     <span className="sticky left-0 z-10 -ml-4 bg-card pl-4">

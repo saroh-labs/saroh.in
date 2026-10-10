@@ -25,6 +25,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ProviderSetupDialog } from "./provider-setup-dialog";
 
 /*
@@ -157,7 +158,7 @@ export function ProviderRowView({
                             {!available ? (
                                 <span
                                     className={cn(
-                                        "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
+                                        "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
                                         PILL[entry.state].tone,
                                     )}
                                 >
@@ -193,9 +194,9 @@ export function ProviderRowView({
                     {(available || entry.state === "DISCONNECTED") &&
                     entry.lock ? (
                         <>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                            <StatusBadge tone="neutral">
                                 {entry.lock.comesWith}
-                            </span>
+                            </StatusBadge>
                             <Button asChild variant="outline" size="sm">
                                 <Link href={entry.lock.href}>
                                     {entry.lock.cta}
@@ -299,7 +300,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                         </span>
                         <span
                             className={cn(
-                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
+                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
                                 pill.tone,
                             )}
                         >

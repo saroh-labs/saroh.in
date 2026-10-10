@@ -123,9 +123,7 @@ export function TestReleasesPanel({
                                 aria-label="Earlier"
                                 className="grid gap-2"
                             >
-                                <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                    Earlier
-                                </h3>
+                                <h3 className="label">Earlier</h3>
                                 <ul className="grid divide-y rounded-xl border">
                                     {shownEarlier.map((release) => {
                                         const status = releaseStatusCopy(

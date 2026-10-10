@@ -133,10 +133,7 @@ export function VariantStockTable({
     return (
         <>
             <div
-                className={cn(
-                    GRID,
-                    "pb-[5px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
-                )}
+                className={cn(GRID, "label pb-[5px] text-muted-foreground/80")}
             >
                 <span>Variant</span>
                 <span>On hand</span>

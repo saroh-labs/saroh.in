@@ -112,10 +112,7 @@ export function Locked({ children }: { children: ReactNode }) {
  */
 export function ComingSoon() {
     return (
-        <Badge
-            variant="draft"
-            className="flex-none px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-        >
+        <Badge variant="draft" size="sm" className="flex-none">
             Coming soon
         </Badge>
     );

@@ -244,9 +244,7 @@ function NewOrderBody({
             <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-3.5 overflow-y-auto px-[18px] py-4">
                 {stores.length > 1 ? (
                     <div>
-                        <div className="mb-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Taken at
-                        </div>
+                        <div className="label mb-[7px]">Taken at</div>
                         <div
                             role="radiogroup"
                             aria-label="Location"

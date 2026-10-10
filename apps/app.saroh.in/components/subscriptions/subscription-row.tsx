@@ -2,6 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import {
     initials,
@@ -12,8 +13,6 @@ import {
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
-
-import { Pill } from "./pill";
 
 /** A tab's count; a failed renewal's count is red while it has any. */
 export function Count({ n, danger = false }: { n: number; danger?: boolean }) {
@@ -84,7 +83,7 @@ export function SubscriptionRow({
                 </span>
             </span>
             <span className="min-w-0 flex-[1_1_110px]">
-                <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                <StatusBadge tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</StatusBadge>
             </span>
             <span
                 className={cn(

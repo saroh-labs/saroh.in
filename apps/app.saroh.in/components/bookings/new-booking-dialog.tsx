@@ -470,7 +470,7 @@ export function NewBookingDialog({
                                     >
                                         {byDay.map(([day, daySlots]) => (
                                             <div key={day}>
-                                                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                                <div className="label">
                                                     {day}
                                                 </div>
                                                 <div className="mt-1.5 flex flex-wrap gap-1.5">

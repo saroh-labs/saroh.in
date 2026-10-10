@@ -21,7 +21,8 @@ import {
     packTabRows,
 } from "@/lib/customer-workspace/packs";
 
-import { Bar, CARD, Chips, Empty, Failed, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Bar, CARD, Chips, Empty, Failed } from "./parts";
 
 /** What selling them a pack needs; null when this viewer may not sell. */
 export interface PackSale {
@@ -240,9 +241,9 @@ function PackItem({
                                         <span className="min-w-0 flex-[1_1_140px] font-semibold">
                                             {u.what}
                                         </span>
-                                        <RowPill tone={u.state.tone}>
+                                        <StatusBadge tone={u.state.tone}>
                                             {u.state.label}
-                                        </RowPill>
+                                        </StatusBadge>
                                     </Link>
                                 </li>
                             ))}

@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/shared/status-badge";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import { providerName } from "@/lib/payments/providers";
@@ -36,9 +37,9 @@ export function OrderPayments({
                             {providerName(intent.provider)}
                         </span>
                         <span className="flex items-center gap-2">
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                            <StatusBadge tone="neutral">
                                 {formatStatus(intent.status)}
-                            </span>
+                            </StatusBadge>
                             <span className="font-display font-semibold tabular-nums">
                                 {formatMoney(
                                     intent.amountCents,

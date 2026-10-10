@@ -256,10 +256,7 @@ export function ContactsView({
             cell: (c) => {
                 const label = c.source ? contactSourceLabel(c.source) : null;
                 return label ? (
-                    <Badge
-                        variant="secondary"
-                        className="whitespace-nowrap text-[11px] font-medium"
-                    >
+                    <Badge variant="secondary" size="sm">
                         {label}
                     </Badge>
                 ) : (

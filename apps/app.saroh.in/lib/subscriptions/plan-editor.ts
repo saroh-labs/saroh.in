@@ -407,7 +407,7 @@ export function publishedText(
 
 export const PLAN_COPY: EditorCopy = {
     noun: "plan",
-    liveLabel: "Open",
+    liveLabel: "Live",
     liveClean: "Open to new sign-ups · no changes",
     draftSaved: "Draft · saved — nobody can join it yet",
     draftFirstSaved:

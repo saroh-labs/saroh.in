@@ -169,7 +169,6 @@ export function SiteVersions({
                                             <Badge
                                                 key={b.label}
                                                 variant={BADGE[b.tone]}
-                                                className="whitespace-nowrap"
                                             >
                                                 {b.label}
                                             </Badge>
@@ -364,10 +363,7 @@ function ScheduledList({
                                         <span className="text-sm font-medium [overflow-wrap:anywhere]">
                                             {releaseTitle(release)}
                                         </span>
-                                        <Badge
-                                            variant="info"
-                                            className="whitespace-nowrap"
-                                        >
+                                        <Badge variant="info">
                                             {status.label}
                                         </Badge>
                                     </div>

@@ -57,9 +57,7 @@ export function BusinessPrintPreview({
             )}
         >
             <div className="flex items-baseline gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    How it prints
-                </span>
+                <span className="label">How it prints</span>
                 {live ? (
                     <span className="text-[11.5px] text-brand-subtle-foreground">
                         Showing your unsaved edit
@@ -68,7 +66,7 @@ export function BusinessPrintPreview({
             </div>
             <div className="rounded-[10px] border border-border bg-[#FFFDF6] px-[18px] pb-4 pt-[18px] text-[12px] leading-normal text-[#1C1C1A] shadow-[0_1px_2px_rgba(28,28,26,0.06)]">
                 <div className="mb-2.5 flex items-baseline gap-2 border-b border-[rgba(28,28,26,0.12)] pb-2">
-                    <span className="text-[10.5px] font-bold uppercase tracking-[0.12em]">
+                    <span className="label">
                         {registered ? "Tax invoice" : "Invoice"}
                     </span>
                     <span className="ml-auto font-mono text-[11px]">

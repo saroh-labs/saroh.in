@@ -84,10 +84,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
             <div className="flex flex-wrap items-baseline gap-[9px]">
-                <h2
-                    id={headingId}
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id={headingId} className="label">
                     Today
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
@@ -163,7 +160,8 @@ function TodayLine({
                     <Badge
                         key={flag}
                         variant="error"
-                        className="mt-[3px] justify-self-start px-2 py-0.5 text-[11.5px] font-semibold"
+                        size="sm"
+                        className="mt-[3px] justify-self-start"
                     >
                         {flag}
                     </Badge>

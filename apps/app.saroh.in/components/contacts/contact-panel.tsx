@@ -33,7 +33,7 @@ export function ContactPanelSection({
     return (
         <section className="overflow-hidden rounded-[12px] border border-border bg-card">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-muted px-4 py-[9px]">
-                <h2 className="py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <h2 className="label py-1">
                     {title}
                     {count === null ? "" : ` · ${count}`}
                 </h2>

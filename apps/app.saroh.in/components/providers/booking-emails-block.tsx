@@ -45,10 +45,7 @@ export function BookingEmailsBlock({
     const variant = urgent ? "default" : "outline";
     return (
         <section aria-labelledby={id}>
-            <h3
-                id={id}
-                className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h3 id={id} className="label mb-2">
                 Booking emails
             </h3>
             <div className="overflow-hidden rounded-xl border border-border bg-card px-4 py-[13px] min-[760px]:px-[18px]">
@@ -60,7 +57,7 @@ export function BookingEmailsBlock({
                             </span>
                             <span
                                 className={cn(
-                                    "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
+                                    "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
                                     PILL[b.tone],
                                 )}
                             >

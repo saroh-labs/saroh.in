@@ -195,7 +195,7 @@ export function SkuTab({
                 What your variants would be called
             </p>
             <div className="overflow-hidden rounded-[12px] border border-border bg-card">
-                <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5 border-b border-border/70 px-4 py-[9px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+                <div className="label grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5 border-b border-border/70 px-4 py-[9px] text-muted-foreground/80">
                     <span>Variant</span>
                     <span>Today</span>
                     <span>Suggested</span>

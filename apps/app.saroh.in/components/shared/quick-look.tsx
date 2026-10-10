@@ -171,11 +171,7 @@ export function QuickLookCard({
                 className,
             )}
         >
-            {label ? (
-                <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </h3>
-            ) : null}
+            {label ? <h3 className="label mb-1.5">{label}</h3> : null}
             {children}
         </section>
     );

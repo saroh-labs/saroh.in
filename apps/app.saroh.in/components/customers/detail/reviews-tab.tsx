@@ -15,6 +15,7 @@ import { stars } from "@/lib/product-reviews/describe";
 import type { Review } from "@/lib/product-reviews/service";
 import { productHref } from "@/lib/products/links";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Empty } from "./parts";
 
 /** A text action under a review: pointer, hover, focus and pressed. */
@@ -107,9 +108,9 @@ export function ReviewsTab({
                                 </p>
                             )}
                             {hidden ? (
-                                <span className="mt-1.5 inline-block rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
+                                <StatusBadge tone="neutral" className="mt-1.5">
                                     Hidden from the shop
-                                </span>
+                                </StatusBadge>
                             ) : null}
                             {r.reply ? (
                                 <p className="mt-2 rounded-lg bg-muted/60 px-[11px] py-2 text-[13px] leading-[1.5] text-foreground/75">

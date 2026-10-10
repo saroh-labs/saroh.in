@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { OrderReadLine } from "@/lib/orders/read";
 import { productHref } from "@/lib/products/links";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { FOCUS, PanelTitle } from "./parts";
 
 /**
@@ -100,9 +101,12 @@ export function OrderItems({
                                     </div>
                                 ) : null}
                                 {clashes[l.id] ? (
-                                    <div className="mt-[5px] inline-block rounded-full bg-destructive-subtle px-2 py-0.5 text-[11.5px] font-bold text-destructive-subtle-foreground">
+                                    <StatusBadge
+                                        tone="error"
+                                        className="mt-[5px]"
+                                    >
                                         {clashes[l.id]}
-                                    </div>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             <span className="whitespace-nowrap text-[12.5px] tabular-nums text-muted-foreground">

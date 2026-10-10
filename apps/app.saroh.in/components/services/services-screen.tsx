@@ -7,9 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
@@ -178,15 +178,15 @@ export function ServicesScreen({
                                         {s.name}
                                     </Link>
                                     {live ? null : (
-                                        <StatePill
-                                            label="Paused"
-                                            tone="neutral"
+                                        <StatusBadge
+                                            thing="service"
+                                            status="NOT_TAKING"
                                         />
                                     )}
-                                    <StatePill
-                                        label={isClass ? "Class" : "One-to-one"}
-                                        tone={isClass ? "draft" : "success"}
-                                    />
+                                    {/* A kind, not a state: the outline tag. */}
+                                    <StatusBadge tone="tag">
+                                        {isClass ? "Class" : "One-to-one"}
+                                    </StatusBadge>
                                 </div>
                                 <div
                                     className={cn(

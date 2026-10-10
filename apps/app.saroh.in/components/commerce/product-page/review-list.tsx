@@ -10,6 +10,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
@@ -82,9 +83,9 @@ export function ReviewList({
                                     />
                                 </span>
                                 {hidden ? (
-                                    <span className="rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
+                                    <StatusBadge tone="neutral">
                                         Hidden from the shop
-                                    </span>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             {r.body ? (
