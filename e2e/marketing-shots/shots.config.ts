@@ -855,15 +855,20 @@ const CREATE_BUSINESS_SHOTS: Shot[] = [
 
 const NW_TAX = "/settings/organization?section=tax";
 
-/** GST switched on and a GSTIN typed, never saved. */
+/** The GST row's Change, which opens its sheet. */
+const GST_CHANGE = "#business-gst-edit";
+
+/** In the GST row's sheet: GST switched on and a GSTIN typed, never saved. */
 const GST_ON: Step[] = [
-    { click: '#business-panel button:text-is("Edit")' },
-    { click: '[role="switch"][aria-label="GST-registered"]' },
+    { click: GST_CHANGE },
+    { waitFor: '[role="dialog"]' },
+    { click: '[role="dialog"] [role="switch"][aria-label="GST-registered"]' },
     {
-        fill: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        fill: '[role="dialog"] input[placeholder="29ABCDE1234F1ZW"]',
         value: "29AAGCN4821K1Z5",
     },
-    { click: '[role="tab"]:text-is("Tax and invoices")' },
+    // Out of the field, so its parts are checked as a whole.
+    { click: '[role="dialog"] h2' },
 ];
 
 const GSTIN_SHOTS: Shot[] = [
@@ -873,8 +878,8 @@ const GSTIN_SHOTS: Shot[] = [
         role: "owner",
         route: NW_TAX,
         viewport: HELP_DESK,
-        mark: '#business-panel button:text-is("Edit")',
-        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Edit button",
+        mark: GST_CHANGE,
+        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Change button on the GST row",
         caption: "Tax and invoices at Northwind Supply, not GST-registered yet",
     },
     {
@@ -886,11 +891,11 @@ const GSTIN_SHOTS: Shot[] = [
         steps: GST_ON,
         clip: {
             selector:
-                '#business-panel div.space-y-2:has(> div > button[role="switch"])',
-            until: '#business-panel div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
+                '[role="dialog"] div.space-y-2:has(> div > button[role="switch"])',
+            until: '[role="dialog"] div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
             pad: 14,
         },
-        mark: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        mark: '[role="dialog"] input[placeholder="29ABCDE1234F1ZW"]',
         alt: "Northwind Supply (demo shop) with GST-registered switched on and a GSTIN typed, its state code, PAN, entity, Z and check character shown under it",
         caption: "GST-registered on, and the GSTIN broken into its parts",
     },
@@ -912,8 +917,13 @@ const GSTIN_SHOTS: Shot[] = [
         route: NW_TAX,
         viewport: { width: 1440, height: 1000 },
         steps: GST_ON,
-        clip: { selector: 'aside[aria-label="How it prints"]', pad: 12 },
-        mark: 'aside[aria-label="How it prints"] span:text-is("Tax invoice")',
+        // The sheet's own preview, which follows the draft; the page's
+        // shows what is saved.
+        clip: {
+            selector: '[role="dialog"] aside[aria-label="How it prints"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] aside[aria-label="How it prints"] span:text-is("Tax invoice")',
         alt: "How it prints at Northwind Supply (demo shop), showing the unsaved edit: a tax invoice with the GSTIN and Karnataka",
         caption: "How it prints, now a tax invoice with the GSTIN",
     },
