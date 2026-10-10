@@ -1,6 +1,7 @@
 "use client";
 
 import { FormSheet } from "@/components/shared/form-sheet";
+import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -191,12 +192,7 @@ export function MergeDialog({
             fieldsClassName="block"
             footNote={
                 failure ? (
-                    <p
-                        role="alert"
-                        className="text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        {failure}
-                    </p>
+                    <Refusal>{failure}</Refusal>
                 ) : block && !preview?.refusals.length ? (
                     <p className="text-[12px] text-muted-foreground">{block}</p>
                 ) : null

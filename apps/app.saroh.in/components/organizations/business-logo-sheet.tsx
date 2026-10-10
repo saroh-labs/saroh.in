@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { useState } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -93,14 +94,7 @@ export function BusinessLogoSheet({
                 disabled={saving}
                 onBusy={setUploading}
             />
-            {refusal ? (
-                <p
-                    role="alert"
-                    className="text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    {refusal}
-                </p>
-            ) : null}
+            <Refusal>{refusal}</Refusal>
         </FormSheet>
     );
 }

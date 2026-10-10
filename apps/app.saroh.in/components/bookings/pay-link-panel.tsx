@@ -1,5 +1,7 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
+import { isRoleRefusal } from "@/lib/api/role-denied";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useId, useState } from "react";
@@ -7,6 +9,12 @@ import { useId, useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { createBookingPayLink } from "@/lib/services/actions";
 import { ShareLink } from "@saroh/ui/copy-button";
+
+/** After why the link wasn't made: the booking stands, and what to do. */
+const LINK_FAILED =
+    "The booking is made. Try again, or they can pay at the session.";
+/** The same for a role that can't make one: trying again won't help. */
+const LINK_REFUSED = "The booking is made. They can pay at the session.";
 
 /**
  * The pay link a booking got, or why it couldn't. `plan`: the business's
@@ -86,13 +94,7 @@ export function PayLinkPanel({
                     The booking is made; they can pay at the session.
                 </p>
             ) : (
-                <p
-                    role="alert"
-                    className="text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    {link.error} The booking is made — try again, or they can
-                    pay at the session.
-                </p>
+                <Refusal>{`${link.error} ${isRoleRefusal(link.error) ? LINK_REFUSED : LINK_FAILED}`}</Refusal>
             )}
             <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>

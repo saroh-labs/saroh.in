@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { MAP_LINK_MAX } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -480,11 +481,7 @@ function RegisteredAddressChoice({
                     </div>
                 ) : null}
 
-                {refusal ? (
-                    <p role="alert" className={PROBLEM}>
-                        {refusal}
-                    </p>
-                ) : null}
+                <Refusal>{refusal}</Refusal>
             </div>
         </FormSheet>
     );

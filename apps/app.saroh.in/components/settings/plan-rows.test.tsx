@@ -56,16 +56,15 @@ describe("what the plan holds back, under Home's and Business's steps", () => {
 });
 
 describe("a counted step that is the way to another plan", () => {
-    const step = (href: string): ReadyStep =>
-        ({
-            key: "site",
-            label: "Publish your website",
-            done: false,
-            why: "Customers can't open it yet.",
-            cta: "See plans",
-            href,
-            broken: false,
-        }) as ReadyStep;
+    const step = (href: string): ReadyStep => ({
+        key: "site",
+        label: "Publish your website",
+        done: false,
+        why: "Customers can't open it yet.",
+        cta: "See plans",
+        href,
+        broken: false,
+    });
 
     it("keeps its button for someone who may change the plan", () => {
         expect(readyRows([step(PLANS)], true)[0]).toMatchObject({

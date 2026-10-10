@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { MAP_LINK_MAX } from "@saroh/block-contract";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -104,11 +105,7 @@ export function LocationAddressFields({
                     <Note>{MAP_LINK.note}</Note>
                 )}
             </div>
-            {refusal ? (
-                <p role="alert" className={PROBLEM}>
-                    {refusal}
-                </p>
-            ) : null}
+            <Refusal>{refusal}</Refusal>
         </>
     );
 }

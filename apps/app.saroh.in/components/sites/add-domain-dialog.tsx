@@ -1,6 +1,7 @@
 "use client";
 
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import { Refusal } from "@/components/shared/refusal";
 import { Badge } from "@saroh/ui/badge";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -12,6 +13,9 @@ import type { DomainView } from "@/lib/domains/domain-view";
 import { bareHostname } from "@/lib/domains/hostname";
 import type { SiteDomain } from "@/lib/domains/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+
+/** The field's own problem; anything else here is the API's sentence. */
+const NEEDS_DOMAIN = "Enter the domain to add.";
 
 /**
  * Add a domain, start to finish in one dialog (owner, 10 Oct): the domain
@@ -55,7 +59,7 @@ export function AddDomainDialog({
         // A pasted https://…/ address is taken down to its domain (UX-066).
         const value = bareHostname(hostname);
         if (!value) {
-            setFormError("Enter the domain to add.");
+            setFormError(NEEDS_DOMAIN);
             return;
         }
         setFormError(null);
@@ -141,7 +145,7 @@ export function AddDomainDialog({
                             aria-invalid={formError ? true : undefined}
                             aria-describedby="add-domain-note"
                         />
-                        {formError ? (
+                        {formError === NEEDS_DOMAIN ? (
                             <p
                                 id="add-domain-note"
                                 role="alert"
@@ -149,6 +153,10 @@ export function AddDomainDialog({
                             >
                                 {formError}
                             </p>
+                        ) : formError ? (
+                            // Why the domain wasn't added, as the API or
+                            // the connection said it.
+                            <Refusal id="add-domain-note">{formError}</Refusal>
                         ) : (
                             <p
                                 id="add-domain-note"

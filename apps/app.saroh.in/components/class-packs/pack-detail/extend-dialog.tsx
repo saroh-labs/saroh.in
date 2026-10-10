@@ -1,5 +1,6 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { formatDate } from "@/lib/format/datetime";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -149,15 +150,7 @@ export function ExtendDialog({
                     pack&apos;s history.
                 </p>
             </div>
-            {error ? (
-                <p
-                    id={ids.err}
-                    role="alert"
-                    className="m-0 text-[12.5px] font-medium text-destructive"
-                >
-                    {error}
-                </p>
-            ) : null}
+            <Refusal id={ids.err}>{error}</Refusal>
         </FormDialog>
     );
 }

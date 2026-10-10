@@ -1,6 +1,7 @@
 "use client";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useState } from "react";
@@ -171,14 +172,7 @@ export function RemoveDetailsDialog({
                     Type {name} exactly to confirm.
                 </p>
             ) : null}
-            {failure ? (
-                <p
-                    role="alert"
-                    className="mt-3 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    {failure}
-                </p>
-            ) : null}
+            <Refusal className="mt-3">{failure}</Refusal>
         </FormDialog>
     );
 }
