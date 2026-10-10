@@ -542,7 +542,7 @@ the Privacy Policy states both.
   publish, restore and go-live), a web-address change, a post published,
   unpublished or deleted, trackers saved or switched by Saroh, the business
   logo set or removed (it is the icon of a site with none of its own,
-  DEC-121), how the business is reached (its phone, contact email, social
+  DEC-124), how the business is reached (its phone, contact email, social
   links, the registered address, its choice or its map link, and a
   location's name, address, map link, hours or kind: the footer reads them live, DEC-125; cause
   `contact`, `enqueueBusinessSitesRevalidation`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
