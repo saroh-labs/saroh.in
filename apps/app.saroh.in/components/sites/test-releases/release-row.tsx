@@ -20,6 +20,7 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
 import { ReleaseLinks } from "@/components/sites/test-releases/release-links";
+import { runAction } from "@/lib/api/run-action";
 import type {
     GoLiveGate,
     ReleaseAbilities,
@@ -80,15 +81,17 @@ export function ReleaseRow({
         release.status === "ready" || release.status === "scheduled";
 
     async function open() {
-        setBusy("open");
-        await openReleaseInNewTab(siteId, release.id);
-        setBusy(null);
+        await runAction(() => openReleaseInNewTab(siteId, release.id), {
+            setBusy: (on) => setBusy(on ? "open" : null),
+        });
     }
 
     async function cancelSchedule() {
-        setBusy("cancel");
-        const res = await cancelScheduledGoLive(siteId, release.id);
-        setBusy(null);
+        const res = await runAction(
+            () => cancelScheduledGoLive(siteId, release.id),
+            { setBusy: (on) => setBusy(on ? "cancel" : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             `Scheduled go-live cancelled. ${release.name} is ready again.`,
@@ -97,9 +100,11 @@ export function ReleaseRow({
     }
 
     async function discard(): Promise<ConfirmResult> {
-        setBusy("discard");
-        const res = await discardTestRelease(siteId, release.id);
-        setBusy(null);
+        const res = await runAction(
+            () => discardTestRelease(siteId, release.id),
+            { setBusy: (on) => setBusy(on ? "discard" : null) },
+        );
+        if (!res) return;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${release.name} discarded. Its links no longer open it.`);
         onChanged();

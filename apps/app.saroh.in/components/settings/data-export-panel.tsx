@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { getDataExportLink, startDataExport } from "@/lib/data-export/actions";
 import type { DataExportLine } from "@/lib/data-export/words";
 import {
@@ -39,7 +40,8 @@ export function DataExportPanel({
 
     const start = () =>
         startStarting(async () => {
-            const result = await startDataExport();
+            const result = await runAction(() => startDataExport());
+            if (!result) return;
             if (!result.ok) {
                 showError("Your data couldn't be prepared", result.error);
                 return;

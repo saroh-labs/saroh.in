@@ -13,6 +13,7 @@ import {
     updateStorefront,
 } from "@/lib/stores/storefront-actions";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SectionProps } from "./location-save";
 import { Note, Section } from "./storefront-section";
 
@@ -45,7 +46,10 @@ export function ClosingSection({
 
     const pause = () => {
         startClosing(async () => {
-            const res = await updateStorefront(store.id, { paused: true });
+            const res = await runAction(() =>
+                updateStorefront(store.id, { paused: true }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

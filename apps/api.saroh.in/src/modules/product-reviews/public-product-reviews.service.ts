@@ -8,6 +8,7 @@ import {
 import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { noticeOf } from "../notifications/notice-target";
 import { PRODUCT_LINES } from "../orders/order-line";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import type { PublicReviewDto } from "./dto";
@@ -192,8 +193,9 @@ export class PublicProductReviewsService {
                         await tx.notification.create({
                             data: {
                                 organizationId: inv.organizationId,
-                                type: REVIEW_NOTICE_TYPE,
-                                reviewId: review.id,
+                                ...noticeOf(REVIEW_NOTICE_TYPE, {
+                                    reviewId: review.id,
+                                }),
                                 title: `A ${rating}-star review of ${item.product.name}`,
                                 body: body
                                     ? body.slice(0, 140)

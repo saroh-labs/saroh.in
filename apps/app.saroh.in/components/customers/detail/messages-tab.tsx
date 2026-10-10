@@ -25,6 +25,7 @@ import {
 } from "@/lib/customer-workspace/thread";
 import { dayText } from "@/lib/subscriptions/view";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { Empty } from "./parts";
 
 /**
@@ -74,7 +75,7 @@ export function MessagesTab({
         setBusy(true);
         const res = await replyAction(contactId, text).catch(() => ({
             ok: false as const,
-            error: "The connection dropped. Your reply wasn't sent.",
+            error: UNREACHED,
         }));
         setBusy(false);
         if (!res.ok) return showError(res.error);

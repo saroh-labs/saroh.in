@@ -14,6 +14,8 @@ import {
     visitsNextNote,
 } from "@/lib/orders/visits";
 
+import { runAction } from "@/lib/api/run-action";
+
 /**
  * The header's next action for a treatment: "Mark visit N attended" (once
  * it has started, `order:stage`) or "Book visit N" (New booking with the
@@ -89,7 +91,10 @@ function NextButton({
     if (attend !== null && canMark) {
         const mark = () =>
             startTransition(async () => {
-                const res = await markVisitAttended(orderId, attend);
+                const res = await runAction(() =>
+                    markVisitAttended(orderId, attend),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                 } else {

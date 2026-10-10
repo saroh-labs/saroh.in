@@ -35,6 +35,7 @@ import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
@@ -200,9 +201,7 @@ function EditorBody({
             });
         } catch {
             setCreatingNow(false);
-            showError(
-                "Couldn't create it — the connection dropped. Everything you entered is still here.",
-            );
+            showError(UNREACHED);
             return;
         }
         if (!res.ok) {

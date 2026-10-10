@@ -7,6 +7,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { FilePlus } from "lucide-react";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { createPage } from "@/lib/sites/actions";
 import type { ModulePageOffer } from "@/lib/sites/page-menu";
 import type { CreatePageInput, SitePage } from "@/lib/sites/service";
@@ -54,10 +55,11 @@ export function AddPagePanel({
     const [path, setPath] = useState("");
 
     async function add(input: CreatePageInput, key: string) {
-        setBusy(key);
         setRefusal(null);
-        const res = await createPage(siteId, input);
-        setBusy(null);
+        const res = await runAction(() => createPage(siteId, input), {
+            setBusy: (on) => setBusy(on ? key : null),
+        });
+        if (!res) return;
         if (res.ok) {
             onAdded(res.data);
             return;

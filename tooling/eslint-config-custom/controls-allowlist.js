@@ -204,8 +204,6 @@ export const RAW_ALLOWED = {
     "components/modules/turn-on/bookings-fields.tsx": ["label"],
     // label: a label that wraps its control
     "components/modules/turn-on/setup-fields.tsx": ["label"],
-    // button: a control styled by its screen's own helper
-    "components/notifications/notifications-inbox.tsx": ["button"],
     // button: one of a segmented choice (radio)
     "components/organizations/business-setup-form.tsx": ["button"],
     // label: a label that wraps its control

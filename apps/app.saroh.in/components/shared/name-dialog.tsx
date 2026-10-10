@@ -5,6 +5,7 @@ import { Label } from "@saroh/ui/label";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { FormDialog } from "./form-dialog";
 
 /**
@@ -59,9 +60,7 @@ export function NameDialog({
     async function save() {
         setTried(true);
         if (problem(name)) return;
-        setBusy(true);
-        const ok = await onSubmit(name);
-        setBusy(false);
+        const ok = await runAction(() => onSubmit(name), { setBusy });
         if (ok) setOpen(false);
     }
 

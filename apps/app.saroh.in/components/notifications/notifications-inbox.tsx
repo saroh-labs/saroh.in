@@ -1,81 +1,109 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { ListCard, ListRow } from "@/components/shared/list-card";
-import { personHref } from "@/lib/contacts/person-href";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import {
     markAllNotificationsRead,
     markNotificationRead,
+    undoMarkAllNotificationsRead,
 } from "@/lib/notifications/actions";
+import { notificationHref } from "@/lib/notifications/href";
 import type { Notification } from "@/lib/notifications/service";
+import type { NoticeGroup } from "@/lib/notifications/when";
+import { exactWhen, noticeGroup, relativeWhen } from "@/lib/notifications/when";
+
+const GROUPS: { key: NoticeGroup; label: string }[] = [
+    { key: "today", label: "Today" },
+    { key: "earlier", label: "Earlier" },
+];
+
+const ROW =
+    "block w-full text-left transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+
+const NONE: ReadonlySet<string> = new Set();
 
 /**
- * Format an ISO timestamp as a short date-time.
+ * Workspace → Notifications (10 Oct 2026). Every row is a link to the
+ * thing it is about (`notificationHref`): the order, the booking, the
+ * invoice, the lead, the review, the customer's thread, the website, or
+ * the page for one about a place. Opening a row is reading it, for every
+ * kind of row, so the bell's count means one thing: not opened yet.
  *
- * The locale is pinned, not inherited: this component server-renders and then
- * hydrates, and `undefined` resolves to the runtime's own locale — Node's on the
- * server, the browser's on the client. When the two disagree React fails
- * hydration and discards the tree. See `lib/format/locale.ts`.
- */
-function formatWhen(iso: string): string {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString(DISPLAY_LOCALE, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    });
-}
-
-/**
- * Workspace → Notifications, as the workspace design draws it: a list with
- * "Notification" and "When" columns, an Unread tag, and opening a row marks it
- * read. A row about an enquiry opens the lead; one with nowhere to go is its
- * own mark-read control.
+ * - Unread is a quiet dot in Ink and a title in full weight. Never a
+ *   warning colour: a new order isn't something wrong.
+ * - Rows are grouped Today and Earlier, by the business's day, and say how
+ *   long ago ("5 min ago") while that is the useful answer.
+ * - Reading a row says nothing else: the dot goes. "Mark all as read"
+ *   offers Undo, which gives back exactly what that press marked.
  */
 export function NotificationsInbox({
     notifications,
     businessName,
+    now: renderedAt,
 }: {
     notifications: Notification[];
     businessName: string;
+    /** When the server drew this, so both sides count from one instant. */
+    now: string;
 }) {
     const router = useRouter();
+    const zone = useBusinessZone();
     const [pending, startTransition] = useTransition();
-    const unread = notifications.filter((n) => !n.readAt).length;
+    // Opened here and on their way to being saved: read at once.
+    const [opened, setOpened] = useState<ReadonlySet<string>>(NONE);
+    const [now, setNow] = useState(() => new Date(renderedAt));
+    useEffect(() => {
+        const tick = () => setNow(new Date());
+        tick();
+        const timer = window.setInterval(tick, 60_000);
+        return () => window.clearInterval(timer);
+    }, [renderedAt]);
 
-    const markOne = (id: string, quiet = false) => {
-        startTransition(async () => {
-            const res = await markNotificationRead(id);
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            if (!quiet) showSuccess("Marked as read");
-            router.refresh();
-        });
+    const isUnread = (n: Notification) => !n.readAt && !opened.has(n.id);
+    const unread = notifications.filter(isUnread).length;
+
+    /** Opening it is reading it. One signal: the dot goes. */
+    const open = (n: Notification) => {
+        if (!isUnread(n)) return;
+        setOpened((had) => new Set(Array.from(had).concat(n.id)));
+        // Not awaited: the link is already on its way. A save that didn't
+        // get there leaves it unread for next time, which is the truth.
+        void runAction(() => markNotificationRead(n.id), { quiet: true });
     };
 
     const markAll = () => {
         startTransition(async () => {
-            const res = await markAllNotificationsRead();
+            const res = await runAction(() => markAllNotificationsRead());
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            showSuccess("All notifications marked as read");
             router.refresh();
+            const readAt = res.data.readAt;
+            if (!readAt) {
+                showSuccess("All notifications marked as read.");
+                return;
+            }
+            showUndo("All notifications marked as read.", async () => {
+                const back = await runAction(
+                    () => undoMarkAllNotificationsRead(readAt),
+                    { quiet: true },
+                );
+                if (!back) return { ok: false, error: UNREACHED };
+                router.refresh();
+                return back.ok ? true : { ok: false, error: back.error };
+            });
         });
     };
 
@@ -88,6 +116,13 @@ export function NotificationsInbox({
             />
         );
     }
+
+    const groups = GROUPS.map((group) => ({
+        ...group,
+        rows: notifications.filter(
+            (n) => noticeGroup(n.createdAt, now, zone) === group.key,
+        ),
+    })).filter((group) => group.rows.length > 0);
 
     return (
         <div className="grid gap-3">
@@ -109,111 +144,71 @@ export function NotificationsInbox({
                 </div>
             ) : null}
 
-            <ListCard
-                main="Notification"
-                end="When"
-                note="Notifications belong to you within this business, and to the modules it has on — switching business changes the list, and marking one read does not mark it read for anyone else."
-            >
-                {notifications.map((n, index) => {
-                    const isUnread = !n.readAt;
-                    const row = (
-                        <ListRow
-                            title={n.title}
-                            sub={n.body}
-                            muted={!isUnread}
-                            tag={
-                                isUnread ? (
-                                    <Badge variant="warning">Unread</Badge>
-                                ) : null
-                            }
-                            end={
-                                <span className="text-[12px] tabular-nums text-muted-foreground">
-                                    {formatWhen(n.createdAt)}
-                                </span>
-                            }
-                        />
-                    );
-                    const rowClass =
-                        "block w-full text-left transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
-                    const label = `${n.title}${isUnread ? ", unread" : ", read"}${n.body ? ` — ${n.body}` : ""}`;
-                    return (
-                        <li
-                            key={n.id}
-                            style={{ "--wk-i": index } as React.CSSProperties}
-                            className="wk-item border-b border-border last:border-b-0"
-                        >
-                            {n.leadId ? (
+            {groups.map((group, g) => (
+                <ListCard
+                    key={group.key}
+                    main={group.label}
+                    end="When"
+                    note={
+                        g === groups.length - 1
+                            ? "Notifications belong to you within this business, and to the modules it has on. Switching business changes the list, and reading one does not mark it read for anyone else."
+                            : undefined
+                    }
+                >
+                    {group.rows.map((n, index) => {
+                        const fresh = isUnread(n);
+                        const when = relativeWhen(n.createdAt, now, zone);
+                        return (
+                            <li
+                                key={n.id}
+                                style={
+                                    { "--wk-i": index } as React.CSSProperties
+                                }
+                                className="wk-item border-b border-border last:border-b-0"
+                            >
                                 <Link
-                                    href={`/leads/${n.leadId}`}
-                                    aria-label={label}
-                                    className={rowClass}
-                                    onClick={() => {
-                                        // Opening it is reading it.
-                                        if (isUnread) markOne(n.id, true);
-                                    }}
+                                    href={notificationHref(n)}
+                                    aria-label={`${n.title}${fresh ? ", unread" : ""}${n.body ? `. ${n.body}` : ""}. ${when}`}
+                                    data-unread={fresh ? "" : undefined}
+                                    className={ROW}
+                                    onClick={() => open(n)}
                                 >
-                                    {row}
+                                    <ListRow
+                                        title={
+                                            <span className="inline-flex min-w-0 items-center gap-2">
+                                                {fresh ? (
+                                                    <span
+                                                        aria-hidden
+                                                        data-unread-dot
+                                                        className="size-2 shrink-0 rounded-full bg-foreground"
+                                                    />
+                                                ) : null}
+                                                <span className="min-w-0">
+                                                    {n.title}
+                                                </span>
+                                            </span>
+                                        }
+                                        sub={n.body}
+                                        muted={!fresh}
+                                        end={
+                                            <time
+                                                dateTime={n.createdAt}
+                                                title={exactWhen(
+                                                    n.createdAt,
+                                                    zone,
+                                                )}
+                                                className="text-[12px] tabular-nums text-muted-foreground"
+                                            >
+                                                {when}
+                                            </time>
+                                        }
+                                    />
                                 </Link>
-                            ) : n.reviewId ? (
-                                // A review's notice is NOT read by opening it:
-                                // it clears when the review is replied to or
-                                // hidden, which is what "needs a reply" means.
-                                <Link
-                                    href={`/commerce/products?tab=reviews&review=${encodeURIComponent(n.reviewId)}`}
-                                    aria-label={label}
-                                    className={rowClass}
-                                >
-                                    {row}
-                                </Link>
-                            ) : n.contactId ? (
-                                // A customer's message (UX-014): it opens
-                                // their thread, and opening it is reading it.
-                                <Link
-                                    href={personHref(n.contactId, "msg")}
-                                    aria-label={label}
-                                    className={rowClass}
-                                    onClick={() => {
-                                        if (isUnread) markOne(n.id, true);
-                                    }}
-                                >
-                                    {row}
-                                </Link>
-                            ) : n.type === "plan.limit" ||
-                              n.type === "plan.changed" ||
-                              n.type === "plan.ending" ? (
-                                // A plan limit's notice (U13), the plan
-                                // changing (UX-041), or a plan that ends
-                                // (#805): opening it is reading it, and it
-                                // opens the plans.
-                                <Link
-                                    href="/settings/billing#change-plan"
-                                    aria-label={label}
-                                    className={rowClass}
-                                    onClick={() => {
-                                        if (isUnread) markOne(n.id, true);
-                                    }}
-                                >
-                                    {row}
-                                </Link>
-                            ) : isUnread ? (
-                                <button
-                                    type="button"
-                                    aria-label={`${label}. Mark as read`}
-                                    disabled={pending}
-                                    className={rowClass}
-                                    onClick={() => {
-                                        markOne(n.id);
-                                    }}
-                                >
-                                    {row}
-                                </button>
-                            ) : (
-                                row
-                            )}
-                        </li>
-                    );
-                })}
-            </ListCard>
+                            </li>
+                        );
+                    })}
+                </ListCard>
+            ))}
         </div>
     );
 }

@@ -156,6 +156,8 @@ describe("a new order", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "order.new",
+            // The row opens the order.
+            orderId: "ord_1",
             title: "New order ORD-012 from Asha Rao",
             body: "₹1,240.00, paid online.",
         });
@@ -326,6 +328,8 @@ describe("a failed payment", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "payment.failed",
+            // The row opens the invoice.
+            invoiceId: "inv_1",
             title: "Payment failed on invoice INV-0042",
             body: "Meera Iyer's payment of ₹2,400.00 didn't go through. They can try again from the same link.",
         });
@@ -1083,6 +1087,8 @@ describe("the website's review (UX-043)", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "site.review.approved",
+            // The row opens the website.
+            siteId: "site_1",
             title: "Rina Reviewer approved Rye & Co",
             body: "With 1 open note to look at before it goes live.",
         });

@@ -19,6 +19,7 @@ import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
 import { applyImport, previewImport } from "@/lib/imports/actions";
@@ -151,11 +152,14 @@ export function CsvImport({
             next: DuplicatePolicy,
         ) => {
             startTransition(async () => {
-                const res = await previewImport(storeId, descriptor.entity, {
-                    csv: text,
-                    mapping: nextMapping,
-                    policy: next,
-                });
+                const res = await runAction(() =>
+                    previewImport(storeId, descriptor.entity, {
+                        csv: text,
+                        mapping: nextMapping,
+                        policy: next,
+                    }),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     setError(res.error);
                     setPreview(null);
@@ -204,12 +208,15 @@ export function CsvImport({
 
     function onImport(createAtMost?: number) {
         startTransition(async () => {
-            const res = await applyImport(storeId, descriptor.entity, {
-                csv,
-                mapping,
-                policy,
-                ...(createAtMost === undefined ? {} : { createAtMost }),
-            });
+            const res = await runAction(() =>
+                applyImport(storeId, descriptor.entity, {
+                    csv,
+                    mapping,
+                    policy,
+                    ...(createAtMost === undefined ? {} : { createAtMost }),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // More rows than the plan's products limit (U13): its notice.
                 if (res.plan) showPlanRefusal(res.plan);

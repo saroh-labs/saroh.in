@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { parseOptionValues } from "@/lib/products/option-values";
 import { addOption, addOptionValue } from "@/lib/products/settings-actions";
 
@@ -42,7 +43,8 @@ export function OptionValuesInline({
         if (values.length === 0) return;
         start(async () => {
             if (!optionId) {
-                const made = await addOption(optName, values);
+                const made = await runAction(() => addOption(optName, values));
+                if (!made) return;
                 if (!made.ok) {
                     showError(made.error);
                     return;
@@ -50,7 +52,10 @@ export function OptionValuesInline({
                 onOption(made.data.id);
             } else {
                 for (const value of values) {
-                    const res = await addOptionValue(optionId, value);
+                    const res = await runAction(() =>
+                        addOptionValue(optionId, value),
+                    );
+                    if (!res) return;
                     if (!res.ok) {
                         showError(`${value}: ${res.error}`);
                         return;

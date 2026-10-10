@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     removalPreviewAction,
     removeDetailsAction,
@@ -74,10 +75,14 @@ export function RemoveDetailsDialog({
     async function remove() {
         setTried(true);
         if (!canRemove || removing) return;
-        setRemoving(true);
         setFailure(null);
-        const res = await removeDetailsAction(contactId);
-        setRemoving(false);
+        const res = await runAction(() => removeDetailsAction(contactId), {
+            setBusy: setRemoving,
+            // Said in the dialog, beside what it was about to remove.
+            quiet: true,
+            onUnreached: setFailure,
+        });
+        if (!res) return;
         if (!res.ok) {
             setFailure(asSentence(res.error));
             return;

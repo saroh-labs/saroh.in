@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { createStaff } from "@/lib/staff/actions";
 
 /**
@@ -55,13 +56,16 @@ export function AddPersonDialog({
     async function add() {
         setTried(true);
         if (!name.trim() || saving) return;
-        setSaving(true);
         setError(null);
-        const res = await createStaff({
-            name: name.trim(),
-            title: title.trim() || undefined,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createStaff({
+                    name: name.trim(),
+                    title: title.trim() || undefined,
+                }),
+            { setBusy: setSaving, quiet: true, onUnreached: setError },
+        );
+        if (!res) return;
         if (!res.ok) {
             setError(res.error);
             return;

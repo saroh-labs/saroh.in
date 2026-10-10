@@ -23,6 +23,7 @@ import {
 
 import { chipClass } from "@/components/shared/chip";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { TabIntro, textBox, useUnsaved } from "./product-settings";
 
@@ -72,10 +73,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     function save() {
         if (problem || !dirty) return;
         start(async () => {
-            const res = await saveDefaults(
-                rows.map(toEntry),
-                applyExisting && hit.count > 0,
+            const res = await runAction(() =>
+                saveDefaults(rows.map(toEntry), applyExisting && hit.count > 0),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -90,7 +91,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                     : "Defaults saved. Existing products keep their values.",
                 () =>
                     start(async () => {
-                        const undo = await undoDefaults(res.data);
+                        const undo = await runAction(() =>
+                            undoDefaults(res.data),
+                        );
+                        if (!undo) return;
                         if (!undo.ok) showError(undo.error);
                         router.refresh();
                     }),

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { patchProduct } from "@/lib/products/actions";
 import { Notice } from "@saroh/ui/notice";
 
@@ -30,9 +31,12 @@ export function ArchivedBanner({
 
     function restore() {
         start(async () => {
-            const res = await patchProduct(storeId, productId, {
-                status: "DRAFT",
-            });
+            const res = await runAction(() =>
+                patchProduct(storeId, productId, {
+                    status: "DRAFT",
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -40,9 +44,12 @@ export function ArchivedBanner({
             router.refresh();
             showUndo("Restored as a draft. Publish it when it is ready.", () =>
                 start(async () => {
-                    const undo = await patchProduct(storeId, productId, {
-                        status: "ARCHIVED",
-                    });
+                    const undo = await runAction(() =>
+                        patchProduct(storeId, productId, {
+                            status: "ARCHIVED",
+                        }),
+                    );
+                    if (!undo) return;
                     if (!undo.ok) showError(undo.error);
                     router.refresh();
                 }),

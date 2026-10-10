@@ -31,6 +31,7 @@ import {
     lostNew,
     useLeaveGuard,
 } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
@@ -130,15 +131,19 @@ export function CourseForm({
             currency: values.currency,
             seats,
         };
-        const res = course
-            ? await updateCourse(course.id, input)
-            : await createCourse({
-                  ...input,
-                  serviceId: values.serviceId,
-                  sessions,
-                  status: open ? "OPEN" : "DRAFT",
-              });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                course
+                    ? updateCourse(course.id, input)
+                    : createCourse({
+                          ...input,
+                          serviceId: values.serviceId,
+                          sessions,
+                          status: open ? "OPEN" : "DRAFT",
+                      }),
+            { setBusy },
+        );
+        if (!res) return false;
         if (!res.ok) {
             if (res.field && FIELDS.has(res.field)) {
                 form.setError(res.field as keyof Values, {

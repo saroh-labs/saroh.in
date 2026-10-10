@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setConsent } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
@@ -33,9 +34,11 @@ export function ConsentToggle({
     const [busy, setBusy] = useState<MessageChannel | null>(null);
 
     async function toggle(channel: MessageChannel, next: ConsentStatus) {
-        setBusy(channel);
-        const res = await setConsent({ contactId, channel, status: next });
-        setBusy(null);
+        const res = await runAction(
+            () => setConsent({ contactId, channel, status: next }),
+            { setBusy: (on) => setBusy(on ? channel : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

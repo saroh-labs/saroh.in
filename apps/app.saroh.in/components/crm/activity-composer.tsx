@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
 
 /**
@@ -36,9 +37,10 @@ export function ActivityComposer({
         setTried(true);
         const text = body.trim();
         if (!text) return;
-        setBusy(true);
-        const res = await logActivity(leadId, text);
-        setBusy(false);
+        const res = await runAction(() => logActivity(leadId, text), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

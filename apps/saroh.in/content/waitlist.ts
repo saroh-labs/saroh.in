@@ -1,4 +1,5 @@
 import { SAROH_CONTACT_EMAIL } from "./contact";
+import { SAROH_NAME } from "./name";
 
 /**
  * The waitlist page's content (Waitlist design, plan U30): the kinds of
@@ -115,6 +116,6 @@ export const WAITLIST_CONTACT = SAROH_CONTACT_EMAIL;
 
 /** The footer's meaning of the name, and where Saroh is. */
 export const WAITLIST_FOOTER = {
-    word: "सारोह",
-    meaning: "sa (with) + aaroh (rising) · Let's rise together.",
+    word: SAROH_NAME.word,
+    meaning: `${SAROH_NAME.parts} · ${SAROH_NAME.line}`,
 };

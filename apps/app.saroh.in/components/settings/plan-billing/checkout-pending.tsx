@@ -9,6 +9,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PendingCheckout } from "@/lib/saroh-billing/plan-view";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
+import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
@@ -30,13 +31,13 @@ export function CheckoutPending({ pending }: { pending: PendingCheckout }) {
     }, []);
 
     async function resume() {
-        if (!pending.handoff) return;
-        setOpening(true);
-        const outcome = await openRazorpayWindow(
-            pending.handoff,
-            pending.planName,
+        const handoff = pending.handoff;
+        if (!handoff) return;
+        const outcome = await runAction(
+            () => openRazorpayWindow(handoff, pending.planName),
+            { setBusy: setOpening },
         );
-        setOpening(false);
+        if (!outcome) return;
         if (outcome === "paid") await confirm(8);
         else if (outcome === "unavailable") {
             showError(

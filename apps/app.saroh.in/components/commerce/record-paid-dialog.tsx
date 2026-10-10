@@ -5,6 +5,7 @@ import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { useId, useState } from "react";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { runAction } from "@/lib/api/run-action";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import type { HandRefundChoice } from "@/lib/orders/hand-refund";
 import { handRefundAmount, handRefundVerb } from "@/lib/orders/hand-refund";
@@ -75,12 +76,11 @@ export function RecordPaidDialog({
     async function record() {
         setTried(true);
         if (!how || !ready) return;
-        setBusy(true);
-        const ok = await onRecord(
-            how,
-            amount.kind === "ok" ? amount.money : undefined,
+        const ok = await runAction(
+            () =>
+                onRecord(how, amount.kind === "ok" ? amount.money : undefined),
+            { setBusy },
         );
-        setBusy(false);
         if (ok) onOpenChange(false);
     }
 

@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setProductSoldOut } from "@/lib/products/actions";
 import type { SoldOutPlace } from "@/lib/products/tracking";
 import {
@@ -98,11 +99,10 @@ function SoldOutButton({
 
     function toggle() {
         start(async () => {
-            const res = await setProductSoldOut(
-                productId,
-                place.storefrontId,
-                next,
+            const res = await runAction(() =>
+                setProductSoldOut(productId, place.storefrontId, next),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(soldOutFailed(next), res.error);
                 return;

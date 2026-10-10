@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { LATE_AFTER_ANCHOR } from "@/components/stores/fulfilment-section";
+import { runAction } from "@/lib/api/run-action";
 import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";
 import { dismissLateRuleNotice } from "@/lib/stores/storefront-actions";
@@ -36,7 +37,10 @@ export function LateRuleNoticeCard({
     const dismiss = () => {
         setGone(true);
         start(async () => {
-            const res = await dismissLateRuleNotice(notice.storeId);
+            const res = await runAction(() =>
+                dismissLateRuleNotice(notice.storeId),
+            );
+            if (!res) return setGone(false);
             if (!res.ok) {
                 setGone(false);
                 showError(res.error);

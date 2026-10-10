@@ -11,6 +11,7 @@ import { useId, useState } from "react";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormDialog } from "@/components/shared/form-dialog";
+import { UNREACHED } from "@/lib/api/unreached";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";
 import {
@@ -160,7 +161,7 @@ function SendLinkDialog({
             email && card.emailTo !== null,
         ).catch((): { ok: false; error: string } => ({
             ok: false,
-            error: "Saroh couldn't be reached. Nothing was sent. Try again.",
+            error: UNREACHED,
         }));
         setBusy(false);
         if (!res.ok) {
@@ -325,7 +326,7 @@ function CancelAutopay({
         const res = await cancelAutopay(subscriptionId).catch(
             (): { ok: false; error: string } => ({
                 ok: false,
-                error: "Saroh couldn't be reached. Nothing changed. Try again.",
+                error: UNREACHED,
             }),
         );
         if (!res.ok) {

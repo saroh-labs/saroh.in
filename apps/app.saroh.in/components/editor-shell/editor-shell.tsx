@@ -28,6 +28,7 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
 
@@ -247,7 +248,8 @@ export function EditorShell<V extends Record<string, unknown>>(
 
     async function remove(): Promise<ConfirmResult> {
         setBusy(true);
-        const res = await editor.remove();
+        // Stays busy while it leaves; anything else gives the control back.
+        const res = await runAction(() => editor.remove());
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);

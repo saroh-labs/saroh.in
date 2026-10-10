@@ -7,6 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { useState } from "react";
 
 import { DomainRecords } from "@/components/sites/domain-records";
+import { runAction } from "@/lib/api/run-action";
 import type { DomainView } from "@/lib/domains/domain-view";
 import { bareHostname } from "@/lib/domains/hostname";
 import type { SiteDomain } from "@/lib/domains/service";
@@ -57,11 +58,14 @@ export function AddDomainDialog({
             setFormError("Enter the domain to add.");
             return;
         }
-        setAdding(true);
         setFormError(null);
-        const res = await onClaim(value);
-        setAdding(false);
-        if (!res.ok) setFormError(res.error);
+        const res = await runAction(() => onClaim(value), {
+            setBusy: setAdding,
+            // Said in the dialog, under the domain they typed.
+            quiet: true,
+            onUnreached: setFormError,
+        });
+        if (res && !res.ok) setFormError(res.error);
     }
 
     return (

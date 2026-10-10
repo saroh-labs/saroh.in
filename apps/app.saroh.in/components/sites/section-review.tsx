@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import { createComment } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
@@ -195,14 +196,17 @@ function SectionSlot({
         e.preventDefault();
         const text = body.trim();
         if (text.length === 0) return;
-        setSaving(true);
-        const res = await createComment(siteId, {
-            pageId,
-            sectionKey: section.key,
-            body: text,
-            ...(testReleaseId ? { testReleaseId } : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createComment(siteId, {
+                    pageId,
+                    sectionKey: section.key,
+                    body: text,
+                    ...(testReleaseId ? { testReleaseId } : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

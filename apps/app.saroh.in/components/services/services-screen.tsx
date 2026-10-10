@@ -11,6 +11,7 @@ import { useState } from "react";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
@@ -77,11 +78,14 @@ export function ServicesScreen({
 
     async function toggle(s: Service) {
         const wasOn = s.status === "ACTIVE";
-        setBusy(s.id);
-        const res = await updateService(s.id, {
-            status: wasOn ? "ARCHIVED" : "ACTIVE",
-        });
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                updateService(s.id, {
+                    status: wasOn ? "ARCHIVED" : "ACTIVE",
+                }),
+            { setBusy: (on) => setBusy(on ? s.id : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         router.refresh();
         showUndo(takingToast(s.name, wasOn), async () => {

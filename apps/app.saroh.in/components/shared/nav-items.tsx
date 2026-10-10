@@ -113,7 +113,15 @@ export type NavAction =
     // "New service" and "New location" in the command menu make one too:
     // the API asks these of the write, so the palette asks them of the row.
     | "service:write"
-    | "store:create";
+    | "store:create"
+    // The command menu's daily starts (10 Oct 2026): New order, New
+    // booking, New product, New customer and New discount code, each
+    // asked the permission the API asks of that write.
+    | "order:create"
+    | "booking:write"
+    | "store:write"
+    | "contact:write"
+    | "discount:write";
 
 /**
  * Role → what it may reach here.
@@ -153,6 +161,11 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pack:write",
         "service:write",
         "store:create",
+        "order:create",
+        "booking:write",
+        "store:write",
+        "contact:write",
+        "discount:write",
         "lead:read",
         "pipeline:read",
     ],
@@ -184,6 +197,11 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "pack:write",
         "service:write",
         "store:create",
+        "order:create",
+        "booking:write",
+        "store:write",
+        "contact:write",
+        "discount:write",
         "lead:read",
         "pipeline:read",
     ],

@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { businessTimezone } from "../bookings/staff-availability";
 import { paperDay } from "../invoices/invoice-paper-view";
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
@@ -309,7 +310,8 @@ export class MovesApplyHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId,
-                    type: PLAN_ENDING_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_ENDING_NOTIFICATION_TYPE, {}),
                     title: words.title,
                     body: words.body,
                 },

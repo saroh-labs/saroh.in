@@ -15,6 +15,7 @@ import {
 import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail } from "@/lib/products/service";
 
+import { runAction } from "@/lib/api/run-action";
 import { QuickSheet } from "../quick-sheet";
 
 /**
@@ -48,9 +49,11 @@ export function PhotosSheet({
     const dirty = !samePhotos(draft, baseline);
 
     async function save() {
-        setSaving(true);
-        const res = await replaceProductImages(product.id, photosInput(draft));
-        setSaving(false);
+        const res = await runAction(
+            () => replaceProductImages(product.id, photosInput(draft)),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
