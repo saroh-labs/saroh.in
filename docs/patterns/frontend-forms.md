@@ -87,9 +87,9 @@ Website › Settings follows it (`components/sites/settings/`): its frame is
 `SettingsSheetFrame` in `settings-sheet.tsx`, a copy of The place's with
 the same classes until the two are lifted into one, and its links are
 `settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
-is done inside its sheet or dialog (the share image is uploaded there, Add
-domain shows its DNS records there); an Edit never sends the merchant to
-another page to finish.
+is done inside its sheet or dialog (the share image and the site icon are
+uploaded there, Add domain shows its DNS records there); an Edit never
+sends the merchant to another page to finish.
 
 ## Rules
 

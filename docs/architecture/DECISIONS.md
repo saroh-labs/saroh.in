@@ -1356,3 +1356,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
 - Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
 - Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
+
+## DEC-120 A site's icon: its own, else the business logo, else a plain initial; never Saroh's mark
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: every merchant site served one fixed `favicon.ico` from the renderer (`apps/saroh.app/app/favicon.ico`, the framework's default mark), and there was no setting. A merchant's site never carries Saroh's brand, or anyone else's.
+- Decision: a site shows its own icon when the merchant uploaded one; else the business logo from Settings › Business; else a plain tile with the site's initial in the site's accent colour. The renderer ships no icon file of its own.
+- The site's own icon is set in Website › Settings › Search and sharing, in the row's sheet: PNG, JPG or WebP (no SVG, as the storage allowlist), under 1 MB, as the business logo. "At least 192 × 192; square works best" is guidance, not a refusal. `site:update`; no plan lock.
+- It is part of the draft, like the share image ("Next publish"): saved on the Site (`iconMediaId`, `iconUrl`, the logo's shape), written into the Publication snapshot at publish (`site.icon`, only when there is one) and counted in what waits for the next publish. The logo that stands in is the business's, read live, and applies at once.
+- The public site read resolves the icon (own, else logo, else none) and sends it with the snapshot, so the renderer asks nothing more. Every page's head names it, for the tab and as the phone's touch icon. `/favicon.ico` on a merchant's address forwards to it (302). With neither, the site serves the tile itself at `/site-icon.svg`, and `/favicon.ico` answers with it. A draft preview and a test release show theirs.
+- No image pipeline: an uploaded image is served as it is, from the media address, with its type declared. The tile is an SVG drawn by one function (`@saroh/site-blocks/site-icon`) that the site serves and the workspace previews, so no font or image library is added; a phone gets no touch icon for it and draws its own.
+- Consequences: migration `20261107100000_site_icon`. The library refuses to delete an image while it is a site's icon. Setting or removing the business logo tells the page cache (`site.pages.revalidate`, cause `icon`), since a kept page carries the old one. `docs/patterns/frontend-design-system.md` → "Type and the mark".
