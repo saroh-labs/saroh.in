@@ -46,7 +46,7 @@ import type {
 import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
@@ -119,7 +119,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 /**
  * Bookings › Availability (U16, the design's `?view=avail`): when each person
  * can be booked. Weekly hours, time off, one-off extra hours and the
- * business's booking rules are a draft until "Save changes"; saving writes
+ * business's booking rules are a draft until "Save"; saving writes
  * what changed, and Undo puts it all back. Hours never move a booking — the
  * ones left outside are listed and kept. The booking rules show with nobody
  * on the diary too (UX-022): a solo owner sets how people pay and cancel.
@@ -307,7 +307,7 @@ export function AvailabilityEditor({
         }
     }
 
-    // Hours, time off and rules wait for "Save changes": a way off the
+    // Hours, time off and rules wait for "Save": a way off the
     // page asks first.
     const guard = useLeaveGuard({
         dirty: canEdit && dirty && !saving,
@@ -334,7 +334,7 @@ export function AvailabilityEditor({
                 busy={saving}
                 busyLabel="Saving…"
             >
-                Save changes
+                Save
             </Button>
         </div>
     ) : null;
@@ -421,44 +421,39 @@ export function AvailabilityEditor({
                     Your role can see these hours but not change them.
                 </ReadOnlyNote>
             )}
-            <div
-                role="radiogroup"
-                aria-label="Team member"
-                className="mb-3.5 flex flex-wrap gap-1.5"
-            >
-                {people.map((p) => {
-                    const on = p.id === me.id;
-                    return (
-                        <button
-                            key={p.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => setWho(p.id)}
-                            className={chipClass(on)}
-                        >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "mr-[7px] inline-block size-2 rounded-full",
-                                    takesClasses.includes(p.id)
-                                        ? "bg-diary-class"
-                                        : "bg-diary-one",
-                                )}
-                            />
-                            {p.name}
-                            {p.title ? ` · ${p.title}` : ""}
-                        </button>
-                    );
-                })}
+            <div className="mb-3.5 flex flex-wrap gap-1.5">
+                <ChipGroup
+                    label="Team member"
+                    value={me.id}
+                    onChange={setWho}
+                    choices={people.map((p) => ({
+                        value: p.id,
+                        label: (
+                            <>
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "mr-[7px] inline-block size-2 rounded-full",
+                                        takesClasses.includes(p.id)
+                                            ? "bg-diary-class"
+                                            : "bg-diary-one",
+                                    )}
+                                />
+                                {p.name}
+                                {p.title ? ` · ${p.title}` : ""}
+                            </>
+                        ),
+                    }))}
+                />
                 {canEdit ? (
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
                         onClick={() => setAdding(true)}
-                        className="h-8 rounded-full border border-dashed border-border-strong px-3 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                        className="h-8 rounded-full border-dashed border-border-strong px-3 text-[12.5px] font-semibold"
                     >
                         + Add someone
-                    </button>
+                    </Button>
                 ) : null}
             </div>
 

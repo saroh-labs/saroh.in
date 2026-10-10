@@ -4,14 +4,16 @@ import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { ArrowDown, ArrowUp, Check, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ProductThumb } from "@/components/stores/catalogue/product-thumb";
 import type { PickableProduct } from "@/lib/collections/actions";
 import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /**
@@ -175,27 +177,27 @@ export function ProductsPicker({
 
             {disabled ? null : (
                 <div className="space-y-2 pt-1">
-                    <label
+                    <Field
+                        label="Add products"
                         htmlFor="collection-product-search"
-                        className="block text-[12.5px] font-medium"
+                        className="space-y-2"
                     >
-                        Add products
-                    </label>
-                    <div className="relative">
-                        <Search
-                            aria-hidden
-                            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                        />
-                        <Input
-                            id="collection-product-search"
-                            type="search"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                            placeholder="Search names and SKUs"
-                            className="pl-8"
-                            autoComplete="off"
-                        />
-                    </div>
+                        <div className="relative">
+                            <Search
+                                aria-hidden
+                                className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                                id="collection-product-search"
+                                type="search"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                                placeholder="Search names and SKUs"
+                                className="pl-8"
+                                autoComplete="off"
+                            />
+                        </div>
+                    </Field>
                     <div aria-live="polite" aria-busy={searching}>
                         {searchError ? (
                             <p
@@ -220,38 +222,23 @@ export function ProductsPicker({
                                     const on = picked.includes(p.id);
                                     const off = !on && room.full;
                                     return (
-                                        <button
+                                        <CheckRow
                                             key={p.id}
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={on}
+                                            checked={on}
                                             disabled={off}
-                                            onClick={() => {
+                                            onChange={() => {
                                                 onKnow(p);
                                                 onChange(
                                                     togglePicked(picked, p.id),
                                                 );
                                             }}
                                             className={cn(
-                                                "flex w-full min-w-0 items-center gap-2.5 rounded-[9px] border border-border bg-card px-2.5 py-2 text-left text-[13px] coarse:min-h-11",
+                                                "w-full gap-2.5 rounded-[9px] border border-border bg-card px-2.5 py-2",
                                                 off
-                                                    ? "cursor-not-allowed bg-disabled text-muted-foreground"
+                                                    ? "bg-disabled text-muted-foreground"
                                                     : "hover:bg-muted",
                                             )}
                                         >
-                                            <span
-                                                aria-hidden
-                                                className={cn(
-                                                    "flex size-4 shrink-0 items-center justify-center rounded-[4px]",
-                                                    on
-                                                        ? "bg-foreground text-background"
-                                                        : "border-[1.5px] border-border-strong bg-card",
-                                                )}
-                                            >
-                                                {on ? (
-                                                    <Check className="size-3" />
-                                                ) : null}
-                                            </span>
                                             <ProductThumb
                                                 name={p.name}
                                                 image={p.image}
@@ -266,7 +253,7 @@ export function ProductsPicker({
                                                         : "Archived"}
                                                 </span>
                                             ) : null}
-                                        </button>
+                                        </CheckRow>
                                     );
                                 })}
                                 {found.more ? (

@@ -33,9 +33,10 @@ import {
     pickable,
 } from "@/lib/customer-workspace/merge";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import { Notice } from "@saroh/ui/notice";
-import { AccountBox, Choice } from "./merge-parts";
+import { AccountBox, pickClass } from "./merge-parts";
 import { MergeSearch } from "./merge-search";
 
 interface Loaded {
@@ -254,48 +255,62 @@ export function MergeDialog({
                                 )}
                             </span>
                         ))}
-                        <div
-                            role="radiogroup"
-                            aria-label="Which record stays"
+                        <ChoiceGroup
+                            label="Which record stays"
                             className="contents"
-                        >
-                            <span className="text-muted-foreground">Stays</span>
-                            {COLUMNS.map((c) => (
-                                <Choice
-                                    key={c}
-                                    on={loaded.keep === c}
-                                    disabled={merging}
-                                    onClick={() => keep(c)}
-                                >
-                                    {c === "here"
+                            value={loaded.keep}
+                            onChange={keep}
+                            disabled={merging}
+                            choices={COLUMNS.map((c) => ({
+                                value: c,
+                                label:
+                                    c === "here"
                                         ? "Keep this record"
-                                        : `Keep ${names.there}`}
-                                </Choice>
-                            ))}
-                        </div>
+                                        : `Keep ${names.there}`,
+                            }))}
+                            itemClassName={(on) => pickClass(on)}
+                            layout={(item) => (
+                                <>
+                                    <span className="text-muted-foreground">
+                                        Stays
+                                    </span>
+                                    {COLUMNS.map(item)}
+                                </>
+                            )}
+                        />
                         {rows.map((row) => (
-                            <div
+                            <ChoiceGroup
                                 key={row.key}
-                                role="radiogroup"
-                                aria-label={row.label}
+                                label={row.label}
                                 className="contents"
-                            >
-                                <span className="text-muted-foreground">
-                                    {row.label}
-                                </span>
-                                {COLUMNS.map((c) => (
-                                    <Choice
-                                        key={c}
-                                        on={loaded.picks[row.key] === c}
-                                        empty={!pickable(row, c)}
-                                        disabled={merging}
-                                        onClick={() => pick(row, c)}
-                                    >
-                                        {row.values[c] ??
-                                            "Nothing to take from this record"}
-                                    </Choice>
-                                ))}
-                            </div>
+                                value={loaded.picks[row.key]}
+                                onChange={(c) => pick(row, c)}
+                                disabled={merging}
+                                choices={COLUMNS.map((c) => {
+                                    const empty = !pickable(row, c);
+                                    return {
+                                        value: c,
+                                        label:
+                                            row.values[c] ??
+                                            "Nothing to take from this record",
+                                        disabled: empty,
+                                        tip: empty
+                                            ? "Nothing to take from this record"
+                                            : undefined,
+                                    };
+                                })}
+                                itemClassName={(on, choice) =>
+                                    pickClass(on, choice.disabled)
+                                }
+                                layout={(item) => (
+                                    <>
+                                        <span className="text-muted-foreground">
+                                            {row.label}
+                                        </span>
+                                        {COLUMNS.map(item)}
+                                    </>
+                                )}
+                            />
                         ))}
                     </div>
 

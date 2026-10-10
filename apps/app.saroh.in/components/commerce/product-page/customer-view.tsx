@@ -3,9 +3,9 @@
 import { formatDate } from "@/lib/format/datetime";
 import type { ProductPageData, StockWord } from "@saroh/site-blocks";
 import { ProductPage, SiteThemeScope } from "@saroh/site-blocks";
-import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
+import { SwitchRow } from "@/components/shared/check-row";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { EditorSection } from "@/lib/products/links";
 import { productEditHref, productHref } from "@/lib/products/links";
@@ -145,29 +145,14 @@ export function CustomerView({
                           ? "Archived — customers cannot see this page. This is how it looked."
                           : "A draft — customers cannot see this yet. This is how it will look once it is published."}
                 </p>
-                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={notes}
-                    onClick={() => setNotes((v) => !v)}
-                    className="flex h-8 items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                <SwitchRow
+                    side="start"
+                    checked={notes}
+                    onChange={setNotes}
+                    className="h-8 shrink-0 gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[12.5px] font-semibold hover:bg-muted coarse:h-11"
                 >
-                    <span
-                        aria-hidden
-                        className={cn(
-                            "relative inline-block h-[18px] w-[30px] rounded-full transition-colors duration-fast",
-                            notes ? "bg-foreground" : "bg-border-strong",
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                "absolute top-[2px] size-[14px] rounded-full bg-background transition-[left] duration-fast",
-                                notes ? "left-[14px]" : "left-[2px]",
-                            )}
-                        />
-                    </span>
                     Team notes
-                </button>
+                </SwitchRow>
             </div>
             <div className="mt-[22px] flex flex-wrap items-start gap-[22px] rounded-[12px] bg-muted/60 p-4 sm:p-[22px]">
                 <div className="min-w-0 flex-[1_1_540px] overflow-hidden rounded-xl border border-border shadow-sm">

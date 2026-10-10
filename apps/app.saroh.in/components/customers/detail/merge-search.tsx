@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { findCustomers } from "@/lib/customers/actions";
 import type { CustomerSearch } from "@/lib/customers/picker";
 import { resultLabel } from "@/lib/customers/picker";
+import { Field } from "@saroh/ui/field";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /** How long typing settles before the search runs. */
@@ -67,18 +68,17 @@ export function MergeSearch({
 
     return (
         <div className="mt-3.5 grid gap-1.5">
-            <label htmlFor={id} className="text-[12.5px] font-medium">
-                Find the other record
-            </label>
-            <Input
-                id={id}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Name, phone or email"
-                autoComplete="off"
-                autoFocus
-                aria-describedby={`${id}-status`}
-            />
+            <Field label="Find the other record">
+                <Input
+                    id={id}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name, phone or email"
+                    autoComplete="off"
+                    autoFocus
+                    aria-describedby={`${id}-status`}
+                />
+            </Field>
             <p
                 id={`${id}-status`}
                 role="status"

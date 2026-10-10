@@ -215,11 +215,11 @@ describe("Time off, read first", () => {
 });
 
 describe("Add time off", () => {
-    it("opens a sheet of that name, which says it isn't saved until Save changes", async () => {
+    it("opens a sheet of that name, which says it isn't saved until Save", async () => {
         draw();
         await press(button("Add time off", host));
         expect(sheetName()).toBe("New time off");
-        expect(sheet()?.textContent).toContain("until you press Save changes");
+        expect(sheet()?.textContent).toContain("until you press Save.");
         expect(button("Add day off", sheet() ?? undefined)).toBeDefined();
         expect(button("Cancel", sheet() ?? undefined)).toBeDefined();
         expect(onAdd).not.toHaveBeenCalled();

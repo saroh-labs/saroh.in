@@ -20,6 +20,7 @@ import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
 
 /**
  * The class this reader's tokens are scoped to. A literal, for the same reason
@@ -321,25 +322,27 @@ function SectionSlot({
                         onSubmit={submit}
                         className="grid gap-2"
                     >
-                        <label
-                            htmlFor={`note-${section.key}`}
-                            className="text-xs font-medium"
+                        <Field
+                            label={
+                                <>
+                                    Your note about{" "}
+                                    {section.label ??
+                                        SECTION_NAME[section.type] ??
+                                        "this section"}
+                                </>
+                            }
                         >
-                            Your note about{" "}
-                            {section.label ??
-                                SECTION_NAME[section.type] ??
-                                "this section"}
-                        </label>
-                        <Textarea
-                            id={`note-${section.key}`}
-                            autoFocus
-                            rows={3}
-                            value={body}
-                            onChange={(e) => setBody(e.target.value)}
-                            disabled={saving}
-                            placeholder="What should change here?"
-                            className="w-full"
-                        />
+                            <Textarea
+                                id={`note-${section.key}`}
+                                autoFocus
+                                rows={3}
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                disabled={saving}
+                                placeholder="What should change here?"
+                                className="w-full"
+                            />
+                        </Field>
                         <div className="flex gap-2">
                             <Button
                                 type="submit"

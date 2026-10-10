@@ -15,3 +15,40 @@ if (typeof Element !== "undefined") {
         return matches.call(this, selector);
     };
 }
+
+/*
+ * jsdom has no ResizeObserver, and the shared `Checkbox` and `Switch`
+ * (Radix) measure themselves with one. Nothing is laid out here, so an
+ * observer that never reports is the truth. A test that needs sizes brings
+ * its own.
+ */
+if (
+    typeof globalThis !== "undefined" &&
+    typeof globalThis.ResizeObserver === "undefined"
+) {
+    globalThis.ResizeObserver = class {
+        observe() {
+            return undefined;
+        }
+        unobserve() {
+            return undefined;
+        }
+        disconnect() {
+            return undefined;
+        }
+    };
+}
+
+/*
+ * jsdom lays nothing out, so it has no `scrollIntoView`. Putting the
+ * keyboard on the first field in error brings it into view too
+ * (`focusFirstError`), and here there is nowhere to scroll.
+ */
+if (
+    typeof Element !== "undefined" &&
+    typeof Element.prototype.scrollIntoView !== "function"
+) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+        return undefined;
+    };
+}

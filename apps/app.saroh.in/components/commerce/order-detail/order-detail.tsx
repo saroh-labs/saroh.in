@@ -283,6 +283,7 @@ export function OrderDetail({
                             : undefined
                     }
                     format={order.money ? format : undefined}
+                    currency={currency}
                 />
             ) : null}
             {next && !hold ? (
@@ -570,6 +571,7 @@ export function OrderDetail({
             </div>
             {payLink.dialog}
             <OrderSheets
+                currency={currency}
                 panel={panel}
                 opening={opening}
                 order={order}

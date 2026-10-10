@@ -2,9 +2,8 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
-import type { KeyboardEvent } from "react";
-import { useRef } from "react";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { GOAL_LATER } from "@/lib/modules/goals";
 import type { SetupGoal } from "@/lib/organizations/setup-plan";
 
@@ -30,7 +29,6 @@ export function SetupGoalChoice({
     labelledBy: string;
     describedBy?: string;
 }) {
-    const cards = useRef<(HTMLButtonElement | null)[]>([]);
     const choices = [
         ...goals.map((g) => ({
             key: g.key,
@@ -45,74 +43,53 @@ export function SetupGoalChoice({
             lands: "Opens Home.",
         },
     ];
-    const current = choices.findIndex((c) => c.key === value);
-
-    function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, at: number) {
-        const step =
-            event.key === "ArrowDown" || event.key === "ArrowRight"
-                ? 1
-                : event.key === "ArrowUp" || event.key === "ArrowLeft"
-                  ? -1
-                  : 0;
-        if (step === 0) return;
-        event.preventDefault();
-        const next = (at + step + choices.length) % choices.length;
-        onChange(choices[next].key);
-        cards.current[next]?.focus();
-    }
 
     return (
-        <div
-            role="radiogroup"
-            aria-labelledby={labelledBy}
-            aria-describedby={describedBy}
+        <ChoiceGroup
+            labelledBy={labelledBy}
+            describedBy={describedBy}
             className="grid gap-2"
-        >
-            {choices.map((choice, at) => {
+            value={choices.some((c) => c.key === value) ? value : null}
+            onChange={onChange}
+            choices={choices.map((choice) => {
                 const on = choice.key === value;
-                return (
-                    <button
-                        key={choice.key}
-                        ref={(el) => {
-                            cards.current[at] = el;
-                        }}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        data-goal={choice.key}
-                        tabIndex={on || (current === -1 && at === 0) ? 0 : -1}
-                        onClick={() => onChange(choice.key)}
-                        onKeyDown={(e) => onKeyDown(e, at)}
-                        className={cn(
-                            "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            on
-                                ? "border-foreground bg-muted"
-                                : "border-input hover:bg-muted active:bg-accent-active",
-                        )}
-                    >
-                        <span className="min-w-0 flex-1">
-                            <span className="block text-[13.5px] font-semibold">
-                                {choice.title}
+                return {
+                    value: choice.key,
+                    data: { "data-goal": choice.key },
+                    label: (
+                        <>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[13.5px] font-semibold">
+                                    {choice.title}
+                                </span>
+                                <span className="mt-0.5 block text-pretty text-[12px] leading-snug text-muted-foreground">
+                                    {choice.note}
+                                    {on ? ` ${choice.lands}` : null}
+                                </span>
                             </span>
-                            <span className="mt-0.5 block text-pretty text-[12px] leading-snug text-muted-foreground">
-                                {choice.note}
-                                {on ? ` ${choice.lands}` : null}
+                            <span
+                                aria-hidden
+                                className={cn(
+                                    "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                                    on
+                                        ? "border-foreground bg-foreground text-background"
+                                        : "border-input",
+                                )}
+                            >
+                                {on ? <Check className="size-3" /> : null}
                             </span>
-                        </span>
-                        <span
-                            aria-hidden
-                            className={cn(
-                                "flex size-5 shrink-0 items-center justify-center rounded-full border",
-                                on
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-input",
-                            )}
-                        >
-                            {on ? <Check className="size-3" /> : null}
-                        </span>
-                    </button>
-                );
+                        </>
+                    ),
+                };
             })}
-        </div>
+            itemClassName={(on) =>
+                cn(
+                    "flex min-h-11 items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left focus-visible:ring-offset-0",
+                    on
+                        ? "border-foreground bg-muted"
+                        : "border-input hover:bg-muted active:bg-accent-active",
+                )
+            }
+        />
     );
 }

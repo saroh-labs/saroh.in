@@ -3,6 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
+import { SwitchRow } from "@/components/shared/check-row";
 import type { ExtraGroup } from "@/lib/organizations/extras";
 import {
     extraGroups,
@@ -205,7 +206,7 @@ export function ExtraPermissions({
 }
 
 /**
- * One row, the whole of it the switch (the design's `role="switch"` row):
+ * One row, the whole of it the switch (the shared `Switch`, with its words):
  * pointer, hover, focus and pressed states when it can move; locked rows sit
  * on the muted ground and don't respond.
  */
@@ -226,22 +227,19 @@ function ExtraSwitch({
 }) {
     const inert = locked || disabled;
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-disabled={inert || undefined}
-            aria-label={`${label}, ${on ? "on" : "off"}${locked ? ", included in the role" : ""}`}
-            onClick={() => {
-                if (!inert) onToggle(!on);
-            }}
+        <SwitchRow
+            checked={on}
+            onChange={onToggle}
+            disabled={inert}
+            size="default"
+            name={`${label}, ${on ? "on" : "off"}${locked ? ", included in the role" : ""}`}
             className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-[11px] py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
+                "w-full rounded-lg px-[11px] py-[9px] transition-colors duration-fast",
                 locked
                     ? "cursor-default bg-foreground/[0.03]"
                     : disabled
-                      ? "cursor-not-allowed bg-card opacity-60"
-                      : "cursor-pointer bg-card hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
+                      ? "bg-card opacity-60"
+                      : "bg-card hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
             )}
         >
             <span className="min-w-0 flex-1">
@@ -259,24 +257,6 @@ function ExtraSwitch({
                     </span>
                 ) : null}
             </span>
-            <span
-                aria-hidden
-                className={cn(
-                    "relative inline-block h-6 w-[42px] shrink-0 rounded-full transition-colors duration-fast",
-                    on
-                        ? locked
-                            ? "bg-muted-foreground/40"
-                            : "bg-foreground"
-                        : "bg-border",
-                )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+        </SwitchRow>
     );
 }

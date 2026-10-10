@@ -4,7 +4,7 @@ import { count } from "@/lib/format/plural";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import { Notice } from "@saroh/ui/notice";
@@ -70,25 +70,16 @@ export function CategoryMergeSheet({
                 <p className="mb-2 text-[13px] font-semibold">
                     Merge {category.name} into
                 </p>
-                <div
-                    role="radiogroup"
-                    aria-label={`Merge ${category.name} into`}
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {targets.map((t) => (
-                        <button
-                            key={t.id || "none"}
-                            type="button"
-                            role="radio"
-                            aria-checked={to === t.id}
-                            disabled={busy}
-                            onClick={() => setTo(t.id)}
-                            className={chipClass(to === t.id)}
-                        >
-                            {t.name}
-                        </button>
-                    ))}
-                </div>
+                <ChipGroup
+                    label={`Merge ${category.name} into`}
+                    value={to}
+                    onChange={setTo}
+                    disabled={busy}
+                    choices={targets.map((t) => ({
+                        value: t.id,
+                        label: t.name,
+                    }))}
+                />
             </div>
             <Notice role="status">
                 {into === null

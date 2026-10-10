@@ -1,4 +1,4 @@
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import { FailedRead } from "@/components/shared/failed-read";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ProgressBar } from "@saroh/ui/progress-bar";
@@ -83,15 +83,14 @@ export function Chips<K extends string>({
             {chips.map((c) => {
                 const on = c.key === value;
                 return (
-                    <button
+                    <Chip
                         key={c.key}
-                        type="button"
-                        aria-pressed={on}
+                        as="toggle"
+                        on={on}
                         onClick={() => onChange(c.key)}
-                        className={chipClass(on)}
                     >
                         {c.label}
-                    </button>
+                    </Chip>
                 );
             })}
         </div>

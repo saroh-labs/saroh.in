@@ -46,6 +46,7 @@ import type {
     DiscountReach,
 } from "@/lib/discounts/service";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { Segmented } from "@saroh/ui/segmented";
 
 const formSchema = z
@@ -149,6 +150,7 @@ export function DiscountForm({
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             code: discount?.code ?? "",
             description: discount?.description ?? "",
@@ -238,7 +240,7 @@ export function DiscountForm({
         <Form {...form}>
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid max-w-[620px] gap-4"
             >
                 <FormCard>
@@ -298,7 +300,7 @@ export function DiscountForm({
                         control={form.control}
                         name="kind"
                         render={({ field }) => (
-                            <FormItem className="grid justify-items-start gap-2 space-y-0">
+                            <FormItem>
                                 <FormLabel>What it takes off</FormLabel>
                                 <Segmented
                                     label="What it takes off"
@@ -392,7 +394,6 @@ export function DiscountForm({
                         <Segmented
                             label="What it applies to"
                             aria-labelledby="discount-reach"
-                            className="max-w-full justify-self-start"
                             value={mode}
                             onValueChange={(v) => {
                                 setMode(v);
@@ -533,7 +534,7 @@ export function DiscountForm({
                         busy={isSubmitting}
                         busyLabel="Saving…"
                     >
-                        {discount ? "Save changes" : "Create code"}
+                        {discount ? "Save" : "Create code"}
                     </Button>
                     {discount?.state === "ACTIVE" ? (
                         <Button

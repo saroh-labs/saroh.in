@@ -27,6 +27,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import {
     descriptionFootnote,
     markupCount,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/products/editor-labels";
 import { LIMITS, stripHtml } from "@/lib/products/editor-sections";
 import { editorKey } from "@/lib/tiptap/editor-key";
+import { Label } from "@saroh/ui/label";
 
 /**
  * A product's description (editor v2, "Description"). Six tools up front —
@@ -338,39 +340,33 @@ function DescriptionSurface({
                         </Tool>
                     </>
                 ) : null}
-                <div
-                    role="radiogroup"
-                    aria-label="Text style"
+                <ChoiceGroup
+                    label="Text style"
                     className="mr-1 flex gap-0.5"
-                >
-                    {(["text", "h2", "h3"] as const).map((s) => (
-                        <button
-                            key={s}
-                            type="button"
-                            role="radio"
-                            aria-checked={state.style === s}
-                            disabled={off}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() =>
-                                s === "text"
-                                    ? chain().setParagraph().run()
-                                    : chain()
-                                          .toggleHeading({
-                                              level: s === "h2" ? 2 : 3,
-                                          })
-                                          .run()
-                            }
-                            className={cn(
-                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:text-disabled-foreground coarse:h-11",
-                                state.style === s
-                                    ? "border-foreground bg-muted"
-                                    : "border-border bg-card hover:bg-muted",
-                            )}
-                        >
-                            {s === "text" ? "Text" : s.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
+                    value={state.style}
+                    disabled={off}
+                    keepFocus
+                    reselect
+                    onChange={(s) =>
+                        s === "text"
+                            ? chain().setParagraph().run()
+                            : chain()
+                                  .toggleHeading({ level: s === "h2" ? 2 : 3 })
+                                  .run()
+                    }
+                    choices={(["text", "h2", "h3"] as const).map((s) => ({
+                        value: s,
+                        label: s === "text" ? "Text" : s.toUpperCase(),
+                    }))}
+                    itemClassName={(on) =>
+                        cn(
+                            "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:text-disabled-foreground coarse:h-11",
+                            on
+                                ? "border-foreground bg-muted"
+                                : "border-border bg-card hover:bg-muted",
+                        )
+                    }
+                />
                 <button
                     type="button"
                     role="switch"
@@ -504,9 +500,7 @@ function LinkTool({
                         setOpen(false);
                     }}
                 >
-                    <label htmlFor="desc-link" className="text-xs font-medium">
-                        Link to
-                    </label>
+                    <Label htmlFor="desc-link">Link to</Label>
                     <Input
                         id="desc-link"
                         value={href}

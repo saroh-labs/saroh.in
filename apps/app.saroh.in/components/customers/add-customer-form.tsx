@@ -24,6 +24,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { TextLink } from "@saroh/ui/text-link";
 
 const formSchema = z.object({
@@ -50,6 +51,7 @@ export function AddCustomerForm() {
     const [holder, setHolder] = useState<EmailHolder | null>(null);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: { email: "", firstName: "", lastName: "", phone: "" },
     });
     const { isSubmitting, isDirty } = form.formState;
@@ -85,7 +87,7 @@ export function AddCustomerForm() {
         <Form {...form}>
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid gap-4"
             >
                 <FormField

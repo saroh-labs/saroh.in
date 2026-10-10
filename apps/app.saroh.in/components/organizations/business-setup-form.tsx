@@ -47,6 +47,7 @@ import {
     takeLaunchOfferAfterOnboarding,
 } from "@/lib/saroh-billing/checkout-actions";
 
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { SetupGoalChoice } from "./setup-goal-choice";
 import { SetupKindChoice } from "./setup-kind-choice";
 
@@ -135,6 +136,7 @@ export function BusinessSetupForm({
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(schemaFor(needsName)),
+        ...PAGE_FORM,
         defaultValues: {
             kind: "BUSINESS",
             yourName: "",
@@ -303,7 +305,7 @@ export function BusinessSetupForm({
         <Form {...form}>
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid gap-5"
                 noValidate
             >

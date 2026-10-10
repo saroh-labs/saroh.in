@@ -4,6 +4,7 @@ import type { Service } from "./service";
 import type { ServiceDraft } from "./service-editor";
 import {
     bookingPageNote,
+    changedParts,
     changedSections,
     depositNote,
     draftOf,
@@ -11,8 +12,12 @@ import {
     fromMinor,
     glance,
     hasBookableHours,
+    HOURS_SECTION,
+    hoursNote,
     needsMeetingLink,
+    problemFor,
     savedMessage,
+    serviceFieldProblems,
     serviceInput,
     serviceProblems,
     serviceUpdate,
@@ -102,6 +107,7 @@ describe("draftOf", () => {
             bufferBefore: "5",
             gstRate: "18",
             sacCode: "999723",
+            hours: [],
         });
     });
 
@@ -600,6 +606,138 @@ describe("who takes it, with one person on the diary", () => {
         // With two or more on the diary it still is.
         expect(serviceProblems(named, true, false, false)).toContain(
             "Pick who takes it.",
+        );
+    });
+});
+
+describe("its own weekly hours are part of the draft (one Save)", () => {
+    const MON = { dayOfWeek: 1, start: "09:00", end: "18:00" };
+    const TUE = { dayOfWeek: 2, start: "09:00", end: "18:00" };
+
+    it("opens with the hours it is handed: saved ones, or what a new one starts with", () => {
+        expect(draftOf(service(), [], "UTC", [MON]).hours).toEqual([MON]);
+        expect(draftOf(null, [], "UTC", [MON, TUE]).hours).toEqual([MON, TUE]);
+        expect(draftOf(null, [], "UTC").hours).toEqual([]);
+    });
+
+    it("names them as their own section when they change, whatever the order", () => {
+        const saved = draft({ hours: [MON, TUE] });
+        expect(changedSections(saved, draft({ hours: [TUE, MON] }))).toEqual(
+            [],
+        );
+        expect(changedSections(saved, draft({ hours: [MON] }))).toEqual([
+            HOURS_SECTION,
+        ]);
+    });
+
+    it("says which call each change goes in, so Try again sends only what is left", () => {
+        const saved = draft({ hours: [MON] });
+        expect(changedParts(saved, saved)).toEqual({
+            fields: false,
+            who: false,
+            hours: false,
+        });
+        expect(changedParts(saved, draft({ hours: [MON, TUE] }))).toEqual({
+            fields: false,
+            who: false,
+            hours: true,
+        });
+        expect(
+            changedParts(saved, { ...saved, name: "Other", staffIds: [] }),
+        ).toEqual({ fields: true, who: true, hours: false });
+        // Pausing it is the service's own field.
+        expect(changedParts(saved, { ...saved, taking: false }).fields).toBe(
+            true,
+        );
+    });
+
+    it("refuses a window that ends before it starts, by its row", () => {
+        const bad = draft({
+            hours: [MON, { dayOfWeek: 3, start: "18:00", end: "09:00" }],
+        });
+        const problems = serviceFieldProblems(bad, true);
+        expect(problems).toEqual([
+            {
+                field: "hours",
+                row: 1,
+                message:
+                    "Wednesday's hours end before they start. Choose a later end.",
+            },
+        ]);
+        expect(problemFor(problems, "hours", 0)).toBeNull();
+        expect(problemFor(problems, "hours", 1)).toBe(
+            "Wednesday's hours end before they start. Choose a later end.",
+        );
+        expect(serviceProblems(bad, true)).toEqual([
+            "Wednesday's hours end before they start. Choose a later end.",
+        ]);
+    });
+
+    it("says a new one with hours of its own can be booked in them", () => {
+        expect(
+            savedMessage({
+                isNew: true,
+                name: "Check-up",
+                kind: "one",
+                comingUp: 0,
+                hasHours: true,
+            }),
+        ).toBe("Check-up added. Customers can book it in its weekly hours.");
+        expect(
+            savedMessage({
+                isNew: true,
+                name: "Yoga",
+                kind: "class",
+                comingUp: 0,
+                hasPerson: true,
+                hasHours: true,
+            }),
+        ).toBe("Yoga added. Customers can book it in its weekly hours.");
+        // Someone takes a one-to-one: their free time is still the answer.
+        expect(
+            savedMessage({
+                isNew: true,
+                name: "Check-up",
+                kind: "one",
+                comingUp: 0,
+                hasPerson: true,
+                hasHours: true,
+            }),
+        ).toBe(
+            "Check-up added. Customers can book it in the free time of who takes it.",
+        );
+    });
+
+    it("says over the rows that they go with the page's Save, and where a new one's came from", () => {
+        expect(hoursNote("Asia/Kolkata", true)).toBe(
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page. They start from your opening hours: change them if this runs at other times.",
+        );
+        expect(hoursNote("Asia/Kolkata", false)).toBe(
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page. With people on the diary, their free time inside these windows is what customers can book.",
+        );
+    });
+});
+
+describe("serviceFieldProblems", () => {
+    it("puts each problem on its field, in the order the page reads", () => {
+        const problems = serviceFieldProblems(
+            draft({ name: " ", minutes: "2", price: "", sacCode: "12" }),
+            true,
+        );
+        expect(problems.map((p) => p.field)).toEqual([
+            "name",
+            "minutes",
+            "price",
+            "sacCode",
+        ]);
+        expect(problemFor(problems, "name")).toBe("Add a name.");
+        expect(problemFor(problems, "gap")).toBeNull();
+        // The same sentences the strip under the header reads out.
+        expect(problems.map((p) => p.message)).toEqual(
+            serviceProblems(
+                draft({ name: " ", minutes: "2", price: "", sacCode: "12" }),
+                true,
+            ),
         );
     });
 });

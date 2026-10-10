@@ -1,17 +1,11 @@
 "use client";
 
-import { FieldError } from "@saroh/ui/field";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
-import {
-    FIELD,
-    HELP,
-    LABEL,
-    Section,
-} from "@/components/services/service-editor/fields";
+import { HELP, Section } from "@/components/services/service-editor/fields";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 
 /**
@@ -29,48 +23,40 @@ export function DetailsSection({
     const { values, set, errors } = fields;
     const ids = {
         name: useId(),
-        nameErr: useId(),
         what: useId(),
         help: useId(),
     };
     return (
         <Section title="Details">
-            <label htmlFor={ids.name} className={LABEL}>
-                Name
-            </label>
-            <Input
-                id={ids.name}
-                value={values.name}
-                maxLength={120}
-                autoComplete="off"
-                placeholder={
-                    withClasses
-                        ? "e.g. Monthly membership"
-                        : "e.g. A loaf a week"
-                }
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={errors.name ? ids.nameErr : undefined}
-                onChange={(e) => set({ name: e.target.value })}
-                className={FIELD}
-            />
-            <FieldError id={ids.nameErr}>{errors.name}</FieldError>
-            <label htmlFor={ids.what} className={cn(LABEL, "mt-3")}>
-                What&apos;s included
-            </label>
-            <Input
-                id={ids.what}
-                value={values.description}
-                maxLength={500}
-                autoComplete="off"
-                placeholder={
-                    withClasses
-                        ? "e.g. Gym floor and classes, any time"
-                        : "e.g. One 800g sourdough, collect Saturdays"
-                }
-                aria-describedby={ids.help}
-                onChange={(e) => set({ description: e.target.value })}
-                className={FIELD}
-            />
+            <Field label="Name" error={errors.name} className="space-y-[5px]">
+                <Input
+                    id={ids.name}
+                    value={values.name}
+                    maxLength={120}
+                    autoComplete="off"
+                    placeholder={
+                        withClasses
+                            ? "e.g. Monthly membership"
+                            : "e.g. A loaf a week"
+                    }
+                    onChange={(e) => set({ name: e.target.value })}
+                />
+            </Field>
+            <Field label="What's included" className="mt-3 space-y-[5px]">
+                <Input
+                    id={ids.what}
+                    value={values.description}
+                    maxLength={500}
+                    autoComplete="off"
+                    placeholder={
+                        withClasses
+                            ? "e.g. Gym floor and classes, any time"
+                            : "e.g. One 800g sourdough, collect Saturdays"
+                    }
+                    aria-describedby={ids.help}
+                    onChange={(e) => set({ description: e.target.value })}
+                />
+            </Field>
             <p id={ids.help} className={HELP}>
                 One line — it&apos;s what people read on the booking page and
                 their receipt.

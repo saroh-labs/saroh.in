@@ -7,7 +7,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -17,19 +17,22 @@ import { joinAnd } from "@/lib/editor-shell/state";
 import {
     archiveService,
     createService,
+    replaceRules,
     updateService,
 } from "@/lib/services/actions";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
 import { takingLabel } from "@/lib/services/service-cards";
-import type { ServiceDraft } from "@/lib/services/service-editor";
+import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 import {
+    changedParts,
     changedSections,
     draftOf,
     glance,
     hasBookableHours,
+    problemFor,
     savedMessage,
+    serviceFieldProblems,
     serviceInput,
-    serviceProblems,
     serviceUpdate,
     staffFor,
     stateLine,
@@ -37,13 +40,24 @@ import {
     TREATMENT_NEEDS_STOREFRONT,
     VIEW_ONLY,
 } from "@/lib/services/service-editor";
+import {
+    hoursFromRules,
+    hoursNotSaved,
+    rulesOf,
+    startingHours,
+} from "@/lib/services/service-hours-draft";
 import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
-import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import type {
+    BookingPaymentView,
+    StaffView,
+    WeeklyRange,
+} from "@/lib/staff/types";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
+import { focusFirstError } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { AtAGlance } from "./at-a-glance";
 import {
@@ -62,7 +76,14 @@ const SERVICES_HREF = "/services";
  * service and a saved one, in place of the old dialog and forms. What it
  * is, its time and where, its price, who takes it, the booking page and
  * At a glance; everything else the old forms had is under More settings.
- * One Save, in the header, applies to bookings made after it.
+ * One Save, in the header, applies to bookings made after it. It goes in
+ * up to three calls: the service, who takes it, and its own weekly hours
+ * (`PUT …/rules`). When the service is saved and its hours are not, the
+ * page says exactly that, keeps the hours typed, and Try again sends only
+ * the hours.
+ *
+ * A field says what is wrong once it has been left; Save says the rest and
+ * puts the keyboard on the first one.
  *
  * "At booking, they pay" sits under Price (E8), and Visits under Time
  * (E10): more than one makes it a treatment, which needs a storefront to
@@ -75,6 +96,7 @@ export function ServiceEditor({
     usage,
     currency,
     timezone,
+    openingHours = null,
     canEdit,
     hasPage,
     hasStorefront = null,
@@ -93,6 +115,11 @@ export function ServiceEditor({
     currency: string;
     /** The business's time zone, for a new service. */
     timezone: string;
+    /**
+     * When the business is open: what a new service's own hours start
+     * from. Null with none set, or when they couldn't be read.
+     */
+    openingHours?: WeeklyRange[] | null;
     canEdit: boolean;
     /** Whether the business has a booking page; null when unknown. */
     hasPage: boolean | null;
@@ -110,7 +137,16 @@ export function ServiceEditor({
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
     const hasStaff = people.length > 0;
-    const isNew = service === null;
+    // A service added by this page's Save whose hours then failed: it is
+    // saved, so the page edits it from here on, and Try again sends only
+    // the hours.
+    const [createdId, setCreatedId] = useState<string | null>(null);
+    const serviceId = service?.id ?? createdId;
+    const isNew = serviceId === null;
+    // Its own hours give a service its times when nobody on the diary
+    // takes it, or it is a class (`startingHours`).
+    const ownHours = (kind: ServiceDraft["kind"]) =>
+        startingHours(openingHours, kind === "class" || !hasStaff);
     const [saved, setSaved] = useState(() =>
         draftOf(
             service,
@@ -121,13 +157,42 @@ export function ServiceEditor({
                   ? [people[0].id]
                   : [],
             timezone,
+            service ? hoursFromRules(rules ?? []) : ownHours("one"),
         ),
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
-    const set = (patch: Partial<ServiceDraft>) =>
-        setDraft((d) => ({ ...d, ...patch }));
+    // A new service's hours follow its kind until someone changes them.
+    const [hoursTouched, setHoursTouched] = useState(false);
+    const set = (patch: Partial<ServiceDraft>) => {
+        if (patch.hours) setHoursTouched(true);
+        setDraft((d) => {
+            const next = { ...d, ...patch };
+            if (
+                service === null &&
+                createdId === null &&
+                !hoursTouched &&
+                !patch.hours &&
+                patch.kind &&
+                patch.kind !== d.kind
+            ) {
+                next.hours = ownHours(patch.kind);
+            }
+            return next;
+        });
+    };
+    // The service was saved and its hours were not: said on the page until
+    // they are, or the page is left.
+    const [hoursFailed, setHoursFailed] = useState<{
+        created: boolean;
+        reason: string;
+    } | null>(null);
+    const form = useRef<HTMLFieldSetElement>(null);
+    // Fields that have been left: each says what is wrong from then on.
+    const [left, setLeft] = useState<ReadonlySet<ServiceField>>(new Set());
+    const leave = (field: ServiceField) =>
+        setLeft((had) => (had.has(field) ? had : new Set(had).add(field)));
 
     // The API said there is no storefront to sell a treatment from (E10),
     // though the page couldn't tell: said under Time from then on.
@@ -141,13 +206,22 @@ export function ServiceEditor({
     const [tried, setTried] = useState(false);
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
-    const problems = serviceProblems(
+    const problems = serviceFieldProblems(
         draft,
         hasStaff,
         noStorefront,
         people.length === 1,
     );
     const bad = problems.length > 0;
+    const problem = (field: ServiceField) =>
+        tried || left.has(field) ? problemFor(problems, field) : null;
+    const hoursProblem = (row: number) =>
+        tried || hoursTouched ? problemFor(problems, "hours", row) : null;
+    // What is wrong under More settings opens it, so the keyboard can land
+    // on it.
+    const inMore = (["timezone", "bufferBefore", "sacCode", "hours"] as const)
+        .map((field) => problemFor(problems, field))
+        .some((message) => message !== null);
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
     const pill = statePill(isNew, draft.taking);
     const title = draft.name.trim() || (service?.name ?? "New service");
@@ -188,71 +262,118 @@ export function ServiceEditor({
     async function save() {
         if (!canEdit || saving || (!dirty && !isNew)) return;
         if (bad) {
-            // Say what is missing instead of a button that does nothing.
+            // Say what is missing, under each field, and go to the first.
             setTried(true);
+            focusFirstError(form.current);
             return;
         }
         setSaving(true);
         const input = serviceInput(draft, currency);
+        const parts = changedParts(saved, draft);
+        const creating = serviceId === null;
+        const added = creating || createdId !== null;
+        const ownHoursCount = draft.hours.length;
         const message = savedMessage({
-            isNew,
+            isNew: added,
             name: input.name,
             kind: draft.kind,
             comingUp,
             hasPerson: draft.staffIds.length > 0,
+            hasHours: ownHoursCount > 0,
         });
-        if (service) {
+
+        // 1. The service itself.
+        let id = serviceId;
+        if (id === null) {
+            const res = await runAction(() => createService(input));
+            if (!res?.ok) {
+                setSaving(false);
+                if (res) refused(res.error);
+                return;
+            }
+            id = res.data.id;
+            setCreatedId(id);
+        } else if (parts.fields) {
+            const target = id;
             const res = await runAction(() =>
-                updateService(service.id, serviceUpdate(draft, currency)),
+                updateService(target, serviceUpdate(draft, currency)),
             );
             if (!res?.ok) {
                 setSaving(false);
                 if (res) refused(res.error);
                 return;
             }
+        }
+        const savedId = id;
+        // From here the service is saved. Each later part says so itself
+        // when it is not, and `saved` keeps what the server still has.
+        let nowSaved: ServiceDraft = {
+            ...draft,
+            staffIds: saved.staffIds,
+            hours: saved.hours,
+        };
+
+        // 2. Who takes it: a call per person whose list changes.
+        let whoError: string | null = null;
+        if (staff && (creating ? draft.staffIds.length > 0 : parts.who)) {
             const who = await runAction(
                 async () => ({
-                    error: staff
-                        ? await setWho(service.id, draft.staffIds)
-                        : null,
+                    error: await setWho(savedId, draft.staffIds),
                 }),
-                { setBusy: setSaving, quiet: true },
+                { quiet: true },
             );
-            const whoError = who ? who.error : UNREACHED;
-            router.refresh();
-            if (whoError) {
-                setSaved({ ...draft, staffIds: saved.staffIds });
-                showError("Saved, but who takes it didn't change.", whoError);
-                return;
-            }
-            setSaved(draft);
-            showSuccess(message);
-            return;
+            whoError = who ? who.error : UNREACHED;
         }
-        const res = await runAction(() => createService(input));
-        if (!res?.ok) {
-            setSaving(false);
-            if (res) refused(res.error);
-            return;
+        if (!whoError) nowSaved = { ...nowSaved, staffIds: draft.staffIds };
+
+        // 3. Its own weekly hours: one call that replaces the set.
+        let hoursError: string | null = null;
+        const sendHours =
+            rules !== null && (creating ? ownHoursCount > 0 : parts.hours);
+        if (sendHours) {
+            const toSend = rulesOf(draft.hours) ?? [];
+            const res = await runAction(() => replaceRules(savedId, toSend), {
+                quiet: true,
+            });
+            hoursError = res ? (res.ok ? null : res.error) : UNREACHED;
         }
-        const who = await runAction(
-            async () => ({ error: await setWho(res.data.id, draft.staffIds) }),
-            { quiet: true },
+        if (!hoursError) nowSaved = { ...nowSaved, hours: draft.hours };
+
+        // A new service's draft started with these already in it, so what
+        // is not saved has to differ from `saved` for Try again to send it.
+        if (creating) {
+            if (whoError) nowSaved = { ...nowSaved, staffIds: [] };
+            if (hoursError) nowSaved = { ...nowSaved, hours: [] };
+        }
+        setSaved(nowSaved);
+        setSaving(false);
+        setHoursFailed(
+            hoursError ? { created: added, reason: hoursError } : null,
         );
-        const whoError = who ? who.error : UNREACHED;
+
         if (whoError) {
-            showError("Added, but who takes it wasn't saved.", whoError);
-        } else {
-            showSuccess(message);
+            showError(
+                added
+                    ? "Added, but who takes it wasn't saved."
+                    : "Saved, but who takes it didn't change.",
+                whoError,
+            );
         }
-        router.replace(`/services/${res.data.id}`);
+        if (hoursError) {
+            // It stays on this page with the hours typed, and says so.
+            if (!creating) router.refresh();
+            return;
+        }
+        if (!whoError) showSuccess(message);
+        if (added) router.replace(`/services/${savedId}`);
+        else router.refresh();
     }
 
     async function remove(): Promise<ConfirmResult> {
-        if (!service) return;
+        if (!serviceId) return;
         setSaving(true);
         // The confirm says a refusal, and one that never got there.
-        const res = await runAction(() => archiveService(service.id), {
+        const res = await runAction(() => archiveService(serviceId), {
             quiet: true,
         });
         if (!res?.ok) {
@@ -263,15 +384,17 @@ export function ServiceEditor({
         router.push(SERVICES_HREF);
     }
 
-    // What is wrong is said under the header once there is a name, or
-    // once Add service was pressed without one. The button is off only
-    // while that reason is on screen, never off with nothing said.
-    const problemsShown =
-        canEdit &&
-        bad &&
-        (dirty || isNew) &&
-        (draft.name.trim() !== "" || tried);
-    const saveOff = saving || (!dirty && !isNew) || problemsShown;
+    // Save is never off for "not filled in yet": pressing it says what is
+    // wrong under each field and under the header, and goes to the first.
+    const problemsShown = canEdit && bad && tried;
+    const saveOff = saving || (!dirty && !isNew);
+    const failedNotice = hoursFailed
+        ? hoursNotSaved({
+              created: hoursFailed.created,
+              name: draft.name.trim() || "The service",
+              reason: hoursFailed.reason,
+          })
+        : null;
     // Cmd/Ctrl+S: the page's one Save (it knows when there is nothing to).
     useSaveShortcut(() => void save(), canEdit);
     const crumb = service ? service.name : "New service";
@@ -347,7 +470,7 @@ export function ServiceEditor({
                                     busy={saving}
                                     busyLabel="Saving…"
                                 >
-                                    {isNew ? "Add service" : "Save changes"}
+                                    {isNew ? "Add service" : "Save"}
                                 </Button>
                             </div>
                         ) : (
@@ -360,26 +483,58 @@ export function ServiceEditor({
             </div>
             {problemsShown ? (
                 <Notice tone="error" layout="banner">
-                    {problems.join(" ")}
+                    {problems.map((p) => p.message).join(" ")}
+                </Notice>
+            ) : null}
+            {failedNotice && canEdit ? (
+                <Notice
+                    tone="error"
+                    layout="banner"
+                    role="alert"
+                    title={failedNotice.title}
+                    action={
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void save()}
+                            busy={saving}
+                            busyLabel="Saving…"
+                        >
+                            Try again
+                        </Button>
+                    }
+                >
+                    {failedNotice.body}
                 </Notice>
             ) : null}
 
             <fieldset
+                ref={form}
                 disabled={!canEdit || saving}
                 className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-4 pb-7 pt-4 sm:px-[26px]"
             >
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
-                    <WhatItIs draft={draft} set={set} />
+                    <WhatItIs
+                        draft={draft}
+                        set={set}
+                        problem={problem}
+                        leave={leave}
+                    />
                     <TimeSection
                         draft={draft}
                         set={set}
+                        problem={problem}
+                        leave={leave}
                         hasStaff={hasStaff}
                         noStorefront={noStorefront}
                     />
                     <PriceSection
                         draft={draft}
                         set={set}
+                        problem={problem}
+                        leave={leave}
                         currency={currency}
                         savedDeposit={saved.deposit}
                         paymentsLock={paymentsLock}
@@ -388,6 +543,8 @@ export function ServiceEditor({
                     <WhoTakesIt
                         draft={draft}
                         set={set}
+                        problem={problem}
+                        leave={leave}
                         staff={staff}
                         people={people}
                     />
@@ -395,7 +552,14 @@ export function ServiceEditor({
                     <MoreSettings
                         draft={draft}
                         set={set}
-                        serviceId={service?.id ?? null}
+                        problem={problem}
+                        leave={leave}
+                        hoursProblem={hoursProblem}
+                        startedFromOpening={
+                            isNew && !hoursTouched && draft.hours.length > 0
+                        }
+                        forceOpen={(tried && inMore) || hoursFailed !== null}
+                        serviceId={serviceId}
                         rules={rules}
                         canEdit={canEdit}
                         onDelete={() => setConfirmDelete(true)}
@@ -411,8 +575,9 @@ export function ServiceEditor({
                             rules === null ||
                             hasBookableHours(
                                 saved.kind,
-                                rules.length,
-                                saved.staffIds.length,
+                                // A new one is judged by what Save will send.
+                                (isNew ? draft : saved).hours.length,
+                                (isNew ? draft : saved).staffIds.length,
                             )
                         }
                     />

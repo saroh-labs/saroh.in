@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount } from "@/lib/products/editor-sections";
 
+import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { FieldHelp } from "./fields";
 
@@ -39,13 +40,10 @@ export function WholeStock({
     return (
         <>
             <div className="flex flex-wrap items-start gap-3">
-                <div className="min-w-[92px] flex-[0_1_112px]">
-                    <label
-                        htmlFor="pe-qty"
-                        className="mb-[5px] block text-[12px] font-medium"
-                    >
-                        On hand
-                    </label>
+                <Field
+                    label="On hand"
+                    className="min-w-[92px] flex-[0_1_112px]"
+                >
                     <Input
                         dense
                         aria-invalid={!isCount(draft.quantity) || qtyBad}
@@ -58,14 +56,11 @@ export function WholeStock({
                         aria-label="Quantity on hand"
                         onChange={(e) => onChange({ quantity: e.target.value })}
                     />
-                </div>
-                <div className="min-w-[92px] flex-[0_1_112px]">
-                    <label
-                        htmlFor="pe-low"
-                        className="mb-[5px] block text-[12px] font-medium"
-                    >
-                        Warn at
-                    </label>
+                </Field>
+                <Field
+                    label="Warn at"
+                    className="min-w-[92px] flex-[0_1_112px]"
+                >
                     <Input
                         dense
                         aria-invalid={!isCount(draft.lowStockAlert)}
@@ -80,9 +75,9 @@ export function WholeStock({
                         }
                         aria-label="Warn when on hand reaches"
                     />
-                </div>
+                </Field>
                 <div className="min-w-0 flex-[1_1_96px]">
-                    <p className="mb-[5px] text-[12px] font-medium">
+                    <p className="mb-1.5 text-[0.78125rem] font-medium leading-none">
                         Promised to orders
                     </p>
                     <p className="flex h-8 items-center font-display text-[15px] font-semibold tabular-nums">

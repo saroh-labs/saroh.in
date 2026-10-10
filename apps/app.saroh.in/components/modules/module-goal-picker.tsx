@@ -13,6 +13,7 @@ import { goalFor } from "@/lib/modules/goals";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
+import { Label } from "@saroh/ui/label";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
@@ -259,12 +260,12 @@ export function ModuleGoalPicker({
                         const descriptionId = `goal-${goal.moduleKey}-description`;
 
                         return (
-                            // Wrapping <label> makes the whole row a real hit
+                            // The wrapping label makes the whole row a real hit
                             // target without inventing a control. No `htmlFor`:
                             // the checkbox names itself from the title alone via
                             // aria-labelledby, so the reader hears "Sell products,
                             // checkbox" rather than the row's entire prose.
-                            <label
+                            <Label
                                 key={goal.moduleKey}
                                 // `wk-choice` + `data-selected` carry the commit
                                 // motion (workspace.css): the row settles with a
@@ -276,7 +277,7 @@ export function ModuleGoalPicker({
                                 style={
                                     { "--wk-i": index } as React.CSSProperties
                                 }
-                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
+                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 text-sm font-normal leading-normal hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
                                     isSelected
                                         ? "border-border-strong bg-muted"
                                         : "border-border"
@@ -319,7 +320,7 @@ export function ModuleGoalPicker({
                                         ) : null}
                                     </span>
                                 </span>
-                            </label>
+                            </Label>
                         );
                     })}
                 </fieldset>

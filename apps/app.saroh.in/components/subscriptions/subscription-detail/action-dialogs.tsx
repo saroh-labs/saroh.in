@@ -6,7 +6,7 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup, RadioCards } from "@/components/shared/choice-group";
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
@@ -124,27 +124,12 @@ function PauseBody({
     const picked = options.find((o) => o.key === key) ?? options[0];
     return (
         <>
-            <div
-                role="radiogroup"
-                aria-label="How long to pause"
-                className="flex flex-wrap gap-1.5"
-            >
-                {options.map((o) => {
-                    const on = o.key === picked.key;
-                    return (
-                        <button
-                            key={o.key}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => setKey(o.key)}
-                            className={chipClass(on)}
-                        >
-                            {o.label}
-                        </button>
-                    );
-                })}
-            </div>
+            <ChipGroup
+                label="How long to pause"
+                value={picked.key}
+                onChange={setKey}
+                choices={options.map((o) => ({ value: o.key, label: o.label }))}
+            />
             <p role="status" className={NOTE}>
                 {note(picked)}
             </p>
@@ -177,34 +162,16 @@ function SwitchBody({
     return (
         <>
             {offered.length ? (
-                <div
-                    role="radiogroup"
-                    aria-label="Plan to move to"
-                    className="flex flex-col gap-1.5"
-                >
-                    {offered.map((p) => {
-                        const on = picked === p.id;
-                        return (
-                            <button
-                                key={p.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => setPicked(p.id)}
-                                className={cn(
-                                    "flex w-full rounded-[9px] px-3 py-2.5 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    on
-                                        ? "border-[1.5px] border-foreground bg-muted/50 font-semibold"
-                                        : "border border-border bg-card font-medium hover:border-border-strong active:bg-accent-active",
-                                )}
-                            >
-                                {p.name} ·{" "}
-                                {formatMoneyMajor(p.price, p.currency)}/
-                                {PER[p.interval]}
-                            </button>
-                        );
-                    })}
-                </div>
+                <RadioCards
+                    label="Plan to move to"
+                    className="gap-1.5"
+                    value={picked}
+                    onChange={setPicked}
+                    options={offered.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} · ${formatMoneyMajor(p.price, p.currency)}/${PER[p.interval]}`,
+                    }))}
+                />
             ) : (
                 <p className="text-[13px] text-foreground/75">
                     There is no other plan on sale to move to. Add one in Plans
@@ -274,32 +241,13 @@ function CancelBody({
     return (
         <>
             {options.length > 1 ? (
-                <div
-                    role="radiogroup"
-                    aria-label="When it ends"
-                    className="mb-2.5 flex flex-col gap-1.5"
-                >
-                    {options.map((o) => {
-                        const on = when === o.value;
-                        return (
-                            <button
-                                key={o.value}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => setWhen(o.value)}
-                                className={cn(
-                                    "flex w-full rounded-[9px] px-3 py-2.5 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    on
-                                        ? "border-[1.5px] border-foreground bg-muted/50 font-semibold"
-                                        : "border border-border bg-card font-medium hover:border-border-strong active:bg-accent-active",
-                                )}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <RadioCards
+                    label="When it ends"
+                    className="mb-2.5 gap-1.5"
+                    value={when}
+                    onChange={setWhen}
+                    options={options}
+                />
             ) : null}
             <p role="status" className={cn(NOTE, "mt-0")}>
                 {note}

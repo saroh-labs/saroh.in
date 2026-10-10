@@ -13,9 +13,12 @@ import {
 } from "@/lib/products/settings-actions";
 import { patternProblem } from "@/lib/products/sku-pattern";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+import { Field } from "@saroh/ui/field";
+import { Input } from "@saroh/ui/input";
 import { Tip } from "@saroh/ui/tooltip";
 import { TabIntro, useUnsaved } from "./product-settings";
 
@@ -127,20 +130,16 @@ export function SkuTab({
             {canWrite ? null : <ReadOnlyNote />}
 
             <div className="rounded-[12px] border border-border bg-card px-4 py-3.5">
-                <label className="block text-[12px] font-medium">
-                    Pattern
-                    <input
+                <Field label="Pattern" className="space-y-[5px]">
+                    <Input
                         value={pattern}
                         disabled={!canWrite}
                         spellCheck={false}
                         onChange={(e) => setPattern(e.target.value)}
                         aria-invalid={!!problem}
-                        className={cn(
-                            "mt-[5px] block h-[38px] w-full rounded-[8px] border bg-card px-2.5 font-mono text-[13.5px] font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted/50 coarse:h-11",
-                            problem ? "border-destructive" : "border-border",
-                        )}
+                        className="font-mono"
                     />
-                </label>
+                </Field>
                 <div className="mt-[9px] flex flex-wrap gap-1.5">
                     {TOKENS.map((t) => (
                         <Tip label={t.what}>
@@ -177,25 +176,14 @@ export function SkuTab({
                         {problem}
                     </p>
                 ) : null}
-                <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={suggest}
+                <CheckRow
+                    checked={suggest}
                     disabled={!canWrite}
-                    onClick={() => setSuggest((v) => !v)}
-                    className="mt-3 flex items-center gap-[9px] text-left text-[12.5px] text-foreground/75 disabled:cursor-not-allowed coarse:min-h-11"
+                    onChange={setSuggest}
+                    className="mt-3 gap-[9px] text-[12.5px] text-foreground/75"
                 >
-                    <span
-                        aria-hidden
-                        className={cn(
-                            "size-4 shrink-0 rounded-[4px] bg-card",
-                            suggest
-                                ? "border-[5px] border-foreground"
-                                : "border-[1.5px] border-border-strong",
-                        )}
-                    />
                     Suggest SKUs in the product editor
-                </button>
+                </CheckRow>
             </div>
 
             <p className="mb-2 mt-[18px] text-[12.5px] font-semibold">

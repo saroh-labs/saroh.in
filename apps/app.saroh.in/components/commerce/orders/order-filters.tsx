@@ -16,7 +16,7 @@ import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import { ProductFilter } from "./product-filter";
 
 const SELECT =
@@ -211,13 +211,8 @@ function Toggle({
     onFlip: () => void;
 }) {
     return (
-        <button
-            type="button"
-            aria-pressed={on}
-            onClick={onFlip}
-            className={chipClass(on)}
-        >
+        <Chip as="toggle" on={on} onClick={onFlip}>
             {label}
-        </button>
+        </Chip>
     );
 }

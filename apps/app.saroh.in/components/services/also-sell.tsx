@@ -1,11 +1,11 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { CheckRow } from "@/components/shared/check-row";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";
@@ -69,23 +69,21 @@ export function AlsoSell({
         >
             <span className="text-[13px] font-semibold">Also sell</span>
             {features.map((f) => (
-                <label
+                <CheckRow
                     key={f.key}
-                    className="flex max-w-[300px] cursor-pointer items-start gap-[7px] text-[13px]"
+                    checked={f.on}
+                    disabled={pending}
+                    onChange={() => flip(f)}
+                    boxClassName="mt-0.5"
+                    className="max-w-[300px] items-start gap-[7px] coarse:min-h-0"
                 >
-                    <Checkbox
-                        checked={f.on}
-                        disabled={pending}
-                        onCheckedChange={() => flip(f)}
-                        className="mt-0.5"
-                    />
                     <span>
                         {f.label}
                         <span className="block text-[11.5px] text-muted-foreground">
                             {f.note}
                         </span>
                     </span>
-                </label>
+                </CheckRow>
             ))}
             <TurnOnSheet
                 picked={picked}

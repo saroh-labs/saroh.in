@@ -12,6 +12,7 @@ import { runAction } from "@/lib/api/run-action";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import type { SiteCommentView } from "@/lib/sites/service";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
 import { Tip } from "@saroh/ui/tooltip";
 
 /** A character that is a letter: letters change case, digits and punctuation do not. */
@@ -238,20 +239,16 @@ export function BlockFeedback({
                     void send();
                 }}
             >
-                <label
-                    htmlFor="block-feedback-reply"
-                    className="text-[0.8125rem] font-medium"
-                >
-                    {open.length === 0 ? "Add a note" : "Reply"}
-                </label>
-                <Textarea
-                    id="block-feedback-reply"
-                    value={reply}
-                    rows={3}
-                    maxLength={2000}
-                    placeholder="What should change, and why?"
-                    onChange={(e) => setReply(e.target.value)}
-                />
+                <Field label={open.length === 0 ? "Add a note" : "Reply"}>
+                    <Textarea
+                        id="block-feedback-reply"
+                        value={reply}
+                        rows={3}
+                        maxLength={2000}
+                        placeholder="What should change, and why?"
+                        onChange={(e) => setReply(e.target.value)}
+                    />
+                </Field>
                 <div>
                     <Tip
                         label={

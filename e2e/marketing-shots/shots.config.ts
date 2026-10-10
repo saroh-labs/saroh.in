@@ -421,9 +421,9 @@ const HELP_SHOTS_B: Shot[] = [
                 click: 'section:has(h2:text-is("Price")) [role="radio"]:has-text("25% deposit")',
             },
         ],
-        mark: 'button:has-text("Save changes")',
-        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
-        caption: "A change to the root canal, waiting for Save changes",
+        mark: 'button:text-is("Save")',
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save at the top right",
+        caption: "A change to the root canal, waiting for Save",
     },
     {
         key: "help-take-deposit-4",

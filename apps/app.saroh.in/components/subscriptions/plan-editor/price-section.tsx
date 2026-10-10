@@ -1,13 +1,12 @@
 "use client";
 
-import { FieldError } from "@saroh/ui/field";
+import { Field, FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { useId, useState } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
 import {
-    FIELD,
     HELP,
     LABEL,
     Section,
@@ -67,19 +66,18 @@ export function PriceSection({
             .join(" ") || undefined;
     return (
         <Section title="Price and billing">
-            <label htmlFor={ids.price} className={LABEL}>
-                Price
-            </label>
-            <div className={cn(FIELD, "w-[140px] max-w-full")}>
-                <MoneyInput
-                    id={ids.price}
-                    currency={currency}
-                    value={values.price}
-                    aria-invalid={Boolean(errors.price)}
-                    aria-describedby={describedBy}
-                    onValueChange={(price) => set({ price })}
-                />
-            </div>
+            <Field label="Price" htmlFor={ids.price} className="space-y-[5px]">
+                <div className="w-[140px] max-w-full">
+                    <MoneyInput
+                        id={ids.price}
+                        currency={currency}
+                        value={values.price}
+                        aria-invalid={Boolean(errors.price)}
+                        aria-describedby={describedBy}
+                        onValueChange={(price) => set({ price })}
+                    />
+                </div>
+            </Field>
             <FieldError id={ids.priceErr}>{errors.price}</FieldError>
             <p
                 id={ids.limit}

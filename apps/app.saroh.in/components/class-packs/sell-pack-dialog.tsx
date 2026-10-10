@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { runAction } from "@/lib/api/run-action";
@@ -246,21 +246,15 @@ export function SellPackDialog({
                         >
                             Paid by
                         </div>
-                        <div
-                            role="radiogroup"
-                            aria-labelledby={ids.paid}
-                            className="flex flex-wrap gap-1.5"
-                        >
-                            {DESK_PAID_BY.map((m) => (
-                                <Chip
-                                    key={m.value}
-                                    on={paidBy === m.value}
-                                    onClick={() => setPaidBy(m.value)}
-                                >
-                                    {m.label}
-                                </Chip>
-                            ))}
-                        </div>
+                        <ChipGroup
+                            labelledBy={ids.paid}
+                            value={paidBy}
+                            onChange={setPaidBy}
+                            choices={DESK_PAID_BY.map((m) => ({
+                                value: m.value,
+                                label: m.label,
+                            }))}
+                        />
                     </div>
                     {pack ? (
                         <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">

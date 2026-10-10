@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Pencil, Plus } from "lucide-react";
@@ -9,7 +8,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { moneySign } from "@/lib/format/money";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import type { SheetSize, SheetValues } from "@/lib/products/stock-sheet";
@@ -22,6 +20,8 @@ import {
 } from "@/lib/products/stock-sheet";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { QuickSheet } from "../quick-sheet";
 import { MoveStock } from "./move-stock";
 import { PRICE_ROW, ROW, SheetSizeRow } from "./stock-sheet-row";
@@ -117,7 +117,6 @@ export function StockSheet({
         started ||
         overview.stock.mode === "variant" ||
         overview.stock.product !== null;
-    const symbol = moneySign(product.currency);
     const split = counts && (stock?.split ?? false);
     const problem = sheetProblem(draft);
     const dirty =
@@ -243,7 +242,7 @@ export function StockSheet({
                             canWrite={may.canWrite}
                             hasVariants={product.variants.length > 0}
                             productPrice={draft.price}
-                            symbol={symbol}
+                            currency={product.currency}
                             onSize={(patch) => setSize(i, patch)}
                             onPrice={(price) =>
                                 setDraft((d) => ({ ...d, price }))
@@ -266,41 +265,35 @@ export function StockSheet({
             ) : null}
             {may.canWrite && product.variants.length > 0 ? (
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1.5">
-                        <span>The product&apos;s price</span>
-                        <Input
+                    <Field label="The product's price">
+                        <MoneyInput
+                            currency={product.currency}
                             value={draft.price}
-                            onChange={(e) =>
-                                setDraft((d) => ({
-                                    ...d,
-                                    price: e.target.value,
-                                }))
+                            onValueChange={(price) =>
+                                setDraft((d) => ({ ...d, price }))
                             }
-                            inputMode="decimal"
                         />
-                    </label>
-                    <label className="flex flex-col gap-1.5">
-                        <span>MRP (optional)</span>
-                        <Input
+                    </Field>
+                    <Field label="MRP" optional>
+                        <MoneyInput
+                            currency={product.currency}
                             value={draft.mrp}
-                            onChange={(e) =>
-                                setDraft((d) => ({ ...d, mrp: e.target.value }))
+                            onValueChange={(mrp) =>
+                                setDraft((d) => ({ ...d, mrp }))
                             }
-                            inputMode="decimal"
                         />
-                    </label>
+                    </Field>
                 </div>
             ) : may.canWrite ? (
-                <label className="mt-4 flex max-w-[50%] flex-col gap-1.5">
-                    <span>MRP (optional)</span>
-                    <Input
+                <Field label="MRP" optional className="mt-4 max-w-[50%]">
+                    <MoneyInput
+                        currency={product.currency}
                         value={draft.mrp}
-                        onChange={(e) =>
-                            setDraft((d) => ({ ...d, mrp: e.target.value }))
+                        onValueChange={(mrp) =>
+                            setDraft((d) => ({ ...d, mrp }))
                         }
-                        inputMode="decimal"
                     />
-                </label>
+                </Field>
             ) : null}
             <p className="mt-3 text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
                 {product.variants.length > 0

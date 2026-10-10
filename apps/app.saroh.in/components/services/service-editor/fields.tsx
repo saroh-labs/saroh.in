@@ -1,17 +1,35 @@
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import { useId } from "react";
+
+import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 
 /*
  * The Service Editor's small parts, after the design: a section card with
  * its title, a label over a field, and the grey note under one.
  */
 
-export const LABEL = "block";
-export const FIELD = "mt-[5px] font-normal";
+/**
+ * A caption over a group of controls (a set of chips, the weekly hours):
+ * the one label size, as `Field` draws it over a single control.
+ */
+export const LABEL = "block text-[0.78125rem] font-medium leading-none";
 export const HELP =
     "mt-1.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground";
+
+/**
+ * What a section is handed to edit the page's one draft: the draft, a way
+ * to change it, what is wrong with a field once that should be said (it
+ * has been left, or Save was pressed), and a way to say a field was left.
+ */
+export interface Edit {
+    draft: ServiceDraft;
+    set: (patch: Partial<ServiceDraft>) => void;
+    problem: (field: ServiceField) => string | null;
+    leave: (field: ServiceField) => void;
+}
 
 /** A titled card, the design's section. */
 export function Section({
@@ -49,28 +67,27 @@ export function NumberField({
     value,
     onChange,
     width,
+    error,
+    onLeave,
 }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
     /** The design's width for this field, as a Tailwind class. */
     width: string;
+    error?: string | null;
+    onLeave?: () => void;
 }) {
-    const id = useId();
     return (
-        <div className="min-w-0">
-            <label htmlFor={id} className={LABEL}>
-                {label}
-            </label>
+        <Field label={label} error={error} onBlur={onLeave}>
             <Input
-                id={id}
                 inputMode="numeric"
                 value={value}
                 onChange={(e) =>
                     onChange(e.target.value.replace(/[^0-9]/g, ""))
                 }
-                className={cn(FIELD, width, "max-w-full")}
+                className={cn(width, "max-w-full")}
             />
-        </div>
+        </Field>
     );
 }
