@@ -157,9 +157,9 @@ export function activityText(
         case "CREATED":
             return "Created";
         case "PUBLISHED":
-            return "Published — on sale";
+            return "Published and on sale";
         case "ARCHIVED":
-            return "Archived — nobody new can buy it";
+            return "Archived. Nobody new can buy it";
         case "RESTORED":
             return "Back on sale";
         case "CHANGED": {
@@ -167,7 +167,7 @@ export function activityText(
                 .map(([field, pair]) => changeWords(field, pair, pack, kind))
                 .filter((x): x is string => x !== null);
             return parts.length > 0
-                ? capital(parts.join("; "))
+                ? capital(parts.join(" · "))
                 : "Terms changed";
         }
         case "SOLD": {
@@ -186,7 +186,7 @@ export function activityText(
         case "EXTENDED": {
             const days = isNum(d.days) ? count(d.days, "day", "days") : null;
             const whose = e.holder ? `${e.holder.name}'s pack` : "A pack";
-            const why = isStr(d.reason) && d.reason ? ` — ${d.reason}` : "";
+            const why = isStr(d.reason) && d.reason ? `: ${d.reason}` : "";
             return days
                 ? `${whose} extended ${days}${why}`
                 : `${whose} extended${why}`;

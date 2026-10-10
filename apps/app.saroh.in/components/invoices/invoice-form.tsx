@@ -780,15 +780,15 @@ export function InvoiceForm({
                     </p>
                     <p className="text-[12px] text-muted-foreground">
                         {registered
-                            ? "GST worked out per line when it's issued — prices include it."
-                            : `No GST — ${businessName} isn't registered.`}
+                            ? "GST worked out per line when it's issued. Prices include it."
+                            : `No GST. ${businessName} isn't registered.`}
                     </p>
                     <p className="mt-3 text-[12.5px] leading-[1.5] text-foreground">
                         A draft has no number and can still change. Issuing
                         numbers it and locks the lines
                         {withLink
-                            ? ", and copies its pay link for you to send — Saroh doesn't send it."
-                            : " — Saroh doesn't send it; print it or share it yourself."}
+                            ? ", and copies its pay link for you to send. Saroh doesn't send it."
+                            : ". Saroh doesn't send it. Print it or share it yourself."}
                     </p>
                     <div className="mt-3 flex flex-col gap-2">
                         {/* Issuing numbers the invoice and locks its lines, so

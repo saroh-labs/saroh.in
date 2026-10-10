@@ -37,12 +37,12 @@ export function packChanges(
     }
     if (published.credits !== values.credits) {
         out.push(
-            `${published.credits ?? "—"} → ${values.credits ?? "—"} ${units}`,
+            `${published.credits ?? "none"} → ${values.credits ?? "none"} ${units}`,
         );
     }
     if (published.validityDays !== values.validityDays) {
         out.push(
-            `use within ${published.validityDays ?? "—"} → ${values.validityDays ?? "—"} days`,
+            `use within ${published.validityDays ?? "no limit"} → ${values.validityDays ?? "no limit"} days`,
         );
     }
     if (published.name.trim() !== values.name.trim() && values.name.trim()) {
@@ -92,7 +92,7 @@ export function publishedToast(
             ? `Changes published. The ${sold} already sold keep what they bought.`
             : "Changes published.";
     }
-    return `${values.name.trim()} is published — you can sell it now.`;
+    return `${values.name.trim()} is published. You can sell it now.`;
 }
 
 // — The side column ————————————————————————————————————————————————————
@@ -131,7 +131,7 @@ export function eachNote(
     if (drops.length) {
         const lo = Math.min(...drops);
         const hi = Math.max(...drops);
-        text += ` · drop-in ${lo === hi ? m(lo) : `${m(lo)}–${m(hi)}`}`;
+        text += ` · drop-in ${lo === hi ? m(lo) : `${m(lo)} to ${m(hi)}`}`;
     }
     return text;
 }
@@ -144,7 +144,7 @@ export function glance(
 ): [string, string][] {
     const each = perCredit(values);
     const drops = dropIns(values, services);
-    let saving = "—";
+    let saving = "Not set";
     if (each !== null && drops.length) {
         const mid = (Math.min(...drops) + Math.max(...drops)) / 2;
         if (mid > 0) {
@@ -155,11 +155,11 @@ export function glance(
         [
             `Per ${unitOf(values.kind)}`,
             each === null
-                ? "—"
+                ? "Not set"
                 : formatMoneyMajor(Math.round(each), values.currency),
         ],
         ["Saving vs drop-in", saving],
-        ["Sold so far", sold === null ? "—" : String(sold)],
+        ["Sold so far", sold === null ? "Not known" : String(sold)],
     ];
 }
 

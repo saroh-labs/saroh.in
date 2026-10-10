@@ -78,7 +78,11 @@ async function send<T>(
     fallback: string,
 ): Promise<SitesResult<T>> {
     const root = await base(siteId);
-    if (!root) return { ok: false, error: "No active organization." };
+    if (!root)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     let res: Response;
     try {
         res = await apiFetch(`${root}${path}`, {

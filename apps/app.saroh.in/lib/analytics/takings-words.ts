@@ -75,7 +75,7 @@ export function ordersHref(from: string, to: string): string {
 
 /** "31 Aug – 27 Sep". */
 export function spanLabel(s: WeekSpan): string {
-    return `${formatDay(s.from, { year: "never" })} – ${formatDay(s.to, { year: "never" })}`;
+    return `${formatDay(s.from, { year: "never" })} to ${formatDay(s.to, { year: "never" })}`;
 }
 
 /** "the week of 14 Sep". */
@@ -111,9 +111,9 @@ function changeClause(change: TakingsChange): string {
         case "LEVEL":
             return ", level with the four weeks before";
         case "FIRST_WEEKS":
-            return " — your first weeks on record, so there's nothing earlier to compare";
+            return ". These are your first weeks on record, so there's nothing earlier to compare";
         case "THIN":
-            return "; too little came in the four weeks before to compare";
+            return ". Too little came in the four weeks before to compare";
     }
 }
 
@@ -156,8 +156,8 @@ function bestAnswer(f: TakingsFigures): string | null {
         : `${capitalise(weekOf(f.best.start))}, at ${amount}`;
     const above = f.bestAboveUsual ?? 0;
     return above > 0
-        ? `${lead} — about ${above}% above ${usual}.`
-        : `${lead} — level with ${usual}.`;
+        ? `${lead}, about ${above}% above ${usual}.`
+        : `${lead}, level with ${usual}.`;
 }
 
 /** "since Monday 28 Sep", or "today (Monday 28 Sep)" on the Monday itself. */
@@ -180,11 +180,11 @@ function soFarAnswer(f: TakingsFigures): string {
     const lead = `You've taken ${money(so.takingsMinor, f.currency)} ${window}, from ${count(so.payments, "payment", "payments")}`;
     switch (so.change.kind) {
         case "AHEAD":
-            return `${lead} — ${so.change.percent}% ahead of the same days last week.`;
+            return `${lead}. That is ${so.change.percent}% ahead of the same days last week.`;
         case "BEHIND":
-            return `${lead} — ${so.change.percent}% behind the same days last week.`;
+            return `${lead}. That is ${so.change.percent}% behind the same days last week.`;
         case "LEVEL":
-            return `${lead} — level with the same days last week.`;
+            return `${lead}. That is level with the same days last week.`;
         case "THIN":
             return `${lead}.`;
     }
@@ -209,7 +209,7 @@ function signalAnswer(
     switch (signal.kind) {
         case "SLIDE":
             return {
-                answer: `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week — down ${signal.percent}%.`,
+                answer: `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week, down ${signal.percent}%.`,
                 link: {
                     href: ordersHref(signal.to.start, signal.to.end),
                     label: "See last week's orders",
@@ -345,9 +345,9 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
         {
             key: "best",
             label: "Best week",
-            value: f.best ? formatDay(f.best.start, { year: "never" }) : "—",
+            value: f.best ? formatDay(f.best.start, { year: "never" }) : "None",
             note: f.best
-                ? `${money(f.best.takingsMinor, f.currency)} — the marked bar.`
+                ? `${money(f.best.takingsMinor, f.currency)}, the marked bar.`
                 : "No week of the twelve took money.",
             href: f.best ? ordersHref(f.best.start, f.best.end) : last4Orders,
         },
@@ -356,7 +356,7 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
             label: "Average order, 4 weeks",
             value:
                 f.averageOrderMinor === null
-                    ? "—"
+                    ? "None"
                     : money(f.averageOrderMinor, f.currency),
             note:
                 f.averageOrderMinor === null
@@ -388,7 +388,7 @@ export function weekReadout(bar: WeekBar, currency: string | null): string {
 /** The week in progress, as the chart's readout says it. */
 export function soFarReadout(f: TakingsFigures): string {
     const so = f.soFar;
-    return `This week so far (${formatDay(so.start, { year: "never" })} – ${formatDay(so.through, { year: "never" })}) · ${money(so.takingsMinor, f.currency)} · ${count(so.orders, "paid order", "paid orders")}`;
+    return `This week so far (${formatDay(so.start, { year: "never" })} to ${formatDay(so.through, { year: "never" })}) · ${money(so.takingsMinor, f.currency)} · ${count(so.orders, "paid order", "paid orders")}`;
 }
 
 /** Under the answers: what the last four weeks were counted from. */

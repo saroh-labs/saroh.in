@@ -64,7 +64,7 @@ export function OverviewPhotos({
                                     aria-label={
                                         more
                                             ? `See all ${media.length}`
-                                            : `${m.alt || (m.kind === "video" ? "Video" : "Photo")}${i === 0 ? ", the cover" : ""} — open Photos`
+                                            : `${m.alt || (m.kind === "video" ? "Video" : "Photo")}${i === 0 ? ", the cover" : ""}, open Photos`
                                     }
                                     className={`${FOCUS} relative block aspect-square overflow-hidden rounded-lg bg-muted`}
                                 >
@@ -178,7 +178,7 @@ export function OverviewDescription({
                                         {mayContain
                                             .map((a) => a.name.toLowerCase())
                                             .join(", ")}{" "}
-                                        — same kitchen.
+                                        (same kitchen).
                                     </span>
                                 ) : null}
                             </dd>

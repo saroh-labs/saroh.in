@@ -71,7 +71,7 @@ export function VariantAddRow({
                     options={values.map((x) => ({
                         value: x.id,
                         label: takenIds.includes(x.id)
-                            ? `${x.value} — already a variant`
+                            ? `${x.value} (already a variant)`
                             : x.value,
                         disabled: takenIds.includes(x.id),
                     }))}

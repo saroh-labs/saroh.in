@@ -33,7 +33,7 @@ export const APPROVAL_BADGE: Record<
 > = {
     REQUESTED: {
         approved: () => false,
-        text: (by) => `In review — asked by ${by}`,
+        text: (by) => `In review, asked by ${by}`,
     },
     APPROVED: {
         approved: (stale) => !stale,
@@ -235,12 +235,12 @@ export function publishTitle({
         return `Finish or remove ${unfinishedPhrase(heldBack)} before publishing`;
     }
     if (dirty && saveError) {
-        return "Not saved — publish waits until your changes save";
+        return "Not saved. Publish waits until your changes save";
     }
-    if (dirty) return "Saving your changes — publish is available in a moment";
+    if (dirty) return "Saving your changes. Publish is available in a moment";
     if (needsApproval) {
         return canOverride
-            ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval; it's recorded.`
+            ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval, and it's recorded.`
             : `${NEEDS_APPROVAL_HINT} Make a test release and ask for a review.`;
     }
     if (neverPublished) return "Put this site live";

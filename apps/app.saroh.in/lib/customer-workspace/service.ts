@@ -126,7 +126,11 @@ export async function linkCustomer(
     customerId: string,
 ): Promise<WorkspaceResult> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(
         `${base}/customers/${encodeURIComponent(contactId)}/links`,
         { method: "POST", body: JSON.stringify({ customerId }) },
@@ -144,7 +148,11 @@ export async function getUnlinkPreview(
     contactId: string,
 ): Promise<CrmResult<UnlinkPreview>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(
         `${base}/customers/${encodeURIComponent(contactId)}/account/unlink`,
     );

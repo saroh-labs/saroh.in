@@ -58,7 +58,7 @@ export function DetailsSection({
                 />
             </Field>
             <p id={ids.help} className={HELP}>
-                One line — it&apos;s what people read on the booking page and
+                One line. It&apos;s what people read on the booking page and
                 their receipt.
             </p>
         </Section>

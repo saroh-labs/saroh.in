@@ -22,7 +22,7 @@ describe("what the workspace says a customer is told (A14)", () => {
             "They'll see it when they sign in on your site.",
         );
         expect(readyNoticeText("NONE", "Asha")).toBe(
-            "Nothing is sent to Asha — the step shows on the order.",
+            "Nothing is sent to Asha. The step shows on the order.",
         );
     });
 
@@ -43,11 +43,11 @@ describe("what the workspace says a customer is told (A14)", () => {
             "If you move or cancel, it shows in Asha's account on your site.",
         );
         expect(bookingChangeText("NONE", "Asha")).toBe(
-            "Saroh doesn't message Asha — tell them yourself if you move or cancel.",
+            "Saroh doesn't message Asha. Tell them yourself if you move or cancel.",
         );
         // Unknown keeps the advice to tell them.
         expect(bookingChangeText(null, "Asha")).toBe(
-            "Saroh doesn't message Asha — tell them yourself if you move or cancel.",
+            "Saroh doesn't message Asha. Tell them yourself if you move or cancel.",
         );
     });
 
@@ -57,7 +57,7 @@ describe("what the workspace says a customer is told (A14)", () => {
         );
         expect(classCancelText(null)).toBe("Saroh doesn't message them.");
         expect(classCancelText({ email: true, thread: false })).toBe(
-            "Those who've signed in on your site are emailed; tell the others yourself.",
+            "Those who've signed in on your site are emailed. Tell the others yourself.",
         );
         expect(classCancelText({ email: false, thread: true })).toBe(
             "Each of them sees it in their account on your site.",

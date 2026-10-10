@@ -34,7 +34,7 @@ export function inviteEmailError(
         return "They're already on the team.";
     }
     if (known.invitedEmails.some((e) => e.toLowerCase() === email)) {
-        return "They're already invited — resend it from the list.";
+        return "They're already invited. Resend it from the list.";
     }
     return null;
 }
@@ -69,7 +69,7 @@ export function invitationMeta(
     }
     parts.push(
         expires.getTime() <= now.getTime()
-            ? `link expired ${day(expires)} — resend for a fresh one`
+            ? `link expired ${day(expires)}, resend for a fresh one`
             : `link works until ${formatDate(expires, zone)}`,
     );
     return parts.join(" · ");
@@ -135,7 +135,7 @@ export function teamCountLine(
     // Bookable staff with no login use a seat too (DEC-105, UX-053).
     if (noLogin > 0) {
         parts.push(
-            `${count(noLogin, "person", "people")} taking bookings with no login`,
+            `${count(noLogin, "person", "people")} taking bookings with no sign-in`,
         );
     }
     if (waiting > 0) {

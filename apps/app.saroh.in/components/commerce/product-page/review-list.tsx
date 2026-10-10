@@ -95,7 +95,7 @@ export function ReviewList({
                                 </p>
                             ) : (
                                 <p className="mt-1.5 text-[13px] text-muted-foreground">
-                                    No comment left — just a rating.
+                                    No comment left, only a rating.
                                 </p>
                             )}
                             {r.reply && replyingTo !== r.id ? (

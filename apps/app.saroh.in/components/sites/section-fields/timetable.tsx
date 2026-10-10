@@ -101,8 +101,8 @@ export function TimetableFields({
                                     </div>
                                 ))}
                             <p className="text-xs text-muted-foreground">
-                                Only classes — services with more than one place
-                                — show on the timetable. A one-to-one service
+                                Only classes (services with more than one place)
+                                show on the timetable. A one-to-one service
                                 ticked here is left out.
                             </p>
                         </>

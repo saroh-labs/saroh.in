@@ -261,7 +261,7 @@ describe("the door: /open/:id", () => {
     it("a business that isn't theirs is refused, and nothing is said", async () => {
         setActiveOrganization.mockResolvedValue({
             ok: false,
-            error: "You are not a member of that organization.",
+            error: "You aren't in that business.",
         });
         const to = await open("org_x", "?joined=1&to=%2Fsites%2Fsite_1");
         expect(to).not.toBe("/sites/site_1");

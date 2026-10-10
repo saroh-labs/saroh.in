@@ -59,7 +59,7 @@ describe("onlinePaymentLine", () => {
         expect(
             onlinePaymentLine({ state: "FAILED", provider: "RAZORPAY" }, true),
         ).toEqual({
-            text: "Payment failed — send a new pay link",
+            text: "Payment failed: send a new pay link",
             tone: "act",
         });
         expect(
@@ -68,7 +68,7 @@ describe("onlinePaymentLine", () => {
                 false,
             ),
         ).toEqual({
-            text: "Waiting for Razorpay — the customer started paying",
+            text: "Waiting for Razorpay: the customer started paying",
             tone: "wait",
         });
         expect(onlinePaymentLine(null, true)).toBeNull();

@@ -86,7 +86,7 @@ export function nextLine(sub: Sub, now: Date = new Date()): string {
     if (sub.endsAt) return `Ends ${formatDate(sub.endsAt, tz, { now })}`;
     return sub.nextRenewalAt
         ? `Renews ${formatDate(sub.nextRenewalAt, tz, { now })}`
-        : "—";
+        : "None";
 }
 
 /** The day the current period ends, in its own timezone: "1 Oct". */
@@ -134,7 +134,7 @@ export function rowInvoice(
         const owed = owedLine(sub);
         const { id, number } = chase;
         if (sub.overdueCount >= 2 && owed) {
-            return { id, number, note: `${owed} — pause or cancel?` };
+            return { id, number, note: `${owed}. Pause or cancel?` };
         }
         const late = chase.dueAt
             ? Math.floor((now.getTime() - Date.parse(chase.dueAt)) / DAY)
@@ -225,7 +225,7 @@ export function explainStart(
         interval === "WEEK"
             ? `It keeps ${formatWeekday(toUtc(anchor), "UTC")} as its renewal day.`
             : `It keeps the ${ordinal(anchor.d)} as its renewal day.`;
-    return `${kept} Only the period holding today, ${span}, is invoiced now — the ${interval === "WEEK" ? "weeks" : "months"} before are not billed.`;
+    return `${kept} Only the period holding today, ${span}, is invoiced now. The ${interval === "WEEK" ? "weeks" : "months"} before are not billed.`;
 }
 
 // — The renewal job ————————————————————————————————————————————
@@ -258,5 +258,5 @@ export function checkedLine(r: Renewals, now: Date = new Date()): string {
     const next = renewalsLate(r, now)
         ? "the next check is late"
         : "the next check is within the hour";
-    return `${last} ${went}; ${next}.`;
+    return `${last} ${went}, and ${next}.`;
 }

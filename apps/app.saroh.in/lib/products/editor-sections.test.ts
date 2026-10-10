@@ -437,11 +437,11 @@ describe("15 photos and 3 videos (#517)", () => {
         const mp4 = { type: "video/mp4", size: 20 * MB };
         expect(mediaFileProblem(jpg, fourteen)).toBe("");
         expect(mediaFileProblem(jpg, [...fourteen, photo(99)])).toBe(
-            "Already 15 photos — take one off first.",
+            "Already 15 photos. Take one off first.",
         );
         expect(mediaFileProblem(mp4, [video(1), video(2)])).toBe("");
         expect(mediaFileProblem(mp4, [video(1), video(2), video(3)])).toBe(
-            "Already 3 videos — take one off first.",
+            "Already 3 videos. Take one off first.",
         );
         // A full set of photos still takes a video, and the other way round.
         expect(mediaFileProblem(mp4, [...fourteen, photo(99)])).toBe("");

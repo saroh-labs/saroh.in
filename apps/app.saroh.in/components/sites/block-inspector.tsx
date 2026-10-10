@@ -71,7 +71,7 @@ export function BlockInspector({
             <div className="px-6 py-10 text-center">
                 <p className="text-sm font-semibold">Nothing selected</p>
                 <p className="mx-auto mt-2 max-w-[30ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
-                    Click a block on the page, or pick one from the list on the
+                    Choose a block on the page, or pick one from the list on the
                     left, to see what can be changed about it.
                 </p>
             </div>
@@ -104,8 +104,8 @@ export function BlockInspector({
                     <Tip
                         label={
                             section.hidden
-                                ? "Hidden — this block is left out when you publish"
-                                : "Visible — this block publishes with the page"
+                                ? "Hidden. This block is left out when you publish"
+                                : "Visible. This block publishes with the page"
                         }
                     >
                         <Button
@@ -254,7 +254,7 @@ export function BlockInspector({
              */}
             <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
                 Written copy edits here and on the page at the same time.
-                Prices, dates and stock come from the workspace and change
+                Prices, dates and stock come from the rest of Saroh and change
                 there.
             </p>
         </div>

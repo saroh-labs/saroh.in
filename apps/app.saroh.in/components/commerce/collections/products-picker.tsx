@@ -265,7 +265,7 @@ export function ProductsPicker({
                                 })}
                                 {found.more ? (
                                     <p className="text-[11.5px] text-muted-foreground">
-                                        Showing the first 20 — type more of a
+                                        Showing the first 20. Type more of a
                                         name to narrow it.
                                     </p>
                                 ) : null}

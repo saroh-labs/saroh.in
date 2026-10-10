@@ -136,7 +136,7 @@ export function DescriptionSection({
                         />
                     }
                 >
-                    Key points — one per line
+                    Key points, one per line
                 </FieldLabel>
                 <Textarea
                     aria-invalid={!!errors.keyPoints}
@@ -145,7 +145,7 @@ export function DescriptionSection({
                     rows={4}
                     disabled={ro}
                     placeholder={
-                        "10% vitamin C, stable in the bottle\nFades dark spots in 6–8 weeks"
+                        "10% vitamin C, stable in the bottle\nFades dark spots in 6 to 8 weeks"
                     }
                     className="resize-y"
                 />

@@ -138,7 +138,7 @@ export function StockSection({
               : belowPromised
                 ? `${belowPromised.promised} promised to open orders${
                       belowPromised.title ? ` for ${belowPromised.title}` : ""
-                  } — on hand can't go below that.`
+                  }. On hand can't go below that.`
                 : "";
 
     useSection(
@@ -310,7 +310,7 @@ export function StockSection({
                             ? product.status === "PUBLISHED"
                                 ? "Nothing on hand. The product stays published and cannot be bought."
                                 : "Nothing on hand yet. Set a quantity before you publish it."
-                            : `On hand has reached the alert level — ${qty} left, alerting at ${low}.`}
+                            : `On hand has reached the alert level: ${qty} left, alerting at ${low}.`}
                     </LowNote>
                 ) : null}
             </SectionCard>
@@ -325,15 +325,15 @@ export function StockSection({
             <FieldHelp className="mt-[9px]" tone={problem ? "bad" : "quiet"}>
                 {problem ||
                     (splitting && counting === "whole"
-                        ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — nothing on the shelf is lost or counted twice."
+                        ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell. Nothing on the shelf is lost or counted twice."
                         : "Each variant has its own count, and the product's total is the sum. Promised updates itself as orders come in and are collected.")}
             </FieldHelp>
             {low.length > 0 && !problem ? (
                 <LowNote>
                     {low
                         .map((l) => `${l.title} has ${l.quantity} left`)
-                        .join(", ")}{" "}
-                    — at or under {plural(low.length, "its", "their")} warning
+                        .join(", ")}
+                    , at or under {plural(low.length, "its", "their")} warning
                     level.
                 </LowNote>
             ) : null}

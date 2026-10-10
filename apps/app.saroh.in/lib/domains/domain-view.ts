@@ -125,7 +125,7 @@ export function domainView(
                 showTxt: true,
                 showCname: true,
                 checkLabel: "Check now",
-                removeWarning: `Nothing changes for visitors: ${h} is not serving your site yet. You can add it again later; the record will be different.`,
+                removeWarning: `Nothing changes for visitors: ${h} is not serving your site yet. You can add it again later, and the record will be different.`,
             };
         case "verified-off":
             return {
@@ -205,7 +205,7 @@ export function checkLine(
             if (!when) return "Add the record, then check.";
             return problem
                 ? `Checked ${when}: ${problem}`
-                : `Checked ${when}: not live yet. A new DNS record can take up to 48 hours to spread; check again later.`;
+                : `Checked ${when}: not live yet. A new DNS record can take up to 48 hours to spread, so check again later.`;
         case "live":
             return when && problem ? `Checked ${when}: ${problem}` : null;
         case "problem":
@@ -232,7 +232,7 @@ function txtCheckLine(
         case "NO_RECORD":
         case null:
         default:
-            return `Checked ${when}: no record found yet. A new DNS record can take up to 48 hours to spread; check again later.`;
+            return `Checked ${when}: no record found yet. A new DNS record can take up to 48 hours to spread, so check again later.`;
     }
 }
 

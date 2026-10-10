@@ -196,5 +196,5 @@ export function extrasSummary(
     const list = new Intl.ListFormat("en", { type: "conjunction" }).format(
         added.map((l) => l.charAt(0).toLowerCase() + l.slice(1)),
     );
-    return `${roleLabel} plus ${list}. Extras only ever add — they cannot take away what ${roleLabel} already allows.`;
+    return `${roleLabel} plus ${list}. Extras only ever add. They cannot take away what ${roleLabel} already allows.`;
 }

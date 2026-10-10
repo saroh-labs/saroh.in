@@ -136,7 +136,7 @@ const OLD_HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
         topic: HELP_TOPICS.organisation,
     },
     {
-        label: "Help: turning capabilities on and off",
+        label: "Help: turning modules on and off",
         topic: HELP_TOPICS.capabilities,
     },
 ];

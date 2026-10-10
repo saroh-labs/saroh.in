@@ -274,7 +274,7 @@ export function DayPanel({
                                 href={LAYER_HOME[layer.key]}
                                 className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                             >
-                                {more} more — open {layer.label}
+                                {more} more. Open {layer.label}
                             </Link>
                         ) : null}
                     </section>

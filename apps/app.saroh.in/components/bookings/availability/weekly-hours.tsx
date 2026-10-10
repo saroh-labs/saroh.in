@@ -291,14 +291,14 @@ export function WeeklyHours({
                                     {out.length === 1
                                         ? "booking this week falls"
                                         : "bookings this week fall"}{" "}
-                                    outside these hours —{" "}
+                                    outside these hours:{" "}
                                     {out
                                         .map(
                                             (b) =>
                                                 `${b.who.split(" ")[0]} ${formatClock(b.start)}`,
                                         )
                                         .join(", ")}
-                                    . They stay booked; move them if you need
+                                    . They stay booked. Move them if you need
                                     to.
                                 </p>
                             ) : null}

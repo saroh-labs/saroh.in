@@ -105,8 +105,8 @@ export function openingNote(
     if (outside.length === 0) return null;
     const open = openOn(opening, day);
     if (open.length === 0) {
-        return `Not bookable in person — you're closed on ${DAY_NAMES[day]}.`;
+        return `Not bookable in person. You're closed on ${DAY_NAMES[day]}.`;
     }
     const verb = plural(outside.length, "isn't", "aren't");
-    return `${list(outside.map(span))} ${verb} bookable in person — you're open ${list(open.map(span))}.`;
+    return `${list(outside.map(span))} ${verb} bookable in person. You're open ${list(open.map(span))}.`;
 }

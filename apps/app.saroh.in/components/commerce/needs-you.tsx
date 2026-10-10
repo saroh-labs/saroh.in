@@ -69,8 +69,8 @@ export function NeedsYou({
                             )}
                         />
                         <span className="min-w-0 flex-[1_1_220px]">
-                            <strong className="font-semibold">{n.name}</strong>{" "}
-                            — {n.what}
+                            <strong className="font-semibold">{n.name}</strong>:{" "}
+                            {n.what}
                         </span>
                         <Button
                             asChild
@@ -90,7 +90,7 @@ export function NeedsYou({
             </ul>
             {more > 0 ? (
                 <p className="text-[12.5px] text-neutral-700 dark:text-muted-foreground">
-                    And {more} more — Show only these lists them all.
+                    And {more} more. Show only these lists them all.
                 </p>
             ) : null}
         </section>

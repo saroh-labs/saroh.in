@@ -64,8 +64,7 @@ describe("the list", () => {
         expect(s.button("Add allergen")).toBeDefined();
         // One on a product can't be removed, and says why.
         expect(
-            s.button("Milk is on 3 products — take it off them first")
-                ?.disabled,
+            s.button("Milk is on 3 products. Take it off them first")?.disabled,
         ).toBe(true);
         expect(s.button("Remove Sesame")?.disabled).toBe(false);
     });

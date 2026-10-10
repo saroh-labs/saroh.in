@@ -113,7 +113,7 @@ export function zoneOption(zone: string, at: Date = new Date()): ZoneOption {
     const city = current === "UTC" ? "UTC" : cityOf(current);
     return {
         zone: current,
-        label: `${city}${name ? ` — ${name}` : ""} (${offset})`,
+        label: `${city}${name ? ` · ${name}` : ""} (${offset})`,
         city,
         name,
         offset,

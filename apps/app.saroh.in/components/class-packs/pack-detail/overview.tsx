@@ -145,8 +145,8 @@ export function PackOverviewTab({
                     </Button>
                 ) : null}
                 <span className="flex-[1_1_220px] text-[12px] text-muted-foreground">
-                    Changes only affect new sales — packs already sold keep
-                    their terms.
+                    Changes only affect new sales. Packs already sold keep their
+                    terms.
                 </span>
             </div>
             <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))]">

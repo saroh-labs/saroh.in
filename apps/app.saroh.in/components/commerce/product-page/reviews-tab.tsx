@@ -38,7 +38,7 @@ export function ProductReviewsTab({
                 description={
                     product.status === "PUBLISHED"
                         ? "Customers are asked after their order is delivered. Only people who bought it can review it."
-                        : "It isn't on the shop, so nobody can order it yet — reviews start after it is published."
+                        : "It isn't on the shop, so nobody can order it yet. Reviews start after it is published."
                 }
             />
         );
@@ -49,7 +49,7 @@ export function ProductReviewsTab({
             <Card className="flex-[1_1_250px] rounded-[12px] px-[18px] py-4">
                 <p className="flex items-baseline gap-2">
                     <span className="font-display text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {summary.average?.toFixed(1) ?? "—"}
+                        {summary.average?.toFixed(1) ?? "None"}
                     </span>
                     {summary.average ? (
                         <span

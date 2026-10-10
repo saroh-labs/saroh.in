@@ -83,9 +83,9 @@ function ProjectModuleRow({
                 <p className="text-sm font-medium">{module.label}</p>
                 {!orgEnabled ? (
                     <p className="text-sm text-muted-foreground">
-                        Not enabled for the organization.{" "}
+                        Not turned on for the business.{" "}
                         <TextLink href="/settings/modules">
-                            Enable it first
+                            Turn it on first
                         </TextLink>
                     </p>
                 ) : !module.canManage ? (

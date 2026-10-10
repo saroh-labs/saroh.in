@@ -99,19 +99,19 @@ export function changeWhat(
                 : "Paused";
         case "RESUMED": {
             if (data.restarted === true) {
-                return `Resumed — a new period started${invoice}`;
+                return `Resumed. A new period started${invoice}`;
             }
             const days = num(data.extendedDays) ?? 0;
             return days > 0
-                ? `Resumed — the paid period moved ${count(days, "day")} later`
+                ? `Resumed. The paid period moved ${count(days, "day")} later`
                 : "Resumed";
         }
         case "CANCELLED":
             return "Cancelled";
         case "CANCEL_SCHEDULED":
-            return `Cancelled — ends ${day(data.endsAt)}`;
+            return `Cancelled, ends ${day(data.endsAt)}`;
         case "KEPT":
-            return "Kept going — no longer ending";
+            return "Kept going, no longer ending";
         case "ENDED":
             return "Ended with its period";
         case "PLAN_CHANGE_BOOKED": {
@@ -147,19 +147,19 @@ export function changeWhat(
                 : `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
         case "RENEWED":
             return data.uncharged === true
-                ? "Renewed — nothing charged, every collection skipped"
+                ? "Renewed. Nothing charged, every collection skipped"
                 : `Renewed${invoice}`;
         case "RETRIED":
             return `Made a new pay link${invoice}`;
         case "RESUME_REFUSED":
-            return "Couldn't resume on its own — Payments is off";
+            return "Couldn't resume on its own. Payments is off";
         case "RENEWAL_FAILED":
             // Autopay stood aside: the customer was paying by link.
             return data.reason === "CHECKOUT_OPEN"
-                ? `Autopay didn't charge — the customer was paying by link${invoice}`
+                ? `Autopay didn't charge. The customer was paying by link${invoice}`
                 : `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
-            return "Not charged — above the autopay limit";
+            return "Not charged, above the autopay limit";
         case "MANDATE_SET_UP": {
             // D12: the method the customer picked.
             const method = str(data.method);
@@ -170,13 +170,13 @@ export function changeWhat(
             // D20: autopay ends with what it was authorised for.
             switch (data.reason) {
                 case "SUBSCRIPTION_ENDED":
-                    return "Autopay cancelled — subscription ended";
+                    return "Autopay cancelled, subscription ended";
                 case "MERGED":
-                    return "Autopay cancelled — customers merged";
+                    return "Autopay cancelled, customers merged";
                 case "PRIVACY_REMOVAL":
-                    return "Autopay cancelled — their details were removed";
+                    return "Autopay cancelled, their details were removed";
                 case "REPLACED":
-                    return "Autopay replaced — they approved a new one";
+                    return "Autopay replaced. They approved a new one";
                 default:
                     return "Autopay cancelled";
             }
@@ -200,7 +200,7 @@ export function changeWhat(
                     : data.reason === "PLAN_CHANGED"
                       ? "plan changed"
                       : "cancelled";
-            return `${how} the early renewal invoice — ${why} before the renewal, autopay not charged${invoice}`;
+            return `${how} the early renewal invoice: ${why} before the renewal, autopay not charged${invoice}`;
         }
         default:
             return "Changed";
@@ -213,7 +213,7 @@ function periodText(data: Data, timeZone: string, now: Date): string {
     const end = str(data.periodEnd);
     if (!start || !end) return "a period";
     const last = new Date(new Date(end).getTime() - 86_400_000).toISOString();
-    return `${formatDate(start, timeZone, { now })} – ${formatDate(last, timeZone, { now })}`;
+    return `${formatDate(start, timeZone, { now })} to ${formatDate(last, timeZone, { now })}`;
 }
 
 /**

@@ -111,7 +111,7 @@ export function BusinessTaxRows({
                     {/* India's financial year, which invoices are
                         numbered by. GST law fixes it for every
                         business, so it is said rather than offered. */}
-                    <span>April – March</span>
+                    <span>April to March</span>
                     <Locked>Set by GST law</Locked>
                 </span>
             </Row>

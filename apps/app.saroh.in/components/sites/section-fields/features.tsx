@@ -107,7 +107,7 @@ export function FeaturesFields({
                     label="Two columns"
                     checked={c.columns === 2}
                     onChange={(on) => patch({ columns: on ? 2 : undefined })}
-                    note="On a desk the points sit in two columns; on a phone, one."
+                    note="On a desk the points sit in two columns, and on a phone, one."
                 />
             ) : null}
             <Field optional label="Note under the points">

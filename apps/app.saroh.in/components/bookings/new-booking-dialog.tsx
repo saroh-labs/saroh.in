@@ -509,7 +509,7 @@ export function NewBookingDialog({
                                         </span>
                                         <span className="text-[12px] text-muted-foreground">
                                             {usePack
-                                                ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking; cancelling gives it back.`
+                                                ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking, and cancelling gives it back.`
                                                 : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
                                         </span>
                                     </span>

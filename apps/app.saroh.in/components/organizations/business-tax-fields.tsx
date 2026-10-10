@@ -202,7 +202,7 @@ export function BusinessTaxFields({
                         at={at}
                     />
                     <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
-                        Invoices already numbered keep their numbers; a new
+                        Invoices already numbered keep their numbers. A new
                         format starts with the next one, and the count carries
                         on. The financial year runs April to March, as GST law
                         sets it.

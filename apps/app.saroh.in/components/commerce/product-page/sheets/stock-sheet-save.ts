@@ -101,7 +101,7 @@ export async function saveStockSheet(
             else failed.push(`the counts (${res.error})`);
         }
     } catch {
-        failed.push("the rest — Saroh couldn't be reached");
+        failed.push("the rest (Saroh couldn't be reached)");
     }
     return { stopped: null, failed, done };
 }

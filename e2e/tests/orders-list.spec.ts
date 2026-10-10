@@ -215,14 +215,14 @@ test.describe("orders list", () => {
 
         await page.goto("/commerce/orders");
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
         await page.getByRole("link", { name: "Next" }).click();
         await expect(page).toHaveURL(/cursor=/);
-        await expect(page.getByText(/Showing 51–/)).toBeVisible();
+        await expect(page.getByText(/Showing 51 to /)).toBeVisible();
         await page.getByRole("link", { name: "Previous" }).click();
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
         await expect(page).not.toHaveURL(/cursor=/);
     });

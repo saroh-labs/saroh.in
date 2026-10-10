@@ -340,21 +340,21 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         ).toBeVisible();
         await page.getByRole("button", { name: "Archive" }).click();
         await expect(
-            page.getByText(/^Archived — nobody new can join/),
+            page.getByText(/^Archived. Nobody new can join/),
         ).toBeVisible();
         await expect(
             page.getByRole("button", { name: "Open to sign-ups" }),
         ).toBeVisible();
         await page.getByRole("tab", { name: "History" }).click();
         await expect(
-            page.getByText("Archived — closed to new sign-ups").first(),
+            page.getByText("Archived, closed to new sign-ups").first(),
         ).toBeVisible();
         await undo(page);
         await expect(
             page.getByRole("button", { name: "Archive" }),
         ).toBeVisible();
         await expect(
-            page.getByText(/^Archived — nobody new can join/),
+            page.getByText(/^Archived. Nobody new can join/),
         ).toHaveCount(0);
         await archivePlan(page, plan.id);
     });
@@ -419,7 +419,7 @@ test.describe("the Plan Editor (D7)", () => {
         await page.getByRole("link", { name: "New plan" }).click();
         await expect(page).toHaveURL(/\/billing\/plans\/new$/);
         await expect(
-            page.getByText("Not saved yet — start with a name"),
+            page.getByText("Not saved yet. Start with a name"),
         ).toBeVisible();
         // The editor shell is the page's one main landmark; the page used
         // to wrap it in a second <main> (axe: landmark-no-duplicate-main).
@@ -427,7 +427,7 @@ test.describe("the Plan Editor (D7)", () => {
 
         await page.getByLabel("Name").fill(name);
         await expect(
-            page.getByText(/^Saved as a draft — nobody can join it yet/),
+            page.getByText(/^Saved as a draft. Nobody can join it yet/),
         ).toBeVisible();
         // The address waits while you type, and moves once you leave the
         // field (UX-080), so the page never jumps under the cursor.
@@ -443,7 +443,7 @@ test.describe("the Plan Editor (D7)", () => {
 
         await page.getByRole("textbox", { name: /^Price/ }).fill("999");
         await expect(
-            page.getByText("Draft · saved — nobody can join it yet"),
+            page.getByText("Draft · saved, nobody can join it yet"),
         ).toBeVisible();
         const editAddress = page.url();
         try {
@@ -493,7 +493,7 @@ test.describe("the Plan Editor (D7)", () => {
             await page.goto(editAddress.replace(/\/edit$/, ""));
             await page.getByRole("button", { name: "Archive" }).click();
             await expect(
-                page.getByText(/^Archived — nobody new can join/),
+                page.getByText(/^Archived. Nobody new can join/),
             ).toBeVisible();
         }
     });
@@ -552,7 +552,7 @@ test.describe("the Plan Editor (D7)", () => {
             .getByLabel("Name")
             .fill(`E2E draft ${ownStamp(test.info())}`);
         await expect(
-            page.getByText(/^Saved as a draft — nobody can join it yet/),
+            page.getByText(/^Saved as a draft. Nobody can join it yet/),
         ).toBeVisible();
         await page
             .getByRole("button", { name: "Delete draft" })

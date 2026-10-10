@@ -34,7 +34,7 @@ export function KitchenPaymentCard({
                     {state.body}
                     {canRecord
                         ? ""
-                        : " Your role can't record payments — ask the owner or an admin to mark it paid."}
+                        : " Your role can't record payments. Ask the owner or an admin to mark it paid."}
                 </p>
             ) : null}
         </Panel>

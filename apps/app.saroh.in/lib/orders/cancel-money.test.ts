@@ -78,7 +78,7 @@ describe("cancelWords", () => {
         expect(
             cancelWords({ ...base, paid: "online", amount: 480, already: 0 }),
         ).toEqual({
-            says: "₹480 goes back to Razorpay, in 3–5 days. Its stock goes back on the shelf once the refund is confirmed.",
+            says: "₹480 goes back to Razorpay, in 3 to 5 days. Its stock goes back on the shelf once the refund is confirmed.",
             confirm: "Refund ₹480",
         });
     });
@@ -87,7 +87,7 @@ describe("cancelWords", () => {
         expect(
             cancelWords({ ...base, paid: "online", amount: 380, already: 100 }),
         ).toEqual({
-            says: "₹100 has already been refunded, so the ₹380 left goes back to Razorpay, in 3–5 days. Its stock goes back on the shelf once the refund is confirmed.",
+            says: "₹100 has already been refunded, so the ₹380 left goes back to Razorpay, in 3 to 5 days. Its stock goes back on the shelf once the refund is confirmed.",
             confirm: "Refund ₹380",
         });
     });
@@ -146,7 +146,7 @@ describe("cancelWords", () => {
                 already: 100,
             }),
         ).toEqual({
-            says: "What's left goes back to Razorpay, in 3–5 days. Its stock goes back on the shelf once the refund is confirmed.",
+            says: "What's left goes back to Razorpay, in 3 to 5 days. Its stock goes back on the shelf once the refund is confirmed.",
             confirm: "Cancel order",
         });
     });

@@ -194,7 +194,7 @@ export function ReviewPanel({
             {review.pending ? (
                 <>
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                        In review. Publishing still works — it is recorded as
+                        In review. Publishing still works. It is recorded as
                         going ahead without approval, and ends the review.
                     </p>
                     {release ? null : (

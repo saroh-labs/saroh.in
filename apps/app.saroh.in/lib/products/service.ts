@@ -323,7 +323,7 @@ async function mutate<T = { id: string }>(
     });
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return { ...failure, field: resultField(failure.field) };
 }
 

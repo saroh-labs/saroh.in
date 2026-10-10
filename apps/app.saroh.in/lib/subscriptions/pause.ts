@@ -72,7 +72,7 @@ export function pauseNote(
     const periodEnd = formatDate(sub.currentPeriodEnd, tz, { now });
     const added = `The days it's paused are added to the period ${first} has paid for.`;
     if (!option?.until) {
-        return `Nothing is charged or collected until you resume it. Resume before ${periodEnd} and the days it's paused are added to the period ${first} has paid for; later, a new period starts with its invoice.`;
+        return `Nothing is charged or collected until you resume it. Resume before ${periodEnd} and the days it's paused are added to the period ${first} has paid for. Later, a new period starts with its invoice.`;
     }
     const until = formatDate(option.until, tz, { now });
     if (option.until <= localDateKey(new Date(sub.currentPeriodEnd), tz)) {

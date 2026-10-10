@@ -159,7 +159,7 @@ export function OrganizationSwitcher({
                 <button
                     type="button"
                     disabled={pending}
-                    aria-label={`Change business — currently ${active.name}`}
+                    aria-label={`Change business, currently ${active.name}`}
                     className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:text-disabled-foreground coarse:min-h-11"
                 >
                     <BusinessTile name={active.name} active size={30} />

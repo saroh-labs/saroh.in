@@ -14,10 +14,10 @@ const january = new Date("2026-01-15T12:00:00Z");
 describe("zoneLabel", () => {
     it("reads as a city, the zone's name and its offset", () => {
         expect(zoneLabel("Asia/Kolkata", july)).toBe(
-            "Kolkata — India Standard Time (GMT+5:30)",
+            "Kolkata · India Standard Time (GMT+5:30)",
         );
         expect(zoneLabel("America/Argentina/Buenos_Aires", july)).toMatch(
-            /^Buenos Aires — .+ \(GMT-3\)$/,
+            /^Buenos Aires · .+ \(GMT-3\)$/,
         );
     });
 

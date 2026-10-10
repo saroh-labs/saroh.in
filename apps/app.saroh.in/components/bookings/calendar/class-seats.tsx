@@ -36,10 +36,10 @@ function prepaid(b: DiaryBooking): boolean {
 function cancelledText(b: DiaryBooking): string {
     if (b.cancelledLate) {
         return prepaid(b)
-            ? "Cancelled late — the class is used"
+            ? "Cancelled late. The class is used"
             : "Cancelled late";
     }
-    return prepaid(b) ? "Cancelled — the class went back" : "Cancelled";
+    return prepaid(b) ? "Cancelled. The class went back" : "Cancelled";
 }
 
 /**
@@ -68,7 +68,7 @@ export function ClassSeats({
         note =
             ctx.now < mark.getTime()
                 ? `Classes come back if cancelled before ${formatWeekday(mark, ctx.timezone, "short")} ${formatTime(mark, ctx.timezone)}`
-                : `Past the ${rule}-hour mark — cancelling now uses the class`;
+                : `Past the ${rule}-hour mark. Cancelling now uses the class`;
     }
     const seats = [...session.bookings].sort(
         (a, b) =>

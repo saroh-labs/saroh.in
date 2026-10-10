@@ -145,12 +145,12 @@ function EditDraft({
         : addressMissing
           ? "An address needs its first line, town, state and PIN code."
           : diff > 0
-            ? `${sentenceStart(first)} owes ${money(diff)} more. It shows as due on the order — nothing is sent to ${first}.`
+            ? `${sentenceStart(first)} owes ${money(diff)} more. It shows as due on the order. Nothing is sent to ${first}.`
             : diff < 0
               ? `${money(-diff)} goes back to ${refundTo} when you save.`
               : same
                 ? "No changes yet."
-                : "Same total — nothing to charge or refund.";
+                : "Same total. Nothing to charge or refund.";
 
     const step = (id: string, by: number) =>
         setQty((q) => ({

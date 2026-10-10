@@ -82,10 +82,10 @@ export const PACK_COPY: EditorCopy = {
     noun: "pack",
     liveLabel: "Live",
     liveClean: "On sale · no changes",
-    draftSaved: "Draft · saved — not on the booking page",
+    draftSaved: "Draft · saved, not on the booking page",
     draftFirstSaved:
-        "Saved as a draft — not on sale, only your team can see it. Delete draft if you change your mind.",
-    notStarted: "Not saved yet — start with a name",
+        "Saved as a draft. Not on sale, and only your team can see it. Delete draft if you change your mind.",
+    notStarted: "Not saved yet. Start with a name",
     viewLabel: "View pack",
 };
 
@@ -205,10 +205,10 @@ export function kindLocked(live: boolean, sold: number | null): boolean {
 /** The line under "Credits are for". */
 export function kindNote(live: boolean, sold: number | null): string {
     if (live && sold === null) {
-        return "Locked — we couldn't check whether it has been sold. Class and one-to-one credits never mix.";
+        return "Locked. We couldn't check whether it has been sold. Class and one-to-one credits never mix.";
     }
     if (live && sold !== null && sold > 0) {
-        return `Locked — ${sold} already sold. Class and one-to-one credits never mix.`;
+        return `Locked. ${sold} already sold. Class and one-to-one credits never mix.`;
     }
     return "Class credits and one-to-one credits never mix.";
 }
@@ -285,7 +285,7 @@ export function packProblems(
     ) {
         out.push({
             field: "serviceIds",
-            message: `One of the ${units} it paid for has been deleted — pick again`,
+            message: `One of the ${units} it paid for has been deleted. Pick again`,
         });
     }
     return out;

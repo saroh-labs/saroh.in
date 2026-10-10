@@ -6,7 +6,7 @@ import type { SellsFrom } from "./service";
  * the API sends (`WEBSITE_SHOP_NOT_CHOSEN`).
  */
 export const SHOP_AWAITS_SELLS_FROM =
-    "Choose which location your online shop sells from — until then your shop page isn't live.";
+    "Choose which location your online shop sells from. Until then your shop page isn't live.";
 
 /** The anchor the readiness step links to: the Shop section. */
 export const SELLS_FROM_ANCHOR = "sells-from";

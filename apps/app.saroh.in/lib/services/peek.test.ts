@@ -93,7 +93,7 @@ describe("phoneText", () => {
                 hasContact: true,
                 person: undefined,
             }),
-        ).toBe("—");
+        ).toBe("Not known");
     });
 
     it("has no page to point at without a contact", () => {

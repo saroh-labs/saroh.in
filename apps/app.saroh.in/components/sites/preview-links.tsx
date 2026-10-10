@@ -166,7 +166,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                         ? ` by ${link.createdBy.name}`
                                         : ""}
                                     . Its address was shown once, when it was
-                                    made; create a new link to share it again.
+                                    made. Create a new link to share it again.
                                 </p>
                             )}
                             <p className="mt-1.5 text-[0.6875rem] leading-relaxed text-muted-foreground">

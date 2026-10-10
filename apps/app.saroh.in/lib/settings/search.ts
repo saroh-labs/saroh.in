@@ -152,7 +152,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Country", "address"),
     team("Roles and what they open", "roles"),
     {
-        ...team("People — invite or change a role", "people"),
+        ...team("People: invite or change a role", "people"),
         action: "member:invite",
     },
     {
@@ -161,7 +161,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     // Names no module: the ones Saroh hasn't rolled out aren't named (DEC-057).
     {
-        label: "Modules — turn parts of Saroh on or off",
+        label: "Modules: turn parts of Saroh on or off",
         page: "/settings/modules",
     },
     { label: "Contacts pipeline", page: "/settings/modules", module: "CRM" },
@@ -173,17 +173,17 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
-    { label: "Alerts — the bell and email", page: "/settings/profile" },
+    { label: "Alerts: the bell and email", page: "/settings/profile" },
     {
-        label: "QR codes — for the counter, a mirror or a card",
+        label: "QR codes: for the counter, a mirror or a card",
         page: "/settings/share",
         words: ["Share", "QR", "Scan", "Short link", "Print"],
         // The codes open pages of the website.
         module: "WEBSITE",
     },
-    { label: "Activity — who changed what", page: "/settings/activity" },
+    { label: "Activity: who changed what", page: "/settings/activity" },
     {
-        label: "Providers — hosting, email, payments",
+        label: "Providers: hosting, email, payments",
         page: "/settings/providers",
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },

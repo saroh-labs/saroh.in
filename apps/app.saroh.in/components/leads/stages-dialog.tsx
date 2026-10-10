@@ -184,7 +184,7 @@ export function StagesDialog({
                             <IconButton
                                 label={
                                     r.leads > 0
-                                        ? `${r.name} has ${count(r.leads, "lead")}; move them before removing it`
+                                        ? `${r.name} has ${count(r.leads, "lead")}. Move them before removing it`
                                         : `Remove ${r.name || "this stage"}`
                                 }
                                 icon={<X className="size-4" />}

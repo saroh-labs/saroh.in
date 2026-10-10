@@ -481,7 +481,7 @@ describe("a paid plan picked on saroh.in (U27)", () => {
     it("never starts a checkout when the business wasn't made", async () => {
         createOrganization.mockResolvedValue({
             ok: false,
-            error: "Something went wrong.",
+            error: "That didn't go through. Try again..",
         });
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
         await submit();
@@ -527,7 +527,7 @@ describe("an opening-day invite (U31)", () => {
     it("never takes the offer when the business wasn't made", async () => {
         createOrganization.mockResolvedValue({
             ok: false,
-            error: "Something went wrong.",
+            error: "That didn't go through. Try again..",
         });
         await submit();
         expect(takeOffer).not.toHaveBeenCalled();

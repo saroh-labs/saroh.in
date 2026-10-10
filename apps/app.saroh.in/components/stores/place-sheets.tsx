@@ -122,7 +122,7 @@ export function PlaceNameSheet({
             />
             {missing ? (
                 <p id="storefront-name-note" role="alert" className={PROBLEM}>
-                    Name is required
+                    Add a name.
                 </p>
             ) : (
                 <Note id="storefront-name-note">

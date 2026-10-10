@@ -657,7 +657,7 @@ describe("SiteEditor shell", () => {
 
         expect(button("Move up").disabled).toBe(true);
         expect(host.textContent).toContain(
-            "On every page — can't be removed or moved",
+            "On every page. Can't be removed or moved",
         );
     });
 
@@ -734,7 +734,7 @@ describe("SiteEditor shell", () => {
         expect(button("Editing").getAttribute("aria-pressed")).toBe("true");
         expect(button("Publish")).toBeTruthy();
         expect(host.textContent).toContain(
-            "This is your site with the draft. Try it; nothing is live until you publish.",
+            "This is your site with the draft. Try it. Nothing is live until you publish.",
         );
         // No window bar round the site.
         expect(host.textContent).not.toContain("flour.saroh.app/");
@@ -1408,7 +1408,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         // moment", and the pill says Not saved.
         expect(button("Publish").disabled).toBe(true);
         expect(button("Publish").getAttribute("aria-description")).toBe(
-            "Not saved — publish waits until your changes save",
+            "Not saved. Publish waits until your changes save",
         );
         expect($("[role=status]")?.textContent).toBe("Not saved");
 
@@ -1608,7 +1608,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Header"));
         expect(sheet()?.textContent).toContain(
-            "On every page — can't be removed or moved",
+            "On every page. Can't be removed or moved",
         );
         type(field("Site name"), "Rye & Co.");
         expect(canvasHome()?.getAttribute("aria-label")).toBe(

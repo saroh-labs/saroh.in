@@ -147,7 +147,7 @@ export function PageSettings({
                     {fixed !== null ? (
                         <p className="text-xs leading-relaxed text-foreground">
                             <span className="font-mono">{fixed.path}</span>
-                            {` — ${fixed.purpose}`}
+                            {` · ${fixed.purpose}`}
                         </p>
                     ) : (
                         <>

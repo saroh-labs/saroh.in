@@ -204,7 +204,7 @@ export function ProductGridFieldsView({
                     }
                     rows={2}
                     maxLength={400}
-                    placeholder="Baked this morning; what is gone usually goes before ten."
+                    placeholder="Baked this morning. What is gone usually goes before ten."
                 />
             </Field>
         </div>
@@ -320,9 +320,9 @@ function CollectionField({
 
 /** Why a picked product won't show, or null when it can. */
 function notShown(status: string | undefined): string | null {
-    if (status === undefined) return "Deleted — not shown on the site";
-    if (status === "ARCHIVED") return "Archived — not shown on the site";
-    if (status === "DRAFT") return "Draft — not shown until published";
+    if (status === undefined) return "Deleted, not shown on the site";
+    if (status === "ARCHIVED") return "Archived, not shown on the site";
+    if (status === "DRAFT") return "Draft, not shown until published";
     return null;
 }
 

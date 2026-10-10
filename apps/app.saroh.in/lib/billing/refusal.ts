@@ -73,7 +73,7 @@ export function planRefusalOf(
             code: "MODULE_LOCKED",
             title,
             body: upgradeTo
-                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost; it's here when you upgrade.`
+                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost. It's here when you upgrade.`
                 : "Nothing you've made is lost.",
             cta: planLabel(upgradeTo?.name),
             upgradeTo,

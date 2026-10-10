@@ -60,10 +60,10 @@ describe("takingsAnswers", () => {
             "Nothing has come in since Monday 28 Sep.",
         );
         expect(answer(answers, "month")).toBe(
-            "You took ₹47,000 in the last four weeks (31 Aug – 27 Sep), up 18% on the four weeks before.",
+            "You took ₹47,000 in the last four weeks (31 Aug to 27 Sep), up 18% on the four weeks before.",
         );
         expect(answer(answers, "best")).toBe(
-            "The week of 14 Sep, at ₹15,000 — about 40% above your usual week (the twelve-week average).",
+            "The week of 14 Sep, at ₹15,000, about 40% above your usual week (the twelve-week average).",
         );
         // Nothing below the usual week by much, no slide, one place.
         expect(answer(answers, "watch")).toBe(
@@ -92,7 +92,7 @@ describe("takingsAnswers", () => {
                 sameDaysLastWeekPayments: 30,
             }),
         ).toBe(
-            "You've taken ₹3,10,400 since Monday 28 Sep, from 41 payments — 12% ahead of the same days last week.",
+            "You've taken ₹3,10,400 since Monday 28 Sep, from 41 payments. That is 12% ahead of the same days last week.",
         );
         expect(
             at({
@@ -102,7 +102,7 @@ describe("takingsAnswers", () => {
                 sameDaysLastWeekPayments: 4,
             }),
         ).toBe(
-            "You've taken ₹5,000 since Monday 28 Sep, from 1 payment — 50% behind the same days last week.",
+            "You've taken ₹5,000 since Monday 28 Sep, from 1 payment. That is 50% behind the same days last week.",
         );
         // Too few payments last week to compare: the figure, and no claim.
         expect(
@@ -135,7 +135,7 @@ describe("takingsAnswers", () => {
     it("says the best week once, and that it was last week when it was", () => {
         const answers = answersFor([...STEADY.slice(0, 11), 20_000]);
         expect(answer(answers, "best")).toBe(
-            "Last week (21 Sep) was your best of the twelve, at ₹20,000 — about 71% above your usual week (the twelve-week average).",
+            "Last week (21 Sep) was your best of the twelve, at ₹20,000, about 71% above your usual week (the twelve-week average).",
         );
         expect(answer(answers, "watch")).not.toMatch(/best/);
     });
@@ -149,7 +149,7 @@ describe("takingsAnswers", () => {
             8_000,
         ]);
         expect(answer(down, "month")).toBe(
-            "You took ₹32,000 in the last four weeks (31 Aug – 27 Sep), down 20% on the four weeks before.",
+            "You took ₹32,000 in the last four weeks (31 Aug to 27 Sep), down 20% on the four weeks before.",
         );
         const level = answersFor([
             ...STEADY.slice(0, 8),
@@ -159,7 +159,7 @@ describe("takingsAnswers", () => {
             10_020,
         ]);
         expect(answer(level, "month")).toBe(
-            "You took ₹40,020 in the last four weeks (31 Aug – 27 Sep), level with the four weeks before.",
+            "You took ₹40,020 in the last four weeks (31 Aug to 27 Sep), level with the four weeks before.",
         );
     });
 
@@ -169,10 +169,10 @@ describe("takingsAnswers", () => {
             { firstSaleOn: "2026-08-19" },
         );
         expect(answer(young, "month")).toBe(
-            "You took ₹33,500 in the last four weeks (31 Aug – 27 Sep) — your first weeks on record, so there's nothing earlier to compare.",
+            "You took ₹33,500 in the last four weeks (31 Aug to 27 Sep). These are your first weeks on record, so there's nothing earlier to compare.",
         );
         expect(answer(young, "best")).toBe(
-            "Last week (21 Sep) was your best of the twelve, at ₹9,500 — about 28% above your usual week (the average of your 6 weeks on record).",
+            "Last week (21 Sep) was your best of the twelve, at ₹9,500, about 28% above your usual week (the average of your 6 weeks on record).",
         );
         // Growing every week: nothing to watch.
         expect(answer(young, "watch")).toBe(
@@ -183,7 +183,7 @@ describe("takingsAnswers", () => {
             orders: [3, 3, 3, 3, 1, 0, 1, 0, 3, 3, 3, 3],
         });
         expect(answer(thin, "month")).toBe(
-            "You took ₹47,000 in the last four weeks (31 Aug – 27 Sep); too little came in the four weeks before to compare.",
+            "You took ₹47,000 in the last four weeks (31 Aug to 27 Sep). Too little came in the four weeks before to compare.",
         );
     });
 
@@ -223,7 +223,7 @@ describe("takingsAnswers", () => {
             8_000,
         ]);
         expect(answer(slide, "watch")).toBe(
-            "Sales have fallen three weeks running, from ₹14,000 in the week of 7 Sep to ₹8,000 last week — down 43%.",
+            "Sales have fallen three weeks running, from ₹14,000 in the week of 7 Sep to ₹8,000 last week, down 43%.",
         );
         expect(slide.find((a) => a.key === "watch")?.link).toEqual({
             href: "/commerce/orders?date=custom&from=2026-09-21&to=2026-09-27&payment=paid",
@@ -283,7 +283,7 @@ describe("takingsAnswers", () => {
     it("says nothing came in when the last four weeks were empty", () => {
         const quiet = answersFor([...STEADY.slice(0, 8), 0, 0, 0, 0]);
         expect(answer(quiet, "month")).toBe(
-            "Nothing came in during the last four weeks (31 Aug – 27 Sep), against ₹40,000 in the four weeks before.",
+            "Nothing came in during the last four weeks (31 Aug to 27 Sep), against ₹40,000 in the four weeks before.",
         );
     });
 });
@@ -319,7 +319,7 @@ describe("takingsTiles", () => {
                 key: "best",
                 label: "Best week",
                 value: "14 Sep",
-                note: "₹15,000 — the marked bar.",
+                note: "₹15,000, the marked bar.",
                 href: "/commerce/orders?date=custom&from=2026-09-14&to=2026-09-20&payment=paid",
             },
             {
@@ -369,11 +369,11 @@ describe("takingsTiles", () => {
             ),
         );
         expect(none[2]).toMatchObject({
-            value: "—",
+            value: "None",
             note: "No week of the twelve took money.",
         });
         expect(none[3]).toMatchObject({
-            value: "—",
+            value: "None",
             note: "No paid orders to average.",
         });
     });
@@ -383,7 +383,7 @@ describe("labels", () => {
     it("says the chart and the split for a screen reader", () => {
         const f = takingsFigures(takingsRead(STEADY));
         expect(chartLabel(f)).toBe(
-            "Sales for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000.",
+            "Sales for the twelve weeks 6 Jul to 27 Sep, highest in the week of 14 Sep at ₹15,000.",
         );
         expect(
             splitLabel([
@@ -404,10 +404,10 @@ describe("labels", () => {
             ]),
         ).toBe("Hill Road 66 per cent, online 34 per cent.");
         expect(takingsSubtitle(f)).toBe(
-            "This week so far, and the twelve whole weeks 6 Jul – 27 Sep.",
+            "This week so far, and the twelve whole weeks 6 Jul to 27 Sep.",
         );
         expect(sparkLabel(f)).toBe(
-            "Sales for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000. The last four weeks (31 Aug – 27 Sep) are drawn darkest, the four before them (3 Aug – 30 Aug) lighter.",
+            "Sales for the twelve weeks 6 Jul to 27 Sep, highest in the week of 14 Sep at ₹15,000. The last four weeks (31 Aug to 27 Sep) are drawn darkest, the four before them (3 Aug to 30 Aug) lighter.",
         );
     });
 
@@ -421,7 +421,7 @@ describe("labels", () => {
             "Week of 14 Sep · ₹15,000 · 15 paid orders",
         );
         expect(soFarReadout(f)).toBe(
-            "This week so far (28 Sep – 30 Sep) · ₹1,200 · 1 paid order",
+            "This week so far (28 Sep to 30 Sep) · ₹1,200 · 1 paid order",
         );
         expect(sourceLine(f)).toBe(
             "From 47 payments in the last four weeks: 47 paid orders and 0 paid invoices, less refunds.",

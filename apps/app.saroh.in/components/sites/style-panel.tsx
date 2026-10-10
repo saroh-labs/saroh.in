@@ -241,7 +241,7 @@ export function StylePanel({
                                         // the name.
                                         ariaLabel: swatch.label,
                                         tip: unreadable
-                                            ? `${swatch.label} — too close to the page colour to read`
+                                            ? `${swatch.label}: too close to the page colour to read`
                                             : swatch.label,
                                         disabled: unreadable,
                                         style: {

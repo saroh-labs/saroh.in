@@ -217,7 +217,7 @@ function EditorBody({
                     ? "Created and live on the shop."
                     : "Created as a draft."
             } Add variants and stock on the right if it needs them.${
-                photosOk ? "" : " The photos didn't save — add them again."
+                photosOk ? "" : " The photos didn't save. Add them again."
             }`,
         );
         router.replace(productEditHref(storeId, res.data.id));
@@ -230,7 +230,7 @@ function EditorBody({
                 : firstBad
             : createStatus === "PUBLISHED"
               ? "Goes live as soon as it is created."
-              : "It will be created as a draft — only the team will see it."
+              : "It will be created as a draft. Only the team will see it."
         : saveHint(dirty, stuck, names);
     const showHeaderSave = canWrite && (creating || dirty.length > 1);
     const headerOff = creating

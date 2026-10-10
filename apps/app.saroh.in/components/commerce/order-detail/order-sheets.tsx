@@ -136,7 +136,7 @@ export function OrderSheets({
                     how={
                         money.recordedByHand
                             ? "Give it back from the till."
-                            : `Back to ${refundTo}, in 3–5 days.`
+                            : `Back to ${refundTo}, in 3 to 5 days.`
                     }
                     format={format}
                     currency={currency}

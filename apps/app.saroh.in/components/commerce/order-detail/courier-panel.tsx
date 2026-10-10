@@ -52,7 +52,7 @@ export function CourierPanel({
             description={
                 handover
                     ? `To ${draft.to}`
-                    : `Add or correct what the courier gave you. It stays on the order; nothing is sent to ${draft.first}.`
+                    : `Add or correct what the courier gave you. It stays on the order. Nothing is sent to ${draft.first}.`
             }
             busy={draft.busy}
             onClose={draft.onCancel}
@@ -178,10 +178,10 @@ function CourierDraft({
                             className="mt-3"
                             error={
                                 bad
-                                    ? "That isn't a web address — paste the whole link, starting https://."
+                                    ? "That isn't a web address. Paste the whole link, starting https://."
                                     : null
                             }
-                            hint={`Paste the link ${name || "the courier"} gave you. It stays on the order; nothing is sent to ${first}.`}
+                            hint={`Paste the link ${name || "the courier"} gave you. It stays on the order. Nothing is sent to ${first}.`}
                         >
                             <Input
                                 type="url"

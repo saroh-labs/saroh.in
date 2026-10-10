@@ -123,9 +123,9 @@ export function ServicesListFields({
                                 {c.serviceIds.map((id, index) => {
                                     const service = byId.get(id);
                                     const note = !service
-                                        ? "Deleted — not shown on the site"
+                                        ? "Deleted, not shown on the site"
                                         : service.status === "ARCHIVED"
-                                          ? "Archived — not shown on the site"
+                                          ? "Archived, not shown on the site"
                                           : null;
                                     return (
                                         <li

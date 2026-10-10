@@ -240,7 +240,7 @@ function PhotoChoice({
                 }
             />
             <FieldHelp className="mt-1.5">
-                Chosen from this product&apos;s photos — nothing new to upload.
+                Chosen from this product&apos;s photos. Nothing new to upload.
             </FieldHelp>
         </>
     );
@@ -302,7 +302,7 @@ function SellItAt({
                     role="status"
                     className="mt-[7px] text-[11.5px] text-foreground"
                 >
-                    Not sold anywhere — customers will not see this {opt}.
+                    Not sold anywhere. Customers will not see this {opt}.
                 </p>
             ) : null}
         </>

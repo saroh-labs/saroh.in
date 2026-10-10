@@ -103,7 +103,7 @@ export function BookingPackControl({
         <div className="grid gap-3">
             <p className="text-sm text-muted-foreground">
                 They hold a class pack that covers this session. Using it takes
-                a class off; cancelling gives it back.
+                a class off, and cancelling gives it back.
             </p>
             {usable.length > 1 ? (
                 <OptionSelect

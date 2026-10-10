@@ -124,7 +124,11 @@ export async function claimDomain(
     hostname: string,
 ): Promise<DomainsResult<SiteDomain>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(base, {
         method: "POST",
         body: JSON.stringify({ hostname, siteId }),
@@ -152,7 +156,11 @@ export async function verifyDomain(
     domainId: string,
 ): Promise<DomainsResult<VerifyOutcome>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${domainId}/verify`, {
         method: "POST",
     });
@@ -165,7 +173,11 @@ export async function removeDomain(
     domainId: string,
 ): Promise<DomainsResult<{ id: string }>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${domainId}`, { method: "DELETE" });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };

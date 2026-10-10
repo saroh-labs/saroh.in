@@ -429,7 +429,7 @@ function bookingsCount(n: number): string {
  * E26): its fields are disabled, and it says why in plain words.
  */
 export const VIEW_ONLY =
-    "View only — your role can't change services, hours or booking rules.";
+    "View only. Your role can't change services, hours or booking rules.";
 
 export function stateLine({
     isNew,
@@ -498,10 +498,10 @@ export function savedMessage({
     }
     if (!comingUp) {
         return comingUp === 0
-            ? "Saved. New bookings use it; nothing already booked changes."
-            : "Saved. New bookings use it; bookings already made keep their details.";
+            ? "Saved. New bookings use it. Nothing already booked changes."
+            : "Saved. New bookings use it. Bookings already made keep their details.";
     }
-    return `Saved. New bookings use it; ${
+    return `Saved. New bookings use it, and ${
         comingUp === 1
             ? "1 booking already made keeps"
             : `${comingUp} bookings already made keep`
@@ -530,7 +530,7 @@ export function timeNote(
     minutes = 0,
 ): string {
     if (kind === "class")
-        return "A class runs at set times; people book a place.";
+        return "A class runs at set times, and people book a place.";
     if (visits > 1) {
         return `${visits} visits of ${minutes || "?"} min, booked one at a time. The order is fulfilled after the last visit.`;
     }
@@ -569,7 +569,7 @@ export function depositNote(
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
             ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
-            : "No card needed to book. No-shows cost you the slot.";
+            : "No card needed to book. No-shows cost you the time.";
     }
     if (way === "DESK" && cents > 0) {
         return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
@@ -656,7 +656,7 @@ export function glance(
     const gap = wholeNumber(draft.gap);
     const priceText =
         price === null || Number.isNaN(price)
-            ? "—"
+            ? "Not set"
             : price === 0
               ? "Free"
               : formatMoney(price, currency);

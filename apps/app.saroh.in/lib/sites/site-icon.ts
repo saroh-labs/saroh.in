@@ -39,7 +39,7 @@ export const SITE_ICON_REMOVE: Record<
 
 /** What an icon should be, said once under the picker. */
 export const SITE_ICON_GUIDE =
-    "PNG, JPG or WebP, at least 192 × 192; square works best.";
+    "PNG, JPG or WebP, at least 192 × 192. Square works best.";
 
 /** An icon being shown: which it is, and the address an `<img>` draws. */
 export interface ShownSiteIcon {
@@ -123,7 +123,7 @@ export function siteIconShapeNote(image: {
         return "This image isn't square, so it will look squashed in a tab. A square one works best.";
     }
     if (width < ICON_MIN_SIDE) {
-        return `This image is ${width} × ${height}. It may look soft on a phone; 192 × 192 or larger is sharper.`;
+        return `This image is ${width} × ${height}. It may look soft on a phone, and 192 × 192 or larger is sharper.`;
     }
     return null;
 }

@@ -72,7 +72,7 @@ function planName(planKey: string): string {
 export function inviteNote(intent: InviteIntent): string | null {
     switch (intent.kind) {
         case "ready":
-            return `Your invite: ${intent.planName} for ${intent.days} days from when this is set up, with no payment details. Nothing is charged; when it ends you're on Free unless you choose a plan.`;
+            return `Your invite: ${intent.planName} for ${intent.days} days from when this is set up, with no payment details. Nothing is charged. When it ends you're on Free unless you choose a plan.`;
         case "unchecked":
             return "Your invite is applied once this is set up.";
         case "refused":

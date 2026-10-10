@@ -83,7 +83,7 @@ describe("a pack on the Packs tab", () => {
         );
         expect(row.bar).toBe("soon");
         expect(row.whenTone).toBe("soon");
-        expect(row.when).toBe("Use by 3 Oct — 5 days left");
+        expect(row.when).toBe("Use by 3 Oct, 5 days left");
         expect(row.extNote).toBe("+14 days on 20 Sep: Knee injury");
     });
 

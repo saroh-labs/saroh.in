@@ -163,7 +163,7 @@ export function AllergyBanner({
                 {first} is allergic to {hits}
             </div>
             <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
-                {named.join("; ")}. Check with {first} before it goes out.
+                {named.join(". ")}. Check with {first} before it goes out.
             </p>
         </Notice>
     );

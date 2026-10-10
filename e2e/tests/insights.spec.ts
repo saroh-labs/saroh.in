@@ -64,7 +64,7 @@ test("a business that has sold reads its answers, then the figures behind them",
     ).toBeVisible();
     // Whatever it took, the sentence names its window.
     await expect(answers).toContainText(
-        /the last four weeks \(\d+ \w+ – \d+ \w+\)/,
+        /the last four weeks \(\d+ \w+ to \d+ \w+\)/,
     );
     // What the figures were counted from, and how, in the merchant's words.
     await expect(answers).toContainText(

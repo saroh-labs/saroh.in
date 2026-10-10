@@ -100,7 +100,7 @@ export function OrdersTab({
                             <span className="tabular-nums">
                                 {o.total && o.currency
                                     ? formatMoneyMajor(o.total, o.currency)
-                                    : "—"}
+                                    : "Not known"}
                             </span>
                             <span className="text-muted-foreground">
                                 {o.via.storefront.name}

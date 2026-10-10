@@ -157,7 +157,7 @@ test.describe("Collections", () => {
             await expect(locked).toHaveAttribute("aria-checked", "true");
             await expect(locked).toHaveAttribute("aria-disabled", "true");
             await expect(
-                edit.getByText(/change the product's category to change this/),
+                edit.getByText(/Change the product's category to change this/),
             ).toBeVisible();
 
             // Untick the hand-picked one here; the page follows.

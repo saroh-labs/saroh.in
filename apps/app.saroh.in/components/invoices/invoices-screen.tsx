@@ -199,7 +199,7 @@ export function InvoicesScreen({
                     : tax
                       ? tax.registered
                           ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
-                          : " Not GST-registered — no tax is charged."
+                          : " Not GST-registered. No tax is charged."
                       : null}
             </p>
 
@@ -250,8 +250,8 @@ export function InvoicesScreen({
                     <Notice tone="error" className="mb-3.5">
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                                {overdueCount} overdue · {sums(overdue)} —
-                                worked out from the due date.
+                                {overdueCount} overdue · {sums(overdue)}, worked
+                                out from the due date.
                             </span>
                             <Button
                                 size="sm"
@@ -317,7 +317,7 @@ export function InvoicesScreen({
                 {truncated ? (
                     <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">
                         Showing the newest {LIST_LIMIT} invoices and every
-                        unpaid one; older paid and cancelled invoices are not
+                        unpaid one. Older paid and cancelled invoices are not
                         listed.
                     </p>
                 ) : null}

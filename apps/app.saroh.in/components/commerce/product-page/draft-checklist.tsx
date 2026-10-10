@@ -47,8 +47,8 @@ export function DraftChecklist({
             title: "Photos",
             sub:
                 product.images.length > 0
-                    ? `${mediaCounter(product.images)} — the first photo is the cover.`
-                    : "No photos yet — up to 15 photos and 3 videos.",
+                    ? `${mediaCounter(product.images)}. The first photo is the cover.`
+                    : "No photos yet. Up to 15 photos and 3 videos.",
             cta: { label: "Add photos", section: "photos" },
         },
         {
@@ -85,7 +85,7 @@ export function DraftChecklist({
             title: "Variants",
             sub:
                 product.variants.length > 0
-                    ? `${product.variants.length} — ${product.variants.map((v) => v.title).join(", ")}.`
+                    ? `${product.variants.length}: ${product.variants.map((v) => v.title).join(", ")}.`
                     : `Optional. Sold as itself at ${money(product.price)} until you add sizes or shades.`,
             cta: { label: "Add variants", section: "variants" },
         },
@@ -97,8 +97,8 @@ export function DraftChecklist({
                 Before it goes on the shop
             </h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
-                A draft — only the team can see it. Nothing here is required to
-                publish; these are what customers will look for.
+                A draft. Only the team can see it. Nothing here is required to
+                publish. These are what customers will look for.
             </p>
             <ul className="mt-3 divide-y divide-border">
                 {rows.map((row) => (
@@ -121,7 +121,7 @@ export function DraftChecklist({
                             <p className="text-[13.5px] font-medium">
                                 {row.title}
                                 <span className="sr-only">
-                                    {row.done ? " — done" : " — to do"}
+                                    {row.done ? ", done" : ", to do"}
                                 </span>
                             </p>
                             <p className="text-[12.5px] text-muted-foreground">

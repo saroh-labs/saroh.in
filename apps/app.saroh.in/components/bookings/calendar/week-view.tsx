@@ -52,7 +52,7 @@ export function WeekView({
                             key={d.date}
                             type="button"
                             onClick={() => onDay(d.date)}
-                            aria-label={`${d.label}, ${count(n, "booking")} — open the day`}
+                            aria-label={`${d.label}, ${count(n, "booking")}. Open the day`}
                             className={cn(
                                 "border-b border-l border-b-border border-l-border/60 px-2.5 py-2 text-left transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted",
                                 d.selected ? "bg-muted/60" : "bg-transparent",

@@ -33,7 +33,7 @@ export function rowRating(
 export function ratingLabel(
     r: { average: number; count: number } | null,
 ): string {
-    return r ? `${r.average.toFixed(1)} · ${r.count}` : "—";
+    return r ? `${r.average.toFixed(1)} · ${r.count}` : "None";
 }
 
 /** Where an order's invitation stands, as one sentence. */
@@ -46,11 +46,11 @@ export function invitationSentence(s: InvitationState): string {
         case "expired":
             return `The invitation expired with ${s.reviewed} of ${s.lines} reviewed.`;
         case "sending":
-            return "Invitation sending — it shows as sent once your email provider accepts it.";
+            return "Invitation sending. It shows as sent once your email provider accepts it.";
         case "failed":
             return "The last invitation couldn't be sent, so it didn't use one of the three. You can send it again.";
         case "sent":
-            return `Invitation sent — ${s.reviewed} of ${s.lines} reviewed so far.`;
+            return `Invitation sent. ${s.reviewed} of ${s.lines} reviewed so far.`;
     }
 }
 

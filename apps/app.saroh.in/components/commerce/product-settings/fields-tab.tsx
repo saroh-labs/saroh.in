@@ -67,7 +67,7 @@ export function FieldsTab({
                 action={fields.length > 0 ? addOne : null}
             >
                 Extra things a product records, for the categories you pick.
-                Team only fields stay on the product page; fields on the shop
+                Team only fields stay on the product page. Fields on the shop
                 show under the description.
             </TabIntro>
             {canWrite ? null : <ReadOnlyNote />}

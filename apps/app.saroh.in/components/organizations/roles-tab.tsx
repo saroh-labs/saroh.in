@@ -39,13 +39,13 @@ import { TextLink } from "@saroh/ui/text-link";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
-    { key: "", label: "Nothing — I will tick what it needs" },
+    { key: "", label: "Nothing. I will tick what it needs" },
     {
         key: "MEMBER",
-        label: "Member — runs the day, no money or settings",
+        label: "Member: runs the day, no money or settings",
     },
-    { key: "ADMIN", label: "Admin — everything except removing an owner" },
-    { key: "REVIEWER", label: "Reviewer — look at websites and sign them off" },
+    { key: "ADMIN", label: "Admin: everything except removing an owner" },
+    { key: "REVIEWER", label: "Reviewer: look at websites and sign them off" },
 ] as const;
 
 /**

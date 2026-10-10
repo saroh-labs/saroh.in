@@ -104,7 +104,7 @@ describe("the list", () => {
         expect(s.button("Remove 500g")).toBeUndefined();
         // One a product chooses by can't be deleted, and says why.
         expect(s.button("Delete Size")?.disabled).toBe(true);
-        expect(s.text()).toContain("change their variants first");
+        expect(s.text()).toContain("Change their variants first");
         expect(s.button("Delete Shade")?.disabled).toBe(false);
     });
 

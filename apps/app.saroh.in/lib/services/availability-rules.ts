@@ -226,7 +226,7 @@ export function payWayHint(
 ): string {
     const base =
         way === "DESK"
-            ? "Nobody pays on the booking page; they pay when they come, a deposit too."
+            ? "Nobody pays on the booking page. They pay when they come, a deposit too."
             : way === "ONLINE"
               ? "Everyone pays on the booking page when they book. Free services book with nothing to pay."
               : "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.";

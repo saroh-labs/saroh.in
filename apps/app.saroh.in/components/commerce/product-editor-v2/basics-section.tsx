@@ -244,7 +244,7 @@ export function BasicsSection({
                         }
                     >
                         {!v.slug.trim()
-                            ? "A product needs an address — it is what the link is made of."
+                            ? "A product needs an address. It is what the link is made of."
                             : v.slug.length > LIMITS.slug
                               ? "Longer than the 150 characters an address can be."
                               : !slugOk
@@ -331,7 +331,7 @@ export function BasicsSection({
                 className="mt-4"
                 hint={
                     v.categoryId === ""
-                        ? "Uncategorized is a real choice — it clears the category rather than leaving it alone."
+                        ? "Uncategorized is a real choice. It clears the category rather than leaving it alone."
                         : "A product sits in one category. Choosing Uncategorized clears it."
                 }
             >

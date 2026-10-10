@@ -44,8 +44,8 @@ export function PlanAside({
             <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                 {/* The design says members do this from "their own link";
                     that link (A8) isn't live, so this says what is true now. */}
-                Archiving a plan stops new sign-ups; everyone on it carries on.
-                You can pause, skip or move anyone on it from their
+                Archiving a plan stops new sign-ups, and everyone on it carries
+                on. You can pause, skip or move anyone on it from their
                 subscription.
             </p>
         </>

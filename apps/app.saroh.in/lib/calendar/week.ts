@@ -61,7 +61,7 @@ export function weekTitle(from: string): string {
     const start = sameMonth
         ? String(Number(from.slice(8, 10)))
         : formatDay(from, { year: sameYear ? "never" : "always" });
-    return `${start}–${formatDay(to, { year: "always" })}`;
+    return `${start} to ${formatDay(to, { year: "always" })}`;
 }
 
 /**

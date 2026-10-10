@@ -223,7 +223,7 @@ function CancelBody({
     const [voidToo, setVoidToo] = useState(false);
     const note =
         when === "periodEnd"
-            ? `Ends on ${periodEndText}. Nothing more is charged; what's paid for still happens.`
+            ? `Ends on ${periodEndText}. Nothing more is charged. What's paid for still happens.`
             : failed
               ? "Nothing more is charged, and it ends today. Restarting makes a new subscription. This cannot be undone."
               : "It ends today and nothing more is charged. Restarting makes a new subscription. This cannot be undone.";

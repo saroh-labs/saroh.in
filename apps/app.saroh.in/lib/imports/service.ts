@@ -89,7 +89,7 @@ async function post<T>(path: string, body: unknown): Promise<Result<T>> {
     // A refused file lists its problems under `error.details.fileIssues`.
     const details = (data as { error?: { details?: unknown } } | null)?.error
         ?.details as { fileIssues?: RowIssue[] } | undefined;
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,

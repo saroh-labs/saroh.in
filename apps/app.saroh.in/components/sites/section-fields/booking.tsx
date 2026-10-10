@@ -84,7 +84,7 @@ export function BookingFields({
                 )}
                 {load.status === "ready" && selectedMissing && (
                     <p className="text-xs text-muted-foreground">
-                        The selected service is no longer available — choose
+                        The selected service is no longer available. Choose
                         another.
                     </p>
                 )}

@@ -281,7 +281,7 @@ describe("allergyCheck", () => {
         );
         expect(check.hits).toEqual([SESAME]);
         expect(check.lines).toEqual({ li_1: "May contain sesame" });
-        expect(check.named).toEqual(["Sourdough loaf — may contain sesame"]);
+        expect(check.named).toEqual(["Sourdough loaf: may contain sesame"]);
     });
 
     it("says contains over may contain", () => {
@@ -385,14 +385,14 @@ describe("eventText", () => {
     it("names each step, and says when one was undone", () => {
         expect(eventText(ev({}), money)).toBe("Preparing");
         expect(eventText(ev({ undoneAt: "2026-09-23T09:31:00Z" }), money)).toBe(
-            "Preparing — undone",
+            "Preparing, undone",
         );
         expect(
             eventText(
                 ev({ kind: "UNDO", fromStage: "READY", toStage: "PREPARING" }),
                 money,
             ),
-        ).toBe("Undone — back to preparing");
+        ).toBe("Undone, back to preparing");
     });
 
     it("says a change of how it leaves whole (B9)", () => {

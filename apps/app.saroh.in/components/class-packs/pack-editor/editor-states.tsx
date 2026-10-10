@@ -17,7 +17,7 @@ import { packCrumbs } from "./pack-crumbs";
 export type PackEditorStateKind =
     "missing" | "failed" | "forbidden" | "readOnly" | "archived";
 
-const BACK_TO_PACKS = { href: "/class-packs", label: "Back to Packs" };
+const BACK_TO_PACKS = { href: "/class-packs", label: "Back to Class packs" };
 
 /**
  * The Pack Editor when there is nothing to edit (E18, after the design's

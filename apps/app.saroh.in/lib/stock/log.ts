@@ -102,7 +102,7 @@ export function entryNote(
     if (e.kind === "COUNTED") {
         if (e.mismatch && e.expected !== null) {
             parts.push(
-                `Counted ${e.after} against ${e.expected} shown; the log said ${e.before}`,
+                `Counted ${e.after} against ${e.expected} shown, and the log said ${e.before}`,
             );
         } else {
             parts.push(

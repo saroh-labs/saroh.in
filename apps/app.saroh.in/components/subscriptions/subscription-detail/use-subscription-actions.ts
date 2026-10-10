@@ -185,7 +185,7 @@ export function useSubscriptionActions(
                 showUndo(
                     skipped
                         ? `Back on: ${row.label}.`
-                        : `Skipped ${row.label}. Nothing is refunded. It just isn't collected.`,
+                        : `Skipped ${row.label}. Nothing is refunded. It isn't collected.`,
                     undo(() =>
                         skipped
                             ? skipCollection(sub.id, row.date)

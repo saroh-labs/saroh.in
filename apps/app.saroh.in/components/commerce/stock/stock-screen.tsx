@@ -151,7 +151,7 @@ export function StockScreen({
                 ? `${countOf(short.length, "shelf is", "shelves are")} now short for orders already placed.`
                 : null,
             mismatched > 0
-                ? `${mismatched} didn't match — the shelf moved while you counted. See Checks.`
+                ? `${mismatched} didn't match because the shelf moved while you counted. See Checks.`
                 : null,
         ].filter(Boolean);
         count.clear();

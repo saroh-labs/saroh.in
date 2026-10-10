@@ -64,7 +64,7 @@ export function ProductDiscountsTab({
     return (
         <div>
             <p className="mb-3 text-pretty text-[12.5px] text-muted-foreground">
-                Discounts that reach this product — set on it, its category, the
+                Discounts that reach this product: set on it, its category, the
                 location or everything. Set up in Discounts.
             </p>
             <ul className="flex flex-col gap-2.5">
@@ -102,7 +102,7 @@ export function ProductDiscountsTab({
                                 <p className="mt-1.5 text-[13.5px]">
                                     {discountAmount(d, money)}{" "}
                                     {DISCOUNT_REACH_LABEL[d.appliesTo] ?? ""}
-                                    {d.description ? ` — ${d.description}` : ""}
+                                    {d.description ? ` · ${d.description}` : ""}
                                 </p>
                                 <p className="mt-1 text-[12px] text-muted-foreground">
                                     {d.endsAt ? (

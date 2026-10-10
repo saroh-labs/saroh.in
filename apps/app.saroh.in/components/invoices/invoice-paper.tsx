@@ -178,7 +178,7 @@ export function InvoicePaper({
                                 ) : null}
                             </>
                         ) : (
-                            "Draft — not numbered"
+                            "Draft, not numbered"
                         )}
                     </p>
                     {i.related ? (
@@ -213,10 +213,10 @@ export function InvoicePaper({
                         <p className="mt-1 text-[13px]">
                             {taxed.placeOfSupply
                                 ? `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
-                                : "—"}
+                                : "Not set"}
                             {taxed.taxType === "INTER"
-                                ? " — IGST"
-                                : " — CGST + SGST"}
+                                ? " · IGST"
+                                : " · CGST + SGST"}
                         </p>
                     </div>
                 ) : null}

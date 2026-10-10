@@ -42,7 +42,7 @@ const panel = (over: Partial<AutopayPanel> = {}): AutopayPanel => ({
     line: "Autopay · UPI",
     detail: null,
     notice: {
-        text: "Autopay limit too low — covers up to ₹1,500, this renewal is ₹1,800",
+        text: "Autopay limit too low. It covers up to ₹1,500, and this renewal is ₹1,800",
         tone: "warn",
     },
     sendLabel: "Send a set-up link",

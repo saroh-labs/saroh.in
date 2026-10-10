@@ -90,7 +90,7 @@ test.describe("product page — Overview and Stock", () => {
         // The cover opens Photos.
         await page
             .getByRole("link", {
-                name: /Cover photo — open Photos|Add a photo/,
+                name: /Cover photo, open Photos|Add a photo/,
             })
             .click();
         await expect(page).toHaveURL(/tab=photos/);

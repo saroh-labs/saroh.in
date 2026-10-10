@@ -38,7 +38,7 @@ describe("product page display rules", () => {
                 },
                 rupees,
             ),
-        ).toBe("₹499 – ₹899");
+        ).toBe("₹499 to ₹899");
     });
 
     it("says what customers see for each stock word", () => {

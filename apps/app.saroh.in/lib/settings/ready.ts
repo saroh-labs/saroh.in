@@ -411,7 +411,7 @@ function businessType(
     return {
         key: "businessType",
         label: "Choose your business type",
-        why: "You said your business is registered. Choose which kind — private limited, LLP, partnership or another — so your business details are right before you take money.",
+        why: "You said your business is registered. Choose which kind (private limited, LLP, partnership or another) so your business details are right before you take money.",
         cta: "Choose type",
         // Straight to the Type row's sheet, not the top of the tab.
         href: businessEditHref("type"),

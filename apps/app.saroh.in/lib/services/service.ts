@@ -255,7 +255,11 @@ async function send<T>(
     fallback: string,
 ): Promise<ApiResult<T>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/services${path}`, {
         method,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),

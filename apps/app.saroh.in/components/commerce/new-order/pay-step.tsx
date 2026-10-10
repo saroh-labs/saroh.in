@@ -135,7 +135,7 @@ export function PayStep({
                         <span className="font-semibold">Handed over now</span>
                         <span className="block text-[12px] text-muted-foreground">
                             {handedOver
-                                ? "It's made Collected — nothing more to do."
+                                ? "It's made Collected. Nothing more to do."
                                 : "It starts as New, to prepare and hand over later."}
                         </span>
                     </span>

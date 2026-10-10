@@ -27,7 +27,7 @@ describe("lastUpdateLine", () => {
             ),
         ).toBe("Last payment update from Razorpay: 2 minutes ago.");
         expect(lastUpdateLine({ ...setup, lastReceivedAt: null }, now)).toBe(
-            "No payment updates received yet — check the webhook in Razorpay.",
+            "No payment updates received yet. Check the webhook in Razorpay.",
         );
     });
 

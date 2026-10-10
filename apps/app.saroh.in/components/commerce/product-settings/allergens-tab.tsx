@@ -122,7 +122,7 @@ export function AllergensTab({
                 <EmptyState
                     size="panel"
                     title="No allergens yet"
-                    description="A shop that sells food usually starts with the common eight; anyone else can leave this empty."
+                    description="A shop that sells food usually starts with the common eight. Anyone else can leave this empty."
                     action={
                         canWrite ? (
                             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -158,7 +158,7 @@ export function AllergensTab({
                     {allergens.map((a) => {
                         const used = a.contains + a.mayContain;
                         const title = used
-                            ? `${a.name} is on ${count(used, "product")} — take it off them first`
+                            ? `${a.name} is on ${count(used, "product")}. Take it off them first`
                             : `Remove ${a.name}`;
                         return (
                             <li
@@ -234,7 +234,7 @@ export function AllergensTab({
             )}
 
             <p className="mt-2 text-[11.5px] text-muted-foreground">
-                One a product lists cannot be removed — take it off those
+                One a product lists cannot be removed. Take it off those
                 products first.
             </p>
         </section>

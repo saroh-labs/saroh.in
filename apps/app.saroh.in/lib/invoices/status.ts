@@ -360,7 +360,7 @@ export function whenLine(
     }
     switch (i.standing) {
         case "DRAFT":
-            return { ...none, before: "Not issued — no number yet" };
+            return { ...none, before: "Not issued, no number yet" };
         case "OVERDUE": {
             const late = i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 0;
             return {

@@ -78,22 +78,22 @@ describe("Sold out by hand (#515)", () => {
         expect(untrackedLine([hill])).toBe("Available on the shop.");
         expect(untrackedLine([])).toBe("Available on the shop.");
         expect(untrackedShort([hill])).toBe(
-            "Not tracked — sells unless you mark it sold out.",
+            "Not tracked. Sells unless you mark it sold out.",
         );
     });
 
     it("says sold out by hand at one storefront, or at every one", () => {
         expect(untrackedLine([{ ...hill, soldOut: true }])).toBe(
-            "Sold out — marked by hand",
+            "Sold out, marked by hand",
         );
         expect(
             untrackedLine([
                 { ...hill, soldOut: true },
                 { ...online, soldOut: true },
             ]),
-        ).toBe("Sold out — marked by hand");
+        ).toBe("Sold out, marked by hand");
         expect(untrackedShort([{ ...hill, soldOut: true }])).toBe(
-            "Not tracked — sold out, marked by hand.",
+            "Not tracked · sold out, marked by hand.",
         );
     });
 
@@ -110,7 +110,7 @@ describe("Sold out by hand (#515)", () => {
 
     it("names the storefronts when only some are marked", () => {
         expect(untrackedLine([{ ...hill, soldOut: true }, online])).toBe(
-            "Sold out at Hill Road — marked by hand",
+            "Sold out at Hill Road, marked by hand",
         );
         expect(
             untrackedLine([
@@ -118,7 +118,7 @@ describe("Sold out by hand (#515)", () => {
                 online,
                 { ...market, soldOut: true },
             ]),
-        ).toBe("Sold out at Hill Road and Market — marked by hand");
+        ).toBe("Sold out at Hill Road and Market, marked by hand");
     });
 
     it("words the action, the toast and the refusal", () => {

@@ -170,7 +170,7 @@ export function MadeBySection({
                         {storeName}
                     </div>
                     <FieldHelp className="mb-4 mt-1.5">
-                        From your business details — nothing to type.
+                        From your business details. Nothing to type.
                     </FieldHelp>
                 </>
             ) : (
@@ -251,8 +251,8 @@ export function MadeBySection({
                 placeholder="None"
             />
             <FieldHelp className="mb-4 mt-1.5">
-                How long, and what it covers — one line. Leave it empty if there
-                is none; the shop shows nothing.
+                How long, and what it covers, in one line. Leave it empty if
+                there is none, and the shop shows nothing.
             </FieldHelp>
 
             <FieldLabel aside={toggle("showReturns", "Returns")}>

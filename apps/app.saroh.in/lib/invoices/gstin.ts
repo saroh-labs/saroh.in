@@ -123,7 +123,7 @@ const MISSING: Record<GstinPartKey, string> = {
 export function gstinProblem(value: string): string | null {
     const g = clean(value);
     if (g === "") {
-        return `A GST-registered business needs its GSTIN here — 15 characters, like ${GSTIN_EXAMPLE}.`;
+        return `A GST-registered business needs its GSTIN here: 15 characters, like ${GSTIN_EXAMPLE}.`;
     }
     const parts = gstinParts(g);
     const wrong = parts.find((p) => p.state === "wrong");
@@ -141,16 +141,16 @@ export function gstinProblem(value: string): string | null {
                 return "The 14th character of a GSTIN is always Z.";
             case "check":
                 return g.length > 15
-                    ? `That's ${g.length} characters — a GSTIN has 15.`
-                    : "The last character doesn't match the rest — look for a mistyped character.";
+                    ? `That's ${g.length} characters. A GSTIN has 15.`
+                    : "The last character doesn't match the rest. Look for a mistyped character.";
         }
     }
-    if (g.length > 15) return `That's ${g.length} characters — a GSTIN has 15.`;
+    if (g.length > 15) return `That's ${g.length} characters. A GSTIN has 15.`;
     if (g.length < 15) {
         const missing = parts
             .filter((p) => p.state !== "done")
             .map((p) => MISSING[p.key]);
-        return `${g.length} of 15 characters — add ${list(missing)}.`;
+        return `${g.length} of 15 characters. Add ${list(missing)}.`;
     }
     return null;
 }

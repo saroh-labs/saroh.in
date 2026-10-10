@@ -93,7 +93,7 @@ export const basicsSchema = z
             .trim()
             .min(
                 1,
-                "A product needs an address — it is what the link is made of.",
+                "A product needs an address. It is what the link is made of.",
             )
             .max(
                 LIMITS.slug,
@@ -444,8 +444,8 @@ export function mediaCounter(items: PhotoDraft[]): string {
     return `${photos} of ${LIMITS.photos} photos · ${videos} of ${LIMITS.videos} videos`;
 }
 
-export const PHOTOS_FULL_MESSAGE = `Already ${LIMITS.photos} photos — take one off first.`;
-export const VIDEOS_FULL_MESSAGE = `Already ${LIMITS.videos} videos — take one off first.`;
+export const PHOTOS_FULL_MESSAGE = `Already ${LIMITS.photos} photos. Take one off first.`;
+export const VIDEOS_FULL_MESSAGE = `Already ${LIMITS.videos} videos. Take one off first.`;
 export const NOT_MEDIA_MESSAGE =
     "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
 export const VIDEO_TOO_BIG_MESSAGE =

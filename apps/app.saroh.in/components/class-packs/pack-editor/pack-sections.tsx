@@ -227,7 +227,7 @@ export function WhoCanBuy({ values, set, errors }: Edit) {
                 <span>
                     Only for someone&apos;s first pack
                     <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                        An intro offer — only someone who has never bought a{" "}
+                        An intro offer: only someone who has never bought a{" "}
                         {units} pack before can buy it.
                     </span>
                 </span>

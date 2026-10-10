@@ -299,8 +299,8 @@ describe("activityDetail — what changed", () => {
                     changes: [
                         {
                             field: "openingHours",
-                            before: "Mon–Sun 09:00–18:00",
-                            after: "Mon–Sat 09:00–18:00, Sun closed",
+                            before: "Mon to Sun 9:00 am to 6:00 pm",
+                            after: "Mon to Sat 9:00 am to 6:00 pm, Sun closed",
                         },
                     ],
                 },
@@ -308,8 +308,8 @@ describe("activityDetail — what changed", () => {
         ).toEqual([
             {
                 label: "Opening hours, High Street",
-                before: "Mon–Sun 09:00–18:00",
-                after: "Mon–Sat 09:00–18:00, Sun closed",
+                before: "Mon to Sun 9:00 am to 6:00 pm",
+                after: "Mon to Sat 9:00 am to 6:00 pm, Sun closed",
             },
         ]);
         expect(

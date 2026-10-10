@@ -67,7 +67,11 @@ export async function changeWebAddress(
     address: string,
 ): Promise<ChangeWebAddressResult> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/web-address`, {
         method: "PUT",
         body: JSON.stringify({ address }),

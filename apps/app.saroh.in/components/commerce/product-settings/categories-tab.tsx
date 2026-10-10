@@ -138,7 +138,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 // With none yet, the empty state carries the button.
                 action={categories.length > 0 ? newCategory : null}
             >
-                What each product is — one per product. They drive the
+                What each product is, one per product. They drive the
                 shop&apos;s filters and your reports. To group products for the
                 website, use collections.
             </TabIntro>
@@ -245,7 +245,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                         </p>
                     </div>
                     <span className="text-[12px] text-muted-foreground">
-                        Always there — where products go when their category is
+                        Always there. Where products go when their category is
                         removed
                     </span>
                 </li>

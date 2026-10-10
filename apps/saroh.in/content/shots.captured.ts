@@ -376,7 +376,7 @@ export const CAPTURED: Record<
     },
     "help-monthly-plan-6": {
         src: "/shots/help/help-monthly-plan-6.webp",
-        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Try again with a new pay link",
         width: 2048,
         height: 1120,
         mark: { x: 0.1123, y: 0.4473, w: 0.2067, h: 0.0893 },

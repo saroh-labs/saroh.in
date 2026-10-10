@@ -38,8 +38,8 @@ export const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
 }));
 
 const PRESETS: { label: string; days: Weekday[] }[] = [
-    { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
-    { label: "Mon–Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
+    { label: "Mon to Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
+    { label: "Mon to Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
     { label: "Every day", days: DAYS.map((d) => d.key) },
 ];
 
@@ -158,7 +158,7 @@ export function OpeningHoursFields({
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
-                                            –
+                                            to
                                         </span>
                                         <TimeSelect
                                             value={d.close}
@@ -247,7 +247,7 @@ export function OpeningHoursFields({
                                 }}
                             />
                             <span aria-hidden className="text-muted-foreground">
-                                –
+                                to
                             </span>
                             <TimeSelect
                                 value={shared.close}

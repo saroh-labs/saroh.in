@@ -61,7 +61,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
 
     // What turning a module off changes (F13).
     APPOINTMENTS_UPCOMING_BOOKINGS:
-        "Upcoming bookings stay booked; the booking page stops taking new ones.",
+        "Upcoming bookings stay booked. The booking page stops taking new ones.",
     APPOINTMENTS_SITE_BOOK_PAGE:
         "Your site's booking page stops taking bookings.",
     APPOINTMENTS_ACCOUNT_TAB:
@@ -74,7 +74,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     PAYMENTS_SITE_PLANS: "Your site stops selling plans.",
     COMMERCE_STOREFRONTS: "Your locations stop taking orders.",
     COMMERCE_PUBLISHED_PRODUCTS:
-        "Products leave your site; they are kept here.",
+        "Products leave your site. They are kept here.",
     COMMERCE_SITE_SHOP: "Your site's shop closes.",
     COMMERCE_SITE_SHOP_PAGE: "Your site's shop page stops selling.",
     COMMERCE_ACCOUNT_TAB: "Orders leave your customers' accounts on your site.",

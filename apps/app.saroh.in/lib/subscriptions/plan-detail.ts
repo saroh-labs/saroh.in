@@ -99,9 +99,9 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
               ? "Open to sign-ups"
               : "Archive",
         banner: draft
-            ? "This is a draft — nobody can join it until you publish it."
+            ? "This is a draft. Nobody can join it until you publish it."
             : archived
-              ? "Archived — nobody new can join. Everyone already on it carries on as before."
+              ? "Archived. Nobody new can join. Everyone already on it carries on as before."
               : null,
         unpublished: !draft && Boolean(plan.pendingChangedAt),
     };
@@ -175,7 +175,7 @@ function pricePhrase(changes: Changes, currency: string): string | null {
     if (every) {
         const from = str(every[0]) as Interval | null;
         const to = str(every[1]) as Interval | null;
-        return `changed billing from every ${from ? EVERY[from] : "—"} to every ${to ? EVERY[to] : "—"}`;
+        return `changed billing from every ${from ? EVERY[from] : "unknown period"} to every ${to ? EVERY[to] : "unknown period"}`;
     }
     return null;
 }
@@ -229,7 +229,7 @@ export function eventWhat(event: PlanEvent, currency: string): string {
                 : "Created";
         }
         case "ARCHIVED":
-            return "Archived — closed to new sign-ups";
+            return "Archived, closed to new sign-ups";
         case "RESTORED":
             return "Opened to new sign-ups again";
         case "PUBLISHED":
@@ -238,7 +238,7 @@ export function eventWhat(event: PlanEvent, currency: string): string {
             return "Discarded unpublished changes";
         default: {
             const phrases = editPhrases(c, currency);
-            return phrases.length ? upper(phrases.join("; ")) : "Changed";
+            return phrases.length ? upper(phrases.join(", ")) : "Changed";
         }
     }
 }
@@ -299,7 +299,7 @@ export function historyRows(
  * with more pages says "at least".
  */
 export function priceChangesText(page: PlanEventsPage | null): string {
-    if (!page) return "—";
+    if (!page) return "Not known";
     const n = page.events.filter(
         (e) => e.kind !== "CREATED" && touchesPrice(e.changes),
     ).length;
@@ -319,7 +319,8 @@ export function glanceRows(
         { label: "On it now", value: String(plan.subscriberCount) },
         {
             label: "Coming in a month",
-            value: monthly > 0 ? formatMoneyMajor(monthly, plan.currency) : "—",
+            value:
+                monthly > 0 ? formatMoneyMajor(monthly, plan.currency) : "None",
         },
         { label: "Price changes", value: priceChangesText(events) },
     ];

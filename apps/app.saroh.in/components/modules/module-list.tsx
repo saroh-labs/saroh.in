@@ -96,7 +96,7 @@ export function ModuleList({
             </div>
             <p className="mt-2.5 text-pretty text-[11.5px] leading-normal text-muted-foreground">
                 {canManage
-                    ? "Turning one off removes its section from the rail at once. Nothing is deleted — the data waits for it to come back on."
+                    ? "Turning one off removes its section from the rail at once. Nothing is deleted. The data waits for it to come back on."
                     : // Shown disabled rather than hidden: knowing what this
                       // business runs on is part of working here, even for
                       // someone who cannot change it.
@@ -124,7 +124,7 @@ const DISPLAY: Partial<Record<string, { note: string }>> = {
         note: "A number of visits bought up front and used over time.",
     },
     COMMUNICATIONS: {
-        note: "Email and WhatsApp to your customers and leads. Works in the background — no new menu item.",
+        note: "Email and WhatsApp to your customers and leads. Works in the background, with no new menu item.",
     },
     AUTOMATIONS: {
         note: "Follow-ups that run on their own. No new menu item.",
@@ -142,7 +142,7 @@ function noteOf(modules: ModuleView[], module: ModuleView): string {
         DISPLAY[module.key]?.note ??
         (rows.length > 0
             ? `${listWords(rows)} in the rail.`
-            : "Works in the background — no new menu item.");
+            : "Works in the background, with no new menu item.");
     // "Needs Appointments." from the API's dependencies, not the copy, so
     // it is said of every module that has one — only the ones shown: a
     // module Saroh hasn't rolled out is never named (DEC-057).
@@ -262,7 +262,7 @@ function ModuleRow({
             offOrder.map((k) => [k, "DISABLED"]),
             () =>
                 showUndo(
-                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? ` — ${listWords(leaving)} ${plural(leaving.length, "has", "have")} left the rail` : ""}. Nothing is deleted.`,
+                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? `. ${listWords(leaving)} ${plural(leaving.length, "has", "have")} left the rail` : ""}. Nothing is deleted.`,
                     // Undo in the order the API accepts: needed before needing.
                     () =>
                         run(

@@ -146,7 +146,7 @@ describe("planHeader", () => {
         const h = planHeader(plan({ status: "ARCHIVED" }), false);
         expect(h.state).toEqual({ label: "Archived", tone: "off" });
         expect(h.archiveLabel).toBe("Open to sign-ups");
-        expect(h.banner).toMatch(/^Archived — nobody new can join/);
+        expect(h.banner).toMatch(/^Archived. Nobody new can join/);
     });
 
     it("a draft is finished, not archived, and never 'unpublished'", () => {
@@ -261,7 +261,7 @@ describe("eventWhat", () => {
                 "INR",
             ),
         ).toBe(
-            "Renamed it from “Monthly” to “Standard”; changed the price from ₹1,200 to ₹1,500; changed classes from 4 a month to 8 a month",
+            "Renamed it from “Monthly” to “Standard”, changed the price from ₹1,200 to ₹1,500, changed classes from 4 a month to 8 a month",
         );
     });
 
@@ -282,7 +282,7 @@ describe("eventWhat", () => {
             ),
         ).toBe("Created at ₹1,500 / month");
         expect(eventWhat(event({ kind: "ARCHIVED", changes: {} }), "INR")).toBe(
-            "Archived — closed to new sign-ups",
+            "Archived, closed to new sign-ups",
         );
         expect(eventWhat(event({ kind: "RESTORED", changes: {} }), "INR")).toBe(
             "Opened to new sign-ups again",
@@ -374,7 +374,7 @@ describe("priceChangesText and glanceRows", () => {
     });
 
     it("never claims an exact count it can't know", () => {
-        expect(priceChangesText(null)).toBe("—");
+        expect(priceChangesText(null)).toBe("Not known");
         expect(priceChangesText(page({ nextCursor: "e1" }))).toBe("1+");
         expect(priceChangesText(page({ earlierUnrecorded: true }))).toBe(
             "1 recorded",
@@ -392,7 +392,7 @@ describe("priceChangesText and glanceRows", () => {
         ]);
         expect(
             glanceRows(plan({ monthlyFromMembers: "0.00" }), null)[1].value,
-        ).toBe("—");
+        ).toBe("None");
     });
 });
 

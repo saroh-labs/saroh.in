@@ -243,7 +243,7 @@ export function StockTable({
                                                           <TextLink
                                                               href={ordersHref}
                                                               scroll={false}
-                                                              aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
+                                                              aria-label={`${shelf.promised} promised to open ${shelf.name} orders, open them`}
                                                           >
                                                               {shelf.promised}
                                                           </TextLink>
@@ -461,7 +461,7 @@ export function StockCards({
                                                     <Link
                                                         href={ordersHref}
                                                         scroll={false}
-                                                        aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
+                                                        aria-label={`${shelf.promised} promised to open ${shelf.name} orders, open them`}
                                                         className="relative z-[1] inline-flex items-center rounded-sm text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                                                     >
                                                         {shelf.promised}{" "}

@@ -166,7 +166,7 @@ test.describe("a walk-in who gives a phone, paid in cash", () => {
                     .getByRole("button", { name: "Take ₹430 cash · create" })
                     .click();
                 await expect(
-                    page.getByText("Order created — give ₹70 change."),
+                    page.getByText("Order created. Give ₹70 change."),
                 ).toBeVisible();
             } else {
                 await sheet

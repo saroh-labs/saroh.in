@@ -828,6 +828,7 @@ bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step words pnpm run check:words
 bg_step formats pnpm run check:formats
+bg_step copy pnpm run check:copy
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,

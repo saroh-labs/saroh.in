@@ -106,7 +106,7 @@ describe("taking payment at the desk (P2)", () => {
             replayed: false,
         };
         expect(deskTakenText(paid, rupees)).toBe(
-            "₹500 taken in cash — give ₹200 change.",
+            "₹500 taken in cash. Give ₹200 change.",
         );
         expect(deskTakenText({ ...paid, changeCents: 0 }, rupees)).toBe(
             "₹500 taken in cash. The invoice is marked paid.",

@@ -98,7 +98,7 @@ describe("heldByLine", () => {
                 { title: "400g", promised: 1 },
                 { title: "1kg", promised: 0 },
             ]),
-        ).toBe("5 held by 3 open orders — 800g 4, 400g 1");
+        ).toBe("5 held by 3 open orders: 800g 4, 400g 1");
     });
     it("is nothing when nothing is promised", () => {
         expect(heldByLine(0, 0, [])).toBeNull();
@@ -130,7 +130,7 @@ describe("Linked to this product", () => {
             lines: [{ variantId: "v1", title: "800g", quantity: 2 }],
         };
         expect(openOrderLine(order, "Sourdough")).toBe(
-            "#1020 Priya — 800g × 2, new",
+            "#1020 Priya: 800g × 2, new",
         );
     });
     const placement = (
@@ -162,7 +162,7 @@ describe("Linked to this product", () => {
         });
         expect(collectionsSummary(placement({ collections: [] }))).toEqual({
             count: "In no collection",
-            names: "—",
+            names: "None",
         });
     });
     it("says the website can't show products yet, rather than none", () => {

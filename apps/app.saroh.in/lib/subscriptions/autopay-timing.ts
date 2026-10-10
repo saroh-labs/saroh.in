@@ -79,13 +79,13 @@ export function timingOptions(
             value: "DAY_AFTER_RENEWAL",
             title: "Charge the day after renewal",
             consequence:
-                "The invoice goes out on the renewal date and autopay charges a day later. There's time for a Retry before it's overdue.",
+                "The invoice goes out on the renewal date and autopay charges a day later. There's time to try again before it's overdue.",
             isDefault: true,
         },
         {
             value: "ON_DUE_DATE",
             title: "Charge on the due date",
-            consequence: `The invoice goes out on the renewal date and autopay charges on its due date, ${count(s.dueDays, "day")} later. No time for a Retry before it's overdue.`,
+            consequence: `The invoice goes out on the renewal date and autopay charges on its due date, ${count(s.dueDays, "day")} later. No time to try again before it's overdue.`,
             isDefault: false,
         },
     ];

@@ -149,7 +149,7 @@ export function MoneyCard({
         pay.push([
             "Lands",
             money.recordedByHand
-                ? "Taken outside Saroh — cash or a transfer, not paid out by it"
+                ? "Taken outside Saroh: cash or a transfer, not paid out by it"
                 : `Your ${provider ? providerName(provider) : "provider"} account, on its payout schedule`,
         ]);
     }
@@ -225,7 +225,7 @@ export function MoneyCard({
                             later edit replaced, so it isn&apos;t counted as
                             paid. Refund it from your{" "}
                             {provider ? providerName(provider) : "provider"}{" "}
-                            dashboard; this clears once the refund comes
+                            dashboard. This clears once the refund comes
                             through.
                         </span>
                     </p>

@@ -104,7 +104,7 @@ export function SkinSwitcher() {
                 />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel>Workspace theme</DropdownMenuLabel>
+                <DropdownMenuLabel>Theme</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {VISIBLE_SKINS.map((option) => {
                     const selected = option.id === skin;

@@ -92,7 +92,7 @@ describe("version history (T12)", () => {
             "Asha went live without approval. Publishing needs approval on this site, and an owner overrode it.",
         );
         expect(out).toContain(
-            "Published without approval by Ravi — a reviewer had asked for changes.",
+            "Published without approval by Ravi. A reviewer had asked for changes.",
         );
         // Four versions, three routes worth a badge.
         expect(html.match(/Overridden by|Bypassed<|>Approved</g)).toHaveLength(

@@ -42,8 +42,8 @@ export function NextSteps() {
                     <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         <strong className="font-semibold text-foreground/75">
                             Variants
-                        </strong>{" "}
-                        — one per size, shade or colour. Each starts at the
+                        </strong>
+                        : one per size, shade or colour. Each starts at the
                         product&apos;s price, and can have its own.
                     </span>
                 </li>
@@ -54,8 +54,8 @@ export function NextSteps() {
                     <span className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         <strong className="font-semibold text-foreground/75">
                             Stock
-                        </strong>{" "}
-                        — how many you have, and when to warn you. With
+                        </strong>
+                        : how many you have, and when to warn you. With
                         variants, each keeps its own count.
                     </span>
                 </li>

@@ -68,7 +68,7 @@ import { resolveStyleVariables } from "@/lib/sites/style";
 const PREVIEW_SCOPE = "site-preview-scope";
 
 /** What a form sent on a draft says: it went nowhere (G5). */
-export const FORM_NOT_SENT = "Preview — not sent";
+export const FORM_NOT_SENT = "Preview, not sent";
 export const FORM_NOT_SENT_DETAIL = "Forms send from your live site.";
 
 function toRenderedSection(
@@ -443,7 +443,7 @@ function CanvasBlock({
                  */
                 <button
                     type="button"
-                    aria-label={`${notes} open on this block — read the feedback`}
+                    aria-label={`${notes} open on this block. Read the feedback`}
                     onClick={(e) => {
                         e.stopPropagation();
                         onOpenNotes();

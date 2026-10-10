@@ -67,8 +67,8 @@ export default async function NewStorefrontPage() {
                     full !== null
                         ? undefined
                         : first
-                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} locations`} — it sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
-                          : "A place you sell from — a shop counter, a studio, a market stall. Its hours, checkout and payments are set up on the next screen."
+                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} locations`}. It sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
+                          : "A place you sell from: a shop counter, a studio, a market stall. Its hours, checkout and payments are set up on the next screen."
                 }
             />
             {full !== null ? (

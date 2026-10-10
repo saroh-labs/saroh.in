@@ -1213,7 +1213,7 @@ export const SETTINGS_PAGES = [
     {
         href: "/settings/profile",
         label: "Your profile",
-        description: "Your login and the alerts you get",
+        description: "Your sign-in and the alerts you get",
         icon: UserRound,
     },
     {

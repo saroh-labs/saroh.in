@@ -145,7 +145,7 @@ const link = (label: string) =>
 describe("BusinessWeek: the Week as card columns (E25)", () => {
     it("titles the week and lists a day's things by time, each opening its record", () => {
         render(rye());
-        expect(host.querySelector("h1")?.textContent).toBe("14–20 Sep 2026");
+        expect(host.querySelector("h1")?.textContent).toBe("14 to 20 Sep 2026");
         const sat = column("2026-09-19");
         const cards = Array.from(sat?.querySelectorAll("a") ?? []);
         expect(cards.map((a) => a.getAttribute("href"))).toEqual([
@@ -219,7 +219,7 @@ describe("BusinessWeek: the Week as card columns (E25)", () => {
             })),
         });
         render(june);
-        expect(host.querySelector("h1")?.textContent).toBe("1–7 Jun 2026");
+        expect(host.querySelector("h1")?.textContent).toBe("1 to 7 Jun 2026");
         expect(link("Previous week")).toBeNull();
         expect(host.textContent).toContain(
             "Saroh has your data from June 2026",

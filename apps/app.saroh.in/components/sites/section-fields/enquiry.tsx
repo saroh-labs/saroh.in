@@ -80,7 +80,7 @@ export function EnquiryFields({
             <div className="grid gap-2">
                 <Label className={FIELD_LABEL}>Fields</Label>
                 <p className="text-xs text-muted-foreground">
-                    Include at least one email field — it identifies the person
+                    Include at least one email field. It identifies the person
                     who enquired.
                 </p>
                 {c.fields.map((field, i) => (

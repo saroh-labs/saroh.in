@@ -24,7 +24,7 @@ import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
+    name: z.string().trim().min(1, { message: "Add a name." }),
     description: z.string().optional(),
 });
 

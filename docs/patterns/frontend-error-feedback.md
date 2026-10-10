@@ -60,7 +60,10 @@
       `lib/format` like any other (`frontend-design-system.md` → Numbers
       and dates).
     - `scripts/check-formats.mjs` (in `pnpm prepush`) fails "successfully"
-      or an exclamation mark in a toast call.
+      or an exclamation mark in a toast call, and `scripts/check-app-copy.mjs`
+      (`pnpm check:copy`) fails an em dash, a semicolon or a word the
+      product never says in anything the app shows (`saroh-product.md` →
+      One word each).
 - **Adopted** — **Toast copy is product copy.** Show the API's guarded message
   (`res.error`) or your own sentence — never an exception's `error.message`, an
   API `detail` or a response body. Gap: `saroh.in`'s `join-waitlist.tsx`

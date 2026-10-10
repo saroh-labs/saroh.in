@@ -195,7 +195,7 @@ export function payNote(
         case "UPI":
             return `Show the counter QR. Create once ${total} shows on your UPI app.`;
         case "CARD":
-            return `Key ${total} into the machine; create once it approves.`;
+            return `Key ${total} into the machine, and create once it approves.`;
         case "LINK":
             return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid, and nobody starts it until it's paid.`;
         case "LATER":

@@ -5,10 +5,10 @@
 #         Services, /services); app/(shell)/services/page.tsx ("Edit")
 #   PRICE apps/app.saroh.in/components/services/service-editor/editor-sections.tsx
 #         ("Price", "Price (₹)"); .../service-editor/deposit-field.tsx ("At
-#         booking, they pay": "Nothing — they pay at the visit", "25%
+#         booking, they pay": "Nothing, they pay at the visit", "25%
 #         deposit", "50% deposit", "The full price")
 #   NOTE  apps/app.saroh.in/lib/services/service-editor.ts depositNote ("No
-#         card needed to book. No-shows cost you the slot."; "They pay … when
+#         card needed to book. No-shows cost you the time."; "They pay … when
 #         booking, and the rest (…) at the visit. Refunded if they cancel in
 #         time."; "A deposit is part of the price. Set a price first, or take
 #         nothing at booking.")
@@ -74,7 +74,7 @@ steps:
       marker: Edit
     # PRICE, NOTE.
     - title: Choose what they pay at booking
-      body: "Under Price, At booking, they pay has four choices: Nothing — they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
+      body: "Under Price, At booking, they pay has four choices: Nothing, they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
       shot: help-take-deposit-2
       caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking, and the note that it's paid at the desk for now, as no payment provider is connected."
       tip: "In time means before the free cancellation time in your booking rules, under Bookings › Availability. A late cancel keeps the deposit."

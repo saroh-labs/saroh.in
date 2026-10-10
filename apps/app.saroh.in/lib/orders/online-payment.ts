@@ -53,7 +53,7 @@ export function onlinePaymentWords(
             return {
                 word: `Waiting for ${provider}`,
                 next: "the customer started paying",
-                detail: `The customer started paying. It shows as paid here once ${provider} confirms it — usually within a few minutes. Don't start it until then.`,
+                detail: `The customer started paying. It shows as paid here once ${provider} confirms it, usually within a few minutes. Don't start it until then.`,
                 tone: "wait",
             };
         case "NOT_FINISHED":
@@ -77,5 +77,5 @@ export function onlinePaymentLine(
 ): { text: string; tone: OnlinePaymentWords["tone"] } | null {
     if (!payment) return null;
     const words = onlinePaymentWords(payment, canSend);
-    return { text: `${words.word} — ${words.next}`, tone: words.tone };
+    return { text: `${words.word}: ${words.next}`, tone: words.tone };
 }

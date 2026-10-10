@@ -183,7 +183,7 @@ export function initials(name: string): string {
 export function totals(list: MoneyTotal[]): string {
     return list.length
         ? list.map((t) => formatMoneyMajor(t.amount, t.currency)).join(" + ")
-        : "—";
+        : "None";
 }
 
 // ---------------------------------------------------------------- header
@@ -446,7 +446,7 @@ export function howTheyGet(rows: DetailOrder[]): string {
         return `Always collects at ${where}${where.endsWith(".") ? "" : "."}`;
     }
     if (!collected.length) return "Always delivered.";
-    return `Collects at ${where} — ${collected.length} of ${rows.length} orders. The rest were delivered.`;
+    return `Collects at ${where}: ${collected.length} of ${rows.length} orders. The rest were delivered.`;
 }
 
 /**
@@ -460,7 +460,7 @@ export function deliveryAddress(
     return (
         kept ??
         rows.find((o) => o.delivery)?.delivery ??
-        "No address — they have only collected."
+        "No address. They have only collected."
     );
 }
 
@@ -588,7 +588,7 @@ export function bookingRow(
               ? `With ${staff}`
               : "",
         pay: b.cancelledLate
-            ? "Cancelled late — the class stays used"
+            ? "Cancelled late. The class stays used"
             : payText(b),
         issue: isIssue(b),
         state: bookingState(b, upcoming),
@@ -671,7 +671,7 @@ export function packLines(
                 sub: expired
                     ? `Ran out ${formatDate(p.expiresAt, timeZone, { now })} with ${p.left} unused`
                     : `Use by ${formatDate(p.expiresAt, timeZone, { now })}${
-                          soon ? ` — ${countOf(days, "day")} left` : ""
+                          soon ? `, ${countOf(days, "day")} left` : ""
                       } · ${bought}`,
                 warn: soon,
             };
@@ -839,7 +839,7 @@ export function owedLine(d: CustomerDetail): string | null {
     const owed = d.stats.owed;
     if (!owed || owed.unpaidCount === 0) return null;
     return `${countOf(owed.unpaidCount, "invoice")} unpaid · ${totals(owed.totals)}${
-        owed.overdueCount ? " — some overdue" : ""
+        owed.overdueCount ? ", some overdue" : ""
     }`;
 }
 

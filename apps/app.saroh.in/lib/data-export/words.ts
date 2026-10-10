@@ -109,7 +109,7 @@ export function dataExportLine(
     const parts = [
         fileSize(view.sizeBytes),
         left > 0
-            ? `${count(left, "file was", "files were")} too big to fit; media.csv inside lists ${plural(left, "it", "them")}`
+            ? `${count(left, "file was", "files were")} too big to fit, and media.csv inside lists ${plural(left, "it", "them")}`
             : null,
     ].filter((part): part is string => Boolean(part));
     return {

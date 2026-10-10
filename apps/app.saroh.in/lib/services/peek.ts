@@ -77,7 +77,7 @@ export function attentionText(attention: PeekAttention | null): string | null {
     return shown.length ? shown.join(" · ") : null;
 }
 
-export const NO_PHONE_ON_PAGE = "No phone yet — add it on their page";
+export const NO_PHONE_ON_PAGE = "No phone yet. Add it on their page";
 export const NO_PHONE = "No phone yet";
 
 /**
@@ -98,7 +98,7 @@ export function phoneText({
     const typed = bookerPhone?.trim();
     if (typed) return typed;
     if (!hasContact) return NO_PHONE;
-    if (!person) return "—";
+    if (!person) return "Not known";
     const theirs = person.phone?.trim();
     if (theirs) return theirs;
     return NO_PHONE_ON_PAGE;

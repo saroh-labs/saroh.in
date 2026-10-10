@@ -244,7 +244,7 @@ test.describe("business settings", { tag: "@serial" }, () => {
             await page
                 .getByRole("button", { name: "Undo" })
                 .click({ timeout: 10_000 });
-            await expect(page.getByText("Changed since — reload")).toBeVisible({
+            await expect(page.getByText("Changed since. Reload")).toBeVisible({
                 timeout: 15_000,
             });
             expect(await readPrefix(page.request)).toBe("UZ");

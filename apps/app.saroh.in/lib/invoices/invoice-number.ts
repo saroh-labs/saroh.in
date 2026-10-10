@@ -64,7 +64,7 @@ export const SEPARATOR_LABEL: Record<NumberSeparator, string> = {
 export const RESTART_LABEL: Record<NumberRestart, string> = {
     FY: "Every financial year",
     MONTH: "Every month",
-    NEVER: "Never — one running count",
+    NEVER: "Never, one running count",
 };
 
 /**

@@ -250,7 +250,7 @@ function FulfilmentDraft({
                         </CheckRow>
                     ) : (
                         <p className="mt-2 text-[12px] text-muted-foreground">
-                            Nothing is sent to {first} — let them know by email
+                            Nothing is sent to {first}. Let them know by email
                             or phone.
                         </p>
                     )

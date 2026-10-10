@@ -293,7 +293,7 @@ export function pageText(page: CustomersPage): string {
     const from = (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.total, page.page * page.pageSize);
     const f = formatNumber;
-    return `Showing ${f(from)}–${f(to)} of ${f(page.total)}`;
+    return `Showing ${f(from)} to ${f(to)} of ${f(page.total)}`;
 }
 
 export function pageCount(page: CustomersPage): number {
@@ -384,7 +384,7 @@ export function lastSub(
  * a person the merchant added on the list (the design's words), else "—".
  */
 export function noOrderText(row: CustomerRow): string {
-    return row.addedByHand ? "Added by hand" : "—";
+    return row.addedByHand ? "Added by hand" : "None";
 }
 
 /**
@@ -392,7 +392,7 @@ export function noOrderText(row: CustomerRow): string {
  * "—" when nothing is paid, which is a state, not a measurement.
  */
 export function spentText(spent: MoneyTotal[]): string {
-    if (spent.length === 0) return "—";
+    if (spent.length === 0) return "None";
     return spent.map((m) => formatMoneyMajor(m.amount, m.currency)).join(" + ");
 }
 

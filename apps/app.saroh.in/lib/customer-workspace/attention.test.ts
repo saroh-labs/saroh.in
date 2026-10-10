@@ -517,13 +517,13 @@ describe("who can read a sensitive note (C12, DEC-073)", () => {
 
     it("says the roles in the tick, and only the rule when they're unknown", () => {
         expect(sensitiveTickText(["Dentist", "Owner"])).toBe(
-            "Sensitive — only people who can see sensitive notes (Dentist, Owner) can read it",
+            "Sensitive. Only people who can see sensitive notes (Dentist, Owner) can read it",
         );
         expect(sensitiveTickText(null)).toBe(
-            "Sensitive — only people who can see sensitive notes can read it",
+            "Sensitive. Only people who can see sensitive notes can read it",
         );
         expect(sensitiveTickText([])).toBe(
-            "Sensitive — only people who can see sensitive notes can read it",
+            "Sensitive. Only people who can see sensitive notes can read it",
         );
     });
 });

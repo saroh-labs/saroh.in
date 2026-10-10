@@ -9,7 +9,7 @@
 #          Available; "Connected"; the last-payment-update line)
 #   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
 #          (step 1 "Your API keys": "Key ID", "Key secret", "Public key"
-#          optional, "Shown to the checkout; not a secret."; "Cashfree signs
+#          optional, "Shown to the checkout. Not a secret."; "Cashfree signs
 #          its payment updates with your key secret, so there's no separate
 #          secret to add."; "Connect Cashfree"; the business details step)
 #   HOOK   apps/app.saroh.in/components/providers/payment-webhook-steps.tsx
@@ -17,7 +17,7 @@
 #          URL", "Copy", "Tick these events")
 #   WORDS  apps/app.saroh.in/lib/providers/webhook.ts ("Developers ›
 #          Webhooks › Add Webhook Endpoint"; "No payment updates received
-#          yet — check the webhook in Cashfree."; "Last payment update from
+#          yet. Check the webhook in Cashfree."; "Last payment update from
 #          Cashfree: …")
 #   PATH   packages/integrations/src/index.ts (WEBHOOK_EVENTS.CASHFREE)
 #   KEYS   apps/api.saroh.in/src/modules/payments/providers/cashfree.provider.ts
@@ -64,7 +64,7 @@ steps:
       marker: Connect Cashfree
     # ROWS, WORDS.
     - title: Check that payment updates arrive
-      body: "Make a test payment, such as an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says No payment updates received yet — check the webhook in Cashfree."
+      body: "Make a test payment, such as an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says No payment updates received yet. Check the webhook in Cashfree."
       shot: help-connect-cashfree-5
       caption: "Cashfree connected at Northwind Supply (a demo shop), waiting for its first payment update."
       marker: No payment updates received yet

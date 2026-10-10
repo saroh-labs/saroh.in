@@ -80,7 +80,7 @@ export function VisibilitySection({
               : "Saving publishes it for the first time. Nobody outside the team has seen it yet."
           : status === "DRAFT"
             ? "Saving takes it off the shop. Anyone who had the link finds nothing there."
-            : "Saving archives it — it stops being sold, and its address stops resolving.";
+            : "Saving archives it. It stops being sold, and its address stops resolving.";
 
     useSection(
         "visibility",

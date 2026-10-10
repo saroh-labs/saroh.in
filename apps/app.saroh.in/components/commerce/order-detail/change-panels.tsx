@@ -70,7 +70,7 @@ export function ChangeCard({
               ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
               : fulfilment === null
                 ? "Items are locked now that preparing has started. How it's fulfilled can still change until it's handed over."
-                : "Preparing has started — refund what is wrong and add a new order."));
+                : "Preparing has started. Refund what is wrong and add a new order."));
     return (
         <Panel aria-labelledby="od-change">
             <PanelTitle id="od-change" className="mb-2.5">
@@ -152,7 +152,7 @@ export function ChangeCard({
  * disabled beside this.
  */
 const NO_RECORD =
-    "Your role can't record payments — ask the owner or an admin to mark it paid.";
+    "Your role can't record payments. Ask the owner or an admin to mark it paid.";
 
 /**
  * The order is not paid, so the kitchen is blocked (the API offers no next
@@ -218,8 +218,8 @@ export function PaymentBanner({
                             {handover === "collection"
                                 ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
                                 : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
-                            Cancel it to put the stock back, or keep waiting —
-                            nothing cancels on its own.
+                            Cancel it to put the stock back, or keep waiting.
+                            Nothing cancels on its own.
                             {canRecord ? "" : ` ${NO_RECORD}`}
                         </p>
                     </div>
@@ -311,11 +311,11 @@ export function PaymentBanner({
                         className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
                     >
                         {failed
-                            ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ${link ? "send them a pay link" : "ask them to pay again"}, or take it in cash.`
+                            ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first}. ${link ? "Send them a pay link" : "Ask them to pay again"}, or take it in cash.`
                             : pending
                               ? `${pending.detail}${canRecord ? "" : ` ${NO_RECORD}`}`
                               : canRecord
-                                ? `It waits for ${first}'s payment. Don't start it until it's paid — or take it in cash at the counter.`
+                                ? `It waits for ${first}'s payment. Don't start it until it's paid, or take it in cash at the counter.`
                                 : `It waits for ${first}'s payment. Don't start it until it's paid. ${NO_RECORD}`}
                     </p>
                 </div>

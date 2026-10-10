@@ -240,7 +240,7 @@ export function ChangePlanDialog({
                         </DialogTitle>
                         <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
                             {still
-                                ? `If you paid, ${picked?.name ?? "the plan"} switches on as soon as Razorpay tells us — you don't need to pay again. Your plan shows it while it's waiting.`
+                                ? `If you paid, ${picked?.name ?? "the plan"} switches on as soon as Razorpay tells us. You don't need to pay again. Your plan shows it while it's waiting.`
                                 : `Checking with Razorpay, then switching you to ${picked?.name ?? "the plan"}. This takes a few seconds.`}
                         </DialogDescription>
                     </DialogHeader>

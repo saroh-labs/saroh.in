@@ -264,7 +264,7 @@ describe("the kind lock (E13)", () => {
     it("locks a sold live pack, and says how many sold", () => {
         expect(kindLocked(true, 3)).toBe(true);
         expect(kindNote(true, 3)).toBe(
-            "Locked — 3 already sold. Class and one-to-one credits never mix.",
+            "Locked. 3 already sold. Class and one-to-one credits never mix.",
         );
     });
 
@@ -326,7 +326,7 @@ describe("When you publish", () => {
             "Changes published. The 3 already sold keep what they bought.",
         );
         expect(publishedToast(TEN, false, 0)).toBe(
-            "Ten classes is published — you can sell it now.",
+            "Ten classes is published. You can sell it now.",
         );
     });
 });
@@ -334,7 +334,7 @@ describe("When you publish", () => {
 describe("the side column", () => {
     it("works out each class against the drop-in price", () => {
         expect(eachNote(TEN, SERVICES)).toBe(
-            "₹450 a class · drop-in ₹500–₹700",
+            "₹450 a class · drop-in ₹500 to ₹700",
         );
         expect(glance(TEN, SERVICES, 3)).toEqual([
             ["Per class", "₹450"],
@@ -347,9 +347,9 @@ describe("the side column", () => {
         const unpriced = { ...TEN, price: null };
         expect(eachNote(unpriced, SERVICES)).toBe("");
         expect(glance(unpriced, SERVICES, null)).toEqual([
-            ["Per class", "—"],
-            ["Saving vs drop-in", "—"],
-            ["Sold so far", "—"],
+            ["Per class", "Not set"],
+            ["Saving vs drop-in", "Not set"],
+            ["Sold so far", "Not known"],
         ]);
     });
 });

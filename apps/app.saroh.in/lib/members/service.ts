@@ -66,7 +66,7 @@ async function mutate(
     });
     if (res.ok) return { ok: true, data: { ok: true } };
     const data: unknown = await res.json().catch(() => null);
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,

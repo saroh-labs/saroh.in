@@ -54,8 +54,8 @@ export function PaymentsToRefund({
                             {p.refund === "REFUNDED"
                                 ? `It has been refunded.`
                                 : p.refund === "PENDING"
-                                  ? `A refund is on its way; ${name} will confirm it.`
-                                  : `It wasn't applied to the invoice and is owed back. Refund it from your ${name} dashboard — Saroh records the refund when ${name} reports it.`}
+                                  ? `A refund is on its way. ${name} will confirm it.`
+                                  : `It wasn't applied to the invoice and is owed back. Refund it from your ${name} dashboard. Saroh records the refund when ${name} reports it.`}
                         </p>
                     </Notice>
                 );

@@ -184,7 +184,7 @@ export function WeekColumns({
                                     aria-haspopup="dialog"
                                     className="cursor-pointer px-0.5 py-1 text-left text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
-                                    {col.more} more — open the day
+                                    {col.more} more. Open the day
                                 </Button>
                             ) : null}
                             {col.empty ? (

@@ -174,7 +174,7 @@ export function PrePublishCheck({
                             blocked
                                 ? "Choose a web address first"
                                 : unsaved
-                                  ? "Saving your changes — publish is available in a moment"
+                                  ? "Saving your changes. Publish is available in a moment"
                                   : undefined
                         }
                     >
@@ -259,7 +259,7 @@ export function PrePublishCheck({
                                 <span className="mt-1 block">
                                     A reviewer&apos;s request for changes is
                                     still open. Publishing now goes ahead
-                                    without approval, and records that it did —
+                                    without approval, and records that it did,
                                     here and in version history.
                                 </span>
                             ) : null}
@@ -329,7 +329,7 @@ export function PrePublishCheck({
                      */}
                     {awaitingNavigation.length > 0 ? (
                         <p className="mt-10 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
-                            Two checks are not running yet — whether a hidden
+                            Two checks are not running yet: whether a hidden
                             section is still linked from your navigation, and
                             whether a page is missing from it. Saroh does not
                             manage your navigation yet.

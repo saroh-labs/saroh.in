@@ -126,7 +126,7 @@ test.describe("Stock screen", () => {
             await sheet.getByLabel("How many").fill("2");
             await sheet.getByRole("button", { name: "Record stock" }).click();
             await expect(
-                page.getByText("Recorded 2 wasted — 5 on hand now."),
+                page.getByText("Recorded 2 wasted. 5 on hand now."),
             ).toBeVisible();
 
             await page.goto(

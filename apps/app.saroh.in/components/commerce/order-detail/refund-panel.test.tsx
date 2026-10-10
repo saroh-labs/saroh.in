@@ -54,7 +54,7 @@ const html = (lines: OrderReadLine[]) => {
                 lines={lines}
                 remaining={480}
                 shipping={0}
-                how="Back to Razorpay, in 3–5 days."
+                how="Back to Razorpay, in 3 to 5 days."
                 format={(n) => `₹${n}`}
                 currency="INR"
                 onCancel={noop}
@@ -84,7 +84,7 @@ describe("RefundPanel", () => {
         }
         expect(out).toContain("Or another amount");
         expect(out).toContain('aria-label="Refund another amount"');
-        expect(out).toContain("Back to Razorpay, in 3–5 days.");
+        expect(out).toContain("Back to Razorpay, in 3 to 5 days.");
     });
 
     it("keeps Refund off until a line is ticked or an amount typed", () => {

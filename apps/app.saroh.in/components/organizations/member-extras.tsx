@@ -106,7 +106,7 @@ export function ExtrasCell({ labels }: { labels: string[] }) {
     if (labels.length === 0) {
         return (
             <span className="text-[13px] text-muted-foreground">
-                <span aria-hidden>—</span>
+                <span aria-hidden>None</span>
                 <span className="sr-only">No extra permissions</span>
             </span>
         );

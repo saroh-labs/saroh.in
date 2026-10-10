@@ -63,15 +63,15 @@ describe("the week's days", () => {
 
 describe("weekTitle", () => {
     it("says the design's title", () => {
-        expect(weekTitle("2026-09-14")).toBe("14–20 Sep 2026");
+        expect(weekTitle("2026-09-14")).toBe("14 to 20 Sep 2026");
     });
 
     it("names both months when the week crosses one", () => {
-        expect(weekTitle("2026-09-28")).toBe("28 Sep–4 Oct 2026");
+        expect(weekTitle("2026-09-28")).toBe("28 Sep to 4 Oct 2026");
     });
 
     it("names both years when it crosses the new year", () => {
-        expect(weekTitle("2026-12-28")).toBe("28 Dec 2026–3 Jan 2027");
+        expect(weekTitle("2026-12-28")).toBe("28 Dec 2026 to 3 Jan 2027");
     });
 });
 

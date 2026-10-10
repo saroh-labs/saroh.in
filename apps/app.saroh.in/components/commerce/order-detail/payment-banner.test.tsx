@@ -32,7 +32,7 @@ describe("the pay-on-handover banner", () => {
         const html = render({ uncollectedDays: 4, onCancel: () => undefined });
         expect(html).toContain("Not collected for 4 days");
         expect(html).toContain("Anika chose to pay when they collect it");
-        expect(html).toContain("nothing cancels on its own");
+        expect(html).toContain("Nothing cancels on its own");
         expect(html).toContain("Mark paid");
         expect(html).toContain("Cancel order…");
     });
@@ -76,7 +76,7 @@ describe("the banner for someone who can't record payments (DEC-106)", () => {
     it("shows Paid in cash disabled, described by the reason", () => {
         const html = render({ handover: undefined, canRecord: false });
         expect(html).toContain(
-            "Your role can&#x27;t record payments — ask the owner or an admin to mark it paid.",
+            "Your role can&#x27;t record payments. Ask the owner or an admin to mark it paid.",
         );
         expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby=/);
         expect(html).toContain("Paid in cash");

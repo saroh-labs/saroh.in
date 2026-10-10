@@ -287,7 +287,7 @@ function ClassesLeft({
                                 )}
                             >
                                 {m.paused
-                                    ? "Paused — classes start again when it resumes."
+                                    ? "Paused. Classes start again when it resumes."
                                     : `Classes this month · resets ${formatDate(m.resetsAt, d.timezone, { now })}, unused ones don't carry over`}
                             </div>
                             {change ? (
@@ -388,7 +388,7 @@ function NextBooking({
                                     : "text-foreground",
                             )}
                         >
-                            {typeof s.n === "number" ? s.n : "—"}
+                            {typeof s.n === "number" ? s.n : "Not known"}
                         </div>
                         <div className="text-[11.5px] text-muted-foreground">
                             {s.label}

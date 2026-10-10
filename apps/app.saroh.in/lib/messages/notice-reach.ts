@@ -53,7 +53,7 @@ export function readyNoticeText(
         case "ON_SIGN_IN":
             return "They'll see it when they sign in on your site.";
         case "NONE":
-            return `Nothing is sent to ${first} — the step shows on the order.`;
+            return `Nothing is sent to ${first}. The step shows on the order.`;
         default:
             return "The step shows on the order.";
     }
@@ -75,9 +75,9 @@ export function bookingChangeText(
         case "ACCOUNT":
             return `If you move or cancel, it shows in ${first}'s account on your site.`;
         case "ON_SIGN_IN":
-            return `If you move or cancel, ${first} sees it when they sign in on your site — tell them yourself if it's soon.`;
+            return `If you move or cancel, ${first} sees it when they sign in on your site. Tell them yourself if it's soon.`;
         default:
-            return `Saroh doesn't message ${first} — tell them yourself if you move or cancel.`;
+            return `Saroh doesn't message ${first}. Tell them yourself if you move or cancel.`;
     }
 }
 
@@ -95,7 +95,7 @@ export function classCancelText(
         return "Each of them sees it in their account on your site.";
     }
     if (channels?.email) {
-        return "Those who've signed in on your site are emailed; tell the others yourself.";
+        return "Those who've signed in on your site are emailed. Tell the others yourself.";
     }
     return "Saroh doesn't message them.";
 }

@@ -251,7 +251,7 @@ describe("the Invoices design's words", () => {
         ).toMatchObject({ before: "3 days late", late: true });
         expect(
             whenLine(inv({ standing: "DRAFT", number: null }), NOW).before,
-        ).toBe("Not issued — no number yet");
+        ).toBe("Not issued, no number yet");
     });
 
     it("says how a paid invoice was paid", () => {

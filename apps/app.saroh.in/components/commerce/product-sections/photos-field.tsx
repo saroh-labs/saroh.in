@@ -82,8 +82,8 @@ export function PhotosField({
     return (
         <div className="flex flex-col gap-3">
             <p className="text-[12.5px] text-muted-foreground">
-                {mediaCounter(value)}. The first photo is the cover — on the
-                shop and in lists. Every variant shows the same photos unless it
+                {mediaCounter(value)}. The first photo is the cover, on the shop
+                and in lists. Every variant shows the same photos unless it
                 picks one of its own.
             </p>
 

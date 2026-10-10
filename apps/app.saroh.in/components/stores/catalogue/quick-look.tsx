@@ -265,7 +265,7 @@ function PriceBlock({ row }: { row: CatalogueRow }) {
         <div className="min-w-0">
             <div className="font-display text-[14px] font-semibold tabular-nums tracking-[-0.02em]">
                 {row.priceRange
-                    ? `${money(row.priceRange.low)} – ${money(row.priceRange.high)}`
+                    ? `${money(row.priceRange.low)} to ${money(row.priceRange.high)}`
                     : money(row.price)}
             </div>
             {row.priceRange ? (

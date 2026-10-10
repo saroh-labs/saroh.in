@@ -137,7 +137,7 @@ export function versionRowCopy(p: SitePublication): VersionRowCopy {
     }
     if (p.bypass) {
         lines.push({
-            text: `Published without approval by ${p.bypass.by} — a reviewer had asked for changes.`,
+            text: `Published without approval by ${p.bypass.by}. A reviewer had asked for changes.`,
             tone: "warning",
         });
     }

@@ -100,7 +100,7 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                     What you hear about
                 </h3>
                 <span className="text-[12.5px] text-muted-foreground">
-                    Only for you — your team picks their own.
+                    Only for you. Your team picks their own.
                 </span>
             </div>
             {grid.notes.map((note) => (

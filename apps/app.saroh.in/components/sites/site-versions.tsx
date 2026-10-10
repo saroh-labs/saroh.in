@@ -305,7 +305,7 @@ function RestoreConfirm({
                 {current
                     ? ` (published ${formatDateTime(current.publishedAt, zone, { year: "always" })})`
                     : ""}
-                . Nothing is deleted — this version is published again as a new
+                . Nothing is deleted. This version is published again as a new
                 entry, so you can undo it from this same list. Your unpublished
                 draft is left alone.
                 {changesRequested && gate.kind !== "override"

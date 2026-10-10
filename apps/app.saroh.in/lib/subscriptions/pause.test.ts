@@ -64,7 +64,7 @@ describe("pause lengths (D8)", () => {
             "Nothing is charged or collected until 3 Oct. It restarts on its own. The days it's paused are added to the period Meera has paid for.",
         );
         expect(pauseNote(open, SUB, NOW)).toBe(
-            "Nothing is charged or collected until you resume it. Resume before 16 Oct and the days it's paused are added to the period Meera has paid for; later, a new period starts with its invoice.",
+            "Nothing is charged or collected until you resume it. Resume before 16 Oct and the days it's paused are added to the period Meera has paid for. Later, a new period starts with its invoice.",
         );
     });
 

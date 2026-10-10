@@ -527,7 +527,7 @@ describe("Pack Detail's Sales (E17)", () => {
         expect(text()).toContain("₹1,500 now");
         expect(text()).toContain("Since 20 Aug · 1 bought at this price");
         expect(text()).toContain(
-            "Until 20 Aug · 1 bought at it — they keep it",
+            "Until 20 Aug · 1 bought at it, and they keep it",
         );
     });
 
@@ -620,7 +620,7 @@ describe("Pack Detail's Activity (E17)", () => {
         );
         expect(tabCount("activity")).toBe("2+");
         expect(text()).toContain(
-            "Asha Rao's pack extended 7 days — Knee injury",
+            "Asha Rao's pack extended 7 days: Knee injury",
         );
         expect(text()).toContain("Sold to Asha Rao · ₹1,500 · None");
         expect(text()).toContain("Saroh support");

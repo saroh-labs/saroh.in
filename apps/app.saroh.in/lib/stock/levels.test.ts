@@ -176,7 +176,7 @@ describe("changes and toasts", () => {
     it("confirms a move and an add", () => {
         expect(movedWords(3, "Online")).toBe("Moved 3 to Online.");
         expect(addedWords(5, "Sourdough", 12)).toBe(
-            "Added 5 to Sourdough — 12 can sell now",
+            "Added 5 to Sourdough. 12 can sell now",
         );
     });
 });

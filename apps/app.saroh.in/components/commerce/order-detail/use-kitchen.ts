@@ -151,7 +151,7 @@ export function useKitchen({
                 if (to === "READY") {
                     showSuccess(
                         "Marked ready.",
-                        `It shows on the order — nothing was sent to ${first}.`,
+                        `It shows on the order. Nothing was sent to ${first}.`,
                     );
                 } else {
                     showUndo(message, () => undo(res.data.eventId, from), {
@@ -325,7 +325,7 @@ export function useKitchen({
                 fields.trackingNumber
                     ? "Tracking number saved."
                     : "Tracking details saved.",
-                `It stays on the order — nothing is sent to ${first}.`,
+                `It stays on the order. Nothing is sent to ${first}.`,
             );
             refresh();
         });

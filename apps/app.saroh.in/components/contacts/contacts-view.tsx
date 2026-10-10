@@ -34,7 +34,7 @@ import { Users } from "lucide-react";
  */
 
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
-const Missing = () => <span className="text-muted-foreground">—</span>;
+const Missing = () => <span className="text-muted-foreground">Not set</span>;
 
 const FILTERS: DataFilter<ContactListItem>[] = [
     { id: "all", label: "All" },

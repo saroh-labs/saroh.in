@@ -82,7 +82,7 @@ export function archiveToast(
     if (!archived) return `${plan.name} is open to sign-ups again.`;
     const n = plan.subscriberCount;
     return n
-        ? `${plan.name} archived. Its ${count(n, "subscriber carries", "subscribers carry")} on; nobody new can join.`
+        ? `${plan.name} archived. Its ${count(n, "subscriber carries", "subscribers carry")} on, and nobody new can join.`
         : `${plan.name} archived. Nobody new can join.`;
 }
 

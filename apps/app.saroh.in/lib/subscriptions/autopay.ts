@@ -71,11 +71,11 @@ export function autopayPanel(
     if (!autopay && card?.ended) {
         const day = formatDate(card.ended.at, tz, { now });
         line = card.ended.confirmed
-            ? `Autopay cancelled ${day} — renewals are invoiced with a pay link`
-            : `Autopay cancelled ${day} — being confirmed with ${provider}`;
+            ? `Autopay cancelled ${day}. Renewals are invoiced with a pay link`
+            : `Autopay cancelled ${day}, being confirmed with ${provider}`;
         if (!card.ended.confirmed) {
             notice = {
-                text: `Nothing more is charged. ${provider} hasn't confirmed the cancel yet — Saroh keeps asking.`,
+                text: `Nothing more is charged. ${provider} hasn't confirmed the cancel yet. Saroh keeps asking.`,
                 tone: "info",
             };
         }
@@ -85,8 +85,8 @@ export function autopayPanel(
     if (limitLow && (autopay?.state === "ON" || autopay?.state === "PAUSED")) {
         notice = {
             text: limitLow.limit
-                ? `Autopay limit too low — covers up to ${formatMoneyMajor(limitLow.limit, limitLow.currency)}, this renewal is ${formatMoneyMajor(limitLow.amount, limitLow.currency)}`
-                : `Autopay limit too low — this renewal of ${formatMoneyMajor(limitLow.amount, limitLow.currency)} is more than it covers`,
+                ? `Autopay limit too low. It covers up to ${formatMoneyMajor(limitLow.limit, limitLow.currency)}, and this renewal is ${formatMoneyMajor(limitLow.amount, limitLow.currency)}`
+                : `Autopay limit too low. This renewal of ${formatMoneyMajor(limitLow.amount, limitLow.currency)} is more than it covers`,
             tone: "warn",
         };
     } else if (sub.autopayCharge) {
@@ -184,14 +184,14 @@ export function cancelledText(
             };
         case "CONFIRMING":
             return {
-                title: "Autopay is off — nothing more is charged.",
+                title: "Autopay is off. Nothing more is charged.",
                 detail: withTold(
-                    `${provider} hasn't confirmed yet; Saroh keeps asking.`,
+                    `${provider} hasn't confirmed yet. Saroh keeps asking.`,
                 ),
             };
         case "REFUSED":
             return {
-                title: "Autopay is off in Saroh — nothing more is charged.",
+                title: "Autopay is off in Saroh. Nothing more is charged.",
                 detail: withTold(
                     `${provider} didn't confirm it. Check it's cancelled in your ${provider} dashboard.`,
                 ),
@@ -241,7 +241,7 @@ export function renewalWords(offered: boolean): {
                   "It renews with an invoice each period, paid with a pay link until they turn on autopay. Nobody is contacted.",
           }
         : {
-              plan: "What you sell on repeat. It renews with an invoice each period; nothing is charged.",
+              plan: "What you sell on repeat. It renews with an invoice each period. Nothing is charged.",
               subscribe:
                   "It renews with an invoice each period. Nothing is charged and nobody is contacted.",
           };
