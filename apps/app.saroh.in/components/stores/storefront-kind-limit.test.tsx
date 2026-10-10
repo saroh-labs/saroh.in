@@ -27,6 +27,12 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: (...args: unknown[]) => update(...args) as unknown,
 }));
+vi.mock("@/lib/members/actions", () => ({
+    inviteMember: vi.fn(),
+    removeMember: vi.fn(),
+    revokeInvitation: vi.fn(),
+    updateMemberRole: vi.fn(),
+}));
 const showError = vi.fn();
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -116,10 +122,28 @@ function draw() {
     );
 }
 
+/** A button by its words, on the page or in a sheet (a portal). */
 const item = (name: string) =>
-    Array.from(host.querySelectorAll<HTMLButtonElement>("button")).find(
+    Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
         (b) => b.textContent === name,
     );
+
+/** The open sheet, and the name a screen reader gives it. */
+const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');
+const sheetName = () => {
+    const id = sheet()?.getAttribute("aria-labelledby");
+    return id ? document.getElementById(id)?.textContent : undefined;
+};
+
+async function pressEscape() {
+    await act(async () => {
+        document.activeElement?.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+        await Promise.resolve();
+    });
+    await settle();
+}
 
 /** Lets the save's transition and its awaited action settle. */
 async function settle() {
@@ -360,7 +384,7 @@ describe("the tabs", () => {
     });
 });
 
-describe("a way's Edit panel", () => {
+describe("a way's Edit sheet", () => {
     const shop: StorefrontSettings = {
         ...online,
         kind: "SHOP",
@@ -396,24 +420,43 @@ describe("a way's Edit panel", () => {
     };
     const labelled = (name: string) =>
         host.querySelector<HTMLButtonElement>(`[aria-label="${name}"]`);
+    // The sheet's own controls: it draws in a portal, not in `host`.
     const chip = (name: string) =>
         Array.from(
-            host.querySelectorAll<HTMLButtonElement>("[role=radio]"),
+            document.querySelectorAll<HTMLButtonElement>("[role=radio]"),
         ).find((b) => b.textContent === name);
     const field = (id: string) =>
-        host.querySelector<HTMLInputElement>(`#${id}`);
+        document.querySelector<HTMLInputElement>(`#${id}`);
+    const form = (way: string) =>
+        document.querySelector(`form#delivery-${way}-panel`);
 
-    it("nothing is open until Edit, and then one way at a time", async () => {
+    it("nothing is open until Edit, which opens a sheet named for the way", async () => {
         drawShop();
-        expect(
-            host.querySelector("form#delivery-local_delivery-panel"),
-        ).toBeNull();
+        expect(sheet()).toBeNull();
+        expect(form("local_delivery")).toBeNull();
         await press(labelled("Edit local delivery"));
-        expect(
-            host.querySelector("#delivery-local_delivery-panel"),
-        ).not.toBeNull();
-        // The others wait: one edit at a time.
-        expect(labelled("Edit pick-up")?.disabled).toBe(true);
+        expect(sheetName()).toBe("Local delivery");
+        expect(sheet()?.textContent).toContain(
+            "Whether you deliver nearby from here, what customers pay and when an order counts as late.",
+        );
+        // In the sheet, not under the row: the rows stay as they were.
+        expect(sheet()?.contains(form("local_delivery"))).toBe(true);
+        expect(host.querySelector("form")).toBeNull();
+        expect(labelled("Edit pick-up")?.disabled).toBe(false);
+        // The keyboard starts on its first control.
+        expect(document.activeElement?.id).toBe("delivery-local_delivery-on");
+    });
+
+    it("each way's sheet carries its own name", async () => {
+        drawShop();
+        await press(labelled("Edit pick-up"));
+        expect(sheetName()).toBe("Pick-up");
+        expect(sheet()?.textContent).toContain(
+            "Whether customers can collect from here, and when an order counts as late.",
+        );
+        await press(item("Cancel"));
+        await press(labelled("Edit shipping"));
+        expect(sheetName()).toBe("Shipping");
     });
 
     it("the current late time is the chosen preset; a time between is Other…", async () => {
@@ -440,10 +483,10 @@ describe("a way's Edit panel", () => {
         type(field("delivery-local_delivery-fee"), "40");
         type(field("delivery-local_delivery-over"), "999");
         await press(chip("4 h"));
-        expect(host.textContent).toContain(
+        expect(sheet()?.textContent).toContain(
             "At checkout: Local delivery · ₹40, free over ₹999",
         );
-        expect(host.textContent).toContain("Also applies to shipping.");
+        expect(sheet()?.textContent).toContain("Also applies to shipping.");
         // Nothing saved yet: no switch or field here saves on its own.
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
@@ -454,8 +497,8 @@ describe("a way's Edit panel", () => {
             lateAfterMinutes: { LOCAL_DELIVERY: 240 },
         });
         expect(showSuccess).toHaveBeenCalledWith("Local delivery saved");
-        // Saved: the panel closes.
-        expect(host.querySelector("#delivery-local_delivery-panel")).toBeNull();
+        // Saved: the sheet closes.
+        expect(sheet()).toBeNull();
     });
 
     it("turning a way on or off is part of the same Save", async () => {
@@ -463,7 +506,7 @@ describe("a way's Edit panel", () => {
         drawShop();
         await press(labelled("Edit shipping"));
         await press(
-            host.querySelector<HTMLButtonElement>("#delivery-shipping-on"),
+            document.querySelector<HTMLButtonElement>("#delivery-shipping-on"),
         );
         expect(update).not.toHaveBeenCalled();
         await press(chip("2 days"));
@@ -496,14 +539,54 @@ describe("a way's Edit panel", () => {
         type(field("delivery-local_delivery-fee"), "40");
         await press(item("Cancel"));
         expect(update).not.toHaveBeenCalled();
+        expect(sheet()).toBeNull();
         expect(
             host.querySelector(
                 '[data-testid="delivery-local_delivery-summary"]',
             )?.textContent,
         ).toBe("Free · late after 24 h");
+        // The keyboard is back on the row's Edit.
+        expect(document.activeElement).toBe(labelled("Edit local delivery"));
         // Opened again, it starts from what is saved.
         await press(labelled("Edit local delivery"));
         expect(item("Free")?.getAttribute("data-state")).toBe("on");
+    });
+
+    it("Escape and the close button drop the draft too, unasked", async () => {
+        drawShop();
+        await press(labelled("Edit local delivery"));
+        await press(chip("4 h"));
+        await pressEscape();
+        expect(sheet()).toBeNull();
+        expect(update).not.toHaveBeenCalled();
+        await press(labelled("Edit local delivery"));
+        expect(chip("24 h")?.getAttribute("data-state")).toBe("on");
+        await press(chip("4 h"));
+        await press(
+            Array.from(sheet()?.querySelectorAll("button") ?? []).find(
+                (b) => b.textContent === "Close",
+            ),
+        );
+        expect(sheet()).toBeNull();
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("can't be dismissed while its save is on the way", async () => {
+        let done: (v: unknown) => void = () => undefined;
+        update.mockReturnValue(new Promise((r) => (done = r)));
+        drawShop();
+        await press(labelled("Edit local delivery"));
+        await press(chip("4 h"));
+        await press(item("Save"));
+        expect(item("Saving…")?.disabled).toBe(true);
+        await pressEscape();
+        expect(sheetName()).toBe("Local delivery");
+        await act(async () => {
+            done({ ok: true, data: shop });
+            await Promise.resolve();
+        });
+        await settle();
+        expect(sheet()).toBeNull();
     });
 
     it("says what to fix in place, and sends nothing", async () => {
@@ -511,20 +594,23 @@ describe("a way's Edit panel", () => {
         await press(labelled("Edit local delivery"));
         await press(item("Charge"));
         await press(item("Save"));
-        expect(host.textContent).toContain("Enter what customers pay");
+        expect(sheet()?.textContent).toContain("Enter what customers pay");
         await press(chip("Other…"));
         type(field("delivery-local_delivery-late"), "0");
-        expect(host.textContent).toContain("Between 5 minutes and 30 days.");
+        expect(sheet()?.textContent).toContain(
+            "Between 5 minutes and 30 days.",
+        );
         expect(update).not.toHaveBeenCalled();
     });
 
-    it("a refusal keeps the panel open with what was typed", async () => {
+    it("a refusal keeps the sheet open with what was typed", async () => {
         update.mockResolvedValue({ ok: false, error: "Could not save that." });
         drawShop();
         await press(labelled("Edit local delivery"));
         await press(chip("8 h"));
         await press(item("Save"));
         expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(sheetName()).toBe("Local delivery");
         expect(chip("8 h")?.getAttribute("data-state")).toBe("on");
     });
 });
