@@ -19,7 +19,7 @@ export default async function LoginPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect, email } = await searchParams;
+    const { redirect, email, with: way } = await searchParams;
     const providers = await signInProviders();
     return (
         <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
@@ -27,6 +27,9 @@ export default async function LoginPage({
                 returnTo={safeDestination(redirect)}
                 invitedEmail={typeof email === "string" ? email : undefined}
                 providers={providers}
+                // A code is the main way. `?with=password` opens the
+                // password form, for a link that knows it is wanted.
+                way={way === "password" ? "password" : "code"}
             />
         </SplitShell>
     );

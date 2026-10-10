@@ -16,7 +16,7 @@ import type { SocialProvider } from "@/lib/sign-in-options";
  * on the API (`providers`, from `lib/sign-in-options.ts`). A provider without
  * keys failed at the round-trip on the live sign-in page, so it isn't drawn
  * (owner, 9 Oct); setting its keys brings it back. With none, nothing is
- * drawn, not even the divider: email and password are the whole page.
+ * drawn, not even the divider: the emailed code is the whole page.
  */
 
 const PROVIDERS = [

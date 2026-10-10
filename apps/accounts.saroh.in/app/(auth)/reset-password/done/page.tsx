@@ -32,7 +32,7 @@ export default function PasswordResetDonePage() {
                 asChild
                 className="sa-cta h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
             >
-                <Link href="/login">Sign in</Link>
+                <Link href="/login?with=password">Sign in</Link>
             </Button>
         </SplitShell>
     );

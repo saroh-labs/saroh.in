@@ -17,8 +17,10 @@ import { isJoining } from "@/lib/joining";
  *
  * Every line has to be TRUE:
  *
- * - The plan's three steps are real. The account is made here, the business
- *   is named in setup, and what Saroh does first is picked from Home.
+ * - The plan's three steps are real. The account is made here, and setup's
+ *   one screen names the business and picks what to do first.
+ * - Signing up and signing in take a code sent to the address, and no
+ *   password. One can be added from the account page.
  * - Resetting a password signs every other device out
  *   (`revokeSessionsOnPasswordReset`). The same sentence appears ON the form,
  *   because this panel is gone below 760px and a consequence that size cannot
@@ -69,7 +71,7 @@ export const LOGIN_PANEL: PanelCopy = {
 export const SIGNUP_PANEL: PanelCopy = {
     eyebrow: "Sign up",
     heading: PROMISE,
-    body: "Three short steps and you are in. Next, we email you a code to check the address is yours.",
+    body: "Three short steps and you are in, with no password to think up. Next, we email you a code to check the address is yours.",
     steps: PLAN_STEPS,
     currentStep: 1,
 };
@@ -81,7 +83,7 @@ export const SIGNUP_JOIN_PANEL: PanelCopy = {
     body: "The business already exists, so there is nothing to set up. Next, we email you a code to check the address is yours.",
     points: [
         "Use the address the invitation was sent to",
-        "Eight characters or more for the password",
+        "No password to think up",
         "Whoever invited you decides what you can see and change",
     ],
 };
@@ -102,33 +104,43 @@ export const VERIFY_JOIN_PANEL: PanelCopy = {
     points: [
         `The code lasts ${CODE_MINUTES} minutes`,
         "Asking for a new one replaces the one before it",
-        "Paste all of it at once and it fills the boxes",
+        "Paste it in, or type it from the email",
     ],
 };
 
-/**
- * The line under "Check your email": what to do, then what happens next.
- * `returnTo` is where the verified account lands (already vetted): an
- * invitation, a page they were on their way to, or nothing, which is setup.
- */
-export function verifyBlurb(returnTo: string | null | undefined): string {
-    const act = "Type the code we emailed you.";
-    if (isJoining(returnTo)) {
-        return `${act} Next, you join the business that invited you.`;
-    }
-    if (!returnTo || returnTo.includes("/onboarding")) {
-        return `${act} Next, you name your business.`;
-    }
-    return `${act} Next, you carry on where you were going.`;
+/** Which page the code step is on: it decides what "next" can promise. */
+export type CodeFrom = "sign-up" | "sign-in";
+
+function settingUp(returnTo: string | null | undefined, from: CodeFrom) {
+    // Sign-up with nowhere else to go ends in setup. So does a link that
+    // carries a plan or an invite there.
+    return returnTo ? returnTo.includes("/onboarding") : from === "sign-up";
 }
 
-/** The line under "You're verified", while the page hands off. */
-export function verifiedLine(returnTo: string | null | undefined): string {
+/**
+ * What the code step says comes after the code. `returnTo` is where the
+ * account lands (already vetted): an invitation, a page they were on their
+ * way to, or nothing. Signing in promises nothing about setup.
+ */
+export function codeNext(
+    returnTo: string | null | undefined,
+    from: CodeFrom,
+): string | undefined {
+    if (isJoining(returnTo)) {
+        return "Next, you join the business that invited you.";
+    }
+    if (settingUp(returnTo, from)) return "Next, you name your business.";
+    return returnTo ? "Next, you carry on where you were going." : undefined;
+}
+
+/** The line under "You're signed in", while the page hands off. */
+export function doneLine(
+    returnTo: string | null | undefined,
+    from: CodeFrom,
+): string {
     if (isJoining(returnTo))
         return "Taking you to the business that invited you…";
-    if (!returnTo || returnTo.includes("/onboarding")) {
-        return "Taking you to set up your business…";
-    }
+    if (settingUp(returnTo, from)) return "Taking you to set up your business…";
     return "Taking you to Saroh…";
 }
 

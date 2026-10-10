@@ -107,28 +107,6 @@
     transition-timing-function: var(--ease-out);
 }
 
-/* ─── Code entry ────────────────────────────────────────────────────────────
-   The verify screen's one job. Focus takes the same ring as every other field;
-   a filled box takes the stronger edge — a colour step, not an alpha. */
-
-.sa-otp {
-    transition-property: border-color, box-shadow, background-color;
-    transition-duration: var(--duration-fast);
-    transition-timing-function: var(--ease-out);
-}
-
-.sa-otp:focus-visible {
-    outline: none;
-    border-color: hsl(var(--ring));
-    box-shadow:
-        0 0 0 2px hsl(var(--background)),
-        0 0 0 4px hsl(var(--ring));
-}
-
-.sa-otp[data-filled="true"] {
-    border-color: hsl(var(--border-strong));
-}
-
 /* ─── Feedback ───────────────────────────────────────────────────────────── */
 
 .sa-alert {
@@ -145,8 +123,8 @@
 .sa-check-path {
     stroke-dasharray: 32;
     stroke-dashoffset: 32;
-    animation: sa-draw var(--duration-slow) var(--ease-out)
-        var(--duration-fast) forwards;
+    animation: sa-draw var(--duration-slow) var(--ease-out) var(--duration-fast)
+        forwards;
 }
 
 @keyframes sa-fade {

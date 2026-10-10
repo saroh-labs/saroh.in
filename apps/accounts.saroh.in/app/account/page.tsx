@@ -1,8 +1,8 @@
 "use client";
 
 import { ChangeEmailForm } from "@/components/account/change-email-form";
-import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { DeleteAccount } from "@/components/account/delete-account";
+import { PasswordSection } from "@/components/account/password-section";
 import { ProfileForm } from "@/components/account/profile-form";
 import { SessionsList } from "@/components/account/sessions-list";
 import { getAppUrl } from "@/lib/app-urls";
@@ -97,7 +97,7 @@ export default function AccountPage() {
 
             <ProfileForm initialName={user.name} />
             <ChangeEmailForm currentEmail={user.email} />
-            <ChangePasswordForm />
+            <PasswordSection email={user.email} />
             <SessionsList currentToken={session.session.token} />
             <DeleteAccount />
         </main>
