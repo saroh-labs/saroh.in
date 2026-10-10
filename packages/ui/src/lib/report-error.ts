@@ -1,17 +1,19 @@
 /**
  * The one place a frontend error boundary sends an error (#103).
  *
- * Vendor-neutral on purpose: no tracker SDK is installed yet, and choosing one
- * is the user's decision. Until one is registered with {@link setErrorReporter},
- * this logs to the console exactly as the boundaries did before. When a
- * tracker lands, one `setErrorReporter(...)` call per app (in its
- * `instrumentation-client.ts`, gated on the app's DSN env var) forwards every
- * boundary's errors without touching the boundaries again.
+ * Vendor-neutral on purpose: this file knows no tracker. Until one is
+ * registered with {@link setErrorReporter}, it logs to the console exactly as
+ * the boundaries did before. The workspace, accounts, the admin console and
+ * saroh.in register PostHog's (DEC-123) in their `instrumentation-client.ts`,
+ * only when the app has a key; merchant sites, docs, help, templates and the
+ * UI gallery register nothing, so their boundaries only log.
  *
  * What a report carries is fixed here, not by each caller: the error's name,
  * message and stack, where it was caught, and Next's `digest` (the id the
  * server logged the same error under). Never a request body, form values, a
- * cookie, or the page's query string.
+ * cookie, or the page's query string. The message is masked here; the
+ * registered reporter (`@saroh/error-tracking/browser`) scrubs the message
+ * and the stack again with the shared scrubber before anything is sent.
  */
 
 export interface ErrorReportContext {

@@ -24,12 +24,29 @@ export const env = createEnv({
         // Optional: `lib/app-urls.ts` falls back to the standard dev/prod
         // origins, so a fresh clone needs no extra config.
         NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+        /**
+         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * address (the EU cloud when unset). Unset, nothing is loaded or
+         * sent. The browser SDK is used for exceptions only.
+         */
+        NEXT_PUBLIC_POSTHOG_KEY: z
+            .string()
+            .regex(/^phc_[A-Za-z0-9]+$/)
+            .optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        /** Which environment this build is for (wrangler.jsonc, DEC-107). */
+        NEXT_PUBLIC_VERCEL_ENV: z
+            .enum(["development", "preview", "production"])
+            .optional(),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+        NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+        NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

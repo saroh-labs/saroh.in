@@ -109,6 +109,12 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
+    /**
+     * Told once, after a user's row is first written (sign-up by password
+     * or through a provider). Handed the id only, never the email or name.
+     * Whatever it throws is swallowed: it can't fail a sign-up.
+     */
+    onUserCreated?: (user: { id: string }) => void;
 }
 
 /**
@@ -227,6 +233,25 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
         database: prismaAdapter(prisma, {
             provider: "postgresql",
         }),
+        // Only when the host asked to be told: no hook otherwise.
+        ...(opts.onUserCreated
+            ? {
+                  databaseHooks: {
+                      user: {
+                          create: {
+                              after: (user: { id: string }) => {
+                                  try {
+                                      opts.onUserCreated?.({ id: user.id });
+                                  } catch {
+                                      // Never a sign-up's problem.
+                                  }
+                                  return Promise.resolve();
+                              },
+                          },
+                      },
+                  },
+              }
+            : {}),
         account: {
             accountLinking: {
                 enabled: true,

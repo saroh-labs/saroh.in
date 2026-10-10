@@ -17,6 +17,8 @@ import {
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
+import { WorkspaceTracking } from "@/components/shared/workspace-tracking";
+import { env } from "@/env";
 import { accountsUrl } from "@/lib/accounts";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
@@ -33,6 +35,8 @@ import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
+import { usageSharingOrNull } from "@/lib/usage-sharing/service";
+import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -85,6 +89,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
+    // Whether masked session recording is switched on for this environment
+    // (DEC-123): a PostHog key and the replay switch. Off, nothing is read.
+    const recordingOn = replaySwitchedOn({
+        key: env.NEXT_PUBLIC_POSTHOG_KEY,
+        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+    });
+
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
     // page in the app rather than the slowest one.
@@ -108,6 +119,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         billing,
         paused,
         closing,
+        usageSharing,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -153,6 +165,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         activeOrg?.lifecycleStatus === "PENDING_DELETION"
             ? closingOrNull()
             : null,
+        // "Help improve Saroh" (DEC-123): the person's own choice, read
+        // before the recorder could start, and only where session
+        // recording is switched on at all. Null when unread: not recorded.
+        recordingOn ? usageSharingOrNull() : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14).
@@ -216,6 +232,17 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             >
                 Skip to content
             </a>
+            {/*
+             * PostHog in the signed-in shell (DEC-123): internal ids beside
+             * the workspace's error reports, and the masked session
+             * recording when it is switched on and this person shares.
+             * Draws nothing; does nothing without a key.
+             */}
+            <WorkspaceTracking
+                userId={session.user.id}
+                organizationId={activeOrg?.id}
+                sharesUsage={recordingOn && sharesUsageNow(usageSharing)}
+            />
             {/*
              * The role, alongside module availability, decides what the chrome
              * offers. Two different questions — does this business have the

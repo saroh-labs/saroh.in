@@ -32,7 +32,10 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
-import { installErrorTracking } from "./common/observability/report-error";
+import {
+    flushTelemetry,
+    installTelemetry,
+} from "./common/observability/posthog";
 import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
@@ -163,8 +166,21 @@ async function bootstrap() {
         new LoggingInterceptor(),
     );
     app.useGlobalFilters(new AllExceptionsFilter());
-    // Off unless ERROR_TRACKING_DSN is set (#103).
-    installErrorTracking(env.ERROR_TRACKING_DSN);
+    // PostHog: errors and the workspace's milestones (DEC-123). Off unless
+    // POSTHOG_KEY is set. With it on, a stop signal first sends what is
+    // queued (two seconds at most), then exits as it would have anyway: a
+    // milestone is sent once, so one lost at a deploy is lost for good.
+    if (
+        installTelemetry({
+            key: env.POSTHOG_KEY,
+            host: env.POSTHOG_HOST,
+            environment: env.POSTHOG_ENVIRONMENT,
+        })
+    ) {
+        process.once("SIGTERM", () => {
+            void flushTelemetry().finally(() => process.exit(0));
+        });
+    }
 
     const port = env.PORT;
     await app.listen(port);

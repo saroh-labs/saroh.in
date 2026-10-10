@@ -73,9 +73,14 @@
     // SITE_PAGE_CACHE_TTL is how long one is kept, in seconds.
     // SITE_ACCOUNT_AREA (on | off) shows Sign in / My account and /account,
     // on in dev (9 Oct); the api's own switch must be on first.
+    // POSTHOG_KEY / POSTHOG_HOST (DEC-123): server-side error reports only,
+    // off until the project's public key (phc_…, not a secret) is set.
+    // Never NEXT_PUBLIC_: nothing of a tracker's reaches a visitor's browser.
     "vars": {
         "VERCEL_ENV": "preview",
         "NEXT_PUBLIC_VERCEL_ENV": "preview",
+        // "POSTHOG_KEY": "",
+        // "POSTHOG_HOST": "",
         "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
@@ -127,6 +132,8 @@
             "vars": {
                 "VERCEL_ENV": "production",
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
+                // "POSTHOG_KEY": "",
+                // "POSTHOG_HOST": "",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_API_URL": "https://api.saroh.in",

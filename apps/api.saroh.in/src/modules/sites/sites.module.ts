@@ -2,6 +2,7 @@ import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { BillingModule } from "../billing/billing.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
@@ -37,6 +38,8 @@ import { TestReleasesService } from "./test-releases.service";
  */
 @Module({
     imports: [
+        // The activation ledger: the first publish (DEC-123).
+        AnalyticsCoreModule,
         BillingModule,
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,

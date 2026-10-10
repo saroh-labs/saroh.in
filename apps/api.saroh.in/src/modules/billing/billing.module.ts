@@ -3,6 +3,7 @@ import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { env } from "../../env";
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -91,6 +92,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  */
 @Module({
     imports: [
+        // The activation ledger: the first paid plan (DEC-123). Imports
+        // nothing itself, so it adds no cycle.
+        AnalyticsCoreModule,
         AuditModule,
         FeatureFlagModule,
         JobsModule,

@@ -4,6 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
 
 import { AlertsGrid } from "./alerts-grid";
+import { UsageSharingCard } from "./usage-sharing-card";
 
 /**
  * Settings → Your profile ("Saroh Settings" design): you, and what you hear
@@ -16,18 +17,28 @@ import { AlertsGrid } from "./alerts-grid";
  *
  * "What you hear about" is the design's grid of alerts by channel: your own
  * choices in this business (F14, `alerts-grid.tsx`).
+ *
+ * "Help improve Saroh" is a third card, not in the design, shown only where
+ * session recording is switched on (DEC-123, `usage-sharing-card.tsx`).
  */
 export function YourProfile({
     name,
     email,
     accountUrl,
     alerts,
+    sharesUsage,
 }: {
     name: string;
     email: string;
     /** Your account on accounts.saroh.in. */
     accountUrl: string;
     alerts: AlertPreferencesRead;
+    /**
+     * "Help improve Saroh" (DEC-123): whether you share how you use the
+     * workspace. Undefined where session recording is not switched on (or
+     * the choice couldn't be read), and the card is then left out.
+     */
+    sharesUsage?: boolean;
 }) {
     const rows: {
         label: string;
@@ -96,6 +107,10 @@ export function YourProfile({
             </section>
 
             <AlertsGrid read={alerts} />
+
+            {sharesUsage === undefined ? null : (
+                <UsageSharingCard on={sharesUsage} />
+            )}
         </div>
     );
 }

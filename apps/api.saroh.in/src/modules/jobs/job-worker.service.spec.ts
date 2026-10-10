@@ -13,6 +13,9 @@ jest.mock("../../env", () => ({
 
 import type { Job } from "@saroh/database";
 
+import { structuredLogger } from "../../common/logging/structured-logger";
+import type { ServerErrorEvent } from "../../common/observability/report-error";
+import { setErrorSink } from "../../common/observability/report-error";
 import { JobHandlerRegistry } from "./job-handler.registry";
 import { FakeJobQueue } from "./job-queue.port";
 import { JobWorkerService } from "./job-worker.service";
@@ -75,6 +78,65 @@ describe("JobWorkerService.runOnce", () => {
 
         expect(queue.jobs[0].status).toBe("FAILED");
         expect(queue.jobs[0].processedAt).toBeInstanceOf(Date);
+    });
+
+    describe("the error tracker (DEC-123)", () => {
+        const seen: ServerErrorEvent[] = [];
+        beforeEach(() => {
+            seen.length = 0;
+            setErrorSink({ capture: (event) => seen.push(event) });
+            jest.spyOn(structuredLogger, "error").mockImplementation(
+                () => undefined,
+            );
+        });
+        afterEach(() => {
+            setErrorSink(null);
+            jest.restoreAllMocks();
+        });
+
+        it("is told when a job fails its last attempt: type and ids, never the payload", async () => {
+            const queue = new FakeJobQueue();
+            const registry = new JobHandlerRegistry();
+            registry.register("enquiry.notify", () =>
+                Promise.reject(new Error("no inbox for asha@example.com")),
+            );
+            const job = await queue.enqueue({
+                type: "enquiry.notify",
+                payload: { leadId: "lead_1", email: "asha@example.com" },
+                organizationId: "org_1",
+                maxAttempts: 1,
+            });
+
+            await makeWorker(queue, registry).runOnce();
+
+            expect(seen).toEqual([
+                {
+                    name: "Error",
+                    message: "no inbox for [email]",
+                    stack: expect.any(String) as string,
+                    correlationId: job.id,
+                    jobType: "enquiry.notify",
+                    jobId: job.id,
+                    organizationId: "org_1",
+                },
+            ]);
+            expect(JSON.stringify(seen)).not.toContain("lead_1");
+            expect(JSON.stringify(seen)).not.toContain("asha@example.com");
+        });
+
+        it("is not told about an attempt that will be retried", async () => {
+            const queue = new FakeJobQueue();
+            const registry = new JobHandlerRegistry();
+            registry.register("enquiry.notify", () =>
+                Promise.reject(new Error("smtp down")),
+            );
+            await queue.enqueue({ type: "enquiry.notify", payload: {} });
+
+            await makeWorker(queue, registry).runOnce();
+
+            expect(queue.jobs[0].status).toBe("PENDING");
+            expect(seen).toEqual([]);
+        });
     });
 
     it("does not record DONE when its lease was reclaimed while the handler ran", async () => {

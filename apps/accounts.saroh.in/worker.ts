@@ -10,6 +10,7 @@
  * `exclude`) and the lint, as saroh.app's is. What it runs is
  * `crash-page.ts`, which is typed and tested.
  */
+import { reportWorkerCrash } from "@saroh/error-tracking/server";
 import { withCrashPage } from "@saroh/ui/lib/crash-page";
 import handler from "./.open-next/worker.js";
 
@@ -18,6 +19,15 @@ export default {
         (request, env, ctx) => handler.fetch(request, env, ctx),
         {
             brand: "saroh",
+            // The crash also goes to PostHog when this Worker has a key
+            // (DEC-123): scrubbed, the path as a route, never its query.
+            report: (error, { request, env }) =>
+                reportWorkerCrash(error, request, {
+                    key: env.NEXT_PUBLIC_POSTHOG_KEY,
+                    host: env.NEXT_PUBLIC_POSTHOG_HOST,
+                    app: "auth",
+                    vercelEnv: env.VERCEL_ENV,
+                }),
             homeHref: "/apps",
             homeLabel: "Go to your apps",
         },

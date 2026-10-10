@@ -165,6 +165,30 @@
 - **Current** — **`--warning` is a fill;** text on a pale tint uses
   `--warning-subtle-foreground`.
 
+## Session recordings: mark what isn't text — **Current** (DEC-123)
+
+The workspace's signed-in shell can be recorded for a sample of sessions
+(`POSTHOG_REPLAY`, off by default; never any other app, never a merchant
+site). A recording hides every character of text and every input by itself,
+and leaves out every `img`, `picture`, `video`, `audio`, `canvas`, `iframe`,
+`object` and `embed` (`REPLAY_BLOCK_SELECTOR` in
+`packages/error-tracking/src/browser.ts`). What that can't see is customer or
+business data drawn as **something other than text**:
+
+- **Put `data-ph-block` on the element that draws it.** A chart's bars and
+  lines (`ChartContainer` already carries it), a signature, a QR code, a map,
+  a photo set as a CSS `background-image`, a hand-drawn `<svg>` whose shape
+  is the data (a sparkline, a progress ring showing an amount). The recording
+  shows a blank box of the same size.
+- **Icons and decoration need nothing.** An `<svg>` icon says nothing about
+  anyone. Text inside an `<svg>` is masked like any other text.
+- **`ph-no-capture`** (the SDK's own class) does the same as `data-ph-block`.
+  Prefer the attribute: it says why, and it isn't a styling class.
+- A `hidden` or `file` input's value is not masked by the recorder: if one
+  ever holds something sensitive, block its container.
+
+When in doubt, block: a blank box in a recording costs nothing.
+
 ## Touch, reflow and accessibility
 
 - **Current** — **A sticky bottom bar reports its height.** Anything stuck to

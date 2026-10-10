@@ -48,6 +48,12 @@ type MaybeCorrelated = Request &
         organizationContext?: OrganizationContext;
     };
 
+/** Express's template for the matched route: `/orders/:orderId`. */
+function routePattern(req: Request): string | undefined {
+    const path = (req.route as { path?: unknown } | undefined)?.path;
+    return typeof path === "string" ? path : undefined;
+}
+
 function statusToCode(status: number): string {
     const name: unknown = (HttpStatus as Record<number, unknown>)[status];
     return typeof name === "string" ? name : "ERROR";
@@ -143,6 +149,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 statusCode,
                 method: req.method,
                 url: req.originalUrl,
+                // The matched route's own template, when one matched.
+                route: routePattern(req),
                 headers: req.headers,
                 organizationId: req.organizationContext?.organizationId,
             });

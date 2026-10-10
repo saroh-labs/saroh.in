@@ -2,6 +2,7 @@ import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -33,6 +34,8 @@ import { SEND_REFUND_TYPE, SendRefundHandler } from "./send-refund.handler";
  */
 @Module({
     imports: [
+        // The activation ledger: the first provider connected (DEC-123).
+        AnalyticsCoreModule,
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,
         // Sending a refused checkout's refund (G13, DEC-032).

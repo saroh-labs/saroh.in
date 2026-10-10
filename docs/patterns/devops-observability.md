@@ -75,14 +75,48 @@ errors) are kept one year.
   either sets it to match the policy and writes it down in the host's own
   runbook, which is not in this public repository.
 
+## Error tracking and product events: PostHog — **Current** (DEC-123)
+
+What is sent from where, the scrubber's rules, the limits and how to switch
+it on: `docs/architecture/ERROR_TRACKING_AND_UPTIME.md`. The rules a change
+must keep:
+
+- **Off without a key.** No SDK loaded, no client made, nothing sent. A new
+  call site never needs its own "is it on" check: it calls the seam.
+- **Errors go through the seam, never straight to an SDK.** The API:
+  `reportError()` and `reportJobError()`
+  (`src/common/observability/report-error.ts`); only `posthog.ts` beside it
+  imports `posthog-node`. The frontends: `reportError()` from
+  `@saroh/ui/lib/report-error` in a boundary, and nothing else; each app's
+  `instrumentation-client.ts`, `instrumentation.ts` and `worker.ts` do the
+  rest.
+- **Merchant sites report from the server only.** Nothing of PostHog's in
+  `apps/saroh.app` or `packages/site-blocks` beyond the server reporter:
+  `pnpm run check:merchant-site-tracking` fails the gate.
+- **One scrubber**, `@saroh/error-tracking`. Send ids and route templates,
+  never a body, a header, a query string, a name, an email, a phone number
+  or an amount. A new fact beside an error goes through `scrubContext`.
+- **A product milestone is sent by the API, once, from the activation
+  ledger** (`modules/analytics/product-milestones.ts`). The list is nine
+  events and is closed: a tenth is the owner's decision, not a call site's.
+  Never capture a product event from a browser.
+- **Session replay is the workspace's signed-in shell only**, masked, and
+  off by default. Mark customer data that isn't text with `data-ph-block`
+  (`frontend-design-system.md` → Session recordings).
+- **Degraded paths it adds, and what volume means:**
+  `posthog_send_failed` (WARN): PostHog refused a batch or couldn't be
+  reached; a steady stream means the key or host is wrong, or PostHog is
+  down. `error_sink_failed` (WARN): the forwarder itself threw; any at all
+  is a bug in it. `posthog_environment_missing` (ERROR, once at boot): the
+  host has a key and no `POSTHOG_ENVIRONMENT`, and nothing is being sent.
+  `product_milestone_not_sent` (WARN): the ledger has the milestone and
+  PostHog's copy is missing. `job_failed_final` (ERROR): a job failed its
+  last attempt; any at all is worth a look.
+
 ## Not in place yet
 
-- **No error tracker yet, but the seam is in** (#103). `AllExceptionsFilter`
-  calls `reportError()` (`src/common/observability/report-error.ts`), and every
-  frontend boundary calls `reportError()` from `@saroh/ui/lib/report-error`.
-  Both log only until a tracker is installed. `ERROR_TRACKING_DSN` is the API's
-  switch, off by default. What may be sent, the recommendation, and the
-  decisions left are in `docs/architecture/ERROR_TRACKING_AND_UPTIME.md`.
+- **No source maps at the tracker**, so a browser stack names built files.
+  `ERROR_TRACKING_AND_UPTIME.md` → Later.
 - **No uptime monitor** on `/health/ready`, and no log-based alerting. Same
   document.
 - **No post-deploy watch list.** Start one in a runbook: error rate before and

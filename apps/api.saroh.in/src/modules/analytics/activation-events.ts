@@ -1,16 +1,21 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 
 import { AnalyticsService } from "./analytics.service";
 import {
     FIRST_BOOKING_CREATED_TYPE,
     FIRST_CUSTOMER_CREATED_TYPE,
     FIRST_ORDER_CREATED_TYPE,
+    FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE,
+    FIRST_PLAN_UPGRADED_TYPE,
     FIRST_PRODUCT_CREATED_TYPE,
+    FIRST_SERVICE_CREATED_TYPE,
+    FIRST_SITE_PUBLISHED_TYPE,
     IMPORT_COMPLETED_TYPE,
     MODULE_ENABLED_TYPE,
     ONBOARDING_COMPLETED_TYPE,
     ORGANIZATION_CREATED_TYPE,
 } from "./event-contract";
+import { ProductMilestones } from "./product-milestones";
 
 /**
  * Activation instrumentation (#176, and the last open line of #119).
@@ -33,12 +38,21 @@ import {
  * duplicate key as an idempotent no-op. So a caller emits on EVERY create and
  * only the first is ever stored — no caller has to query "have they made one
  * before?", and no race between two concurrent creates can record two firsts.
+ *
+ * **The ledger is also the source of the product milestones sent to PostHog**
+ * (DEC-123). When `record()` says a row was stored, not replayed,
+ * `ProductMilestones` is told its type; it sends the matching milestone once
+ * and never holds this up. So a milestone can't be sent twice for a
+ * business, and nothing here knows about PostHog.
  */
 @Injectable()
 export class ActivationEvents {
     private readonly logger = new Logger(ActivationEvents.name);
 
-    constructor(private readonly analytics: AnalyticsService) {}
+    constructor(
+        private readonly analytics: AnalyticsService,
+        @Optional() private readonly milestones?: ProductMilestones,
+    ) {}
 
     /** t0 of the funnel. Once per Organization, ever. */
     organizationCreated(organizationId: string): Promise<void> {
@@ -108,6 +122,46 @@ export class ActivationEvents {
     }
 
     /**
+     * The product funnel's other firsts (DEC-123). Safe to call on every
+     * create, publish, connect and completed checkout, as the ones above
+     * are: only the first is stored. Each carries an id or a key, never a
+     * credential or a price.
+     */
+    firstServiceCreated(
+        organizationId: string,
+        serviceId: string,
+    ): Promise<void> {
+        return this.emitOnce(organizationId, FIRST_SERVICE_CREATED_TYPE, {
+            serviceId,
+        });
+    }
+
+    firstSitePublished(organizationId: string, siteId: string): Promise<void> {
+        return this.emitOnce(organizationId, FIRST_SITE_PUBLISHED_TYPE, {
+            siteId,
+        });
+    }
+
+    /** `provider` is the provider's name ("RAZORPAY"), never a key of theirs. */
+    firstPaymentProviderConnected(
+        organizationId: string,
+        provider: string,
+    ): Promise<void> {
+        return this.emitOnce(
+            organizationId,
+            FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE,
+            { provider },
+        );
+    }
+
+    /** A checkout for a paid plan completed. `planKey` is the plan's key. */
+    firstPlanUpgraded(organizationId: string, planKey: string): Promise<void> {
+        return this.emitOnce(organizationId, FIRST_PLAN_UPGRADED_TYPE, {
+            planKey,
+        });
+    }
+
+    /**
      * An import finished. NOT deduped — every import is worth counting, and the
      * properties are counts only: no file name, no row contents. An import file
      * is full of customer data and none of it belongs in an analytics ledger.
@@ -147,7 +201,7 @@ export class ActivationEvents {
         dedupeKey: string | null,
     ): Promise<void> {
         try {
-            await this.analytics.record({
+            const stored = await this.analytics.record({
                 organizationId,
                 type,
                 properties,
@@ -156,6 +210,11 @@ export class ActivationEvents {
                 // there is no visitor to hash and no consent basis to carry.
                 visitorHash: null,
             });
+            // Stored for the first time, not a replay: the one moment a
+            // product milestone may be sent (DEC-123). Returns at once.
+            if (!stored.deduped) {
+                this.milestones?.ledgerStored(type, organizationId);
+            }
         } catch (err) {
             // Deliberate: instrumentation must never fail the business
             // operation that triggered it. Logged so a broken contract is

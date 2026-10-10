@@ -69,6 +69,20 @@ export const env = createEnv({
             .string()
             .regex(/^G-[A-Z0-9]+$/)
             .optional(),
+        /**
+         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * address (the EU cloud when unset). Unset, nothing is loaded or
+         * sent. The browser SDK is used for exceptions only.
+         */
+        NEXT_PUBLIC_POSTHOG_KEY: z
+            .string()
+            .regex(/^phc_[A-Za-z0-9]+$/)
+            .optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        /** Which environment this build is for (wrangler.jsonc, DEC-107). */
+        NEXT_PUBLIC_VERCEL_ENV: z
+            .enum(["development", "preview", "production"])
+            .optional(),
     },
     server: {
         API_URL: z.string().url().optional(),
@@ -96,6 +110,9 @@ export const env = createEnv({
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+        NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+        NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

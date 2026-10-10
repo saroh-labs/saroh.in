@@ -132,6 +132,10 @@ const NEVER: Record<string, string> = {
     // F14: a person's own alert choices; the rows follow their role and
     // the modules on, read by the service.
     "notifications/notification-preferences.controller.ts": "cross-cutting",
+    // DEC-123: a person's own "Help improve Saroh" choice, kept on their
+    // user row; it belongs to no module.
+    "notifications/usage-sharing.controller.ts":
+        "the person's own choice, not a capability",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
     // DEC-069 (L2): the web address is the business's whichever modules

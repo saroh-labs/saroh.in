@@ -80,7 +80,10 @@ Before the split, one API restart signed out every user.
 - **Adopted** — **Show `error.digest` as a reference** — the only handle a user
   can give support. Report the error with `reportError(error, { boundary,
 digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
-  once a tracker is registered. Never call `console.error` directly in a
+  to PostHog where the app registered a reporter and has a key (DEC-123: the
+  workspace, accounts, admin and saroh.in; never a merchant site, whose
+  boundaries only log). Never import a tracker's SDK in a boundary or a
+  component. Never call `console.error` directly in a
   boundary. Current in every app's root and global boundaries and in
   `SectionError`.
 - **Current** — **A 403 from a server read calls `forbidden()` instead of throwing

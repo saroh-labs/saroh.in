@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { ActivationEvents } from "./activation-events";
 import { AnalyticsService } from "./analytics.service";
+import { ProductMilestones } from "./product-milestones";
 
 /**
  * The analytics write primitives, on their own.
@@ -23,7 +24,9 @@ import { AnalyticsService } from "./analytics.service";
  * `AnalyticsModule` re-exports this, so existing consumers are unaffected.
  */
 @Module({
-    providers: [AnalyticsService, ActivationEvents],
-    exports: [AnalyticsService, ActivationEvents],
+    // `ProductMilestones` (DEC-123) has no DI dependencies either: it is
+    // told what the ledger stored and sends the matching milestone.
+    providers: [AnalyticsService, ActivationEvents, ProductMilestones],
+    exports: [AnalyticsService, ActivationEvents, ProductMilestones],
 })
 export class AnalyticsCoreModule {}

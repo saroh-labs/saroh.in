@@ -10,6 +10,7 @@
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
         "check:security-headers": "node scripts/check-security-headers.mjs",
         "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
+        "check:merchant-site-tracking": "node scripts/check-merchant-site-tracking.mjs",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",

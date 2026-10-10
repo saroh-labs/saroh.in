@@ -6,6 +6,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
 import type { MerchantPaymentProvider } from "@saroh/database";
@@ -17,6 +18,7 @@ import {
     NO_ATTENTION,
 } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import {
     assertPlanTakesOnlinePayment,
@@ -469,6 +471,8 @@ export class PaymentsService {
 
     constructor(
         @Inject(PROVIDER_FACTORY) private readonly factory: ProviderFactory,
+        /** The activation ledger, for the first provider connected (DEC-123). */
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     /**
@@ -601,6 +605,14 @@ export class PaymentsService {
                         ? 0
                         : 1,
             },
+        );
+
+        // The business's first payment provider (DEC-123): the provider's
+        // name, never a key. Stored once by the ledger, after the write;
+        // it swallows its own errors.
+        await this.activation?.firstPaymentProviderConnected(
+            ctx.organizationId,
+            provider,
         );
 
         return redact(row);

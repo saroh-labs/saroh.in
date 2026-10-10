@@ -79,6 +79,7 @@ the right-hand files **before** writing code.
 | Add an environment variable, an environment check or a feature flag                                        | `docs/patterns/devops-environments-and-flags.md`                                               |
 | Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |
 | Add logging, a degraded path, a health check or error tracking                                             | `docs/patterns/devops-observability.md`                                                        |
+| Send anything to PostHog, add a product event, or touch tracking or session recording on any app           | `docs/architecture/ERROR_TRACKING_AND_UPTIME.md` · `docs/patterns/devops-observability.md`     |
 | Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
 | Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
 

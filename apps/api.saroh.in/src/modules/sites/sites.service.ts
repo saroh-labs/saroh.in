@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
 import {
@@ -15,6 +16,7 @@ import {
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import { keptPostsOnSite } from "../content/post-paused";
@@ -704,7 +706,11 @@ function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
 
 @Injectable()
 export class SitesService {
-    constructor(private readonly entitlements: EntitlementService) {}
+    constructor(
+        private readonly entitlements: EntitlementService,
+        /** The activation ledger, for the first publish (DEC-123). */
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     /**
      * Create a draft Site (pages + DRAFT versions + sections) from a template.
@@ -2012,7 +2018,7 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(snapshot);
 
-        return prisma.$transaction(async (tx) => {
+        const published = await prisma.$transaction(async (tx) => {
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
              * flag that blocks (`checkAddress`). Asked here, beside the
@@ -2057,6 +2063,11 @@ export class SitesService {
                 route: live.route,
             };
         });
+        // The first time one of the business's websites went live
+        // (DEC-123). After the commit; stored once by the ledger, and it
+        // swallows its own errors.
+        await this.activation?.firstSitePublished(ctx.organizationId, site.id);
+        return published;
     }
 
     // -----------------------------------------------------------------------

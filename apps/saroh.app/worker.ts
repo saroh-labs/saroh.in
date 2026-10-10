@@ -11,6 +11,7 @@
  * `exclude`) and everything it does lives in `lib/page-cache/`, which is
  * typed and tested.
  */
+import { reportWorkerCrash } from "@saroh/error-tracking/server";
 import { withCrashPage } from "@saroh/ui/lib/crash-page";
 
 import handler from "./.open-next/worker.js";
@@ -37,7 +38,20 @@ export default {
                 },
             },
         ),
-        // No home link: on a host whose Worker failed, home fails too.
-        { brand: "neutral" },
+        {
+            // No home link: on a host whose Worker failed, home fails too.
+            brand: "neutral",
+            // With a key (DEC-123), the crash is reported from the Worker:
+            // the site's host and the path as a route, nothing about the
+            // visitor. The visitor's browser is never involved.
+            report: (error, { request, env }) =>
+                reportWorkerCrash(error, request, {
+                    key: env.POSTHOG_KEY,
+                    host: env.POSTHOG_HOST,
+                    app: "sites",
+                    vercelEnv: env.VERCEL_ENV,
+                    siteHost: true,
+                }),
+        },
     ),
 };

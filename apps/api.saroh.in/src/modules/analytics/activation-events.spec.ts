@@ -75,6 +75,14 @@ describe("activation event contracts", () => {
                 return { orderId: "o_1" };
             case "first.booking.created":
                 return { bookingId: "bk_1" };
+            case "first.service.created":
+                return { serviceId: "svc_1" };
+            case "first.site.published":
+                return { siteId: "site_1" };
+            case "first.payment-provider.connected":
+                return { provider: "RAZORPAY" };
+            case "first.plan.upgraded":
+                return { planKey: "pro" };
             case "import.completed":
                 return {
                     entity: "products",

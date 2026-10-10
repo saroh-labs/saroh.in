@@ -21,6 +21,8 @@ import { NotificationPreferencesService } from "./notification-preferences.servi
 import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
+import { UsageSharingController } from "./usage-sharing.controller";
+import { UsageSharingService } from "./usage-sharing.service";
 
 /**
  * New-enquiry notifications (S3-006), a customer's message from their site
@@ -51,10 +53,16 @@ import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
         FeatureFlagModule,
         forwardRef(() => OrganizationsModule),
     ],
-    controllers: [NotificationsController, NotificationPreferencesController],
+    controllers: [
+        NotificationsController,
+        NotificationPreferencesController,
+        // "Help improve Saroh" (DEC-123): the person's own, beside their alerts.
+        UsageSharingController,
+    ],
     providers: [
         NotificationsService,
         NotificationPreferencesService,
+        UsageSharingService,
         EnquiryNotifyHandler,
         CustomerMessageNotifyHandler,
         TeamAlertHandler,

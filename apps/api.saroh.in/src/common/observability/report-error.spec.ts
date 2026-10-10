@@ -1,7 +1,7 @@
 import { structuredLogger } from "../logging/structured-logger";
 import {
-    installErrorTracking,
     reportError,
+    reportJobError,
     scrubMessage,
     setErrorSink,
     toServerErrorEvent,
@@ -58,7 +58,9 @@ describe("reportError (#103)", () => {
                 correlationId: "req-1",
                 statusCode: 500,
                 method: "POST",
-                path: "/organizations/org_1/orders",
+                // No route matched: the path, with what looks like an id
+                // replaced. `org_1` is too short to look like one.
+                route: "/organizations/org_1/orders",
                 organizationId: "org_1",
             },
         ]);
@@ -93,14 +95,61 @@ describe("reportError (#103)", () => {
         ).toMatchObject({ message: "A non-Error value was thrown" });
     });
 
-    it("stays off without a DSN, and says so rather than forwarding with one", () => {
-        expect(installErrorTracking(undefined)).toBe(false);
-        expect(logWarn).not.toHaveBeenCalled();
-        expect(installErrorTracking("https://key@errors.example/1")).toBe(
-            false,
+    it("gives a tracker the framework's route template when one matched", () => {
+        const seen: unknown[] = [];
+        setErrorSink({ capture: (e) => seen.push(e) });
+        reportError(new Error("boom"), {
+            ...ctx,
+            route: "/organizations/:organizationId/orders",
+        });
+        expect(seen).toEqual([
+            expect.objectContaining({
+                route: "/organizations/:organizationId/orders",
+            }),
+        ]);
+    });
+
+    it("reports a job's last failure with its type and ids, and logs it at ERROR", () => {
+        const seen: unknown[] = [];
+        setErrorSink({ capture: (e) => seen.push(e) });
+        reportJobError(new Error("send to +91 98765 43210 failed"), {
+            jobId: "job_1",
+            jobType: "booking.notify",
+            organizationId: "org_1",
+            attempts: 5,
+        });
+        expect(logError).toHaveBeenCalledWith(
+            "job_failed_final",
+            expect.objectContaining({
+                jobId: "job_1",
+                jobType: "booking.notify",
+                attempts: 5,
+                errorMessage: "send to [number] failed",
+            }),
         );
-        expect(logWarn).toHaveBeenCalledWith(
-            "error_tracking_not_installed",
+        expect(seen).toEqual([
+            {
+                name: "Error",
+                message: "send to [number] failed",
+                stack: expect.any(String) as string,
+                correlationId: "job_1",
+                jobType: "booking.notify",
+                jobId: "job_1",
+                organizationId: "org_1",
+            },
+        ]);
+    });
+
+    it("logs a job's last failure and forwards nothing with no tracker", () => {
+        expect(() =>
+            reportJobError(new Error("x"), {
+                jobId: "job_1",
+                jobType: "t",
+                attempts: 1,
+            }),
+        ).not.toThrow();
+        expect(logError).toHaveBeenCalledWith(
+            "job_failed_final",
             expect.any(Object),
         );
     });
