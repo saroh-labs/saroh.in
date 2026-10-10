@@ -274,6 +274,7 @@ function CheckActions({
                     {checked(true)}
                     {c.order ? (
                         <Button
+                            data-ph-unmask=""
                             asChild
                             variant="outline"
                             className={SMALL_BUTTON}

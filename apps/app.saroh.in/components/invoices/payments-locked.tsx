@@ -15,6 +15,7 @@ export function PaymentsLocked({ title, text }: LockedCopy) {
     return (
         <main className="w-full px-4 py-[60px] sm:px-[22px]">
             <PermissionDeniedState
+                data-ph-unmask=""
                 className="gap-[9px] border-border-strong py-9 sm:py-9"
                 title={title}
                 description={text}

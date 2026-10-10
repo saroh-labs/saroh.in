@@ -83,6 +83,7 @@ export default async function CustomerPage({
         <PageContainer width="full">
             <div className="flex flex-col gap-6">
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={[
                         "Sell",

@@ -10,8 +10,10 @@ import { SITE_NAME, SITE_URL } from "@/lib/seo";
 import { env } from "@/env";
 import { gaMeasurementId } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
+import { siteRecordingOn } from "@/lib/site-recording";
 
 import { GoogleAnalytics } from "./google-analytics";
+import { SiteReplay } from "./site-replay";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -104,6 +106,10 @@ export default function RootLayout({
     const privacy = shownLegal(resourcesContext()).find(
         (p) => p.id === "privacy",
     );
+    const recording = siteRecordingOn({
+        key: env.NEXT_PUBLIC_POSTHOG_KEY,
+        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+    });
     return (
         <html lang="en" style={{ colorScheme: "light" }}>
             <body
@@ -115,7 +121,11 @@ export default function RootLayout({
                         vercelEnv: env.VERCEL_ENV,
                     })}
                     privacyHref={privacy?.href}
+                    recording={recording}
                 />
+                {/* Session replay (DEC-125): only where it is switched on,
+                    and then only after the notice above is accepted. */}
+                <SiteReplay on={recording} />
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"

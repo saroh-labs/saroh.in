@@ -34,6 +34,9 @@ export function PlanEndingBanner({
     return (
         <div
             role="status"
+            // Saroh's words and Saroh's plan names; the day count and the
+            // date's digits are hidden in a recording all the same.
+            data-ph-unmask=""
             className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-brand-300 bg-brand-subtle px-4 py-2.5 dark:border-brand-700 sm:px-6"
         >
             <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">

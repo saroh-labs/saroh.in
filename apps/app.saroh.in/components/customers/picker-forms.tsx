@@ -277,7 +277,12 @@ export function DuplicateWarning({
                 >
                     Add someone new
                 </Button>
-                <Button type="button" size="sm" onClick={onPickThem}>
+                <Button
+                    data-ph-mask=""
+                    type="button"
+                    size="sm"
+                    onClick={onPickThem}
+                >
                     Pick {who}
                 </Button>
             </div>

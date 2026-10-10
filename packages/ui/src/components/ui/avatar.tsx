@@ -174,6 +174,9 @@ const Avatar = React.forwardRef<
 >(({ className, size, tone, ring, ringTone, ...props }, ref) => (
     <AvatarPrimitive.Root
         ref={ref}
+        // Someone's initials (their picture is left out with every image):
+        // always masked in a recording.
+        data-ph-mask=""
         className={cn(
             // A role ring is a ring: `ringTone` alone draws it.
             avatarVariants({ size, tone, ring: ring ?? !!ringTone, ringTone }),

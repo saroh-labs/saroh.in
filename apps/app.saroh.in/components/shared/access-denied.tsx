@@ -39,6 +39,7 @@ export function AccessDenied({
     return (
         <PageContainer>
             <PermissionDeniedState
+                data-ph-mask=""
                 title={title}
                 description={description}
                 note={note}

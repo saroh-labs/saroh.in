@@ -8,6 +8,18 @@ export interface PageHeaderProps extends Omit<
 > {
     title: React.ReactNode;
     description?: React.ReactNode;
+    /**
+     * Say so when the title or the description shows a record's own data: a
+     * customer's name, an order's number, a site's name. A session
+     * recording then masks it (DEC-125): `true` masks both, `"title"` or
+     * `"description"` only that one. Left out, both are read as Saroh's own
+     * fixed words ("Customers", "New product").
+     *
+     * A title or description that is not a literal string must say which
+     * (`false` for fixed words): `lib/usage-sharing/replay-marks.test.ts`
+     * in the workspace fails on one that doesn't.
+     */
+    holdsData?: boolean | "title" | "description";
     /** Trailing actions — keep to ONE primary (Button variant="brand") + optional secondary. */
     actions?: React.ReactNode;
     /**
@@ -28,9 +40,16 @@ export function PageHeader({
     description,
     actions,
     breadcrumb,
+    holdsData = false,
     className,
     ...props
 }: PageHeaderProps) {
+    // One or the other, never neither: fixed words can be read in a session
+    // recording, a record's data never (`data-ph-mask` always wins).
+    const mark = (part: "title" | "description") =>
+        holdsData === true || holdsData === part
+            ? { "data-ph-mask": "" }
+            : { "data-ph-unmask": "" };
     const crumbs = breadcrumb?.length ? (
         <nav
             aria-label="Breadcrumb"
@@ -94,11 +113,17 @@ export function PageHeader({
                         H3 and stops there; component titles (CardTitle,
                         DialogTitle) stay on Geist, because below H3 the brand
                         is the UI face. */}
-                    <h1 className="truncate font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]">
+                    <h1
+                        {...mark("title")}
+                        className="truncate font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.03em]"
+                    >
                         {title}
                     </h1>
                     {description ? (
-                        <p className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground">
+                        <p
+                            {...mark("description")}
+                            className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground"
+                        >
                             {description}
                         </p>
                     ) : null}

@@ -154,6 +154,11 @@ export function HomeDashboard({
  * which to turn on; offering a choice they cannot act on is the dead-end
  * pattern in another costume. Everyone else is told who makes it, so an empty
  * Home never reads as a broken one.
+ *
+ * Each state says `data-ph-unmask`: this is setup, before the business has
+ * anything of a customer's, and a session recording reads it in full
+ * (DEC-125, 10 Oct). The one thing in it that isn't Saroh's own words is
+ * the business's own name.
  */
 function FirstRun({
     modules,
@@ -176,6 +181,7 @@ function FirstRun({
     ) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="Nothing is turned on yet"
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
@@ -196,6 +202,7 @@ function FirstRun({
     if (onButNotOpen(modules)) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="Nothing here is open to you yet"
                 description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. An owner or admin can change what you can reach, in Team.`}
@@ -211,6 +218,7 @@ function FirstRun({
     if (heldByPlan(modules)) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="What's turned on isn't in your plan"
                 description={
@@ -234,6 +242,7 @@ function FirstRun({
     if (manages) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="Nothing is turned on yet"
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
@@ -250,6 +259,7 @@ function FirstRun({
 
     return (
         <EmptyState
+            data-ph-unmask=""
             icon={<Home aria-hidden />}
             title="Nothing is turned on yet"
             description={`${businessName} has not picked what Saroh does for it. Once someone who manages it does, the work shows up here and in the sidebar.`}

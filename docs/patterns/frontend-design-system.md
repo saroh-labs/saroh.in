@@ -165,21 +165,80 @@
 - **Current** — **`--warning` is a fill;** text on a pale tint uses
   `--warning-subtle-foreground`.
 
-## Session recordings: mark what isn't text — **Current** (DEC-125)
+## Session recordings: what a recording may read — **Current** (DEC-125, amended 10 Oct)
 
-The workspace's signed-in shell can be recorded for a sample of sessions
-(`POSTHOG_REPLAY`, off by default; never any other app, never a merchant
-site). A recording hides every character of text and every input by itself,
-and leaves out every `img`, `picture`, `video`, `audio`, `canvas`, `iframe`,
-`object` and `embed` (`REPLAY_BLOCK_SELECTOR` in
-`packages/error-tracking/src/browser.ts`). What that can't see is customer or
-business data drawn as **something other than text**:
+The signed-in workspace is recorded where `NEXT_PUBLIC_POSTHOG_REPLAY` is `on`
+(production), so the owner can see how people use it and where they get
+lost. A recording must show **Saroh's own interface and nothing of a
+business's or its customers'**. Three attributes decide that, and the
+default is the safe one.
 
-- **Put `data-ph-block` on the element that draws it.** A chart's bars and
-  lines (`ChartContainer` already carries it), a signature, a QR code, a map,
-  a photo set as a CSS `background-image`, a hand-drawn `<svg>` whose shape
-  is the data (a sparkline, a progress ring showing an amount). The recording
-  shows a blank box of the same size.
+| On an element    | In a recording                                                            |
+| ---------------- | ------------------------------------------------------------------------- |
+| nothing          | **masked**: every character becomes `*`                                   |
+| `data-ph-unmask` | readable, for itself and everything inside it, except digits and emails   |
+| `data-ph-mask`   | masked, **always**: it wins over a `data-ph-unmask` above it or inside it |
+| `data-ph-block`  | left out: a blank box of the same size (for what isn't text)              |
+
+How it works: `maskTextSelector: "*"` hands every text node to `maskTextFn`
+(`maskWorkspaceText` in `packages/error-tracking/src/browser.ts`), which is
+the way posthog-js documents for unmasking selectively. A selector alone
+can't do it: a mask on an element covers its children, so `:not()` never
+unmasks. Attributes that hold words (`title`, `aria-label`, `placeholder`,
+`alt`, `data-value`, …) follow the same rule (`maskWorkspaceAttribute`); a
+link keeps its path and loses its query string, and a `mailto:`, `tel:` or
+outside link is hidden.
+
+**The rule: a component that renders API data never carries
+`data-ph-unmask`.** Fixed words do: a button's label, a field's name, help
+text, a column's name, the navigation, an empty state, a banner.
+
+- **The shared components mark themselves**, so most screens do nothing:
+    - readable: `Button`, `Label` (and `FormLabel`), `FormDescription`,
+      `FormMessage`, `TableHead`, `TabsTrigger`, `PageHeader`'s title and
+      description, the state cards' title, description and note (`EmptyState`,
+      `FailedState`, `PermissionDeniedState`, `CapabilityOffState`),
+      `ErrorPage`, `NotFound`, `DataView`'s column heads; in the workspace,
+      the rail, the tab bar and its sheet, the plan-ending banner, the
+      recording notice, `ReadOnlyNote`, and the goal picker after setup;
+    - always masked: `TableCell`, `DataView`'s rows (table and list),
+      `Avatar`, `StatCard`'s figure, the account button.
+- **When you put a record's data inside a readable component, say so on
+  it:** `<Button data-ph-mask="">Link to {holderName}</Button>`,
+  `<EmptyState data-ph-mask="" title={`No orders match “${q}”`} />`. When
+  the computed thing is fixed words after all (a plan's name, a label from a
+  table in the code), say `data-ph-unmask=""`.
+  `apps/app.saroh.in/lib/usage-sharing/replay-marks.test.ts` reads every
+  screen and fails on a readable component handed something that looks like
+  a record's (a name, an email, an address, a search, a title, an amount)
+  until it carries one or the other.
+- **`PageHeader`: a title that is not a literal says `holdsData`.** `true`
+  masks the title and the description (a customer's name as the page
+  title), `"title"` or `"description"` only that one, `false` says they are
+  fixed words. The same test fails without it.
+- **Everything else is masked until someone marks it:** a hand-rolled
+  `<h1>`, `<button>` or `<label>`, a card's text, a `Badge`, a toast, a
+  dialog's or a sheet's title and description. That is on purpose: toasts
+  and titles are computed far more often than not (`${name} added`). Mark
+  one `data-ph-unmask` only where its words are fixed.
+- **Digits and emails are hidden even in readable words** (`hideFigures`):
+  "Take ₹***", "Step * of *". It is a net under mistakes, not a licence to
+  unmask amounts.
+- **Setup is readable in full.** The goal picker after setup
+  (`app/onboarding/modules`) and Home's first-run states are marked at
+  their root: there is nothing of a customer's there yet. Inputs are still
+  masked.
+- **Inputs are always masked** by the recorder itself (`maskAllInputs`),
+  whatever is marked.
+
+What isn't text is left out: every `img`, `picture`, `video`, `audio`,
+`canvas`, `iframe`, `object` and `embed` (`REPLAY_BLOCK_SELECTOR`), and:
+
+- **Put `data-ph-block` on the element that draws customer or business data
+  as something other than text.** A chart's bars and lines (`ChartContainer`
+  already carries it), a QR code (`QrArt` carries it), a signature, a map, a
+  photo set as a CSS `background-image`, a hand-drawn `<svg>` whose shape is
+  the data (a sparkline, a progress ring showing an amount).
 - **Icons and decoration need nothing.** An `<svg>` icon says nothing about
   anyone. Text inside an `<svg>` is masked like any other text.
 - **`ph-no-capture`** (the SDK's own class) does the same as `data-ph-block`.
@@ -187,7 +246,14 @@ business data drawn as **something other than text**:
 - A `hidden` or `file` input's value is not masked by the recorder: if one
   ever holds something sensitive, block its container.
 
-When in doubt, block: a blank box in a recording costs nothing.
+When in doubt, mask or block: a row of stars in a recording costs nothing.
+
+**saroh.in is the other way round.** Its pages are Saroh's own public
+words, so a recording (only after the cookie notice is accepted) reads
+them, and draws its pictures. Inputs are masked. Where a page shows back
+what a visitor typed or gave (the waitlist's "you're in", a checked link's
+results), mark it `data-ph-mask`; a picture inside it is left out too, and
+`data-ph-block` leaves anything out.
 
 ## Touch, reflow and accessibility
 

@@ -148,6 +148,7 @@ export function SiteReviewView({
                 <nav aria-label="Pages" className="flex flex-wrap gap-2">
                     {site.pages.map((p) => (
                         <Button
+                            data-ph-mask=""
                             key={p.id}
                             asChild
                             size="sm"

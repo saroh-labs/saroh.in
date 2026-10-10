@@ -20,11 +20,19 @@ export async function usageSharingOrNull(): Promise<UsageSharing | null> {
         if (!base) return null;
         const res = await apiFetch(`${base}/me/usage-sharing`);
         if (!res.ok) return null;
-        const data = (await res.json()) as { sharesUsage?: unknown } | null;
+        const data = (await res.json()) as {
+            sharesUsage?: unknown;
+            noticeSeenAt?: unknown;
+        } | null;
         const value = data?.sharesUsage;
-        return typeof value === "boolean" || value === null
-            ? { sharesUsage: value }
-            : null;
+        if (typeof value !== "boolean" && value !== null) return null;
+        // An API from before the notice says nothing: read as not seen, so
+        // the notice shows rather than a recording starting untold.
+        const seen = data?.noticeSeenAt;
+        return {
+            sharesUsage: value,
+            noticeSeenAt: typeof seen === "string" && seen ? seen : null,
+        };
     } catch {
         return null;
     }
@@ -39,5 +47,15 @@ export function updateUsageSharing(
         "PATCH",
         { sharesUsage },
         "Couldn't save that choice",
+    );
+}
+
+/** They dismissed the one-time notice; the API keeps when, once. */
+export function markUsageNoticeSeen(): Promise<CrmResult<UsageSharing>> {
+    return mutate<UsageSharing>(
+        "/me/usage-sharing/notice-seen",
+        "POST",
+        {},
+        "Couldn't save that",
     );
 }

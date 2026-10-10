@@ -65,6 +65,7 @@ export default async function SitesPage() {
             <div className="flex flex-col gap-6">
                 <PageHeader title="Website" className="mb-0" />
                 <EmptyState
+                    data-ph-unmask=""
                     icon={<Globe />}
                     title={nothingHere.title}
                     description={nothingHere.description}

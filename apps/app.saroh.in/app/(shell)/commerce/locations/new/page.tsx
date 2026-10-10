@@ -44,6 +44,7 @@ export default async function NewStorefrontPage() {
     return (
         <PageContainer width="form">
             <PageHeader
+                holdsData="description"
                 breadcrumb={sellCrumbs(
                     {
                         label: locationsWord(storefronts.length),

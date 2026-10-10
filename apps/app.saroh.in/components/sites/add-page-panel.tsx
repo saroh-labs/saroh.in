@@ -178,6 +178,7 @@ export function AddPagePanel({
                     <p>{refusal.message}</p>
                     {refusal.suggestion ? (
                         <Button
+                            data-ph-mask=""
                             type="button"
                             variant="outline"
                             size="sm"

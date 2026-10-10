@@ -101,11 +101,21 @@ function StateCard({
             {/* The display face at 19px for the line that names the state,
                 and body copy a step darker than meta text: this is the
                 sentence someone has to read to know what happened. */}
-            <h2 className="font-display text-[19px] font-semibold tracking-[-0.025em]">
+            {/* A state's words are Saroh's own: a session recording may
+                read them (`data-ph-unmask`). One that repeats what someone
+                typed or names a record is marked `data-ph-mask` where it
+                is used. */}
+            <h2
+                data-ph-unmask=""
+                className="font-display text-[19px] font-semibold tracking-[-0.025em]"
+            >
                 {title}
             </h2>
             {description ? (
-                <p className="mx-auto max-w-[50ch] text-pretty text-[13.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mx-auto max-w-[50ch] text-pretty text-[13.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground"
+                >
                     {description}
                 </p>
             ) : null}
@@ -113,7 +123,10 @@ function StateCard({
                 // Who can change it, set apart from why it happened: the
                 // design gives this its own sunken block rather than a third
                 // paragraph nobody finishes.
-                <p className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground"
+                >
                     {note}
                 </p>
             ) : null}

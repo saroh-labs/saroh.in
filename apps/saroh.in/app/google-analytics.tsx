@@ -6,10 +6,12 @@ import Script from "next/script";
 import { useSyncExternalStore } from "react";
 
 import { buttonClasses } from "@/components/v2/button";
-import type { Consent } from "@/lib/consent";
+import type { Consent, ConsentScope } from "@/lib/consent";
 import {
     clearAnalyticsCookies,
+    consentFor,
     readConsent,
+    readConsentCoversRecording,
     subscribeConsent,
     writeConsent,
 } from "@/lib/consent";
@@ -40,27 +42,78 @@ import { isPreviewPath } from "@/lib/pricing-preview";
  *
  * Never in a Saroh team browser (`lib/team-browser.ts`): our own visits
  * aren't visitors.
+ *
+ * **Recording** (DEC-125, 10 Oct). Where session replay is switched on for
+ * this deployment (`recording`), the same notice asks about it too, in
+ * words that say so, and the one answer covers both; `app/site-replay.tsx`
+ * starts the recorder only on that answer. An "Accept" given to the older
+ * notice was for Google Analytics alone: it is read as no answer yet, so
+ * the notice asks again and neither loads until it is given
+ * (`consentFor`). With recording on and no Analytics id, the notice still
+ * asks, about recording alone.
  */
 export function GoogleAnalytics({
     id,
     privacyHref,
+    recording = false,
 }: {
     id: string | undefined;
     /** The Privacy page, once it is published; the notice links it. */
     privacyHref?: string;
+    /** Session replay is switched on here: the notice asks about it too. */
+    recording?: boolean;
 }) {
     const pathname = usePathname();
+    const choice = useAnalyticsConsent(recording);
+    const team = useSyncExternalStore(NO_CHANGES, teamBrowser, () => false);
+    if (
+        (!id && !recording) ||
+        isPreviewPath(pathname) ||
+        choice === UNREAD ||
+        team
+    )
+        return null;
+    if (choice === "granted") return id ? <GaTag id={id} /> : null;
+    if (choice === "refused") return null;
+    return (
+        <CookieNotice
+            privacyHref={privacyHref}
+            analytics={Boolean(id)}
+            recording={recording}
+        />
+    );
+}
+
+/**
+ * The visitor's answer, as this deployment must read it (`consentFor`):
+ * "unread" on the server and before the browser has been asked.
+ */
+export function useAnalyticsConsent(
+    recording: boolean,
+): Consent | null | typeof UNREAD {
     const choice = useSyncExternalStore<Consent | null | typeof UNREAD>(
         subscribeConsent,
         readConsent,
         () => UNREAD,
     );
-    const team = useSyncExternalStore(NO_CHANGES, teamBrowser, () => false);
-    if (!id || isPreviewPath(pathname) || choice === UNREAD || team)
-        return null;
-    if (choice === "granted") return <GaTag id={id} />;
-    if (choice === "refused") return null;
-    return <CookieNotice privacyHref={privacyHref} />;
+    const covers = useSyncExternalStore(
+        subscribeConsent,
+        readConsentCoversRecording,
+        () => false,
+    );
+    return choice === UNREAD ? UNREAD : consentFor(choice, covers, recording);
+}
+
+/** What the notice asks, by what this deployment would switch on. */
+export function noticeWords(asks: {
+    analytics: boolean;
+    recording: boolean;
+}): string {
+    if (asks.analytics && asks.recording)
+        return "saroh.in uses Google Analytics cookies to count visits and, if you accept, records how the site is used so we can make it clearer. What you type is never recorded. Refuse and the site works the same.";
+    if (asks.recording)
+        return "If you accept, saroh.in records how the site is used so we can make it clearer. What you type is never recorded. Refuse and the site works the same.";
+    return "saroh.in uses Google Analytics cookies to count visits. Refuse them and the site works the same.";
 }
 
 function GaTag({ id }: { id: string }) {
@@ -86,15 +139,25 @@ function GaTag({ id }: { id: string }) {
  * buttons of equal weight. A region in the corner, never a modal: nothing
  * behind it is blocked, and focus is not taken.
  */
-function CookieNotice({ privacyHref }: { privacyHref?: string }) {
+function CookieNotice({
+    privacyHref,
+    analytics,
+    recording,
+}: {
+    privacyHref?: string;
+    analytics: boolean;
+    recording: boolean;
+}) {
+    // What "Accept" is an answer to: kept with it, so an older "Accept"
+    // is never taken for one about recording.
+    const scope: ConsentScope = recording ? "analytics+recording" : "analytics";
     return (
         <section
             aria-label="Cookies"
             className="fixed inset-x-3 bottom-3 z-40 grid gap-4 rounded-mk-card border border-border bg-card p-5 font-sans text-foreground shadow-mk-menu min-[520px]:inset-x-auto min-[520px]:bottom-5 min-[520px]:left-5 min-[520px]:max-w-[420px]"
         >
             <p className="m-0 text-[14.5px] leading-[1.55] text-mk-copy">
-                saroh.in uses Google Analytics cookies to count visits. Refuse
-                them and the site works the same.
+                {noticeWords({ analytics, recording })}
                 {privacyHref ? (
                     <>
                         {" "}
@@ -110,7 +173,7 @@ function CookieNotice({ privacyHref }: { privacyHref?: string }) {
             <div className="flex flex-wrap gap-2">
                 <button
                     type="button"
-                    onClick={() => writeConsent("granted")}
+                    onClick={() => writeConsent("granted", scope)}
                     className={buttonClasses({
                         variant: "secondary",
                         size: "sm",
@@ -122,7 +185,7 @@ function CookieNotice({ privacyHref }: { privacyHref?: string }) {
                 <button
                     type="button"
                     onClick={() => {
-                        writeConsent("refused");
+                        writeConsent("refused", scope);
                         clearAnalyticsCookies();
                     }}
                     className={buttonClasses({

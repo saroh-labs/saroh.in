@@ -97,6 +97,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         const Comp = asChild ? Slot : "button";
         return (
             <Comp
+                // Saroh's own words: a session recording may read a
+                // button's label (frontend-design-system.md → Session
+                // recordings). One whose label holds a record's data adds
+                // `data-ph-mask`, which always wins.
+                data-ph-unmask=""
                 className={cn(buttonVariants({ variant, size, className }))}
                 ref={ref}
                 {...props}

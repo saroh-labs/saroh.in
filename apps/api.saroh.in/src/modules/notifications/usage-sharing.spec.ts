@@ -1,7 +1,13 @@
 // "Help improve Saroh" (DEC-125): the person's own choice, read and written
 // for the session's user only, and nothing but a boolean accepted.
 jest.mock("@saroh/database", () => ({
-    prisma: { user: { findUnique: jest.fn(), update: jest.fn() } },
+    prisma: {
+        user: {
+            findUnique: jest.fn(),
+            update: jest.fn(),
+            updateMany: jest.fn(),
+        },
+    },
 }));
 
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
@@ -20,42 +26,76 @@ const ctx = {
     role: "STAFF",
 } as unknown as OrganizationContext;
 
+const SELECT = { sharesUsage: true, usageNoticeSeenAt: true };
+const SEEN = new Date("2026-10-10T09:30:00.000Z");
+
 describe("UsageSharingService (DEC-125)", () => {
     beforeEach(() => jest.clearAllMocks());
 
-    it("reads the session's own user, and only that column", async () => {
-        db.user.findUnique.mockResolvedValue({ sharesUsage: false });
+    it("reads the session's own user, and only those two columns", async () => {
+        db.user.findUnique.mockResolvedValue({
+            sharesUsage: false,
+            usageNoticeSeenAt: SEEN,
+        });
         await expect(new UsageSharingService().read(ctx)).resolves.toEqual({
             sharesUsage: false,
+            noticeSeenAt: SEEN.toISOString(),
         });
         expect(db.user.findUnique).toHaveBeenCalledWith({
             where: { id: "user_1" },
-            select: { sharesUsage: true },
+            select: SELECT,
         });
     });
 
     it("says null for someone who has never chosen", async () => {
-        db.user.findUnique.mockResolvedValue({ sharesUsage: null });
+        db.user.findUnique.mockResolvedValue({
+            sharesUsage: null,
+            usageNoticeSeenAt: null,
+        });
         await expect(new UsageSharingService().read(ctx)).resolves.toEqual({
             sharesUsage: null,
+            noticeSeenAt: null,
         });
         db.user.findUnique.mockResolvedValue(null);
         await expect(new UsageSharingService().read(ctx)).resolves.toEqual({
             sharesUsage: null,
+            noticeSeenAt: null,
+        });
+    });
+
+    it("keeps the first time the notice was dismissed, for the session's own user", async () => {
+        db.user.updateMany.mockResolvedValue({ count: 1 });
+        db.user.findUnique.mockResolvedValue({
+            sharesUsage: null,
+            usageNoticeSeenAt: SEEN,
+        });
+        await expect(
+            new UsageSharingService().noticeSeen(ctx, SEEN),
+        ).resolves.toEqual({
+            sharesUsage: null,
+            noticeSeenAt: SEEN.toISOString(),
+        });
+        // Only while it is still unset: a second dismissal changes nothing.
+        expect(db.user.updateMany).toHaveBeenCalledWith({
+            where: { id: "user_1", usageNoticeSeenAt: null },
+            data: { usageNoticeSeenAt: SEEN },
         });
     });
 
     it.each([true, false])(
         "writes %s on the session's own user",
         async (sharesUsage) => {
-            db.user.update.mockResolvedValue({ sharesUsage });
+            db.user.update.mockResolvedValue({
+                sharesUsage,
+                usageNoticeSeenAt: null,
+            });
             await expect(
                 new UsageSharingService().update(ctx, { sharesUsage }),
-            ).resolves.toEqual({ sharesUsage });
+            ).resolves.toEqual({ sharesUsage, noticeSeenAt: null });
             expect(db.user.update).toHaveBeenCalledWith({
                 where: { id: "user_1" },
                 data: { sharesUsage },
-                select: { sharesUsage: true },
+                select: SELECT,
             });
         },
     );

@@ -229,6 +229,7 @@ function Header({
 }) {
     return (
         <PageHeader
+            holdsData="description"
             title="Pipeline"
             description={pipelineName}
             actions={

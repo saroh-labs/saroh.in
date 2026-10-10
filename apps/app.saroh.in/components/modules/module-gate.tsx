@@ -43,7 +43,11 @@ function Unavailable({
         // arrived where they meant to — the workspace design draws every state
         // INSIDE the page, under its own heading.
         <PageContainer>
-            <PageHeader title={capability.label} className="mb-6" />
+            <PageHeader
+                holdsData={false}
+                title={capability.label}
+                className="mb-6"
+            />
             <CapabilityOffState
                 title={`${capability.label} is turned off`}
                 description={
@@ -132,7 +136,11 @@ export async function ModuleGate({
         if (planOnly) {
             return (
                 <PageContainer>
-                    <PageHeader title={access.module.label} className="mb-6" />
+                    <PageHeader
+                        holdsData={false}
+                        title={access.module.label}
+                        className="mb-6"
+                    />
                     <PlanLocked
                         moduleKey={access.module.key}
                         label={access.module.label}

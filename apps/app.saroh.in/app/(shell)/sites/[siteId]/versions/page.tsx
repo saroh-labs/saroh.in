@@ -53,6 +53,7 @@ export default async function SiteVersionsPage({
     return (
         <PageContainer>
             <PageHeader
+                holdsData="description"
                 title="Version history"
                 description={site.name}
                 actions={

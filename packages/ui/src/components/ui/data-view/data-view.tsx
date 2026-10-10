@@ -248,7 +248,10 @@ export function DataView<TRow>({
                 className="rounded-[11px] border border-border bg-card"
             >
                 <table className="w-full border-collapse text-[13.5px]">
-                    <thead>
+                    {/* Column names are Saroh's own words, and a recording
+                        may read them; every row below is a record's data
+                        and is masked whatever a cell draws. */}
+                    <thead data-ph-unmask="">
                         {/* A faint head fill and a stronger rule, as the
                                 applied Products screen draws it. */}
                         <tr className="h-10 border-b border-border bg-foreground/[0.03]">
@@ -342,7 +345,7 @@ export function DataView<TRow>({
                             ) : null}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-ph-mask="">
                         {/* `wk-item` staggers rows in (workspace.css caps
                                 it at six items, so no row waits). Hover is
                                 the translucent Ink wash (brand file §22), and
@@ -485,7 +488,11 @@ export function DataView<TRow>({
             // List: the whole row is the target, which is what one-handed
             // and gloved use needs. Detail columns are dropped, not hidden
             // behind a disclosure nobody taps.
-            <ul className="divide-y rounded-xl border border-border bg-card">
+            // Every row is a record's data: masked in a recording.
+            <ul
+                data-ph-mask=""
+                className="divide-y rounded-xl border border-border bg-card"
+            >
                 {visible.map((row, rowIndex) => {
                     // `.at()` rather than a destructure: a caller could
                     // declare only `detail` columns, leaving this empty,

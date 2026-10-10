@@ -237,6 +237,7 @@ export function ProviderRowView({
                     ) : null}
                     {hasDetails ? (
                         <Button
+                            data-ph-unmask=""
                             type="button"
                             variant="ghost"
                             size="sm"

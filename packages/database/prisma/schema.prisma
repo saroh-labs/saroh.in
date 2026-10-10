@@ -34,6 +34,10 @@ model User {
   // which reads as yes only where recording is switched on at all. False:
   // they said no, on every device. Theirs, not a business's.
   sharesUsage Boolean?
+  // When they dismissed the workspace's one-time notice that says how it is
+  // recorded (DEC-125, 10 Oct). Null: not yet, so it is shown, and nothing is
+  // recorded before it has been.
+  usageNoticeSeenAt DateTime?
 
   // Relations
   stores       StoreOwner[] // Stores they own
