@@ -82,6 +82,9 @@ const REFUSED = [
     // Reviews, and page views (a tester's visits are not the business's).
     "POST public/product-reviews/:token/reviews",
     "POST public/sites/:siteId/analytics/events",
+    // A QR code's scan: it adds to the business's count, and a test
+    // release's host has no short links.
+    "POST public/sites/:siteId/qr/:code/scan",
 ];
 
 const routes = publicWriteRoutes(join(__dirname, "../../modules"));

@@ -13,8 +13,12 @@ import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
 import { PageCacheRevalidateHandler } from "./page-cache.job";
 import { PublicFooterService } from "./public-footer.service";
 import { PublicHeadService } from "./public-head.service";
+import { PublicQrController } from "./public-qr.controller";
+import { PublicQrService } from "./public-qr.service";
 import { PublicSitesController } from "./public-sites.controller";
 import { PublicVisitService } from "./public-visit.service";
+import { QrCodesController } from "./qr-codes.controller";
+import { QrCodesService } from "./qr-codes.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SiteTrackingController } from "./site-tracking.controller";
 import { SiteTrackingService } from "./site-tracking.service";
@@ -47,7 +51,9 @@ import { TestReleasesService } from "./test-releases.service";
         SitesController,
         TestReleasesController,
         SiteTrackingController,
+        QrCodesController,
         PublicSitesController,
+        PublicQrController,
     ],
     providers: [
         SitesService,
@@ -57,6 +63,8 @@ import { TestReleasesService } from "./test-releases.service";
         PublicVisitService,
         PublicFooterService,
         PublicHeadService,
+        QrCodesService,
+        PublicQrService,
         GoLiveHandler,
         PageCacheRevalidateHandler,
         OrganizationGuard,

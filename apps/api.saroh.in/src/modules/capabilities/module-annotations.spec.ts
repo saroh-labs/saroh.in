@@ -47,6 +47,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
     "sites/site-tracking.controller.ts": "WEBSITE",
+    // A site's QR codes (Settings › Share).
+    "sites/qr-codes.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -180,6 +182,10 @@ const NEVER: Record<string, string> = {
     // shop's address and hours stay true whichever modules are on.
     "sites/public-sites.controller.ts":
         "published sites, and the business's place and hours",
+    // A QR code's short link, relayed by the site's server. It forwards
+    // to a page that answers for its own module, so it carries none.
+    "sites/public-qr.controller.ts":
+        "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always
     // on, so it must not vanish with a module switch.
     "site-accounts/sign-in.controller.ts":
