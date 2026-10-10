@@ -49,7 +49,16 @@ import { z } from "zod";
  * even with the id in a local `.env`, so test runs never count as visitors
  * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
  * Even there, GA loads only once a visitor accepts the cookie notice
- * (`app/google-analytics.tsx`).
+ * (`app/site-tags.tsx`).
+ *
+ * `NEXT_PUBLIC_GOOGLE_ADS_ID` (`AW-…`) and `NEXT_PUBLIC_META_PIXEL_ID`
+ * (digits) turn the advertising tags on (DEC-127), by the same rule: a
+ * production deployment only, and only once a visitor accepts advertising
+ * cookies in the notice. They are public ids, not secrets. Unset, nothing of
+ * that platform's is loaded or sent. `NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL`
+ * and `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL` are Google Ads' labels for the
+ * two conversions; without a label Google Ads isn't told of that one
+ * (`lib/tags.ts`).
  *
  * `RESOURCES_PREVIEW` (server-only, `1` or `true`) shows Resources pages and
  * changelog entries before their `publishOn` date (plan KTD-2), so a preview
@@ -68,6 +77,23 @@ export const env = createEnv({
         NEXT_PUBLIC_GA_MEASUREMENT_ID: z
             .string()
             .regex(/^G-[A-Z0-9]+$/)
+            .optional(),
+        /** Advertising tags (DEC-127): public ids, off when unset. */
+        NEXT_PUBLIC_GOOGLE_ADS_ID: z
+            .string()
+            .regex(/^AW-\d+$/)
+            .optional(),
+        NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]+$/)
+            .optional(),
+        NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]+$/)
+            .optional(),
+        NEXT_PUBLIC_META_PIXEL_ID: z
+            .string()
+            .regex(/^\d{5,20}$/)
             .optional(),
         /**
          * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
@@ -110,6 +136,12 @@ export const env = createEnv({
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+        NEXT_PUBLIC_GOOGLE_ADS_ID: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
+        NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL:
+            process.env.NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL,
+        NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL:
+            process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL,
+        NEXT_PUBLIC_META_PIXEL_ID: process.env.NEXT_PUBLIC_META_PIXEL_ID,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

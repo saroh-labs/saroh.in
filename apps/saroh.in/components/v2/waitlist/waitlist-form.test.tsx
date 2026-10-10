@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WaitlistContent } from "@/content/waitlist";
 import { launchOfferLines, NO_OFFER, WAITLIST } from "@/content/waitlist";
+import type { TagConfig } from "@/lib/ga";
+import { resetTags, syncTags } from "@/lib/tags";
 import { WAITLIST_MESSAGES } from "@/lib/waitlist";
 
 import { WaitlistForm } from "./waitlist-form";
@@ -25,9 +27,33 @@ import { WaitlistForm } from "./waitlist-form";
 const fetchMock = vi.fn();
 const gtag = vi.fn();
 
+const GA = "G-TEST123";
+/** Made-up ids: saroh.in advertising, with a label for the waitlist. */
+const ADVERTISING: TagConfig = {
+    gaId: GA,
+    adsId: "AW-123456789",
+    adsWaitlistLabel: "waitLabel",
+    pixelId: "1234567890",
+};
+
+/** What the visitor accepted in the cookie notice, as the page's tags see it. */
+function accepted(
+    config: TagConfig,
+    allowed: { analytics: boolean; ads: boolean },
+) {
+    resetTags();
+    syncTags(config, allowed);
+    window.gtag = gtag;
+}
+const adConversions = () =>
+    gtag.mock.calls.filter((c) => c[0] === "event" && c[1] === "conversion");
+const pixelEvents = () =>
+    ((window.fbq?.queue ?? []) as unknown[][]).filter((c) => c[0] === "track");
+
 beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
-    window.gtag = gtag;
+    // Visit counts accepted, and no advertising: where every test starts.
+    accepted({ gaId: GA }, { analytics: true, ads: false });
     window.requestAnimationFrame = (cb: FrameRequestCallback) => {
         cb(0);
         return 0;
@@ -86,6 +112,83 @@ async function submit() {
         await Promise.resolve();
     });
 }
+
+describe("the waitlist_joined ad conversion (DEC-127)", () => {
+    const BOTH = { analytics: true, ads: true };
+    const joined = { status: "success", created: true, position: 7 };
+
+    it("tells Google Ads and Meta once that someone joined, and nothing about them", async () => {
+        accepted(ADVERTISING, BOTH);
+        answer(joined);
+        renderForm("?plan=grow&src=pricing");
+        fill();
+        await submit();
+        await screen.findByText("Glow Studio is #7 on the list.");
+
+        expect(adConversions()).toEqual([
+            ["event", "conversion", { send_to: "AW-123456789/waitLabel" }],
+        ]);
+        expect(pixelEvents().slice(1)).toEqual([["track", "Lead"]]);
+        const sent = JSON.stringify([adConversions(), window.fbq?.queue]);
+        expect(sent).not.toContain("you@glowstudio.in");
+        expect(sent).not.toContain("Glow Studio");
+        expect(sent).not.toContain("Pune");
+    });
+
+    it("sends none when advertising cookies weren't accepted", async () => {
+        accepted(ADVERTISING, { analytics: true, ads: false });
+        answer(joined);
+        renderForm();
+        fill();
+        await submit();
+        await screen.findByText("Glow Studio is #7 on the list.");
+
+        expect(adConversions()).toEqual([]);
+        expect(window.fbq).toBeUndefined();
+        // Visit counts were accepted, so Analytics still hears the join.
+        expect(gtag).toHaveBeenCalledWith(
+            "event",
+            "waitlist_join",
+            expect.objectContaining({ send_to: GA }),
+        );
+    });
+
+    it("sends none where no advertising id is set", async () => {
+        accepted({ gaId: GA }, BOTH);
+        answer(joined);
+        renderForm();
+        fill();
+        await submit();
+        await screen.findByText("Glow Studio is #7 on the list.");
+
+        expect(adConversions()).toEqual([]);
+        expect(window.fbq).toBeUndefined();
+    });
+
+    it("sends none for a repeat: they had already joined", async () => {
+        accepted(ADVERTISING, BOTH);
+        answer({ status: "success", created: false });
+        renderForm();
+        fill();
+        await submit();
+        await screen.findByText("Glow Studio is on the list.");
+
+        expect(adConversions()).toEqual([]);
+        expect(pixelEvents().slice(1)).toEqual([]);
+    });
+
+    it("sends none when the join fails", async () => {
+        accepted(ADVERTISING, BOTH);
+        answer({ status: "failure", reason: { code: "UPSTREAM" } }, 502);
+        renderForm();
+        fill();
+        await submit();
+        await screen.findByRole("alert");
+
+        expect(adConversions()).toEqual([]);
+        expect(pixelEvents().slice(1)).toEqual([]);
+    });
+});
 
 describe("WaitlistForm", () => {
     it("saves a gallery template from ?template=: says so, sends it, and the done state names it (U13)", async () => {
@@ -182,6 +285,7 @@ describe("WaitlistForm", () => {
             src: "pricing",
             plan: "grow",
             ref: true,
+            send_to: GA,
         });
         const sent = JSON.stringify(gtag.mock.calls);
         expect(sent).not.toContain("you@glowstudio.in");

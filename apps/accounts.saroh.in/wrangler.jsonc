@@ -57,6 +57,9 @@
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "NEXT_PUBLIC_APP_URL": "https://app.saroh.io",
         "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.io",
+        // The sign-up hand-off through saroh.in's /welcome (DEC-127) is
+        // production's alone: dev sign-ups are never ad conversions.
+        // "NEXT_PUBLIC_SIGNUP_WELCOME_URL": "https://www.saroh.io/welcome",
     },
     "env": {
         "production": {
@@ -87,6 +90,13 @@
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_APP_URL": "https://app.saroh.in",
                 "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.in",
+                // Ad conversions (DEC-127): off until this line is
+                // uncommented, which is the last step of "Turning ads
+                // tracking on" (docs/architecture/ADS_TRACKING.md) and only
+                // after saroh.in has deployed /welcome. A newly verified
+                // account then passes through that page on its way to
+                // onboarding. No ad tag and no ad id ever lives in this app.
+                // "NEXT_PUBLIC_SIGNUP_WELCOME_URL": "https://www.saroh.in/welcome",
             },
             "services": [
                 {

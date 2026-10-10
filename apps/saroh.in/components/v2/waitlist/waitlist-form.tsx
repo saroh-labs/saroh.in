@@ -8,6 +8,7 @@ import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
+import { fireConversion } from "@/lib/tags";
 import type {
     WaitlistResponse,
     WaitlistTemplate,
@@ -54,6 +55,9 @@ const SEND_FAILED: Record<string, string> = {
  * done state (D-8). If the send fails, the form stays filled with a retry
  * message under the button. GA hears `waitlist_join` with the kind, source,
  * plan and whether a referral link was used — never the email or name.
+ * A new entry (not a repeat) is also the `waitlist_joined` ad conversion
+ * (DEC-127): Google Ads and Meta are told that one happened and nothing
+ * else, and only for a visitor who accepted advertising cookies.
  *
  * The plan, source, referral and saved template come from the page's
  * address (`?plan=`, `?src=`, `?ref=`, `?template=`), read here in the
@@ -150,6 +154,7 @@ export function WaitlistForm({
             ref: referral !== undefined,
             template,
         });
+        if (result.created) fireConversion("waitlist_joined");
         setJoined({
             business: parsed.business,
             email: parsed.email,

@@ -113,6 +113,31 @@ must keep:
   PostHog's copy is missing. `job_failed_final` (ERROR): a job failed its
   last attempt; any at all is worth a look.
 
+## Ad tags: saroh.in only — **Current** (DEC-127)
+
+Saroh's own advertising tags (Google Ads, the Meta Pixel) and Google
+Analytics. What is sent and how to switch it on:
+`docs/architecture/ADS_TRACKING.md`. The rules a change must keep:
+
+- **One loader.** Only `apps/saroh.in/lib/tags.ts` adds a third party's
+  script or calls `gtag`/`fbq`. A new conversion is a name in its
+  `Conversion` type and one `fireConversion()` call; a Google Analytics
+  event is `track()` (`lib/analytics.ts`). Neither needs its own "is it
+  allowed" check.
+- **Nothing before consent, and advertising is its own answer**
+  (`lib/consent.ts`). The team's browser and one sending Do Not Track or
+  Global Privacy Control are never tagged. Off without an id, and off
+  everywhere but production.
+- **Only the fact.** Never an email, a phone number, a name or anything a
+  visitor typed, hashed or not: no enhanced conversions, no advanced
+  matching.
+- **Nowhere else.** No ad tag, ad id or ad host in the workspace, the
+  console, accounts, `apps/saroh.app` or `packages/site-blocks`:
+  `pnpm run check:merchant-site-tracking` fails the gate. A merchant's own
+  trackers on their own site (#889) are the files that check allows by name.
+  A conversion that happens on another host is counted the way sign-up is:
+  by passing through a page on saroh.in (`lib/welcome.ts`).
+
 ## Not in place yet
 
 - **No source maps at the tracker**, so a browser stack names built files.

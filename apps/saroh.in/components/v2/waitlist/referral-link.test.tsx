@@ -8,6 +8,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetTags, syncTags } from "@/lib/tags";
+
 import { ReferralLink } from "./referral-link";
 
 /** The referral link (plan U30): Copy, then "Copied", and one GA event. */
@@ -15,6 +17,9 @@ const gtag = vi.fn();
 const writeText = vi.fn();
 
 beforeEach(() => {
+    // Visit counts accepted: events go to this Analytics id (`lib/tags.ts`).
+    resetTags();
+    syncTags({ gaId: "G-TEST123" }, { analytics: true, ads: false });
     window.gtag = gtag;
     Object.defineProperty(navigator, "clipboard", {
         value: { writeText },
@@ -46,7 +51,9 @@ describe("ReferralLink", () => {
 
         expect(writeText).toHaveBeenCalledWith(LINK.href);
         expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
-        expect(gtag).toHaveBeenCalledWith("event", "referral_copy", {});
+        expect(gtag).toHaveBeenCalledWith("event", "referral_copy", {
+            send_to: "G-TEST123",
+        });
     });
 
     it("selects the link when the clipboard is refused", async () => {

@@ -63,7 +63,13 @@ export const SERVED_PATHS: readonly string[] = indexedPaths("waitlist");
 
 /**
  * What robots.txt keeps crawlers out of: the pricing draft and the link that
- * opens it (staff-only; noindex by header and meta too), and the site's own
+ * opens it (staff-only; noindex by header and meta too), the sign-up
+ * hand-off (`/welcome`, a page nobody reads; noindex too), and the site's own
  * API routes.
  */
-export const CRAWL_DISALLOWED = ["/api/", "/pricing/draft", "/pricing/preview"];
+export const CRAWL_DISALLOWED = [
+    "/api/",
+    "/pricing/draft",
+    "/pricing/preview",
+    "/welcome",
+];

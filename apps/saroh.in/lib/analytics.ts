@@ -1,8 +1,10 @@
 import type { LaunchMode, PlanId } from "@/lib/links";
+import { analyticsDestination } from "@/lib/tags";
 
 /**
- * GA4 events for the marketing site (plan U18). GA itself loads in the root
- * layout; this only sends events through the `gtag` it defines.
+ * GA4 events for the marketing site (plan U18). GA itself loads from the
+ * root layout (`app/site-tags.tsx`, `lib/tags.ts`); this only sends events
+ * through the `gtag` that defines.
  *
  * No personal data in any parameter: never an email, a business name, a
  * phone number or free text a visitor typed. Every parameter below is one of
@@ -29,25 +31,24 @@ export interface AnalyticsEvents {
     help_vote: { article: string; helpful: "yes" | "no" };
 }
 
-type Gtag = (command: "event", name: string, params: object) => void;
-
-declare global {
-    interface Window {
-        gtag?: Gtag;
-    }
-}
-
-/** Send one event. A no-op on the server, or where GA has not loaded. */
+/**
+ * Send one event to Google Analytics. A no-op on the server, where GA has
+ * not loaded, and where the visitor hasn't accepted visit counts
+ * (`lib/tags.ts`). The event names its destination, so it goes to Analytics
+ * alone and never to the Google Ads account that shares the tag (DEC-127).
+ */
 export function track<E extends keyof AnalyticsEvents>(
     name: E,
     params: AnalyticsEvents[E],
 ): void {
     if (typeof window === "undefined" || !window.gtag) return;
+    const to = analyticsDestination();
+    if (!to) return;
     // Drop undefined keys so GA does not record "(not set)" as a value.
     const clean = Object.fromEntries(
         Object.entries(params as Record<string, unknown>).filter(
             ([, v]) => v !== undefined,
         ),
     );
-    window.gtag("event", name, clean);
+    window.gtag("event", name, { ...clean, send_to: to });
 }

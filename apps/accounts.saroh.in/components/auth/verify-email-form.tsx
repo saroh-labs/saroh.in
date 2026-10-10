@@ -2,7 +2,7 @@
 
 import { AuthHeading } from "@/components/auth/field";
 import { OtpInput } from "@/components/auth/otp-input";
-import { getOnboardingUrl } from "@/lib/app-urls";
+import { afterSignUp, getOnboardingUrl } from "@/lib/app-urls";
 import { authClient } from "@/lib/auth.client";
 import { withCarry } from "@/lib/joining";
 import {
@@ -110,11 +110,15 @@ export function VerifyEmailForm({
             // login form. Play the confirmation, then hand off: a hard
             // navigation to another origin freezes the tab for a beat, and
             // landing that freeze AFTER a completed animation reads as
-            // progress instead of as a hang.
+            // progress instead of as a hang. `afterSignUp` routes it through
+            // saroh.in's /welcome when that hand-off is on (DEC-127); this
+            // page itself loads no advertising tag.
             setIsVerified(true);
             setTimeout(() => setIsLeaving(true), SUCCESS_EXIT_AT_MS);
             setTimeout(() => {
-                window.location.href = returnTo ?? getOnboardingUrl();
+                window.location.href = afterSignUp(
+                    returnTo ?? getOnboardingUrl(),
+                );
             }, SUCCESS_HOLD_MS);
         },
         [email, isVerifying, returnTo],
