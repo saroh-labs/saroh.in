@@ -238,6 +238,26 @@ describe("the API's answers", () => {
     });
 });
 
+describe("the note for the business", () => {
+    const bag = {
+        lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+        fulfilment: "PICKUP",
+        key: "key-12345678",
+    };
+
+    it("is sent on trimmed, cut at what a note may run to, and left out when empty", () => {
+        expect(startBody({ ...bag, notes: "  No nuts, please " })?.notes).toBe(
+            "No nuts, please",
+        );
+        expect(
+            (startBody({ ...bag, notes: "x".repeat(900) })?.notes as string)
+                .length,
+        ).toBe(500);
+        expect(startBody({ ...bag, notes: "   " })).not.toHaveProperty("notes");
+        expect(startBody({ ...bag, notes: 7 })).not.toHaveProperty("notes");
+    });
+});
+
 describe("the facts a product page says before the bag", () => {
     const options = {
         canOrder: true,

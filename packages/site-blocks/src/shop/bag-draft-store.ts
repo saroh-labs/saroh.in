@@ -18,7 +18,8 @@ import { stateIn } from "./india-states";
  *
  * `sessionStorage`, not a cookie and not `localStorage`: it never leaves
  * the browser, and it ends with the tab. Only what the customer typed in
- * the bag is kept. It is emptied when the order is placed. Every read and
+ * the bag is kept, and never the note for the business, which may say
+ * something about someone's health. It is emptied when the order is placed. Every read and
  * write is wrapped, as the bag's are: a storage that refuses leaves this
  * page's memory only.
  */
@@ -76,6 +77,8 @@ export function parseBagDraft(raw: string | null): BagDraft {
         pay: PAYS.find((p) => p === stored.pay) ?? null,
         address,
         saved: SAVED.find((v) => v === stored.saved) ?? null,
+        // Never kept: see `writeBagDraft`.
+        note: "",
         code: typeof stored.code === "string" ? cleanCode(stored.code) : null,
         checkout:
             checkout &&
@@ -110,9 +113,13 @@ export function readBagDraft(site: string): BagDraft {
 /** Keep the draft for the visit; an empty one clears what was kept. */
 export function writeBagDraft(site: string, draft: BagDraft): void {
     try {
+        // The note stays in the page's memory: "no nuts", "after my
+        // surgery" may say something about someone's health, and nothing
+        // like that is written anywhere but the order.
+        const { note: _note, ...kept } = draft;
         if (isEmpty(draft)) window.sessionStorage.removeItem(keyOf(site));
         else {
-            window.sessionStorage.setItem(keyOf(site), JSON.stringify(draft));
+            window.sessionStorage.setItem(keyOf(site), JSON.stringify(kept));
         }
     } catch {
         // Kept in the bag's state for this page only.

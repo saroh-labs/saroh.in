@@ -956,6 +956,30 @@ describe("starting a checkout and paying (G13)", () => {
         expect((await contactOf()).phone).toBe("9811122233");
     });
 
+    it("keeps the customer's note on the order, for the business to read", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const noted = await start(s, token, { notes: "No nuts, please" });
+        expect(noted.status).toBe(201);
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id: noted.body.orderId as string },
+                select: { notes: true },
+            }),
+        ).toEqual({ notes: "No nuts, please" });
+        // None typed: none kept. Longer than a note may be: refused.
+        const plain = await start(s, token);
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id: plain.body.orderId as string },
+                select: { notes: true },
+            }),
+        ).toEqual({ notes: null });
+        expect((await start(s, token, { notes: "x".repeat(501) })).status).toBe(
+            400,
+        );
+    });
+
     it("refuses a delivery with no phone to ring, or one that isn't a number, and makes nothing", async () => {
         const s = await shop();
         const { token } = await signIn(s.host);

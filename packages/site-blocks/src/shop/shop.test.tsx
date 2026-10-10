@@ -739,6 +739,67 @@ describe("the header's bag", () => {
         expect(screen.queryByText(/^Returns/)).toBeNull();
     });
 
+    it("sends an optional note for the business with the order, and never keeps it for the visit", async () => {
+        const { start } = setup({ signedIn: true });
+        await openTheBag();
+        const note = screen.getByLabelText(/^Note for Rye & Co\./);
+        expect(note).not.toBeRequired();
+        expect(note).toHaveAttribute("maxlength", "500");
+        expect(note.className).toContain("text-base");
+        fireEvent.change(note, { target: { value: "  No nuts, please  " } });
+        expect(JSON.stringify({ ...window.sessionStorage })).not.toContain(
+            "No nuts",
+        );
+        // Closed and opened again on the same page: still there.
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await openTheBag();
+        expect(screen.getByLabelText(/^Note for Rye & Co\./)).toHaveValue(
+            "  No nuts, please  ",
+        );
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0].notes).toBe("No nuts, please");
+    });
+
+    it("keeps the checkout's key for the visit without the note's words, and a new key for a new note", async () => {
+        const { start } = setup({ signedIn: true, outcome: "closed" });
+        await openTheBag();
+        const place = async () => {
+            fireEvent.click(
+                await screen.findByRole("button", { name: /^Place order/ }),
+            );
+            fireEvent.click(
+                await screen.findByRole("button", {
+                    name: "Back to your bag",
+                }),
+            );
+            await screen.findByText("Sourdough");
+        };
+        fireEvent.change(screen.getByLabelText(/^Note for Rye & Co\./), {
+            target: { value: "No nuts, please" },
+        });
+        await place();
+        // The key is kept for the visit; the note's words are not.
+        const kept = window.sessionStorage.getItem(`saroh.bag-draft.${SITE}`);
+        expect(kept).toContain(start.mock.calls[0][0].key);
+        expect(kept).not.toContain("No nuts");
+        await place();
+        expect(start.mock.calls[1][0].key).toBe(start.mock.calls[0][0].key);
+        fireEvent.change(screen.getByLabelText(/^Note for Rye & Co\./), {
+            target: { value: "Nuts are fine" },
+        });
+        await place();
+        expect(start.mock.calls[2][0].key).not.toBe(start.mock.calls[0][0].key);
+    });
+
+    it("sends no note when none was typed", async () => {
+        const { start } = setup({ signedIn: true });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0]).not.toHaveProperty("notes");
+    });
+
     it("holds the button while a line can't be sold, and says why", async () => {
         setup({
             signedIn: true,
@@ -1661,7 +1722,8 @@ describe("the bag's delivery fields on a phone", () => {
         const fields = Array.from(
             document.querySelectorAll("input, select, textarea"),
         );
-        expect(fields).toHaveLength(8);
+        // The address's seven, the code, and the note for the business.
+        expect(fields).toHaveLength(9);
         for (const field of fields) {
             expect(field.className).toMatch(/\btext-base\b/);
             expect(field.className).not.toMatch(/text-\[1[0-5](\.\d)?px\]/);

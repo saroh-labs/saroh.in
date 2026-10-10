@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
-import { focusRing, optionClasses } from "../booking-flow/styles";
+import { focusRing, inputFill, optionClasses } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type {
@@ -60,6 +60,21 @@ export { lineNote };
  * never names a method: the provider's window shows the ways the business
  * takes (DEC-059).
  */
+
+/**
+ * A note as the checkout's print carries it: a number that changes when
+ * the note does, from which the note can't be read back.
+ */
+export function notePrint(note: string): number {
+    let hash = 5381;
+    for (let i = 0; i < note.length; i += 1) {
+        hash = (Math.imul(hash, 33) ^ note.charCodeAt(i)) >>> 0;
+    }
+    return hash;
+}
+
+/** The most an order's note may run to: the API's own limit. */
+export const MAX_ORDER_NOTE = 500;
 
 type Load =
     | { kind: "loading" }
@@ -186,6 +201,13 @@ export interface BagDraft {
      */
     saved: "shown" | "typing" | null;
     /**
+     * "Note for ‹business›": a gift message, "no sesame", "ring the bell".
+     * Optional, and sent with the order for the business to read. Kept
+     * while the page is open and never written to the visit's storage
+     * (`bag-draft-store.ts`): it may say something about someone's health.
+     */
+    note: string;
+    /**
      * The discount code applied in the bag (DEC-104), as typed and tidied;
      * null for none. The quote judges it every time it prices the bag.
      */
@@ -205,12 +227,14 @@ export const EMPTY_DRAFT: BagDraft = {
     pay: null,
     address: EMPTY_ADDRESS,
     saved: null,
+    note: "",
     code: null,
     checkout: null,
 };
 
 export function BagSheet({
     site,
+    businessName,
     items,
     api,
     signedIn,
@@ -222,6 +246,8 @@ export function BagSheet({
     onClose,
 }: {
     site: string;
+    /** Who the note is for: "Note for Rye & Co.". */
+    businessName: string;
     items: readonly BagItem[];
     api: ShopCheckoutApi;
     signedIn: boolean;
@@ -422,10 +448,17 @@ export function BagSheet({
             fulfilment: way,
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
+            ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),
             // Only a code the quote applied: a refused one is never sent.
             ...(applied ? { discountCode: applied } : {}),
         };
-        const print = JSON.stringify(body);
+        // The bag's print is kept for the visit beside its key, so the
+        // note goes in as a number worked out from it, never its words:
+        // another note is another request, and nothing typed is stored.
+        const print = JSON.stringify({
+            ...body,
+            ...(body.notes ? { notes: notePrint(body.notes) } : {}),
+        });
         const checkout =
             draft.checkout?.print === print
                 ? draft.checkout
@@ -726,6 +759,29 @@ export function BagSheet({
                         </fieldset>
                     ) : null}
                 </div>
+            ) : null}
+
+            {quote ? (
+                <label className="mt-3.5 block text-[13.5px] font-medium">
+                    Note for {businessName}{" "}
+                    <span className="text-site-body font-normal">
+                        (optional)
+                    </span>
+                    <textarea
+                        rows={2}
+                        maxLength={MAX_ORDER_NOTE}
+                        value={draft.note}
+                        onChange={(e) =>
+                            onDraft((d) => ({ ...d, note: e.target.value }))
+                        }
+                        placeholder="A gift message, or anything they should know"
+                        className={cn(
+                            "border-site-border text-site-fg placeholder:text-site-muted mt-1 block w-full resize-y rounded-[calc(var(--site-radius)+8px)] border px-3 py-2.5 text-base",
+                            inputFill,
+                            focusRing,
+                        )}
+                    />
+                </label>
             ) : null}
 
             {problem ? (

@@ -293,6 +293,7 @@ export function ShopBag({
             {step.kind === "bag" ? (
                 <BagSheet
                     site={site}
+                    businessName={businessName}
                     items={items}
                     api={api}
                     signedIn={customer !== null}
