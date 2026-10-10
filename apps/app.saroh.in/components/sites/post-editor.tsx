@@ -1,6 +1,7 @@
 "use client";
 
 import { EditorLoading } from "@/components/sites/editor-loading";
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -232,6 +233,8 @@ export function PostEditor({
     // For the case the timer has not yet fired. A way out saves what is
     // waiting first and asks only when that save can't go; closing the
     // tab gets the browser's own warning.
+    // Cmd/Ctrl+S: Save draft, said aloud if it can't (no title yet).
+    useSaveShortcut(() => void save(), !paused);
     const guard = useLeaveGuard({
         dirty,
         lost: title.trim()

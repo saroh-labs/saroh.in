@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
@@ -158,6 +159,7 @@ export function CreateSiteForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid min-w-0 max-w-2xl gap-5"
             >

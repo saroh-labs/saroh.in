@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -310,7 +311,11 @@ function SectionSlot({
                         </ul>
                     ) : null}
 
-                    <form onSubmit={submit} className="grid gap-2">
+                    <form
+                        onKeyDown={submitOnModEnter}
+                        onSubmit={submit}
+                        className="grid gap-2"
+                    >
                         <label
                             htmlFor={`note-${section.key}`}
                             className="text-xs font-medium"

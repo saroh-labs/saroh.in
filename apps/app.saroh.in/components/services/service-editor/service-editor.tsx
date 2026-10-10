@@ -1,5 +1,6 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -230,6 +231,8 @@ export function ServiceEditor({
     }
 
     const saveOff = bad || (!dirty && !isNew) || saving;
+    // Cmd/Ctrl+S: the page's one Save (it knows when there is nothing to).
+    useSaveShortcut(() => void save(), canEdit);
     const crumb = service ? service.name : "New service";
 
     return (

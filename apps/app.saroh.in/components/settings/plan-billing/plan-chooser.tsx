@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
@@ -275,6 +276,7 @@ export function PlanChooser({
                     ) : null}
                     {!coupon || couponErr ? (
                         <form
+                            onKeyDown={submitOnModEnter}
                             className="flex flex-wrap items-center gap-2"
                             onSubmit={(e) => {
                                 e.preventDefault();

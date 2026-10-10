@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -180,6 +181,7 @@ export function CourseForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 // Enter runs the form's first button: Save for a course
                 // being changed, Save and open for a new one (which waits
                 // for a session, so Enter does nothing until there is one).

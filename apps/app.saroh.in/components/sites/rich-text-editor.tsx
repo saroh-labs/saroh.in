@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -794,6 +795,7 @@ function LinkTool({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-72">
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="grid gap-2"
                     onSubmit={(e) => {
                         e.preventDefault();

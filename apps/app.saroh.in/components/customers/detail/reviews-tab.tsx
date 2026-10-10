@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { Textarea } from "@saroh/ui/textarea";
@@ -117,6 +118,7 @@ export function ReviewsTab({
 
                             {canReply && replying ? (
                                 <form
+                                    onKeyDown={submitOnModEnter}
                                     className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();

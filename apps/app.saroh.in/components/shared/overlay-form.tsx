@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { FormEvent, ReactNode } from "react";
@@ -242,6 +243,8 @@ export function useOverlayFrame({
             ref: setForm,
             ...draftWatch(touch),
             noValidate: true,
+            // Cmd/Ctrl+Enter sends it, as its button would.
+            onKeyDown: submitOnModEnter,
             onSubmit: async (event: FormEvent<HTMLFormElement>) => {
                 // A form of its own inside a field (a link box in a
                 // popover) hands its submit up to this one, and it isn't

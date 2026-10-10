@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -195,6 +196,7 @@ export function WeeklyHours({
                                                 className="w-auto max-w-[calc(100vw-1.5rem)] rounded-[12px] p-3"
                                             >
                                                 <form
+                                                    onKeyDown={submitOnModEnter}
                                                     className="grid gap-2.5"
                                                     onSubmit={(e) => {
                                                         e.preventDefault();

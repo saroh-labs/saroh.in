@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -230,6 +231,7 @@ export function DiscountForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid max-w-[620px] gap-4"
             >

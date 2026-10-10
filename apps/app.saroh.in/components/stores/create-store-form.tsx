@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -60,6 +61,7 @@ export function CreateStoreForm() {
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid max-w-md gap-4"
             >

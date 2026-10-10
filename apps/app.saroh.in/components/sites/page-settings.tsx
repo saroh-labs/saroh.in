@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -98,6 +99,7 @@ export function PageSettings({
             ) : null}
 
             <form
+                onKeyDown={submitOnModEnter}
                 className="grid gap-3"
                 onSubmit={(e) => {
                     e.preventDefault();

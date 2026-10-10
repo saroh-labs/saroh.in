@@ -1,5 +1,6 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
@@ -234,6 +235,12 @@ function EditorBody({
     const headerOff = creating
         ? createBad || creatingNow
         : savable.length === 0 || saving.length > 0;
+    // Cmd/Ctrl+S: what the header's button does, when it could be pressed.
+    useSaveShortcut(() => {
+        if (headerOff) return;
+        if (creating) void create();
+        else void saveSections(savable);
+    }, canWrite);
 
     const jumps = SECTION_ORDER.filter(
         (k) =>

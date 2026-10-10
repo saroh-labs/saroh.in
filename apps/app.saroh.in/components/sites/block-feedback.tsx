@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -221,6 +222,7 @@ export function BlockFeedback({
             ) : null}
 
             <form
+                onKeyDown={submitOnModEnter}
                 className="grid gap-2 border-t pt-4"
                 onSubmit={(e) => {
                     e.preventDefault();

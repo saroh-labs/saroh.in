@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@saroh/auth/client";
 import { Button } from "@saroh/ui/button";
@@ -283,6 +284,7 @@ export function BusinessSetupForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className={cn(
                     "grid gap-5",

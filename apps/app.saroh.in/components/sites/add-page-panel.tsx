@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -109,6 +110,7 @@ export function AddPagePanel({
 
             {blank ? (
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="grid gap-1.5 p-1"
                     onSubmit={(e) => {
                         e.preventDefault();

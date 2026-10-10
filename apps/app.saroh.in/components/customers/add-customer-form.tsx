@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -82,7 +83,11 @@ export function AddCustomerForm() {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <form
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="grid gap-4"
+            >
                 <FormField
                     control={form.control}
                     name="email"

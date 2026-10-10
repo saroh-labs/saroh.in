@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -416,6 +417,7 @@ export function InvoiceForm({
             {details.step}
             {guard.dialog}
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(
                     (values) => onSubmit(values, "draft"),
                     onInvalid,
