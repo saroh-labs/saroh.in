@@ -8,7 +8,7 @@ import {
     NAV_GROUPS,
     navPathname,
 } from "@/components/shared/nav-items";
-import type { PageShape } from "@/components/shared/page-loading";
+import type { PageShape, PageWidth } from "@/components/shared/page-loading";
 import { PageLoading } from "@/components/shared/page-loading";
 
 /** What the shell's own loader says for an address: where you are going. */
@@ -69,12 +69,12 @@ export function shellLoadingWords(pathname: string): ShellLoadingWords {
 }
 
 /** The shell's loader: named for the page being opened, never for Home. */
-export function ShellLoading() {
+export function ShellLoading({ width }: { width: PageWidth }) {
     const words = shellLoadingWords(usePathname());
     return (
         <PageLoading
             shape={words.shape}
-            width="full"
+            width={width}
             breadcrumb={words.breadcrumb.length ? words.breadcrumb : undefined}
             title={words.title}
             label={words.label}

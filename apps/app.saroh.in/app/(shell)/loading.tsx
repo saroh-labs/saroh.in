@@ -1,5 +1,5 @@
 import { ShellLoading } from "@/components/shared/shell-loading";
 
 export default function Loading() {
-    return <ShellLoading />;
+    return <ShellLoading width="full" />;
 }
