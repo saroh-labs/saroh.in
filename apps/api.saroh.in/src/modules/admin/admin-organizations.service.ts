@@ -30,6 +30,8 @@ export interface OrganizationDirectoryQuery {
     moduleKey?: string;
     /** `attention`: only businesses with something an operator should look at. */
     health?: "attention";
+    /** `on`: only businesses on legal hold (DEC-119). */
+    legalHold?: "on";
     cursor?: string;
     limit?: number;
 }
@@ -52,6 +54,11 @@ export interface OrganizationDirectoryRow {
     name: string;
     slug: string;
     lifecycleStatus: string;
+    /**
+     * On legal hold (DEC-119): its data is kept whatever is asked. Who,
+     * when and why are on the business page, behind a support session.
+     */
+    legalHold: boolean;
     createdAt: Date;
     members: number;
     enabledModules: string[];
@@ -79,6 +86,7 @@ const ROW_SELECT = {
     name: true,
     slug: true,
     lifecycleStatus: true,
+    legalHoldAt: true,
     createdAt: true,
     _count: { select: { memberships: true } },
     organizationModules: {
@@ -223,6 +231,7 @@ export class AdminOrganizationsService {
         }
 
         if (query.lifecycle) and.push({ lifecycleStatus: query.lifecycle });
+        if (query.legalHold === "on") and.push({ legalHoldAt: { not: null } });
 
         if (query.planKey === "none") {
             and.push({ subscription: { is: null } });
@@ -364,6 +373,7 @@ export class AdminOrganizationsService {
                 name: record.name,
                 slug: record.slug,
                 lifecycleStatus: record.lifecycleStatus,
+                legalHold: record.legalHoldAt !== null,
                 createdAt: record.createdAt,
                 members: record._count.memberships,
                 enabledModules: record.organizationModules.map(

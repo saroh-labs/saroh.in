@@ -7,6 +7,7 @@ import { appBase } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
+import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
 import { lifecycleAllows } from "../organizations/organization-lifecycle.policy";
 import { buildDataExport } from "./data-export-build";
 import {
@@ -40,7 +41,9 @@ function exportIdOf(job: Job): string | null {
  * **`data-export.expire`** deletes the zip from storage and marks the
  * export EXPIRED. Storage first: a delete that fails throws, the row still
  * names the key, and the queue tries again. The deletion clean-up never
- * cancels it (`CLEANUP_KEEPS_JOB_TYPES`).
+ * cancels it (`CLEANUP_KEEPS_JOB_TYPES`). It runs for a business on legal
+ * hold too: the zip is a copy, and every record in it stays where it is
+ * (`legal-hold.deletes.spec.ts` lists it as not the business's data).
  */
 @Injectable()
 export class DataExportHandler {
@@ -57,7 +60,12 @@ export class DataExportHandler {
             where: { id: exportId },
             include: {
                 organization: {
-                    select: { name: true, slug: true, lifecycleStatus: true },
+                    select: {
+                        name: true,
+                        slug: true,
+                        lifecycleStatus: true,
+                        legalHoldAt: true,
+                    },
                 },
             },
         });
@@ -71,6 +79,12 @@ export class DataExportHandler {
         // nobody is left to download this.
         if (!lifecycleAllows(row.organization.lifecycleStatus, "takeout")) {
             await this.fail(exportId, "The business was deleted first.");
+            return;
+        }
+        // Put on legal hold since it was asked for (DEC-119): no export
+        // is made while the hold lasts.
+        if (row.organization.legalHoldAt) {
+            await this.fail(exportId, LEGAL_HOLD_MESSAGE);
             return;
         }
         await prisma.dataExport.updateMany({

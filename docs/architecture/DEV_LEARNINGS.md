@@ -12,6 +12,44 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Deletion — a deleted business lost its files on day one, while the law needs 180 days and the policy said 30
+
+**Symptom**: none reported. Found 10 Oct 2026 when the Terms and Privacy
+Policy were aligned with the DPDP Act and the intermediary rules: the day a
+business's deletion window ended, its clean-up deleted every uploaded file
+and its payment and messaging keys, and kept every row for ever. The
+Privacy Policy said data was "removed from live systems within 30 days".
+Neither was what the law asks: an account's data is to be kept 180 days
+after it closes, and then removed. And a business suspended for something
+the law prohibits could have its deletion scheduled the same afternoon,
+which would have destroyed its files while they were needed.
+**Cause**: #921 decided what "deleted" does to billing, the site and the
+members' door, and treated what was left as tidying up, one list of things
+to clear. Files and keys sat in that list together, though one is a record
+to keep for a period and the other a secret to drop at once; and personal
+data was in no list at all, because the rows had to stay for the tax
+records. Nobody had written down how long anything is kept, so the code,
+the policy and the law each had a different number. Security logs were the
+same: the policy said 90 days and nothing pruned them.
+**Fix** (DEC-119): the clean-up now only shuts access off and deletes
+secrets; `organization.retention.erase` erases the files and the personal
+data 180 days after `deletedRetainedAt`, never the tax records; a legal
+hold (`Organization.legalHoldAt`) stops scheduling, the sweep, the
+clean-up, the eraser, privacy removals, the data download and the
+retention sweeps; `security-logs.retention` prunes at one year. The
+retention periods are two constants in one file,
+`apps/api.saroh.in/src/modules/organizations/retention.ts`.
+**Check**: `organizations/legal-hold.deletes.spec.ts` scans the source for
+jobs that delete and fails a new one until it is hold-aware or declared
+not a business's data. `admin/retention-erase-plan.spec.ts` fails when a
+field or relation a privacy removal keeps has no decision for a deleted
+business. `organizations/retention.spec.ts` pins 180 and 365, and that the
+environment can't shorten the first.
+**Rule**: a period the policy states is a constant in `retention.ts`,
+never a number in a handler; and a thing a deletion removes is first asked
+"a secret, or a record with a period?". `docs/patterns/backend-jobs.md` →
+Retention.
+
 ## Deploy — the merchant sites' production Worker didn't know it was production
 
 **Symptom**: none reported. Found 9 Oct 2026 in a review after Vercel was

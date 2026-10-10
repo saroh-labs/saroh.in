@@ -1,9 +1,10 @@
 /**
  * A deleted business against a real Postgres (#921): the deletion sweep
- * queues its clean-up, the clean-up clears what it leaves behind — Saroh's
- * subscription at the provider, custom hostnames, media, payment keys,
- * pending jobs — and keeps its records; its site answers as never published
- * and its members are refused. A business inside its window is charged no
+ * queues its clean-up, the clean-up shuts its access off — Saroh's
+ * subscription at the provider, custom hostnames, payment keys, pending
+ * jobs — and keeps its data and its files for the 180 days (DEC-119); its
+ * site answers as never published and its members are refused. On legal
+ * hold the clean-up removes nothing. A business inside its window is charged no
  * renewal but keeps its site and its door. Runs in the integration project
  * (TEST_DATABASE_URL).
  */
@@ -24,7 +25,6 @@ import type { ModuleLifecycleService } from "../capabilities/module-lifecycle.se
 import type { DomainVerifier } from "../domains/domain-verifier";
 import { DomainsService } from "../domains/domains.service";
 import { FakeDomainHosting } from "../domains/providers/fake-hosting";
-import { MediaService } from "../media/media.service";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { resolveSiteHost } from "../site-accounts/site-host";
 import { siteRootDomain } from "../sites/site-host-mode";
@@ -53,11 +53,9 @@ const domains = new DomainsService(
     {} as EntitlementService,
     hosting,
 );
-const media = new MediaService(storage);
 const cleanup = new OrganizationDeletionCleanupHandler(
     new DeletedBusinessBilling(providers),
     domains,
-    media,
 );
 const sweep = new OrganizationDeletionHandler(new AdminAuditService());
 const sites = new SitesService({
@@ -227,7 +225,7 @@ describe("the deletion sweep queues the clean-up (#921)", () => {
 });
 
 describe("the clean-up of a deleted business (#921)", () => {
-    it("clears what it leaves behind and keeps its records", async () => {
+    it("shuts its access off and keeps its data and its files (DEC-119)", async () => {
         const b = await business("DELETED_RETAINED");
 
         const result = await cleanup.run(b.org.id);
@@ -251,12 +249,15 @@ describe("the clean-up of a deleted business (#921)", () => {
         expect(
             await prisma.domain.count({ where: { organizationId: b.org.id } }),
         ).toBe(0);
-        // Its media out of storage, and their rows.
-        expect(storage.has(b.key)).toBe(false);
+        // Its files stay, in storage and as rows: they go with its data,
+        // 180 days on (`organization.retention.erase`). Until DEC-119 this
+        // run deleted them on day one.
+        expect(storage.has(b.key)).toBe(true);
         expect(
             await prisma.media.count({ where: { organizationId: b.org.id } }),
-        ).toBe(0);
-        // Its payment keys.
+        ).toBe(1);
+        expect(result.counts).not.toHaveProperty("mediaRemoved");
+        // Its payment keys go at once: secrets, not records.
         expect(
             await prisma.merchantPaymentProvider.count({
                 where: { organizationId: b.org.id },
@@ -271,14 +272,114 @@ describe("the clean-up of a deleted business (#921)", () => {
             [b.pendingJob.id]: "CANCELLED",
             [b.providerCancel.id]: "PENDING",
         });
-        // Kept: the business, its customers, its site row.
+        // Kept: the business, its customers with their details, its site row.
         expect(
             await prisma.organization.count({ where: { id: b.org.id } }),
         ).toBe(1);
         expect(
-            await prisma.contact.count({ where: { id: b.contact.id } }),
-        ).toBe(1);
+            await prisma.contact.findUniqueOrThrow({
+                where: { id: b.contact.id },
+                select: { firstName: true, removedAt: true },
+            }),
+        ).toEqual({ firstName: "Asha", removedAt: null });
         expect(await prisma.site.count({ where: { id: b.site.id } })).toBe(1);
+    });
+
+    it("removes nothing of a business on legal hold, and runs when the hold is lifted (DEC-119)", async () => {
+        const b = await business("DELETED_RETAINED");
+        await prisma.organization.update({
+            where: { id: b.org.id },
+            data: {
+                legalHoldAt: new Date(),
+                legalHoldReason: "Police notice 14/2026",
+                legalHoldByUserId: "staff_1",
+            },
+        });
+
+        const held = await cleanup.run(b.org.id);
+
+        expect(held.ran).toBe(false);
+        expect(held.failed).toEqual([]);
+        expect(held.held).toEqual([
+            "jobs",
+            "billing",
+            "domains",
+            "memberships",
+            "keys",
+        ]);
+        expect(cancelSubscription).not.toHaveBeenCalled();
+        expect(
+            [...hosting.hostnames.values()].some(
+                (h) => h.hostname === b.hostname,
+            ),
+        ).toBe(true);
+        expect(
+            await prisma.domain.count({ where: { organizationId: b.org.id } }),
+        ).toBe(1);
+        expect(
+            await prisma.merchantPaymentProvider.count({
+                where: { organizationId: b.org.id },
+            }),
+        ).toBe(1);
+        expect(
+            (
+                await prisma.job.findUniqueOrThrow({
+                    where: { id: b.pendingJob.id },
+                })
+            ).status,
+        ).toBe("PENDING");
+        expect(storage.has(b.key)).toBe(true);
+        // Said on the ledger, for the console's deletion trail.
+        const noted = await prisma.adminAuditEvent.findFirst({
+            where: {
+                organizationId: b.org.id,
+                action: "organization.deletion.cleanup",
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        expect(noted?.outcome).toBe("FAILURE");
+        expect(noted?.metadata).toMatchObject({ legalHold: true });
+
+        // A Platform Owner lifts it: the clean-up is queued again and runs.
+        const owner: PlatformAdminInfo = {
+            userId: "staff_owner",
+            platformAdminId: null,
+            roles: ["PLATFORM_OWNER"],
+            permissions: [],
+            viaBootstrap: true,
+        };
+        await new AdminLifecycleService(
+            new AdminAuditService(),
+            {} as ModuleLifecycleService,
+            {} as EntitlementService,
+        ).liftLegalHold({
+            staff: owner,
+            organizationId: b.org.id,
+            reason: "Case closed, order of 2 Dec",
+        });
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: b.org.id,
+                    type: ORGANIZATION_DELETION_CLEANUP_TYPE,
+                    status: "PENDING",
+                },
+            }),
+        ).toBe(1);
+
+        const after = await cleanup.run(b.org.id);
+        expect(after.ran).toBe(true);
+        expect(after.held).toEqual([]);
+        expect(
+            await prisma.merchantPaymentProvider.count({
+                where: { organizationId: b.org.id },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.domain.count({ where: { organizationId: b.org.id } }),
+        ).toBe(0);
+        // Still its files: those wait for the eraser.
+        expect(storage.has(b.key)).toBe(true);
     });
 
     it("runs again safely: nothing left to do, nothing asked of the provider", async () => {
@@ -293,7 +394,6 @@ describe("the clean-up of a deleted business (#921)", () => {
             jobsCancelled: 0,
             billingSubscriptionCancelled: 0,
             domainsReleased: 0,
-            mediaRemoved: 0,
             keysDeleted: 0,
         });
         expect(cancelSubscription).not.toHaveBeenCalled();
@@ -311,7 +411,14 @@ describe("the clean-up of a deleted business (#921)", () => {
         });
         expect(sub.status).toBe("ACTIVE");
         // The other steps still ran.
-        expect(storage.has(b.key)).toBe(false);
+        expect(
+            await prisma.domain.count({ where: { organizationId: b.org.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.merchantPaymentProvider.count({
+                where: { organizationId: b.org.id },
+            }),
+        ).toBe(0);
     });
 
     it.each(["ACTIVE", "PENDING_DELETION"])(

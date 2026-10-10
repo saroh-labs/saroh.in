@@ -19,7 +19,6 @@ import {
     AddNoteDto,
     CatalogueMoveDto,
     ChangePlanDto,
-    ConfirmedOperatorDto,
     ListOrganizationsDto,
     ModuleOverrideDto,
     OpenAdminAccessSessionDto,
@@ -30,6 +29,7 @@ import {
     RevokeAdminAccessSessionDto,
     ScheduleDeletionDto,
     SetModuleDto,
+    SuspendDto,
     TrialDto,
 } from "./dto";
 import { RequireOrganizationAccessSession } from "./organization-access-session.guard";
@@ -70,6 +70,7 @@ export class AdminOrganizationsController {
                 planKey: query.plan,
                 moduleKey: query.module,
                 health: query.health,
+                legalHold: query.legalHold,
                 cursor: query.cursor,
                 limit: query.limit,
             },
@@ -189,7 +190,7 @@ export class AdminOrganizationsController {
     suspend(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("organizationId") organizationId: string,
-        @Body() dto: ConfirmedOperatorDto,
+        @Body() dto: SuspendDto,
     ) {
         return this.once(
             "organization.suspend",
@@ -202,6 +203,54 @@ export class AdminOrganizationsController {
                     organizationId,
                     reason: dto.reason,
                     confirmName: dto.confirmName,
+                    legalHold: dto.legalHold,
+                }),
+        );
+    }
+
+    /**
+     * Place a legal hold on a business already suspended or on its way out
+     * (DEC-119): nothing deletes or erases its data until it is lifted.
+     */
+    @Post("organizations/:organizationId/legal-hold")
+    @RequireAdminPermission(AdminPermission.OrganizationLifecycleWrite)
+    placeLegalHold(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "organization.legal-hold.place",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.lifecycle.placeLegalHold({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /** Lift a legal hold. Platform Owners only (DEC-119). */
+    @Post("organizations/:organizationId/legal-hold/lift")
+    @RequireAdminPermission(AdminPermission.OrganizationLegalHoldLift)
+    liftLegalHold(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "organization.legal-hold.lift",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.lifecycle.liftLegalHold({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
                 }),
         );
     }

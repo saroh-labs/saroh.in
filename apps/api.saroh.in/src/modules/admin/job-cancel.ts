@@ -42,6 +42,10 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "A step of an autopay charge; cancelling it would strand the charge",
     "site.go_live":
         "A scheduled go-live; the business cancels it from its Website, which keeps the release in step",
+    "organization.retention.erase":
+        "The retention eraser runs itself again; cancelling a run would only hide it",
+    "security-logs.retention":
+        "The security log retention sweep runs itself again; cancelling a run would only hide it",
     "organization.deletion.cleanup":
         "A deleted business's clean-up; cancelling it would leave its billing, domains, files and keys behind",
 };

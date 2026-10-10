@@ -75,6 +75,9 @@ export const AuditAction = {
     // written in the removal's transaction with the contact as the target.
     // Counts only (what was deleted, blanked or cancelled), never a value.
     CustomerRemoved: "customer.removed",
+    // A privacy removal refused because the business is on legal hold
+    // (DEC-119): the contact as the target, DENIED, the reason as a code.
+    CustomerRemovalRefused: "customer.removal.refused",
     // Someone changed one of their own alerts (F14): which alert, which
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.

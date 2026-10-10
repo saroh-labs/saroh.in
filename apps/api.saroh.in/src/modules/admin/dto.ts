@@ -152,6 +152,16 @@ export class ConfirmedOperatorDto extends OperatorReasonDto {
     confirmName!: string;
 }
 
+/**
+ * Suspend, optionally with a legal hold (DEC-119): "Suspended for activity
+ * the law prohibits — keep its data". The reason given is the hold's.
+ */
+export class SuspendDto extends ConfirmedOperatorDto {
+    @IsOptional()
+    @IsBoolean()
+    legalHold?: boolean;
+}
+
 export class ScheduleDeletionDto extends ConfirmedOperatorDto {
     @IsOptional()
     @Type(() => Number)
@@ -235,6 +245,11 @@ export class ListOrganizationsDto {
     @IsOptional()
     @IsIn(["attention"])
     health?: "attention";
+
+    /** `on`: only businesses on legal hold (DEC-119). */
+    @IsOptional()
+    @IsIn(["on"])
+    legalHold?: "on";
 
     /** `picker`: the flag screen's id/name/slug list, unpaged. */
     @IsOptional()

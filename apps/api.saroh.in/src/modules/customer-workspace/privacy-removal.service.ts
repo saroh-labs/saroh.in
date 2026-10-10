@@ -12,6 +12,13 @@ import {
     cancelFoundBooking,
     sendCancelRefund,
 } from "../bookings/booking-cancel";
+import {
+    LEGAL_HOLD_CODE,
+    LEGAL_HOLD_MESSAGE,
+    legalHoldRefusal,
+    onLegalHold,
+    onLegalHoldLocked,
+} from "../organizations/legal-hold";
 import { allows } from "../organizations/organization-policy";
 import {
     autopayRefusal,
@@ -57,6 +64,16 @@ import { removeDetailsInTx } from "./privacy-removal-writes";
  *
  * `customer:remove`, on its own from the day it ships (R15): never implied
  * by `contact:write`.
+ *
+ * **Refused while the business is on legal hold** (DEC-119,
+ * `organizations/legal-hold.ts`): its data is kept, a customer's details
+ * included. The preview says so as its first refusal and Remove answers
+ * 409 before anything is touched (and again under the business's row lock
+ * in the last transaction); each writes `customer.removal.refused` to the
+ * business's history, DENIED, with the contact's id and the reason as a
+ * code. A held business is suspended or closing, so the workspace's own
+ * lifecycle gate usually refuses the POST first; the preview is what the
+ * dialog reads, which is why it records too.
  */
 
 export interface RemovalPreview {
@@ -92,25 +109,31 @@ export class PrivacyRemovalService {
         now: Date = new Date(),
     ): Promise<RemovalPreview> {
         requireCustomerPower(ctx, "customer:remove");
-        return this.db.$transaction(async (tx) => {
+        const preview = await this.db.$transaction(async (tx) => {
             const contact = await findContact(
                 tx,
                 ctx.organizationId,
                 contactId,
             );
-            const [refusals, goes, stays] = await Promise.all([
+            const [held, refusals, goes, stays] = await Promise.all([
+                onLegalHold(tx, ctx.organizationId),
                 refusalsFor(tx, ctx.organizationId, contactId),
                 countGoes(tx, ctx.organizationId, contactId, now),
                 countStays(tx, ctx.organizationId, contactId),
             ]);
             return {
-                contactId,
-                name: fullName(contact),
-                refusals,
-                goes,
-                stays,
+                held,
+                view: {
+                    contactId,
+                    name: fullName(contact),
+                    refusals: held ? [HOLD_REFUSAL, ...refusals] : refusals,
+                    goes,
+                    stays,
+                },
             };
         });
+        if (preview.held) await this.recordHoldRefusal(ctx, contactId);
+        return preview.view;
     }
 
     /** Remove their details. Final. */
@@ -121,6 +144,15 @@ export class PrivacyRemovalService {
     ): Promise<RemovalResult> {
         requireCustomerPower(ctx, "customer:remove");
         const organizationId = ctx.organizationId;
+
+        // 0. On legal hold nothing of the business's is removed (DEC-119).
+        if (await onLegalHold(this.db, organizationId)) {
+            await this.db.$transaction((tx) =>
+                findContact(tx, organizationId, contactId),
+            );
+            await this.recordHoldRefusal(ctx, contactId);
+            throw legalHoldRefusal();
+        }
 
         // 1. The refusals, before anything is touched.
         await this.db.$transaction(async (tx) => {
@@ -152,6 +184,10 @@ export class PrivacyRemovalService {
             await tx.$queryRaw`SELECT id FROM "Contact"
                 WHERE id = ${contactId} AND "organizationId" = ${organizationId}
                 FOR UPDATE`;
+            // A hold placed since step 0 waits on this lock or stops here.
+            if (await onLegalHoldLocked(tx, organizationId)) {
+                throw legalHoldRefusal();
+            }
             await findContact(tx, organizationId, contactId);
             refuse(await refusalsFor(tx, organizationId, contactId));
             const stillOpen = await tx.paymentMandate.findFirst({
@@ -208,6 +244,36 @@ export class PrivacyRemovalService {
         return { contactId, removedAt: now.toISOString(), goes };
     }
 
+    /**
+     * The refusal on the business's history (DEC-119): who asked, for which
+     * contact, and why, as a code. Ids only. A failed write is logged and
+     * never turns the refusal into an error.
+     */
+    private async recordHoldRefusal(
+        ctx: OrganizationContext,
+        contactId: string,
+    ): Promise<void> {
+        try {
+            await this.db.auditEvent.create({
+                data: {
+                    action: AuditAction.CustomerRemovalRefused,
+                    actorUserId: ctx.userId,
+                    organizationId: ctx.organizationId,
+                    targetType: "contact",
+                    targetId: contactId,
+                    outcome: "DENIED",
+                    metadata: auditMetadata(ctx.roleKey, {
+                        reason: LEGAL_HOLD_CODE,
+                    }),
+                },
+            });
+        } catch (error) {
+            this.logger.error(
+                `customer_removal_refusal_not_recorded org=${ctx.organizationId} contact=${contactId} error=${error instanceof Error ? error.name : "unknown"}`,
+            );
+        }
+    }
+
     private async cancelFutureBookings(
         ctx: OrganizationContext,
         contactId: string,
@@ -244,6 +310,12 @@ export class PrivacyRemovalService {
         return cancelled;
     }
 }
+
+/** The preview's first refusal for a business on legal hold. */
+const HOLD_REFUSAL: RemovalRefusal = {
+    reason: "legal-hold",
+    message: LEGAL_HOLD_MESSAGE,
+};
 
 function refuse(refusals: RemovalRefusal[]): void {
     if (refusals.length === 0) return;

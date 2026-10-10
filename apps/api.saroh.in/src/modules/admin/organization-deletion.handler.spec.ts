@@ -4,6 +4,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             findUnique: jest.fn(),
             updateMany: jest.fn(),
+            // Past their window and on legal hold (DEC-119): for the log.
+            count: jest.fn(),
         },
         auditEvent: { create: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
@@ -32,6 +34,7 @@ import {
 const list = prisma.organization.findMany as jest.Mock;
 const read = prisma.organization.findUnique as jest.Mock;
 const write = prisma.organization.updateMany as jest.Mock;
+const heldCount = prisma.organization.count as jest.Mock;
 const history = prisma.auditEvent.create as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 
@@ -62,6 +65,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     write.mockResolvedValue({ count: 1 });
     jobCreate.mockResolvedValue({});
+    heldCount.mockResolvedValue(0);
 });
 
 describe("OrganizationDeletionHandler.sweep (#907)", () => {
@@ -73,6 +77,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
                 where: {
                     lifecycleStatus: "PENDING_DELETION",
                     deletionScheduledAt: { not: null, lte: NOW },
+                    legalHoldAt: null,
                 },
             }),
         );
@@ -88,6 +93,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
         expect(result).toEqual({
             deleted: ["o1"],
             waiting: [],
+            held: 0,
             passed: 0,
             failed: 0,
         });
@@ -97,6 +103,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
                 lifecycleStatus: "PENDING_DELETION",
                 lifecycleVersion: 3,
                 deletionScheduledAt: { not: null, lte: NOW },
+                legalHoldAt: null,
             },
             data: {
                 lifecycleStatus: "DELETED_RETAINED",
@@ -154,6 +161,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
             expect(result).toEqual({
                 deleted: [],
                 waiting: [],
+                held: 0,
                 passed: 1,
                 failed: 0,
             });
@@ -173,6 +181,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
         expect(await handler.sweep(NOW)).toEqual({
             deleted: [],
             waiting: [],
+            held: 0,
             passed: 1,
             failed: 0,
         });
@@ -216,6 +225,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
         expect(result).toEqual({
             deleted: [],
             waiting: ["o1"],
+            held: 0,
             passed: 0,
             failed: 0,
         });
@@ -289,6 +299,47 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
             where: { id: { notIn: string[] } };
         };
         expect(second.where.id.notIn).toHaveLength(50);
+    });
+});
+
+describe("OrganizationDeletionHandler and a legal hold (DEC-119)", () => {
+    it("never deletes a business on legal hold, even one listed before the hold", async () => {
+        list.mockResolvedValueOnce([{ id: "o1" }]);
+        read.mockResolvedValue(
+            org("o1", { legalHoldAt: new Date("2026-11-09T12:00:00.000Z") }),
+        );
+        heldCount.mockResolvedValue(1);
+        const { handler, audit } = build();
+
+        const result = await handler.sweep(NOW);
+
+        expect(result).toEqual({
+            deleted: [],
+            waiting: [],
+            held: 1,
+            passed: 1,
+            failed: 0,
+        });
+        expect(write).not.toHaveBeenCalled();
+        expect(audit.write).not.toHaveBeenCalled();
+        expect(history).not.toHaveBeenCalled();
+        expect(jobCreate).not.toHaveBeenCalled();
+        // Not even asked what it owes: the hold comes first.
+        expect(refundsOutstanding).not.toHaveBeenCalled();
+    });
+
+    it("counts held businesses past their window for the log only", async () => {
+        list.mockResolvedValue([]);
+        heldCount.mockResolvedValue(2);
+        const result = await build().handler.sweep(NOW);
+        expect(result.held).toBe(2);
+        expect(heldCount).toHaveBeenCalledWith({
+            where: {
+                lifecycleStatus: "PENDING_DELETION",
+                deletionScheduledAt: { not: null, lte: NOW },
+                legalHoldAt: { not: null },
+            },
+        });
     });
 });
 

@@ -13,6 +13,8 @@ import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
+import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
+import { retentionEndsAt } from "../organizations/retention";
 import type { OrganizationPresence } from "./admin-presence";
 import { organizationPresence } from "./admin-presence";
 import type { SiteTrackersRow } from "./admin-site-trackers.service";
@@ -43,6 +45,26 @@ export interface OrganizationFacts {
     suspensionReason: string | null;
     deletionScheduledAt: Date | null;
     deletionReason: string | null;
+    /**
+     * Its legal hold (DEC-119), or null: when it was placed, the operator's
+     * reason, and who placed it (a name; an email only to a PII reader).
+     */
+    legalHold: {
+        at: Date;
+        reason: string | null;
+        byUserId: string | null;
+        by: string | null;
+    } | null;
+    /** When its deletion window ended and access was shut off. */
+    deletedRetainedAt: Date | null;
+    /**
+     * The day its files and personal data are erased: 180 days after it was
+     * deleted (`organizations/retention.ts`). Null unless it is deleted.
+     * While it is on legal hold nothing is erased on that day.
+     */
+    dataKeptUntil: Date | null;
+    /** When the retention eraser finished with it; null until then. */
+    retentionErasedAt: Date | null;
     timezone: string | null;
     country: string | null;
     counts: {
@@ -291,7 +313,7 @@ export class AdminOrganizationViewService {
         organizationId: string,
         caller: { canReadPii: boolean },
     ): Promise<OrganizationSupportView> {
-        const facts = await this.facts(organizationId);
+        const facts = await this.facts(organizationId, caller);
 
         const [
             people,
@@ -423,7 +445,10 @@ export class AdminOrganizationViewService {
         }
     }
 
-    private async facts(organizationId: string): Promise<OrganizationFacts> {
+    private async facts(
+        organizationId: string,
+        caller: { canReadPii: boolean },
+    ): Promise<OrganizationFacts> {
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
             select: {
@@ -437,6 +462,11 @@ export class AdminOrganizationViewService {
                 suspensionReason: true,
                 deletionScheduledAt: true,
                 deletionReason: true,
+                legalHoldAt: true,
+                legalHoldReason: true,
+                legalHoldByUserId: true,
+                deletedRetainedAt: true,
+                retentionErasedAt: true,
                 businessProfile: { select: { timezone: true, country: true } },
             },
         });
@@ -460,9 +490,34 @@ export class AdminOrganizationViewService {
                 prisma.contact.count({ where }),
             ]);
 
-        const { businessProfile, ...rest } = organization;
+        const {
+            businessProfile,
+            legalHoldAt,
+            legalHoldReason,
+            legalHoldByUserId,
+            ...rest
+        } = organization;
+        const holders = legalHoldByUserId
+            ? await this.names([legalHoldByUserId], caller)
+            : new Map<string, string>();
         return {
             ...rest,
+            legalHold: legalHoldAt
+                ? {
+                      at: legalHoldAt,
+                      reason: legalHoldReason,
+                      byUserId: legalHoldByUserId,
+                      by: legalHoldByUserId
+                          ? (holders.get(legalHoldByUserId) ?? null)
+                          : null,
+                  }
+                : null,
+            dataKeptUntil:
+                organization.lifecycleStatus ===
+                    OrganizationLifecycleStatus.DeletedRetained &&
+                organization.deletedRetainedAt
+                    ? retentionEndsAt(organization.deletedRetainedAt)
+                    : null,
             timezone: businessProfile?.timezone ?? null,
             country: businessProfile?.country ?? null,
             counts: { members, sites, orders, openOrders, bookings, contacts },

@@ -150,9 +150,13 @@ export const REVIEWER_NAME = "A customer";
 
 // ── Refusals ────────────────────────────────────────────────────────────
 
-/** Why a removal is refused; `autopay` comes from `payments/mandate-gate.ts`. */
+/**
+ * Why a removal is refused; `autopay` comes from `payments/mandate-gate.ts`
+ * and `legal-hold` from `organizations/legal-hold.ts` (DEC-119: a held
+ * business's data is kept, a customer's details included).
+ */
 export type RemovalRefusalReason =
-    "open-order" | "live-subscription" | "autopay";
+    "open-order" | "live-subscription" | "autopay" | "legal-hold";
 
 export interface RemovalRefusal {
     reason: RemovalRefusalReason;
