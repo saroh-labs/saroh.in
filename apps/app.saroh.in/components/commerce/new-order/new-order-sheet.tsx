@@ -273,6 +273,7 @@ function NewOrderBody({
                     loading={o.waysLoading}
                 />
                 <PayStep
+                    currency={o.data?.currency ?? null}
                     options={o.options}
                     pay={o.pay}
                     onPay={o.setPay}

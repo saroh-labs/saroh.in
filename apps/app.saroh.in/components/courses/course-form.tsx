@@ -37,6 +37,7 @@ import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDate, formatTimeRange } from "@/lib/format/datetime";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 const schema = z.object({
@@ -89,6 +90,7 @@ export function CourseForm({
     const first = services.at(0);
     const form = useForm<Values>({
         resolver: zodResolver(schema),
+        ...PAGE_FORM,
         defaultValues: {
             serviceId: course?.service.id ?? first?.id ?? "",
             name: course?.name ?? "",
@@ -191,7 +193,10 @@ export function CourseForm({
                 // Enter runs the form's first button: Save for a course
                 // being changed, Save and open for a new one (which waits
                 // for a session, so Enter does nothing until there is one).
-                onSubmit={form.handleSubmit((v) => save(v, !course))}
+                onSubmit={form.handleSubmit(
+                    (v) => save(v, !course),
+                    toFirstError,
+                )}
                 className="grid max-w-[720px] gap-6"
             >
                 <FormField
@@ -349,8 +354,9 @@ export function CourseForm({
                                 type="button"
                                 variant="outline"
                                 disabled={busy}
-                                onClick={form.handleSubmit((v) =>
-                                    save(v, false),
+                                onClick={form.handleSubmit(
+                                    (v) => save(v, false),
+                                    toFirstError,
                                 )}
                             >
                                 Save as draft

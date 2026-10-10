@@ -22,7 +22,7 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import {
     lostChanges,
@@ -31,6 +31,7 @@ import {
 } from "@/components/shared/use-leave-guard";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import {
     createInvoice,
     issueInvoice,
@@ -49,6 +50,7 @@ import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import { copyText } from "@saroh/ui/copy-button";
 import { OptionSelect } from "@saroh/ui/option-select";
+import type { BaseSyntheticEvent } from "react";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -197,6 +199,7 @@ export function InvoiceForm({
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             contactId: draft?.contact?.id ?? initialContactId ?? "",
             due: draft?.dueAt ? "kept" : 14,
@@ -365,8 +368,13 @@ export function InvoiceForm({
         router.push(to);
     }
 
-    function onInvalid(errs: FieldErrors<FormValues>) {
+    function onInvalid(
+        errs: FieldErrors<FormValues>,
+        event?: BaseSyntheticEvent,
+    ) {
         if (errs.billToGstin || errs.billToState) setBuyerOpen(true);
+        // The buyer's fields open first, so the keyboard can land on one.
+        toFirstError(errs, event);
         if (errs.lines?.root?.message ?? errs.lines?.message) {
             showError(String(errs.lines.root?.message ?? errs.lines.message));
         }
@@ -732,38 +740,36 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Due">
-                        <div
-                            role="radiogroup"
-                            aria-label="Due"
-                            className="flex flex-wrap items-center gap-1.5"
-                        >
-                            {draft?.dueAt ? (
-                                <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === "kept"}
-                                    onClick={() => form.setValue("due", "kept")}
-                                    className={chipClass(due === "kept")}
-                                >
-                                    <ViewerDate
-                                        iso={draft.dueAt}
-                                        variant="dayMonth"
-                                    />
-                                </button>
-                            ) : null}
-                            {DUES.map((d) => (
-                                <button
-                                    key={d.days}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === d.days}
-                                    onClick={() => form.setValue("due", d.days)}
-                                    className={chipClass(due === d.days)}
-                                >
-                                    {d.label}
-                                </button>
-                            ))}
-                        </div>
+                        <ChipGroup
+                            label="Due"
+                            className="items-center"
+                            value={String(due)}
+                            onChange={(v) =>
+                                form.setValue(
+                                    "due",
+                                    v === "kept" ? "kept" : Number(v),
+                                )
+                            }
+                            choices={[
+                                ...(draft?.dueAt
+                                    ? [
+                                          {
+                                              value: "kept",
+                                              label: (
+                                                  <ViewerDate
+                                                      iso={draft.dueAt}
+                                                      variant="dayMonth"
+                                                  />
+                                              ),
+                                          },
+                                      ]
+                                    : []),
+                                ...DUES.map((d) => ({
+                                    value: String(d.days),
+                                    label: d.label,
+                                })),
+                            ]}
+                        />
                     </Card>
                 </div>
 

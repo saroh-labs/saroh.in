@@ -11,10 +11,15 @@ import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
+import type { Choice } from "@/components/shared/choice-group";
+import {
+    ChoiceGroup,
+    Eyebrow,
+    pillClass,
+} from "@/components/shared/choice-group";
 import { Refusal } from "@/components/shared/refusal";
+import { Field } from "@saroh/ui/field";
 import { TextLink } from "@saroh/ui/text-link";
-import type { Choice } from "./choice-group";
-import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 
 /** From this many products and pages, "More…" gets a search box. */
 const SEARCH_FROM = 7;
@@ -172,16 +177,14 @@ export function QrTargetPicker({
                 itemClassName={(on) => pillClass(on)}
             />
             {place === "OTHER" ? (
-                <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-                    Where is that?
+                <Field label="Where is that?">
                     <Input
                         value={placeNote}
                         maxLength={QR_PLACE_NOTE_MAX}
                         onChange={(e) => onPlaceNote(e.target.value)}
                         placeholder="Reception desk"
-                        className="font-normal"
                     />
-                </label>
+                </Field>
             ) : null}
         </div>
     );

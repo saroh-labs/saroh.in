@@ -22,7 +22,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
  * person's time off and the business's closures as one line each, and
  * "Add time off" by the heading, which opens the sheet with the fields
  * (`add-time-off-sheet.tsx`). Adds and removals are part of the screen's
- * draft until "Save changes"; a line added and not saved yet says so.
+ * draft until the page's "Save"; a line added and not saved yet says so.
  */
 export function TimeOffCard({
     me,

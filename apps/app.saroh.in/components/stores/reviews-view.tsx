@@ -24,6 +24,7 @@ import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
 import type { InvitableOrder, Review } from "@/lib/product-reviews/service";
+import { Field } from "@saroh/ui/field";
 
 const FILTERS: DataFilter<Review>[] = [
     { id: "all", label: "All" },
@@ -340,23 +341,26 @@ function ReviewSheet({
 
                         {canWrite ? (
                             <div className="grid gap-2">
-                                <label
-                                    htmlFor="review-reply"
-                                    className="text-[12.5px] font-medium"
+                                <Field
+                                    label={
+                                        review.reply
+                                            ? "Your reply (edit it here)"
+                                            : "Reply in public"
+                                    }
+                                    className="space-y-2"
                                 >
-                                    {review.reply
-                                        ? "Your reply (edit it here)"
-                                        : "Reply in public"}
-                                </label>
-                                <Textarea
-                                    id="review-reply"
-                                    value={reply}
-                                    rows={4}
-                                    maxLength={1000}
-                                    onChange={(e) => setReply(e.target.value)}
-                                    aria-invalid={empty || undefined}
-                                    aria-describedby="review-reply-note"
-                                />
+                                    <Textarea
+                                        id="review-reply"
+                                        value={reply}
+                                        rows={4}
+                                        maxLength={1000}
+                                        onChange={(e) =>
+                                            setReply(e.target.value)
+                                        }
+                                        aria-invalid={empty || undefined}
+                                        aria-describedby="review-reply-note"
+                                    />
+                                </Field>
                                 <p
                                     id="review-reply-note"
                                     className="text-[11.5px] text-muted-foreground"

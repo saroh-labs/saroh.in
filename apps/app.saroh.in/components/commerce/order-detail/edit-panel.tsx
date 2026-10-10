@@ -14,6 +14,7 @@ import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 import { addedLines } from "@/lib/orders/sellables";
 
+import { Field } from "@saroh/ui/field";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -229,22 +230,21 @@ function EditDraft({
                         reassurance="Nothing can be added until they load. Quantities and the address still change."
                     />
                 ) : addable && addable.length > 0 ? (
-                    <label className="mt-2.5 block text-[12px] font-medium">
-                        Add an item
+                    <Field label="Add an item" className="mt-2.5">
                         <OptionSelect
                             size="sm"
                             // Picking adds a line and the box empties again.
                             value=""
                             onValueChange={pick}
                             placeholder="Choose a product…"
-                            className="mt-1 w-full min-w-[150px]"
+                            className="w-full min-w-[150px]"
                             options={addable.map((s) => ({
                                 value: s.key,
                                 label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
                                 disabled: s.soldOut,
                             }))}
                         />
-                    </label>
+                    </Field>
                 ) : null}
                 {delivery ? (
                     <fieldset className="mt-3">

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { MenuEditor } from "./menu-editor";
 import { NOTE } from "./settings-sheet";
 
@@ -133,24 +134,23 @@ export function FooterSheet({
             )}
             {/* The two formats a richText section offers: one content
                 model, one sanitizer. */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>Written as</span>
-                {(["html", "markdown"] as const).map((f) => (
-                    <button
-                        key={f}
-                        type="button"
-                        onClick={() => setFormat(f)}
-                        aria-pressed={format === f}
-                        className={cn(
-                            "rounded px-2 py-0.5 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                            format === f
-                                ? "bg-secondary text-secondary-foreground"
-                                : "hover:text-foreground active:bg-accent-active",
-                        )}
-                    >
-                        {f === "html" ? "HTML" : "Plain text"}
-                    </button>
-                ))}
+            <div className="grid gap-1.5">
+                <span
+                    id="footer-written-as"
+                    className="text-[0.78125rem] font-medium"
+                >
+                    Written as
+                </span>
+                <Segmented
+                    label="Written as"
+                    aria-labelledby="footer-written-as"
+                    value={format}
+                    onValueChange={setFormat}
+                    options={[
+                        { value: "html", label: "HTML" },
+                        { value: "markdown", label: "Plain text" },
+                    ]}
+                />
             </div>
             <p className={NOTE}>
                 Clear the box to remove the footer. Links and basic formatting

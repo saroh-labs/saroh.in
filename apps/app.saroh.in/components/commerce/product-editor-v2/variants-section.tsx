@@ -38,7 +38,7 @@ import { DROPPED, saveVariantList } from "./variant-save";
 export function VariantsSection({
     product,
     storeId,
-    symbol,
+    currency,
     options,
     sku,
     stores,
@@ -46,7 +46,7 @@ export function VariantsSection({
 }: {
     product: ProductDetail;
     storeId: string;
-    symbol: string;
+    currency: string;
     options: ProductOptionView[];
     /** Settings → SKUs, and this product's number for {N}. */
     sku: { pattern: string; suggest: boolean; n: number };
@@ -341,7 +341,7 @@ export function VariantsSection({
                                                 skuKey(x) === skuKey(r),
                                         )}
                                         error={errOf(r)}
-                                        symbol={symbol}
+                                        currency={currency}
                                         productPrice={productPrice}
                                         photos={photos}
                                         stores={sellAt}
@@ -373,7 +373,7 @@ export function VariantsSection({
                         sku={newSku}
                         suggested={suggested}
                         price={newPrice}
-                        symbol={symbol}
+                        currency={currency}
                         productPrice={productPrice}
                         skuBad={dupSku || newSkuValue.length > LIMITS.sku}
                         priceBad={newPriceBad}

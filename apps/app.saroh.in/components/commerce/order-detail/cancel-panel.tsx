@@ -1,7 +1,6 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
@@ -14,13 +13,14 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
 
 export interface CancelChoice {
     reason: string | null;
@@ -116,8 +116,7 @@ function CancelDraft({
                     ))}
                 </ul>
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Why
+                    <Field label="Why">
                         <OptionSelect<RefundReason | "">
                             size="sm"
                             value={reason}
@@ -126,10 +125,13 @@ function CancelDraft({
                             options={REFUND_REASONS}
                             className="w-full min-w-[150px]"
                         />
-                    </label>
+                    </Field>
                     {reason === "other" ? (
-                        <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why (optional)
+                        <Field
+                            label="Say why"
+                            optional
+                            className="flex-[1_1_160px]"
+                        >
                             <Input
                                 dense
                                 type="text"
@@ -138,19 +140,17 @@ function CancelDraft({
                                 onChange={(e) => setOther(e.target.value)}
                                 className="w-full"
                             />
-                        </label>
+                        </Field>
                     ) : null}
                 </div>
                 {canTell ? (
-                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
-                        <input
-                            type="checkbox"
-                            checked={tell}
-                            onChange={(e) => setTell(e.target.checked)}
-                            className={cn(FOCUS, "size-4 cursor-pointer")}
-                        />
+                    <CheckRow
+                        checked={tell}
+                        onChange={setTell}
+                        className="mt-2 text-[12.5px]"
+                    >
                         Tell {first} in their messages
-                    </label>
+                    </CheckRow>
                 ) : (
                     <p className="mt-1 text-[12px] text-muted-foreground">
                         Nothing is sent to {first}. Let them know by email or

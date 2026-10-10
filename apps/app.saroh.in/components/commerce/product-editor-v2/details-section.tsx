@@ -28,7 +28,7 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
@@ -260,10 +260,10 @@ function FulfilmentChips({
                 {FULFILMENT_CHOICES.map((c) => {
                     const on = picked.includes(c.value);
                     return (
-                        <button
+                        <Chip
                             key={c.value}
-                            type="button"
-                            aria-pressed={on}
+                            as="toggle"
+                            on={on}
                             disabled={disabled}
                             onClick={() =>
                                 onChange(
@@ -272,10 +272,9 @@ function FulfilmentChips({
                                         : inTableOrder([...picked, c.value]),
                                 )
                             }
-                            className={chipClass(on)}
                         >
                             {c.label}
-                        </button>
+                        </Chip>
                     );
                 })}
             </div>
@@ -319,16 +318,15 @@ function Allergens({
             {list.map((a) => {
                 const on = ids.includes(a.id);
                 return (
-                    <button
+                    <Chip
                         key={a.id}
-                        type="button"
-                        aria-pressed={on}
+                        as="toggle"
+                        on={on}
                         disabled={disabled}
                         onClick={() => onChange(toggle(ids, a.id))}
-                        className={chipClass(on)}
                     >
                         {a.name}
-                    </button>
+                    </Chip>
                 );
             })}
         </div>

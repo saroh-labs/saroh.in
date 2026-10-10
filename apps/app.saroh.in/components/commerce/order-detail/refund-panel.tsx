@@ -2,7 +2,6 @@
 
 import { plural } from "@/lib/format/plural";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
@@ -16,13 +15,15 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
 
 export interface RefundChoice {
     /** Null: everything still refundable, delivery included. */
@@ -83,6 +84,8 @@ interface RefundProps {
     /** "Back to Razorpay, in 3–5 days." */
     how: string;
     format: (amount: number) => string;
+    /** The order's currency, for the amount box. */
+    currency: string;
     onCancel: () => void;
     onRefund: (choice: RefundChoice) => void;
 }
@@ -94,6 +97,7 @@ function RefundDraft({
     shipping,
     how,
     format,
+    currency,
     onRefund,
 }: RefundProps) {
     const ids = useId();
@@ -126,31 +130,14 @@ function RefundDraft({
                     {open.map((l) => {
                         const on = !!picked[l.id];
                         return (
-                            <button
+                            <CheckRow
                                 key={l.id}
-                                type="button"
-                                role="checkbox"
-                                aria-checked={on}
-                                onClick={() =>
-                                    setPicked((p) => ({
-                                        ...p,
-                                        [l.id]: !p[l.id],
-                                    }))
+                                checked={on}
+                                onChange={(next) =>
+                                    setPicked((p) => ({ ...p, [l.id]: next }))
                                 }
-                                className={cn(
-                                    FOCUS,
-                                    "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted active:bg-accent-active coarse:min-h-11",
-                                )}
+                                className="w-full gap-2.5 rounded-[7px] px-1.5 py-2 hover:bg-muted active:bg-accent-active"
                             >
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "size-4 shrink-0 rounded",
-                                        on
-                                            ? "border-[5px] border-foreground"
-                                            : "border-[1.5px] border-border-strong",
-                                    )}
-                                />
                                 <span className="min-w-0 flex-1">
                                     {refundableQuantity(l)} ×{" "}
                                     {l.name ??
@@ -162,13 +149,12 @@ function RefundDraft({
                                 <span className="tabular-nums">
                                     {format(worth(l))}
                                 </span>
-                            </button>
+                            </CheckRow>
                         );
                     })}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Why
+                    <Field label="Why">
                         <OptionSelect<RefundReason | "">
                             size="sm"
                             value={reason}
@@ -181,10 +167,13 @@ function RefundDraft({
                             }
                             className="w-full min-w-[150px]"
                         />
-                    </label>
+                    </Field>
                     {reason === "other" ? (
-                        <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why (optional)
+                        <Field
+                            label="Say why"
+                            optional
+                            className="flex-[1_1_160px]"
+                        >
                             <Input
                                 dense
                                 type="text"
@@ -193,18 +182,15 @@ function RefundDraft({
                                 onChange={(e) => setOther(e.target.value)}
                                 className="w-full"
                             />
-                        </label>
+                        </Field>
                     ) : null}
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Or another amount
-                        <Input
+                    <Field label="Or another amount">
+                        <MoneyInput
                             dense
-                            type="text"
-                            inputMode="decimal"
+                            currency={currency}
                             value={typed}
-                            onChange={(e) => setTyped(e.target.value)}
-                            placeholder="₹"
-                            aria-label="Refund another amount, in rupees"
+                            onValueChange={setTyped}
+                            aria-label="Refund another amount"
                             aria-invalid={
                                 typedAmount.kind === "bad" || undefined
                             }
@@ -213,12 +199,11 @@ function RefundDraft({
                                     ? `${ids}-amount-help`
                                     : undefined
                             }
-                            className="w-[110px] tabular-nums"
+                            className="w-[110px]"
                         />
-                    </label>
+                    </Field>
                     {putBackUnits > 0 ? (
-                        <label className="grid gap-1 text-[12px] font-medium">
-                            Stock
+                        <Field label="Stock">
                             <OptionSelect<"back" | "off">
                                 size="sm"
                                 value={stock}
@@ -232,7 +217,7 @@ function RefundDraft({
                                 ]}
                                 className="w-full min-w-[150px]"
                             />
-                        </label>
+                        </Field>
                     ) : null}
                 </div>
             </OrderSheetBody>

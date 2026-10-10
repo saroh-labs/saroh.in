@@ -30,6 +30,7 @@ import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 import type { ModuleStates } from "@/lib/sites/template-picker";
 
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { TextLink } from "@saroh/ui/text-link";
 import { TemplatePicker } from "./template-picker";
 
@@ -110,6 +111,7 @@ export function CreateSiteForm({
     const listed = templates ?? [];
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             name: defaults?.siteName ?? "",
             subdomain: defaults?.address ?? "",
@@ -159,7 +161,7 @@ export function CreateSiteForm({
         <Form {...form}>
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid min-w-0 max-w-2xl gap-5"
             >
                 <div className="grid min-w-0 max-w-md gap-4">

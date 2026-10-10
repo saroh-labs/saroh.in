@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
@@ -9,6 +8,9 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Tip } from "@saroh/ui/tooltip";
 import { FIELD, StepCard } from "./parts";
 
@@ -29,6 +31,7 @@ export function PayStep({
     total,
     note,
     format,
+    currency,
     discount,
     onDiscount,
     handedOver = null,
@@ -43,6 +46,8 @@ export function PayStep({
     total: string;
     note: string;
     format: (cents: number) => string;
+    /** The location's currency, for the cash box; null before it is read. */
+    currency: string | null;
     /** A code or an amount off, as typed. */
     discount: string;
     onDiscount: (discount: string) => void;
@@ -53,8 +58,6 @@ export function PayStep({
     handedOver?: boolean | null;
     onHandedOver?: (on: boolean) => void;
 }) {
-    const givenId = useId();
-    const handedId = useId();
     const discountId = useId();
     const [discounting, setDiscounting] = useState(discount !== "");
     return (
@@ -80,22 +83,27 @@ export function PayStep({
             </div>
             {pay === "CASH" ? (
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label
-                        htmlFor={givenId}
-                        className="flex-[1_1_140px] text-[12px] font-medium"
-                    >
-                        Cash given
-                        <Input
-                            id={givenId}
-                            type="text"
-                            inputMode="decimal"
-                            value={given}
-                            onChange={(e) => onGiven(e.target.value)}
-                            placeholder={total}
-                            autoComplete="off"
-                            className={cn(FIELD, "mt-[5px]")}
-                        />
-                    </label>
+                    <Field label="Cash given" className="flex-[1_1_140px]">
+                        {currency ? (
+                            <MoneyInput
+                                currency={currency}
+                                value={given}
+                                onValueChange={onGiven}
+                                placeholder={total}
+                                className="bg-card"
+                            />
+                        ) : (
+                            <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={given}
+                                onChange={(e) => onGiven(e.target.value)}
+                                placeholder={total}
+                                autoComplete="off"
+                                className="bg-card"
+                            />
+                        )}
+                    </Field>
                     <div
                         aria-live="polite"
                         className={cn(
@@ -117,16 +125,12 @@ export function PayStep({
                 {note}
             </p>
             {handedOver !== null ? (
-                <label
-                    htmlFor={handedId}
-                    className="mt-2.5 flex cursor-pointer items-start gap-2.5 text-[13px] coarse:min-h-11"
+                <CheckRow
+                    checked={handedOver}
+                    onChange={(on) => onHandedOver?.(on)}
+                    className="mt-2.5 items-start gap-2.5"
+                    boxClassName="mt-0.5"
                 >
-                    <Checkbox
-                        id={handedId}
-                        checked={handedOver}
-                        onCheckedChange={(v) => onHandedOver?.(v === true)}
-                        className="mt-0.5"
-                    />
                     <span>
                         <span className="font-semibold">Handed over now</span>
                         <span className="block text-[12px] text-muted-foreground">
@@ -135,17 +139,11 @@ export function PayStep({
                                 : "It starts as New, to prepare and hand over later."}
                         </span>
                     </span>
-                </label>
+                </CheckRow>
             ) : null}
             {discounting ? (
-                <div className="mt-2.5">
-                    <label
-                        htmlFor={discountId}
-                        className="text-[12px] font-medium"
-                    >
-                        Discount
-                    </label>
-                    <div className="mt-[5px] flex gap-2">
+                <Field label="Discount" htmlFor={discountId} className="mt-2.5">
+                    <div className="flex gap-2">
                         <Input
                             id={discountId}
                             value={discount}
@@ -167,7 +165,7 @@ export function PayStep({
                             Remove
                         </Button>
                     </div>
-                </div>
+                </Field>
             ) : (
                 <Button
                     variant="link"

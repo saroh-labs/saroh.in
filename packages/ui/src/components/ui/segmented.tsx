@@ -29,7 +29,10 @@ export interface SegmentedProps<V extends string = string> {
     onValueChange?: (value: V) => void;
     /** `sm` (32px) for a toolbar, `md` (38px) beside a field. 44px on touch. */
     size?: "sm" | "md";
-    /** Fill the row, each option the same width. */
+    /**
+     * Fill the row, each option the same width. Without it the strip is as
+     * wide as its words, under its label.
+     */
     block?: boolean;
     disabled?: boolean;
     className?: string;
@@ -38,8 +41,16 @@ export interface SegmentedProps<V extends string = string> {
     "aria-labelledby"?: string;
 }
 
+/*
+ * The track is a block of its own, as wide as its options: `flex` with
+ * `w-fit`, never `inline-flex`. Inline, it sat on the label's line when a
+ * form put a label before it, and it stretched to the column in a grid or
+ * a stacked form. Now it drops under its label and stays the size of its
+ * words wherever it is placed, and `block` is the one way to fill the row.
+ * On a narrow screen it is no wider than its parent and its options wrap.
+ */
 const TRACK =
-    "inline-flex max-w-full flex-wrap items-stretch gap-0.5 rounded-lg border border-border bg-muted p-0.5";
+    "flex w-fit max-w-full flex-wrap items-stretch gap-0.5 rounded-lg border border-border bg-muted p-0.5";
 const SEGMENT =
     "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 font-medium transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background coarse:h-11 coarse:px-3.5 [&_svg]:size-4 [&_svg]:shrink-0";
 const SIZE = { sm: "h-7 text-[13px]", md: "h-[32px] text-sm" } as const;
@@ -112,7 +123,7 @@ export function Segmented<V extends string = string>({
     // With nothing chosen yet, the first option holds the tab stop.
     const chosen = options.some((o) => o.value === value);
 
-    const track = cn(TRACK, block && "flex w-full", className);
+    const track = cn(TRACK, block && "w-full", className);
     const naming = aria["aria-labelledby"]
         ? { "aria-labelledby": aria["aria-labelledby"] }
         : { "aria-label": label };

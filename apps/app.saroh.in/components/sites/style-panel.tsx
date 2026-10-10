@@ -4,10 +4,11 @@ import { fontPairStacks } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
-import { Tip } from "@saroh/ui/tooltip";
+import { Label } from "@saroh/ui/label";
 
 /**
  * The Style panel (#189) — colour and spacing for a whole site.
@@ -129,39 +130,28 @@ export function StylePanel({
                 {fontPairs.length > 0 ? (
                     <section className="space-y-3">
                         <h3 className="label">Typeface</h3>
-                        <div
-                            role="radiogroup"
-                            aria-label="Typeface"
+                        <ChoiceGroup
+                            label="Typeface"
                             className="space-y-1"
-                        >
-                            {fontPairs.map((pair) => {
-                                const active = activePair === pair.key;
-                                return (
-                                    <button
-                                        key={pair.key}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={active}
-                                        onClick={() => setFontPair(pair.key)}
-                                        className={cn(
-                                            "flex min-h-9 w-full items-center rounded border px-2.5 py-1.5 text-left text-sm",
-                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                                            active
-                                                ? "border-foreground ring-1 ring-foreground"
-                                                : "border-border hover:bg-muted",
-                                        )}
-                                        style={{
-                                            fontFamily: fontPairStacks(
-                                                pair.key,
-                                                faces,
-                                            )?.heading,
-                                        }}
-                                    >
-                                        {pair.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                            value={activePair}
+                            onChange={setFontPair}
+                            choices={fontPairs.map((pair) => ({
+                                value: pair.key,
+                                label: pair.name,
+                                style: {
+                                    fontFamily: fontPairStacks(pair.key, faces)
+                                        ?.heading,
+                                },
+                            }))}
+                            itemClassName={(active) =>
+                                cn(
+                                    "flex min-h-9 w-full items-center rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
+                                    active
+                                        ? "border-foreground ring-1 ring-foreground"
+                                        : "border-border hover:bg-muted",
+                                )
+                            }
+                        />
                     </section>
                 ) : null}
                 <section
@@ -172,30 +162,18 @@ export function StylePanel({
                 >
                     <h3 className="label">Colour</h3>
                     {colourways.length > 0 ? (
-                        <div
-                            role="radiogroup"
-                            aria-label="Colourway"
+                        <ChoiceGroup
+                            label="Colourway"
                             className="space-y-1"
-                        >
-                            {colourways.map((cw) => {
-                                const active = current?.id === cw.id;
-                                return (
-                                    <button
-                                        key={cw.id}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={active}
-                                        onClick={() =>
-                                            onChange(inColourway(style, cw))
-                                        }
-                                        className={cn(
-                                            "flex min-h-9 w-full items-center gap-2.5 rounded border px-2.5 py-1.5 text-left text-sm",
-                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                                            active
-                                                ? "border-foreground ring-1 ring-foreground"
-                                                : "border-border hover:bg-muted",
-                                        )}
-                                    >
+                            value={current?.id ?? null}
+                            onChange={(id) => {
+                                const cw = colourways.find((c) => c.id === id);
+                                if (cw) onChange(inColourway(style, cw));
+                            }}
+                            choices={colourways.map((cw) => ({
+                                value: cw.id,
+                                label: (
+                                    <>
                                         <span
                                             aria-hidden="true"
                                             className="flex shrink-0 overflow-hidden rounded-sm border"
@@ -211,10 +189,18 @@ export function StylePanel({
                                             ))}
                                         </span>
                                         {cw.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                    </>
+                                ),
+                            }))}
+                            itemClassName={(active) =>
+                                cn(
+                                    "flex min-h-9 w-full items-center gap-2.5 rounded border px-2.5 py-1.5 text-left text-sm focus-visible:ring-offset-1 coarse:min-h-11",
+                                    active
+                                        ? "border-foreground ring-1 ring-foreground"
+                                        : "border-border hover:bg-muted",
+                                )
+                            }
+                        />
                     ) : null}
                     {paletteOn ? (
                         <p className="text-xs text-muted-foreground">
@@ -227,70 +213,55 @@ export function StylePanel({
                     {options.rows.map((row) => (
                         <div key={row.key} className="space-y-1.5">
                             <span className="text-xs">{row.label}</span>
-                            <div
-                                role="radiogroup"
-                                aria-label={row.label}
+                            <ChoiceGroup
+                                label={row.label}
                                 className="flex gap-1.5"
-                            >
-                                {row.swatches.map((swatch) => {
-                                    const active =
-                                        !paletteOn &&
-                                        (row.key === "text"
-                                            ? effectiveTextKey === swatch.key
-                                            : style.colours[row.key] ===
-                                              swatch.key);
-                                    // Only the text row can be illegible against
-                                    // a choice made elsewhere in this panel.
+                                value={
+                                    paletteOn
+                                        ? null
+                                        : row.key === "text"
+                                          ? effectiveTextKey
+                                          : style.colours[row.key]
+                                }
+                                onChange={(key) => setColour(row.key, key)}
+                                choices={row.swatches.map((swatch) => {
+                                    // Only the text row can be illegible
+                                    // against a choice made elsewhere in
+                                    // this panel.
                                     const unreadable =
                                         row.key === "text" &&
                                         !textReadable(swatch.hsl);
-                                    return (
-                                        <Tip
-                                            label={
-                                                unreadable
-                                                    ? `${swatch.label} — too close to the page colour to read`
-                                                    : swatch.label
-                                            }
-                                        >
-                                            <button
-                                                key={swatch.key}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={active}
-                                                // The swatch is the label: a name
-                                                // like "Clay" means nothing without
-                                                // the colour, and the colour means
-                                                // nothing to a screen reader without
-                                                // the name.
-                                                aria-label={swatch.label}
-                                                disabled={unreadable}
-                                                onClick={() =>
-                                                    setColour(
-                                                        row.key,
-                                                        swatch.key,
-                                                    )
-                                                }
-                                                style={{
-                                                    background: `hsl(${swatch.hsl})`,
-                                                }}
-                                                className={cn(
-                                                    "h-7 w-7 rounded border transition-[box-shadow] duration-fast",
-                                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                                                    active
-                                                        ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
-                                                        : "border-border hover:ring-2 hover:ring-border",
-                                                    // Struck through rather than
-                                                    // hidden: the option still
-                                                    // exists, it just does not work
-                                                    // with this page colour.
-                                                    unreadable &&
-                                                        "cursor-not-allowed opacity-30",
-                                                )}
-                                            />
-                                        </Tip>
-                                    );
+                                    return {
+                                        value: swatch.key,
+                                        label: null,
+                                        // The swatch is the label: a name
+                                        // like "Clay" means nothing without
+                                        // the colour, and the colour means
+                                        // nothing to a screen reader without
+                                        // the name.
+                                        ariaLabel: swatch.label,
+                                        tip: unreadable
+                                            ? `${swatch.label} — too close to the page colour to read`
+                                            : swatch.label,
+                                        disabled: unreadable,
+                                        style: {
+                                            background: `hsl(${swatch.hsl})`,
+                                        },
+                                    };
                                 })}
-                            </div>
+                                itemClassName={(active, choice) =>
+                                    cn(
+                                        "h-7 w-7 rounded border transition-[box-shadow] focus-visible:ring-offset-1 coarse:h-11 coarse:w-11",
+                                        active
+                                            ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                                            : "border-border hover:ring-2 hover:ring-border",
+                                        // Faded rather than hidden: the
+                                        // option still exists, it just does
+                                        // not work with this page colour.
+                                        choice.disabled && "opacity-30",
+                                    )
+                                }
+                            />
                         </div>
                     ))}
                 </section>
@@ -306,12 +277,12 @@ export function StylePanel({
                         return (
                             <div key={scalar.key} className="space-y-1">
                                 <div className="flex items-baseline justify-between">
-                                    <label
+                                    <Label
                                         htmlFor={`style-${scalar.key}`}
-                                        className="text-xs"
+                                        className="text-xs font-normal leading-normal"
                                     >
                                         {scalar.label}
-                                    </label>
+                                    </Label>
                                     <span className="text-xs tabular-nums text-muted-foreground">
                                         {scalar.unit === "×"
                                             ? `${value.toFixed(2)}×`

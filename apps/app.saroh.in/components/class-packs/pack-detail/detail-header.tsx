@@ -10,6 +10,7 @@ import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Notice } from "@saroh/ui/notice";
+import { Segmented } from "@saroh/ui/segmented";
 /** The page's gutter: the page container's own, 26px and 16px on a phone. */
 export const GUTTER = "px-4 sm:px-[26px]";
 
@@ -97,31 +98,15 @@ export function PackDetailHeader({
                                     {head.bookingPage}
                                 </span>
                             ) : null}
-                            <div
-                                role="group"
-                                aria-label="View as"
-                                className="flex rounded-[10px] bg-muted p-[3px]"
-                            >
-                                {LENSES.map((l) => {
-                                    const on = lens === l.key;
-                                    return (
-                                        <button
-                                            key={l.key}
-                                            type="button"
-                                            aria-pressed={on}
-                                            onClick={() => onLens(l.key)}
-                                            className={cn(
-                                                "cursor-pointer rounded-[8px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                                on
-                                                    ? "bg-card text-foreground shadow-xs"
-                                                    : "text-muted-foreground hover:text-foreground active:bg-accent-active",
-                                            )}
-                                        >
-                                            {l.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <Segmented
+                                label="View as"
+                                value={lens}
+                                onValueChange={onLens}
+                                options={LENSES.map((l) => ({
+                                    value: l.key,
+                                    label: l.label,
+                                }))}
+                            />
                         </>
                     }
                     actions={

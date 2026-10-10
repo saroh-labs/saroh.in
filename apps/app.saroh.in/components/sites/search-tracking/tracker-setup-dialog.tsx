@@ -4,7 +4,6 @@ import { FormDialog } from "@/components/shared/form-dialog";
 import type { PosthogRegion, TrackerKind } from "@saroh/block-contract";
 import { POSTHOG_REGIONS } from "@saroh/block-contract";
 import { Label } from "@saroh/ui/label";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId, useState, useTransition } from "react";
 
@@ -16,6 +15,7 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
+import { RadioCards } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import type { SaveOutcome } from "./parts";
@@ -166,25 +166,16 @@ export function TrackerSetupDialog({
                     <legend id={`${id}-region`} className="text-sm font-medium">
                         Where your project is hosted
                     </legend>
-                    <RadioGroup
-                        aria-labelledby={`${id}-region`}
-                        value={region ?? ""}
-                        onValueChange={(v) =>
-                            setChosenRegion(v as PosthogRegion)
-                        }
-                        className="grid gap-2 sm:grid-cols-2"
-                    >
-                        {POSTHOG_REGIONS.map((r) => (
-                            <label
-                                key={r}
-                                htmlFor={`${id}-${r}`}
-                                className="flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-border px-3 py-2 text-sm transition-colors duration-fast hover:bg-muted active:bg-accent-active coarse:min-h-11"
-                            >
-                                <RadioGroupItem id={`${id}-${r}`} value={r} />
-                                {POSTHOG_REGION_WORDS[r]}
-                            </label>
-                        ))}
-                    </RadioGroup>
+                    <RadioCards
+                        labelledBy={`${id}-region`}
+                        className="sm:grid-cols-2"
+                        value={region ?? null}
+                        onChange={setChosenRegion}
+                        options={POSTHOG_REGIONS.map((r) => ({
+                            value: r,
+                            label: POSTHOG_REGION_WORDS[r],
+                        }))}
+                    />
                 </fieldset>
             ) : null}
         </FormDialog>

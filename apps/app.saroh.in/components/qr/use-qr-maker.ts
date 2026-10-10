@@ -290,7 +290,7 @@ export function useQrMaker(input: UseQrMakerInput) {
         return res.data;
     }
 
-    /** "Make this code", or "Save changes". */
+    /** "Make this code", or "Save". */
     async function make() {
         if (busy) return;
         const wasNew = bound === null;

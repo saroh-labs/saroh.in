@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { CourierFields, Shipment } from "@/lib/orders/courier";
@@ -17,7 +16,8 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { Field } from "@saroh/ui/field";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -125,30 +125,18 @@ function CourierDraft({
                 >
                     Courier
                 </div>
-                <div
-                    role="radiogroup"
-                    aria-labelledby={`${ids}-courier`}
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {choices.map((c) => {
-                        const on = c === courier;
-                        return (
-                            <button
-                                key={c}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => pickChip(c)}
-                                className={chipClass(on)}
-                            >
-                                {c}
-                            </button>
-                        );
-                    })}
-                </div>
+                <ChipGroup
+                    labelledBy={`${ids}-courier`}
+                    value={courier}
+                    onChange={pickChip}
+                    choices={choices.map((c) => ({ value: c, label: c }))}
+                />
                 {other ? (
-                    <label className="mt-3 block text-[12px] font-medium">
-                        Courier&apos;s name
+                    <Field
+                        label="Courier's name"
+                        hint="As the order will name it."
+                        className="mt-3"
+                    >
                         <Input
                             ref={otherRef}
                             type="text"
@@ -157,21 +145,21 @@ function CourierDraft({
                             autoComplete="off"
                             onChange={(e) => setOtherName(e.target.value)}
                             placeholder="DTDC, India Post…"
-                            aria-describedby={`${ids}-other-help`}
-                            className="mt-[5px] w-full font-mono"
+                            className="w-full font-mono"
                         />
-                        <span
-                            id={`${ids}-other-help`}
-                            className="mt-[5px] block text-[11.5px] font-normal text-muted-foreground"
-                        >
-                            As the order will name it.
-                        </span>
-                    </label>
+                    </Field>
                 ) : null}
                 {!own ? (
                     <>
-                        <label className="mt-3 block text-[12px] font-medium">
-                            Tracking number
+                        <Field
+                            label="Tracking number"
+                            className="mt-3"
+                            hint={
+                                handover
+                                    ? "You can add it later, once the courier sends it."
+                                    : `As ${name || "the courier"} gave it to you.`
+                            }
+                        >
                             <Input
                                 ref={numberRef}
                                 type="text"
@@ -181,44 +169,29 @@ function CourierDraft({
                                 spellCheck={false}
                                 onChange={(e) => setNumber(e.target.value)}
                                 placeholder="Leave empty if you don't have it yet"
-                                aria-describedby={`${ids}-number-help`}
-                                className="mt-[5px] w-full font-mono"
+                                className="w-full font-mono"
                             />
-                        </label>
-                        <p
-                            id={`${ids}-number-help`}
-                            className="mt-[5px] text-[11.5px] text-muted-foreground"
+                        </Field>
+                        <Field
+                            label="Tracking link"
+                            optional
+                            className="mt-3"
+                            error={
+                                bad
+                                    ? "That isn't a web address — paste the whole link, starting https://."
+                                    : null
+                            }
+                            hint={`Paste the link ${name || "the courier"} gave you. It stays on the order; nothing is sent to ${first}.`}
                         >
-                            {handover
-                                ? "You can add it later, once the courier sends it."
-                                : `As ${name || "the courier"} gave it to you.`}
-                        </p>
-                        <label className="mt-3 block text-[12px] font-medium">
-                            Tracking link
                             <Input
                                 type="url"
                                 inputMode="url"
                                 value={link}
                                 onChange={(e) => setLink(e.target.value)}
                                 placeholder="https://"
-                                aria-invalid={bad || undefined}
-                                aria-describedby={`${ids}-link-help`}
-                                className="mt-[5px] w-full font-mono"
+                                className="w-full font-mono"
                             />
-                        </label>
-                        <p
-                            id={`${ids}-link-help`}
-                            className={cn(
-                                "mt-[5px] text-[11.5px]",
-                                bad
-                                    ? "text-destructive-subtle-foreground"
-                                    : "text-muted-foreground",
-                            )}
-                        >
-                            {bad
-                                ? "That isn't a web address — paste the whole link, starting https://."
-                                : `Optional. Paste the link ${name || "the courier"} gave you. It stays on the order; nothing is sent to ${first}.`}
-                        </p>
+                        </Field>
                     </>
                 ) : null}
             </OrderSheetBody>

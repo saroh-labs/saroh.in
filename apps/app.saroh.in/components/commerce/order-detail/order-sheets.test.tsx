@@ -295,9 +295,15 @@ async function press(el: HTMLElement) {
 }
 
 function field(label: string) {
-    const el = Array.from(dialog()?.querySelectorAll("label") ?? [])
-        .find((l) => l.textContent.trim().startsWith(label))
-        ?.querySelector("input");
+    // The label sits above its box and points at it (`Field`).
+    const named = Array.from(dialog()?.querySelectorAll("label") ?? []).find(
+        (l) => l.textContent.trim().startsWith(label),
+    );
+    const el = named?.htmlFor
+        ? dialog()?.querySelector<HTMLInputElement>(
+              `input[id="${named.htmlFor}"]`,
+          )
+        : named?.querySelector("input");
     if (!el) throw new Error(`No "${label}" field`);
     return el;
 }

@@ -17,6 +17,7 @@ import {
     removalBody,
 } from "@/lib/contacts/removal";
 import type { RemovalPreview } from "@/lib/contacts/service";
+import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -145,33 +146,28 @@ export function RemoveDetailsDialog({
                 </Notice>
             ) : null}
 
-            <label
-                htmlFor={inputId}
-                className="mt-3.5 block text-[12.5px] font-medium"
+            <Field
+                label={`Type ${name} to confirm`}
+                error={
+                    tried && !matches && refused.length === 0
+                        ? `Type ${name} exactly to confirm.`
+                        : null
+                }
+                className="mt-3.5"
             >
-                Type {name} to confirm
-            </label>
-            <Input
-                id={inputId}
-                type="text"
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                aria-invalid={(tried && !matches) || undefined}
-                aria-label="Type the customer's name to confirm"
-                autoComplete="off"
-                spellCheck={false}
-                disabled={removing || refused.length > 0}
-                className="mt-1.5 px-2.5"
-            />
-
-            {tried && !matches && refused.length === 0 ? (
-                <p
-                    role="alert"
-                    className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
-                >
-                    Type {name} exactly to confirm.
-                </p>
-            ) : null}
+                <Input
+                    id={inputId}
+                    type="text"
+                    value={typed}
+                    onChange={(e) => setTyped(e.target.value)}
+                    aria-invalid={(tried && !matches) || undefined}
+                    aria-label="Type the customer's name to confirm"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={removing || refused.length > 0}
+                    className="px-2.5"
+                />
+            </Field>
             <Refusal className="mt-3">{failure}</Refusal>
         </FormDialog>
     );

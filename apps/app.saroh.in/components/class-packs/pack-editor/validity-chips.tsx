@@ -1,13 +1,12 @@
 "use client";
 
-import { FieldError } from "@saroh/ui/field";
+import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useId, useRef, useState } from "react";
 
 import { parseWhole, VALIDITY_CHIPS } from "@/lib/class-packs/pack-editor";
 
-import { FIELD, LABEL, PackChip } from "./parts";
+import { LABEL, PackChip } from "./parts";
 
 /**
  * "Use within" (E18): the design's day chips, then "Other…", which reveals
@@ -65,10 +64,7 @@ export function ValidityChips({
                 </PackChip>
             </div>
             {showField ? (
-                <div className="mt-2.5">
-                    <label htmlFor={ids.field} className={LABEL}>
-                        Number of days
-                    </label>
+                <Field label="Number of days" className="mt-2.5 space-y-[5px]">
                     <Input
                         ref={fieldRef}
                         id={ids.field}
@@ -78,9 +74,9 @@ export function ValidityChips({
                         aria-invalid={error ? true : undefined}
                         aria-describedby={error ? ids.error : undefined}
                         onChange={(e) => onChange(parseWhole(e.target.value))}
-                        className={cn(FIELD, "w-[88px] max-w-full")}
+                        className="w-[88px] max-w-full"
                     />
-                </div>
+                </Field>
             ) : null}
             <FieldError id={ids.error}>{error}</FieldError>
         </div>

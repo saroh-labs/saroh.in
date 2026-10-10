@@ -28,8 +28,9 @@ import {
 } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { ChipGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
-import { Chip, Eyebrow } from "./parts";
+import { Eyebrow } from "./parts";
 
 export interface HoursTarget {
     staff: StaffView;
@@ -242,44 +243,34 @@ function Form({
                 {formatClockRange(from, to)}
             </p>
             <Eyebrow id="oh-for">For</Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby="oh-for"
-                className="mb-3 flex flex-wrap gap-1.5"
-            >
-                {lengths.map((m, i) => (
-                    <Chip key={m} on={len === m} onClick={() => setLen(m)}>
-                        {block && i === 0
+            <ChipGroup
+                labelledBy="oh-for"
+                className="mb-3"
+                value={String(len)}
+                onChange={(m) => setLen(Number(m))}
+                choices={lengths.map((m, i) => ({
+                    value: String(m),
+                    label:
+                        block && i === 0
                             ? `Whole gap · ${lengthLabel(m)}`
-                            : lengthLabel(m)}
-                    </Chip>
-                ))}
-            </div>
+                            : lengthLabel(m),
+                }))}
+            />
             {block ? null : (
                 <>
                     <Eyebrow id="oh-repeat">Repeat</Eyebrow>
-                    <div
-                        role="radiogroup"
-                        aria-labelledby="oh-repeat"
-                        className="flex flex-wrap gap-1.5"
-                    >
-                        <Chip
-                            on={scope === "day"}
-                            onClick={() => setScope("day")}
-                        >
-                            Just{" "}
-                            {formatDay(date, {
-                                weekday: "short",
-                                year: "never",
-                            })}
-                        </Chip>
-                        <Chip
-                            on={scope === "week"}
-                            onClick={() => setScope("week")}
-                        >
-                            Every {dayName}
-                        </Chip>
-                    </div>
+                    <ChipGroup
+                        labelledBy="oh-repeat"
+                        value={scope}
+                        onChange={setScope}
+                        choices={[
+                            {
+                                value: "day",
+                                label: `Just ${formatDay(date, { weekday: "short", year: "never" })}`,
+                            },
+                            { value: "week", label: `Every ${dayName}` },
+                        ]}
+                    />
                 </>
             )}
             <p

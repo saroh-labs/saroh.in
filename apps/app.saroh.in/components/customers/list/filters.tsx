@@ -3,7 +3,7 @@
 import { formatNumber } from "@/lib/format/money";
 import { ListSearch } from "@saroh/ui/list-search";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
 import type {
     CustomerChip,
     CustomerSort,
@@ -116,16 +116,11 @@ function ChipButton({
     onPick: (chip: CustomerChip) => void;
 }) {
     return (
-        <button
-            type="button"
-            aria-pressed={on}
-            onClick={() => onPick(chip)}
-            className={chipClass(on)}
-        >
+        <Chip as="toggle" on={on} onClick={() => onPick(chip)}>
             {label}
             <span className="ml-1.5 tabular-nums opacity-70">
                 {formatNumber(count)}
             </span>
-        </button>
+        </Chip>
     );
 }

@@ -19,7 +19,7 @@ import {
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**
@@ -137,24 +137,16 @@ export function EntrySheet({
             }}
             onSubmit={save}
         >
-            <div
-                role="radiogroup"
-                aria-label="What happened"
-                className="flex flex-wrap gap-2"
-            >
-                {ENTRY_KINDS.map((k) => (
-                    <button
-                        key={k.kind}
-                        type="button"
-                        role="radio"
-                        aria-checked={kind === k.kind}
-                        className={chipClass(kind === k.kind)}
-                        onClick={() => change(setKind)(k.kind)}
-                    >
-                        {k.label}
-                    </button>
-                ))}
-            </div>
+            <ChipGroup
+                label="What happened"
+                className="gap-2"
+                value={kind}
+                onChange={change(setKind)}
+                choices={ENTRY_KINDS.map((k) => ({
+                    value: k.kind,
+                    label: k.label,
+                }))}
+            />
             <div className="grid gap-[5px]">
                 <Label htmlFor="en-what" className="text-[12.5px] font-medium">
                     What

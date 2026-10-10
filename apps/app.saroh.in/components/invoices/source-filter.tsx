@@ -1,4 +1,4 @@
-import { Chip } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import type { SourceChip } from "@/lib/invoices/sources";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -20,21 +20,13 @@ export function SourceChips({
 }) {
     if (chips.length === 0) return null;
     return (
-        <div
-            role="radiogroup"
-            aria-label="What it was for"
-            className="mb-3 flex flex-wrap gap-2"
-        >
-            {chips.map((c) => (
-                <Chip
-                    key={c.id}
-                    on={c.id === chosen}
-                    onClick={() => onPick(c.id)}
-                >
-                    {c.label}
-                </Chip>
-            ))}
-        </div>
+        <ChipGroup
+            label="What it was for"
+            className="mb-3 gap-2"
+            value={chosen}
+            onChange={onPick}
+            choices={chips.map((c) => ({ value: c.id, label: c.label }))}
+        />
     );
 }
 

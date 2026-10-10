@@ -35,6 +35,7 @@ import {
     SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
 import { IconButton } from "@saroh/ui/icon-button";
+import { Label } from "@saroh/ui/label";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { Segmented } from "@saroh/ui/segmented";
 
@@ -174,10 +175,10 @@ export function InvoiceNumberFields({
                                                 )
                                             }
                                         />
-                                        <label
+                                        <Label
                                             htmlFor={`number-part-${row.part}`}
                                             className={cn(
-                                                "min-w-0 flex-1 text-[13px] !font-normal",
+                                                "min-w-0 flex-1 text-[13px] font-normal leading-normal",
                                                 !row.on &&
                                                     "text-muted-foreground",
                                             )}
@@ -191,7 +192,7 @@ export function InvoiceNumberFields({
                                                     timezone,
                                                 )}
                                             </span>
-                                        </label>
+                                        </Label>
                                         <IconButton
                                             label={`Move ${PART_LABEL[row.part]} earlier`}
                                             icon={<ArrowUp />}

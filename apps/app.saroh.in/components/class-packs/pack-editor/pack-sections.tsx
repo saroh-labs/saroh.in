@@ -1,7 +1,6 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
-import { FieldError } from "@saroh/ui/field";
+import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
@@ -27,7 +26,8 @@ import {
     packRules,
 } from "@/lib/class-packs/pack-editor-words";
 
-import { FIELD, HELP, LABEL, PackChip, PackSection } from "./parts";
+import { CheckRow } from "@/components/shared/check-row";
+import { HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 
 /*
@@ -61,9 +61,7 @@ export function Details({
 }) {
     const ids = {
         name: useId(),
-        nameErr: useId(),
         desc: useId(),
-        descErr: useId(),
         kind: useId(),
         kindNote: useId(),
         kindErr: useId(),
@@ -76,40 +74,32 @@ export function Details({
     };
     return (
         <PackSection title="Details">
-            <label htmlFor={ids.name} className={LABEL}>
-                Name
-            </label>
-            <Input
-                id={ids.name}
-                value={values.name}
-                maxLength={120}
-                autoComplete="off"
-                placeholder="e.g. 10 classes"
-                aria-invalid={errors.name ? true : undefined}
-                aria-describedby={errors.name ? ids.nameErr : undefined}
-                onChange={(e) => set({ name: e.target.value })}
-                className={FIELD}
-            />
-            <FieldError id={ids.nameErr}>{errors.name}</FieldError>
+            <Field label="Name" error={errors.name} className="space-y-[5px]">
+                <Input
+                    id={ids.name}
+                    value={values.name}
+                    maxLength={120}
+                    autoComplete="off"
+                    placeholder="e.g. 10 classes"
+                    onChange={(e) => set({ name: e.target.value })}
+                />
+            </Field>
 
-            <label htmlFor={ids.desc} className={cn(LABEL, "mt-3")}>
-                Description{" "}
-                <span className="font-normal text-muted-foreground">
-                    (optional)
-                </span>
-            </label>
-            <Textarea
-                id={ids.desc}
-                rows={2}
-                maxLength={MAX_DESCRIPTION}
-                value={values.description ?? ""}
-                placeholder="e.g. Any class, any day. Great for getting started."
-                aria-invalid={errors.description ? true : undefined}
-                aria-describedby={errors.description ? ids.descErr : undefined}
-                onChange={(e) => set({ description: e.target.value })}
-                className="mt-[5px]"
-            />
-            <FieldError id={ids.descErr}>{errors.description}</FieldError>
+            <Field
+                label="Description"
+                optional
+                error={errors.description}
+                className="mt-3 space-y-[5px]"
+            >
+                <Textarea
+                    id={ids.desc}
+                    rows={2}
+                    maxLength={MAX_DESCRIPTION}
+                    value={values.description ?? ""}
+                    placeholder="e.g. Any class, any day. Great for getting started."
+                    onChange={(e) => set({ description: e.target.value })}
+                />
+            </Field>
 
             <div id={ids.kind} className={cn(LABEL, "mt-3")}>
                 Credits are for
@@ -167,10 +157,7 @@ export function CreditsAndPrice({
     return (
         <PackSection title="Credits and price">
             <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-0">
-                    <label htmlFor={ids.credits} className={LABEL}>
-                        How many
-                    </label>
+                <Field label="How many" className="space-y-[5px]">
                     <Input
                         id={ids.credits}
                         inputMode="numeric"
@@ -188,14 +175,15 @@ export function CreditsAndPrice({
                         onChange={(e) =>
                             set({ credits: parseWhole(e.target.value) })
                         }
-                        className={cn(FIELD, "w-[88px] max-w-full")}
+                        className="w-[88px] max-w-full"
                     />
-                </div>
-                <div className="min-w-0">
-                    <label htmlFor={ids.price} className={LABEL}>
-                        Price
-                    </label>
-                    <div className={cn(FIELD, "w-[140px] max-w-full")}>
+                </Field>
+                <Field
+                    label="Price"
+                    htmlFor={ids.price}
+                    className="space-y-[5px]"
+                >
+                    <div className="w-[140px] max-w-full">
                         <MoneyInput
                             id={ids.price}
                             currency={values.currency}
@@ -209,7 +197,7 @@ export function CreditsAndPrice({
                             }
                         />
                     </div>
-                </div>
+                </Field>
             </div>
             <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>
             <FieldError id={ids.priceErr}>{errors.price}</FieldError>
@@ -229,15 +217,13 @@ export function WhoCanBuy({ values, set, errors }: Edit) {
     const units = values.kind === "ONE_TO_ONE" ? "one-to-one" : "class";
     return (
         <PackSection title="Who can buy it" tight>
-            <label className="mt-1 flex cursor-pointer items-start gap-[9px] text-[13px]">
-                <Checkbox
-                    checked={values.firstPackOnly}
-                    onCheckedChange={(on) =>
-                        set({ firstPackOnly: on === true })
-                    }
-                    aria-describedby={errors.firstPackOnly ? errId : undefined}
-                    className="mt-0.5"
-                />
+            <CheckRow
+                checked={values.firstPackOnly}
+                onChange={(firstPackOnly) => set({ firstPackOnly })}
+                aria-describedby={errors.firstPackOnly ? errId : undefined}
+                className="mt-1 items-start gap-[9px]"
+                boxClassName="mt-0.5"
+            >
                 <span>
                     Only for someone&apos;s first pack
                     <span className="mt-0.5 block text-[12px] text-muted-foreground">
@@ -245,7 +231,7 @@ export function WhoCanBuy({ values, set, errors }: Edit) {
                         {units} pack before can buy it.
                     </span>
                 </span>
-            </label>
+            </CheckRow>
             <FieldError id={errId}>{errors.firstPackOnly}</FieldError>
         </PackSection>
     );

@@ -22,11 +22,13 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
-import { chipClass } from "@/components/shared/chip";
+import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
-import { TabIntro, textBox, useUnsaved } from "./product-settings";
+import { Field } from "@saroh/ui/field";
+import { TabIntro, useUnsaved } from "./product-settings";
 
 /**
  * What a new product starts with — how to use it, when to warn about stock,
@@ -178,8 +180,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-3">
-                                <label className="min-w-0 flex-[2_1_260px] text-[12px] font-medium">
-                                    How to use or care for it
+                                <Field
+                                    label="How to use or care for it"
+                                    className="flex-[2_1_260px] space-y-[5px]"
+                                >
                                     <Input
                                         dense
                                         value={r.howToUse}
@@ -194,12 +198,15 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 ? "Nothing — each product says"
                                                 : `All products: ${all.howToUse}`
                                         }
-                                        className="mt-[5px] w-full min-w-0"
+                                        className="w-full min-w-0"
                                     />
-                                </label>
-                                <label className="min-w-0 flex-[1_1_110px] text-[12px] font-medium">
-                                    Warn at
-                                    <input
+                                </Field>
+                                <Field
+                                    label="Warn at"
+                                    className="flex-[1_1_110px] space-y-[5px]"
+                                >
+                                    <Input
+                                        dense
                                         type="number"
                                         min={0}
                                         inputMode="numeric"
@@ -214,46 +221,25 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 : `All products: ${all?.low ?? ""}`
                                         }
                                         aria-invalid={!lowOk}
-                                        className={cn(
-                                            textBox,
-                                            "mt-[5px] block h-[34px] w-full rounded-[7px] px-[9px] font-normal",
-                                            lowOk
-                                                ? "border-border"
-                                                : "border-destructive",
-                                        )}
+                                        className="w-full min-w-0"
                                     />
-                                </label>
+                                </Field>
                                 <div className="min-w-0 flex-[1_1_100%]">
                                     <p className="mb-1.5 text-[12px] font-medium">
                                         Returns
                                     </p>
-                                    <div
-                                        role="radiogroup"
-                                        aria-label={`${r.name} returns`}
-                                        className="flex flex-wrap gap-1.5"
-                                    >
-                                        {choices.map((o) => (
-                                            <button
-                                                key={o.choice || "same"}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={
-                                                    r.returns === o.choice
-                                                }
-                                                disabled={!catalogue.canWrite}
-                                                onClick={() =>
-                                                    set(r.key, {
-                                                        returns: o.choice,
-                                                    })
-                                                }
-                                                className={chipClass(
-                                                    r.returns === o.choice,
-                                                )}
-                                            >
-                                                {o.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <ChipGroup
+                                        label={`${r.name} returns`}
+                                        value={r.returns}
+                                        onChange={(returns) =>
+                                            set(r.key, { returns })
+                                        }
+                                        disabled={!catalogue.canWrite}
+                                        choices={choices.map((o) => ({
+                                            value: o.choice,
+                                            label: o.label,
+                                        }))}
+                                    />
                                 </div>
                             </div>
                             {catalogue.canWrite
@@ -343,28 +329,19 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                         </Button>
                     </div>
                     {hit.count > 0 ? (
-                        <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={applyExisting}
-                            onClick={() => setApplyExisting((v) => !v)}
-                            className="mt-[9px] flex items-center gap-[9px] text-left text-[12.5px] text-foreground/75 coarse:min-h-11"
+                        <CheckRow
+                            checked={applyExisting}
+                            onChange={setApplyExisting}
+                            className="mt-[9px] gap-[9px] text-[12.5px] text-foreground/75"
                         >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "size-4 shrink-0 rounded-[4px]",
-                                    applyExisting
-                                        ? "bg-foreground"
-                                        : "border-[1.5px] border-border-strong bg-card",
-                                )}
-                            />
-                            Also update the {hit.count} saved{" "}
-                            {plural(hit.count, "product")} still using an old
-                            value
-                            {hit.where ? ` (${hit.where})` : ""}. Products with
-                            their own value are left alone.
-                        </button>
+                            <span>
+                                Also update the {hit.count} saved{" "}
+                                {plural(hit.count, "product")} still using an
+                                old value
+                                {hit.where ? ` (${hit.where})` : ""}. Products
+                                with their own value are left alone.
+                            </span>
+                        </CheckRow>
                     ) : null}
                 </div>
             ) : null}

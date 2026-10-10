@@ -1,18 +1,16 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { useId, useState } from "react";
 
+import { RadioCards } from "@/components/shared/choice-group";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { runAction } from "@/lib/api/run-action";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import type { HandRefundChoice } from "@/lib/orders/hand-refund";
 import { handRefundAmount, handRefundVerb } from "@/lib/orders/hand-refund";
 import { PAID_HOW } from "@/lib/orders/paid-how";
-
-const CHOICE =
-    "flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-border px-3 py-2 text-[13px] transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active coarse:min-h-11";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 
 /**
  * "Record this order as paid?" (#834): asks how the business was paid —
@@ -34,6 +32,7 @@ export function RecordPaidDialog({
     refund = false,
     left,
     format,
+    currency = "INR",
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -56,6 +55,8 @@ export function RecordPaidDialog({
      */
     left?: number;
     format?: (amount: number) => string;
+    /** The order's currency, for the amount box. */
+    currency?: string;
 }) {
     const id = useId();
     const [how, setHow] = useState<PaymentMethod | null>(initial ?? null);
@@ -66,7 +67,7 @@ export function RecordPaidDialog({
     const words = recordWords(refund);
     const amounts =
         refund && format !== undefined && left !== undefined && left > 0
-            ? { left, format }
+            ? { left, format, currency }
             : null;
     const amount = amounts
         ? handRefundAmount(choice, typed, amounts.left, amounts.format)
@@ -108,63 +109,34 @@ export function RecordPaidDialog({
                     >
                         How much went back?
                     </legend>
-                    <RadioGroup
-                        aria-labelledby={`${id}-much`}
+                    <RadioCards
+                        labelledBy={`${id}-much`}
                         value={choice}
-                        onValueChange={(v) => setChoice(v as HandRefundChoice)}
-                        className="grid gap-2 sm:grid-cols-2"
-                    >
-                        <label htmlFor={`${id}-full`} className={CHOICE}>
-                            <RadioGroupItem id={`${id}-full`} value="full" />
-                            <span className="min-w-0 flex-1">Full amount</span>
-                            <span className="tabular-nums text-muted-foreground">
-                                {amounts.format(amounts.left)}
-                            </span>
-                        </label>
-                        <label htmlFor={`${id}-another`} className={CHOICE}>
-                            <RadioGroupItem
-                                id={`${id}-another`}
-                                value="another"
-                            />
-                            Another amount
-                        </label>
-                    </RadioGroup>
+                        onChange={setChoice}
+                        className="sm:grid-cols-2"
+                        options={[
+                            {
+                                value: "full",
+                                label: "Full amount",
+                                aside: amounts.format(amounts.left),
+                            },
+                            { value: "another", label: "Another amount" },
+                        ]}
+                    />
                     {choice === "another" ? (
-                        <div className="grid gap-1">
-                            <label
-                                htmlFor={`${id}-amount`}
-                                className="text-[12px] font-medium"
-                            >
-                                Amount handed back, in rupees
-                            </label>
-                            <Input
-                                id={`${id}-amount`}
-                                type="text"
-                                inputMode="decimal"
+                        <Field
+                            label="Amount handed back"
+                            error={amount.kind === "bad" ? amount.error : null}
+                        >
+                            <MoneyInput
+                                currency={amounts.currency}
                                 autoComplete="off"
                                 value={typed}
-                                onChange={(e) => setTyped(e.target.value)}
+                                onValueChange={setTyped}
                                 placeholder={`Up to ${amounts.format(amounts.left)}`}
-                                aria-invalid={
-                                    amount.kind === "bad" || undefined
-                                }
-                                aria-describedby={
-                                    amount.kind === "bad"
-                                        ? `${id}-amount-help`
-                                        : undefined
-                                }
-                                className="tabular-nums sm:w-[160px]"
+                                className="sm:w-[160px]"
                             />
-                            {amount.kind === "bad" ? (
-                                <p
-                                    id={`${id}-amount-help`}
-                                    role="alert"
-                                    className="text-[12px] text-destructive-subtle-foreground"
-                                >
-                                    {amount.error}
-                                </p>
-                            ) : null}
-                        </div>
+                        </Field>
                     ) : null}
                 </fieldset>
             ) : null}
@@ -175,26 +147,13 @@ export function RecordPaidDialog({
                 >
                     {words.legend}
                 </legend>
-                <RadioGroup
-                    aria-labelledby={`${id}-legend`}
-                    value={how ?? ""}
-                    onValueChange={(v) => setHow(v as PaymentMethod)}
-                    className="grid gap-2 sm:grid-cols-2"
-                >
-                    {PAID_HOW.map((w) => (
-                        <label
-                            key={w.value}
-                            htmlFor={`${id}-${w.value}`}
-                            className={CHOICE}
-                        >
-                            <RadioGroupItem
-                                id={`${id}-${w.value}`}
-                                value={w.value}
-                            />
-                            {w.label}
-                        </label>
-                    ))}
-                </RadioGroup>
+                <RadioCards
+                    labelledBy={`${id}-legend`}
+                    value={how}
+                    onChange={setHow}
+                    className="sm:grid-cols-2"
+                    options={PAID_HOW}
+                />
                 {tried && how === null ? (
                     <p
                         role="alert"

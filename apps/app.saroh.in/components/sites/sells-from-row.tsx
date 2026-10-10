@@ -2,11 +2,11 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { RadioCards } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
@@ -209,35 +209,19 @@ function SellsFromSheet({
                 >
                     {SELLS_FROM_QUESTION}
                 </legend>
-                <RadioGroup
-                    aria-labelledby={`${id}-legend`}
-                    value={picked ?? ""}
-                    onValueChange={setPicked}
-                    className="grid gap-2"
-                >
-                    {sellsFrom.choices.map((choice) => (
-                        <label
-                            key={choice.id}
-                            htmlFor={`${id}-${choice.id}`}
-                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 text-sm transition-colors duration-fast hover:bg-muted active:bg-accent-active"
-                        >
-                            <RadioGroupItem
-                                id={`${id}-${choice.id}`}
-                                value={choice.id}
-                            />
-                            <span className="min-w-0 flex-1">
-                                <span className="block font-medium">
-                                    {choice.name}
-                                </span>
-                                <span className="block text-xs text-muted-foreground">
-                                    {choice.products === 1
-                                        ? "1 product"
-                                        : `${choice.products} products`}
-                                </span>
-                            </span>
-                        </label>
-                    ))}
-                </RadioGroup>
+                <RadioCards
+                    labelledBy={`${id}-legend`}
+                    value={picked}
+                    onChange={setPicked}
+                    options={sellsFrom.choices.map((choice) => ({
+                        value: choice.id,
+                        label: choice.name,
+                        note:
+                            choice.products === 1
+                                ? "1 product"
+                                : `${choice.products} products`,
+                    }))}
+                />
             </fieldset>
             {tried && !picked ? (
                 <p role="alert" className={PROBLEM}>

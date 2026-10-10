@@ -6,6 +6,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useId, useState } from "react";
 
 import type { ReviewerVerdict } from "@/lib/sites/service";
+import { Field } from "@saroh/ui/field";
 
 /** The API's own floor and cap on a reason (`CreateApprovalDto.reason`). */
 export const REASON_MIN = 3;
@@ -56,31 +57,20 @@ export function VerdictControls({
     if (asking) {
         return (
             <div className="grid w-full gap-2">
-                <label htmlFor={fieldId} className="text-xs font-medium">
-                    What needs changing?
-                </label>
-                <Textarea
-                    id={fieldId}
-                    value={reason}
-                    rows={3}
-                    maxLength={REASON_MAX}
-                    autoFocus
-                    aria-invalid={problem ? true : undefined}
-                    aria-describedby={problem ? `${fieldId}-error` : undefined}
-                    onChange={(e) => {
-                        setReason(e.target.value);
-                        if (problem) setProblem(null);
-                    }}
-                    placeholder="The opening hours on Home are last season's."
-                />
-                {problem ? (
-                    <p
-                        id={`${fieldId}-error`}
-                        className="text-xs text-destructive"
-                    >
-                        {problem}
-                    </p>
-                ) : null}
+                <Field label="What needs changing?" error={problem}>
+                    <Textarea
+                        id={fieldId}
+                        value={reason}
+                        rows={3}
+                        maxLength={REASON_MAX}
+                        autoFocus
+                        onChange={(e) => {
+                            setReason(e.target.value);
+                            if (problem) setProblem(null);
+                        }}
+                        placeholder="The opening hours on Home are last season's."
+                    />
+                </Field>
                 <div className="flex gap-2">
                     <Button
                         type="button"

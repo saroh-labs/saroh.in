@@ -46,6 +46,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { runAction } from "@/lib/api/run-action";
+import { Segmented } from "@saroh/ui/segmented";
 import {
     StepHeading,
     WebhookAddressStep,
@@ -549,32 +550,15 @@ function MessagingForm({
     return (
         <>
             <FormSheetBody className="gap-4">
-                <div
-                    role="radiogroup"
-                    aria-label="Channel"
-                    className="grid grid-cols-2 gap-[5px]"
-                >
-                    {(Object.keys(CHANNELS) as CommsChannel[]).map((key) => (
-                        <label
-                            key={key}
-                            className={cn(
-                                "flex cursor-pointer items-center justify-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                                channel === key
-                                    ? "border-border-strong bg-foreground/[0.03] font-semibold"
-                                    : "border-muted font-medium hover:border-border-strong",
-                            )}
-                        >
-                            <input
-                                type="radio"
-                                name="comms-channel"
-                                className="sr-only"
-                                checked={channel === key}
-                                onChange={() => pickChannel(key)}
-                            />
-                            {CHANNELS[key].label}
-                        </label>
-                    ))}
-                </div>
+                <Segmented
+                    label="Channel"
+                    block
+                    value={channel}
+                    onValueChange={pickChannel}
+                    options={(Object.keys(CHANNELS) as CommsChannel[]).map(
+                        (key) => ({ value: key, label: CHANNELS[key].label }),
+                    )}
+                />
 
                 <Connected
                     rows={connected

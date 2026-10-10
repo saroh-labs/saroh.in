@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { PlanWay } from "@/components/billing/plan-way";
+import { RadioCards } from "@/components/shared/choice-group";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -519,9 +520,9 @@ function Permissions({
                                     key={c.action}
                                     className="flex items-center gap-3 border-t border-border py-[9px]"
                                 >
-                                    <label
+                                    <Label
                                         htmlFor={id}
-                                        className="min-w-0 flex-1"
+                                        className="min-w-0 flex-1 text-[13px] font-normal leading-normal"
                                     >
                                         <span className="block text-[13px]">
                                             {c.label}
@@ -536,7 +537,7 @@ function Permissions({
                                                 {NOT_YOURS_TO_GIVE}
                                             </span>
                                         ) : null}
-                                    </label>
+                                    </Label>
                                     <Switch
                                         id={id}
                                         checked={checked}
@@ -802,23 +803,17 @@ function NewRoleSheet({
                 <legend className="mb-1.5 text-sm font-medium">
                     Start from
                 </legend>
-                {START_FROM.map((option) => (
-                    <label
-                        key={option.key || "blank"}
-                        className="flex cursor-pointer items-start gap-2.5 text-[13px] coarse:min-h-11 coarse:items-center"
-                    >
-                        <input
-                            type="radio"
-                            name="start-from"
-                            value={option.key}
-                            checked={from === option.key}
-                            onChange={() => setFrom(option.key)}
-                            disabled={pending}
-                            className="mt-[3px] accent-foreground coarse:mt-0"
-                        />
-                        <span>{option.label}</span>
-                    </label>
-                ))}
+                <RadioCards
+                    label="Start from"
+                    value={from}
+                    onChange={setFrom}
+                    disabled={pending}
+                    options={START_FROM.map((option) => ({
+                        value: option.key,
+                        label: option.label,
+                    }))}
+                    rowClassName="font-normal"
+                />
                 <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
                     A copy, not a link. Changing this role later does not change
                     the one it started from.

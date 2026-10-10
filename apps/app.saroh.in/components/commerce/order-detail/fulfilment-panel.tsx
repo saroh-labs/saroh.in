@@ -15,14 +15,16 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { chipClass } from "@/components/shared/chip";
+import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
 interface AddressDraft {
     line1: string;
     city: string;
@@ -72,6 +74,8 @@ interface FulfilmentProps {
     first: string;
     /** The delivery charge now, in major units. */
     shipping: number;
+    /** The order's currency, for the charge box. */
+    currency: string;
     address: DeliveryAddress | null;
     paid: PaidHow;
     /** Where money handed back goes: "Razorpay", "the till". */
@@ -92,6 +96,7 @@ function FulfilmentDraft({
     options,
     first,
     shipping,
+    currency,
     address,
     paid,
     refundTo,
@@ -151,27 +156,15 @@ function FulfilmentDraft({
     return (
         <>
             <OrderSheetBody>
-                <div
-                    role="radiogroup"
-                    aria-label="Fulfilment"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {options.map((o) => {
-                        const on = pick === o.type;
-                        return (
-                            <button
-                                key={o.type}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => choose(o.type)}
-                                className={chipClass(on)}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <ChipGroup
+                    label="Fulfilment"
+                    value={pick}
+                    onChange={choose}
+                    choices={options.map((o) => ({
+                        value: o.type,
+                        label: o.label,
+                    }))}
+                />
                 {moved && delivery ? (
                     <fieldset className="mt-2.5">
                         <legend className="text-[12px] font-medium">
@@ -234,32 +227,27 @@ function FulfilmentDraft({
                     </fieldset>
                 ) : null}
                 {moved ? (
-                    <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
-                        Delivery charge
-                        <Input
+                    <Field label="Delivery charge" className="mt-2.5 w-[140px]">
+                        <MoneyInput
                             dense
-                            type="text"
-                            inputMode="decimal"
+                            currency={currency}
                             value={charge}
-                            onChange={(e) => setCharge(e.target.value)}
-                            placeholder="₹"
+                            onValueChange={setCharge}
                             aria-invalid={typed.kind === "bad" || undefined}
                             aria-describedby={`${ids}-note`}
-                            className="w-full tabular-nums"
+                            className="w-full"
                         />
-                    </label>
+                    </Field>
                 ) : null}
                 {moved ? (
                     canTell ? (
-                        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
-                            <input
-                                type="checkbox"
-                                checked={tell}
-                                onChange={(e) => setTell(e.target.checked)}
-                                className={cn(FOCUS, "size-4 cursor-pointer")}
-                            />
+                        <CheckRow
+                            checked={tell}
+                            onChange={setTell}
+                            className="mt-2 text-[12.5px]"
+                        >
                             Tell {first} in their messages
-                        </label>
+                        </CheckRow>
                     ) : (
                         <p className="mt-2 text-[12px] text-muted-foreground">
                             Nothing is sent to {first} — let them know by email

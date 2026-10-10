@@ -16,9 +16,13 @@ export const STOREFRONTS_HREF = "/commerce/locations";
 export function VisitsField({
     value,
     onChange,
+    error,
+    onLeave,
 }: {
     value: string;
     onChange: (value: string) => void;
+    error?: string | null;
+    onLeave?: () => void;
 }) {
     return (
         <NumberField
@@ -26,6 +30,8 @@ export function VisitsField({
             value={value}
             onChange={onChange}
             width="w-[90px]"
+            error={error}
+            onLeave={onLeave}
         />
     );
 }

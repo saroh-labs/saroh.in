@@ -13,6 +13,7 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 
+import { CheckRow } from "@/components/shared/check-row";
 import type {
     EnquiryContent,
     EnquiryField,
@@ -161,18 +162,15 @@ export function EnquiryFields({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    checked={field.required ?? false}
-                                    onChange={(e) =>
-                                        patchField(i, {
-                                            required: e.target.checked,
-                                        })
-                                    }
-                                />
+                            <CheckRow
+                                checked={field.required ?? false}
+                                onChange={(required) =>
+                                    patchField(i, { required })
+                                }
+                                className="text-sm"
+                            >
                                 Required
-                            </label>
+                            </CheckRow>
                         </div>
                     </div>
                 ))}

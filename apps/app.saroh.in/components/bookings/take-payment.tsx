@@ -29,6 +29,8 @@ import {
     deskProblem,
     deskTakenText,
 } from "@/lib/services/desk-pay";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Tip } from "@saroh/ui/tooltip";
 
 /**
@@ -194,31 +196,48 @@ export function TakePayment({
                         </div>
                         {choice === "CASH" ? (
                             <div className="flex flex-wrap items-end gap-2.5">
-                                <label
-                                    htmlFor={ids.given}
-                                    className="flex-[1_1_140px] text-[12px] font-medium"
+                                <Field
+                                    label="Cash given"
+                                    className="flex-[1_1_140px]"
                                 >
-                                    Cash given
-                                    <Input
-                                        id={ids.given}
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={given}
-                                        onChange={(e) => {
-                                            setGiven(e.target.value);
-                                            setError(null);
-                                        }}
-                                        placeholder={amount}
-                                        autoComplete="off"
-                                        aria-invalid={
-                                            problem ? true : undefined
-                                        }
-                                        aria-describedby={
-                                            problem ? ids.error : undefined
-                                        }
-                                        className="mt-[5px] bg-card px-2.5"
-                                    />
-                                </label>
+                                    {currency ? (
+                                        <MoneyInput
+                                            currency={currency}
+                                            value={given}
+                                            onValueChange={(next) => {
+                                                setGiven(next);
+                                                setError(null);
+                                            }}
+                                            placeholder={amount}
+                                            aria-invalid={
+                                                problem ? true : undefined
+                                            }
+                                            aria-describedby={
+                                                problem ? ids.error : undefined
+                                            }
+                                            className="bg-card"
+                                        />
+                                    ) : (
+                                        <Input
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={given}
+                                            onChange={(e) => {
+                                                setGiven(e.target.value);
+                                                setError(null);
+                                            }}
+                                            placeholder={amount}
+                                            autoComplete="off"
+                                            aria-invalid={
+                                                problem ? true : undefined
+                                            }
+                                            aria-describedby={
+                                                problem ? ids.error : undefined
+                                            }
+                                            className="bg-card"
+                                        />
+                                    )}
+                                </Field>
                                 <div
                                     aria-live="polite"
                                     className={cn(

@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { trimmedOr } from "@/lib/forms/values";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
 
@@ -33,6 +34,7 @@ export function CreateStoreForm() {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             name: "",
             description: "",
@@ -61,7 +63,7 @@ export function CreateStoreForm() {
         <Form {...form}>
             <form
                 onKeyDown={submitOnModEnter}
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid max-w-md gap-4"
             >
                 <FormField

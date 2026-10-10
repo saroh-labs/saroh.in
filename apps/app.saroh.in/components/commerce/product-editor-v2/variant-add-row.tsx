@@ -7,9 +7,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
-import { MoneyBox } from "./fields";
 
 /**
  * "Add a variant": a value, a SKU (the store's pattern suggests one) and a
@@ -26,7 +26,7 @@ export function VariantAddRow({
     sku,
     suggested,
     price,
-    symbol,
+    currency,
     productPrice,
     skuBad,
     priceBad,
@@ -46,7 +46,8 @@ export function VariantAddRow({
     sku: string;
     suggested: string;
     price: string;
-    symbol: string;
+    /** The business's currency, for the price box. */
+    currency: string;
     productPrice: string;
     skuBad: boolean;
     priceBad: boolean;
@@ -88,19 +89,16 @@ export function VariantAddRow({
                     placeholder={suggested || "SKU"}
                     className="font-mono"
                 />
-                <MoneyBox symbol={symbol} small>
-                    <Input
-                        dense
-                        aria-invalid={priceBad}
-                        value={price}
-                        onChange={(e) => onPrice(e.target.value)}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder={productPrice}
-                        aria-label="New variant price, blank uses the product's"
-                        className="pl-[22px]"
-                    />
-                </MoneyBox>
+                <MoneyInput
+                    dense
+                    currency={currency}
+                    aria-invalid={priceBad}
+                    value={price}
+                    onValueChange={onPrice}
+                    disabled={locked}
+                    placeholder={productPrice}
+                    aria-label="New variant price, blank uses the product's"
+                />
             </div>
             <div className="mt-[9px] flex flex-wrap items-center gap-2.5">
                 <Button
@@ -144,30 +142,17 @@ export function OptionChoice({
     return (
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-medium">Customers choose by</span>
-            <div
-                role="radiogroup"
-                aria-label="Option name"
-                className="flex flex-wrap gap-[5px]"
-            >
-                {options.map((o) => {
-                    const on = o.id === optionId;
-                    return (
-                        <button
-                            key={o.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => {
-                                if (!on) onPick(o);
-                            }}
-                            className={chipClass(on)}
-                        >
-                            {o.name}
-                        </button>
-                    );
-                })}
-            </div>
+            <ChipGroup
+                label="Option name"
+                className="gap-[5px]"
+                value={optionId}
+                onChange={(id) => {
+                    const option = options.find((o) => o.id === id);
+                    if (option) onPick(option);
+                }}
+                disabled={locked}
+                choices={options.map((o) => ({ value: o.id, label: o.name }))}
+            />
             <TextLink
                 href={productSettingsHref("options")}
                 className="text-[12px]"

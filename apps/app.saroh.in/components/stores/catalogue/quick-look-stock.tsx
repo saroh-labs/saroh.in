@@ -5,7 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { stockWords } from "@/lib/products/catalogue";
@@ -24,6 +24,7 @@ import {
 import { addedWords } from "@/lib/stock/levels";
 
 import { runAction } from "@/lib/api/run-action";
+import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";
 import { TONE_TEXT } from "./tones";
 
@@ -42,6 +43,7 @@ export function StockBlock({
     canStock: boolean;
     onChanged: () => void;
 }) {
+    const addId = useId();
     const stock = useMemo(() => quickStock(row, storeId), [row, storeId]);
     const where = row.places.filter((p) =>
         stock.shelves.some((s) => s.storeIds.includes(p.storeId)),
@@ -88,9 +90,15 @@ export function StockBlock({
             {showShelves(stock) ? (
                 <>
                     {canStock && where.length > 1 ? (
-                        <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                            Add at
+                        <div className="flex items-center gap-2">
+                            <Label
+                                htmlFor={`${addId}-add-at`}
+                                className="text-[12px] font-normal text-muted-foreground"
+                            >
+                                Add at
+                            </Label>
                             <OptionSelect
+                                id={`${addId}-add-at`}
                                 size="sm"
                                 value={addAt ?? ""}
                                 onValueChange={setAddAt}
@@ -100,7 +108,7 @@ export function StockBlock({
                                 }))}
                                 className="w-auto min-w-[140px]"
                             />
-                        </label>
+                        </div>
                     ) : null}
                     {stock.shelves.map((s) => (
                         <ShelfRow

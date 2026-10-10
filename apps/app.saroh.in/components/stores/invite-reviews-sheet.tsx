@@ -1,11 +1,11 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
 import { showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
+import { CheckRow } from "@/components/shared/check-row";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { useHold } from "@/components/shared/use-hold";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -180,14 +180,12 @@ export function InviteReviewsSheet({
                             const on = picked.has(o.id);
                             return (
                                 <li key={o.id}>
-                                    <label className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2">
-                                        <Checkbox
-                                            checked={on}
-                                            disabled={!on && full}
-                                            onCheckedChange={(v) =>
-                                                toggle(o.id, v === true)
-                                            }
-                                        />
+                                    <CheckRow
+                                        checked={on}
+                                        disabled={!on && full}
+                                        onChange={(v) => toggle(o.id, v)}
+                                        className="min-h-12 gap-3 px-3 py-2"
+                                    >
                                         <span className="min-w-0 flex-1">
                                             <span className="block truncate text-[13px] font-medium">
                                                 {o.customerName ??
@@ -202,7 +200,7 @@ export function InviteReviewsSheet({
                                                 <ViewerDate iso={o.placedAt} />
                                             </span>
                                         </span>
-                                    </label>
+                                    </CheckRow>
                                 </li>
                             );
                         })}

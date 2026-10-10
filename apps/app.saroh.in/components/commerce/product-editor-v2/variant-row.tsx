@@ -12,10 +12,12 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { Chip } from "@/components/shared/chip";
+import { ChoiceGroup } from "@/components/shared/choice-group";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
-import { FieldHelp, MoneyBox } from "./fields";
+import { FieldHelp } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";
@@ -34,7 +36,7 @@ export function VariantRowView({
     takenIds,
     skuDupe,
     error,
-    symbol,
+    currency,
     productPrice,
     photos,
     stores,
@@ -53,7 +55,8 @@ export function VariantRowView({
     takenIds: string[];
     skuDupe: boolean;
     error: string;
-    symbol: string;
+    /** The business's currency, for the price box. */
+    currency: string;
     productPrice: string;
     photos: ProductImage[];
     /** The business's storefronts when there is more than one; else []. */
@@ -103,21 +106,16 @@ export function VariantRowView({
                     aria-label={`Variant ${i + 1} SKU`}
                     className="font-mono"
                 />
-                <MoneyBox symbol={symbol} small>
-                    <Input
-                        dense
-                        aria-invalid={
-                            r.price.trim() !== "" && !isMoney(r.price)
-                        }
-                        value={r.price}
-                        onChange={(e) => onChange({ price: e.target.value })}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder={productPrice}
-                        aria-label={`Variant ${i + 1} price, blank uses the product's`}
-                        className="pl-[22px]"
-                    />
-                </MoneyBox>
+                <MoneyInput
+                    dense
+                    currency={currency}
+                    aria-invalid={r.price.trim() !== "" && !isMoney(r.price)}
+                    value={r.price}
+                    onValueChange={(price) => onChange({ price })}
+                    disabled={locked}
+                    placeholder={productPrice}
+                    aria-label={`Variant ${i + 1} price, blank uses the product's`}
+                />
                 <Tip label={`Remove ${title || "this variant"}`}>
                     <IconButton
                         label={`Remove ${title || "this variant"}`}
@@ -206,28 +204,16 @@ function PhotoChoice({
             <p className="mb-[7px] text-[12px] font-semibold">
                 Photo shown when someone picks it
             </p>
-            <div
-                role="radiogroup"
-                aria-label={`Photo for ${title || "this variant"}`}
+            <ChoiceGroup
+                label={`Photo for ${title || "this variant"}`}
                 className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((p) => {
-                    const on = imageId === p.id;
-                    return (
-                        <button
-                            key={p.id || "cover"}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => onPick(p.id)}
-                            className={cn(
-                                "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-[1.5px] border-foreground"
-                                    : "border border-border",
-                            )}
-                        >
+                value={imageId}
+                onChange={onPick}
+                disabled={locked}
+                choices={choices.map((p) => ({
+                    value: p.id,
+                    label: (
+                        <>
                             {p.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos
                                 <img
@@ -241,10 +227,18 @@ function PhotoChoice({
                             <span className="max-w-[110px] truncate text-[11.5px]">
                                 {p.label}
                             </span>
-                        </button>
-                    );
-                })}
-            </div>
+                        </>
+                    ),
+                }))}
+                itemClassName={(on) =>
+                    cn(
+                        "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 coarse:h-11",
+                        on
+                            ? "border-[1.5px] border-foreground"
+                            : "border border-border",
+                    )
+                }
+            />
             <FieldHelp className="mt-1.5">
                 Chosen from this product&apos;s photos — nothing new to upload.
             </FieldHelp>
@@ -285,10 +279,10 @@ function SellItAt({
                 {stores.map((s) => {
                     const on = chosen.includes(s.id);
                     return (
-                        <button
+                        <Chip
                             key={s.id}
-                            type="button"
-                            aria-pressed={on}
+                            as="toggle"
+                            on={on}
                             disabled={locked}
                             onClick={() =>
                                 onChange(
@@ -297,10 +291,9 @@ function SellItAt({
                                         : [...chosen, s.id],
                                 )
                             }
-                            className={chipClass(on)}
                         >
                             {s.name}
-                        </button>
+                        </Chip>
                     );
                 })}
             </div>

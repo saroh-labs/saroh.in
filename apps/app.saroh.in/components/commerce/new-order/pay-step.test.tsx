@@ -25,6 +25,7 @@ describe("handed over now (UX-059)", () => {
             <PayStep
                 options={[{ key: "CASH", label: "Cash", off: null }]}
                 pay="CASH"
+                currency="INR"
                 onPay={() => undefined}
                 given=""
                 onGiven={() => undefined}

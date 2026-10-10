@@ -1,7 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-
+import { RadioCards } from "@/components/shared/choice-group";
 import type { CollectionKind } from "@/lib/collections/service";
 
 const KINDS: { value: CollectionKind; label: string; note: string }[] = [
@@ -52,50 +51,13 @@ export function KindChoice({
             <legend className="mb-2 text-[12.5px] font-medium">
                 How it fills
             </legend>
-            <div role="radiogroup" className="flex flex-col gap-2">
-                {KINDS.map((k) => {
-                    const on = k.value === value;
-                    return (
-                        <button
-                            key={k.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={disabled}
-                            onClick={() => onChange(k.value)}
-                            className={cn(
-                                "flex w-full items-start gap-2.5 rounded-[9px] border bg-card px-3 py-2.5 text-left coarse:min-h-11",
-                                on
-                                    ? "border-foreground"
-                                    : "border-border hover:bg-muted",
-                                disabled && "cursor-not-allowed bg-disabled",
-                            )}
-                        >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-[1.5px]",
-                                    on
-                                        ? "border-foreground"
-                                        : "border-border-strong",
-                                )}
-                            >
-                                {on ? (
-                                    <span className="size-2 rounded-full bg-foreground" />
-                                ) : null}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                                <span className="block text-[13px] font-semibold">
-                                    {k.label}
-                                </span>
-                                <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                                    {k.note}
-                                </span>
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+            <RadioCards
+                label="How it fills"
+                value={value}
+                onChange={onChange}
+                disabled={disabled}
+                options={KINDS}
+            />
         </fieldset>
     );
 }
