@@ -166,7 +166,7 @@ export function offNote(input: {
     }
     if (input.taken > 0) {
         return {
-            text: `${input.taken} ${input.taken === 1 ? "booking falls" : "bookings fall"} in this time. They're kept — move or cancel them from the calendar.`,
+            text: `${input.taken} ${input.taken === 1 ? "booking falls" : "bookings fall"} in this time. They're kept. Move or cancel them from the calendar.`,
             tone: "warn",
         };
     }

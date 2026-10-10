@@ -70,6 +70,19 @@ field, a merge), each opened by its own trigger so the keyboard returns to
 it, and `ConfirmDialog` (`returnFocusTo`) before a delete. No row turns
 into a form, and the task finishes inside what opened.
 
+The same goes for adding to a list: the list, then one button that opens
+the sheet, never fields left open under the rows. Where the screen has its
+own Save bar (Availability's Time off, `add-time-off-sheet.tsx`), the
+sheet's button adds to the page's draft and the sheet says so. One or two
+short choices inside a dense grid (a time range in a week's row,
+`weekly-hours.tsx`) open in a popover over the row, so no other row moves.
+Two addresses that show the same records are one screen with a segmented
+switch on both (`bookings-view-switch.tsx`, `leads-view-switch.tsx`), not a
+loose button to the other. And a small job is finished where it started:
+a button that only needs a name or a choice opens its dialog there
+(the calendar's "Add someone") instead of sending the merchant to another
+page.
+
 ## Rules
 
 - **Current** — **Schema first.** A `z.object` at the top defines validation and
