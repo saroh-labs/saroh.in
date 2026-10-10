@@ -18,6 +18,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { AuthUser } from "../../common/types/store-context";
 import { authorize } from "../organizations/organization-policy";
 import { CreateStoreDto, UpdateStoreDto } from "./dto";
+import { LocationLogoService } from "./location-logo.service";
 import { StoresService } from "./stores.service";
 
 /**
@@ -28,7 +29,10 @@ import { StoresService } from "./stores.service";
 @Controller("stores")
 @UseGuards(BetterAuthGuard)
 export class StoresController {
-    constructor(private readonly storesService: StoresService) {}
+    constructor(
+        private readonly storesService: StoresService,
+        private readonly locationLogo: LocationLogoService,
+    ) {}
 
     @Get()
     list(@CurrentUser() user: AuthUser) {
@@ -58,9 +62,13 @@ export class StoresController {
         );
     }
 
+    /**
+     * The location, with its own logo, the business's and the one to show
+     * (`ownLogo`, `businessLogo`, `effectiveLogo`; DEC-123).
+     */
     @Get(":id")
     get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-        return this.storesService.getForUser(id, user.id);
+        return this.locationLogo.read(user.id, id);
     }
 
     /** A setting: refused while the business is closing or suspended (DEC-120). */
@@ -71,6 +79,6 @@ export class StoresController {
         @Param("id") id: string,
         @Body() dto: UpdateStoreDto,
     ) {
-        return this.storesService.updateForUser(user.id, id, dto);
+        return this.locationLogo.update(user.id, id, dto);
     }
 }

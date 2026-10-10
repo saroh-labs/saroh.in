@@ -3,6 +3,7 @@ import { FailedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
+import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
@@ -49,7 +50,8 @@ import { withClosures } from "@/lib/staff/time-off";
  * and the screen says free times are missing. The bookings read failing is
  * the page failing — a diary with nothing in it would be a lie.
  *
- * The register this page used to be lives on at /bookings/all.
+ * The register this page used to be lives on at /bookings/all, the List
+ * side of the header's Calendar | List switch.
  */
 export const metadata = { title: "Bookings" };
 
@@ -134,7 +136,9 @@ export default async function BookingsPage({
     if (!calendar) {
         return (
             <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Calendar" />
+                <BookingsTopBar page="Calendar">
+                    <BookingsViewSwitch current="calendar" />
+                </BookingsTopBar>
                 <div className="px-[22px] pb-6 pt-[18px]">
                     <FailedState
                         title="Couldn't load the calendar"

@@ -286,6 +286,28 @@ export class MediaService {
             );
         }
 
+        // The same for a location that uses it as its own logo (DEC-123).
+        const asLocationLogo = await prisma.store.count({
+            where: { logoMediaId: media.id, deletedAt: null },
+        });
+        if (asLocationLogo > 0) {
+            throw new ConflictException(
+                "This image is a location's logo. Replace it there, or use your business logo, before deleting it.",
+            );
+        }
+
+        // A site's own icon (DEC-124): saved, perhaps not yet published, so
+        // the published-site check above does not see it. Deleting it would
+        // put a broken image in the tab at the next publish.
+        const asIcon = await prisma.site.count({
+            where: { iconMediaId: media.id },
+        });
+        if (asIcon > 0) {
+            throw new ConflictException(
+                "This image is your site icon. Remove it in Website settings before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 

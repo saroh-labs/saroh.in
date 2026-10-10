@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
@@ -50,6 +51,8 @@ import {
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
+import { AddPersonDialog } from "../availability/add-person-dialog";
+import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
 import { DayByPerson } from "./day-by-person";
@@ -164,6 +167,7 @@ export function CalendarScreen({
     const [peek, setPeek] = useState<string | null>(null);
     const [gap, setGap] = useState<GapTarget | null>(null);
     const [hours, setHours] = useState<HoursTarget | null>(null);
+    const [addingPerson, setAddingPerson] = useState(false);
     const [phonePerson, setPhonePerson] = useState<string | null>(null);
 
     const calendar = useMemo(
@@ -519,6 +523,7 @@ export function CalendarScreen({
     return (
         <>
             <BookingsTopBar page="Calendar">
+                <BookingsViewSwitch current="calendar" />
                 <div
                     role="radiogroup"
                     aria-label="Layout"
@@ -606,12 +611,13 @@ export function CalendarScreen({
                             ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
                             : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
                         {can.hours ? (
-                            <Link
-                                href="/bookings/availability"
-                                className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                            <button
+                                type="button"
+                                onClick={() => setAddingPerson(true)}
+                                className="rounded-sm font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
                             >
                                 Add who takes bookings
-                            </Link>
+                            </button>
                         ) : null}
                     </p>
                 ) : null}
@@ -663,7 +669,10 @@ export function CalendarScreen({
                                 onClosed={openClosed}
                             />
                         ) : (
-                            <NoOneYet canHours={can.hours} />
+                            <NoOneYet
+                                canHours={can.hours}
+                                onAdd={() => setAddingPerson(true)}
+                            />
                         )}
                     </>
                 ) : null}
@@ -696,7 +705,7 @@ export function CalendarScreen({
                     </AgendaMonth>
                 ) : null}
 
-                <RulesNote rules={rules} canHours={can.hours} />
+                <RulesNote rules={rules} />
             </div>
 
             <BookingQuickLook
@@ -738,6 +747,16 @@ export function CalendarScreen({
                 timezone={timezone}
                 onClose={() => setHours(null)}
             />
+            {/* Adding someone is a name and what they do, so it is done
+                here; the dialog refreshes the calendar, which gives them
+                their column. Their week is Availability's job. */}
+            {can.hours ? (
+                <AddPersonDialog
+                    open={addingPerson}
+                    onOpenChange={setAddingPerson}
+                    hoursHint="Set their hours in Availability."
+                />
+            ) : null}
         </>
     );
 }
@@ -836,36 +855,24 @@ export function rulesSentence(rules: BookingRules | null): string {
     return `${book}${cancel}. Free times are worked out from availability, minus bookings and the gap after each.`;
 }
 
-function RulesNote({
-    rules,
-    canHours,
-}: {
-    rules: BookingRules | null;
-    canHours: boolean;
-}) {
-    // The links sit on their own row, each a whole tap target on a phone:
-    // inline in the sentence, "Change hours and rules" wrapped across two
-    // lines and shared one with "Every booking as a list".
-    const link =
-        "inline-flex items-center text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground coarse:min-h-11";
+// The rules as they stand. Changing them is Availability, in the rail; the
+// calendar links there only where hours are what is missing ("Add who takes
+// bookings", "Add someone"). The list is the header's Calendar | List switch.
+function RulesNote({ rules }: { rules: BookingRules | null }) {
     return (
-        <div className="mt-3 text-[11.5px] text-muted-foreground">
-            <p>{rulesSentence(rules)}</p>
-            <div className="mt-1 flex flex-wrap gap-x-4">
-                {canHours ? (
-                    <Link href="/bookings/availability" className={link}>
-                        Change hours and rules
-                    </Link>
-                ) : null}
-                <Link href="/bookings/all" className={link}>
-                    Every booking as a list
-                </Link>
-            </div>
-        </div>
+        <p className="mt-3 text-[11.5px] text-muted-foreground">
+            {rulesSentence(rules)}
+        </p>
     );
 }
 
-function NoOneYet({ canHours }: { canHours: boolean }) {
+function NoOneYet({
+    canHours,
+    onAdd,
+}: {
+    canHours: boolean;
+    onAdd: () => void;
+}) {
     return (
         <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
             <p className="text-[14px] font-semibold">
@@ -876,12 +883,12 @@ function NoOneYet({ canHours }: { canHours: boolean }) {
                 a column here with their free times to book.
             </p>
             {canHours ? (
-                <Link
-                    href="/bookings/availability"
-                    className="mt-3 inline-flex h-[38px] items-center rounded-[9px] bg-primary px-4 text-[14px] font-semibold text-primary-foreground hover:bg-primary-hover"
+                <Button
+                    className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
+                    onClick={onAdd}
                 >
                     Add someone
-                </Link>
+                </Button>
             ) : null}
         </div>
     );

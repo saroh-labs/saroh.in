@@ -38,6 +38,11 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
+// The web address's QR button: its panel reads only when opened.
+vi.mock("@/lib/qr/actions", () => ({
+    openQrPanel: vi.fn(),
+    makeQrPanelCode: vi.fn(),
+}));
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,

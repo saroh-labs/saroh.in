@@ -52,28 +52,6 @@ export function PanelTitle({
     );
 }
 
-/**
- * A panel that opens under Items to change the order (refund, edit, courier):
- * the same card with an Ink edge, because it is the thing being worked on.
- */
-export function WorkPanel({
-    label,
-    children,
-}: {
-    label: string;
-    children: ReactNode;
-}) {
-    return (
-        <section
-            role="region"
-            aria-label={label}
-            className="min-w-0 rounded-xl border border-foreground bg-card px-4 py-3.5"
-        >
-            {children}
-        </section>
-    );
-}
-
 export type PillTone = "brand" | "success" | "neutral" | "danger";
 
 /**

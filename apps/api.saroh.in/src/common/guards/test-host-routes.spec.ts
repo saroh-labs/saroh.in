@@ -71,6 +71,9 @@ const REFUSED = [
     // saroh.in's server calls either, never a merchant's test release.
     "POST public/tools/link-preview",
     "POST public/tools/link-preview/report",
+    // saroh.in's QR code maker: its email gate stores an address and
+    // sends an email; only saroh.in's server calls it.
+    "POST public/tools/qr-code-maker/unlock",
     // saroh.in/customers' report about a business: stored for staff; only
     // saroh.in's server sends one, never a merchant's test release.
     "POST public/business-reports",
@@ -85,6 +88,9 @@ const REFUSED = [
     // Reviews, and page views (a tester's visits are not the business's).
     "POST public/product-reviews/:token/reviews",
     "POST public/sites/:siteId/analytics/events",
+    // A QR code's scan: it adds to the business's count, and a test
+    // release's host has no short links.
+    "POST public/sites/:siteId/qr/:code/scan",
 ];
 
 const routes = publicWriteRoutes(join(__dirname, "../../modules"));

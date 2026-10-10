@@ -4,10 +4,8 @@ import type { EmailSetup } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
-import {
-    BUSINESS_TYPE_ANCHOR,
-    businessTypeOf,
-} from "@/lib/organizations/business-types";
+import { businessEditHref } from "@/lib/organizations/business-rows";
+import { businessTypeOf } from "@/lib/organizations/business-types";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -184,6 +182,7 @@ export interface ReadyChecklist {
     extras?: ReadyStep[];
 }
 
+/** A Business tab, for a line that only points at where something is. */
 export const business = (section: string) =>
     `/settings/organization?${BUSINESS_TAB_PARAM}=${section}`;
 
@@ -350,7 +349,8 @@ function howToPay(
         label: "Tell customers how to pay you",
         why: "Add your UPI ID or bank details. Customers see them on every unpaid invoice, order and booking.",
         cta: "Add UPI or bank",
-        href: business("pay"),
+        // The tab, with its sheet open: the step is done there.
+        href: businessEditHref("pay"),
         broken: false,
         left: !set,
     };
@@ -379,7 +379,7 @@ function address(
             label: "Add the state to your address",
             why: "It's printed on your invoices, and GST depends on it.",
             cta: "Add state",
-            href: business("address"),
+            href: businessEditHref("address"),
             broken: false,
             left: true,
         };
@@ -390,7 +390,7 @@ function address(
         label: `Add ${yourAddress(kind)}`,
         why: "It's printed on every invoice you send.",
         cta: "Add address",
-        href: business("address"),
+        href: businessEditHref("address"),
         broken: false,
         left: !(rest && state),
     };
@@ -412,8 +412,8 @@ function businessType(
         label: "Choose your business type",
         why: "You said your business is registered. Choose which kind — private limited, LLP, partnership or another — so your business details are right before you take money.",
         cta: "Choose type",
-        // Straight to the Type field, not the top of the tab.
-        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
+        // Straight to the Type row's sheet, not the top of the tab.
+        href: businessEditHref("type"),
         broken: false,
         left: businessTypeOf(profile.type) === "",
     };
@@ -430,7 +430,7 @@ function tax(
         label: "Add your GSTIN",
         why: "So your invoices count as tax invoices.",
         cta: "Add GSTIN",
-        href: business("tax"),
+        href: businessEditHref("taxId"),
         broken: false,
         left: !filled(settings.profile?.taxId),
     };

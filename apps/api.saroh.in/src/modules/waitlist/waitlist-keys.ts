@@ -50,6 +50,9 @@ export function waitlistTemplate(
 /** The `source` of an entry the link preview tool's email gate made (KTD-5). */
 export const LINK_PREVIEW_SOURCE = "link-preview";
 
+/** The `source` of an entry the QR code maker's email gate made (QR codes plan U9). */
+export const QR_MAKER_SOURCE = "qr-maker";
+
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
 /**

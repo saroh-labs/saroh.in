@@ -15,6 +15,7 @@ import { notTakingOrders } from "../billing/paused-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
 import { takingNewActivity } from "../orders/checkout-paused";
+import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
 import {
@@ -95,6 +96,11 @@ export interface SignedInCustomer {
     organizationId: string;
     accountId: string;
     contactId: string;
+    /**
+     * The site they are signed in on, when the caller has it: where a QR
+     * code a booking names is looked up (`sites/qr-source.ts`).
+     */
+    siteId?: string;
 }
 
 /** Who takes a service, as the booking page may show them: a name and an id. */
@@ -603,6 +609,18 @@ export class PublicBookingsService {
             },
         };
         if (price) person.holdUntil = holdExpiry(now);
+        // The QR code whose scan opened the page, if its address still
+        // carried the tag: looked up on the customer's own site, outside
+        // the reservation, and never a reason to refuse the booking.
+        const sourceCode = signedIn?.siteId
+            ? await qrSourceFor(
+                  {
+                      siteId: signedIn.siteId,
+                      organizationId: service.organizationId,
+                  },
+                  input.sourceTag,
+              )
+            : null;
         let booking: Booking;
         try {
             booking = await reserve(
@@ -615,6 +633,7 @@ export class PublicBookingsService {
                     source: `booking:service:${serviceId}`,
                     actorUserId: null,
                     account,
+                    sourceCode,
                 },
                 also,
                 person,

@@ -4,7 +4,9 @@
  * merchants' own trackers, owner's wording 8 Oct, rev 44; Vercel removed,
  * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (rev 68: a business's duty for a child's data, under Age; rev 69: PostHog, for errors and setup steps): Data
  * Fiduciary and Data Processor named, security logs kept 1 year, 180 days
- * after closing, suspended accounts, and "If there's a breach"). Published VERBATIM at
+ * after closing, suspended accounts, and "If there's a breach"; the QR code
+ * maker's email, 10 Oct, is NOT YET in the owner's doc: a minimal factual
+ * addition for the owner to review). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -40,7 +42,7 @@ If your website uses analytics or advertising tools that you connect (such as Go
 | Account | Name, email, phone, password (stored hashed), your role | To sign you in and run your account |
 | Business | Business name, address, GSTIN, locations, team members | To run Saroh for your business and put the right details on invoices |
 | Billing | Your plan, invoices from Saroh, payment status | To bill you. Card and UPI details are handled by Razorpay; we never see or store full card numbers |
-| Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, or the link report |
+| Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, the link report, or the link back to the QR code maker |
 | Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
@@ -80,6 +82,7 @@ Our servers and database are in **India**. Some providers above may process data
 | Invoices | 8 years, as Indian tax law requires |
 | Waitlist entries | 12 months after the launch invite, unless you sign up; at once if you ask |
 | A link-preview report | With the email it was sent to, 12 months |
+| An email given to the QR code maker | 12 months after you last used it |
 | Security logs | 1 year |
 | A suspended account under investigation | As long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested |
 

@@ -113,9 +113,16 @@ test("the address, type and logo wait for a first invoice", async ({
     await expect(extras).toContainText("Choose your business type");
     await expect(extras).toContainText("Add your logo");
     const add = card.getByRole("link", { name: "Add address" });
+    // The tab its row is on, with the row's sheet open (owner, 10 Oct).
     await expect(add).toHaveAttribute(
         "href",
-        "/settings/organization?section=address",
+        "/settings/organization?section=address&edit=address",
     );
     await expect(add).toHaveCSS("cursor", "pointer");
+    await add.click();
+    const sheet = page.getByRole("dialog", { name: "Registered address" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByLabel("Address line 1")).toBeVisible();
+    await sheet.getByRole("button", { name: "Cancel" }).click();
+    await expect(sheet).toBeHidden();
 });

@@ -1,10 +1,16 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
+import type { SettingsSheet } from "@/lib/sites/settings-edit";
+import {
+    groupOfSheet,
+    SETTINGS_ROW_ID,
+    settingsSheetFromHash,
+} from "@/lib/sites/settings-edit";
 import type {
     SettingsGroupId,
     ShareStep,
@@ -29,10 +35,14 @@ import { ShareChecklist } from "./share-checklist";
  *
  * The open group is in the address (`?section=…`, as Settings › Business),
  * pushed per choice so a link opens it and Back and Forward step between
- * them. Every group stays mounted and only the open one shows, so a row
- * half-edited in one is still there on coming back. A checklist step
- * opens its group, its row (`onJump`, where the reader may edit) and puts
- * focus on its field, or on the row.
+ * them. Every group stays mounted and only the open one shows. A checklist
+ * step opens its group and, where the reader may edit, its row's sheet in
+ * place (`onJump`); for a reader who can't, it shows the row and puts
+ * focus on it.
+ *
+ * A link that opens a row's sheet lands on that row's group too: `?edit=`
+ * names it before the first paint (`startOn`), and the readiness step's
+ * `#sells-from` once the browser has the address (`onArrive`).
  */
 export function SettingsSections({
     groups,
@@ -41,6 +51,8 @@ export function SettingsSections({
     live,
     canEdit,
     onJump,
+    startOn = null,
+    onArrive,
     footer,
 }: {
     groups: readonly { id: SettingsGroupId; label: string }[];
@@ -48,19 +60,60 @@ export function SettingsSections({
     steps: readonly ShareStep[];
     live: boolean;
     canEdit: boolean;
-    /** Opens the step's row for editing. */
+    /** Opens the step's row for editing, in its sheet. */
     onJump?: (key: ShareStepKey) => void;
+    /** The group a link's sheet is in (`?edit=`), shown on arrival. */
+    startOn?: SettingsGroupId | null;
+    /** A link to a row's id asks for its sheet (`#sells-from`). */
+    onArrive?: (sheet: SettingsSheet) => void;
     /** The publish bar. */
     footer?: React.ReactNode;
 }) {
     const ids = groups.map((g) => g.id);
-    const [open, setOpen] = useTabParam(SETTINGS_TAB_PARAM, ids, ids[0], {
-        history: "push",
-    });
+    const [inAddress, setInAddress] = useTabParam(
+        SETTINGS_TAB_PARAM,
+        ids,
+        ids[0],
+        { history: "push" },
+    );
+    // Where a link landed, until a group is chosen: its sheet's group,
+    // whatever `?section=` the link did or didn't carry.
+    const [landed, setLanded] = useState<SettingsGroupId | null>(
+        startOn && ids.includes(startOn) ? startOn : null,
+    );
+    const open = landed ?? inAddress;
+    const setOpen = (id: SettingsGroupId) => {
+        setLanded(null);
+        setInAddress(id);
+    };
     const [focusOn, setFocusOn] = useState<string | null>(null);
     const selectId = useId();
 
-    // After the group has switched and the row opened: into view, and focus.
+    // On arrival, once: a link to a row by its id (the readiness step's
+    // `#sells-from`) shows the row's group and asks for its sheet, and the
+    // address names the group the link landed on, so a reload stays there.
+    const arrived = useRef({ ids, landed, onArrive });
+    useEffect(() => {
+        const { ids, landed, onArrive } = arrived.current;
+        const sheet = settingsSheetFromHash(window.location.hash);
+        const group = sheet ? groupOfSheet(sheet) : landed;
+        if (!group || !ids.includes(group)) return;
+        const url = new URL(window.location.href);
+        if (group === ids[0]) url.searchParams.delete(SETTINGS_TAB_PARAM);
+        else url.searchParams.set(SETTINGS_TAB_PARAM, group);
+        if (url.href !== window.location.href) {
+            window.history.replaceState(null, "", url);
+        }
+        if (!sheet) return;
+        const frame = requestAnimationFrame(() => {
+            setLanded(group);
+            if (onArrive) onArrive(sheet);
+            else setFocusOn(SETTINGS_ROW_ID[sheet]);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, []);
+
+    // After the group has switched: the row into view, and focus on it.
     useEffect(() => {
         if (!focusOn) return;
         const frame = requestAnimationFrame(() => {
@@ -68,22 +121,18 @@ export function SettingsSections({
             setFocusOn(null);
             if (!row) return;
             row.scrollIntoView({ block: "center" });
-            const field = row.querySelector<HTMLElement>(
-                "input, textarea, [contenteditable='true']",
-            );
-            if (field) field.focus();
-            else {
-                row.tabIndex = -1;
-                row.focus();
-            }
+            row.tabIndex = -1;
+            row.focus();
         });
         return () => cancelAnimationFrame(frame);
     }, [focusOn]);
 
     function jump(step: ShareStep) {
         setOpen(groupOfStep(step.key));
-        onJump?.(step.key);
-        setFocusOn(step.anchor);
+        // The row's sheet opens in place and takes the keyboard; closed,
+        // it hands it to the row's Edit. A reader is shown the row.
+        if (onJump) onJump(step.key);
+        else setFocusOn(step.anchor);
     }
 
     const index = ids.indexOf(open);
@@ -106,7 +155,7 @@ export function SettingsSections({
     };
 
     return (
-        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1040px)]">
             <div
                 role="tablist"
                 aria-label="Settings sections"

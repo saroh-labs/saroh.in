@@ -721,7 +721,9 @@ describe("module pages on the public site read (G15, real database)", () => {
 
         const view = await sites.getPublicationBySiteId(b.siteId);
         expect(view).not.toHaveProperty("modules");
+        // `icon` is always there (DEC-124): null here, with no icon or logo.
         expect(Object.keys(view).sort()).toEqual([
+            "icon",
             "publishedAt",
             "siteId",
             "snapshot",

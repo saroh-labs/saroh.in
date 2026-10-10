@@ -12,6 +12,7 @@ import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
+import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -424,6 +425,16 @@ export function ShownLink({
                 >
                     <Copy aria-hidden className="size-4" />
                 </Button>
+                <QrButton
+                    compact="always"
+                    link={{
+                        mode: "instant",
+                        url,
+                        what: "this invoice's pay link",
+                        opens: "pay",
+                        fileName: "pay-link-qr",
+                    }}
+                />
             </div>
             <p className="text-[12px] leading-[1.45] text-muted-foreground">
                 Kept here until you close this tab. Copying it again

@@ -1,6 +1,6 @@
 import type { ModulePageStates } from "@saroh/site-blocks";
 import { moduleOff } from "./module-pages";
-import { PRIVATE_PATH_PREFIXES, isPrivateSitePath } from "./private-paths";
+import { ROBOTS_DISALLOW, isPrivateSitePath } from "./private-paths";
 
 /**
  * What a merchant's site tells search engines (#890): `robots.txt` and
@@ -107,7 +107,7 @@ export function sitemapXml(origin: string, paths: readonly string[]): string {
  * where the sitemap is.
  */
 export function robotsTxt(origin: string): string {
-    const disallow = PRIVATE_PATH_PREFIXES.map((p) => `Disallow: ${p}`);
+    const disallow = ROBOTS_DISALLOW.map((p) => `Disallow: ${p}`);
     return [
         "User-agent: *",
         "Allow: /",

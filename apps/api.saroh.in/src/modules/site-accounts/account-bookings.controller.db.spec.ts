@@ -21,6 +21,7 @@ import { validationPipeOptions } from "../../common/validation";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { QrCodesService } from "../sites/qr-codes.service";
 import { AccountBookingsController } from "./account-bookings.controller";
 import { AccountUnlinkService } from "./account-unlink.service";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
@@ -952,5 +953,192 @@ describe("'This isn't them' after booking signed in", () => {
         expect(await contactOf(credit.id)).toBe(result.contactId);
         expect(await contactOf(staffs.id)).toBe(zoya.id);
         expect(await contactOf(handWritten.id)).toBe(zoya.id);
+    });
+});
+
+describe("the QR code a booking came from", () => {
+    /** A code of the business's site, as the workspace would have made it. */
+    function qr(biz: Business, code: string, retired = false) {
+        return prisma.qrCode.create({
+            data: {
+                siteId: biz.siteId,
+                organizationId: biz.organizationId,
+                code,
+                targetKind: "BOOK",
+                place: "COUNTER",
+                color: "#1c1c1a",
+                retiredAt: retired ? new Date() : null,
+            },
+        });
+    }
+
+    const sourceOf = async (serviceId: string) =>
+        (await prisma.booking.findFirstOrThrow({ where: { serviceId } }))
+            .sourceCode;
+
+    const listed = async (biz: Business) =>
+        (
+            await new QrCodesService().list(
+                {
+                    organizationId: biz.organizationId,
+                    userId: "u_owner",
+                    role: "OWNER",
+                },
+                biz.siteId,
+            )
+        ).codes;
+
+    it("stores the code's row on a booking made with its tag, and the list counts it", async () => {
+        const biz = await business();
+        const code = await qr(biz, "h7c");
+        const { token } = await signIn(biz.host);
+
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            source: "qr-h7c",
+        });
+
+        expect(res.status).toBe(201);
+        // The answer never says where a booking came from.
+        expect(JSON.stringify(res.body)).not.toContain(code.id);
+        expect(await sourceOf(biz.oneToOne)).toBe(code.id);
+        expect(await listed(biz)).toEqual([
+            expect.objectContaining({ id: code.id, bookings: 1, orders: 0 }),
+        ]);
+    });
+
+    it("stops counting a booking once it is cancelled", async () => {
+        const biz = await business();
+        const code = await qr(biz, "h7c");
+        const { token } = await signIn(biz.host);
+        await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            source: "qr-h7c",
+        });
+        await prisma.booking.updateMany({
+            where: { serviceId: biz.oneToOne },
+            data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+
+        expect(await listed(biz)).toEqual([
+            expect.objectContaining({ id: code.id, bookings: 0 }),
+        ]);
+    });
+
+    it("books without a source for another business's code, even one with the same short id elsewhere", async () => {
+        const kavi = await business("Kavi Dental");
+        const pulse = await business("Pulse Fitness");
+        // Pulse has `k9d`; Kavi doesn't. Both have `h7c`, each its own row.
+        await qr(pulse, "k9d");
+        const pulseShared = await qr(pulse, "h7c");
+        const kaviShared = await qr(kavi, "h7c");
+        const { token } = await signIn(kavi.host);
+
+        const theirs = await book(kavi, token, {
+            serviceId: kavi.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            source: "qr-k9d",
+        });
+        expect(theirs.status).toBe(201);
+        expect(await sourceOf(kavi.oneToOne)).toBeNull();
+
+        const shared = await book(kavi, token, {
+            serviceId: kavi.yoga,
+            startAt: nextMonday(7).toISOString(),
+            source: "qr-h7c",
+        });
+        expect(shared.status).toBe(201);
+        expect(await sourceOf(kavi.yoga)).toBe(kaviShared.id);
+        expect(
+            await prisma.booking.count({
+                where: { sourceCode: pulseShared.id },
+            }),
+        ).toBe(0);
+        expect((await listed(pulse)).map((c) => c.bookings)).toEqual([0, 0]);
+    });
+
+    it("books without a source for a tag that isn't one, and never refuses over it", async () => {
+        const biz = await business();
+        const code = await qr(biz, "h7c");
+        const { token } = await signIn(biz.host);
+        const odd: unknown[] = [
+            "newsletter",
+            "qr-",
+            "qr-toolong1",
+            // The row's own id: the browser never names a row.
+            code.id,
+            7,
+            null,
+            { code: "h7c" },
+        ];
+        for (const [i, source] of odd.entries()) {
+            const res = await book(biz, token, {
+                serviceId: biz.yoga,
+                startAt: nextMonday(7, i + 1).toISOString(),
+                source,
+            });
+            expect([String(source), res.status]).toEqual([String(source), 201]);
+        }
+        expect(
+            await prisma.booking.count({
+                where: { serviceId: biz.yoga, sourceCode: null },
+            }),
+        ).toBe(odd.length);
+        expect((await listed(biz))[0]?.bookings).toBe(0);
+    });
+
+    it("still counts a retired code: the paper is still out there", async () => {
+        const biz = await business();
+        const code = await qr(biz, "h7c", true);
+        const { token } = await signIn(biz.host);
+
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            source: "qr-h7c",
+        });
+
+        expect(res.status).toBe(201);
+        expect(await sourceOf(biz.oneToOne)).toBe(code.id);
+        expect(await listed(biz)).toEqual([
+            expect.objectContaining({ retired: true, bookings: 1 }),
+        ]);
+    });
+
+    it("stores no source on a booking made without a tag", async () => {
+        const biz = await business();
+        await qr(biz, "h7c");
+        const { token } = await signIn(biz.host);
+
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+        });
+
+        expect(res.status).toBe(201);
+        expect(await sourceOf(biz.oneToOne)).toBeNull();
+    });
+
+    it("answers a retry with the booking it made, source and all", async () => {
+        const biz = await business();
+        const code = await qr(biz, "h7c");
+        const { token } = await signIn(biz.host);
+        const body = {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            idempotencyKey: `key-${next()}`,
+            source: "qr-h7c",
+        };
+
+        expect((await book(biz, token, body)).status).toBe(201);
+        // The retry dropped the tag: the same booking, nothing rewritten.
+        const again = await book(biz, token, { ...body, source: undefined });
+        expect(again.status).toBe(201);
+        expect(
+            await prisma.booking.count({ where: { serviceId: biz.oneToOne } }),
+        ).toBe(1);
+        expect(await sourceOf(biz.oneToOne)).toBe(code.id);
     });
 });

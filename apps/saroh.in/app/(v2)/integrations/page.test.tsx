@@ -2,7 +2,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { liveIntegrations, plannedIntegrations } from "@/content/integrations";
+import { byComingGroup } from "@/content/coming";
+import {
+    liveIntegrations,
+    integrationsIndex as page,
+    plannedIntegrations,
+} from "@/content/integrations";
 
 import ProviderPage, { generateMetadata } from "./[provider]/page";
 import IntegrationsPage, { metadata } from "./page";
@@ -41,6 +46,54 @@ describe("/integrations", () => {
         const rows = within(section).getAllByRole("listitem");
         expect(rows).toHaveLength(plannedIntegrations.length);
         expect(section.querySelectorAll("a")).toHaveLength(0);
+        for (const row of rows) {
+            expect(row.textContent).toContain("Not available yet");
+        }
+    });
+
+    it("draws each planned group's label once, over its rows, in order", () => {
+        render(IntegrationsPage());
+        const section = screen
+            .getByRole("heading", { name: page.plannedTitle })
+            .closest("section");
+        if (!section) throw new Error("no Planned section");
+        const labels = within(section).getAllByRole("heading", { level: 3 });
+        expect(labels.map((h) => h.textContent)).toEqual([
+            "Nov–Dec 2026",
+            "Early 2027",
+            "Later",
+        ]);
+        const groups = byComingGroup(plannedIntegrations);
+        const lists = within(section).getAllByRole("list");
+        expect(lists).toHaveLength(groups.length);
+        lists.forEach((list, i) => {
+            const group = groups[i];
+            expect(list.getAttribute("aria-labelledby")).toBe(labels[i].id);
+            const rows = within(list).getAllByRole("listitem");
+            expect(rows.map((row) => row.textContent)).toEqual(
+                group.rows.map(
+                    (item) => `${item.name}${item.line}${page.notYet}`,
+                ),
+            );
+        });
+        // The label is said once: no row repeats a period.
+        expect(section.textContent.match(/Nov–Dec 2026/g)).toHaveLength(1);
+        expect(section.textContent).not.toMatch(/Jan–Mar|Apr–Jun/);
+    });
+
+    it("names no plan or price in the planned list, and no provider logo", () => {
+        render(IntegrationsPage());
+        const section = screen
+            .getByRole("heading", { name: page.plannedTitle })
+            .closest("section");
+        if (!section) throw new Error("no Planned section");
+        expect(section.textContent).not.toMatch(
+            /every plan|free plan|\bplans?\b|\bgrow\b|\bpro\b|₹|\bprice/i,
+        );
+        expect(section.textContent).not.toMatch(
+            /\bcsv\b|\bpixel\b|google analytics/i,
+        );
+        expect(section.querySelectorAll("img, svg")).toHaveLength(0);
     });
 });
 

@@ -78,6 +78,8 @@ export class AccountBookingsController {
                 bookerPhone: dto.bookerPhone,
                 packPurchaseId: dto.packPurchaseId,
                 subscriptionId: dto.subscriptionId,
+                // The QR code's tag, if the page's address carried one.
+                sourceTag: dto.source,
             },
             // The visitor's address, as the site's server relayed it: the
             // API only ever sees that server's.
@@ -87,6 +89,7 @@ export class AccountBookingsController {
                 organizationId: customer.organizationId,
                 accountId: customer.accountId,
                 contactId: customer.contactId,
+                siteId: customer.siteId,
             },
         );
         const result = publicBookingResult(booking, payToken);

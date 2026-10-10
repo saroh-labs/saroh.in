@@ -1,5 +1,5 @@
 import { upgradeHref } from "@/lib/billing/access";
-import { business } from "@/lib/settings/ready";
+import { businessEditHref } from "@/lib/organizations/business-rows";
 
 import type { SarohEmailState } from "./service";
 
@@ -18,8 +18,8 @@ import type { SarohEmailState } from "./service";
 /** Where the block's main action goes: the first email provider to connect. */
 export const CONNECT_EMAIL_ANCHOR = "connect-email";
 
-/** Where a contact email is added: Business → Contact. */
-export const CONTACT_EMAIL_HREF = business("contact");
+/** Where a contact email is added: Business → Contact, its sheet open. */
+export const CONTACT_EMAIL_HREF = businessEditHref("contactEmail");
 
 /** Where the block sends a business that can't connect its own email yet. */
 export const SEE_PLANS_HREF = upgradeHref();

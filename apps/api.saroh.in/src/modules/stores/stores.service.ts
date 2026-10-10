@@ -19,6 +19,7 @@ import {
 import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
+import type { LogoPatch } from "./location-logo";
 
 /**
  * Storefront roles allowed to change a store and take its orders (VIEWER is
@@ -447,8 +448,17 @@ export class StoresService {
         return { id: store.id };
     }
 
-    /** Update a store's core fields — owner or a write-capable member. */
-    async updateForUser(userId: string, storeId: string, dto: UpdateStoreDto) {
+    /**
+     * Update a store's core fields — owner or a write-capable member. Its
+     * logo changes only with a `logo` patch, which `LocationLogoService`
+     * works out from the save (DEC-123); without one it stays as it is.
+     */
+    async updateForUser(
+        userId: string,
+        storeId: string,
+        dto: UpdateStoreDto,
+        logo: LogoPatch | null = null,
+    ) {
         if (!(await this.canWrite(storeId, userId))) {
             throw new NotFoundException("Location not found");
         }
@@ -460,7 +470,7 @@ export class StoresService {
             data: {
                 name: dto.name,
                 description: dto.description ?? null,
-                logo: dto.logo ?? null,
+                ...(logo ?? {}),
             },
         });
         return { id: storeId };

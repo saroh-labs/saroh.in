@@ -11,7 +11,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { createStaff } from "@/lib/staff/actions";
 
@@ -19,17 +19,26 @@ import { createStaff } from "@/lib/staff/actions";
  * Someone new on the diary (U3): a name and what they do. A trainer at the
  * front desk may never log in, so no login is needed, but like everyone who
  * takes bookings they use a team seat (DEC-105); a full team is refused by
- * the API and said here. Their hours are set on this page once they are
- * added, and which services they take on Services.
+ * the API and said here, and a refusal keeps the dialog open with what was
+ * typed. Their hours are set on Availability once they are added, and which
+ * services they take on Services.
+ *
+ * Opened from Availability and, so nobody is sent away to add a name, from
+ * the calendar's "Nobody is on the diary yet". Cancel, Escape and the close
+ * button drop what was typed, it can't be dismissed while it is adding, and
+ * the keyboard goes back to the button that opened it.
  */
 export function AddPersonDialog({
     open,
     onOpenChange,
     onAdded,
+    hoursHint = "Set their hours below.",
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onAdded: (staffId: string) => void;
+    onAdded?: (staffId: string) => void;
+    /** Where their hours are set from here, said once they are added. */
+    hoursHint?: string;
 }) {
     const router = useRouter();
     const ids = { name: useId(), title: useId() };
@@ -37,6 +46,15 @@ export function AddPersonDialog({
     const [title, setTitle] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const opener = useRef<HTMLElement | null>(null);
+
+    function close() {
+        if (saving) return;
+        setName("");
+        setTitle("");
+        setError(null);
+        onOpenChange(false);
+    }
 
     async function add() {
         if (!name.trim() || saving) return;
@@ -51,17 +69,33 @@ export function AddPersonDialog({
             setError(res.error);
             return;
         }
-        showSuccess(`${res.data.name} is on the diary. Set their hours below.`);
+        showSuccess(`${res.data.name} is on the diary. ${hoursHint}`);
         setName("");
         setTitle("");
         onOpenChange(false);
-        onAdded(res.data.id);
+        onAdded?.(res.data.id);
         router.refresh();
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[420px] gap-0 rounded-[14px] px-5 py-[18px]">
+        <Dialog
+            open={open}
+            onOpenChange={(o) => (o ? onOpenChange(true) : close())}
+        >
+            <DialogContent
+                className="max-w-[420px] gap-0 rounded-[14px] px-5 py-[18px]"
+                onOpenAutoFocus={() => {
+                    // Before the dialog takes the keyboard: who opened it.
+                    opener.current =
+                        document.activeElement instanceof HTMLElement
+                            ? document.activeElement
+                            : null;
+                }}
+                onCloseAutoFocus={(e) => {
+                    e.preventDefault();
+                    if (opener.current?.isConnected) opener.current.focus();
+                }}
+            >
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -117,7 +151,8 @@ export function AddPersonDialog({
                             type="button"
                             variant="outline"
                             className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                            onClick={() => onOpenChange(false)}
+                            disabled={saving}
+                            onClick={close}
                         >
                             Cancel
                         </Button>

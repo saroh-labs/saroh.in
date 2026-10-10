@@ -18,6 +18,10 @@ import {
  * hold with its Undo, the Member's view without money, and the allergy
  * banner — against the seeded stack.
  *
+ * The page is read first (owner, 10 Oct): every change to the order opens
+ * in a side sheet, a dialog named by its title. Each journey works inside
+ * that dialog and waits for it to close before it reads the page again.
+ *
  * The kitchen flow runs on an order it makes in Northwind Supply, the
  * generic dev business, paid by hand: Rye & Co. is the film set and is only
  * read here. A refund needs a payment taken through a provider, which a dev
@@ -266,13 +270,17 @@ test.describe("order detail", () => {
         await page.goto(`/commerce/orders/${id}`);
 
         await page.getByRole("button", { name: "Refund…" }).click();
-        const panel = page.getByRole("region", { name: "Refund" });
+        const panel = page.getByRole("dialog", {
+            name: "What are you refunding?",
+        });
         const lines = panel.getByRole("checkbox");
         await expect(lines).toHaveCount(3);
         await lines.nth(0).click();
         await lines.nth(1).click();
         await panel.getByRole("button", { name: /^Refund / }).click();
 
+        // The sheet closes into the ten-second hold on the page.
+        await expect(panel).toBeHidden();
         await expect(page.getByText(/Refunding .* in \d+s/)).toBeVisible();
         await page.getByRole("button", { name: "Refund now" }).click();
         await expect(shown(page, /The rest of the order stands/)).toBeVisible();
@@ -298,7 +306,9 @@ test.describe("order detail", () => {
         await page.goto(`/commerce/orders/${id}`);
 
         await page.getByRole("button", { name: "Refund…" }).click();
-        const panel = page.getByRole("region", { name: "Refund" });
+        const panel = page.getByRole("dialog", {
+            name: "What are you refunding?",
+        });
         await panel.getByLabel("Refund another amount, in rupees").fill("1");
         const go = panel.getByRole("button", { name: /^Refund / });
         await expect(go).toBeDisabled();
@@ -308,6 +318,7 @@ test.describe("order detail", () => {
         await panel.getByLabel("Why").selectOption({ label: "Late" });
         await expect(go).toHaveText("Refund ₹1");
         await go.click();
+        await expect(panel).toBeHidden();
         await page.getByRole("button", { name: "Refund now" }).click();
         await expect(shown(page, /The rest of the order stands/)).toBeVisible();
         await expect(
@@ -330,7 +341,7 @@ test.describe("order detail", () => {
         await page
             .getByRole("button", { name: "Edit items or address" })
             .click();
-        const panel = page.getByRole("region", { name: "Edit order" });
+        const panel = page.getByRole("dialog", { name: /^Edit #/ });
         const add = panel.getByLabel("Add an item");
         await expect(add).toBeVisible();
         // The first of the seed's own products on offer that isn't sold out:
@@ -345,6 +356,7 @@ test.describe("order detail", () => {
         await add.selectOption(choice ?? "");
         await expect(panel.getByText("· added")).toBeVisible();
         await panel.getByRole("button", { name: /^Save/ }).click();
+        await expect(panel).toBeHidden();
         await expect(shown(page, /^Saved\./)).toBeVisible();
         await expect(
             page
@@ -386,11 +398,12 @@ test.describe("shipping on order detail", () => {
         await page
             .getByRole("button", { name: "Hand to courier", exact: true })
             .click();
-        const panel = page.getByRole("region", { name: "Hand to courier" });
+        const panel = page.getByRole("dialog", { name: "Hand to courier" });
         await expect(panel.getByText(/^To 14 Lake View Road/)).toBeVisible();
         await panel.getByRole("radio", { name: "Blue Dart" }).click();
         await panel.getByLabel("Tracking number").fill("BD 9920 1140");
         await panel.getByRole("button", { name: "Handed over" }).click();
+        await expect(panel).toBeHidden();
 
         await expect(
             shown(page, "Handed to Blue Dart · BD 9920 1140."),
@@ -416,10 +429,11 @@ test.describe("shipping on order detail", () => {
         await page
             .getByRole("button", { name: "Hand to courier", exact: true })
             .click();
-        await page
-            .getByRole("region", { name: "Hand to courier" })
-            .getByRole("button", { name: "Handed over" })
-            .click();
+        const handover = page.getByRole("dialog", {
+            name: "Hand to courier",
+        });
+        await handover.getByRole("button", { name: "Handed over" }).click();
+        await expect(handover).toBeHidden();
         await expect(shown(page, /^Handed to Delhivery\./)).toBeVisible();
 
         const card = page.getByRole("region", { name: "Customer" });
@@ -427,13 +441,14 @@ test.describe("shipping on order detail", () => {
         await card
             .getByRole("button", { name: "Add the tracking number" })
             .click();
-        const panel = page.getByRole("region", {
+        const panel = page.getByRole("dialog", {
             name: "Tracking",
             exact: true,
         });
         await expect(panel.getByLabel("Tracking number")).toBeFocused();
         await panel.getByLabel("Tracking number").fill("1487 2290 3314");
         await panel.getByRole("button", { name: "Save" }).click();
+        await expect(panel).toBeHidden();
 
         await expect(shown(page, "Tracking number saved.")).toBeVisible();
         await expect(card.getByText("1487 2290 3314")).toBeVisible();
@@ -457,7 +472,7 @@ test.describe("shipping on order detail", () => {
         await page
             .getByRole("button", { name: "Hand to courier", exact: true })
             .click();
-        const panel = page.getByRole("region", { name: "Hand to courier" });
+        const panel = page.getByRole("dialog", { name: "Hand to courier" });
         await panel.getByRole("radio", { name: "Other" }).click();
         const name = panel.getByLabel("Courier's name");
         await expect(name).toBeFocused();
@@ -468,6 +483,7 @@ test.describe("shipping on order detail", () => {
         await name.fill("DTDC");
         await panel.getByLabel("Tracking number").fill("D 4410 2291");
         await panel.getByRole("button", { name: "Handed over" }).click();
+        await expect(panel).toBeHidden();
 
         await expect(
             shown(page, "Handed to DTDC · D 4410 2291."),
@@ -546,7 +562,7 @@ test.describe("shipping on order detail", () => {
             page.getByRole("group", { name: /Out for delivery, step 4 of 5/ }),
         ).toBeVisible();
         await expect(
-            page.getByRole("region", { name: "Hand to courier" }),
+            page.getByRole("dialog", { name: "Hand to courier" }),
         ).toHaveCount(0);
         await expect(
             page
@@ -593,6 +609,7 @@ test.describe("change and cancel on order detail (B9)", () => {
         }
         await sheet.getByLabel("Delivery charge").fill("0");
         await sheet.getByRole("button", { name: /^Save/ }).click();
+        await expect(sheet).toBeHidden();
         await expect(shown(page, /^Now /)).toBeVisible();
         await expect(
             page
@@ -611,12 +628,14 @@ test.describe("change and cancel on order detail (B9)", () => {
         await page.goto(`/commerce/orders/${id}`);
 
         await page.getByRole("button", { name: "Cancel order…" }).click();
-        const sheet = page.getByRole("region", { name: /^Cancel #/ });
+        const sheet = page.getByRole("dialog", { name: /^Cancel #/ });
         await expect(
             sheet.getByText(/It stays on record as cancelled, never deleted/),
         ).toBeVisible();
         await sheet.getByLabel("Why").selectOption({ label: "Late" });
         await sheet.getByRole("button", { name: "Cancel order" }).click();
+        // The sheet closes into the ten-second hold on the page.
+        await expect(sheet).toBeHidden();
         await expect(page.getByText(/Cancelling in \d+s/)).toBeVisible();
         await page.getByRole("button", { name: "Cancel now" }).click();
         await expect(

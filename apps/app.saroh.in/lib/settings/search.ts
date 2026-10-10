@@ -3,6 +3,7 @@ import {
     SETTINGS_PAGES,
     settingsPagesFor,
 } from "@/components/shared/nav-items";
+import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
 
@@ -37,7 +38,7 @@ export function settingsPageLabel(
 }
 
 /** The query a settings page reads its own tab from. */
-export const BUSINESS_TAB_PARAM = "section";
+export { BUSINESS_TAB_PARAM };
 export const TEAM_TAB_PARAM = "view";
 
 export interface SettingsEntry {
@@ -79,7 +80,7 @@ const team = (label: string, value: string): SettingsEntry => ({
 
 /**
  * In the design's order: Business by its tabs, then Team, Modules, Plan and
- * billing, Your profile, Activity, Providers.
+ * billing, Your profile, Share, Activity, Providers.
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
@@ -157,6 +158,13 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
     { label: "Alerts — the bell and email", page: "/settings/profile" },
+    {
+        label: "QR codes — for the counter, a mirror or a card",
+        page: "/settings/share",
+        words: ["Share", "QR", "Scan", "Short link", "Print"],
+        // The codes open pages of the website.
+        module: "WEBSITE",
+    },
     { label: "Activity — who changed what", page: "/settings/activity" },
     {
         label: "Providers — hosting, email, payments",

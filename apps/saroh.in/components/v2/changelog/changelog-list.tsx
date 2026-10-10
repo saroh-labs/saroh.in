@@ -8,6 +8,7 @@ import {
     entryDate,
     entryDayLong,
 } from "@/content/changelog";
+import { byComingGroup } from "@/content/coming";
 
 import { Arrow } from "../arrow";
 
@@ -80,7 +81,17 @@ export function FirstEntrySoon({ day }: { day: string }) {
     );
 }
 
-/** Coming next: planned work, each row marked and never a link (R16). */
+/** The design's 140px "when" column, in JetBrains Mono. */
+const WHEN_COL = "flex-[0_0_140px] font-mono text-[13px]";
+
+/**
+ * Coming next: planned work, each row marked and never a link (R16).
+ *
+ * The rows keep the design's layout. The "when" column holds the group's
+ * label on a group's first row only (owner, 10 Oct 2026); on the rows after
+ * it the column stays as an empty spacer, dropped where the row has wrapped
+ * and it would only be a blank line.
+ */
 export function ComingNextList() {
     return (
         <section
@@ -96,29 +107,47 @@ export function ComingNextList() {
             <p className="m-0 mb-4 text-mk-faq text-mk-copy">
                 {CHANGELOG.comingSub}
             </p>
-            <ul className="m-0 grid list-none p-0">
-                {COMING_NEXT.map((item) => (
-                    <li
-                        key={item.name}
-                        className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-t border-border py-5"
+            <div className="grid">
+                {byComingGroup(COMING_NEXT).map((group) => (
+                    <ul
+                        key={group.key}
+                        aria-labelledby={`coming-${group.key}`}
+                        className="m-0 grid list-none p-0"
                     >
-                        <span className="flex-[0_0_140px] font-mono text-[13px] text-muted-foreground">
-                            {item.when}
-                        </span>
-                        <span className="grid min-w-0 flex-[1_1_380px] gap-1">
-                            <span className="text-[17px] font-semibold">
-                                {item.name}
-                            </span>
-                            <span className="text-[15px] leading-[1.55] text-mk-copy">
-                                {item.line}
-                            </span>
-                        </span>
-                        <span className="rounded-full border border-border-strong px-2.5 py-1 text-[12.5px] font-semibold text-muted-foreground">
-                            {CHANGELOG.notYet}
-                        </span>
-                    </li>
+                        {group.rows.map((item, index) => (
+                            <li
+                                key={item.name}
+                                className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-t border-border py-5"
+                            >
+                                {index === 0 ? (
+                                    <h3
+                                        id={`coming-${group.key}`}
+                                        className={`${WHEN_COL} m-0 font-normal text-muted-foreground`}
+                                    >
+                                        {group.label}
+                                    </h3>
+                                ) : (
+                                    <span
+                                        aria-hidden="true"
+                                        className={`${WHEN_COL} max-sm:hidden`}
+                                    />
+                                )}
+                                <span className="grid min-w-0 flex-[1_1_380px] gap-1">
+                                    <span className="text-[17px] font-semibold">
+                                        {item.name}
+                                    </span>
+                                    <span className="text-[15px] leading-[1.55] text-mk-copy">
+                                        {item.line}
+                                    </span>
+                                </span>
+                                <span className="rounded-full border border-border-strong px-2.5 py-1 text-[12.5px] font-semibold text-muted-foreground">
+                                    {CHANGELOG.notYet}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
                 ))}
-            </ul>
+            </div>
         </section>
     );
 }

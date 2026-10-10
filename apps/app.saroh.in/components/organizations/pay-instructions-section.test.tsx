@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Settings › Business › How to pay us (R32): the card reads what is saved,
- * the fields refuse what the API would, Save sends only what changed, and
- * the preview shows what a customer will see — the business's own UPI QR,
- * or the generic line when nothing is set. Made-up details only.
+ * Settings › Business › How to pay us (R32), read first: the rows say what
+ * is saved, any row's Edit opens the one sheet, its fields refuse what the
+ * API would, Save sends only what changed, and the preview shows what a
+ * customer will see (the business's own UPI QR, or the generic line when
+ * nothing is set), saved on the page and live in the sheet. Made-up details
+ * only.
  *
  * `react-dom/client` + `act` directly, as the other component tests do.
  */
@@ -16,6 +18,7 @@ import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructio
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { PayInstructionsSection } from "./pay-instructions-section";
+import { useBusinessSheets } from "./use-business-sheets";
 
 const save = vi.fn();
 vi.mock("@/lib/organizations/settings-actions", () => ({
@@ -24,6 +27,9 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
 const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
+}));
+vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams("section=pay"),
 }));
 
 const NONE: PayInstructionsSettings = {
@@ -38,27 +44,36 @@ const UPI = "northwind.supply@okexample";
 
 let root: Root;
 let host: HTMLDivElement;
-const onDone = vi.fn();
 const onSaved = vi.fn();
 const offerUndo = vi.fn();
 
-function draw(saved: PayInstructionsSettings | undefined, editing = false) {
-    act(() =>
-        root.render(
-            <PayInstructionsSection
-                saved={saved}
-                businessName="Northwind"
-                editing={editing}
-                canEdit
-                onEdit={vi.fn()}
-                onDone={onDone}
-                onDirty={vi.fn()}
-                onSaved={onSaved}
-                hidden={false}
-                offerUndo={offerUndo}
-            />,
-        ),
+/** The tab as the page holds it: the page owns which sheet is open. */
+function Tab({
+    saved,
+    canEdit,
+}: {
+    saved: PayInstructionsSettings | undefined;
+    canEdit: boolean;
+}) {
+    const sheets = useBusinessSheets(
+        (which) => (canEdit ? which : null),
+        () => undefined,
     );
+    return (
+        <PayInstructionsSection
+            saved={saved}
+            businessName="Northwind"
+            canEdit={canEdit}
+            hidden={false}
+            sheets={sheets}
+            onSaved={onSaved}
+            offerUndo={offerUndo}
+        />
+    );
+}
+
+function draw(saved: PayInstructionsSettings | undefined, canEdit = true) {
+    act(() => root.render(<Tab saved={saved} canEdit={canEdit} />));
 }
 
 beforeEach(() => {
@@ -70,7 +85,6 @@ beforeEach(() => {
     root = createRoot(host);
     save.mockReset();
     showError.mockReset();
-    onDone.mockReset();
     onSaved.mockReset();
     offerUndo.mockReset();
 });
@@ -78,6 +92,7 @@ beforeEach(() => {
 afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    document.body.innerHTML = "";
 });
 
 async function settle() {
@@ -88,31 +103,49 @@ async function settle() {
     }
 }
 
-function typeInto(name: string, value: string) {
-    const el = host.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');
+const sheetName = () => {
+    const id = sheet()?.getAttribute("aria-labelledby");
+    return id ? document.getElementById(id)?.textContent : undefined;
+};
+
+async function typeInto(name: string, value: string) {
+    const el = sheet()?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
         `[name="${name}"]`,
     );
     if (!el) throw new Error(`No field ${name}`);
-    const proto =
-        el instanceof HTMLTextAreaElement
-            ? HTMLTextAreaElement.prototype
-            : HTMLInputElement.prototype;
     act(() => {
-        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+        Object.getOwnPropertyDescriptor(
+            Object.getPrototypeOf(el) as object,
+            "value",
+        )?.set?.call(el, value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
     });
+    await settle();
 }
 
-function button(name: string): HTMLButtonElement {
-    const hit = Array.from(host.querySelectorAll("button")).find(
-        (b) => b.textContent.trim() === name,
+async function press(name: string, within: ParentNode = document) {
+    const hit = Array.from(within.querySelectorAll("button")).find(
+        (b) =>
+            b.getAttribute("aria-label") === name ||
+            b.textContent.trim() === name,
     );
     if (!hit) throw new Error(`No button ${name}`);
-    return hit;
+    await act(async () => {
+        hit.click();
+        await Promise.resolve();
+    });
+    await settle();
 }
 
+/** The page's preview: what is saved. */
 const preview = () =>
     host.querySelector<HTMLElement>('aside[aria-label="What customers see"]');
+/** The sheet's preview: what is being typed. */
+const draft = () =>
+    sheet()?.querySelector<HTMLElement>(
+        'aside[aria-label="What customers see"]',
+    );
 
 describe("How to pay us (R32)", () => {
     it("with nothing set, reads Not set and previews the generic line", () => {
@@ -128,10 +161,10 @@ describe("How to pay us (R32)", () => {
         expect(preview()?.querySelector("p.border-dashed")?.textContent).toBe(
             "Nothing set yet. Customers see “Pay Northwind the way they've asked you to.”",
         );
-        expect(preview()?.textContent).toContain(
-            "Customers see “Pay Northwind the way they've asked you to.”",
-        );
         expect(preview()?.querySelector('[data-testid="upi-qr"]')).toBeNull();
+        // Read first: no field until a row's Edit.
+        expect(host.querySelector("input, textarea, form")).toBeNull();
+        expect(sheet()).toBeNull();
     });
 
     it("reads an older API that sent none as nothing set", () => {
@@ -159,80 +192,102 @@ describe("How to pay us (R32)", () => {
         expect(preview()?.textContent).toContain("Pay by bank transfer");
     });
 
-    it("refuses a UPI ID and an IFSC that aren't, on their fields, with Save off", async () => {
-        draw(NONE, true);
-        typeInto("upiId", "northwind");
-        typeInto("bankAccountName", "Northwind Supply");
-        typeInto("bankAccountNumber", "987654321012");
-        typeInto("bankIfsc", "WXYZ123");
-        await settle();
-        expect(host.textContent).toContain("That isn't a UPI ID.");
-        expect(host.textContent).toContain("An IFSC is 11 characters");
-        expect(button("Save").disabled).toBe(true);
+    it("a read-only role sees the rows without Edit", () => {
+        draw({ ...NONE, upiId: UPI }, false);
+        expect(host.textContent).toContain(UPI);
+        // The preview's own Copy is the customer's, not an Edit.
+        expect(
+            host.querySelector("#business-pay-panel")?.querySelector("button"),
+        ).toBeNull();
+    });
+
+    it("any row's Edit opens the one sheet, and the keyboard goes back to that row", async () => {
+        draw(NONE);
+        await press("Add bank details");
+        expect(sheetName()).toBe("How to pay us");
+        expect(sheet()?.querySelector('[name="upiId"]')).not.toBeNull();
+        expect(sheet()?.querySelector('[name="note"]')).not.toBeNull();
+        await press("Cancel");
+        expect(sheet()).toBeNull();
+        expect(document.activeElement?.id).toBe("business-pay-bank-edit");
+    });
+
+    it("refuses a UPI ID and an IFSC that aren't, on their fields, and sends nothing", async () => {
+        draw(NONE);
+        await press("Add UPI ID");
+        await typeInto("upiId", "northwind");
+        await typeInto("bankAccountName", "Northwind Supply");
+        await typeInto("bankAccountNumber", "987654321012");
+        await typeInto("bankIfsc", "WXYZ123");
+        await press("Save");
+        expect(sheet()?.textContent).toContain("That isn't a UPI ID.");
+        expect(sheet()?.textContent).toContain("An IFSC is 11 characters");
+        expect(save).not.toHaveBeenCalled();
         // The preview leaves out what isn't valid yet.
-        expect(preview()?.querySelector('[data-testid="upi-qr"]')).toBeNull();
+        expect(draft()?.querySelector('[data-testid="upi-qr"]')).toBeNull();
     });
 
     it("asks for the rest of the bank details on Save, and sends nothing", async () => {
-        draw(NONE, true);
-        typeInto("bankAccountNumber", "987654321012");
-        await settle();
-        await act(async () => {
-            button("Save").click();
-            await Promise.resolve();
-        });
-        await settle();
-        expect(host.textContent).toContain(
+        draw(NONE);
+        await press("Add bank details");
+        await typeInto("bankAccountNumber", "987654321012");
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
             "Add the name on the account, so a transfer reaches you.",
         );
         expect(save).not.toHaveBeenCalled();
     });
 
-    it("saves only what changed, and shows the new QR live while typing", async () => {
+    it("shows the new QR live in the sheet, saves only what changed and closes", async () => {
         const saved = { ...NONE, note: "Thanks!" };
-        draw(saved, true);
-        typeInto("upiId", ` ${UPI} `);
-        await settle();
-        expect(preview()?.textContent).toContain("Showing your unsaved edit");
-        expect(
-            preview()?.querySelector('[data-testid="upi-qr"]'),
-        ).not.toBeNull();
+        draw(saved);
+        await press("Add UPI ID");
+        await typeInto("upiId", ` ${UPI} `);
+        expect(draft()?.textContent).toContain("Showing your unsaved edit");
+        expect(draft()?.querySelector('[data-testid="upi-qr"]')).not.toBeNull();
+        // The page still shows what is saved.
+        expect(preview()?.querySelector('[data-testid="upi-qr"]')).toBeNull();
 
         const after = {
             payInstructions: { ...saved, upiId: UPI },
         } as unknown as OrganizationSettings;
         save.mockResolvedValue({ ok: true, data: after });
-        await act(async () => {
-            button("Save").click();
-            await Promise.resolve();
-        });
-        await settle();
+        await press("Save");
         expect(save).toHaveBeenCalledWith({
             payInstructions: { upiId: UPI },
         });
         expect(offerUndo).toHaveBeenCalledWith("How to pay us saved", null);
         expect(onSaved).toHaveBeenCalledWith(after);
-        expect(onDone).toHaveBeenCalled();
+        expect(sheet()).toBeNull();
     });
 
-    it("puts the API's refusal on the field it names", async () => {
-        draw(NONE, true);
-        typeInto("upiId", UPI);
-        await settle();
+    it("Cancel saves nothing, and the next opening starts from what is saved", async () => {
+        draw({ ...NONE, upiId: UPI });
+        await press("Edit UPI ID");
+        await typeInto("upiId", "someone@okexample");
+        await press("Cancel");
+        expect(save).not.toHaveBeenCalled();
+        await press("Edit UPI ID");
+        expect(
+            sheet()?.querySelector<HTMLInputElement>('[name="upiId"]')?.value,
+        ).toBe(UPI);
+    });
+
+    it("puts the API's refusal on the field it names, and stays open", async () => {
+        draw(NONE);
+        await press("Add UPI ID");
+        await typeInto("upiId", UPI);
         save.mockResolvedValue({
             ok: false,
             error: "That isn't a UPI ID. It looks like yourname@okhdfc.",
             field: "upiId",
         });
-        await act(async () => {
-            button("Save").click();
-            await Promise.resolve();
-        });
-        await settle();
-        expect(host.textContent).toContain(
+        await press("Save");
+        expect(sheet()?.textContent).toContain(
             "That isn't a UPI ID. It looks like yourname@okhdfc.",
         );
         expect(showError).not.toHaveBeenCalled();
-        expect(onDone).not.toHaveBeenCalled();
+        expect(onSaved).not.toHaveBeenCalled();
+        expect(sheetName()).toBe("How to pay us");
     });
 });

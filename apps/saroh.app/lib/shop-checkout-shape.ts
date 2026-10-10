@@ -7,6 +7,8 @@ import type {
 } from "@saroh/site-blocks";
 import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
 
+import { qrSourceTag } from "./qr-resolve";
+
 /**
  * The site checkout's answers (round-2 G13), narrowed, and every refusal
  * turned into the page's own words. Kept apart from `shop-checkout.ts`,
@@ -346,6 +348,9 @@ export function startBody(v: unknown): Record<string, unknown> | null {
     if (notes) body.notes = notes;
     const code = cleanCode(v.discountCode);
     if (code) body.discountCode = code;
+    // The tag of the QR code whose scan opened the page, if it is one.
+    const source = qrSourceTag(v.source);
+    if (source) body.source = source;
     if (isRecord(v.address)) {
         const a = v.address;
         const address: Record<string, string> = {};

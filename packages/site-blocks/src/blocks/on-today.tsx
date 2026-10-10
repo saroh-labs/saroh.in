@@ -10,6 +10,7 @@ import { dateText } from "../booking-flow/model";
 import type { OpeningHoursDay } from "../lib/opening-hours";
 import { isOpeningWeek, openState, openStateText } from "../lib/opening-hours";
 import { cn } from "../lib/utils";
+import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton } from "./cta";
 import PlainHero from "./hero-plain";
 
@@ -176,6 +177,7 @@ export default function OnTodayHero({
     /** The moment "Open now" is worked out for. Tests pin it. */
     now?: Date;
 }) {
+    const source = useQrSource();
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", today: given } : { kind: "loading" },
     );
@@ -272,7 +274,7 @@ export default function OnTodayHero({
                             <>
                                 {" · "}
                                 <Link
-                                    href={bookHref}
+                                    href={withQrSource(bookHref, source)}
                                     className="text-site-fg focus-visible:ring-site-accent rounded-sm font-semibold underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
                                 >
                                     See tomorrow
@@ -379,6 +381,8 @@ function Panel({
 
 /** One time: when, what and with whom, and a tag — a link when it can be. */
 function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
+    // On a page a QR code's scan opened, the link carries its tag on.
+    const source = useQrSource();
     const tag = tagOf(item);
     const body = (
         <>
@@ -408,7 +412,7 @@ function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
     if (!bookHref) return <div className={rowClass}>{body}</div>;
     return (
         <Link
-            href={todayHref(bookHref, item)}
+            href={withQrSource(todayHref(bookHref, item), source)}
             className={cn(
                 rowClass,
                 "focus-visible:ring-site-accent hover:bg-[color-mix(in_srgb,hsl(var(--site-fg))_4%,hsl(var(--site-surface)))] focus-visible:outline-none focus-visible:ring-2",

@@ -16,7 +16,7 @@ import type { StorefrontInput, StorefrontSettings } from "./storefronts";
 
 /**
  * Location › Delivery, read then edited one way at a time (the 9 Oct second
- * pass): the sentence each way's row says, the draft its Edit panel holds,
+ * pass): the sentence each way's row says, the draft its Edit sheet holds,
  * and the one update its Save sends. Pure, so the rules are tested without
  * a screen.
  */
@@ -160,7 +160,7 @@ export function waySummary(store: Store, type: Way): WaySummary {
     };
 }
 
-/** What an Edit panel holds until Save or Cancel. */
+/** What an Edit sheet holds until Save or Cancel. */
 export interface WayDraft {
     on: boolean;
     /** "What customers pay": Charge, or Free. */
@@ -235,7 +235,7 @@ const sameMoney = (a: string | null, b: string | null) =>
     a === null || b === null ? a === b : Number(a) === Number(b);
 
 /**
- * The one update an Edit panel's Save sends: only what changed, with the
+ * The one update an Edit sheet's Save sends: only what changed, with the
  * same fields the page always saved (`fulfilmentTypes`, the way's fee,
  * `freeShippingThreshold`, `lateAfterMinutes`). Turned off, only the ways
  * change: the fee and late time are kept for when it comes back.
@@ -316,6 +316,22 @@ export function checkoutLine(
             ? `, free over ${money(over, store.currency)}`
             : ""
     }`;
+}
+
+const WAY_OFFER: Record<Way, string> = {
+    PICKUP: "Whether customers can collect from here",
+    LOCAL_DELIVERY: "Whether you deliver nearby from here",
+    SHIPPING: "Whether you ship from here",
+};
+
+/**
+ * The line under a way's sheet title: what the sheet controls. What
+ * customers pay is named only where the sheet asks for it (`paidWay`).
+ */
+export function waySheetSays(store: Store, type: Way): string {
+    return paidWay(store, type)
+        ? `${WAY_OFFER[type]}, what customers pay and when an order counts as late.`
+        : `${WAY_OFFER[type]}, and when an order counts as late.`;
 }
 
 /** "Also applies to shipping." for the location's one free-over amount. */

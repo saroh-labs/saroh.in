@@ -2,7 +2,6 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import {
     Select,
@@ -15,15 +14,18 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Row, Section as Rows } from "@/components/sites/settings-rows";
 import { providerName } from "@/lib/payments/providers";
 import {
     LOCATION_SECTIONS,
     PROVIDERS_HREF,
 } from "@/lib/stores/location-readiness";
+import { taxRateSays } from "@/lib/stores/tax-rate";
 
 import type { SectionProps } from "./location-save";
 import { PayOnHandoverRow } from "./pay-on-handover-row";
 import { Note, Section, ToggleRow } from "./storefront-section";
+import { TAX_RATE_ROW_ID, TaxRateSheet } from "./tax-rate-sheet";
 
 /**
  * The currencies offered before a location's first order: the ones Saroh's
@@ -158,10 +160,15 @@ function OnlinePayments({ store, canEdit, pending, save }: SectionProps) {
     );
 }
 
+/**
+ * Tax: the switch, which saves when flipped, and while it is on the rate as
+ * a read-first row ("Tax rate · 18% of each order's items, before delivery
+ * · Edit"). Edit opens the rate's side sheet; read-only roles see the row
+ * without it.
+ */
 function Tax({ store, canEdit, pending, save, setStore }: SectionProps) {
-    const [rate, setRate] = useState(String(Number(store.taxRate)));
-    const rateValid = /^\d{1,2}(\.\d{1,2})?$|^100$/.test(rate.trim());
-    const rateDirty = rateValid && Number(rate) !== Number(store.taxRate);
+    // `opened` counts the openings, so each one starts from the saved rate.
+    const [editing, setEditing] = useState({ open: false, opened: 0 });
 
     return (
         <>
@@ -186,50 +193,46 @@ function Tax({ store, canEdit, pending, save, setStore }: SectionProps) {
                 }}
             />
             {store.taxEnabled ? (
-                <form
-                    className="grid gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        if (rateDirty) {
-                            save(
-                                { taxRate: rate.trim() },
-                                `Tax rate set to ${Number(rate)}%`,
-                            );
+                <Rows>
+                    <Row
+                        id={TAX_RATE_ROW_ID}
+                        label="Tax rate"
+                        action={
+                            canEdit ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={pending}
+                                    aria-haspopup="dialog"
+                                    aria-label="Edit tax rate"
+                                    onClick={() =>
+                                        setEditing((e) => ({
+                                            open: true,
+                                            opened: e.opened + 1,
+                                        }))
+                                    }
+                                >
+                                    Edit
+                                </Button>
+                            ) : null
                         }
-                    }}
-                >
-                    <Label htmlFor="storefront-tax-rate">Tax rate</Label>
-                    <div className="flex items-center gap-2">
-                        <div className="relative w-28">
-                            <Input
-                                id="storefront-tax-rate"
-                                inputMode="decimal"
-                                value={rate}
-                                readOnly={!canEdit}
-                                aria-invalid={!rateValid || undefined}
-                                aria-describedby="storefront-tax-rate-note"
-                                onChange={(e) => setRate(e.target.value)}
-                                className="pr-7 tabular-nums"
-                            />
-                            <span
-                                aria-hidden
-                                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground"
-                            >
-                                %
-                            </span>
-                        </div>
-                        {canEdit && rateDirty ? (
-                            <Button type="submit" disabled={pending}>
-                                Save
-                            </Button>
-                        ) : null}
-                    </div>
-                    <Note id="storefront-tax-rate-note">
-                        {rateValid
-                            ? "A percentage of the order's items, before delivery."
-                            : "A percentage from 0 to 100, with up to 2 decimals."}
-                    </Note>
-                </form>
+                    >
+                        <span data-testid="tax-rate-summary">
+                            {taxRateSays(store.taxRate)}
+                        </span>
+                    </Row>
+                </Rows>
+            ) : null}
+            {canEdit && editing.opened > 0 ? (
+                <TaxRateSheet
+                    // A fresh draft each time it opens.
+                    key={editing.opened}
+                    store={store}
+                    open={editing.open && store.taxEnabled}
+                    pending={pending}
+                    save={save}
+                    onClose={() => setEditing((e) => ({ ...e, open: false }))}
+                />
             ) : null}
         </>
     );

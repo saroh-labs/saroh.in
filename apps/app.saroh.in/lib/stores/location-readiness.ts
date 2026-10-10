@@ -23,6 +23,7 @@ export const LOCATION_SECTIONS = {
     payments: { id: "payments", label: "Payments" },
     delivery: { id: "delivery", label: "Delivery" },
     customers: { id: "customers", label: "Customers" },
+    people: { id: "people", label: "People" },
     closing: { id: "pause-or-close", label: "Pause or close" },
 } as const;
 
@@ -41,7 +42,10 @@ export const LOCATION_TAB_PARAM = "section";
 /** Where "Connect a provider" goes, as it did from the old Checkout card. */
 export const PROVIDERS_HREF = "/settings/providers";
 
-/** The fields a readiness action can jump to and focus. */
+/**
+ * The fields a readiness action can jump to and focus. Each is in its
+ * row's Edit sheet on The place, which the jump opens (`placeSheetFor`).
+ */
 export const ADDRESS_FIELD_ID = "storefront-address";
 export const HOURS_FIELD_ID = "storefront-hours";
 /** "Do customers come here?": where a place without a counter gets one. */

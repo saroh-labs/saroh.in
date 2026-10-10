@@ -1,8 +1,8 @@
-import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
+import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
@@ -22,7 +22,9 @@ import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 /**
  * Every booking as one list (S4-003) — the register the calendar replaced as
  * Bookings' landing page (U15). Kept whole, because its filters (upcoming,
- * past, waiting to be marked) answer questions a diary does not. The org's bookings across every service,
+ * past, waiting to be marked) answer questions a diary does not. It is the
+ * List side of the header's Calendar | List switch, which the calendar
+ * carries too. The org's bookings across every service,
  * each rendered in the booking's own timezone — the zone the booker saw —
  * because an Organization has no single zone to fold them into.
  *
@@ -96,9 +98,7 @@ export default async function BookingsPage({
                 description="Bookings across your services, in the timezone each was booked in."
                 actions={
                     <>
-                        <Button asChild variant="outline">
-                            <Link href="/bookings">Calendar</Link>
-                        </Button>
+                        <BookingsViewSwitch current="list" />
                         <NewBookingDialog
                             services={services
                                 .filter((s) => s.status === "ACTIVE")

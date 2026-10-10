@@ -8,22 +8,33 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
 import {
+    NOTE,
+    PROBLEM,
+    SettingsSheetFrame,
+    useSheetControl,
+} from "@/components/sites/settings/settings-sheet";
+import {
     readVerificationPaste,
     VERIFICATION_WORDS,
     verificationSavedLine,
 } from "@/lib/sites/search-tracking";
 
 import type { SaveSection } from "./parts";
+import { LineRow } from "./parts";
 
 /**
  * One verification code (DEC-108, U7): the full `<meta>` tag or the bare
- * code. The code is taken out of the tag here, checked with the shared
- * validator as it is typed, and only the code is sent; a paste that looks
- * secret is refused on the spot and never leaves the page.
+ * code. The code is taken out of the tag in the browser, checked with the
+ * shared validator as it is typed, and only the code is sent; a paste that
+ * looks secret is refused on the spot and never leaves the page.
  *
- * Once saved it says what is true — the tag is on the live site, go back
- * and press Verify — and links to the live page. There is no "Verified":
- * only the service knows that.
+ * Read first (owner, 10 Oct): the row says the code saved, or that none
+ * is, and Add or Edit opens its sheet, which says where to find the code.
+ * Clearing the box there takes the code off the live site.
+ *
+ * Once saved the row says what is true — the tag is on the live site, go
+ * back and press Verify — and links to the live page. There is no
+ * "Verified": only the service knows that.
  */
 export function VerificationField({
     service,
@@ -41,21 +52,10 @@ export function VerificationField({
 }) {
     const id = useId();
     const words = VERIFICATION_WORDS[service];
-    const [draft, setDraft] = useState(saved ?? "");
+    const sheet = useSheetControl();
     const [serverError, setServerError] = useState<string | null>(null);
     const [justSaved, setJustSaved] = useState(false);
     const [pending, startTransition] = useTransition();
-
-    const read = readVerificationPaste(service, draft);
-    const problem = read.state === "bad" ? read.message : (serverError ?? null);
-    const value = read.state === "ok" ? read.value : null;
-    const canSave = !pending && value !== null && value !== saved;
-
-    function onChange(next: string) {
-        setDraft(next);
-        setServerError(null);
-        setJustSaved(false);
-    }
 
     function submit(code: string | null) {
         startTransition(async () => {
@@ -66,74 +66,44 @@ export function VerificationField({
                 }
                 return;
             }
-            setDraft(code ?? "");
-            if (code === null) {
-                setJustSaved(false);
-                showSuccess(`${words.label} code removed from your live site.`);
-                return;
-            }
-            setJustSaved(true);
-            showSuccess(verificationSavedLine(service));
+            sheet.close();
+            setJustSaved(code !== null);
+            showSuccess(
+                code === null
+                    ? `${words.label} code removed from your live site.`
+                    : verificationSavedLine(service),
+            );
         });
     }
 
-    const where = words.where.replace("{host}", host ?? "your site's address");
-
     return (
-        <div className="space-y-2 px-4 py-3" data-verification={service}>
-            <Label htmlFor={`${id}-code`} className="text-sm font-medium">
-                {words.label}
-            </Label>
-            <p id={`${id}-where`} className="text-sm text-muted-foreground">
-                {where}
-            </p>
-            <form
-                className="flex flex-wrap items-start gap-2"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    if (canSave && value) submit(value);
-                }}
-            >
-                <Input
-                    id={`${id}-code`}
-                    value={draft}
-                    onChange={(e) => onChange(e.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder="Paste the tag or the code"
-                    aria-invalid={problem ? true : undefined}
-                    aria-describedby={`${id}-where ${id}-said`}
-                    className="min-w-0 flex-1 basis-56 font-mono text-sm"
-                />
-                <div className="flex shrink-0 gap-2">
-                    <Button type="submit" disabled={!canSave}>
-                        {pending ? "Saving…" : "Save"}
+        <div data-verification={service}>
+            <LineRow
+                label={words.label}
+                action={
+                    <Button
+                        id={`${id}-edit`}
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        aria-haspopup="dialog"
+                        aria-label={`${saved ? "Edit" : "Add"} ${words.label} code`}
+                        onClick={() => {
+                            setServerError(null);
+                            sheet.show();
+                        }}
+                    >
+                        {saved ? "Edit" : "Add"}
                     </Button>
-                    {saved ? (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={pending}
-                            onClick={() => submit(null)}
-                        >
-                            Remove
-                        </Button>
-                    ) : null}
-                </div>
-            </form>
-            <div id={`${id}-said`} aria-live="polite">
-                {problem ? (
-                    <p className="text-sm text-destructive">{problem}</p>
-                ) : read.state === "ok" && read.extracted ? (
-                    <p className="text-sm text-muted-foreground">
-                        Code found:{" "}
-                        <span className="font-mono [overflow-wrap:anywhere]">
-                            {read.value}
-                        </span>
-                    </p>
-                ) : null}
-                {justSaved ? (
-                    <p className="text-sm">
+                }
+            >
+                {saved ? (
+                    <span className="font-mono">{saved}</span>
+                ) : (
+                    <span className="text-muted-foreground">Not set</span>
+                )}
+                {justSaved && saved ? (
+                    <span className="mt-1 block" role="status">
                         {verificationSavedLine(service)}{" "}
                         {liveUrl ? (
                             <a
@@ -145,9 +115,112 @@ export function VerificationField({
                                 View your live page
                             </a>
                         ) : null}
-                    </p>
+                    </span>
                 ) : null}
-            </div>
+            </LineRow>
+            {sheet.opened > 0 ? (
+                <VerificationSheet
+                    key={sheet.opened}
+                    editId={`${id}-edit`}
+                    service={service}
+                    saved={saved}
+                    host={host}
+                    open={sheet.open}
+                    pending={pending}
+                    serverError={serverError}
+                    onTyped={() => setServerError(null)}
+                    onClose={sheet.close}
+                    onSave={submit}
+                />
+            ) : null}
         </div>
+    );
+}
+
+function VerificationSheet({
+    editId,
+    service,
+    saved,
+    host,
+    open,
+    pending,
+    serverError,
+    onTyped,
+    onClose,
+    onSave,
+}: {
+    editId: string;
+    service: VerificationService;
+    saved: string | null;
+    host: string | null;
+    open: boolean;
+    pending: boolean;
+    /** The API's refusal of this code, said under it. */
+    serverError: string | null;
+    onTyped: () => void;
+    onClose: () => void;
+    onSave: (code: string | null) => void;
+}) {
+    const id = useId();
+    const words = VERIFICATION_WORDS[service];
+    const [draft, setDraft] = useState(saved ?? "");
+    const read = readVerificationPaste(service, draft);
+    const problem = read.state === "bad" ? read.message : serverError;
+    const value = read.state === "ok" ? read.value : null;
+    const empty = draft.trim() === "";
+
+    return (
+        <SettingsSheetFrame
+            editId={editId}
+            title={words.label}
+            description={words.where.replace(
+                "{host}",
+                host ?? "your site's address",
+            )}
+            open={open}
+            pending={pending}
+            onClose={onClose}
+            onSubmit={(e) => {
+                e.preventDefault();
+                // Nothing typed: the code comes off, if there was one.
+                const next = empty ? null : value;
+                if (!empty && next === null) return;
+                if (next === saved) onClose();
+                else onSave(next);
+            }}
+        >
+            <Label htmlFor={`${id}-code`}>Tag or code</Label>
+            <Input
+                id={`${id}-code`}
+                value={draft}
+                onChange={(e) => {
+                    setDraft(e.target.value);
+                    onTyped();
+                }}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Paste the tag or the code"
+                aria-invalid={problem ? true : undefined}
+                aria-describedby={`${id}-said`}
+                className="font-mono text-sm"
+            />
+            <div id={`${id}-said`} aria-live="polite">
+                {problem ? (
+                    <p className={PROBLEM}>{problem}</p>
+                ) : read.state === "ok" && read.extracted ? (
+                    <p className="text-sm text-muted-foreground">
+                        Code found:{" "}
+                        <span className="font-mono [overflow-wrap:anywhere]">
+                            {read.value}
+                        </span>
+                    </p>
+                ) : (
+                    <p className={NOTE}>
+                        It is on your live site as soon as you save.
+                        {saved ? " Clear the box to remove it." : ""}
+                    </p>
+                )}
+            </div>
+        </SettingsSheetFrame>
     );
 }

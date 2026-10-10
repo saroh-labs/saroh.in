@@ -1,13 +1,15 @@
 ---
 # Every label below was checked against the real screens on 6 Oct 2026
-# (R7), in the code and in the captured shots. Sources, from the repo root:
+# (R7), in the code and in the captured shots; OPTS again in the code on
+# 10 Oct, when an option's values moved into its Edit sheet (its shot is to
+# be captured again). Sources, from the repo root:
 #   MORE  apps/app.saroh.in/components/stores/catalogue/catalogue-header.tsx
 #         (Products › More › "Product settings")
 #   OPTS  apps/app.saroh.in/components/commerce/product-settings/options-tab.tsx
-#         ("Options", "Add a value, press Enter", "New option, e.g.
-#         Fragrance", "Add option"; a value in use "cannot be removed");
-#         product-settings.tsx (tabs Options, SKUs; changes take effect at
-#         once and offer Undo)
+#         ("Options", "New option", "Edit") and option-sheet.tsx ("Add a
+#         value", "Add value", "Save", "Add option"; a value in use "cannot
+#         be removed"); product-settings.tsx (tabs Options, SKUs; a save
+#         offers Undo)
 #   VARI  apps/app.saroh.in/components/commerce/product-editor-v2/variants-section.tsx
 #         ("Sold as itself … Add variants … gets its own stock count",
 #         "Blank price uses the product's …", one option per product:
@@ -33,16 +35,16 @@ order: 20
 intro: "When a product comes in sizes, colours or packs, add each one as a variant of it. Each has its own SKU, its own price if it needs one, and its own stock count. This takes about two minutes."
 description: "Give a product sizes, colours or packs in Saroh: set up your options, add each variant with its own SKU and price, and choose where each one sells."
 readMinutes: 3
-updated: "2026-10-06"
+updated: "2026-10-10"
 publishOn: "2026-10-17"
 steps:
     # MORE, OPTS.
     - title: Set up your options
-      body: "An option is what customers choose by, like Size, and its values are the choices, like 400g and 800g. In Saroh, open Sell › Products, press More and choose Product settings, then Options. To add a value, type it in the box at the end of an option's values and press Enter. It's added straight away, with Undo. For a new kind of choice, type its name under New option, e.g. Fragrance, and press Add option."
+      body: "An option is what customers choose by, like Size, and its values are the choices, like 400g and 800g. In Saroh, open Sell › Products, press More and choose Product settings, then Options. To add a value, press Edit on the option, type the value in the box under its values and press Add value, then Save. You can undo it. For a new kind of choice, press New option, name it, add its values and press Add option."
       shot: help-add-sizes-1
-      caption: "Options at Rye & Co. (demo bakery): Size, Grind and Pack, with 1kg typed into Size."
+      caption: "Options at Rye & Co. (demo bakery): Size, with 1kg typed in to add."
       tip: "A value a product already uses can't be removed. Change that product's variants first."
-      marker: Add a value, press Enter
+      marker: Add value
     # VARI.
     - title: Open the product and press Add variants
       body: "Open the product from Products. Until it has variants it is sold as itself, at its own price. Under Variants, press Add variants."

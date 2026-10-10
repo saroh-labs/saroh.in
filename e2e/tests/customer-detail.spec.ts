@@ -193,12 +193,16 @@ test.describe("customer detail", () => {
         });
         await page.goto(`/customers/${who.id}?tab=notes`);
         const text = `E2E note ${s}`;
-        await page.getByLabel("New note").fill(text);
+        // The tab is the list; the field opens in a side sheet.
+        await page.getByRole("button", { name: "Add note" }).click();
+        const sheet = page.getByRole("dialog", { name: "Add note" });
+        await sheet.getByLabel("Note", { exact: true }).fill(text);
         // Allergies live on Needs attention, not on a note (Z2a).
         await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(
             0,
         );
-        await page.getByRole("button", { name: "Add note" }).click();
+        await sheet.getByRole("button", { name: "Add note" }).click();
+        await expect(sheet).toBeHidden();
         const note = page.getByRole("article").filter({ hasText: text });
         await expect(note).toBeVisible();
         await expect(note).not.toContainText("Allergy:");

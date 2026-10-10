@@ -1,9 +1,5 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
-import { Textarea } from "@saroh/ui/textarea";
-import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import { Absent, Group, Row, Section } from "@/components/sites/settings-rows";
@@ -17,30 +13,20 @@ import type {
     SiteFooter,
     SiteNavigationItem,
 } from "@/lib/sites/service";
-import { automaticMenu, ROW_ANCHORS } from "@/lib/sites/settings-page";
+import { SETTINGS_ROW_ID } from "@/lib/sites/settings-edit";
+import { automaticMenu } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
-import { EditActions } from "./edit-actions";
-import { MenuEditor } from "./menu-editor";
+import { EditAction } from "./edit-actions";
+import { FooterSheet, MenuSheet, PostsPathSheet } from "./menu-footer-sheets";
 import type { SettingsSave } from "./use-settings-save";
-
-/* On demand and browser-only, for the same reasons as in the editor. */
-const RichTextEditor = dynamic(
-    () =>
-        import("@/components/sites/rich-text-editor").then(
-            (m) => m.RichTextEditor,
-        ),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
-        ),
-    },
-);
 
 /**
  * Menu and footer: the links at the top of every page, the line at the
  * foot, and where the site's posts live. All part of the draft.
+ *
+ * Each row says what is saved and its Edit opens the row's sheet; a save
+ * shows in the row at once (`saved`), before the page reads again.
  *
  * With no menu built, the live site still lists its module pages on its
  * own (`resolveSiteNavigation`), so the row names them rather than saying
@@ -55,21 +41,22 @@ export function MenuFooterGroup({
     address: SiteAddress | null;
     state: SettingsSave;
 }) {
-    const { editing, run } = state;
-    const [menu, setMenu] = useState<SiteNavigationItem[]>(
-        site.navigation?.items ?? [],
-    );
-    const [footerValue, setFooterValue] = useState(site.footer?.value ?? "");
-    const [footerFormat, setFooterFormat] = useState<SiteFooter["format"]>(
-        site.footer?.format ?? "html",
-    );
-    const [postsPrefix, setPostsPrefix] = useState(site.postsPrefix ?? "");
+    const { editing, run, pending, close } = state;
+    // What the rows say: the site's own, then each save as it lands.
+    const [saved, setSaved] = useState<{
+        menu: SiteNavigationItem[] | null;
+        footer: SiteFooter | null;
+        postsPrefix: string | null;
+    }>({
+        menu: site.navigation?.items ?? null,
+        footer: site.footer ?? null,
+        postsPrefix: site.postsPrefix ?? null,
+    });
     const pagesById = new Map(site.pages.map((p) => [p.id, p]));
     const automatic = automaticMenu(site);
 
-    function saveMenu() {
+    function saveMenu(menu: SiteNavigationItem[]) {
         run(
-            "menu",
             () =>
                 updateSiteNavigation(
                     site.id,
@@ -78,55 +65,53 @@ export function MenuFooterGroup({
             menu.length
                 ? "Menu saved. Publish to make it public."
                 : "Menu removed. Publish to take it off the site.",
+            () => setSaved((s) => ({ ...s, menu: menu.length ? menu : null })),
         );
     }
 
-    function saveFooter() {
-        // Empty IS the delete: the API collapses a blank value to null, so
-        // clearing the box removes the footer.
-        const next: SiteFooter | null =
-            footerValue.trim() === ""
-                ? null
-                : { format: footerFormat, value: footerValue };
+    function saveFooter(footer: SiteFooter | null) {
         run(
-            "footer",
-            () => updateSiteFooter(site.id, next),
-            next === null
+            () => updateSiteFooter(site.id, footer),
+            footer === null
                 ? "Footer removed. Publish to take it off the site."
                 : "Footer saved. Publish to make it public.",
+            () => setSaved((s) => ({ ...s, footer })),
         );
     }
 
-    const hasFooter = Boolean(site.footer?.value.trim());
+    function savePostsPath(postsPrefix: string) {
+        run(
+            () =>
+                updateSiteSettings(site.id, {
+                    postsPrefix: postsPrefix || null,
+                }),
+            "Posts path saved. Publish to make it public.",
+            () => setSaved((s) => ({ ...s, postsPrefix: postsPrefix || null })),
+        );
+    }
+
+    const hasFooter = Boolean(saved.footer?.value.trim());
+    const sheet = { open: editing?.open ?? false, pending, onClose: close };
 
     return (
         <Group id="menu-and-footer" title="Menu and footer">
             <Section>
                 <Row
-                    id={ROW_ANCHORS.menu}
+                    id={SETTINGS_ROW_ID.menu}
                     label="Menu"
                     draft
                     action={
-                        <EditActions
+                        <EditAction
                             row="menu"
                             state={state}
-                            editLabel={site.navigation ? "Edit" : "Build"}
-                            onSave={saveMenu}
-                            onCancel={() =>
-                                setMenu(site.navigation?.items ?? [])
-                            }
+                            label={saved.menu ? "Edit" : "Build"}
+                            name={saved.menu ? "Edit menu" : "Build menu"}
                         />
                     }
                 >
-                    {editing === "menu" ? (
-                        <MenuEditor
-                            menu={menu}
-                            setMenu={setMenu}
-                            pages={site.pages}
-                        />
-                    ) : site.navigation ? (
+                    {saved.menu ? (
                         <span className="[overflow-wrap:anywhere]">
-                            {site.navigation.items
+                            {saved.menu
                                 .map(
                                     (i) =>
                                         i.label ??
@@ -150,71 +135,23 @@ export function MenuFooterGroup({
                 </Row>
 
                 <Row
+                    id={SETTINGS_ROW_ID.footer}
                     label="Footer"
                     draft
                     action={
-                        <EditActions
+                        <EditAction
                             row="footer"
                             state={state}
-                            editLabel={hasFooter ? "Edit" : "Write"}
-                            onSave={saveFooter}
-                            onCancel={() => {
-                                setFooterValue(site.footer?.value ?? "");
-                                setFooterFormat(site.footer?.format ?? "html");
-                            }}
+                            label={hasFooter ? "Edit" : "Write"}
+                            name={hasFooter ? "Edit footer" : "Write footer"}
                         />
                     }
                 >
-                    {editing === "footer" ? (
-                        <div className="space-y-2">
-                            {footerFormat === "html" ? (
-                                <RichTextEditor
-                                    value={footerValue}
-                                    onChange={setFooterValue}
-                                    placeholder="Your name · your area · how to reach you"
-                                />
-                            ) : (
-                                <Textarea
-                                    value={footerValue}
-                                    onChange={(e) =>
-                                        setFooterValue(e.target.value)
-                                    }
-                                    rows={4}
-                                    placeholder={"Your name\nYour area"}
-                                    aria-label="Footer text"
-                                />
-                            )}
-                            {/* The two formats a richText section offers:
-                                one content model, one sanitizer. */}
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span>Written as</span>
-                                {(["html", "markdown"] as const).map((f) => (
-                                    <button
-                                        key={f}
-                                        type="button"
-                                        onClick={() => setFooterFormat(f)}
-                                        aria-pressed={footerFormat === f}
-                                        className={cn(
-                                            "rounded px-2 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                            footerFormat === f
-                                                ? "bg-secondary text-secondary-foreground"
-                                                : "hover:text-foreground active:bg-accent-active",
-                                        )}
-                                    >
-                                        {f === "html" ? "HTML" : "Plain text"}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Clear the box to remove the footer. Links and
-                                basic formatting are kept.
-                            </p>
-                        </div>
-                    ) : hasFooter ? (
+                    {hasFooter ? (
                         // A template's row with no line yet keeps its layout
                         // (the API's), and reads as no line here.
                         <span className="whitespace-pre-wrap break-words text-muted-foreground">
-                            {site.footer?.value}
+                            {saved.footer?.value}
                         </span>
                     ) : (
                         <Absent>Not written</Absent>
@@ -222,53 +159,54 @@ export function MenuFooterGroup({
                 </Row>
 
                 <Row
+                    id={SETTINGS_ROW_ID["posts-path"]}
                     label="Posts path"
                     draft
                     action={
-                        <EditActions
-                            row="postsPrefix"
+                        <EditAction
+                            row="posts-path"
                             state={state}
-                            onSave={() =>
-                                run(
-                                    "postsPrefix",
-                                    () =>
-                                        updateSiteSettings(site.id, {
-                                            postsPrefix: postsPrefix || null,
-                                        }),
-                                    "Posts path saved. Publish to make it public.",
-                                )
-                            }
-                            onCancel={() =>
-                                setPostsPrefix(site.postsPrefix ?? "")
-                            }
+                            name="Edit posts path"
                         />
                     }
                 >
-                    {editing === "postsPrefix" ? (
-                        <div className="space-y-1">
-                            <Input
-                                value={postsPrefix}
-                                autoFocus
-                                placeholder="blog"
-                                onChange={(e) => setPostsPrefix(e.target.value)}
-                                aria-label="Posts path"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Posts will live at {address ? address.host : ""}
-                                /{postsPrefix || "blog"}/…
-                            </p>
-                        </div>
-                    ) : (
-                        <span>
-                            /{site.postsPrefix ?? "blog"}
-                            <span className="text-muted-foreground">
-                                {" "}
-                                · where your posts live
-                            </span>
+                    <span>
+                        /{saved.postsPrefix ?? "blog"}
+                        <span className="text-muted-foreground">
+                            {" "}
+                            · where your posts live
                         </span>
-                    )}
+                    </span>
                 </Row>
             </Section>
+
+            {/* The open sheet, a fresh draft each time it opens. */}
+            {editing?.which === "menu" ? (
+                <MenuSheet
+                    key={editing.opened}
+                    {...sheet}
+                    saved={saved.menu ?? []}
+                    pages={site.pages}
+                    onSave={saveMenu}
+                />
+            ) : null}
+            {editing?.which === "footer" ? (
+                <FooterSheet
+                    key={editing.opened}
+                    {...sheet}
+                    saved={saved.footer}
+                    onSave={saveFooter}
+                />
+            ) : null}
+            {editing?.which === "posts-path" ? (
+                <PostsPathSheet
+                    key={editing.opened}
+                    {...sheet}
+                    saved={saved.postsPrefix ?? ""}
+                    host={address?.host ?? null}
+                    onSave={savePostsPath}
+                />
+            ) : null}
         </Group>
     );
 }

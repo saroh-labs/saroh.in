@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { usePayLink } from "@/components/commerce/order-detail/pay-link";
+import { QrButton } from "@/components/qr/qr-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -266,6 +267,18 @@ export function OrderRowMenu({
                         {payLink.url}
                     </code>
                     <DialogFooter className="gap-2">
+                        {payLink.url ? (
+                            <QrButton
+                                className="h-[38px] coarse:h-11 sm:mr-auto"
+                                link={{
+                                    mode: "instant",
+                                    url: payLink.url,
+                                    what: "this order's pay link",
+                                    opens: "pay",
+                                    fileName: "pay-link-qr",
+                                }}
+                            />
+                        ) : null}
                         <Button
                             type="button"
                             variant="outline"

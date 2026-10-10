@@ -6,7 +6,7 @@ import type {
 
 /**
  * The one save path every part of a location's page shares: each control
- * saves on its own (a switch when flipped, a field when its Save is
+ * saves on its own (a switch when flipped, a row's sheet when its Save is
  * pressed), so there is no page-wide save to forget.
  */
 export type Saver = (
@@ -18,7 +18,7 @@ export type Saver = (
      * the location limit, by the radio it stopped.
      */
     inline?: (error: string) => void,
-    /** After the API took it: an edit panel closes. */
+    /** After the API took it: an edit sheet closes. */
     onSaved?: () => void,
 ) => void;
 
@@ -28,7 +28,10 @@ export interface SectionProps {
     pending: boolean;
     save: Saver;
     setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
-    /** Open another tab, and put the keyboard on a field there. */
+    /**
+     * Open another tab, and put the keyboard on a field there. One of The
+     * place's fields opens its sheet instead (`placeSheetFor`).
+     */
     goTo?: (tab: LocationTab, focus?: string) => void;
 }
 

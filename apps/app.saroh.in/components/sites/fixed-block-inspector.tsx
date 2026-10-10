@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useId } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { settingsEditHref } from "@/lib/sites/settings-edit";
 
 /** The lock's reason, said beside the controls it disables (G6). */
 export const FIXED_LOCK = "On every page — can't be removed or moved";
@@ -102,9 +103,14 @@ export function FixedBlockInspector({
             size="sm"
             className="justify-self-start"
         >
-            {/* A new tab, for the same reason as the Services link. */}
+            {/* A new tab, for the same reason as the Services link. It lands
+                on the row with its sheet open (`?edit=`): the menu from the
+                header, the footer from the footer. */}
             <Link
-                href={`/sites/${siteId}/settings`}
+                href={settingsEditHref(
+                    siteId,
+                    part === "header" ? "menu" : "footer",
+                )}
                 target="_blank"
                 rel="noopener"
             >

@@ -169,7 +169,7 @@ test.describe("with Saroh sending a business's booking emails", () => {
         const add = card.getByRole("link", { name: "Add a contact email" });
         await expect(add).toHaveAttribute(
             "href",
-            "/settings/organization?section=contact",
+            "/settings/organization?section=contact&edit=contactEmail",
         );
         const contact = `hi-${b.address.slice(-12)}@example.in`;
         const saved = await page.request.patch(api(b, ""), {

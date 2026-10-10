@@ -402,4 +402,28 @@ describe("the link preview tool's entries (resources plan U2)", () => {
             { email: mail("owner"), checkedUrl: null, checkedAt: null },
         ]);
     });
+
+    it("drops a QR code maker entry 12 months after its last use (QR codes plan U9)", async () => {
+        const now = new Date();
+        const used = (who: string, at: Date) =>
+            prisma.waitlistSignup.create({
+                data: {
+                    email: mail(who),
+                    emailKey: mail(who),
+                    source: "qr-maker",
+                    checkedAt: at,
+                    newsConsent: false,
+                },
+            });
+        await used("old-qr", new Date(now.getTime() - 400 * DAY_MS));
+        await used("new-qr", new Date(now.getTime() - 30 * DAY_MS));
+
+        await expect(new WaitlistRetentionHandler().sweep(now)).resolves.toBe(
+            1,
+        );
+        const left = await prisma.waitlistSignup.findMany({
+            select: { email: true },
+        });
+        expect(left).toEqual([{ email: mail("new-qr") }]);
+    });
 });

@@ -8,6 +8,7 @@ import {
     wayDraft,
     wayInput,
     waySaved,
+    waySheetSays,
     waySummary,
 } from "./delivery-summary";
 import type { StorefrontSettings } from "./storefronts";
@@ -329,5 +330,23 @@ describe("waySaved and checkoutLine", () => {
         expect(
             checkoutLine({ ...base, siteShop: false }, "LOCAL_DELIVERY", draft),
         ).toBeNull();
+    });
+});
+
+describe("waySheetSays", () => {
+    it("says what a way's sheet controls, naming the price only where it asks for one", () => {
+        expect(waySheetSays(base, "LOCAL_DELIVERY")).toBe(
+            "Whether you deliver nearby from here, what customers pay and when an order counts as late.",
+        );
+        expect(waySheetSays(base, "SHIPPING")).toBe(
+            "Whether you ship from here, what customers pay and when an order counts as late.",
+        );
+        // Pick-up is never charged for, and nothing is with no online shop.
+        expect(waySheetSays(base, "PICKUP")).toBe(
+            "Whether customers can collect from here, and when an order counts as late.",
+        );
+        expect(waySheetSays({ ...base, siteShop: false }, "SHIPPING")).toBe(
+            "Whether you ship from here, and when an order counts as late.",
+        );
     });
 });

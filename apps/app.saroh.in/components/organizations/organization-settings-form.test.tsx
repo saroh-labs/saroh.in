@@ -1,30 +1,48 @@
 // @vitest-environment jsdom
 /**
- * Settings › Business › Identity: "What is this?" (DEC-070, K5). The same
- * three answers setup asked with, saved with the Identity card like the
- * name, with Undo; the card's words follow what is saved, and the choice
- * is never offered to a role that may not change settings.
- *
- * `react-dom/client` + `act` directly, as the other component tests do.
+ * Settings › Business, read first (owner, 10 Oct): every tab is rows saying
+ * what is saved, and a row's Edit opens its own side sheet with one Save.
+ * Here, Identity: Cancel saves nothing, a refusal keeps the sheet open with
+ * what was typed, a save closes it and the row reads the new value, a
+ * read-only role has no Edit, and a link with `?edit=` opens the right
+ * sheet. The other tabs are `business-tax-rows.test.tsx` and
+ * `business-hours-section.test.tsx`; the logo, `business-logo-sheet.test.tsx`.
+ * Made-up details only.
  */
 import { act } from "react";
-import type { Root } from "react-dom/client";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { OrganizationSettings } from "@/lib/organizations/settings-service";
-
-import { OrganizationSettingsForm } from "./organization-settings-form";
+import {
+    address,
+    card,
+    draw,
+    edit,
+    host,
+    input,
+    item,
+    mount,
+    onTab,
+    press,
+    pressEscape,
+    row,
+    settings,
+    settle,
+    sheet,
+    sheetName,
+    type,
+    unmount,
+} from "./business-settings.test-kit";
 
 const save = vi.fn();
 const undoSettings = vi.fn();
+const saveLogo = vi.fn();
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: (...args: unknown[]) => save(...args) as unknown,
     undoOrganizationSettings: (...args: unknown[]) =>
         undoSettings(...args) as unknown,
     undoBusinessLogo: vi.fn(),
     undoStorefrontHours: vi.fn(),
-    saveBusinessLogo: vi.fn(),
+    saveBusinessLogo: (...args: unknown[]) => saveLogo(...args) as unknown,
 }));
 
 const showUndo = vi.fn();
@@ -38,124 +56,214 @@ vi.mock("@saroh/ui/toast", () => ({
 }));
 
 const refresh = vi.fn();
-let params = new URLSearchParams();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
-    useSearchParams: () => params,
+    useSearchParams: () => address.params,
     usePathname: () => "/settings/organization",
 }));
 
-// The logo row uploads through the media library; not what is tested here.
+// The logo's sheet uploads through the media library: a picked file
+// becomes the picture this answers with.
+const upload = vi.fn();
 vi.mock("@/components/sites/media-picker", () => ({
-    useImageUpload: () => ({ upload: vi.fn(), busy: false, error: null }),
+    useImageUpload: () => ({ upload, busy: false, error: null }),
 }));
+const updateStorefront = vi.fn();
 vi.mock("@/lib/stores/storefront-actions", () => ({
-    updateStorefront: vi.fn(),
+    updateStorefront: (...args: unknown[]) =>
+        updateStorefront(...args) as unknown,
 }));
-
-function settings(over: Partial<OrganizationSettings> = {}) {
-    return {
-        id: "org_1",
-        name: "Northwind Supply",
-        slug: "northwind",
-        kind: "BUSINESS",
-        profile: {
-            legalName: null,
-            type: "individual",
-            country: "IN",
-            taxId: null,
-            contactEmail: "hello@northwind.in",
-            website: null,
-            timezone: "Asia/Kolkata",
-            phone: null,
-        },
-        tradingSince: null,
-        logo: null,
-        ...over,
-    } satisfies OrganizationSettings;
-}
-
-let root: Root;
-let host: HTMLDivElement;
-
-function draw(s: OrganizationSettings, canEdit = true) {
-    act(() =>
-        root.render(
-            <OrganizationSettingsForm
-                settings={s}
-                canEdit={canEdit}
-                hours={{ state: "ok", storefronts: [] }}
-                canEditHours={false}
-            />,
-        ),
-    );
-}
 
 beforeEach(() => {
-    (
-        globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
-    host = document.createElement("div");
-    document.body.appendChild(host);
-    root = createRoot(host);
-    save.mockReset();
-    undoSettings.mockReset();
-    showUndo.mockReset();
-    refresh.mockReset();
-    params = new URLSearchParams();
-});
-
-afterEach(() => {
-    act(() => root.unmount());
-    host.remove();
-    document.body.innerHTML = "";
-});
-
-async function settle() {
-    for (let i = 0; i < 5; i++) {
-        await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
-        });
+    mount();
+    for (const mock of [
+        save,
+        undoSettings,
+        saveLogo,
+        showUndo,
+        showError,
+        refresh,
+        upload,
+        updateStorefront,
+    ]) {
+        mock.mockReset();
     }
-}
+});
 
-function button(name: string): HTMLButtonElement {
-    const hit = Array.from(host.querySelectorAll("button")).find(
-        (b) =>
-            b.getAttribute("aria-label") === name ||
-            b.textContent.trim() === name,
-    );
-    if (!hit) throw new Error(`No button ${name}`);
-    return hit;
-}
+afterEach(unmount);
 
-function radio(name: string): HTMLButtonElement {
-    const hit = Array.from(
-        host.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
-    ).find((b) => b.textContent.startsWith(name));
-    if (!hit) throw new Error(`No choice ${name}`);
-    return hit;
-}
-
-const click = async (el: HTMLElement) => {
-    await act(async () => {
-        el.click();
-        await Promise.resolve();
+describe("Identity's rows and sheets", () => {
+    it("rows say what is saved, with nothing open until a row's Edit", () => {
+        draw(settings());
+        expect(row("business-kind")?.textContent).toContain("A business");
+        expect(row("business-name")?.textContent).toContain("Northwind Supply");
+        expect(row("business-logo")?.textContent).toContain("No logo yet");
+        expect(row("business-legal-name")?.textContent).toContain(
+            "Same as the business name",
+        );
+        expect(row("business-type")?.textContent).toContain("Individual");
+        expect(card("Identity")?.textContent).toContain("No orders yet");
+        expect(card("Identity")?.textContent).toContain(
+            "From your first order",
+        );
+        expect(sheet()).toBeNull();
+        expect(host.querySelector("input, textarea, form")).toBeNull();
     });
-    await settle();
-};
 
-const card = () =>
-    host.querySelector<HTMLElement>('section[aria-label="Identity"]');
+    it("Edit opens the name's sheet; Save sends only the name, closes and the row reads it", async () => {
+        const before = settings();
+        const after = settings({ name: "Northwind & Co." });
+        save.mockResolvedValue({ ok: true, data: after });
+        draw(before);
+        await press(edit("Edit business name"));
+        expect(sheetName()).toBe("Business name");
+        expect(input("name")?.value).toBe("Northwind Supply");
+        expect(document.activeElement).toBe(input("name"));
+        // Only this row's field.
+        expect(sheet()?.querySelectorAll("input")).toHaveLength(1);
+
+        await type(input("name"), "Northwind & Co.");
+        // What a customer will read, as it is typed.
+        expect(
+            sheet()?.querySelector('aside[aria-label="How it prints"]')
+                ?.textContent,
+        ).toContain("Northwind & Co.");
+        expect(save).not.toHaveBeenCalled();
+        await press(item("Save"));
+
+        expect(save).toHaveBeenCalledWith({ name: "Northwind & Co." });
+        expect(showUndo.mock.calls[0]?.[0]).toBe(
+            "Business name saved. Invoices from now on use it.",
+        );
+        expect(sheet()).toBeNull();
+        expect(row("business-name")?.textContent).toContain("Northwind & Co.");
+        // The page's preview shows what is saved now.
+        expect(
+            host.querySelector('aside[aria-label="How it prints"]')
+                ?.textContent,
+        ).toContain("Northwind & Co.");
+        // The header switcher shows the name: the page reads again.
+        expect(refresh).toHaveBeenCalled();
+    });
+
+    it("Cancel, Escape and Close save nothing, and the next opening starts from what is saved", async () => {
+        draw(settings());
+        await press(edit("Edit business name"));
+        await type(input("name"), "Something else");
+        await press(item("Cancel"));
+        expect(sheet()).toBeNull();
+        expect(document.activeElement).toBe(edit("Edit business name"));
+
+        await press(edit("Edit business name"));
+        expect(input("name")?.value).toBe("Northwind Supply");
+        await type(input("name"), "Something else");
+        await pressEscape();
+        expect(sheet()).toBeNull();
+
+        await press(edit("Edit business name"));
+        await type(input("name"), "Something else");
+        await press(item("Close", sheet() ?? document));
+        expect(sheet()).toBeNull();
+
+        expect(save).not.toHaveBeenCalled();
+        expect(row("business-name")?.textContent).toContain("Northwind Supply");
+    });
+
+    it("Save with nothing changed just closes", async () => {
+        draw(settings());
+        await press(edit("Edit legal name"));
+        expect(sheetName()).toBe("Legal name");
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()).toBeNull();
+    });
+
+    it("an empty name is said on its field and not sent", async () => {
+        draw(settings());
+        await press(edit("Edit business name"));
+        await type(input("name"), "   ");
+        await press(item("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain("Name is required");
+    });
+
+    it("a refusal keeps the sheet open with what was typed, on the field the API names", async () => {
+        save.mockResolvedValue({
+            ok: false,
+            error: "That name is taken by another business.",
+            field: "name",
+        });
+        draw(settings());
+        await press(edit("Edit business name"));
+        await type(input("name"), "Rye & Co.");
+        await press(item("Save"));
+        expect(sheetName()).toBe("Business name");
+        expect(input("name")?.value).toBe("Rye & Co.");
+        expect(sheet()?.textContent).toContain(
+            "That name is taken by another business.",
+        );
+        expect(showError).not.toHaveBeenCalled();
+        expect(row("business-name")?.textContent).toContain("Northwind Supply");
+    });
+
+    it("a refusal that names no field here is a toast, and the sheet stays open", async () => {
+        save.mockResolvedValue({ ok: false, error: "Couldn't save that." });
+        draw(settings());
+        await press(edit("Edit business name"));
+        await type(input("name"), "Rye & Co.");
+        await press(item("Save"));
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
+        expect(sheetName()).toBe("Business name");
+        expect(input("name")?.value).toBe("Rye & Co.");
+    });
+
+    it("a read-only role sees the rows without Edit, and a link opens no sheet", () => {
+        onTab("identity", "&edit=name");
+        draw(settings({ kind: "SOLO" }), { canEdit: false });
+        expect(row("business-kind")?.textContent).toContain("Just me");
+        expect(row("business-name")?.textContent).toContain("Northwind Supply");
+        expect(
+            host.querySelector("#business-panel")?.querySelector("button"),
+        ).toBeNull();
+        expect(sheet()).toBeNull();
+    });
+
+    it("a link with ?edit= opens that row's sheet, and closing it takes the query out", async () => {
+        onTab("identity", "&edit=type");
+        window.history.replaceState(
+            null,
+            "",
+            "/settings/organization?section=identity&edit=type",
+        );
+        draw(settings());
+        expect(sheetName()).toBe("Type");
+        await press(item("Cancel"));
+        expect(sheet()).toBeNull();
+        expect(window.location.search).toBe("?section=identity");
+    });
+
+    it("a link to a row on another tab opens nothing", () => {
+        onTab("identity", "&edit=taxId");
+        draw(settings());
+        expect(sheet()).toBeNull();
+    });
+
+    it("a step on this page that moves the address opens its sheet", () => {
+        draw(settings());
+        expect(sheet()).toBeNull();
+        onTab("identity", "&edit=legalName");
+        draw(settings());
+        expect(sheetName()).toBe("Legal name");
+    });
+});
 
 describe("What is this? (DEC-070, K5)", () => {
-    it("reads what is saved at the top of Identity", () => {
+    it("reads what is saved at the top of Identity, in the kind's words", () => {
         draw(settings({ kind: "WORK" }));
-        expect(card()?.textContent).toContain("What this is");
-        expect(card()?.textContent).toContain("A site for my work");
-        // The name in the kind's words.
-        expect(card()?.textContent).toContain("Your name or brand");
-        expect(card()?.textContent).not.toContain("Business name");
+        expect(card("Identity")?.textContent).toContain("What this is");
+        expect(card("Identity")?.textContent).toContain("A site for my work");
+        expect(card("Identity")?.textContent).toContain("Your name or brand");
+        expect(card("Identity")?.textContent).not.toContain("Business name");
     });
 
     it("switching to Just me saves kind SOLO, and offers Undo", async () => {
@@ -165,25 +273,26 @@ describe("What is this? (DEC-070, K5)", () => {
         undoSettings.mockResolvedValue({ ok: true, data: before });
         draw(before);
 
-        await click(button("Edit identity"));
+        await press(edit("Change what this is"));
+        expect(sheetName()).toBe("What this is");
         const choices = Array.from(
-            host.querySelectorAll(
+            sheet()?.querySelectorAll<HTMLButtonElement>(
                 '[aria-labelledby="business-kind-label"] [role="radio"]',
-            ),
+            ) ?? [],
         );
         expect(choices.map((c) => c.getAttribute("aria-checked"))).toEqual([
             "true",
             "false",
             "false",
         ]);
-        expect(host.textContent).toContain(
+        expect(sheet()?.textContent).toContain(
             "Changes the words Saroh uses and what it suggests first. Nothing is turned on or off.",
         );
 
-        await click(radio("Just me"));
-        await click(button("Save"));
+        await press(choices.find((c) => c.textContent.startsWith("Just me")));
+        await press(item("Save"));
 
-        // Only the kind: nothing else on the card was changed.
+        // Only the kind: nothing else was changed.
         expect(save).toHaveBeenCalledWith({ kind: "SOLO" });
         // It prints on nothing, so the toast doesn't say invoices use it.
         expect(showUndo).toHaveBeenCalledTimes(1);
@@ -191,10 +300,10 @@ describe("What is this? (DEC-070, K5)", () => {
             string,
             () => void,
         ];
-        expect(message).toBe("Identity saved");
-        // The card reads the new words at once.
-        expect(card()?.textContent).toContain("Just me");
-        expect(card()?.textContent).toContain("Your name or brand");
+        expect(message).toBe("What this is saved");
+        // The rows read the new words at once.
+        expect(card("Identity")?.textContent).toContain("Just me");
+        expect(card("Identity")?.textContent).toContain("Your name or brand");
 
         // Undo sends the kind back, and the words come back with it.
         await act(async () => {
@@ -208,53 +317,41 @@ describe("What is this? (DEC-070, K5)", () => {
                 expect: { kind: "SOLO" },
             }),
         );
-        expect(card()?.textContent).toContain("A business");
-        expect(card()?.textContent).toContain("Business name");
-    });
-
-    it("is never offered to a role that may not change settings", () => {
-        draw(settings({ kind: "SOLO" }), false);
-        expect(host.querySelectorAll('[role="radio"]')).toHaveLength(0);
-        expect(
-            Array.from(host.querySelectorAll("button")).some(
-                (b) => b.getAttribute("aria-label") === "Edit identity",
-            ),
-        ).toBe(false);
-        // Read, as the rest of the card is.
-        expect(card()?.textContent).toContain("Just me");
+        expect(card("Identity")?.textContent).toContain("A business");
+        expect(card("Identity")?.textContent).toContain("Business name");
     });
 
     it("reads a kind an older API never sent as a business", () => {
         draw(settings({ kind: undefined }));
-        expect(card()?.textContent).toContain("A business");
-        expect(card()?.textContent).toContain("Business name");
+        expect(card("Identity")?.textContent).toContain("A business");
+        expect(card("Identity")?.textContent).toContain("Business name");
     });
 });
 
 describe("the addresses named apart (DEC-069, L12)", () => {
     it("draws no address row in Identity: the Web address card is its one place", () => {
         draw(settings());
-        expect(card()?.textContent).not.toContain("Workspace address");
-        expect(card()?.textContent).not.toContain("Can't be changed");
-        expect(card()?.textContent).not.toContain("northwind");
+        expect(card("Identity")?.textContent).not.toContain(
+            "Workspace address",
+        );
+        expect(card("Identity")?.textContent).not.toContain("Can't be changed");
+        expect(card("Identity")?.textContent).not.toContain("northwind");
     });
 
     it('names the registered address row "Registered address"', () => {
-        params = new URLSearchParams("section=address");
+        onTab("address");
         draw(settings());
-        const region = host.querySelector<HTMLElement>(
-            'section[aria-label="Registered address"]',
+        expect(row("business-registered-address")?.textContent).toContain(
+            "Registered address",
         );
-        const labels = Array.from(region?.querySelectorAll("dt") ?? []).map(
-            (dt) => dt.textContent.trim(),
+        expect(row("business-registered-address")?.textContent).toContain(
+            "No registered address yet",
         );
-        expect(labels).toContain("Registered address");
-        expect(labels).not.toContain("Address");
+        expect(item("Add address")).toBeDefined();
     });
 });
 
 describe("the business type a business that said Registered still owes (prelaunch)", () => {
-    const typeField = () => host.querySelector("#business-type");
     const said = (type: string | null, registered: boolean | null) =>
         settings({
             profile: {
@@ -262,7 +359,7 @@ describe("the business type a business that said Registered still owes (prelaunc
                 type,
                 country: "IN",
                 taxId: null,
-                contactEmail: "hello@northwind.in",
+                contactEmail: "hello@example.com",
                 website: null,
                 timezone: "Asia/Kolkata",
                 phone: null,
@@ -270,113 +367,34 @@ describe("the business type a business that said Registered still owes (prelaunc
             },
         });
 
-    it("says why on the row, and at the field the checklist lands on", async () => {
+    it("says why on the row, and in the sheet the checklist opens", async () => {
         draw(said(null, true));
-        expect(card()?.textContent).toContain(
-            "Not chosen yet — you said it's registered",
+        expect(row("business-type")?.textContent).toContain(
+            "Not chosen yet. You said it's registered.",
         );
-        await click(button("Edit identity"));
-        expect(typeField()?.textContent).toContain(
+        await press(item("Choose type"));
+        expect(sheetName()).toBe("Type");
+        expect(sheet()?.textContent).toContain(
             "You said at setup that the business is registered. Choose which kind before you take money.",
         );
     });
 
     it("goes back to the plain words once a type is chosen", async () => {
         draw(said("llp", true));
-        expect(card()?.textContent).toContain("LLP");
-        await click(button("Edit identity"));
-        expect(typeField()?.textContent).not.toContain("You said at setup");
-        expect(typeField()?.textContent).toContain(
+        expect(row("business-type")?.textContent).toContain("LLP");
+        await press(edit("Edit type"));
+        expect(sheet()?.textContent).not.toContain("You said at setup");
+        expect(sheet()?.textContent).toContain(
             "An individual trades in their own name",
         );
     });
 
     it("never says it to a business that didn't say Registered", async () => {
         draw(said(null, null));
-        expect(card()?.textContent).not.toContain("you said it's registered");
-        await click(button("Edit identity"));
-        expect(typeField()?.textContent).not.toContain("You said at setup");
-    });
-});
-
-describe("How to pay us (R32)", () => {
-    it("is a tab of its own, after Tax, with its own preview in place of the invoice's", () => {
-        params = new URLSearchParams("section=pay");
-        draw(
-            settings({
-                payInstructions: {
-                    upiId: "northwind.supply@okexample",
-                    bankAccountName: null,
-                    bankAccountNumber: null,
-                    bankIfsc: null,
-                    bankName: null,
-                    note: null,
-                },
-            }),
+        expect(row("business-type")?.textContent).not.toContain(
+            "You said it's registered",
         );
-        const tabs = Array.from(host.querySelectorAll('[role="tab"]')).map(
-            (t) => t.textContent.trim(),
-        );
-        expect(tabs.indexOf("How to pay us")).toBe(
-            tabs.indexOf("Tax and invoices") + 1,
-        );
-        const panel = host.querySelector<HTMLElement>("#business-pay-panel");
-        expect(panel?.closest(".hidden")).toBeNull();
-        expect(panel?.textContent).toContain("northwind.supply@okexample");
-        expect(
-            host
-                .querySelector('aside[aria-label="How it prints"]')
-                ?.classList.contains("hidden"),
-        ).toBe(true);
-        // Another tab: the card is kept, out of sight.
-        expect(host.querySelector("#business-panel")).toBeNull();
-    });
-});
-
-describe("an Indian address isn't saved without its state (UX-018)", () => {
-    const noState = () =>
-        settings({
-            tax: {
-                registered: false,
-                state: null,
-                stateName: null,
-                invoicePrefix: null,
-                deliveryRate: "18",
-                deliverySac: null,
-            },
-            registeredAddress: {
-                line1: "12 Hill Road",
-                line2: null,
-                city: "Bengaluru",
-                postalCode: "560001",
-                state: null,
-                stateName: null,
-            },
-        });
-
-    const type = async (el: HTMLInputElement, value: string) => {
-        await act(async () => {
-            Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            )?.set?.call(el, value);
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            await Promise.resolve();
-        });
-        await settle();
-    };
-
-    it("asks for the state on the address card's save, and sends nothing", async () => {
-        params = new URLSearchParams("section=address");
-        draw(noState());
-        await click(button("Edit registered address"));
-        const city = host.querySelector<HTMLInputElement>('input[name="city"]');
-        if (!city) throw new Error("No city field");
-        await type(city, "Bengaluru North");
-        await click(button("Save"));
-        expect(save).not.toHaveBeenCalled();
-        expect(host.textContent).toContain(
-            "Choose your state. It's printed on your invoices, and GST depends on it.",
-        );
+        await press(item("Choose type"));
+        expect(sheet()?.textContent).not.toContain("You said at setup");
     });
 });

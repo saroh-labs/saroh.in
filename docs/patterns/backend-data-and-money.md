@@ -170,6 +170,13 @@
   keys tie a membership's collection and product, and a collection's
   category, to one business. Archived products show in neither kind. A
   product merge (#530) moves its memberships.
+- **Current** — **A location uses the business logo unless it has its
+  own** (DEC-123). `Store.logo` and `Store.logoMediaId` follow the business
+  logo's shape (`BusinessProfile.logoUrl`, `logoMediaId`); both null means
+  the business's. Read a location's logo through `stores/location-logo.ts`
+  (`locationLogos`: own, the business's, the one to show), never
+  `store.logo` alone, which is null for most locations. Paper keeps the
+  business logo (DEC-082).
 - **Current** — **A backfill that merges rows is a TypeScript script** in
   `packages/database/src/backfill/`, exported so the integration suite can seed
   old-shape rows, run it twice and check the second run changes nothing

@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -15,7 +14,8 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
-import { newStorefrontHref, storefrontHref } from "@/lib/stores/links";
+import { newStorefrontHref } from "@/lib/stores/links";
+import type { LocationDetails } from "@/lib/stores/location-details";
 import type { LocationTab } from "@/lib/stores/location-readiness";
 import {
     LOCATION_SECTIONS,
@@ -23,9 +23,10 @@ import {
     locationReadiness,
     locationSubtitle,
 } from "@/lib/stores/location-readiness";
+import type { LocationPeople } from "@/lib/stores/people";
+import { placeSheetFor, placeSheetToOpen } from "@/lib/stores/place-rows";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
-    StorefrontKind,
     StorefrontSettings,
     StorefrontSummary,
 } from "@/lib/stores/storefronts";
@@ -41,36 +42,29 @@ import {
     locationTabId,
 } from "./location-tabs";
 import { PaymentsSection } from "./payments-section";
+import { PeopleSection } from "./people-section";
 import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
-
-/**
- * The two kinds of location (DEC-069, KTD-12): the `SHOP` and `ONLINE` kinds
- * in the data, named for what they mean to the merchant.
- */
-const KIND_LABEL: Record<StorefrontKind, string> = {
-    SHOP: "Customers visit",
-    ONLINE: "No counter",
-};
-
-const ordersLabel = (n: number) =>
-    n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
+import { StorefrontList } from "./storefront-list";
+import { usePlaceSheets } from "./use-place-sheets";
 
 /**
  * Sell › Location: one location's own page, titled with its name, with what
  * it still needs to take orders at the top, then its parts by job: The
- * place, Payments, Delivery, Customers, and Pause or close last (the 9 Oct
- * audit). With several locations, the list of them sits on the left and
+ * place, Payments, Delivery, Customers, People, and Pause or close last
+ * (the 9 Oct audit; People joined them on 10 Oct). With several locations, the list of them sits on the left and
  * each one is the same page. A location is a storefront in code and in the
  * API (DEC-069 renamed the words, not the identifiers).
  *
- * Every control saves on its own (a switch when it is flipped, a field when
- * its Save is pressed), so there is no page-wide save to forget.
+ * Every control saves on its own (a switch when it is flipped, a row's
+ * sheet when its Save is pressed), so there is no page-wide save to forget.
  */
 export function StorefrontsScreen({
     businessName,
     storefronts,
     selected,
+    details,
+    people = null,
     chosenId,
     site,
     canCreate,
@@ -83,6 +77,13 @@ export function StorefrontsScreen({
     storefronts: StorefrontSummary[];
     /** `null` when the chosen storefront could not be read. */
     selected: StorefrontSettings | null;
+    /**
+     * The chosen location's description and logo, for their row in The
+     * place; left out when they couldn't be read, and so is the row.
+     */
+    details?: LocationDetails;
+    /** Who works at the chosen location; `null` when it couldn't be read. */
+    people?: LocationPeople | null;
     /** The one asked for, so a page that failed to read it still names it. */
     chosenId?: string;
     /**
@@ -167,6 +168,8 @@ export function StorefrontsScreen({
                         <StorefrontDetail
                             key={selected.id}
                             store={selected}
+                            details={details}
+                            people={people}
                             businessName={businessName}
                             site={site}
                             canEdit={canEdit}
@@ -175,6 +178,7 @@ export function StorefrontsScreen({
                             notTakingOrders={notTakingOrders.includes(
                                 selected.id,
                             )}
+                            beside={many}
                         />
                     ) : (
                         <div className="min-w-0 max-w-[760px] flex-1">
@@ -198,94 +202,29 @@ export function StorefrontsScreen({
     );
 }
 
-function StorefrontList({
-    storefronts,
-    selectedId,
-    notTakingOrders,
-}: {
-    storefronts: StorefrontSummary[];
-    selectedId: string | null;
-    notTakingOrders: string[];
-}) {
-    return (
-        <nav
-            aria-label="Locations"
-            className="min-w-0 max-w-[280px] flex-[0_1_236px] overflow-hidden rounded-xl border border-border bg-card max-sm:max-w-none max-sm:flex-[1_1_100%]"
-        >
-            <p className="border-b border-border px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {storefronts.length === 1
-                    ? "1 location"
-                    : `${storefronts.length} locations`}
-            </p>
-            <ul className="flex flex-col gap-0.5 p-1.5">
-                {storefronts.map((s) => {
-                    const on = s.id === selectedId;
-                    return (
-                        <li key={s.id}>
-                            <Link
-                                href={storefrontHref(s.id)}
-                                scroll={false}
-                                aria-current={on ? "page" : undefined}
-                                className={cn(
-                                    "flex min-h-11 items-center gap-[9px] rounded-lg px-[9px] py-[7px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    on
-                                        ? "bg-muted"
-                                        : "hover:bg-muted/60 active:bg-muted",
-                                )}
-                            >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[13.5px] font-medium">
-                                        {s.name}
-                                    </span>
-                                    <span className="block text-[12px] text-muted-foreground">
-                                        {ordersLabel(s.orderCount)}
-                                    </span>
-                                </span>
-                                {notTakingOrders.includes(s.id) ? (
-                                    // Past the plan's locations limit (#800).
-                                    <Badge
-                                        variant="warning"
-                                        className="shrink-0"
-                                    >
-                                        Not taking orders
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        variant={
-                                            s.paused ? "warning" : "neutral"
-                                        }
-                                        className="shrink-0"
-                                    >
-                                        {s.paused
-                                            ? "Paused"
-                                            : KIND_LABEL[s.kind]}
-                                    </Badge>
-                                )}
-                            </Link>
-                        </li>
-                    );
-                })}
-            </ul>
-        </nav>
-    );
-}
-
 function StorefrontDetail({
     store: initial,
+    details,
+    people,
     businessName,
     site,
     canEdit,
     canClose,
     canLinkCustomers,
     notTakingOrders,
+    beside,
 }: {
     store: StorefrontSettings;
+    details: LocationDetails | undefined;
+    people: LocationPeople | null;
     businessName: string;
     site: SiteSelling | null | undefined;
     canEdit: boolean;
     canClose: boolean;
     canLinkCustomers: boolean;
     notTakingOrders: boolean;
+    /** The list of locations is drawn beside this one. */
+    beside: boolean;
 }) {
     const router = useRouter();
     const [store, setStore] = useState(initial);
@@ -333,6 +272,7 @@ function StorefrontDetail({
         ...(store.linkSameEmailCustomers !== undefined
             ? [LOCATION_SECTIONS.customers]
             : []),
+        LOCATION_SECTIONS.people,
         ...(closes ? [LOCATION_SECTIONS.closing] : []),
     ];
     const [tab, setTab] = useTabParam<LocationTab>(
@@ -340,6 +280,17 @@ function StorefrontDetail({
         tabs.map((t) => t.id),
         "the-place",
         { history: "push" },
+    );
+    // The place's Edit sheets: which one is open is kept here, so the
+    // readiness card and Delivery can open one from outside its tab.
+    const sheets = usePlaceSheets(
+        (which) =>
+            placeSheetToOpen(which, {
+                canEdit,
+                kind: store.kind,
+                hasDetails: Boolean(details),
+            }),
+        tab === "the-place",
     );
     // A field to put the keyboard on once its tab has drawn.
     const focusNext = useRef<string | null>(null);
@@ -351,6 +302,14 @@ function StorefrontDetail({
         jumpTo(id);
     }, [jumps, tab]);
     const goTo = (to: LocationTab, focus?: string) => {
+        // One of The place's fields ("Add address", "Set hours"): its
+        // sheet opens there, and the keyboard starts in it.
+        const sheet = to === "the-place" ? placeSheetFor(focus) : null;
+        if (sheet) {
+            setTab(to);
+            sheets.open(sheet);
+            return;
+        }
         focusNext.current = focus ?? LOCATION_PANEL_ID;
         setTab(to);
         setJumps((n) => n + 1);
@@ -358,46 +317,99 @@ function StorefrontDetail({
 
     const shared = { store, canEdit, pending, save, setStore, goTo };
 
+    const readiness = locationReadiness(store, site, { notTakingOrders });
+    const wide = beside ? WIDE_BESIDE_LIST : WIDE_ALONE;
+
+    // One column: notes, what's left to do, the tabs. On a wide screen the
+    // "what's left" card moves to the right of the tabs and stays in view
+    // while a tab is worked through, so the page uses its width (owner,
+    // 10 Oct 2026). It stays first for the keyboard either way.
     return (
-        <div className="flex min-w-0 max-w-[760px] flex-1 flex-col gap-4">
-            {notTakingOrders ? (
-                <PausedNote>{pausedWords("location")}</PausedNote>
+        <div
+            className={cn(
+                "flex min-w-0 max-w-[760px] flex-1 flex-col gap-4",
+                wide.frame,
+            )}
+        >
+            {readiness.total > 0 ? (
+                <div className={cn("order-2 min-w-0", wide.aside)}>
+                    <LocationReadinessCard
+                        readiness={readiness}
+                        canEdit={canEdit}
+                        onJump={goTo}
+                    />
+                </div>
             ) : null}
-            {!canEdit ? <ReadOnlyNote className="mb-0" /> : null}
-            <LocationReadinessCard
-                readiness={locationReadiness(store, site, {
-                    notTakingOrders,
-                })}
-                canEdit={canEdit}
-                onJump={goTo}
-            />
-            <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
-            <div
-                id={LOCATION_PANEL_ID}
-                role="tabpanel"
-                aria-labelledby={locationTabId(tab)}
-                className="min-w-0 outline-none"
-            >
-                {tab === "the-place" ? <PlaceSection {...shared} /> : null}
-                {tab === "payments" ? <PaymentsSection {...shared} /> : null}
-                {tab === "delivery" ? <FulfilmentSection {...shared} /> : null}
-                {tab === "customers" ? (
-                    <SameEmailSection
-                        store={store}
-                        canEdit={canLinkCustomers}
-                        pending={pending}
-                        save={save}
-                        setStore={setStore}
-                    />
+            <div className={cn("contents", wide.main)}>
+                {notTakingOrders ? (
+                    <div className="order-1">
+                        <PausedNote>{pausedWords("location")}</PausedNote>
+                    </div>
                 ) : null}
-                {tab === "pause-or-close" && closes ? (
-                    <ClosingSection
-                        {...shared}
-                        businessName={businessName}
-                        canClose={canClose}
-                    />
+                {!canEdit ? (
+                    <div className="order-1">
+                        <ReadOnlyNote className="mb-0" />
+                    </div>
                 ) : null}
+                <div className="order-3 min-w-0">
+                    <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
+                </div>
+                <div
+                    id={LOCATION_PANEL_ID}
+                    role="tabpanel"
+                    aria-labelledby={locationTabId(tab)}
+                    className="order-4 min-w-0 outline-none"
+                >
+                    {tab === "the-place" ? (
+                        <PlaceSection
+                            {...shared}
+                            details={details}
+                            sheets={sheets}
+                        />
+                    ) : null}
+                    {tab === "payments" ? (
+                        <PaymentsSection {...shared} />
+                    ) : null}
+                    {tab === "delivery" ? (
+                        <FulfilmentSection {...shared} />
+                    ) : null}
+                    {tab === "customers" ? (
+                        <SameEmailSection
+                            store={store}
+                            canEdit={canLinkCustomers}
+                            pending={pending}
+                            save={save}
+                            setStore={setStore}
+                        />
+                    ) : null}
+                    {tab === "people" ? (
+                        <PeopleSection store={store} people={people} />
+                    ) : null}
+                    {tab === "pause-or-close" && closes ? (
+                        <ClosingSection
+                            {...shared}
+                            businessName={businessName}
+                            canClose={canClose}
+                        />
+                    ) : null}
+                </div>
             </div>
         </div>
     );
 }
+
+/**
+ * Where the "what's left" card sits beside the tabs: from 1440px when the
+ * location has the page to itself, and from 1760px when the list of
+ * locations is beside it. Whole class names, so Tailwind finds them.
+ */
+const WIDE_ALONE = {
+    frame: "min-[1440px]:max-w-none min-[1440px]:flex-row min-[1440px]:items-start min-[1440px]:gap-8",
+    main: "min-[1440px]:flex min-[1440px]:min-w-0 min-[1440px]:max-w-[1040px] min-[1440px]:flex-1 min-[1440px]:flex-col min-[1440px]:gap-4",
+    aside: "min-[1440px]:sticky min-[1440px]:top-6 min-[1440px]:order-last min-[1440px]:w-[400px] min-[1440px]:shrink-0",
+};
+const WIDE_BESIDE_LIST = {
+    frame: "min-[1760px]:max-w-none min-[1760px]:flex-row min-[1760px]:items-start min-[1760px]:gap-8",
+    main: "min-[1760px]:flex min-[1760px]:min-w-0 min-[1760px]:max-w-[1040px] min-[1760px]:flex-1 min-[1760px]:flex-col min-[1760px]:gap-4",
+    aside: "min-[1760px]:sticky min-[1760px]:top-6 min-[1760px]:order-last min-[1760px]:w-[400px] min-[1760px]:shrink-0",
+};

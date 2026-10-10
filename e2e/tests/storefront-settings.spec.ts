@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/commerce/locations api:stores
+// @covers accounts:/login app:/open app:/commerce/locations app:/commerce/locations/[storeId]/people app:/commerce/locations/[storeId]/details api:stores
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -58,17 +58,115 @@ test.describe("Locations (DEC-069)", () => {
                     exact: true,
                 }),
         ).toBeVisible();
-        await expect(page.getByLabel("Location name")).toHaveValue(one.name);
+        // The place reads first: the name is a row, not an open field.
+        await expect(page.getByTestId("location-name-summary")).toHaveText(
+            one.name,
+        );
         // The words changed, not only the address.
         await expect(
             page.getByText(/storefront/i).filter({ visible: true }),
         ).toHaveCount(0);
 
-        // A deeper old address lands too.
+        // A deeper old address lands too: the details page is a sheet on
+        // The place now, and its address opens it.
         await page.goto(`/commerce/storefronts/${one.id}/details`);
         await expect(page).toHaveURL(
-            new RegExp(`/commerce/locations/${one.id}/details$`),
+            new RegExp(
+                `/commerce/locations\\?storefront=${one.id}&edit=details$`,
+            ),
         );
+        const details = page.getByRole("dialog", {
+            name: "Description and logo",
+        });
+        await expect(details).toBeVisible();
+        await expect(
+            details.getByLabel("Description", { exact: true }),
+        ).toBeVisible();
+        // The logo is uploaded here, or the business's is used (DEC-123):
+        // no web link to type, and nothing that leaves the sheet.
+        const logo = details.getByRole("group", { name: "Logo" });
+        await expect(logo).toBeVisible();
+        await expect(
+            logo.getByRole("button", { name: /^(Upload logo|Replace)$/ }),
+        ).toBeVisible();
+        await expect(details.getByText("Logo address")).toHaveCount(0);
+        await expect(details.getByRole("link")).toHaveCount(0);
+        // Closed unsaved, it leaves the address as the page's own.
+        await details.getByRole("button", { name: "Cancel" }).click();
+        await expect(details).toBeHidden();
+        await expect(page).toHaveURL(
+            new RegExp(`/commerce/locations\\?storefront=${one.id}$`),
+        );
+
+        // Its people were a page; that address opens the People tab now.
+        await page.goto(`/commerce/locations/${one.id}/people`);
+        await expect(page).toHaveURL(/[?&]section=people$/);
+        await expect(
+            page
+                .getByRole("tablist", { name: "Location settings" })
+                .getByRole("tab", { name: "People" }),
+        ).toHaveAttribute("aria-selected", "true");
+    });
+
+    test("The place is rows that say what is saved; Edit opens a sheet and Cancel saves nothing", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const one = (await locations(page)).at(0);
+        expect(one).toBeDefined();
+        if (!one) return;
+        await page.goto(`/commerce/locations?storefront=${one.id}`);
+
+        const place = page.getByRole("region", { name: "The place" });
+        const name = place.getByTestId("location-name-summary");
+        await expect(name).toHaveText(one.name);
+        await expect(place.getByTestId("location-kind-summary")).toHaveText(
+            /^(Yes, they visit|No, online only)$/,
+        );
+        // Read first: nothing to type in until a row's Edit.
+        await expect(place.getByRole("textbox")).toHaveCount(0);
+
+        // Pressed until it opens: a press before hydration does nothing.
+        // The sheet draws at page level, outside the tab's region.
+        const sheet = page.getByRole("dialog", { name: "Name" });
+        await expect(async () => {
+            await place.getByRole("button", { name: "Edit name" }).click();
+            await expect(sheet).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 20_000 });
+        const field = sheet.getByLabel("Location name");
+        await expect(field).toHaveValue(one.name);
+        await expect(field).toBeFocused();
+        await field.fill(`${one.name} (not saved)`);
+        await sheet.getByRole("button", { name: "Cancel" }).click();
+        // Sheets slide shut: wait before the next Edit.
+        await expect(sheet).toBeHidden();
+        await expect(name).toHaveText(one.name);
+        expect((await locations(page)).find((s) => s.id === one.id)?.name).toBe(
+            one.name,
+        );
+
+        // Opened again, it starts from what is saved.
+        await place.getByRole("button", { name: "Edit name" }).click();
+        await expect(sheet.getByLabel("Location name")).toHaveValue(one.name);
+        await page.keyboard.press("Escape");
+        await expect(sheet).toBeHidden();
+
+        const kind = page.getByRole("dialog", {
+            name: "Do customers come here?",
+        });
+        await place
+            .getByRole("button", { name: "Change whether customers come here" })
+            .click();
+        await expect(kind).toBeVisible();
+        await expect(
+            kind.getByRole("radio", { name: "Yes, they visit" }),
+        ).toBeVisible();
+        await expect(
+            kind.getByRole("radio", { name: "No, online only" }),
+        ).toBeVisible();
+        await kind.getByRole("button", { name: "Cancel" }).click();
+        await expect(kind).toBeHidden();
     });
 
     test("the tabs keep the open one in the address, and Back returns to the last", async ({
@@ -217,7 +315,8 @@ test.describe(
                 await expect(card.getByRole("textbox")).toHaveCount(0);
 
                 // Pressed until it opens: a press before hydration does nothing.
-                const panel = card.locator("#delivery-pickup-panel");
+                // The sheet draws at page level, outside the tab's region.
+                const panel = page.locator("#delivery-pickup-panel");
                 await expect(async () => {
                     await card
                         .getByRole("button", { name: "Edit pick-up" })
@@ -271,11 +370,11 @@ test.describe(
                 ).toBe(20);
                 await panel.getByRole("button", { name: "Cancel" }).click();
 
-                // Shipping, turned on in its panel, starts on its default.
+                // Shipping, turned on in its sheet, starts on its default.
                 await card
                     .getByRole("button", { name: "Edit shipping" })
                     .click();
-                const shipping = card.locator("#delivery-shipping-panel");
+                const shipping = page.locator("#delivery-shipping-panel");
                 await shipping
                     .getByRole("switch", { name: "Offer shipping" })
                     .click();

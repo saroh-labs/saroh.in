@@ -8,6 +8,7 @@ import type { SiteDetail } from "@/lib/sites/service";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
 import { SiteSettings } from "../site-settings";
+import { SiteSettingsRead } from "../site-settings-read";
 
 /**
  * Website › Settings, its groups from a side list (owner, 9 Oct): the open
@@ -24,6 +25,11 @@ vi.mock("@/lib/sites/actions", () => ({
     updateSiteNavigation: vi.fn(),
     updateSiteSettings: vi.fn(),
     setPublishNeedsApproval: vi.fn(),
+}));
+// The address row's QR button: its panel reads only when opened.
+vi.mock("@/lib/qr/actions", () => ({
+    openQrPanel: vi.fn(),
+    makeQrPanelCode: vi.fn(),
 }));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
@@ -135,7 +141,7 @@ describe("the settings' side list", () => {
         expect(document.activeElement?.textContent).toBe("Search and sharing");
     });
 
-    it("jumps from a checklist step to its tab, with its row open", async () => {
+    it("jumps from a checklist step to its tab, with its row's sheet open", async () => {
         render();
         const write = host.querySelector<HTMLAnchorElement>(
             '[data-step="description"] a',
@@ -147,10 +153,29 @@ describe("the settings' side list", () => {
         });
         expect(selected()).toBe("Search and sharing");
         expect(window.location.search).toBe("?section=search-and-sharing");
-        const field = host.querySelector(
-            '#settings-description textarea[aria-label="Search description"]',
+        // Nothing opens in the row: the field is in the row's sheet.
+        expect(host.querySelector("#settings-description textarea")).toBe(null);
+        const field = document.querySelector(
+            '[role="dialog"] #settings-description-field',
         );
         expect(field).not.toBe(null);
         expect(document.activeElement).toBe(field);
+    });
+
+    it("shows a reader the step's row, with nothing to open", async () => {
+        act(() =>
+            root.render(<SiteSettingsRead site={site} address={address} />),
+        );
+        const show = host.querySelector<HTMLAnchorElement>(
+            '[data-step="description"] a',
+        );
+        expect(show?.textContent).toContain("Show");
+        await act(async () => {
+            show?.click();
+            await new Promise((r) => requestAnimationFrame(r));
+        });
+        expect(selected()).toBe("Search and sharing");
+        expect(document.querySelector('[role="dialog"]')).toBe(null);
+        expect(document.activeElement?.id).toBe("settings-description");
     });
 });
