@@ -63,15 +63,10 @@ export function ProductCollectionsSheet({
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Collections saved.", () => {
-            void saveProductCollections(productId, previous).then((undo) => {
-                if (!undo.ok)
-                    showError(
-                        "Couldn't undo. The saved collections stay.",
-                        undo.error,
-                    );
-                router.refresh();
-            });
+        showUndo("Collections saved.", async () => {
+            const undo = await saveProductCollections(productId, previous);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -87,7 +82,7 @@ export function ProductCollectionsSheet({
             }}
             dirty={dirty}
             saving={saving}
-            onSave={() => void save()}
+            onSave={save}
         >
             {rows.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">

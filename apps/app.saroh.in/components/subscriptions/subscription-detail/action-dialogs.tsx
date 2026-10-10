@@ -1,18 +1,12 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
 import { chipClass } from "@/components/shared/chip";
+import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
@@ -21,23 +15,31 @@ import { money } from "@/lib/subscriptions/view";
 export type Step = "pause" | "switch" | "cancel";
 
 const TITLE: Record<Step, string> = {
-    pause: "Pause",
+    pause: "Pause subscription",
     switch: "Change plan",
     cancel: "Cancel subscription",
 };
 
+/** The one sentence under each title: what the step changes. */
+const SAYS: Record<Step, string> = {
+    pause: "Renewals stop for as long as you choose.",
+    switch: "Their next renewal moves to the plan you pick.",
+    cancel: "Choose when it ends.",
+};
+
 const PER = { WEEK: "week", MONTH: "month", QUARTER: "quarter", YEAR: "year" };
 
-/** The footer buttons, at the design's 38px (44 on touch). */
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
+/** What the choice made will do, said under it as it changes. */
+const NOTE =
+    "mt-2.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75";
 
 /**
- * The three steps Subscription Detail asks about before it acts, in the
- * design's centred sheet. Each one is a single API call the screen then
- * offers to Undo; Cancel "today" is the one that cannot be undone, and says
- * so.
+ * The three steps Subscription Detail asks about before it acts: one
+ * choice each, so the app's one dialog (`FormDialog`). Pause and Change
+ * plan are one API call the screen then offers to Undo. Cancel tells the
+ * customer, so it waits ten seconds with Undo before anything is written.
  */
-export function ActionSheet({
+export function ActionDialog({
     step,
     onClose,
     busy,
@@ -73,53 +75,35 @@ export function ActionSheet({
     onCancel: (when: "now" | "periodEnd", voidInvoiceId?: string) => void;
 }) {
     return (
-        <Dialog
+        <FormDialog
             open={step !== null}
-            onOpenChange={(o) => (!o ? onClose() : null)}
+            size="md"
+            title={step ? TITLE[step] : ""}
+            description={step ? SAYS[step] : ""}
+            pending={busy}
+            onClose={onClose}
         >
-            <DialogContent className="w-[calc(100%-40px)] max-w-[440px] gap-0 rounded-[14px] border-0 px-5 py-[18px] sm:rounded-[14px] [&>button:last-child]:hidden">
-                {step ? (
-                    <>
-                        <DialogTitle className="mb-2.5 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                            {TITLE[step]}
-                        </DialogTitle>
-                        {step === "pause" ? (
-                            <PauseBody
-                                options={pauseOptions}
-                                note={pauseNote}
-                                busy={busy}
-                                onClose={onClose}
-                                onPause={onPause}
-                            />
-                        ) : step === "switch" ? (
-                            <SwitchBody
-                                plans={plans}
-                                currentPlanId={currentPlanId}
-                                note={switchNote}
-                                busy={busy}
-                                onClose={onClose}
-                                onSwitch={onSwitch}
-                            />
-                        ) : (
-                            <CancelBody
-                                {...cancel}
-                                busy={busy}
-                                onClose={onClose}
-                                onCancel={onCancel}
-                            />
-                        )}
-                    </>
-                ) : null}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function Footer({ children }: { children: React.ReactNode }) {
-    return (
-        <div className="mt-3.5 flex flex-wrap justify-end gap-2">
-            {children}
-        </div>
+            {step ? (
+                <>
+                    {step === "pause" ? (
+                        <PauseBody
+                            options={pauseOptions}
+                            note={pauseNote}
+                            onPause={onPause}
+                        />
+                    ) : step === "switch" ? (
+                        <SwitchBody
+                            plans={plans}
+                            currentPlanId={currentPlanId}
+                            note={switchNote}
+                            onSwitch={onSwitch}
+                        />
+                    ) : (
+                        <CancelBody {...cancel} onCancel={onCancel} />
+                    )}
+                </>
+            ) : null}
+        </FormDialog>
     );
 }
 
@@ -130,14 +114,10 @@ function Footer({ children }: { children: React.ReactNode }) {
 function PauseBody({
     options,
     note,
-    busy,
-    onClose,
     onPause,
 }: {
     options: readonly PauseOption[];
     note: (option: PauseOption | undefined) => string;
-    busy: boolean;
-    onClose: () => void;
     onPause: (option: PauseOption) => void;
 }) {
     const [key, setKey] = useState(DEFAULT_PAUSE);
@@ -165,21 +145,14 @@ function PauseBody({
                     );
                 })}
             </div>
-            <DialogDescription className="mt-2.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
+            <p role="status" className={NOTE}>
                 {note(picked)}
-            </DialogDescription>
-            <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
-                    Keep going
-                </Button>
-                <Button
-                    className={BTN}
-                    disabled={busy}
-                    onClick={() => onPause(picked)}
-                >
-                    {busy ? "Pausing…" : "Pause"}
-                </Button>
-            </Footer>
+            </p>
+            <FormDialogFoot
+                saveLabel="Pause subscription"
+                savingLabel="Pausing…"
+                onSubmit={() => onPause(picked)}
+            />
         </>
     );
 }
@@ -188,18 +161,15 @@ function SwitchBody({
     plans,
     currentPlanId,
     note,
-    busy,
-    onClose,
     onSwitch,
 }: {
     plans: readonly Plan[];
     currentPlanId: string;
     note: string;
-    busy: boolean;
-    onClose: () => void;
     onSwitch: (planId: string) => void;
 }) {
     const [picked, setPicked] = useState<string | null>(null);
+    const [tried, setTried] = useState(false);
     // Archived plans take no one new, so they are not offered.
     const offered = plans.filter(
         (p) => p.status === "ACTIVE" && p.id !== currentPlanId,
@@ -240,21 +210,27 @@ function SwitchBody({
                     first.
                 </p>
             )}
-            <DialogDescription className="mt-2.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
-                {note}
-            </DialogDescription>
-            <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button
-                    className={BTN}
-                    disabled={!picked || busy}
-                    onClick={() => (picked ? onSwitch(picked) : null)}
+            <p className={NOTE}>{note}</p>
+            {tried && !picked && offered.length ? (
+                <p
+                    role="alert"
+                    className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
                 >
-                    Change from next renewal
-                </Button>
-            </Footer>
+                    Pick the plan to move to.
+                </p>
+            ) : null}
+            {offered.length ? (
+                <FormDialogFoot
+                    saveLabel="Change from next renewal"
+                    savingLabel="Changing…"
+                    onSubmit={() => {
+                        setTried(true);
+                        if (picked) onSwitch(picked);
+                    }}
+                />
+            ) : (
+                <FormDialogFoot doneOnly doneLabel="Close" />
+            )}
         </>
     );
 }
@@ -264,16 +240,12 @@ function CancelBody({
     periodEndText,
     unpaid,
     failed,
-    busy,
-    onClose,
     onCancel,
 }: {
     canWaitForPeriodEnd: boolean;
     periodEndText: string;
     unpaid: { id: string; label: string } | null;
     failed: boolean;
-    busy: boolean;
-    onClose: () => void;
     onCancel: (when: "now" | "periodEnd", voidInvoiceId?: string) => void;
 }) {
     const voidId = useId();
@@ -285,8 +257,8 @@ function CancelBody({
         when === "periodEnd"
             ? `Ends on ${periodEndText}. Nothing more is charged; what's paid for still happens.`
             : failed
-              ? "Nothing more is charged, and it ends today. This can't be undone — restarting makes a new subscription."
-              : "It ends today and nothing more is charged. This can't be undone — restarting makes a new subscription.";
+              ? "Nothing more is charged, and it ends today. Restarting makes a new subscription. This cannot be undone."
+              : "It ends today and nothing more is charged. Restarting makes a new subscription. This cannot be undone.";
     const options: { value: "now" | "periodEnd"; label: string }[] = [
         ...(canWaitForPeriodEnd
             ? [
@@ -328,9 +300,9 @@ function CancelBody({
                     })}
                 </div>
             ) : null}
-            <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/75">
+            <p role="status" className={cn(NOTE, "mt-0")}>
                 {note}
-            </DialogDescription>
+            </p>
             {unpaid ? (
                 <div className="mt-3 flex items-start gap-2.5">
                     <Checkbox
@@ -351,24 +323,15 @@ function CancelBody({
                     </Label>
                 </div>
             ) : null}
-            <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
-                    Keep subscription
-                </Button>
-                <Button
-                    variant="destructive"
-                    className={BTN}
-                    disabled={busy}
-                    onClick={() =>
-                        onCancel(
-                            when,
-                            voidToo && unpaid ? unpaid.id : undefined,
-                        )
-                    }
-                >
-                    {busy ? "Cancelling…" : "Cancel subscription"}
-                </Button>
-            </Footer>
+            <FormDialogFoot
+                tone="destructive"
+                cancelLabel="Keep subscription"
+                saveLabel="Cancel subscription"
+                savingLabel="Cancelling…"
+                onSubmit={() =>
+                    onCancel(when, voidToo && unpaid ? unpaid.id : undefined)
+                }
+            />
         </>
     );
 }

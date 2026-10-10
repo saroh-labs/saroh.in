@@ -1,14 +1,7 @@
 "use client";
 
+import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
@@ -83,6 +76,8 @@ export function TakePayment({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [link, setLink] = useState<PayLinkResult | null>(null);
+    // What is wrong with the cash given is said once the button is pressed.
+    const [tried, setTried] = useState(false);
 
     const format = (cents: number) => formatMoney(cents, currency) ?? "";
     const amount = format(take.cents);
@@ -96,6 +91,7 @@ export function TakePayment({
         setError(null);
         setLink(null);
         setBusy(false);
+        setTried(false);
     }
 
     function close() {
@@ -105,6 +101,7 @@ export function TakePayment({
     }
 
     async function save() {
+        setTried(true);
         if (busy || problem) return;
         setBusy(true);
         setError(null);
@@ -127,7 +124,7 @@ export function TakePayment({
             close();
         } catch {
             setError(
-                "Couldn't record the payment. Nothing was taken — try again.",
+                "Couldn't record the payment. Nothing was taken. Try again.",
             );
             setBusy(false);
         }
@@ -146,147 +143,122 @@ export function TakePayment({
             >
                 Take {amount}
             </Button>
-            <Dialog
+            <FormDialog
                 open={open}
-                onOpenChange={(next) =>
-                    next ? setOpen(true) : link ? close() : setOpen(false)
+                size="md"
+                title={`Take ${amount}`}
+                description={
+                    take.byLink
+                        ? `What ${who} pays for this booking.`
+                        : `What's left after the deposit ${who} paid online.`
                 }
+                pending={busy}
+                onClose={() => (link ? close() : setOpen(false))}
             >
-                <DialogContent className="sm:max-w-[440px]">
-                    <DialogHeader>
-                        <DialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                            Take {amount}
-                        </DialogTitle>
-                        <DialogDescription className="text-[12.5px]">
-                            {take.byLink
-                                ? `What ${who} pays for this booking.`
-                                : `What's left after the deposit ${who} paid online.`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    {link ? (
-                        <PayLinkPanel
-                            booked={`A pay link for ${amount}.`}
-                            bookingId={bookingId}
-                            first={link}
-                            onDone={close}
-                        />
-                    ) : (
-                        <div className="grid gap-2.5">
-                            <div
-                                id={ids.how}
-                                className="text-[12.5px] font-medium"
-                            >
-                                How they pay
-                            </div>
-                            <div
-                                role="radiogroup"
-                                aria-labelledby={ids.how}
-                                className="flex flex-wrap gap-1.5"
-                            >
-                                {choices.map((c) => (
-                                    <Tip label={c.off ?? undefined}>
-                                        <Chip
-                                            key={c.key}
-                                            on={choice === c.key}
-                                            disabled={c.off !== null}
-                                            onClick={() => {
-                                                setChoice(c.key);
-                                                setError(null);
-                                            }}
-                                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                                        >
-                                            {c.label}
-                                        </Chip>
-                                    </Tip>
-                                ))}
-                            </div>
-                            {choice === "CASH" ? (
-                                <div className="flex flex-wrap items-end gap-2.5">
-                                    <label
-                                        htmlFor={ids.given}
-                                        className="flex-[1_1_140px] text-[12px] font-medium"
-                                    >
-                                        Cash given
-                                        <Input
-                                            id={ids.given}
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={given}
-                                            onChange={(e) => {
-                                                setGiven(e.target.value);
-                                                setError(null);
-                                            }}
-                                            placeholder={amount}
-                                            autoComplete="off"
-                                            aria-invalid={
-                                                problem ? true : undefined
-                                            }
-                                            aria-describedby={
-                                                problem ? ids.error : undefined
-                                            }
-                                            className="mt-[5px] h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]"
-                                        />
-                                    </label>
-                                    <div
-                                        aria-live="polite"
-                                        className={cn(
-                                            "flex-[1_1_140px] pb-[9px] text-[13px] font-semibold",
-                                            change.kind === "short"
-                                                ? "text-destructive-subtle-foreground"
-                                                : "text-success-subtle-foreground",
-                                        )}
-                                    >
-                                        {change.kind === "change"
-                                            ? `Change ${format(change.cents)}`
-                                            : change.kind === "short"
-                                              ? `Short ${format(change.cents)}`
-                                              : ""}
-                                    </div>
-                                </div>
-                            ) : null}
-                            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                                {deskNote(choice, amount)}
-                            </p>
-                            {problem || error ? (
-                                <p
-                                    id={ids.error}
-                                    role="alert"
-                                    className="text-[12.5px] font-medium text-destructive"
-                                >
-                                    {problem ?? error}
-                                </p>
-                            ) : null}
+                {link ? (
+                    <PayLinkPanel
+                        booked={`A pay link for ${amount}.`}
+                        bookingId={bookingId}
+                        first={link}
+                        onDone={close}
+                    />
+                ) : (
+                    <div className="grid gap-2.5">
+                        <div id={ids.how} className="text-[12.5px] font-medium">
+                            How they pay
                         </div>
-                    )}
-                    {link ? null : (
-                        <DialogFooter className="gap-2 sm:gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="cursor-pointer"
-                                onClick={() => setOpen(false)}
+                        <div
+                            role="radiogroup"
+                            aria-labelledby={ids.how}
+                            className="flex flex-wrap gap-1.5"
+                        >
+                            {choices.map((c) => (
+                                <Tip label={c.off ?? undefined}>
+                                    <Chip
+                                        key={c.key}
+                                        on={choice === c.key}
+                                        disabled={c.off !== null}
+                                        onClick={() => {
+                                            setChoice(c.key);
+                                            setError(null);
+                                        }}
+                                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                                    >
+                                        {c.label}
+                                    </Chip>
+                                </Tip>
+                            ))}
+                        </div>
+                        {choice === "CASH" ? (
+                            <div className="flex flex-wrap items-end gap-2.5">
+                                <label
+                                    htmlFor={ids.given}
+                                    className="flex-[1_1_140px] text-[12px] font-medium"
+                                >
+                                    Cash given
+                                    <Input
+                                        id={ids.given}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={given}
+                                        onChange={(e) => {
+                                            setGiven(e.target.value);
+                                            setError(null);
+                                        }}
+                                        placeholder={amount}
+                                        autoComplete="off"
+                                        aria-invalid={
+                                            problem ? true : undefined
+                                        }
+                                        aria-describedby={
+                                            problem ? ids.error : undefined
+                                        }
+                                        className="mt-[5px] h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]"
+                                    />
+                                </label>
+                                <div
+                                    aria-live="polite"
+                                    className={cn(
+                                        "flex-[1_1_140px] pb-[9px] text-[13px] font-semibold",
+                                        change.kind === "short"
+                                            ? "text-destructive-subtle-foreground"
+                                            : "text-success-subtle-foreground",
+                                    )}
+                                >
+                                    {change.kind === "change"
+                                        ? `Change ${format(change.cents)}`
+                                        : change.kind === "short"
+                                          ? `Short ${format(change.cents)}`
+                                          : ""}
+                                </div>
+                            </div>
+                        ) : null}
+                        <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                            {deskNote(choice, amount)}
+                        </p>
+                        {(problem && (tried || given !== "")) || error ? (
+                            <p
+                                id={ids.error}
+                                role="alert"
+                                className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                             >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                className="cursor-pointer"
-                                disabled={busy || Boolean(problem)}
-                                aria-describedby={
-                                    problem || error ? ids.error : undefined
-                                }
-                                onClick={() => void save()}
-                            >
-                                {busy
-                                    ? choice === "LINK"
-                                        ? "Making the link…"
-                                        : "Recording…"
-                                    : deskButton(choice, amount)}
-                            </Button>
-                        </DialogFooter>
-                    )}
-                </DialogContent>
-            </Dialog>
+                                {problem ?? error}
+                            </p>
+                        ) : null}
+                    </div>
+                )}
+                {link ? null : (
+                    <FormDialogFoot
+                        saveLabel={deskButton(choice, amount)}
+                        savingLabel={
+                            choice === "LINK"
+                                ? "Making the link…"
+                                : "Recording…"
+                        }
+                        onSubmit={save}
+                    />
+                )}
+            </FormDialog>
         </>
     );
 }

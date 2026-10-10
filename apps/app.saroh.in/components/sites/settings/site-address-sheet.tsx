@@ -7,8 +7,8 @@ import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { LocationAddressFields } from "@/components/stores/location-address-fields";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type {
@@ -142,7 +142,7 @@ export function SiteAddressSheet({
 
     if (listed.length > 0) {
         return (
-            <SettingsSheetFrame
+            <FormSheet
                 id={id}
                 returnFocusTo={returnTo}
                 title={ADDRESS_SHEET.title}
@@ -217,7 +217,7 @@ export function SiteAddressSheet({
                     </ul>
                     <p className={NOTE}>{ADDRESS_SHEET.whileLocations}</p>
                 </div>
-            </SettingsSheetFrame>
+            </FormSheet>
         );
     }
 
@@ -290,7 +290,7 @@ function LocationAddressEdit({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={id}
             returnFocusTo={returnTo}
             title={`${location.name}: address`}
@@ -316,7 +316,7 @@ function LocationAddressEdit({
                 disabled={saving}
                 refusal={refusal}
             />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -391,7 +391,7 @@ function RegisteredAddressChoice({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={id}
             returnFocusTo={returnTo}
             title={ADDRESS_SHEET.title}
@@ -482,6 +482,6 @@ function RegisteredAddressChoice({
                     </p>
                 ) : null}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

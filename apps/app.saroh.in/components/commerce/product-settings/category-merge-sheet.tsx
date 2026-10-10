@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { chipClass } from "@/components/shared/chip";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import { Notice } from "@saroh/ui/notice";
 
@@ -42,7 +42,7 @@ export function CategoryMergeSheet({
         to === null ? null : (targets.find((t) => t.id === to)?.name ?? "");
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -96,6 +96,6 @@ export function CategoryMergeSheet({
                     ? "Pick where its products should go."
                     : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
             </Notice>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

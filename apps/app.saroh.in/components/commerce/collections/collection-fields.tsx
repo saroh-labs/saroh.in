@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
@@ -185,39 +184,5 @@ export function SheetNotices({
                 </p>
             ) : null}
         </>
-    );
-}
-
-/** "You have changes that are not saved", with Discard and Keep editing. */
-export function DiscardBar({
-    onDiscard,
-    onKeep,
-}: {
-    onDiscard: () => void;
-    onKeep: () => void;
-}) {
-    return (
-        <Notice tone="warning" role="alert" layout="banner">
-            <div className="flex flex-wrap items-center gap-2">
-                <span className="flex-[1_1_180px]">
-                    You have changes that are not saved.
-                </span>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
-                    onClick={onDiscard}
-                >
-                    Discard
-                </Button>
-                <Button
-                    type="button"
-                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                    onClick={onKeep}
-                >
-                    Keep editing
-                </Button>
-            </div>
-        </Notice>
     );
 }

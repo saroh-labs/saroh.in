@@ -1,12 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { ExternalLink } from "lucide-react";
+import { showSuccess } from "@saroh/ui/toast";
+import { ExternalLink, Unplug } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
     disconnectCommsProvider,
@@ -27,7 +28,7 @@ import type {
 import type { StatusTone } from "@/components/shared/status-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { CopyButton } from "@saroh/ui/copy-button";
-import { ProviderSetupDialog } from "./provider-setup-dialog";
+import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 /*
  * One row of Settings → Providers (`provider-list.tsx`): a provider with
@@ -107,7 +108,7 @@ export function ProviderRowView({
 
     const setupDialog = (trigger: string, urgent: boolean) =>
         entry.setup.kind === "payments" ? (
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="payments"
                 label={entry.name}
                 trigger={trigger}
@@ -117,7 +118,7 @@ export function ProviderRowView({
                 webhooks={webhooks}
             />
         ) : (
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="messaging"
                 label={entry.name}
                 trigger={trigger}
@@ -128,15 +129,15 @@ export function ProviderRowView({
             />
         );
 
-    async function disconnect() {
+    async function disconnect(): Promise<ConfirmResult> {
         const target = entry.target;
         if (!target) return;
         const res =
             target.kind === "payments"
                 ? await disconnectPaymentProvider(target.provider)
                 : await disconnectCommsProvider(target.channel);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${entry.name} disconnected`);
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess(`${entry.name} disconnected.`);
         router.refresh();
     }
 
@@ -271,8 +272,10 @@ export function ProviderRowView({
                     }}
                     title={`Disconnect ${entry.name}?`}
                     description={entry.consequence}
-                    confirmLabel="Disconnect"
-                    onConfirm={() => void disconnect()}
+                    confirmLabel={`Disconnect ${entry.name}`}
+                    keepLabel={`Keep ${entry.name}`}
+                    icon={Unplug}
+                    onConfirm={disconnect}
                 />
             ) : null}
         </div>

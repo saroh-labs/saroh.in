@@ -87,13 +87,12 @@ export function ServicesScreen({
         setBusy(null);
         if (!res.ok) return showError(res.error);
         router.refresh();
-        showUndo(takingToast(s.name, wasOn), () => {
-            void updateService(s.id, {
+        showUndo(takingToast(s.name, wasOn), async () => {
+            const back = await updateService(s.id, {
                 status: wasOn ? "ACTIVE" : "ARCHIVED",
-            }).then((back) => {
-                if (!back.ok) showError(back.error);
-                router.refresh();
             });
+            router.refresh();
+            return back;
         });
     }
 

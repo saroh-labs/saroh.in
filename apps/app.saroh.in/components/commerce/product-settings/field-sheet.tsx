@@ -19,7 +19,7 @@ import {
 } from "@/lib/products/settings-actions";
 
 import { chipClass } from "@/components/shared/chip";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Segmented } from "@saroh/ui/segmented";
 import { PROBLEM } from "./product-settings";
 
@@ -126,11 +126,10 @@ export function FieldSheet({
         setOpen(false);
         router.refresh();
         if (!field) {
-            showUndo(`${nl} added.`, () => {
-                void removeField(before.id).then((undo) => {
-                    if (!undo.ok) showError(undo.error);
-                    router.refresh();
-                });
+            showUndo(`${nl} added.`, async () => {
+                const back = await removeField(before.id);
+                router.refresh();
+                return back;
             });
             return;
         }
@@ -142,21 +141,20 @@ export function FieldSheet({
                     ? `${nl} now shows on the shop.`
                     : `${nl} is team only now.`
                 : `${nl} saved.`,
-            () => {
-                void updateField(before.id, {
+            async () => {
+                const back = await updateField(before.id, {
                     name: before.name,
                     onShop: before.onShop,
                     categoryIds: before.categoryIds,
-                }).then((undo) => {
-                    if (!undo.ok) showError(undo.error);
-                    router.refresh();
                 });
+                router.refresh();
+                return back;
             },
         );
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -303,6 +301,6 @@ export function FieldSheet({
                     </p>
                 ) : null}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

@@ -1,16 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@saroh/ui/sheet";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { CustomerForm } from "@/components/stores/customer-form";
 import type { Customer } from "@/lib/customers/service";
 
@@ -20,10 +13,12 @@ import type { Customer } from "@/lib/customers/service";
  * shows the details as rows, and this button opens the form that changes
  * them in a side sheet.
  *
- * The sheet holds every field the record has. Nothing is saved until Save
- * changes; a refusal keeps the sheet open with what was typed; Cancel,
- * Escape and the close button drop the draft, and each opening starts from
- * what is saved. Closed, the keyboard goes back to the button.
+ * The sheet holds every field the record has, in the app's one sheet
+ * frame (`FormSheet`). Nothing is saved until Save. A refusal keeps the
+ * sheet open with what was typed. Cancel, Escape and the close button drop
+ * the draft, a press outside does nothing once something is typed, and
+ * each opening starts from what is saved. Closed, the keyboard goes back
+ * to the button.
  */
 export function EditStoreCustomer({
     storeId,
@@ -39,38 +34,27 @@ export function EditStoreCustomer({
     const [opening, setOpening] = useState(0);
 
     return (
-        <Sheet
+        <FormSheet
             open={open}
-            onOpenChange={(o) => {
-                if (o) setOpening((n) => n + 1);
-                setOpen(o);
-            }}
-        >
-            <SheetTrigger asChild>
+            trigger={
                 <Button type="button" variant="outline" size="sm">
                     Edit details
                 </Button>
-            </SheetTrigger>
-            <SheetContent className="flex w-full flex-col sm:max-w-md">
-                <SheetHeader>
-                    <SheetTitle>Edit details</SheetTitle>
-                    <SheetDescription>
-                        What {storeName} keeps for them: their email, name,
-                        phone and where they are.
-                    </SheetDescription>
-                </SheetHeader>
-                {/* The padding keeps a focus ring at the edge from being
-                    cut off where the fields scroll. */}
-                <div className="-mx-1 mt-5 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
-                    <CustomerForm
-                        key={opening}
-                        storeId={storeId}
-                        customer={customer}
-                        onSaved={() => setOpen(false)}
-                        onCancel={() => setOpen(false)}
-                    />
-                </div>
-            </SheetContent>
-        </Sheet>
+            }
+            title="Edit details"
+            description={`What ${storeName} keeps for them: their email, name, phone and where they are.`}
+            onOpen={() => {
+                setOpening((n) => n + 1);
+                setOpen(true);
+            }}
+            onClose={() => setOpen(false)}
+        >
+            <CustomerForm
+                key={opening}
+                storeId={storeId}
+                customer={customer}
+                onSaved={() => setOpen(false)}
+            />
+        </FormSheet>
     );
 }

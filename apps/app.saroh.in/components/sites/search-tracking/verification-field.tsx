@@ -7,7 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     NOTE,
     PROBLEM,
@@ -166,7 +166,7 @@ function VerificationSheet({
     const empty = draft.trim() === "";
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={editId}
             title={words.label}
             description={words.where.replace(
@@ -217,6 +217,6 @@ function VerificationSheet({
                     </p>
                 )}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

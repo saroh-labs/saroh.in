@@ -5,7 +5,7 @@ import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     checkoutLine,
     draftProblems,
@@ -40,7 +40,7 @@ const CHIP =
  *
  * Nothing saves until Save, which sends everything changed in one update
  * (`wayInput`, the same fields the page always saved). It is drawn in the
- * app's one sheet frame (`components/shared/settings-sheet-frame.tsx`),
+ * app's one sheet frame (`components/shared/form-sheet.tsx`),
  * which says how it closes: Cancel, Escape and the close button drop the
  * draft, and a press outside does nothing once something is changed. A
  * refusal keeps the sheet open with what was typed.
@@ -80,7 +80,7 @@ export function DeliveryWaySheet({
         tried || key !== "fee" || draft.fee !== "" ? problems[key] : undefined;
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${id}-panel`}
             // Back to the row's Edit, which opened it.
             returnFocusTo={() =>
@@ -295,6 +295,6 @@ export function DeliveryWaySheet({
                     {checkout}
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

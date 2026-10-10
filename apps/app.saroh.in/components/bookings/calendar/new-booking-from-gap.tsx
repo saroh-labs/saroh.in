@@ -1,12 +1,10 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from "@saroh/ui/dialog";
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -44,7 +42,6 @@ import type { StaffView } from "@/lib/staff/types";
 
 import { TextLink } from "@saroh/ui/text-link";
 import { Chip, Eyebrow } from "./parts";
-import { btn } from "./quick-look-types";
 
 export interface GapTarget {
     staff: StaffView;
@@ -82,22 +79,29 @@ export function NewBookingFromGap({
     onBlock: (target: GapTarget) => void;
 }) {
     return (
-        <Dialog open={target !== null} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-h-[calc(100vh-40px)] max-w-[460px] gap-0 overflow-y-auto rounded-[14px] px-5 py-[18px]">
-                {target ? (
-                    <Form
-                        key={`${target.staff.id}${target.date}${target.free[0]}`}
-                        target={target}
-                        services={services}
-                        people={people}
-                        timezone={timezone}
-                        money={money}
-                        onClose={onClose}
-                        onBlock={onBlock}
-                    />
-                ) : null}
-            </DialogContent>
-        </Dialog>
+        <FormSheet
+            open={target !== null}
+            title="New booking"
+            description={
+                target
+                    ? `With ${target.staff.name} on ${dayLabel(target.date)}. Pick the service, then who it is for.`
+                    : ""
+            }
+            onClose={onClose}
+        >
+            {target ? (
+                <Form
+                    key={`${target.staff.id}${target.date}${target.free[0]}`}
+                    target={target}
+                    services={services}
+                    people={people}
+                    timezone={timezone}
+                    money={money}
+                    onClose={onClose}
+                    onBlock={onBlock}
+                />
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -126,6 +130,7 @@ function Form({
     const [pick, setPick] = useState<CustomerPick | null>(null);
     const [pay, setPay] = useState<PayChoice>(defaultPay(people.payLink));
     const [saving, setSaving] = useState(false);
+    const [tried, setTried] = useState(false);
     const [attempt] = useState(() => crypto.randomUUID());
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<{
@@ -189,11 +194,12 @@ function Form({
         people.payLink && (!chosen || (chosen.priceCents ?? 0) > 0);
     const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
     const booker = bookerFor(pick);
-    const ready = Boolean(serviceId) && booker !== null && !saving;
+    const ready = Boolean(serviceId) && booker !== null;
     const when = `${staff.name} · ${dayLabel(date)} at ${clock(at)}`;
 
     async function book() {
-        if (!serviceId || !ready) return;
+        setTried(true);
+        if (!serviceId || !ready || saving) return;
         setSaving(true);
         setError(null);
         const paidWith = paidWithFor(payNow);
@@ -240,163 +246,156 @@ function Form({
         router.refresh();
         showUndo(
             `Closed the extra ${clock(extra.startMinute)}–${clock(extra.endMinute)}.`,
-            () => {
-                void addExtraHours(staff.id, {
+            async () => {
+                const back = await addExtraHours(staff.id, {
                     date,
                     startMinute: extra.startMinute,
                     endMinute: extra.endMinute,
-                }).then((back) => {
-                    if (!back.ok) showError(back.error);
-                    router.refresh();
                 });
+                router.refresh();
+                return back;
             },
         );
     }
 
     if (done) {
         return (
-            <div>
-                <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                    New booking
-                </DialogTitle>
-                <DialogDescription className="mb-3 mt-[3px] text-[12.5px] text-muted-foreground">
+            <FormSheetBody className="block">
+                <p className="mb-3 text-[12.5px] text-muted-foreground">
                     {when}
-                </DialogDescription>
+                </p>
                 <PayLinkPanel
                     booked={done.booked}
                     bookingId={done.bookingId}
                     first={done.link}
                     onDone={onClose}
                 />
-            </div>
+            </FormSheetBody>
         );
     }
 
     return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                void book();
-            }}
-        >
-            <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                New booking
-            </DialogTitle>
-            <DialogDescription className="mb-3 mt-[3px] text-[12.5px] text-muted-foreground">
-                {when}
-            </DialogDescription>
+        <>
+            <FormSheetBody className="block">
+                <p className="mb-3 text-[12.5px] text-muted-foreground">
+                    {when}
+                </p>
 
-            <Eyebrow id={`${ids.who}-svc`}>Service</Eyebrow>
-            {offered.length ? (
+                <Eyebrow id={`${ids.who}-svc`}>Service</Eyebrow>
+                {offered.length ? (
+                    <div
+                        role="radiogroup"
+                        aria-labelledby={`${ids.who}-svc`}
+                        className="mb-3 flex flex-wrap gap-1.5"
+                    >
+                        {offered.map((s) => {
+                            const price = money
+                                ? formatMoney(s.priceCents, s.currency)
+                                : null;
+                            return (
+                                <Chip
+                                    key={s.id}
+                                    on={serviceId === s.id}
+                                    disabled={!fits(s)}
+                                    onClick={() => setServiceId(s.id)}
+                                >
+                                    {s.name} · {s.durationMinutes} min
+                                    {price ? ` · ${price}` : ""}
+                                    {startOf(s) !== null && startOf(s) !== start
+                                        ? ` · from ${clock(startOf(s) ?? start)}`
+                                        : ""}
+                                </Chip>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <p className="mb-3 text-[12.5px] text-muted-foreground">
+                        {staff.name} takes no one-to-one services yet. Choose
+                        who takes each on Services.
+                    </p>
+                )}
+                {starts === null && offered.length ? (
+                    <p
+                        role="status"
+                        className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground"
+                    >
+                        Finding when each can start…
+                    </p>
+                ) : anyTooLong ? (
+                    <p className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground">
+                        Greyed out: it can&apos;t start in this free time. It is
+                        longer than the time before {clock(free[1])}, or outside
+                        the service&apos;s own hours.
+                    </p>
+                ) : null}
+
+                <Eyebrow id={`${ids.who}-cust`}>Customer</Eyebrow>
+                <CustomerPicker
+                    value={pick}
+                    onPick={setPick}
+                    canSearch={people.canSearch}
+                    labelledBy={`${ids.who}-cust`}
+                />
+
+                <Eyebrow id={`${ids.who}-pay`}>Payment</Eyebrow>
                 <div
                     role="radiogroup"
-                    aria-labelledby={`${ids.who}-svc`}
-                    className="mb-3 flex flex-wrap gap-1.5"
+                    aria-labelledby={`${ids.who}-pay`}
+                    className="flex flex-wrap gap-1.5"
                 >
-                    {offered.map((s) => {
-                        const price = money
-                            ? formatMoney(s.priceCents, s.currency)
-                            : null;
-                        return (
-                            <Chip
-                                key={s.id}
-                                on={serviceId === s.id}
-                                disabled={!fits(s)}
-                                onClick={() => setServiceId(s.id)}
-                            >
-                                {s.name} · {s.durationMinutes} min
-                                {price ? ` · ${price}` : ""}
-                                {startOf(s) !== null && startOf(s) !== start
-                                    ? ` · from ${clock(startOf(s) ?? start)}`
-                                    : ""}
-                            </Chip>
-                        );
-                    })}
+                    {payChoices(offerLink).map((c) => (
+                        <Chip
+                            key={c.key}
+                            on={payNow === c.key}
+                            onClick={() => setPay(c.key)}
+                        >
+                            {c.label}
+                        </Chip>
+                    ))}
                 </div>
-            ) : (
-                <p className="mb-3 text-[12.5px] text-muted-foreground">
-                    {staff.name} takes no one-to-one services yet. Choose who
-                    takes each on Services.
+                <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
+                    {payNote(payNow)}
                 </p>
-            )}
-            {starts === null && offered.length ? (
-                <p
-                    role="status"
-                    className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground"
-                >
-                    Finding when each can start…
-                </p>
-            ) : anyTooLong ? (
-                <p className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground">
-                    Greyed out: it can&apos;t start in this free time — longer
-                    than the time before {clock(free[1])}, or outside the
-                    service&apos;s own hours.
-                </p>
-            ) : null}
-
-            <Eyebrow id={`${ids.who}-cust`}>Customer</Eyebrow>
-            <CustomerPicker
-                value={pick}
-                onPick={setPick}
-                canSearch={people.canSearch}
-                labelledBy={`${ids.who}-cust`}
-            />
-
-            <Eyebrow id={`${ids.who}-pay`}>Payment</Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby={`${ids.who}-pay`}
-                className="flex flex-wrap gap-1.5"
-            >
-                {payChoices(offerLink).map((c) => (
-                    <Chip
-                        key={c.key}
-                        on={payNow === c.key}
-                        onClick={() => setPay(c.key)}
+                {error ? (
+                    <p
+                        role="alert"
+                        className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
                     >
-                        {c.label}
-                    </Chip>
-                ))}
-            </div>
-            <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
-                {payNote(payNow)}
-            </p>
-            {error ? (
-                <p
-                    role="alert"
-                    className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
-                >
-                    {error}
-                </p>
-            ) : null}
-
-            <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
-                {extra ? (
-                    <TextLink
-                        onClick={() => void closeExtra()}
-                        className="text-[12.5px]"
-                    >
-                        Close these extra hours
-                    </TextLink>
+                        {error}
+                    </p>
                 ) : null}
-                <TextLink
-                    onClick={() => onBlock(target)}
-                    className="mr-auto text-[12.5px]"
-                >
-                    Block this time instead
-                </TextLink>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={btn.ghost}
-                    onClick={onClose}
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" className={btn.primary} disabled={!ready}>
-                    {saving ? "Booking…" : "Book it"}
-                </Button>
-            </div>
-        </form>
+
+                {tried && !ready ? (
+                    <p
+                        role="alert"
+                        className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
+                    >
+                        Pick a service and who it is for.
+                    </p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+                    {extra ? (
+                        <TextLink
+                            onClick={() => void closeExtra()}
+                            className="text-[12.5px] coarse:min-h-11"
+                        >
+                            Close these extra hours
+                        </TextLink>
+                    ) : null}
+                    <TextLink
+                        onClick={() => onBlock(target)}
+                        className="text-[12.5px] coarse:min-h-11"
+                    >
+                        Block this time instead
+                    </TextLink>
+                </div>
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel="Create booking"
+                savingLabel="Booking…"
+                pending={saving}
+                onSubmit={book}
+            />
+        </>
     );
 }

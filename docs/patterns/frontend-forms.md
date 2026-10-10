@@ -53,49 +53,116 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **One sheet, one dialog, one confirm** (UX audit, 10 Oct).
+Every overlay in `app.saroh.in` is one of three components, by the size of
+the task. Never write a `SheetContent`, a `DialogContent` or an
+`AlertDialog` and a footer by hand for something that saves:
+`components/shared/overlay-frames.test.ts` reads the app and fails a copy
+(what is not a form, such as a quick look or a picker, is on its short
+list with its reason).
+
+| Component       | For                                | File                                   |
+| --------------- | ---------------------------------- | -------------------------------------- |
+| `FormSheet`     | More than three fields             | `components/shared/form-sheet.tsx`     |
+| `FormDialog`    | One to three fields, or one choice | `components/shared/form-dialog.tsx`    |
+| `ConfirmDialog` | Only what cannot be undone         | `components/shared/confirm-dialog.tsx` |
+
+The sheet and the dialog share one set of rules
+(`components/shared/overlay-form.tsx`):
+
+- **Width.** A sheet is the screen on a phone and 448px beside the page,
+  512px with `wide`. A dialog is `size="sm" | "md" | "lg"` (420, 460,
+  560px), in `@saroh/ui/dialog`. No other widths.
+- **Head.** The title (`font-display`, 18px) is a row's name or verb and
+  thing ("Add note"), with one sentence under it, always.
+- **Foot.** Pinned, with a rule above it in a sheet: the way out (outline),
+  then the overlay's own button (ink), on the right. On a phone they stack
+  full width with the button on top. **This replaces "Save then Cancel on
+  the left".**
+- **Labels.** "Save" for an edit. Verb and thing for a create or an action
+  ("Add note", "Send invite"). Never "Save changes", "Update" or "Done",
+  except `doneOnly` on a sheet that only lists things. The way out is
+  "Cancel", or "Keep order" beside a button that cancels (`cancelLabel`).
+- **Saving.** The label says so ("Saving…"), both buttons wait, and nothing
+  closes it. A refusal keeps it open with what was typed. Success closes it.
+- **The button is never off for "nothing changed" or "not filled in yet".**
+  An edit that says its draft is unchanged (`dirty={false}`) just closes.
+  What is wrong is said when the button is pressed, clears as each field is
+  fixed, and the keyboard goes to the first field marked `aria-invalid`.
+  (`saveOff` is for a button waiting on something in the overlay, such as
+  an upload or a check that is running.)
+- **Ways out.** A press outside closes it only while nothing has changed.
+  Cancel, Escape and the close button are decisions: they drop the draft
+  unasked. There is no "You have changes that are not saved" prompt.
+- **Keyboard.** It starts in the first field and goes back to what opened
+  it (`trigger`, else whatever had focus or was last pressed, else
+  `returnFocusTo`).
+- **A fresh draft per opening:** a `key`, or a draft component under the
+  frame. A draft that is a component of its own draws `FormSheetBody` and
+  `FormSheetFoot` (or `FormDialogFoot`) inside the frame, and says its
+  save is on its way with the foot's `pending`.
+
+`ConfirmDialog` waits for `onConfirm` (a promise): it shows the busy label
+("Deleting…"), blocks dismissal, stays open with the reason on a refusal
+and closes only on success. `tone="neutral"` for a step that destroys
+nothing ("Turn on Track stock", "Make a new link"). The title is "Verb
+thing?" with no quotes round a name, the body says what goes, what stays
+and "This cannot be undone.", and the buttons are "Keep {thing}" (which
+has the keyboard first) then the verb and thing.
+
+**Current** — **Undo or confirm, never both, never neither** (UX audit,
+10 Oct). What can be put back is done at once with `showUndo` and asks
+nothing (a product category, a note). What cannot is the one confirm. What
+has no way back in the API but need not be final is **held**: gone at once,
+written when its ten seconds are up (`useHold`, an invitation cancelled, a
+course session removed). See `frontend-error-feedback.md`.
+
+**Current** — **Nobody is sent away from an overlay.** A task finishes in
+the sheet or dialog that opened. Add a lead and Add contact stay on the
+list, and the toast has the way to the new record
+(`showSuccess(message, description, { label, onClick })`). A link out that
+has to stay (a product's full editor, a record to compare) is the quiet
+action at the far side of the foot, never the main one.
+
 **Current** — **A settings row is read first and edited in a side sheet**
 (owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
 Settings › Business (`components/organizations/`) draw `Row`s from
 `components/sites/settings-rows.tsx` — label, a sentence of what is saved,
-Edit — and each Edit opens its own `@saroh/ui/sheet` with one Save.
-`SettingsSheetFrame` in `components/shared/settings-sheet-frame.tsx` is the
-one frame to use (`PlaceSheetFrame` names it by a location's row): the fields
-scroll, Save then Cancel sit at the foot, nothing saves until Save, a
-refusal keeps the sheet open with what was typed, Cancel, Escape and the
-close button drop the draft, it can't be dismissed while saving, each
-opening is a fresh draft (a `key` per opening) and the keyboard returns to
-the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
+Edit — and each Edit opens its own `FormSheet` with one Save
+(`PlaceSheetFrame` names it by a location's row): the fields scroll, Cancel
+then Save sit at the foot, nothing saves until Save, a refusal keeps the
+sheet open with what was typed, Cancel, Escape and the close button drop
+the draft, it can't be dismissed while saving, each opening is a fresh
+draft (a `key` per opening) and the keyboard returns to the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
 Product settings' lists (`components/commerce/product-settings/`) are the
-same rule for a list you manage: `NameDialog` for a one-field add or rename,
-the same `SettingsSheetFrame` with a `trigger` for anything with more (an
-option's name and values, a field, a merge), so the keyboard returns to the
-button that opened it, and `ConfirmDialog` (`returnFocusTo`) before a delete.
+same rule for a list you manage: `NameDialog`
+(`components/shared/name-dialog.tsx`, a `FormDialog` with one field) for a
+one-field add or rename, a `FormSheet` with a `trigger` for anything with
+more (an option's name and values, a field, a merge), so the keyboard
+returns to the button that opened it. A delete that can be undone asks
+nothing and offers Undo.
 No row turns into a form, and the task finishes inside what opened.
 
 **Current** — **A stray press outside never drops typed work** (UX audit,
-10 Oct). In every sheet frame a press outside closes it only while nothing
-has changed; once the draft differs from what it opened with, a press
-outside does nothing, and Cancel, Escape and the close button are the ways
-out. `SettingsSheetFrame` reads that from its own fields
+10 Oct). In every sheet and dialog a press outside closes it only while
+nothing has changed. Once the draft differs from what it opened with, a
+press outside does nothing, and Cancel, Escape and the close button are the
+ways out. The frame reads that from its own fields
 (`components/shared/use-draft-changed.ts`: boxes, ticks, chips, what a
-picker shows, a picture, a rich text box), so a sheet passes nothing; one
-whose work the fields can't show passes `dirty`. `ActionSheetContent` takes
-`dirty`, and Order Detail's sheets say it with `useOrderSheetDraft`. A long
-dialog that holds typed work (New booking, Add a lead, Invite to team) asks
-the same reader in its `onInteractOutside`. Never write a sheet's
-`SheetContent` and footer by hand: draw the frame, so the rule stays in one
-place (`settings-sheet-frame.test.tsx` lists the sheets and fails a copy).
+picker shows, a picture, a rich text box), so an overlay passes nothing.
+One whose work the fields can't show passes `dirty`, or calls
+`useFormSheetDraft` / `useFormSheetDirty` from a draft under the frame.
 
 A record's page is the same rule: Order Detail
 (`components/commerce/order-detail/`) shows status, items, payments and
 the timeline, and each change (hand to courier, tracking, edit, refund,
 how it's fulfilled, cancel) opens its own sheet, one at a time.
-`OrderSheet` in `order-sheet.tsx` is that frame, built on
-`components/shared/action-sheet.tsx`: the fields scroll
-(`OrderSheetBody`) and what the change does to the money stays at the
-foot with the button that makes it (`OrderSheetFoot`), wider
-(`sm:max-w-lg`) where a list of lines needs it. Its way out reads "Cancel"
-unless the sheet's own button cancels something (`dismiss="Keep order"`). A sheet opened from more
+`OrderSheet` in `order-sheet.tsx` is that frame, a thin name for
+`FormSheet` drawn by its parts: the fields scroll (`OrderSheetBody`) and
+what the change does to the money stays at the foot with the button that
+makes it (`OrderSheetFoot`), `wide` where a list of lines needs it. Its
+way out reads "Cancel" unless the sheet's own button cancels something
+(`cancelLabel="Keep order"`). A sheet opened from more
 than one button has no single trigger, so `useOrderPanel` remembers the
 button pressed and gives the keyboard back to it. A change that is held
 ten seconds (a refund, a cancel) closes its sheet into the hold card on
@@ -115,7 +182,7 @@ a button that only needs a name or a choice opens its dialog there
 page.
 
 Website › Settings follows it (`components/sites/settings/`): it draws the
-same `SettingsSheetFrame` (`settings-sheet.tsx` there keeps only the note
+same `FormSheet` (`settings-sheet.tsx` there keeps only the note
 and problem type and `useSheetControl`), and its links are
 `settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
 is done inside its sheet or dialog (the share image and the site icon are
@@ -211,13 +278,21 @@ preview under its fields, from the draft.
   the waitlist do.
 - **Adopted** — **Every field has a visible label; a placeholder is never the
   label** (13 §5). Not measured.
+- **Current** — **Anything that tells a customer waits ten seconds with
+  Undo** (UX audit, 10 Oct): a reminder or an invoice sent, a message, a
+  team or location invite, review invitations, a booking or an order
+  cancelled from a list, a subscription cancelled. `useHold().send` in
+  `components/shared/use-hold.ts` is the one way: "Sending in 10 seconds",
+  then "Sent to {name}.". The overlay closes keeping what was typed, and a
+  refusal or an Undo opens it again with that. Money out stays as built.
 - **Current** — **shadcn controls, never native pickers.** A list is a
   `Select` — `components/shared/option-select.tsx` wraps it for flat option
   lists and maps a `""` "None" value, which Radix reserves. A time of day is
   `@saroh/ui/time-select` (fixed steps, value stays "HH:MM"); a date is
   `@saroh/ui/date-picker` (Popover + Calendar). No `<select>`,
-  `type="date"`, `type="time"` or `type="datetime-local"` remains in
-  `app.saroh.in`; with react-hook-form, drive them through `Controller` or
+  `type="date"`, `type="time"` or `type="datetime-local"` remains inside
+  an overlay in `app.saroh.in` (the Orders filter bar's two date boxes and
+  two selects on pages are the gap); with react-hook-form, drive them through `Controller` or
   `FormField`, not `register`.
 - **Adopted** — **Form primitives, not raw inputs,** in application forms.
   Raw `<input>` and `<textarea>` elements remain in some inline managers.

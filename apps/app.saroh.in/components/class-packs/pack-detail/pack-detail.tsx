@@ -62,7 +62,6 @@ import { SalesTab } from "./sales-tab";
 import { UsedTab } from "./used-tab";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
 
 /** What the sell dialog needs, read only for someone who may sell. */
 export interface SellContext {
@@ -177,15 +176,12 @@ export function PackDetailScreen({
             }
             router.refresh();
             dismissToasts();
-            showUndo(
-                archiveToast(pack, false),
-                () =>
-                    start(async () => {
-                        const back = await setPackArchived(pack.id, true);
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    }),
-                { duration: UNDO_MS },
+            showUndo(archiveToast(pack, false), () =>
+                start(async () => {
+                    const back = await setPackArchived(pack.id, true);
+                    if (!back.ok) showError(back.error);
+                    router.refresh();
+                }),
             );
         });
     }

@@ -225,27 +225,30 @@ function CourierDraft({
                     </>
                 ) : null}
             </OrderSheetBody>
-            <OrderSheetFoot busy={busy}>
-                {handover && onPrint ? (
-                    <Button type="button" variant="outline" onClick={onPrint}>
-                        Packing slip
-                    </Button>
-                ) : null}
-                <Button
-                    type="button"
-                    disabled={bad || unnamed || busy}
-                    onClick={() =>
-                        onSave(
-                            courierFields(
-                                { courier: name, number, link },
-                                handover ? undefined : before,
-                            ),
-                        )
-                    }
-                >
-                    {handover ? "Handed over" : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            <OrderSheetFoot
+                saveLabel={handover ? "Mark handed over" : "Save"}
+                saveOff={bad || unnamed}
+                extra={
+                    handover && onPrint ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={onPrint}
+                        >
+                            Packing slip
+                        </Button>
+                    ) : null
+                }
+                onSubmit={() =>
+                    onSave(
+                        courierFields(
+                            { courier: name, number, link },
+                            handover ? undefined : before,
+                        ),
+                    )
+                }
+            />
         </>
     );
 }

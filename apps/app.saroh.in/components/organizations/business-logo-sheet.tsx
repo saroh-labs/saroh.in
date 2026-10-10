@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { LogoValue } from "@/components/shared/logo-upload";
 import { LogoUpload } from "@/components/shared/logo-upload";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
@@ -66,7 +66,7 @@ export function BusinessLogoSheet({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${BUSINESS_ROW_ID.logo}-panel`}
             returnFocusTo={returnTo}
             title={words.title}
@@ -98,6 +98,6 @@ export function BusinessLogoSheet({
                     {refusal}
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

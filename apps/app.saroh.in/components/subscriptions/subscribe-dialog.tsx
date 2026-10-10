@@ -1,15 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -18,6 +9,7 @@ import { useId, useState } from "react";
 import { reportFailure } from "@/components/billing/plan-refusal";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { OptionSelect } from "@/components/shared/option-select";
 import { invoiceMoney } from "@/lib/invoices/money";
 import { subscribe } from "@/lib/subscriptions/actions";
@@ -32,8 +24,8 @@ function ymd(d: Date): string {
 }
 
 /**
- * Subscribe someone, after the design's dialog: who, which plan, and when
- * it starts. A start in the past is allowed — someone moved over from a
+ * Subscribe someone, in a side sheet: who, which plan, and when it
+ * starts. A start in the past is allowed — someone moved over from a
  * spreadsheet — and the help under it says, in words, which period is
  * invoiced now and that the ones before are not billed.
  *
@@ -90,14 +82,15 @@ export function SubscribeDialog({
         });
         setBusy(false);
         if (!res.ok) {
-            // The plan's notice replaces this dialog, with the way up.
+            // The plan's notice replaces this sheet, with the way up.
             if (res.plan) onOpenChange(false);
             return reportFailure(res);
         }
         showSuccess(
+            `${person?.name ?? "They"} subscribed to ${plan.name}.`,
             res.data.startsAt
-                ? `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice goes out when they start`
-                : `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice is issued`,
+                ? "The first invoice goes out when they start."
+                : "The first invoice is issued.",
         );
         onOpenChange(false);
         setContactId(initialContactId ?? "");
@@ -106,89 +99,73 @@ export function SubscribeDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Subscribe someone
-                    </DialogTitle>
-                    <DialogDescription>
-                        {renewalWords(autopayOffered).subscribe}
-                    </DialogDescription>
-                </DialogHeader>
-                {active.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        There is no plan to put anyone on yet. Make one in Plans
-                        first.
-                    </p>
-                ) : (
-                    <div className="grid gap-4">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor={ids.who}>Who</Label>
-                            <ContactPicker
-                                id={ids.who}
-                                contacts={contacts}
-                                value={contactId}
-                                onValueChange={setContactId}
-                            />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor={ids.plan}>Plan</Label>
-                            <OptionSelect
-                                id={ids.plan}
-                                value={planId}
-                                onValueChange={setPlanId}
-                                options={active.map((p) => ({
-                                    value: p.id,
-                                    label: `${p.name} · ${invoiceMoney(p.price, p.currency)} ${intervalWords(p.interval).per}`,
-                                }))}
-                            />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor={ids.start}>Starting</Label>
-                            <DatePicker
-                                id={ids.start}
-                                value={start}
-                                onValueChange={setStart}
-                                className="w-full"
-                                aria-describedby={`${ids.start}-help`}
-                            />
-                            {help ? (
-                                <p
-                                    id={`${ids.start}-help`}
-                                    className="text-[12px] leading-[1.5] text-muted-foreground"
-                                >
-                                    {help}
-                                </p>
-                            ) : null}
-                        </div>
-                        <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                            The price is copied onto the subscription. Changing
-                            the plan later will not change what{" "}
-                            {person ? person.name.split(" ")[0] : "they"} pay
-                            {person ? "s" : ""}.
-                        </p>
+        <FormSheet
+            open={open}
+            title="Subscribe someone"
+            description={renewalWords(autopayOffered).subscribe}
+            pending={busy}
+            doneOnly={active.length === 0}
+            doneLabel="Close"
+            saveLabel={startsLater ? "Subscribe" : "Subscribe and invoice"}
+            savingLabel="Subscribing…"
+            fieldsClassName="block"
+            onClose={() => onOpenChange(false)}
+            onSubmit={save}
+        >
+            {active.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground">
+                    There is no plan to put anyone on yet. Make one in Plans
+                    first.
+                </p>
+            ) : (
+                <div className="grid gap-4">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.who}>Who</Label>
+                        <ContactPicker
+                            id={ids.who}
+                            contacts={contacts}
+                            value={contactId}
+                            onValueChange={setContactId}
+                        />
                     </div>
-                )}
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={busy || active.length === 0}
-                        onClick={() => void save()}
-                    >
-                        {busy
-                            ? "Subscribing…"
-                            : startsLater
-                              ? "Subscribe"
-                              : "Subscribe and invoice"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.plan}>Plan</Label>
+                        <OptionSelect
+                            id={ids.plan}
+                            value={planId}
+                            onValueChange={setPlanId}
+                            options={active.map((p) => ({
+                                value: p.id,
+                                label: `${p.name} · ${invoiceMoney(p.price, p.currency)} ${intervalWords(p.interval).per}`,
+                            }))}
+                        />
+                    </div>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.start}>Starting</Label>
+                        <DatePicker
+                            id={ids.start}
+                            value={start}
+                            onValueChange={setStart}
+                            className="w-full"
+                            aria-describedby={`${ids.start}-help`}
+                        />
+                        {help ? (
+                            <p
+                                id={`${ids.start}-help`}
+                                className="text-[12px] leading-[1.5] text-muted-foreground"
+                            >
+                                {help}
+                            </p>
+                        ) : null}
+                    </div>
+                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
+                        The price is copied onto the subscription. Changing the
+                        plan later will not change what{" "}
+                        {person ? person.name.split(" ")[0] : "they"} pay
+                        {person ? "s" : ""}.
+                    </p>
+                </div>
+            )}
+        </FormSheet>
     );
 }

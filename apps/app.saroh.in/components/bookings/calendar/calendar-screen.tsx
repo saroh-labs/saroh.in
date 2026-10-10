@@ -53,6 +53,7 @@ import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 import { Users } from "lucide-react";
 
+import { useHold } from "@/components/shared/use-hold";
 import { Segmented } from "@saroh/ui/segmented";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
@@ -65,7 +66,6 @@ import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
 import type { QuickLookActions } from "./quick-look-types";
-import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
@@ -165,7 +165,7 @@ export function CalendarScreen({
     serviceHours?: ServiceHours | null;
 }) {
     const router = useRouter();
-    const { hold, undo, pending } = useHeld();
+    const { hold, undo, pending } = useHold();
     const [overrides, setOverrides] = useState<Record<string, Override>>({});
     const [peek, setPeek] = useState<string | null>(null);
     const [gap, setGap] = useState<GapTarget | null>(null);
@@ -414,11 +414,10 @@ export function CalendarScreen({
                 setPeek(null);
                 router.refresh();
                 const to = `${dayLabel(localDateOf(slot.startAt, timezone))} at ${clock(localMinuteOf(slot.startAt, timezone))}`;
-                showUndo(`Moved ${firstName(b)} to ${to}.`, () => {
-                    void rescheduleBooking(b.id, b.startAt).then((back) => {
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    });
+                showUndo(`Moved ${firstName(b)} to ${to}.`, async () => {
+                    const back = await rescheduleBooking(b.id, b.startAt);
+                    router.refresh();
+                    return back;
                 });
             });
         },

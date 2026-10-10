@@ -67,7 +67,7 @@ function AlertDialogFooter({
     return (
         <div
             className={cn(
-                "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+                "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
                 className,
             )}
             {...props}
@@ -82,7 +82,10 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <AlertDialogPrimitive.Title
         ref={ref}
-        className={cn("text-lg font-semibold", className)}
+        className={cn(
+            "font-display text-lg font-semibold leading-tight tracking-[-0.02em]",
+            className,
+        )}
         {...props}
     />
 ));
@@ -119,11 +122,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <AlertDialogPrimitive.Cancel
         ref={ref}
-        className={cn(
-            buttonVariants({ variant: "outline" }),
-            "mt-2 sm:mt-0",
-            className,
-        )}
+        className={cn(buttonVariants({ variant: "outline" }), className)}
         {...props}
     />
 ));

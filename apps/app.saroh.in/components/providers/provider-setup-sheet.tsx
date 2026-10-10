@@ -2,25 +2,26 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@saroh/ui/dialog";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
+import { Unplug } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { reportFailure } from "@/components/billing/plan-refusal";
+import {
+    refusedResult,
+    reportFailure,
+} from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
     connectCommsProvider,
@@ -44,7 +45,6 @@ import type {
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
 import { EmptyState } from "@saroh/ui/data-state";
 
-import { Segmented } from "@saroh/ui/segmented";
 import {
     StepHeading,
     WebhookAddressStep,
@@ -114,19 +114,20 @@ const labelOfComms = (channel: CommsChannel, p: string) =>
  * provider — the Providers page's "Set up" / "Manage", which used to link to
  * the page it was already on.
  *
- * Keys go in and never come back out: the API seals them, so replacing one
- * means typing it again, and the dialog says so. Disconnecting is confirmed
+ * A side sheet (`FormSheet`): the keys scroll and the button stays at the
+ * foot. Keys go in and never come back out: the API seals them, so replacing
+ * one means typing it again, and the sheet says so. Disconnecting is confirmed
  * rather than undone for the same reason — undoing it would need the secret
  * nobody can read back.
  */
-export function ProviderSetupDialog(
+export function ProviderSetupSheet(
     props:
         | {
               kind: "payments";
               label: string;
               trigger: string;
               urgent: boolean;
-              /** The provider the dialog opens on. */
+              /** The provider the sheet opens on. */
               provider?: PaymentProviderName;
               connected: ConnectedPaymentProvider[];
               /** Each provider's webhook (DEC-063); `null` when unread. */
@@ -137,17 +138,22 @@ export function ProviderSetupDialog(
               label: string;
               trigger: string;
               urgent: boolean;
-              /** The channel the dialog opens on (Email by default). */
+              /** The channel the sheet opens on (Email by default). */
               channel?: CommsChannel;
-              /** The provider the dialog opens on, on that channel. */
+              /** The provider the sheet opens on, on that channel. */
               provider?: string;
               connected: ConnectedCommsProvider[];
           },
 ) {
     const [open, setOpen] = useState(false);
+    // Which opening this is: each one is a fresh draft.
+    const [opening, setOpening] = useState(0);
+    const [saving, setSaving] = useState(false);
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <FormSheet
+            wide
+            open={open}
+            trigger={
                 <Button
                     size="sm"
                     variant={props.urgent ? "brand" : "outline"}
@@ -156,25 +162,40 @@ export function ProviderSetupDialog(
                 >
                     {props.trigger}
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[520px] overflow-y-auto px-4 min-[420px]:px-6">
-                {props.kind === "payments" ? (
-                    <PaymentsForm
-                        initialProvider={props.provider}
-                        connected={props.connected}
-                        webhooks={props.webhooks}
-                        onDone={() => setOpen(false)}
-                    />
-                ) : (
-                    <MessagingForm
-                        initialChannel={props.channel ?? "EMAIL"}
-                        initialProvider={props.provider}
-                        connected={props.connected}
-                        onDone={() => setOpen(false)}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
+            }
+            title={props.kind === "payments" ? "Payments" : "Messaging"}
+            description={
+                props.kind === "payments"
+                    ? "Where online payments are taken, with the methods your account has switched on. Your keys are sealed when saved and are never shown again, here or anywhere."
+                    : "How messages to your customers and leads are sent. Keys are sealed when saved and never shown again."
+            }
+            pending={saving}
+            onOpen={() => {
+                setOpening((n) => n + 1);
+                setOpen(true);
+            }}
+            onClose={() => setOpen(false)}
+        >
+            {props.kind === "payments" ? (
+                <PaymentsForm
+                    key={opening}
+                    initialProvider={props.provider}
+                    connected={props.connected}
+                    webhooks={props.webhooks}
+                    setSaving={setSaving}
+                    onDone={() => setOpen(false)}
+                />
+            ) : (
+                <MessagingForm
+                    key={opening}
+                    initialChannel={props.channel ?? "EMAIL"}
+                    initialProvider={props.provider}
+                    connected={props.connected}
+                    setSaving={setSaving}
+                    onDone={() => setOpen(false)}
+                />
+            )}
+        </FormSheet>
     );
 }
 
@@ -182,11 +203,13 @@ function PaymentsForm({
     initialProvider,
     connected,
     webhooks,
+    setSaving,
     onDone,
 }: {
     initialProvider?: PaymentProviderName;
     connected: ConnectedPaymentProvider[];
     webhooks: PaymentWebhookSetup[] | null;
+    setSaving: (saving: boolean) => void;
     onDone: () => void;
 }) {
     const router = useRouter();
@@ -216,7 +239,8 @@ function PaymentsForm({
     const hook = webhookFor(webhooks, provider);
     const secretRequired = hook?.secretRequired ?? razorpay;
     const [webhookSecret, setWebhookSecret] = useState("");
-    const [saving, setSaving] = useState(false);
+    // What is missing is said once the button is pressed.
+    const [tried, setTried] = useState(false);
     const details = useBusinessDetailsStep({
         then: `connect ${labelOfPayment(provider)}`,
         continueLabel: "Save and connect",
@@ -239,8 +263,8 @@ function PaymentsForm({
         keyIdWrong ||
         (secretRequired && !webhookSecret.trim());
 
-    async function submit(e: React.FormEvent) {
-        e.preventDefault();
+    async function submit() {
+        setTried(true);
         if (incomplete) return;
         setSaving(true);
         // Online payments are invoiced: the registered address first
@@ -262,161 +286,155 @@ function PaymentsForm({
         if (!res) return;
         // At the plan's connections limit (U13): its notice, not a toast.
         if (!res.ok) return reportFailure(res);
-        showSuccess(`${labelOfPayment(provider)} connected`);
+        showSuccess(`${labelOfPayment(provider)} connected.`);
         onDone();
         router.refresh();
     }
 
-    async function disconnect(p: PaymentProviderName) {
+    async function disconnect(p: PaymentProviderName): Promise<ConfirmResult> {
         const res = await disconnectPaymentProvider(p);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${labelOfPayment(p)} disconnected`);
+        if (!res.ok) return refusedResult(res);
+        showSuccess(`${labelOfPayment(p)} disconnected.`);
         onDone();
         router.refresh();
     }
 
     return (
-        <form onSubmit={(e) => void submit(e)} className="min-w-0 space-y-4">
-            <DialogHeader>
-                <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
-                    Payments
-                </DialogTitle>
-                <DialogDescription>
-                    Where online payments are taken, with the methods your
-                    account has switched on. Your keys are sealed when saved and
-                    are never shown again, here or anywhere.
-                </DialogDescription>
-            </DialogHeader>
-
-            <Connected
-                rows={connected.map((c) => ({
-                    key: c.provider,
-                    name: labelOfPayment(c.provider),
-                    detail: needsPublicKey(c)
-                        ? "No key id yet — enter the keys again below"
-                        : needsWebhookSecret(c)
-                          ? "No webhook signing secret — enter the keys again below"
-                          : c.publicKey,
-                    status: c.status,
-                }))}
-                onDisconnect={(key) =>
-                    setConfirming(key as PaymentProviderName)
-                }
-            />
-
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.provider}>Provider</Label>
-                <OptionSelect
-                    id={ids.provider}
-                    value={provider}
-                    onValueChange={setProvider}
-                    options={PAYMENT_PROVIDERS}
+        <>
+            <FormSheetBody className="gap-4">
+                <Connected
+                    rows={connected.map((c) => ({
+                        key: c.provider,
+                        name: labelOfPayment(c.provider),
+                        detail: needsPublicKey(c)
+                            ? "No key id yet. Enter the keys again below."
+                            : needsWebhookSecret(c)
+                              ? "No webhook signing secret. Enter the keys again below."
+                              : c.publicKey,
+                        status: c.status,
+                    }))}
+                    onDisconnect={(key) =>
+                        setConfirming(key as PaymentProviderName)
+                    }
                 />
-            </div>
-            {razorpay && missingKey ? (
-                <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
-                    Razorpay needs its key id to open your checkout window, and
-                    this connection was saved without one. Enter the key id and
-                    secret again to take payments online.
-                </p>
-            ) : missingSecret ? (
-                <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
-                    This connection was saved without its webhook signing
-                    secret, so {labelOfPayment(provider)}&apos;s payment updates
-                    are refused and payments can&apos;t be confirmed. Enter the
-                    keys again with the secret below.
-                </p>
-            ) : null}
 
-            <section aria-labelledby={ids.keys} className="grid gap-2.5">
-                <StepHeading n={1} id={ids.keys}>
-                    Your API keys
-                </StepHeading>
-                <div className="grid gap-3 min-[420px]:grid-cols-2">
-                    <SecretField
-                        id={ids.keyId}
-                        label={razorpay ? "Key ID (public)" : "Key ID"}
-                        value={keyId}
-                        onChange={setKeyId}
-                        invalid={keyIdWrong}
-                        describedBy={razorpay ? ids.keyHint : undefined}
-                    />
-                    <SecretField
-                        id={ids.secret}
-                        label="Key secret"
-                        value={keySecret}
-                        onChange={setKeySecret}
-                        secret
+                <div className="grid gap-1.5">
+                    <Label htmlFor={ids.provider}>Provider</Label>
+                    <OptionSelect
+                        id={ids.provider}
+                        value={provider}
+                        onValueChange={setProvider}
+                        options={PAYMENT_PROVIDERS}
                     />
                 </div>
-                {razorpay ? (
-                    <p
-                        id={ids.keyHint}
-                        className={cn(
-                            "text-[11.5px] leading-[1.45]",
-                            keyIdWrong
-                                ? "text-destructive"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {keyIdWrong
-                            ? "That isn't a Razorpay key id — it starts rzp_live_ or rzp_test_."
-                            : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+                {razorpay && missingKey ? (
+                    <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
+                        Razorpay needs its key id to open your checkout window,
+                        and this connection was saved without one. Enter the key
+                        id and secret again to take payments online.
                     </p>
-                ) : (
-                    <SecretField
-                        id={ids.public}
-                        label="Public key"
-                        value={publicKey}
-                        onChange={setPublicKey}
-                        optional
-                        hint="Shown to the checkout; not a secret."
-                    />
-                )}
-            </section>
+                ) : missingSecret ? (
+                    <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
+                        This connection was saved without its webhook signing
+                        secret, so {labelOfPayment(provider)}&apos;s payment
+                        updates are refused and payments can&apos;t be
+                        confirmed. Enter the keys again with the secret below.
+                    </p>
+                ) : null}
 
-            <WebhookAddressStep
-                n={2}
-                provider={provider}
-                setup={hook}
-                testMode={razorpay && isTestKey(keyId)}
-            />
+                <section aria-labelledby={ids.keys} className="grid gap-2.5">
+                    <StepHeading n={1} id={ids.keys}>
+                        Your API keys
+                    </StepHeading>
+                    <div className="grid gap-3 min-[420px]:grid-cols-2">
+                        <SecretField
+                            id={ids.keyId}
+                            label={razorpay ? "Key ID (public)" : "Key ID"}
+                            value={keyId}
+                            onChange={setKeyId}
+                            invalid={keyIdWrong || (tried && !keyId.trim())}
+                            describedBy={razorpay ? ids.keyHint : undefined}
+                        />
+                        <SecretField
+                            id={ids.secret}
+                            label="Key secret"
+                            value={keySecret}
+                            onChange={setKeySecret}
+                            invalid={tried && !keySecret.trim()}
+                            secret
+                        />
+                    </div>
+                    {razorpay ? (
+                        <p
+                            id={ids.keyHint}
+                            className={cn(
+                                "text-[11.5px] leading-[1.45]",
+                                keyIdWrong
+                                    ? "text-destructive"
+                                    : "text-muted-foreground",
+                            )}
+                        >
+                            {keyIdWrong
+                                ? "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_."
+                                : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+                        </p>
+                    ) : (
+                        <SecretField
+                            id={ids.public}
+                            label="Public key"
+                            value={publicKey}
+                            onChange={setPublicKey}
+                            optional
+                            hint="Shown to the checkout; not a secret."
+                        />
+                    )}
+                </section>
 
-            {secretRequired ? (
-                <WebhookSecretStep
-                    n={3}
+                <WebhookAddressStep
+                    n={2}
                     provider={provider}
-                    value={webhookSecret}
-                    onChange={setWebhookSecret}
+                    setup={hook}
+                    testMode={razorpay && isTestKey(keyId)}
                 />
-            ) : (
-                <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                    {labelOfPayment(provider)} signs its payment updates with
-                    your key secret, so there&apos;s no separate secret to add.
-                </p>
-            )}
 
-            <DialogFooter className="gap-2 sm:gap-0">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="cursor-pointer"
-                    onClick={onDone}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    className="cursor-pointer"
-                    disabled={saving || incomplete}
-                >
-                    {saving
-                        ? "Connecting…"
-                        : current
-                          ? "Save keys"
-                          : `Connect ${labelOfPayment(provider)}`}
-                </Button>
-            </DialogFooter>
+                {secretRequired ? (
+                    <WebhookSecretStep
+                        n={3}
+                        provider={provider}
+                        value={webhookSecret}
+                        onChange={setWebhookSecret}
+                    />
+                ) : (
+                    <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                        {labelOfPayment(provider)} signs its payment updates
+                        with your key secret, so there&apos;s no separate secret
+                        to add.
+                    </p>
+                )}
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel={
+                    current
+                        ? "Save keys"
+                        : `Connect ${labelOfPayment(provider)}`
+                }
+                savingLabel="Connecting…"
+                note={
+                    tried && incomplete ? (
+                        <p
+                            role="alert"
+                            className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        >
+                            {keyIdWrong
+                                ? "Fix the key ID to connect."
+                                : secretRequired
+                                  ? "Enter the key ID, the key secret and the webhook signing secret to connect."
+                                  : "Enter the key ID and the key secret to connect."}
+                        </p>
+                    ) : null
+                }
+                onSubmit={submit}
+            />
 
             {confirming ? (
                 <ConfirmDialog
@@ -431,12 +449,14 @@ function PaymentsForm({
                             (c) => c.provider === confirming,
                         )?.activeMemberships,
                     })}
-                    confirmLabel="Disconnect"
-                    onConfirm={() => void disconnect(confirming)}
+                    confirmLabel={`Disconnect ${labelOfPayment(confirming)}`}
+                    keepLabel={`Keep ${labelOfPayment(confirming)}`}
+                    icon={Unplug}
+                    onConfirm={() => disconnect(confirming)}
                 />
             ) : null}
             {details.step}
-        </form>
+        </>
     );
 }
 
@@ -444,11 +464,13 @@ function MessagingForm({
     initialChannel,
     initialProvider,
     connected,
+    setSaving,
     onDone,
 }: {
     initialChannel: CommsChannel;
     initialProvider?: string;
     connected: ConnectedCommsProvider[];
+    setSaving: (saving: boolean) => void;
     onDone: () => void;
 }) {
     const router = useRouter();
@@ -462,7 +484,7 @@ function MessagingForm({
     );
     const [values, setValues] = useState<Record<string, string>>({});
     const [fromAddress, setFromAddress] = useState(current?.fromAddress ?? "");
-    const [saving, setSaving] = useState(false);
+    const [tried, setTried] = useState(false);
     const [confirming, setConfirming] = useState<CommsChannel | null>(null);
     const fromId = useId();
     const providerId = useId();
@@ -476,14 +498,16 @@ function MessagingForm({
         setProvider(now?.provider ?? CHANNELS[next].providers[0].value);
         setFromAddress(now?.fromAddress ?? "");
         setValues({});
+        setTried(false);
     }
 
     const missing = spec.fields.some(
         (f) => !f.optional && !(values[f.key] ?? "").trim(),
     );
 
-    async function submit(e: React.FormEvent) {
-        e.preventDefault();
+    async function submit() {
+        setTried(true);
+        if (missing) return;
         setSaving(true);
         const credentials: Record<string, string> = {};
         for (const f of spec.fields) {
@@ -499,101 +523,121 @@ function MessagingForm({
         setSaving(false);
         if (!res.ok) return reportFailure(res);
         showSuccess(
-            `${spec.label} is sent through ${labelOfComms(channel, provider)}`,
+            `${labelOfComms(channel, provider)} connected.`,
+            `${spec.label} is sent through it.`,
         );
         onDone();
         router.refresh();
     }
 
-    async function disconnect(c: CommsChannel) {
+    async function disconnect(c: CommsChannel): Promise<ConfirmResult> {
         const res = await disconnectCommsProvider(c);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${CHANNELS[c].label} disconnected`);
+        if (!res.ok) return refusedResult(res);
+        showSuccess(`${CHANNELS[c].label} disconnected.`);
         onDone();
         router.refresh();
     }
 
     return (
-        <form onSubmit={(e) => void submit(e)} className="space-y-4">
-            <DialogHeader>
-                <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
-                    Messaging
-                </DialogTitle>
-                <DialogDescription>
-                    How messages to your customers and leads are sent. Keys are
-                    sealed when saved and never shown again.
-                </DialogDescription>
-            </DialogHeader>
+        <>
+            <FormSheetBody className="gap-4">
+                <div
+                    role="radiogroup"
+                    aria-label="Channel"
+                    className="grid grid-cols-2 gap-[5px]"
+                >
+                    {(Object.keys(CHANNELS) as CommsChannel[]).map((key) => (
+                        <label
+                            key={key}
+                            className={cn(
+                                "flex cursor-pointer items-center justify-center gap-2 rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+                                channel === key
+                                    ? "border-border-strong bg-foreground/[0.03] font-semibold"
+                                    : "border-muted font-medium hover:border-border-strong",
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name="comms-channel"
+                                className="sr-only"
+                                checked={channel === key}
+                                onChange={() => pickChannel(key)}
+                            />
+                            {CHANNELS[key].label}
+                        </label>
+                    ))}
+                </div>
 
-            <Segmented
-                label="Channel"
-                block
-                value={channel}
-                onValueChange={pickChannel}
-                options={(Object.keys(CHANNELS) as CommsChannel[]).map(
-                    (key) => ({
-                        value: key,
-                        label: CHANNELS[key].label,
-                    }),
-                )}
-            />
-
-            <Connected
-                rows={connected
-                    .filter((c) => c.channel === channel)
-                    .map((c) => ({
-                        key: c.channel,
-                        name: labelOfComms(c.channel, c.provider),
-                        detail: c.fromAddress,
-                        status: c.status,
-                    }))}
-                onDisconnect={(key) => setConfirming(key as CommsChannel)}
-            />
-
-            <div className="grid gap-1.5">
-                <Label htmlFor={providerId}>
-                    {current ? "Replace with" : "Provider"}
-                </Label>
-                <OptionSelect
-                    id={providerId}
-                    value={provider}
-                    onValueChange={setProvider}
-                    options={spec.providers}
+                <Connected
+                    rows={connected
+                        .filter((c) => c.channel === channel)
+                        .map((c) => ({
+                            key: c.channel,
+                            name: labelOfComms(c.channel, c.provider),
+                            detail: c.fromAddress,
+                            status: c.status,
+                        }))}
+                    onDisconnect={(key) => setConfirming(key as CommsChannel)}
                 />
-            </div>
-            {spec.fields.map((f, i) => (
+
+                <div className="grid gap-1.5">
+                    <Label htmlFor={providerId}>
+                        {current ? "Replace with" : "Provider"}
+                    </Label>
+                    <OptionSelect
+                        id={providerId}
+                        value={provider}
+                        onValueChange={setProvider}
+                        options={spec.providers}
+                    />
+                </div>
+                {spec.fields.map((f, i) => (
+                    <SecretField
+                        key={`${channel}-${f.key}`}
+                        id={`${fieldIds}-${i}`}
+                        label={f.label}
+                        value={values[f.key] ?? ""}
+                        onChange={(v) =>
+                            setValues((x) => ({ ...x, [f.key]: v }))
+                        }
+                        invalid={
+                            tried &&
+                            !f.optional &&
+                            !(values[f.key] ?? "").trim()
+                        }
+                        secret={f.secret}
+                        optional={f.optional}
+                        hint={f.hint}
+                    />
+                ))}
                 <SecretField
-                    key={`${channel}-${f.key}`}
-                    id={`${fieldIds}-${i}`}
-                    label={f.label}
-                    value={values[f.key] ?? ""}
-                    onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))}
-                    secret={f.secret}
-                    optional={f.optional}
-                    hint={f.hint}
+                    id={fromId}
+                    label={spec.fromLabel}
+                    value={fromAddress}
+                    onChange={setFromAddress}
+                    optional
+                    hint="What recipients see it come from. Not a secret."
                 />
-            ))}
-            <SecretField
-                id={fromId}
-                label={spec.fromLabel}
-                value={fromAddress}
-                onChange={setFromAddress}
-                optional
-                hint="What recipients see it come from. Not a secret."
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel={
+                    current
+                        ? "Save keys"
+                        : `Connect ${spec.label.toLowerCase()}`
+                }
+                savingLabel="Connecting…"
+                note={
+                    tried && missing ? (
+                        <p
+                            role="alert"
+                            className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        >
+                            Fill in every key to connect.
+                        </p>
+                    ) : null
+                }
+                onSubmit={submit}
             />
-
-            <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={saving || missing}>
-                    {saving
-                        ? "Connecting…"
-                        : current
-                          ? "Save keys"
-                          : `Connect ${spec.label.toLowerCase()}`}
-                </Button>
-            </DialogFooter>
 
             {confirming ? (
                 <ConfirmDialog
@@ -602,12 +646,14 @@ function MessagingForm({
                         if (!o) setConfirming(null);
                     }}
                     title={`Disconnect ${CHANNELS[confirming].label.toLowerCase()}?`}
-                    description="Messages on this channel stop being sent straight away; ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back."
-                    confirmLabel="Disconnect"
-                    onConfirm={() => void disconnect(confirming)}
+                    description="Messages on this channel stop being sent straight away. Ones already sent are not affected. Connecting again means entering the keys again, because they cannot be read back. This cannot be undone."
+                    confirmLabel={`Disconnect ${CHANNELS[confirming].label.toLowerCase()}`}
+                    keepLabel={`Keep ${CHANNELS[confirming].label.toLowerCase()}`}
+                    icon={Unplug}
+                    onConfirm={() => disconnect(confirming)}
                 />
             ) : null}
-        </form>
+        </>
     );
 }
 

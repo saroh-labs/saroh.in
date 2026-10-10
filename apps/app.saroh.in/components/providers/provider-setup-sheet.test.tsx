@@ -18,7 +18,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
-import { ProviderSetupDialog } from "./provider-setup-dialog";
+import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 const connectPaymentProvider = vi.fn();
 vi.mock("@/lib/providers/actions", () => ({
@@ -113,7 +113,7 @@ function open(
 ) {
     act(() => {
         root.render(
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="payments"
                 label={provider === "RAZORPAY" ? "Razorpay" : "Cashfree"}
                 trigger="Connect"
@@ -195,15 +195,21 @@ describe("Razorpay setup, as guided steps", () => {
         expect(button(/Copy webhook URL/).textContent).toBe("Copied");
     });
 
-    it("keeps Save off until the webhook secret is filled", () => {
+    it("connects nothing until the webhook secret is filled, and says what is missing", async () => {
         open("RAZORPAY");
         typeInto(byLabel("Key ID"), "rzp_live_AbC123");
         typeInto(byLabel("Key secret"), "super-secret-value");
-        expect(save().disabled).toBe(true);
         typeInto(byLabel("Webhook signing secret"), "   ");
-        expect(save().disabled).toBe(true);
-        typeInto(byLabel("Webhook signing secret"), "whsec_chosen");
+        // The button is never off: pressing it says what is missing.
         expect(save().disabled).toBe(false);
+        await act(async () => {
+            save().click();
+            await Promise.resolve();
+        });
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+        expect(text()).toContain(
+            "Enter the key ID, the key secret and the webhook signing secret to connect.",
+        );
     });
 
     it("generates a strong secret, shows it, copies it, and sends it on save", async () => {
@@ -284,7 +290,7 @@ describe("Razorpay setup, as guided steps", () => {
             "This connection was saved without its webhook signing secret",
         );
         expect(text()).toContain(
-            "No webhook signing secret — enter the keys again below",
+            "No webhook signing secret. Enter the keys again below.",
         );
     });
 });

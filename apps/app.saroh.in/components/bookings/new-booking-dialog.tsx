@@ -2,15 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -26,11 +17,12 @@ import {
 } from "@/components/bookings/pay-link-panel";
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import { Chip } from "@/components/shared/chip";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
-    draftWatch,
-    useDraftChanged,
-} from "@/components/shared/use-draft-changed";
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
+import { OptionSelect } from "@/components/shared/option-select";
 import { packsFor } from "@/lib/class-packs/actions";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { PackPurchase } from "@/lib/class-packs/service";
@@ -128,15 +120,12 @@ export function NewBookingDialog({
     openOnArrival?: boolean;
 }) {
     const router = useRouter();
-    const {
-        attach: draftRef,
-        touch: draftTouch,
-        changed: draftChanged,
-    } = useDraftChanged();
     const [open, setOpen] = useState(
         openOnArrival && services.length > 0 && !visit,
     );
     const [saving, setSaving] = useState(false);
+    // What is missing is said once the button is pressed.
+    const [tried, setTried] = useState(false);
     // One per attempt, so a double-click books once (the API replays it).
     const [attempt, setAttempt] = useState(() => crypto.randomUUID());
     const [reload, setReload] = useState(0);
@@ -215,10 +204,19 @@ export function NewBookingDialog({
         );
     }
 
-    /** Closed by the dialog's own buttons, as by Esc or the ×. */
+    /** Closed: by Cancel, Escape, the ×, or once it is booked. */
     function close() {
         setOpen(false);
         leaveArrival();
+        setPicked(null);
+        setPackRefusal(null);
+        setUsePack(true);
+        setTried(false);
+        if (done) {
+            setDone(null);
+            setWho(null);
+            setAttempt(crypto.randomUUID());
+        }
     }
 
     const heldNow = held?.key === packKey ? held.packs : [];
@@ -230,9 +228,7 @@ export function NewBookingDialog({
     const booker = bookerFor(who);
     const offerLink = people.payLink && (service?.priceCents ?? 0) > 0;
     const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
-    const ready =
-        Boolean(service && picked && (visit !== undefined || booker)) &&
-        !saving;
+    const ready = Boolean(service && picked && (visit !== undefined || booker));
 
     /** The treatment's next visit (E10): on its order, nothing to pay. */
     async function saveVisit(v: VisitToBook) {
@@ -259,14 +255,16 @@ export function NewBookingDialog({
             return;
         }
         showSuccess(
-            `Visit ${v.visitNumber} of ${v.visits} booked for ${v.who}, ${dayTime(picked, service.timezone)}`,
+            "Visit booked.",
+            `Visit ${v.visitNumber} of ${v.visits} for ${v.who}, ${dayTime(picked, service.timezone)}.`,
         );
-        setOpen(false);
-        setPicked(null);
+        close();
         router.refresh();
     }
 
     async function save() {
+        setTried(true);
+        if (saving) return;
         if (visit) return saveVisit(visit);
         if (!service || !picked || !booker || !who) return;
         setSaving(true);
@@ -315,9 +313,10 @@ export function NewBookingDialog({
         }
         setSaving(false);
         showSuccess(
+            "Booking created.",
             paying
-                ? `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)} — paid with ${pack.pack.name}`
-                : `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}`,
+                ? `${whom} for ${service.name}, ${dayTime(picked, service.timezone)}, paid with ${pack.pack.name}.`
+                : `${whom} for ${service.name}, ${dayTime(picked, service.timezone)}.`,
         );
         close();
         setPicked(null);
@@ -327,25 +326,32 @@ export function NewBookingDialog({
     }
 
     return (
-        <Dialog
+        <FormSheet
             open={open}
-            onOpenChange={(o) => {
-                setOpen(o);
-                if (!o) leaveArrival();
-                if (!o) {
-                    setPicked(null);
-                    setPackRefusal(null);
-                    setUsePack(true);
-                    if (done) {
-                        setDone(null);
-                        setWho(null);
-                        setAttempt(crypto.randomUUID());
-                    }
-                }
-            }}
-        >
-            <DialogTrigger asChild>
-                {visit ? (
+            title={
+                visit
+                    ? `Book visit ${visit.visitNumber} of ${visit.visits}`
+                    : "New booking"
+            }
+            description={
+                visit
+                    ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
+                    : "Pick the service, then who and when."
+            }
+            pending={saving}
+            // Someone or a time chosen is work to lose. Otherwise the
+            // frame reads the fields.
+            dirty={
+                done
+                    ? false
+                    : picked !== null || who !== initialWho
+                      ? true
+                      : undefined
+            }
+            onOpen={() => setOpen(true)}
+            onClose={close}
+            trigger={
+                visit ? (
                     <Button
                         variant={primaryTrigger ? "default" : "outline"}
                         size={primaryTrigger ? "default" : "sm"}
@@ -364,264 +370,226 @@ export function NewBookingDialog({
                         )}
                         New booking
                     </Button>
-                )}
-            </DialogTrigger>
-            <DialogContent
-                className="max-h-[86vh] overflow-y-auto sm:max-w-[500px]"
-                // A stray press outside must not drop a booking half
-                // made: once someone or a time is chosen, only Close,
-                // Escape and the close button leave. As every sheet does
-                // (`components/shared/settings-sheet-frame.tsx`).
-                onInteractOutside={(e) => {
-                    if (
-                        saving ||
-                        (!done &&
-                            (picked !== null ||
-                                who !== initialWho ||
-                                draftChanged()))
-                    ) {
-                        e.preventDefault();
-                    }
-                }}
-            >
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
-                        {visit
-                            ? `Book visit ${visit.visitNumber} of ${visit.visits}`
-                            : "New booking"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {visit
-                            ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
-                            : "Pick the service, then who and when."}
-                    </DialogDescription>
-                </DialogHeader>
-
-                {done ? (
-                    <PayLinkPanel
-                        booked={done.booked}
-                        bookingId={done.bookingId}
-                        first={done.link}
-                        onDone={close}
-                    />
-                ) : (
-                    <>
-                        <div
-                            ref={draftRef}
-                            {...draftWatch(draftTouch)}
-                            className="grid gap-4"
-                        >
-                            {visit ? null : (
-                                <>
-                                    <div className="grid gap-1.5">
-                                        <Label htmlFor={ids.service}>
-                                            What are they booked for?
-                                        </Label>
-                                        <OptionSelect
-                                            id={ids.service}
-                                            value={serviceId}
-                                            onValueChange={(v) => {
-                                                setServiceId(v);
-                                                setPicked(null);
-                                            }}
-                                            options={services.map((s) => ({
-                                                value: s.id,
-                                                label: `${s.name} · ${s.minutes} min`,
-                                            }))}
-                                        />
-                                    </div>
-
-                                    <div className="grid gap-1.5">
-                                        <div
-                                            id={ids.contact}
-                                            className="text-[12.5px] font-medium"
-                                        >
-                                            Who is it for?
-                                        </div>
-                                        <CustomerPicker
-                                            value={who}
-                                            onPick={setWho}
-                                            canSearch={people.canSearch}
-                                            labelledBy={ids.contact}
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="grid gap-2">
-                                <div className="text-[12.5px] font-medium">
-                                    When?
+                )
+            }
+        >
+            {done ? (
+                <PayLinkPanel
+                    booked={done.booked}
+                    bookingId={done.bookingId}
+                    first={done.link}
+                    onDone={close}
+                />
+            ) : (
+                <>
+                    <FormSheetBody className="gap-4">
+                        {visit ? null : (
+                            <>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor={ids.service}>
+                                        What are they booked for?
+                                    </Label>
+                                    <OptionSelect
+                                        id={ids.service}
+                                        value={serviceId}
+                                        onValueChange={(v) => {
+                                            setServiceId(v);
+                                            setPicked(null);
+                                        }}
+                                        options={services.map((s) => ({
+                                            value: s.id,
+                                            label: `${s.name} · ${s.minutes} min`,
+                                        }))}
+                                    />
                                 </div>
-                                {slots === null ? (
-                                    <p className="text-[12.5px] text-muted-foreground">
-                                        Finding open times…
-                                    </p>
-                                ) : byDay.length === 0 ? (
-                                    <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                                        No open times in the next {WINDOW_DAYS}{" "}
-                                        days. Opening more hours on this
-                                        service, under Services, adds times
-                                        here.
-                                    </p>
-                                ) : (
-                                    <div
-                                        role="radiogroup"
-                                        aria-label="Time"
-                                        className="grid max-h-[220px] gap-3 overflow-y-auto pr-1"
-                                    >
-                                        {byDay.map(([day, daySlots]) => (
-                                            <div key={day}>
-                                                <div className="label">
-                                                    {day}
-                                                </div>
-                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                    {daySlots.map((slot) => (
-                                                        <button
-                                                            key={slot.startAt}
-                                                            type="button"
-                                                            role="radio"
-                                                            aria-checked={
-                                                                picked ===
-                                                                slot.startAt
-                                                            }
-                                                            onClick={() =>
-                                                                setPicked(
-                                                                    slot.startAt,
-                                                                )
-                                                            }
-                                                            className={cn(
-                                                                "rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums transition-colors duration-fast",
-                                                                picked ===
-                                                                    slot.startAt
-                                                                    ? "border-foreground bg-foreground text-background"
-                                                                    : "border-border hover:border-border-strong hover:bg-accent",
-                                                            )}
-                                                        >
-                                                            {clockTime(
-                                                                slot.startAt,
-                                                                service?.timezone ??
-                                                                    "UTC",
-                                                            )}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {service ? (
-                                    <p className="text-[11.5px] text-muted-foreground">
-                                        Times in {service.timezone}, the
-                                        service&apos;s own timezone. Only open
-                                        times nobody has taken are shown.
-                                    </p>
-                                ) : null}
-                            </div>
 
-                            {pack && service && !visit ? (
-                                <div
-                                    className={cn(
-                                        "grid gap-2.5 rounded-[10px] border px-3.5 py-3 transition-colors duration-fast",
-                                        usePack
-                                            ? "border-border-strong bg-foreground/[0.03]"
-                                            : "border-border",
-                                    )}
-                                >
-                                    <label className="flex cursor-pointer items-start gap-2.5">
-                                        <Checkbox
-                                            checked={usePack}
-                                            onCheckedChange={(c) =>
-                                                setUsePack(c === true)
-                                            }
-                                            className="mt-0.5"
-                                        />
-                                        <span className="grid gap-0.5">
-                                            <span className="text-[13.5px] font-medium">
-                                                Use their class pack
-                                            </span>
-                                            <span className="text-[12px] text-muted-foreground">
-                                                {usePack
-                                                    ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking; cancelling gives it back.`
-                                                    : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
-                                            </span>
-                                        </span>
-                                    </label>
-                                    {usePack && usable.length > 1 ? (
-                                        <OptionSelect
-                                            id={ids.pack}
-                                            aria-label="Which pack"
-                                            value={pack.id}
-                                            onValueChange={setPackId}
-                                            options={usable.map((p) => ({
-                                                value: p.id,
-                                                label: packOffer(
-                                                    p,
-                                                    service.timezone,
-                                                ),
-                                            }))}
-                                        />
-                                    ) : null}
-                                </div>
-                            ) : null}
-                            {visit ? (
-                                <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                                    A visit is never billed on its own: the
-                                    treatment was sold once, on order #
-                                    {visit.orderNumber}.
-                                </p>
-                            ) : paying ? null : (
                                 <div className="grid gap-1.5">
                                     <div
-                                        id={ids.pay}
+                                        id={ids.contact}
                                         className="text-[12.5px] font-medium"
                                     >
-                                        Payment
+                                        Who is it for?
                                     </div>
-                                    <div
-                                        role="radiogroup"
-                                        aria-labelledby={ids.pay}
-                                        className="flex flex-wrap gap-1.5"
-                                    >
-                                        {payChoices(offerLink).map((c) => (
-                                            <Chip
-                                                key={c.key}
-                                                on={payNow === c.key}
-                                                onClick={() => setPay(c.key)}
-                                            >
-                                                {c.label}
-                                            </Chip>
-                                        ))}
-                                    </div>
-                                    <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                                        {payNote(payNow)}
-                                    </p>
+                                    <CustomerPicker
+                                        value={who}
+                                        onPick={setWho}
+                                        canSearch={people.canSearch}
+                                        labelledBy={ids.contact}
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        <div className="grid gap-2">
+                            <div className="text-[12.5px] font-medium">
+                                When?
+                            </div>
+                            {slots === null ? (
+                                <p className="text-[12.5px] text-muted-foreground">
+                                    Finding open times…
+                                </p>
+                            ) : byDay.length === 0 ? (
+                                <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                                    No open times in the next {WINDOW_DAYS}{" "}
+                                    days. Opening more hours on this service,
+                                    under Services, adds times here.
+                                </p>
+                            ) : (
+                                <div
+                                    role="radiogroup"
+                                    aria-label="Time"
+                                    className="grid max-h-[220px] gap-3 overflow-y-auto pr-1"
+                                >
+                                    {byDay.map(([day, daySlots]) => (
+                                        <div key={day}>
+                                            <div className="label">{day}</div>
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {daySlots.map((slot) => (
+                                                    <button
+                                                        key={slot.startAt}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={
+                                                            picked ===
+                                                            slot.startAt
+                                                        }
+                                                        onClick={() =>
+                                                            setPicked(
+                                                                slot.startAt,
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            "rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums transition-colors duration-fast",
+                                                            picked ===
+                                                                slot.startAt
+                                                                ? "border-foreground bg-foreground text-background"
+                                                                : "border-border hover:border-border-strong hover:bg-accent",
+                                                        )}
+                                                    >
+                                                        {clockTime(
+                                                            slot.startAt,
+                                                            service?.timezone ??
+                                                                "UTC",
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
-                            {packRefusal ? (
-                                <Notice tone="error">{packRefusal}</Notice>
+                            {service ? (
+                                <p className="text-[11.5px] text-muted-foreground">
+                                    Times in {service.timezone}, the
+                                    service&apos;s own timezone. Only open times
+                                    nobody has taken are shown.
+                                </p>
                             ) : null}
                         </div>
 
-                        <DialogFooter className="gap-2 sm:gap-0">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={close}
+                        {pack && service && !visit ? (
+                            <div
+                                className={cn(
+                                    "grid gap-2.5 rounded-[10px] border px-3.5 py-3 transition-colors duration-fast",
+                                    usePack
+                                        ? "border-border-strong bg-foreground/[0.03]"
+                                        : "border-border",
+                                )}
                             >
-                                Close
-                            </Button>
-                            <Button
-                                type="button"
-                                disabled={!ready}
-                                onClick={() => void save()}
-                            >
-                                {saving ? "Booking…" : "Book it"}
-                            </Button>
-                        </DialogFooter>
-                    </>
-                )}
-            </DialogContent>
-        </Dialog>
+                                <label className="flex cursor-pointer items-start gap-2.5">
+                                    <Checkbox
+                                        checked={usePack}
+                                        onCheckedChange={(c) =>
+                                            setUsePack(c === true)
+                                        }
+                                        className="mt-0.5"
+                                    />
+                                    <span className="grid gap-0.5">
+                                        <span className="text-[13.5px] font-medium">
+                                            Use their class pack
+                                        </span>
+                                        <span className="text-[12px] text-muted-foreground">
+                                            {usePack
+                                                ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking; cancelling gives it back.`
+                                                : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
+                                        </span>
+                                    </span>
+                                </label>
+                                {usePack && usable.length > 1 ? (
+                                    <OptionSelect
+                                        id={ids.pack}
+                                        aria-label="Which pack"
+                                        value={pack.id}
+                                        onValueChange={setPackId}
+                                        options={usable.map((p) => ({
+                                            value: p.id,
+                                            label: packOffer(
+                                                p,
+                                                service.timezone,
+                                            ),
+                                        }))}
+                                    />
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {visit ? (
+                            <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                                A visit is never billed on its own: the
+                                treatment was sold once, on order #
+                                {visit.orderNumber}.
+                            </p>
+                        ) : paying ? null : (
+                            <div className="grid gap-1.5">
+                                <div
+                                    id={ids.pay}
+                                    className="text-[12.5px] font-medium"
+                                >
+                                    Payment
+                                </div>
+                                <div
+                                    role="radiogroup"
+                                    aria-labelledby={ids.pay}
+                                    className="flex flex-wrap gap-1.5"
+                                >
+                                    {payChoices(offerLink).map((c) => (
+                                        <Chip
+                                            key={c.key}
+                                            on={payNow === c.key}
+                                            onClick={() => setPay(c.key)}
+                                        >
+                                            {c.label}
+                                        </Chip>
+                                    ))}
+                                </div>
+                                <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                                    {payNote(payNow)}
+                                </p>
+                            </div>
+                        )}
+                        {packRefusal ? (
+                            <Notice tone="error">{packRefusal}</Notice>
+                        ) : null}
+                    </FormSheetBody>
+                    <FormSheetFoot
+                        saveLabel={visit ? "Book visit" : "Create booking"}
+                        savingLabel="Booking…"
+                        note={
+                            tried && !ready ? (
+                                <p
+                                    role="alert"
+                                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                                >
+                                    {visit
+                                        ? "Pick a time."
+                                        : "Pick who it is for and a time."}
+                                </p>
+                            ) : null
+                        }
+                        onSubmit={save}
+                    />
+                </>
+            )}
+        </FormSheet>
     );
 }
 

@@ -1,19 +1,15 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { Skeleton } from "@saroh/ui/skeleton";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
-import { useNarrow } from "@/lib/hooks/use-narrow";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { BLOCKER_COPY } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
@@ -47,8 +43,14 @@ import { useTurnOn } from "./use-turn-on";
  * Several picks (onboarding) are one sheet: one form with a section per
  * module that asks for something, and one "Turn on".
  *
- * From the right at a desk; from the bottom, full height, on a phone, with
- * its actions stuck to the foot (`useBottomBarInset`).
+ * It is the app's one sheet frame (`FormSheet`): the fields scroll and
+ * Cancel and Turn on stay at the foot. Nothing closes it while it is
+ * turning things on.
+ *
+ * Payments or Communications with nothing else to fill in turns on with
+ * nothing connected. "Turn on and connect" is the quieter second way: it
+ * goes on to Settings › Providers once it is on, because connecting a
+ * provider is a sheet of keys of its own and not something to nest here.
  */
 export function TurnOnSheet({
     picked,
@@ -61,42 +63,39 @@ export function TurnOnSheet({
     modules: readonly ModuleView[];
     onOpenChange: (open: boolean) => void;
 }) {
-    const narrow = useNarrow();
     const [session, setSession] = useState(0);
-    const [busy, setBusy] = useState(false);
+    // Said by the body, which knows what the plan lets the business connect.
+    const [says, setSays] = useState<string | null>(null);
     const open = !!picked && picked.length > 0;
     const close = () => {
         onOpenChange(false);
         setSession((n) => n + 1);
     };
-    const guard = (event: Event) => {
-        // Half-way through turning things on, a stray tap doesn't close it.
-        if (busy) event.preventDefault();
-    };
+    const names = (picked ?? []).map((k) => moduleName(k, modules));
+    const single = picked?.length === 1 ? picked[0] : undefined;
     return (
-        <Sheet open={open} onOpenChange={(o) => (o ? undefined : close())}>
-            <SheetContent
-                side={narrow ? "bottom" : "right"}
-                onInteractOutside={guard}
-                onEscapeKeyDown={guard}
-                className={cn(
-                    "flex flex-col gap-0 p-0",
-                    narrow
-                        ? "h-dvh max-h-dvh"
-                        : "h-full w-full sm:max-w-[460px]",
-                )}
-            >
-                {open ? (
-                    <TurnOnBody
-                        key={`${session}:${picked.join(",")}`}
-                        picked={picked}
-                        modules={modules}
-                        onClose={close}
-                        onBusy={setBusy}
-                    />
-                ) : null}
-            </SheetContent>
-        </Sheet>
+        <FormSheet
+            id="turn-on-form"
+            open={open}
+            title={`Turn on ${listWords(names)}`}
+            description={
+                says ??
+                (single && GIVES[single]
+                    ? GIVES[single]
+                    : "Each one works as soon as it's on. Anything else waits in Finish setup.")
+            }
+            onClose={close}
+        >
+            {open ? (
+                <TurnOnBody
+                    key={`${session}:${picked.join(",")}`}
+                    picked={picked}
+                    modules={modules}
+                    onClose={close}
+                    onSays={setSays}
+                />
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -104,16 +103,16 @@ function TurnOnBody({
     picked,
     modules,
     onClose,
-    onBusy,
+    onSays,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
-    onBusy: (busy: boolean) => void;
+    /** The line under the title, once what can be connected is known. */
+    onSays: (line: string | null) => void;
 }) {
     const t = useTurnOn({ picked, modules, onClose });
     const { draft, plan } = t;
-    const names = picked.map((k) => moduleName(k, modules));
     const single = picked.length === 1 ? picked[0] : undefined;
     const fielded = plan.order.filter(hasSetup);
     // A provider the plan won't let the business connect is never offered
@@ -149,37 +148,22 @@ function TurnOnBody({
           ? `Your online shop goes on your website at ${draft.WEBSITE.address ? `${draft.WEBSITE.address}.saroh.app/shop` : "/shop on your web address"} — we'll set up the website for you.`
           : null;
 
-    const submit = async (connect?: boolean) => {
-        onBusy(true);
-        await t.submit(connect);
-        onBusy(false);
-    };
+    // A module whose provider the plan won't connect is described as the
+    // kind it turns on as.
+    const offline =
+        single && lockOf(single) && GIVES_OFFLINE[single]
+            ? GIVES_OFFLINE[single]
+            : null;
+    useEffect(() => {
+        onSays(offline);
+        return () => onSays(null);
+    }, [offline, onSays]);
+
+    const off = !t.ready || t.hidden.length > 0;
 
     return (
         <>
-            <div className="border-b border-border px-[18px] py-3.5 pr-12">
-                <SheetTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                    Turn on {listWords(names)}
-                </SheetTitle>
-                <SheetDescription className="mt-0.5 text-pretty text-[12.5px] leading-normal text-muted-foreground">
-                    {single && lockOf(single) && GIVES_OFFLINE[single]
-                        ? GIVES_OFFLINE[single]
-                        : single && GIVES[single]
-                          ? GIVES[single]
-                          : "Each one works as soon as it's on. Anything else waits in Finish setup."}
-                </SheetDescription>
-            </div>
-
-            <form
-                id="turn-on-form"
-                noValidate
-                aria-busy={t.saving || !t.ready || undefined}
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void submit();
-                }}
-                className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4"
-            >
+            <FormSheetBody className="gap-5">
                 {comes.length > 0 ? (
                     <section className="grid gap-1.5">
                         <h3 className="label">What comes with it</h3>
@@ -279,81 +263,36 @@ function TurnOnBody({
                         ) : null}
                         {connectButtons ? (
                             <p className="text-pretty text-[12.5px] leading-normal text-muted-foreground">
-                                Connect now to go to Settings › Providers once
-                                it&apos;s on, or later: it turns on with nothing
-                                connected.
+                                It turns on with nothing connected. Turn on and
+                                connect goes on to Settings › Providers once
+                                it&apos;s on.
                             </p>
                         ) : null}
                     </>
                 )}
 
                 {t.failure ? <Notice tone="error">{t.failure}</Notice> : null}
-            </form>
-
-            <ActionBar>
-                {connectButtons ? (
-                    <>
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel="Turn on"
+                savingLabel="Turning on…"
+                pending={t.saving}
+                saveOff={off}
+                extra={
+                    connectButtons ? (
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={
-                                !t.ready || t.saving || t.hidden.length > 0
-                            }
-                            onClick={() => void submit(false)}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                            disabled={off || t.saving}
+                            onClick={() => void t.submit(true)}
                         >
-                            Later
+                            Turn on and connect
                         </Button>
-                        <Button
-                            type="button"
-                            disabled={
-                                !t.ready || t.saving || t.hidden.length > 0
-                            }
-                            onClick={() => void submit(true)}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
-                        >
-                            {t.saving ? "Turning on…" : "Connect now"}
-                        </Button>
-                    </>
-                ) : (
-                    <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={t.saving}
-                            onClick={onClose}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            form="turn-on-form"
-                            disabled={
-                                !t.ready || t.saving || t.hidden.length > 0
-                            }
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
-                        >
-                            {t.saving ? "Turning on…" : "Turn on"}
-                        </Button>
-                    </>
-                )}
-            </ActionBar>
+                    ) : null
+                }
+                onSubmit={() => t.submit(connectButtons ? false : undefined)}
+            />
         </>
-    );
-}
-
-/** The sheet's foot: its actions, and the height a toast rises above. */
-function ActionBar({ children }: { children: ReactNode }) {
-    const ref = useRef<HTMLDivElement>(null);
-    useBottomBarInset(ref);
-    return (
-        <div
-            ref={ref}
-            className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-[18px] py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-        >
-            {children}
-        </div>
     );
 }
 

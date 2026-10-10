@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -268,7 +267,38 @@ function FulfilmentDraft({
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    moved && cents !== null
+                        ? saveLabel({
+                              differenceCents: difference,
+                              paid,
+                              linkable,
+                              format: money,
+                          })
+                        : "Save"
+                }
+                saveOff={off}
+                onSubmit={() => {
+                    if (cents === null) return;
+                    onSave({
+                        fulfilment: pick,
+                        shipping: typed.kind === "ok" ? typed.money : "0",
+                        ...(delivery
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(canTell ? { tell } : {}),
+                    });
+                }}
                 note={
                     <p
                         id={`${ids}-note`}
@@ -283,42 +313,7 @@ function FulfilmentDraft({
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() => {
-                        if (cents === null) return;
-                        onSave({
-                            fulfilment: pick,
-                            shipping: typed.kind === "ok" ? typed.money : "0",
-                            ...(delivery
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                            ...(canTell ? { tell } : {}),
-                        });
-                    }}
-                >
-                    {moved && cents !== null
-                        ? saveLabel({
-                              differenceCents: difference,
-                              paid,
-                              linkable,
-                              format: money,
-                          })
-                        : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

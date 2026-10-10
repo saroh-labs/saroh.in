@@ -10,6 +10,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import { updateOrder } from "@/lib/orders/actions";
@@ -90,7 +91,12 @@ export function OrderActions({
     );
     const cancellable = withCancel && canRefund && canCancel(status);
 
-    async function commit(p: Pending, how?: PaymentMethod, amount?: string) {
+    /** Resolves with the refusal's reason, for the dialog that asked. */
+    async function commit(
+        p: Pending,
+        how?: PaymentMethod,
+        amount?: string,
+    ): Promise<{ ok: true } | { ok: false; error: string }> {
         const res = await updateOrder(
             storeId,
             orderId,
@@ -109,10 +115,7 @@ export function OrderActions({
                   }
                 : { status: "CANCELLED" },
         );
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
+        if (!res.ok) return { ok: false, error: res.error };
         // In part, the order stays paid: the toast says how much went back.
         const part =
             amount !== undefined &&
@@ -122,12 +125,13 @@ export function OrderActions({
                 : null;
         showSuccess(
             p.kind === "cancel"
-                ? `${orderRef} cancelled — its stock is back on the shelves`
+                ? `${orderRef} cancelled. Its stock is back on the shelves.`
                 : p.to === "REFUNDED" && format
                   ? handRefundDone(orderRef, part, format)
-                  : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}`,
+                  : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}.`,
         );
         router.refresh();
+        return { ok: true };
     }
 
     // Marking it paid asks how (#834), and is not destructive.
@@ -137,7 +141,8 @@ export function OrderActions({
         (pending.to === "PAID" || pending.to === "REFUNDED")
             ? pending
             : null;
-    const confirm = pending && !recordingPaid ? confirmCopy(pending) : null;
+    const confirm =
+        pending && !recordingPaid ? confirmCopy(pending, paymentStatus) : null;
 
     return (
         <>
@@ -184,9 +189,10 @@ export function OrderActions({
                     refund={recordingPaid.to === "REFUNDED"}
                     left={refundLeft}
                     format={format}
-                    onRecord={(how, amount) => {
-                        setPending(null);
-                        void commit(recordingPaid, how, amount);
+                    onRecord={async (how, amount) => {
+                        const res = await commit(recordingPaid, how, amount);
+                        if (!res.ok) showError(res.error);
+                        return res.ok;
                     }}
                 />
             ) : null}
@@ -199,31 +205,36 @@ export function OrderActions({
                     title={confirm.title}
                     description={confirm.body}
                     confirmLabel={confirm.verb}
-                    cancelLabel={confirm.keep}
-                    onConfirm={() => {
-                        const p = pending;
-                        setPending(null);
-                        if (p) void commit(p);
-                    }}
+                    keepLabel={confirm.keep}
+                    tone={confirm.tone}
+                    onConfirm={(): Promise<ConfirmResult> | undefined =>
+                        pending ? commit(pending) : undefined
+                    }
                 />
             ) : null}
         </>
     );
 }
 
-function confirmCopy(p: Pending): {
+function confirmCopy(
+    p: Pending,
+    now: PaymentStatus,
+): {
     title: string;
     body: string;
     verb: string;
     /** The way out: never "Cancel" beside "Cancel order". */
     keep: string;
+    /** Red only for the cancel: recording a payment destroys nothing. */
+    tone: "destructive" | "neutral";
 } {
     if (p.kind === "cancel") {
         return {
             title: "Cancel this order?",
-            body: "Its reserved stock goes back on the shelves. A cancelled order stays in the list, and it cannot be reopened.",
+            body: "Its reserved stock goes back on the shelves. A cancelled order stays in the list. This cannot be undone.",
             verb: "Cancel order",
             keep: "Keep order",
+            tone: "destructive",
         };
     }
     const bodies: Record<PaymentStatus, string> = {
@@ -231,13 +242,14 @@ function confirmCopy(p: Pending): {
         PAID: "",
         FAILED: "The customer tried to pay and it did not go through. They can still pay later.",
         REFUNDED:
-            "For money returned outside Saroh. Nothing is sent back from here — to refund a card payment, use Refund.",
+            "For money returned outside Saroh. Nothing is sent back from here. To refund a card payment, use Refund.",
         UNPAID: "",
     };
     return {
         title: `Record this order as ${PAYMENT_LABEL[p.to].toLowerCase()}?`,
-        body: `${bodies[p.to]} This cannot be taken back.`,
+        body: `${bodies[p.to]} This cannot be undone.`,
         verb: `Record as ${PAYMENT_LABEL[p.to].toLowerCase()}`,
-        keep: "Not yet",
+        keep: `Keep it ${PAYMENT_LABEL[now].toLowerCase()}`,
+        tone: "neutral",
     };
 }

@@ -190,7 +190,8 @@ describe("Take ₹X at the desk", () => {
         typeInto(cashGiven(), "300");
         expect(dialog().textContent).toContain("Short ₹200");
         expect(dialog().textContent).toContain("That's ₹200 short.");
-        expect(button(/^Take ₹500 cash$/).disabled).toBe(true);
+        // The button stays on: what is wrong is already said.
+        expect(button(/^Take ₹500 cash$/).disabled).toBe(false);
     });
 
     it("takes cash with what was given, says the change, and refreshes", async () => {
