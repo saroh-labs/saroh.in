@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PostEditor } from "@/components/sites/post-editor";
+import { PostReadView } from "@/components/sites/post-read-view";
 import { activeCut, postPaused } from "@/lib/billing/paused";
 import { getPost, listPostCategories } from "@/lib/content/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
@@ -32,6 +33,26 @@ export default async function EditPostPage({
         pausedOrNull(),
     ]);
     if (!post) notFound();
+
+    /*
+     * Changing a post is `section:write` (`posts.service.ts`), which the
+     * site read answers as `can.edit`. A Reviewer or a Member reads the
+     * site's writing, and gets it to read: no editor whose Save and Publish
+     * are refused.
+     */
+    if (!site.can.edit) {
+        return (
+            <PostReadView
+                siteId={siteId}
+                post={post}
+                prefix={site.postsPrefix ?? "blog"}
+                category={
+                    categories.find((c) => c.id === post.categoryId)?.name ??
+                    null
+                }
+            />
+        );
+    }
 
     return (
         <PostEditor
