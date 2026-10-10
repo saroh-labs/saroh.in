@@ -119,7 +119,9 @@ async function sessionFor(
     const page = await context.newPage();
     // To accounts' own page: a sign-in lands on the workspace by default,
     // which would save its open-business cookie into every shot's session.
-    await page.goto(`${urls.ACCOUNTS_URL}/login?redirect=/account`);
+    await page.goto(
+        `${urls.ACCOUNTS_URL}/login?with=password&redirect=/account`,
+    );
     await page.getByLabel("Email").fill(ROLES[role]);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
