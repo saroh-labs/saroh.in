@@ -33,6 +33,13 @@ vi.mock("next/navigation", () => ({
 }));
 const showSuccess = vi.fn();
 const showError = vi.fn();
+// The logo's upload reaches the media library, which is server-only.
+vi.mock("@/components/sites/media-picker", () => ({
+    useImageUpload: () => ({ upload: vi.fn(), busy: false, error: null }),
+}));
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveBusinessLogo: vi.fn(),
+}));
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
     showError: (...args: unknown[]) => showError(...args) as unknown,
@@ -260,6 +267,7 @@ describe("QrShare", () => {
             initials: "GS",
             logo: null,
             hasLogo: false,
+            canSetLogo: false,
         },
         ...over,
     });

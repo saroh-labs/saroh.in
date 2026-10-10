@@ -122,6 +122,9 @@ export function QrMaker({
                         logo={{
                             has: business.hasLogo,
                             read: business.dataUrl !== null,
+                            add: business.canSetLogo
+                                ? { businessName: business.name }
+                                : null,
                         }}
                         colorProblem={
                             m.problem?.where === "color" ? m.problem.text : null

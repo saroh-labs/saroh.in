@@ -70,7 +70,12 @@ export interface UseQrMakerInput {
     /** Every code of the site, newest first. */
     codes: readonly QrCodeView[];
     lock: QrStyleLock | null;
-    business: { name: string; hasLogo: boolean } & QrLogoChoice;
+    business: {
+        name: string;
+        hasLogo: boolean;
+        /** `org:update`: may add the business logo from here. */
+        canSetLogo?: boolean;
+    } & QrLogoChoice;
     /** The code "Change" opened, or null while making. */
     changing: QrCodeView | null;
     onChangingDone: () => void;

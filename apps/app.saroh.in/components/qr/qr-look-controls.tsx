@@ -5,17 +5,14 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useState } from "react";
 
-import { businessEditHref } from "@/lib/organizations/business-rows";
 import { QR_INK } from "@/lib/qr/colours";
 import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
+import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
-
-/** Where the business logo is set: Business → Identity, its sheet open. */
-export const LOGO_HREF = businessEditHref("logo");
 
 const CUSTOM = "__custom__";
 
@@ -30,6 +27,10 @@ const linkClass =
  * one line, and the colours past ink are dimmed and off; the line's link
  * names the plan that has them, from the catalogue. A code already made in
  * its own look keeps it, and says so.
+ *
+ * A branded code with no business logo draws the initials, and "Add your
+ * logo" opens the logo's sheet here (`QrAddLogo`), for someone who may set
+ * it; anyone else reads where it is set.
  */
 export function QrLookControls({
     style,
@@ -56,7 +57,12 @@ export function QrLookControls({
     colorLocked: (hex: string) => boolean;
     /** A branded code made before the plan changed. */
     keptBranded: boolean;
-    logo: { has: boolean; read: boolean };
+    logo: {
+        has: boolean;
+        read: boolean;
+        /** Whose logo to add, for someone who may; left out otherwise. */
+        add?: { businessName: string } | null;
+    };
     colorProblem: string | null;
     onStyle: (style: QrStyle) => void;
     onColor: (hex: string) => void;
@@ -116,9 +122,14 @@ export function QrLookControls({
                 {style === "BRANDED" && !logo.has ? (
                     <p className="text-[13px] text-foreground/80">
                         No logo yet, so your initials stand in.{" "}
-                        <Link href={LOGO_HREF} className={linkClass}>
-                            Add your logo
-                        </Link>
+                        {logo.add ? (
+                            <QrAddLogo
+                                businessName={logo.add.businessName}
+                                className={linkClass}
+                            />
+                        ) : (
+                            "The business logo is added in Settings › Business."
+                        )}
                     </p>
                 ) : null}
                 {style === "BRANDED" && logo.has && !logo.read ? (

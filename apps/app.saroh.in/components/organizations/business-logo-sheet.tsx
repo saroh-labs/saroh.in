@@ -17,6 +17,9 @@ import type { OrganizationSettings } from "@/lib/organizations/settings-service"
  * stays in the library, unused.
  *
  * A refusal keeps the sheet open and is said under the field.
+ *
+ * It reads only the business's name and logo, so a screen that needs the
+ * logo set (the QR maker's "Add your logo") opens it in place.
  */
 export function BusinessLogoSheet({
     settings,
@@ -25,7 +28,7 @@ export function BusinessLogoSheet({
     onClose,
     onSaved,
 }: {
-    settings: OrganizationSettings;
+    settings: Pick<OrganizationSettings, "name" | "logo">;
     open: boolean;
     returnTo: string;
     onClose: () => void;
@@ -37,10 +40,8 @@ export function BusinessLogoSheet({
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [refusal, setRefusal] = useState<string | null>(null);
-    const words = sheetWords("logo", {
-        kind: settings.kind,
-        registered: false,
-    });
+    // The logo's words are the same for every kind of business.
+    const words = sheetWords("logo", { kind: undefined, registered: false });
 
     async function save() {
         if (logo?.url === saved?.url) {

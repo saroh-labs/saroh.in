@@ -38,6 +38,8 @@ export interface QrScreenBusiness {
     logo: string | null;
     /** A logo is set, whether or not its bytes could be had. */
     hasLogo: boolean;
+    /** `org:update`: may add the business logo, from the maker too. */
+    canSetLogo: boolean;
 }
 
 export type QrScreen =
@@ -71,6 +73,13 @@ async function optional<T>(path: string): Promise<T | null> {
 export function mayChange(org: Organization | null): boolean {
     return org?.actions
         ? org.actions.includes("site:update")
+        : org?.role === "OWNER" || org?.role === "ADMIN";
+}
+
+/** `org:update`: may set the business logo. */
+export function maySetLogo(org: Organization | null): boolean {
+    return org?.actions
+        ? org.actions.includes("org:update")
         : org?.role === "OWNER" || org?.role === "ADMIN";
 }
 
@@ -170,6 +179,7 @@ export async function readQrScreen(
             initials: initialsOf(name),
             logo,
             hasLogo: logoUrl !== null,
+            canSetLogo: maySetLogo(org),
         },
     };
 }
