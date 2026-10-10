@@ -86,8 +86,8 @@
 
 Two sentences, in `lib/api/unreached.ts`, and no screen words its own:
 
-- **`UNREACHED`**: "That didn't reach Saroh. Check your connection and try
-  again. Nothing was changed."
+- **`UNREACHED`**: "We couldn't confirm that was saved. Check your connection, see whether it went through, then try again." It never says nothing changed: a write that timed out
+  may have landed.
 - **`SIGNED_OUT`**: "You've been signed out. Sign in again and what you
   typed stays here."
 

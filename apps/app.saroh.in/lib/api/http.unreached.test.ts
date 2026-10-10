@@ -66,7 +66,7 @@ describe("a write that didn't reach the API", () => {
 
     it("the two sentences are the ones a person reads", () => {
         expect(UNREACHED).toBe(
-            "That didn't reach Saroh. Check your connection and try again. Nothing was changed.",
+            "We couldn't confirm that was saved. Check your connection, see whether it went through, then try again.",
         );
         expect(SIGNED_OUT).toBe(
             "You've been signed out. Sign in again and what you typed stays here.",

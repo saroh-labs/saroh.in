@@ -16,7 +16,7 @@
  * Pure and client-safe: no server-only imports.
  */
 export const UNREACHED =
-    "That didn't reach Saroh. Check your connection and try again. Nothing was changed.";
+    "We couldn't confirm that was saved. Check your connection, see whether it went through, then try again.";
 
 export const SIGNED_OUT =
     "You've been signed out. Sign in again and what you typed stays here.";
