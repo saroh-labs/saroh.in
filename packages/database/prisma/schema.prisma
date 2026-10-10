@@ -141,6 +141,9 @@ model Organization {
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
 
+  // "Download your data" (DEC-117): each zip an owner asked for.
+  dataExports DataExport[]
+
   // Products v2 (#460): photos, per-variant stock, store options, defaults.
   productImages      ProductImage[]
   variantInventory   VariantInventory[]
@@ -650,6 +653,41 @@ model Media {
   businessLogos  BusinessProfile[] @relation("BusinessLogo")
 
   @@index([organizationId])
+}
+
+// "Download your data" (owner, 9 Oct, DEC-117): one zip of a business's
+// records as CSV files and its uploaded media, built by the
+// `data-export.build` job, kept in object storage behind a signed link and
+// deleted 7 days after it is ready (`data-export.expire`). One QUEUED or
+// RUNNING per business (the partial unique index): asking again while one
+// is being made is answered with that one.
+model DataExport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The owner who asked. A bare id, like AuditEvent's actor: the row
+  // outlives a membership.
+  requestedByUserId String
+
+  status String @default("QUEUED") // QUEUED | RUNNING | READY | FAILED | EXPIRED
+
+  // Where the zip is, once READY; cleared when it expires.
+  storageKey String?
+  sizeBytes  BigInt?
+  // What it holds: rows per file, and media files put in or left out.
+  counts     Json?
+  // Why it failed, in words; never a stack or a provider body.
+  failure    String?
+
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  readyAt   DateTime?
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([organizationId], map: "DataExport_one_running_per_org", where: raw("status IN ('QUEUED', 'RUNNING')"))
+  @@index([organizationId, createdAt])
 }
 
 // ============================================================================

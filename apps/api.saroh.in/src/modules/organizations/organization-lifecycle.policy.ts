@@ -10,9 +10,13 @@
  * This table is that decision, one row per state, and every place reads it
  * rather than its own list of names:
  *
- * - `activity`: new activity in the business — a workspace write, an
- *   enquiry, booking or payment from its pages
- *   (`organization-lifecycle.gate.ts`).
+ * - `activity`: activity in the business — a workspace write, an enquiry,
+ *   booking or payment from its pages (`organization-lifecycle.gate.ts`).
+ *   `open` takes anything; `wind-down` (DEC-117) takes nothing new but lets
+ *   the business finish what it already started — progress, cancel and
+ *   refund existing orders, bookings and memberships, and take payment for
+ *   ones already owed; `closed` takes nothing. Which workspace write is
+ *   which is its {@link LifecycleWriteClass}.
  * - `billing`: anything that charges or renews — Saroh's own plan (a
  *   checkout, an add-on, a renewal sent to the provider) and the business's
  *   charges to its own customers (a membership renewal, an autopay debit).
@@ -37,7 +41,7 @@ export type OrganizationLifecycleStatus =
     (typeof OrganizationLifecycleStatus)[keyof typeof OrganizationLifecycleStatus];
 
 export interface LifecycleDecision {
-    activity: "open" | "closed";
+    activity: "open" | "wind-down" | "closed";
     billing: "charges" | "refused";
     publicSite: "online" | "offline";
     members: "open" | "closed";
@@ -62,9 +66,10 @@ export const LIFECYCLE_DECISIONS: Readonly<
     },
     // The window (owner, 9 Oct, #921): no renewal is charged and nothing new
     // can start, but it can still be reinstated, so the site and the door
-    // stay as they were.
+    // stay as they were. It winds down (owner, 9 Oct, DEC-117): what was
+    // already started can be finished, cancelled or refunded.
     PENDING_DELETION: {
-        activity: "closed",
+        activity: "wind-down",
         billing: "refused",
         publicSite: "online",
         members: "open",
@@ -98,6 +103,52 @@ export function lifecycleDecision(status: string): LifecycleDecision {
 /** May the business take new activity? */
 export function activityOpen(status: string): boolean {
     return lifecycleDecision(status).activity === "open";
+}
+
+/**
+ * Is the business winding down (DEC-117)? Nothing new, but what it already
+ * started can be finished.
+ */
+export function windingDown(status: string): boolean {
+    return lifecycleDecision(status).activity === "wind-down";
+}
+
+/**
+ * What a write in the workspace does, for the lifecycle (owner, 9 Oct,
+ * DEC-117). Every route is `new` unless it says otherwise
+ * (`@LifecycleWrite`, `common/decorators/lifecycle-write.decorator.ts`):
+ *
+ * - `new`: starts or changes something — an order, a booking, a sale, a
+ *   product, a setting, an invitation. Open only while `activity` is open.
+ * - `wind-down`: finishes, cancels or refunds something already started,
+ *   or takes the money already owed for it. Open while the business is
+ *   open or winding down.
+ * - `takeout`: the business taking its own data away ("Download your
+ *   data"). Open in every state whose members may open the business.
+ */
+export type LifecycleWriteClass = "new" | "wind-down" | "takeout";
+
+export const LIFECYCLE_WRITE_CLASSES: readonly LifecycleWriteClass[] = [
+    "new",
+    "wind-down",
+    "takeout",
+];
+
+/** May a write of this class go ahead in this state? */
+export function lifecycleAllows(
+    status: string,
+    writeClass: LifecycleWriteClass,
+): boolean {
+    const decision = lifecycleDecision(status);
+    if (decision.members === "closed") return false;
+    switch (writeClass) {
+        case "takeout":
+            return true;
+        case "wind-down":
+            return decision.activity !== "closed";
+        case "new":
+            return decision.activity === "open";
+    }
 }
 
 /** May anything charge or renew for this business? */

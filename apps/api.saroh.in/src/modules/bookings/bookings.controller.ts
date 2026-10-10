@@ -15,6 +15,7 @@ import {
 
 import type { Booking } from "@saroh/database";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -249,6 +250,7 @@ export class BookingsController {
      * appointment is, the other says what happened at it.
      */
     @Post("bookings/:bookingId/outcome")
+    @LifecycleWrite("wind-down")
     @RequireModule("APPOINTMENTS")
     @HttpCode(200)
     recordOutcome(
@@ -267,6 +269,7 @@ export class BookingsController {
      * new link and retires the old one. Saroh sends nothing itself yet.
      */
     @Post("bookings/:bookingId/pay-link")
+    @LifecycleWrite("wind-down")
     @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
@@ -286,6 +289,7 @@ export class BookingsController {
      * answers as it did.
      */
     @Post("bookings/:bookingId/desk-payment")
+    @LifecycleWrite("wind-down")
     @RequireModule("APPOINTMENTS")
     @HttpCode(200)
     takeDeskPayment(
@@ -325,6 +329,7 @@ export class BookingsController {
      * and the refund its policy gives (DEC-058). `booking:*` still applies.
      */
     @Delete("bookings/:bookingId")
+    @LifecycleWrite("wind-down")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,

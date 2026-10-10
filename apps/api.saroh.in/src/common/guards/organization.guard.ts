@@ -5,13 +5,16 @@ import {
     Injectable,
     UnauthorizedException,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import type { IncomingHttpHeaders } from "node:http";
 
 import { OrganizationContextService } from "../../modules/organizations/organization-context.service";
 import {
-    assertOrganizationOpen,
+    assertWorkspaceWrite,
     isReadOnlyMethod,
 } from "../../modules/organizations/organization-lifecycle.gate";
+import type { LifecycleWriteClass } from "../../modules/organizations/organization-lifecycle.policy";
+import { LIFECYCLE_WRITE_KEY } from "../decorators/lifecycle-write.decorator";
 import type { OrganizationContext } from "../types/organization-context";
 import type { AuthUser } from "../types/store-context";
 
@@ -21,6 +24,22 @@ interface OrganizationRequest {
     headers: IncomingHttpHeaders;
     user?: AuthUser;
     organizationContext?: OrganizationContext;
+}
+
+/**
+ * The lifecycle class a route declares (`@LifecycleWrite`), `new` when it
+ * names none. Shared with `StoreLifecycleGuard`.
+ */
+export function lifecycleWriteClassOf(
+    reflector: Reflector,
+    context: ExecutionContext,
+): LifecycleWriteClass {
+    return (
+        reflector.getAllAndOverride<LifecycleWriteClass | undefined>(
+            LIFECYCLE_WRITE_KEY,
+            [context.getHandler(), context.getClass()],
+        ) ?? "new"
+    );
 }
 
 /**
@@ -36,13 +55,19 @@ interface OrganizationRequest {
  *   - `UnauthorizedException` if no authenticated user (guard misordering).
  *   - `BadRequestException`   if no organization id can be determined.
  *   - `NotFoundException` / `ForbiddenException` from the resolver otherwise.
- *   - `ForbiddenException` for a write to a business an operator suspended or
- *     scheduled for deletion. Reads still pass, so its people can see what
- *     happened and take their data (`organization-lifecycle.gate.ts`).
+ *   - `ForbiddenException` for a write the business's lifecycle refuses: a
+ *     suspended business takes none, a closing one only what finishes work
+ *     already started (`@LifecycleWrite("wind-down")`, DEC-117), and either
+ *     lets its people download their data (`"takeout"`). Reads still pass,
+ *     so its people can see what happened and take their data
+ *     (`organization-lifecycle.gate.ts`).
  */
 @Injectable()
 export class OrganizationGuard implements CanActivate {
-    constructor(private readonly organizations: OrganizationContextService) {}
+    constructor(
+        private readonly organizations: OrganizationContextService,
+        private readonly reflector: Reflector = new Reflector(),
+    ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context
@@ -66,7 +91,10 @@ export class OrganizationGuard implements CanActivate {
         // After membership: a stranger learns nothing about the business's
         // state, and a member learns why their write was refused.
         if (!isReadOnlyMethod(request.method)) {
-            await assertOrganizationOpen(organizationId);
+            await assertWorkspaceWrite(
+                organizationId,
+                lifecycleWriteClassOf(this.reflector, context),
+            );
         }
         return true;
     }

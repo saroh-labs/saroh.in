@@ -12,6 +12,7 @@ import {
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { InviteMemberDto, UpdateMemberRoleDto } from "./dto";
 import { MembersService } from "./members.service";
@@ -22,7 +23,7 @@ import { MembersService } from "./members.service";
  * and the email-match rule on accept.
  */
 @Controller()
-@UseGuards(BetterAuthGuard)
+@UseGuards(BetterAuthGuard, StoreLifecycleGuard)
 export class MembersController {
     constructor(private readonly members: MembersService) {}
 

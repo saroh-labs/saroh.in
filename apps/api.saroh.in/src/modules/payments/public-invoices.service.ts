@@ -26,7 +26,10 @@ import {
     businessContactOf,
     businessPayInstructionsOf,
 } from "../organizations/business-pay-instructions";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import {
+    assertOrganizationOpen,
+    assertOrganizationWindingDown,
+} from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
@@ -516,7 +519,9 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        await assertOrganizationOpen(found.organizationId);
+        // Paying an invoice already sent is finishing it (DEC-117); a new
+        // autopay mandate, below, is not.
+        await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const invoice = await prisma.invoice.findFirst({
                 where: {

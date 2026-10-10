@@ -11,6 +11,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -110,6 +111,7 @@ export class CoursesController {
     }
 
     @Post(":courseId/enrollments/:enrollmentId/cancel")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     cancelEnrollment(
         @OrgContext() ctx: OrganizationContext,

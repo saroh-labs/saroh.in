@@ -10,7 +10,9 @@ import type { OrganizationContextService } from "./organization-context.service"
 import {
     assertMembersMayOpen,
     assertOrganizationOpen,
+    assertOrganizationWindingDown,
     isReadOnlyMethod,
+    NOT_TAKING_NEW_MESSAGE,
     publicSiteOnlineFor,
 } from "./organization-lifecycle.gate";
 
@@ -25,12 +27,38 @@ describe("assertOrganizationOpen", () => {
     });
 
     it.each(["SUSPENDED", "PENDING_DELETION", "DELETED_RETAINED"])(
-        "refuses new activity for a %s business",
+        "refuses new activity for a %s business, naming no state to the customer",
         async (status) => {
             findUnique.mockResolvedValue({ lifecycleStatus: status });
-            await expect(
-                assertOrganizationOpen("org_1"),
-            ).rejects.toBeInstanceOf(ForbiddenException);
+            let thrown: unknown;
+            try {
+                await assertOrganizationOpen("org_1");
+            } catch (error) {
+                thrown = error;
+            }
+            expect(thrown).toBeInstanceOf(ForbiddenException);
+            const body = (thrown as ForbiddenException).getResponse();
+            expect(body).toEqual({
+                error: "ORGANIZATION_NOT_ACTIVE",
+                message: NOT_TAKING_NEW_MESSAGE,
+            });
+            expect(JSON.stringify(body)).not.toMatch(/clos|delet|suspend/i);
+        },
+    );
+
+    it.each([
+        ["ACTIVE", true],
+        ["PENDING_DELETION", true],
+        ["SUSPENDED", false],
+        ["DELETED_RETAINED", false],
+    ])(
+        "lets a customer finish what was started while %s: %s",
+        async (status, open) => {
+            findUnique.mockResolvedValue({ lifecycleStatus: status });
+            const result = assertOrganizationWindingDown("org_1");
+            if (open) await expect(result).resolves.toBeUndefined();
+            else
+                await expect(result).rejects.toBeInstanceOf(ForbiddenException);
         },
     );
 
@@ -62,6 +90,8 @@ describe("OrganizationGuard on a suspended business", () => {
 
     const contextFor = (method: string) =>
         ({
+            getHandler: () => function handler() {},
+            getClass: () => class Controller {},
             switchToHttp: () => ({
                 getRequest: () => ({
                     method,
