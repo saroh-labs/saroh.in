@@ -19,6 +19,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { SocialNetwork } from "@saroh/block-contract";
+import { SOCIAL_INPUT_MAX } from "@saroh/block-contract";
+
 import {
     MAX_COUNTER_DIGITS,
     MIN_COUNTER_DIGITS,
@@ -331,6 +334,37 @@ export class PayInstructionsDto {
  * no-op. Also absent: anything about ownership or membership — those move only
  * through the membership endpoints.
  */
+/** A link's field: text, held to the longest a network's link runs. */
+const SocialLink = () => (target: object, key: string) => {
+    IsOptional()(target, key);
+    IsString()(target, key);
+    MaxLength(SOCIAL_INPUT_MAX, { message: "That link is too long." })(
+        target,
+        key,
+    );
+};
+
+/**
+ * The business's social links (DEC-125): for each network a handle
+ * ("@rye") or a pasted link, "" to clear it; a network left out stays as it
+ * is. Only the fixed list below is taken (the pipe refuses any other key),
+ * and each value is rebuilt into one canonical address on the network's own
+ * host by the settings save (`business-social.ts`), which names the field
+ * it refuses. No other address is accepted.
+ */
+export class SocialLinksDto implements Partial<Record<SocialNetwork, string>> {
+    @SocialLink() instagram?: string;
+    @SocialLink() facebook?: string;
+    /** A phone number with its country code; kept as a wa.me link. */
+    @SocialLink() whatsapp?: string;
+    @SocialLink() youtube?: string;
+    @SocialLink() x?: string;
+    @SocialLink() linkedin?: string;
+    @SocialLink() googleMaps?: string;
+    @SocialLink() pinterest?: string;
+    @SocialLink() telegram?: string;
+}
+
 export class UpdateOrganizationDto {
     @IsOptional()
     @Transform(trim)
@@ -372,6 +406,21 @@ export class UpdateOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /** The business's social links (DEC-125), a field per network. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => SocialLinksDto)
+    socialLinks?: SocialLinksDto;
+
+    /**
+     * Its website shows the registered address as where to find it
+     * (DEC-125), while no location customers visit has one. Absent, it is
+     * left as it is.
+     */
+    @IsOptional()
+    @IsBoolean()
+    siteShowsRegisteredAddress?: boolean;
 }
 
 /**

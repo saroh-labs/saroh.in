@@ -17,7 +17,8 @@ import { env } from "../../env";
  *    restore, go-live: `putLive`), a change of web address, the merchant's
  *    trackers or codes saved, Saroh switching a site's trackers off or on,
  *    the business logo set or removed (it is the icon of a site with none
- *    of its own, DEC-121).
+ *    of its own, DEC-121), and the business's phone, contact email, social
+ *    links or the address its site shows saved (read live, DEC-125).
  *  - **products** (`productIds`, `stockLevelIds`): every stock flow and
  *    every change to how a product counts takes the product or shelf locks
  *    (`products/stock-levels.ts`, the lock order), so that is where a stock
@@ -30,7 +31,13 @@ import { env } from "../../env";
 export const SITE_PAGES_REVALIDATE_TYPE = "site.pages.revalidate";
 
 export type PageRevalidateCause =
-    "publish" | "address" | "trackers" | "icon" | "stock" | "product";
+    | "publish"
+    | "address"
+    | "trackers"
+    | "icon"
+    | "contact"
+    | "stock"
+    | "product";
 
 export interface PageRevalidatePayload {
     cause: PageRevalidateCause;
@@ -73,6 +80,32 @@ export async function enqueuePageRevalidation(
         },
     });
     return true;
+}
+
+/**
+ * Queue every page of a business's published sites: what a change to how
+ * the business is reached needs (DEC-125), since its footer is on all of
+ * them. With the cache off nothing is read; with no live site nothing is
+ * queued.
+ */
+export async function enqueueBusinessSitesRevalidation(
+    tx: JobTx & Pick<Prisma.TransactionClient, "site">,
+    organizationId: string,
+    cause: PageRevalidateCause,
+): Promise<boolean> {
+    if (!pageCacheRevalidationOn()) return false;
+    const sites = await tx.site.findMany({
+        where: {
+            organizationId,
+            deletedAt: null,
+            currentPublicationId: { not: null },
+        },
+        select: { id: true },
+    });
+    return enqueuePageRevalidation(tx, {
+        cause,
+        siteIds: sites.map((s) => s.id),
+    });
 }
 
 /**

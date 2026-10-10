@@ -28,6 +28,7 @@ import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
+import { enqueueBusinessSitesRevalidation } from "../sites/page-cache-revalidate";
 import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
 import type { LateRuleNotice } from "./storefront-fulfilment";
@@ -510,6 +511,21 @@ export class StorefrontsService {
                     },
                     update: settings,
                 });
+            }
+            // A location's name, address, hours and whether customers
+            // visit are what its business's website shows as where to come
+            // (DEC-125), read live: tell the pages the sites keep.
+            if (
+                dto.name !== undefined ||
+                dto.kind !== undefined ||
+                dto.address !== undefined ||
+                dto.openingHours !== undefined
+            ) {
+                await enqueueBusinessSitesRevalidation(
+                    tx,
+                    organizationId,
+                    "contact",
+                );
             }
         });
 

@@ -26,6 +26,7 @@ function controller() {
         {} as PublicVisitService,
         {} as PublicFooterService,
         {} as PublicHeadService,
+        {} as never,
     );
 }
 
