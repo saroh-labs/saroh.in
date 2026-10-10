@@ -127,6 +127,7 @@ export function ServiceEditor({
     const noStorefront =
         !wasTreatment && (hasStorefront === false || refusedStorefront);
 
+    const [tried, setTried] = useState(false);
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
     const problems = serviceProblems(draft, hasStaff, noStorefront);
@@ -169,7 +170,12 @@ export function ServiceEditor({
     }
 
     async function save() {
-        if (!canEdit || bad || saving || (!dirty && !isNew)) return;
+        if (!canEdit || saving || (!dirty && !isNew)) return;
+        if (bad) {
+            // Say what is missing instead of a button that does nothing.
+            setTried(true);
+            return;
+        }
         setSaving(true);
         const input = serviceInput(draft, currency);
         const message = savedMessage({
@@ -230,7 +236,15 @@ export function ServiceEditor({
         router.push(SERVICES_HREF);
     }
 
-    const saveOff = bad || (!dirty && !isNew) || saving;
+    // What is wrong is said under the header once there is a name, or
+    // once Add service was pressed without one. The button is off only
+    // while that reason is on screen, never off with nothing said.
+    const problemsShown =
+        canEdit &&
+        bad &&
+        (dirty || isNew) &&
+        (draft.name.trim() !== "" || tried);
+    const saveOff = saving || (!dirty && !isNew) || problemsShown;
     // Cmd/Ctrl+S: the page's one Save (it knows when there is nothing to).
     useSaveShortcut(() => void save(), canEdit);
     const crumb = service ? service.name : "New service";
@@ -317,7 +331,7 @@ export function ServiceEditor({
                     }
                 />
             </div>
-            {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
+            {problemsShown ? (
                 <Notice tone="error" layout="banner">
                     {problems.join(" ")}
                 </Notice>

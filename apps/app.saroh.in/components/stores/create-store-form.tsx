@@ -39,7 +39,6 @@ export function CreateStoreForm() {
         },
     });
     const { isSubmitting, isDirty } = form.formState;
-    const name = form.watch("name");
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("location") });
 
     async function onSubmit(values: FormValues) {
@@ -98,7 +97,6 @@ export function CreateStoreForm() {
                 <Button
                     type="submit"
                     className="wk-press justify-self-start"
-                    disabled={!name.trim()}
                     busy={isSubmitting}
                     busyLabel="Creating…"
                 >

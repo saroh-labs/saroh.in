@@ -329,6 +329,11 @@ export function CourseForm({
                             <Button
                                 type="submit"
                                 disabled={sessions.length === 0}
+                                aria-describedby={
+                                    sessions.length === 0
+                                        ? "course-open-why"
+                                        : undefined
+                                }
                                 busy={busy}
                                 busyLabel="Saving…"
                             >
@@ -354,6 +359,15 @@ export function CourseForm({
                         </Link>
                     </Button>
                 </div>
+                {!course && sessions.length === 0 ? (
+                    <p
+                        id="course-open-why"
+                        className="-mt-3 text-[0.78125rem] text-muted-foreground"
+                    >
+                        Add a session to open the course. Until then it can be
+                        saved as a draft.
+                    </p>
+                ) : null}
             </form>
             {guard.dialog}
         </Form>

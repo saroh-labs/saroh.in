@@ -123,7 +123,6 @@ export function CreateSiteForm({
     const [suggestion, setSuggestion] = useState<string | null>(null);
     const { isSubmitting, isDirty } = form.formState;
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("site") });
-    const name = form.watch("name");
     const address = form.watch("subdomain");
 
     async function onSubmit(values: FormValues) {
@@ -273,7 +272,6 @@ export function CreateSiteForm({
                 <Button
                     type="submit"
                     className="wk-press w-fit"
-                    disabled={!name.trim()}
                     busy={isSubmitting}
                     busyLabel="Creating…"
                 >
