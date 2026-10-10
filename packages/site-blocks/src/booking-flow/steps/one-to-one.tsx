@@ -19,7 +19,7 @@ export function OneToOne({
     days,
     day,
     zone,
-    phone,
+    compact = false,
     staff,
     chosen,
     onDay,
@@ -29,7 +29,11 @@ export function OneToOne({
     days: BookingDays;
     day: BookingDay | null;
     zone: string;
-    phone: boolean;
+    /**
+     * Always the narrow layout (a sheet is narrow on any screen). Left
+     * out, CSS chooses: narrow under 700px, never a script's guess.
+     */
+    compact?: boolean;
     /** Who takes it, by name: one is named beside the count. */
     staff: string[];
     chosen: BookingStart | null;
@@ -57,7 +61,9 @@ export function OneToOne({
             <div
                 role="radiogroup"
                 aria-label="Day"
-                className="grid grid-cols-7 gap-1.5"
+                // Seven across, a week a row. Under a finger each day is at
+                // least 44px wide, so a narrow phone wraps to more rows.
+                className="coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))] grid grid-cols-7 gap-1.5"
             >
                 {list.map((d) => {
                     const on = d.date === day?.date;
@@ -73,11 +79,11 @@ export function OneToOne({
                             disabled={!free}
                             onClick={() => onDay(d.date)}
                             className={cn(
-                                "min-w-0 border text-center transition-colors duration-100 ease-out",
+                                "coarse:min-h-11 min-w-0 border text-center transition-colors duration-100 ease-out",
                                 focusRing,
-                                phone
+                                compact
                                     ? "rounded-[calc(var(--site-radius)+10px)] py-2"
-                                    : "rounded-[calc(var(--site-radius)+12px)] px-0.5 py-[9px]",
+                                    : "rounded-[calc(var(--site-radius)+12px)] px-0.5 py-[9px] max-[699px]:rounded-[calc(var(--site-radius)+10px)] max-[699px]:px-0 max-[699px]:py-2",
                                 on
                                     ? "border-site-fg bg-site-fg text-site-bg cursor-pointer"
                                     : free
@@ -92,8 +98,21 @@ export function OneToOne({
                             <span className="mt-0.5 block text-[17px] font-bold">
                                 {n}
                             </span>
-                            <span className="mt-0.5 block text-[11px]">
-                                {dayCountLabel(d, phone)}
+                            {/* "3" where it is narrow, "3 free" where
+                                there is room: both drawn, one shown. The
+                                button's name is its aria-label. */}
+                            {compact ? null : (
+                                <span className="mt-0.5 block text-[11px] max-[699px]:hidden">
+                                    {dayCountLabel(d, false)}
+                                </span>
+                            )}
+                            <span
+                                className={cn(
+                                    "mt-0.5 block text-[11px]",
+                                    !compact && "min-[700px]:hidden",
+                                )}
+                            >
+                                {dayCountLabel(d, true)}
                             </span>
                         </button>
                     );

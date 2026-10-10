@@ -93,7 +93,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         expect(readBag(SITE)).toEqual([
             { listingId: "l-bread", variantId: "v-small", quantity: 1 },
         ]);
@@ -101,7 +103,7 @@ describe("Add to bag on the product page", () => {
             "Sourdough (Small) added to your bag.",
         );
         expect(
-            screen.getByRole("button", { name: "Add another" }),
+            screen.getByRole("button", { name: "Add another · ₹180" }),
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "View bag" }),
@@ -123,7 +125,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         expect(readBag(SITE)).toHaveLength(MAX_BAG_ITEMS);
         expect(screen.getByRole("status")).toHaveTextContent(
             "Your bag is full. Take something out to add this.",
@@ -145,7 +149,9 @@ describe("Add to bag on the product page", () => {
                 action={<AddToBag site={SITE} listingId="l-bread" />}
             />,
         );
-        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add to bag · ₹180" }),
+        );
         const off = screen.getByRole("button", {
             name: "The last one is in your bag",
         });
@@ -169,6 +175,49 @@ describe("Add to bag on the product page", () => {
         expect(off).toBeDisabled();
         fireEvent.click(off);
         expect(readBag(SITE)).toEqual([]);
+    });
+
+    it("is a bar pinned to the foot of a phone, by CSS alone, with room kept under the page", () => {
+        render(
+            <ProductPage
+                product={bread}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        const button = screen.getByRole("button", {
+            name: "Add to bag · ₹180",
+        });
+        const bar = button.closest("[data-bag-bar]");
+        expect(bar?.className).toContain("max-[699px]:fixed");
+        expect(bar?.className).toContain("max-[699px]:bottom-[");
+        // One button, one message: the same block, moved.
+        expect(
+            screen.getAllByRole("button", { name: /^Add to bag/ }),
+        ).toHaveLength(1);
+        expect(bar?.querySelector("style")?.textContent).toMatch(
+            /max-width:699px.*padding-bottom/,
+        );
+    });
+
+    it("says the price of the option picked on the button", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    variants: [
+                        bread.variants[0],
+                        { ...bread.variants[1], stock: "IN_STOCK" },
+                    ],
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: /Large/ }));
+        expect(
+            screen.getByRole("button", { name: "Add to bag · ₹250" }),
+        ).toBeEnabled();
     });
 });
 
@@ -565,6 +614,54 @@ describe("the header's bag", () => {
         expect(screen.getByText("Total").parentElement).toHaveTextContent(
             "Total₹560",
         );
+    });
+
+    it("pins the total and the button to the sheet's foot, and holds the page still", async () => {
+        setup({ signedIn: true });
+        expect(document.body.style.overflow).toBe("");
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        const footer = sheet.querySelector("[data-sheet-footer]");
+        const scroll = sheet.querySelector("[data-sheet-scroll]");
+        expect(footer).not.toBeNull();
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(footer).toContainElement(place);
+        expect(footer).toContainElement(screen.getByText("Total"));
+        // The lines scroll above it, never the footer with them.
+        expect(scroll).toContainElement(screen.getByText("Sourdough"));
+        expect(scroll).not.toContainElement(place);
+        expect(scroll?.className).toContain("overflow-y-auto");
+        // As tall as the screen is now, where the browser knows.
+        expect(sheet.className).toContain(
+            "supports-[height:100dvh]:max-h-[88dvh]",
+        );
+        // 44px under a finger.
+        expect(
+            screen.getByRole("button", { name: "Close" }).className,
+        ).toContain("coarse:size-11");
+        expect(
+            screen.getByRole("button", { name: "One more Sourdough" })
+                .className,
+        ).toContain("coarse:size-11");
+
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        expect(document.body.style.overflow).toBe("");
+    });
+
+    it("keeps the page still while signing in opens over the bag, until both have closed", async () => {
+        setup();
+        await openTheBag();
+        fireEvent.click(
+            await screen.findByRole("button", { name: /^Sign in and pay/ }),
+        );
+        await screen.findByLabelText("Email");
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await screen.findByText("Sourdough");
+        expect(document.body.style.overflow).toBe("hidden");
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        expect(document.body.style.overflow).toBe("");
     });
 
     it("stops − at one: the last one never leaves by a slip of the thumb", async () => {

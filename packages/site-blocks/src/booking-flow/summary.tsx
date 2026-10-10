@@ -52,7 +52,7 @@ export function SummaryAside({
     return (
         <aside
             aria-label="Your booking"
-            className="bg-site-fg text-site-bg sticky top-4 min-w-0 flex-[1_1_300px] rounded-[calc(var(--site-radius)+14px)] p-[22px] shadow-[0_4px_12px_hsl(var(--site-fg)/0.10)]"
+            className="bg-site-fg text-site-bg sticky top-4 min-w-0 flex-[1_1_300px] rounded-[calc(var(--site-radius)+14px)] p-[22px] shadow-[0_4px_12px_hsl(var(--site-fg)/0.10)] max-[699px]:hidden"
         >
             <p className="text-site-accent mb-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
                 Your booking
@@ -150,7 +150,11 @@ function summaryRows({
     ];
 }
 
-/** The same, as a bar pinned to the bottom of a phone. */
+/**
+ * The same, as a bar pinned to the bottom of a phone: drawn beside the
+ * aside and shown under 700px by CSS, never by a script's reading of the
+ * screen.
+ */
 export function PhoneBar({
     hasService,
     whenText,
@@ -168,7 +172,10 @@ export function PhoneBar({
     barLabel: string;
 }) {
     return (
-        <div className="bg-site-fg text-site-bg fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_hsl(var(--site-fg)/0.22)]">
+        <div
+            data-booking-bar=""
+            className="bg-site-fg text-site-bg fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_hsl(var(--site-fg)/0.22)] min-[700px]:hidden"
+        >
             {hasService ? (
                 <p
                     role="status"

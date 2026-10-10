@@ -192,7 +192,7 @@ function OpenTimesSheet({
                             days={strip}
                             day={day}
                             zone={strip.timezone}
-                            phone
+                            compact
                             staff={state.times.staff ? [state.times.staff] : []}
                             chosen={
                                 pick

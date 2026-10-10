@@ -35,7 +35,6 @@ import {
     nextFreeStart,
     pageTitle,
     testReleaseBookingLine,
-    usePhone,
     zoneName,
 } from "./flow-helpers";
 import type { DaysState, Phase } from "./flow-state";
@@ -209,7 +208,6 @@ export default function BookingFlow({
     initialStart = null,
     soldBy = null,
 }: BookingFlowProps) {
-    const phone = usePhone();
     const ids = useId();
     const services = page.services;
     const first = services.find((s) => s.id === initialServiceId) ?? null;
@@ -1022,7 +1020,10 @@ export default function BookingFlow({
     // front, before any choosing, never after the booker has done the work.
     const paused = page.paused === true;
     const bookable = page.open && services.length > 0 && !paused;
-    const showBar = phone && choosing && bookable;
+    // The summary is drawn twice, and CSS alone shows one: the aside from
+    // 700px, the pinned bar under it. A script that asked the screen's
+    // width drew the desk layout first on every phone, then swapped.
+    const showSummary = choosing && bookable;
 
     return (
         <div
@@ -1030,7 +1031,7 @@ export default function BookingFlow({
             className={cn(
                 "bg-site-bg text-site-fg min-h-screen",
                 NO_CAPTURE_CLASS,
-                showBar ? "pb-[150px]" : "pb-10",
+                showSummary ? "pb-10 max-[699px]:pb-[150px]" : "pb-10",
             )}
         >
             <section className="bg-site-hero-bg text-site-hero-fg">
@@ -1194,7 +1195,6 @@ export default function BookingFlow({
                                     sessions={sessions.slice(0, sessionsShown)}
                                     more={sessions.length > sessionsShown}
                                     zone={zone}
-                                    phone={phone}
                                     service={service}
                                     chosen={chosenStart}
                                     business={page.businessName}
@@ -1254,14 +1254,17 @@ export default function BookingFlow({
                                 />
                             ) : null}
 
-                            {message && phone ? (
-                                <FlowMessageLine message={message} />
+                            {message ? (
+                                // The aside says it from 700px.
+                                <div className="min-[700px]:hidden">
+                                    <FlowMessageLine message={message} />
+                                </div>
                             ) : null}
                         </>
                     )}
                 </div>
 
-                {choosing && !phone && bookable ? (
+                {showSummary ? (
                     <SummaryAside
                         serviceName={service?.name ?? null}
                         visits={visitsOf(service)}
@@ -1279,13 +1282,13 @@ export default function BookingFlow({
                 ) : null}
             </div>
 
-            {showBar && rules ? (
-                <p className="text-site-muted mx-auto mt-[18px] max-w-[1060px] px-5 text-[12.5px] leading-normal">
+            {showSummary && rules ? (
+                <p className="text-site-body mx-auto mt-[18px] max-w-[1060px] px-5 text-sm leading-normal min-[700px]:hidden">
                     {rules}
                 </p>
             ) : null}
 
-            {showBar ? (
+            {showSummary ? (
                 <PhoneBar
                     hasService={!!service}
                     whenText={whenText}

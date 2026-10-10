@@ -139,6 +139,8 @@ export interface ProductSelection {
     name: string;
     /** The price shown for it. */
     price: string;
+    /** The currency that price is in. */
+    currency?: string;
     /** Nothing of it can be sold now: the action is off. */
     soldOut: boolean;
     /**
@@ -560,6 +562,7 @@ export default function ProductPage({
                                 variantTitle: variant?.title ?? null,
                                 name: product.name,
                                 price,
+                                currency: product.currency,
                                 soldOut,
                                 left:
                                     stock?.word === "LOW"

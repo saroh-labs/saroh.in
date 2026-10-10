@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { SignedInCustomer } from "../account/api";
+import { viewport } from "../test-viewport";
 import type { SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -201,5 +205,61 @@ describe("the phone on the booking page, for a signed-in customer", () => {
                 phone: " 98450 12345 ",
             }),
         ).toBe("98450 12345");
+    });
+});
+
+describe("the booking page on a phone", () => {
+    it("draws the aside and the pinned bar both, and shows one by the screen's width", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
+        );
+        const { container, unmount } = render(
+            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+        );
+        await chooseOneToOne();
+        // Both are in the page the server sends: no script picks one.
+        expect(container.querySelector("aside")).not.toBeNull();
+        expect(container.querySelector("[data-booking-bar]")).not.toBeNull();
+        // At a desk the aside's button is the one a visitor can press.
+        expect(
+            screen.getByRole("button", { name: /^Book/ }).closest("aside"),
+        ).not.toBeNull();
+        unmount();
+
+        viewport("phone");
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        expect(
+            screen
+                .getByRole("button", { name: /^Book/ })
+                .closest("[data-booking-bar]"),
+        ).not.toBeNull();
+    });
+
+    it("asks no script how wide the screen is", () => {
+        for (const file of ["booking-flow.tsx", "flow-helpers.ts"]) {
+            const source = readFileSync(join(__dirname, file), "utf8");
+            expect(source).not.toMatch(/matchMedia|usePhone|innerWidth/);
+        }
+    });
+
+    it("gives each day and time 44px under a finger", async () => {
+        serve(() => json(ONE_DAYS));
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        fireEvent.click(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        );
+        const day = await screen.findByRole("radio", {
+            name: "Sun 20 Sep: 1 time free",
+        });
+        expect(day.className).toContain("coarse:min-h-11");
+        expect(day.parentElement?.className).toContain(
+            "coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))]",
+        );
+        // A time is 45px tall already.
+        expect(
+            screen.getByRole("radio", { name: "07:00 with Karan Mehta" })
+                .className,
+        ).toContain("h-[45px]");
     });
 });

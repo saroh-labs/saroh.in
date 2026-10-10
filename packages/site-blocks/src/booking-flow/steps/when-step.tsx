@@ -23,7 +23,6 @@ export function WhenStep({
     sessions,
     more,
     zone,
-    phone,
     service,
     chosen,
     business,
@@ -41,7 +40,6 @@ export function WhenStep({
     sessions: BookingStart[];
     more: boolean;
     zone: string;
-    phone: boolean;
     service: BookingService;
     chosen: BookingStart | null;
     business: string;
@@ -104,7 +102,6 @@ export function WhenStep({
                     days={days}
                     day={day}
                     zone={zone}
-                    phone={phone}
                     staff={service.staff}
                     chosen={chosen}
                     onDay={onDay}

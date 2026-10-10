@@ -472,8 +472,38 @@ export function BagSheet({
         codeError ??
         (settled && discount && !discount.applied ? discount.message : null);
 
+    // Pinned to the sheet's foot: why the button is held, what it all
+    // comes to, and the button. The rest of the bag scrolls above.
+    const footer = (
+        <>
+            {held && !problem ? (
+                <p
+                    id={`${site}-held`}
+                    className="text-site-body mt-2 text-sm leading-normal"
+                >
+                    {held}
+                </p>
+            ) : null}
+            {quote ? (
+                <div className="mt-2 flex gap-2.5 text-base">
+                    <span className="flex-1 font-semibold">Total</span>
+                    <span className="font-semibold tabular-nums">{total}</span>
+                </div>
+            ) : null}
+            <button
+                type="button"
+                onClick={place}
+                disabled={!canPlace}
+                aria-describedby={held && !problem ? `${site}-held` : undefined}
+                className={cn(sheetButton(!canPlace), "mt-2.5")}
+            >
+                {placeLabel({ signedIn, busy, pay: pay?.type ?? null, total })}
+            </button>
+        </>
+    );
+
     return (
-        <SheetFrame title="Your bag" onClose={onClose}>
+        <SheetFrame title="Your bag" onClose={onClose} footer={footer}>
             {load.kind === "error" ? (
                 <div className="mt-3">
                     <p role="alert" className={destructiveAlertClasses}>
@@ -555,13 +585,6 @@ export function BagSheet({
                             </span>
                         </div>
                     ) : null}
-                    <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
-                        <span className="flex-1 font-semibold">Total</span>
-                        <span className="font-semibold tabular-nums">
-                            {total}
-                        </span>
-                    </div>
-
                     <CodeField
                         site={site}
                         open={codeOpen}
@@ -719,14 +742,6 @@ export function BagSheet({
                     {notice}
                 </p>
             ) : null}
-            {held && !problem ? (
-                <p
-                    id={`${site}-held`}
-                    className="text-site-body mt-2.5 text-sm leading-normal"
-                >
-                    {held}
-                </p>
-            ) : null}
             {payNote ? (
                 <p className="text-site-body mt-2.5 text-sm leading-normal">
                     {payNote}
@@ -740,15 +755,6 @@ export function BagSheet({
                     {rule}
                 </p>
             ))}
-            <button
-                type="button"
-                onClick={place}
-                disabled={!canPlace}
-                aria-describedby={held && !problem ? `${site}-held` : undefined}
-                className={sheetButton(!canPlace)}
-            >
-                {placeLabel({ signedIn, busy, pay: pay?.type ?? null, total })}
-            </button>
         </SheetFrame>
     );
 }

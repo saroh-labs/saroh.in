@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
+import { viewport } from "../test-viewport";
 import type { CreditFor, Result, SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -432,11 +433,7 @@ describe("a class credit online (A10)", () => {
     });
 
     it("on a phone, the credit found after signing in is a note, not the red error (P2)", async () => {
-        window.matchMedia = vi.fn(() => ({
-            matches: true,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-        })) as unknown as typeof window.matchMedia;
+        viewport("phone");
         serve();
         const credit = creditReads(PACK);
         render(
