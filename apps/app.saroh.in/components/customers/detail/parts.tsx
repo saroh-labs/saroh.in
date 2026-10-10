@@ -66,13 +66,11 @@ export function Chips<K extends string>({
     chips,
     value,
     onChange,
-    height = 30,
 }: {
     label: string;
     chips: { key: K; label: string }[];
     value: K;
     onChange: (key: K) => void;
-    height?: 30 | 32;
 }) {
     return (
         <div

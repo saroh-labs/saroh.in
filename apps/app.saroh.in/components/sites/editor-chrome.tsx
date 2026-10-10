@@ -42,7 +42,10 @@ export function EditorTabs<T extends string>({
             tabs={tabs.map((tab) => ({
                 value: tab.key,
                 label: tab.label,
-                count: tab.count ? tab.count : undefined,
+                count:
+                    tab.count === undefined || tab.count === 0
+                        ? undefined
+                        : tab.count,
             }))}
         />
     );

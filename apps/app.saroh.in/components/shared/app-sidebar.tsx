@@ -487,7 +487,7 @@ function NavFlyout({
                         </span>
                         {(counts?.[child.href] ?? 0) > 0 ? (
                             <CountBadge
-                                count={counts?.[child.href]}
+                                count={counts?.[child.href] ?? 0}
                                 tone="strong"
                                 aria-label={`${counts?.[child.href]} waiting`}
                                 className="ml-2 shrink-0"

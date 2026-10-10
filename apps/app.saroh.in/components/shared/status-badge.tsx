@@ -48,14 +48,14 @@ export function statusVariant(tone: StatusTone): Variant {
     return TONE[tone];
 }
 
-type Common = {
+interface Common {
     /** 11px by default, for rows and beside a title. `default` is 12px. */
     size?: BadgeProps["size"];
     /** A dot before the word, in the badge's colour. */
     dot?: boolean;
     className?: string;
     id?: string;
-};
+}
 
 export type StatusBadgeProps =
     | (Common & {
@@ -105,11 +105,15 @@ export function StatusBadge(props: StatusBadgeProps) {
             size={size}
             dot={dot}
             data-status={words?.state}
-            aria-description={hint || undefined}
+            aria-description={hint === "" ? undefined : hint}
             className={cn("shrink-0 font-semibold", className)}
         >
             {words ? words.word : props.children}
         </Badge>
     );
-    return hint ? <Tip label={hint}>{badge}</Tip> : badge;
+    return hint !== undefined && hint !== "" ? (
+        <Tip label={hint}>{badge}</Tip>
+    ) : (
+        badge
+    );
 }

@@ -114,7 +114,6 @@ export function PacksTab({
                 label="Which packs"
                 value={which}
                 onChange={setWhich}
-                height={32}
                 chips={[
                     {
                         key: "live",

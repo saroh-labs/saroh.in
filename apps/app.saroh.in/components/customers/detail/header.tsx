@@ -285,7 +285,7 @@ export function Tabs({
                 label: t.label,
                 controls: `panel-${t.key}`,
                 // No count on Overview, or where the source failed.
-                count: t.count ? t.count : undefined,
+                count: t.count === null || t.count === 0 ? undefined : t.count,
             }))}
         />
     );

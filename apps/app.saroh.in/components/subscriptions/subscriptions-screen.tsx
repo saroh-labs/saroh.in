@@ -203,7 +203,7 @@ export function SubscriptionsScreen({
                     onValueChange={pick}
                     tabs={[
                         ...TABS.map((t) => ({
-                            value: t as ScreenTab,
+                            value: t,
                             label: TAB_LABEL[t],
                             controls: "subscriptions-panel",
                             count: count(t),
@@ -213,7 +213,7 @@ export function SubscriptionsScreen({
                                     : ("neutral" as const),
                         })),
                         {
-                            value: "plans" as ScreenTab,
+                            value: "plans",
                             label: "Plans",
                             controls: "subscriptions-panel",
                             // No count when they couldn't be read: a 0

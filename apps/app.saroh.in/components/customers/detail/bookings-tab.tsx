@@ -46,7 +46,6 @@ export function BookingsTab({
                 value={filter}
                 onChange={setFilter}
                 chips={chips}
-                height={32}
             />
             {!list.length ? <Empty>{BOOKINGS_EMPTY[filter]}</Empty> : null}
             <div className="flex flex-col gap-2">
