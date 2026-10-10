@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
@@ -8,6 +9,7 @@ import { previewMenu } from "@/lib/in-page-menu";
 import { KEEP_LINKS_INSIDE } from "@/lib/preview-links";
 import { getPreviewByToken } from "@/lib/publication";
 import { SITE_FACES } from "@/lib/site-fonts";
+import { previewIconMetadata } from "@/lib/site-icon";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
@@ -28,10 +30,34 @@ import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
  * thing.
  */
 
-export const metadata: Metadata = {
-    title: "Draft preview",
-    robots: { index: false, follow: false },
-};
+/** One read of the draft for the layout and its metadata. */
+const readPreview = cache(getPreviewByToken);
+
+/**
+ * The tab shows the icon publishing would (DEC-120): the draft's own, else
+ * the business logo, else the plain tile with the site's initial. A dead
+ * link has none.
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    const { token } = await params;
+    const preview = await readPreview(token);
+    return {
+        title: "Draft preview",
+        robots: { index: false, follow: false },
+        ...(preview.ok
+            ? {
+                  icons: previewIconMetadata(preview.icon, {
+                      name: preview.snapshot.site.name,
+                      variables: preview.snapshot.site.styleVariables,
+                  }),
+              }
+            : {}),
+    };
+}
 
 export default async function PreviewLayout({
     params,
@@ -41,7 +67,7 @@ export default async function PreviewLayout({
     children: React.ReactNode;
 }) {
     const { token } = await params;
-    const preview = await getPreviewByToken(token);
+    const preview = await readPreview(token);
 
     if (!preview.ok) {
         if (preview.reason === "missing") notFound();

@@ -31,6 +31,7 @@ import { getSignInOptions } from "@/lib/sign-in";
 import { getFooterFacts } from "@/lib/site-footer";
 import { getSiteHead, NO_HEAD } from "@/lib/site-head";
 import { classifySiteHost } from "@/lib/site-host-mode";
+import { siteIconMetadata } from "@/lib/site-icon";
 import { relayFor } from "@/lib/site-relay";
 import {
     isPlatformAddress,
@@ -111,6 +112,9 @@ export async function generateMetadata({
         {
             title,
             description,
+            // The site's own icon, else the business logo, else its plain
+            // tile (DEC-120): resolved by the read above, never Saroh's.
+            icons: siteIconMetadata(resolved?.icon ?? null),
             openGraph: {
                 title,
                 description,
