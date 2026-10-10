@@ -349,6 +349,21 @@ const input: CatalogInput = {
                 pro: C("Included", "Your own analytics and ad tracking"),
             },
         },
+        {
+            // Hidden from the pricing table until the QR codes screen
+            // ships; the cells already gate a branded code. A plain code
+            // is on every plan and needs no row.
+            id: "qr-branding",
+            name: "QR codes in your own style",
+            group: "site",
+            pricing: "hidden",
+            what: "Make QR codes in your brand's style, with print-ready files and a count of how often each is scanned.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "QR codes in your own style"),
+                pro: C("Included", "QR codes in your own style"),
+            },
+        },
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },

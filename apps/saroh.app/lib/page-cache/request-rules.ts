@@ -17,13 +17,15 @@ const TEST_RELEASE_COOKIE = "__Host-saroh-test";
 
 /**
  * Paths never kept on any host: the customer's own pages
- * (`lib/private-paths.ts`), previews and review links, the renderer's own
+ * (`lib/private-paths.ts`), previews and review links, a QR code's short
+ * link (every scan must reach the server to be counted), the renderer's own
  * routes, and Next's internals (which the static assets serve anyway).
  */
 const NEVER_PREFIXES = [
     "/preview",
     "/review",
     "/pay",
+    "/q",
     "/api",
     "/_next",
     "/__saroh",
