@@ -146,6 +146,21 @@ what the API allows.
   Detail's words ("Your role can't record payments — …"). A storefront role
   that should take payments needs a business role carrying `order:edit`.
   Guarded by the same two scans.
+- **Current** (10 Oct 2026) — **A location's read says what the caller
+  may do there.** `GET stores/:id` carries `abilities` (`edit`,
+  `takeOrders`, `takePayments`, `changeOrders`), from
+  `StoresService.abilities`, which asks the very functions the writes'
+  guards ask (`canWrite`, `orderWriteOrganization` with `money` as
+  `OrdersService.create` passes it). It is never a second policy: a rule
+  changed in a guard changes the answer, and
+  `stores.service.abilities.authorization.spec.ts` and
+  `location-abilities.db.spec.ts` fail if the two disagree. The app reads
+  it (`lib/stores/abilities.ts`) to offer a location Admin, Manager or
+  Editor New order at their location (paid on collection, never the
+  money) and its name and description to edit. A Viewer gets neither. The
+  three writing roles are the same today (`WRITE_ROLES`). Catalogue writes
+  a location role may make are not offered: the product screens are the
+  business's (`requireCan("store:write")`), not a location's.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,

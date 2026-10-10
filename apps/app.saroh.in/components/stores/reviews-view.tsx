@@ -164,16 +164,18 @@ export function ReviewsView({
                 emptyState={{
                     icon: <MessageSquareQuote />,
                     title: "No reviews yet",
-                    note: "They show here once a customer leaves one, and you can invite one from a past order.",
+                    // One sentence, and it promises an invitation only to
+                    // someone who may send one and has an order to ask about.
+                    note: !canWrite
+                        ? "They show here once a customer leaves one."
+                        : invitable.length > 0
+                          ? "They show here once a customer leaves one, and you can invite one from a past order."
+                          : "They show here once a customer leaves one. You can invite one once an order has shipped.",
                     action:
                         canWrite && invitable.length > 0 ? (
                             <Button onClick={() => setInviting(true)}>
                                 Invite a review
                             </Button>
-                        ) : canWrite ? (
-                            <p className="text-[12.5px] text-muted-foreground">
-                                No shipped orders to ask about yet.
-                            </p>
                         ) : undefined,
                 }}
             />

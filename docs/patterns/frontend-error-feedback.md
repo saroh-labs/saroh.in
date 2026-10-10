@@ -248,14 +248,25 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
       (`components/shared/refusal.tsx`): a neutral `Notice` for a refusal
       by role, the error `Notice` for anything else. `ConfirmDialog` draws
       its refusal with it. A new refusal by role in the API starts "Your
-      role " or carries `ROLE_DENIED`, or it is shown as an error. Gap:
-      a save's sentence drawn by hand as `<p role="alert">` under a field
-      is still red when the role refused it.
+      role " or carries `ROLE_DENIED`, or it is shown as an error. A
+      save's sentence under a form is `Refusal` too, never a red line drawn
+      by hand: a hand-written `role="alert"` line is for a field's own
+      problem (validation, or an API sentence that names the field) only.
+      `refusal-call-sites.test.tsx` fails a form that prints `refusal`,
+      `failure` or `res.error` that way.
 - **Current** — **Calm, recoverable copy**: "Couldn't load {things}", "Nothing
   has been changed.", and **Try again** reads again (`retry`, a refetch or
   `router.refresh()`), never "reload the page" and never "Retry". A part of
   a page that couldn't be read is `FailedRead`
-  (`components/shared/failed-read.tsx`). In accounts it never hints at
+  (`components/shared/failed-read.tsx`), and a page that is drawn without
+  it says so above with `PartialRead`: "Couldn't load {things}.", one
+  sentence on what that leaves unsaid (`so`), and Try again. Both take
+  `onRetry` for a read the component made itself (a preview, a picker's
+  library, a sheet's catalogue): that read is called again, since
+  refreshing the route would not ask for it. A card that keeps the page's
+  first read in state starts from it when it arrives (`ChangesCard`).
+  `partial-read.test.tsx` fails a page that words its own. In accounts it
+  never hints at
   whether an account or a password was right.
 - **Current** — **Accounts never shows the auth library's message.** Every
   failed `authClient` call goes through `authErrorCopy(code)`
@@ -317,7 +328,11 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   sentence and the header's own action ("New {thing}"), or no button and no
   promise of one for someone who may not create. No results keeps the full
   card and offers "Clear search", "Clear filters" or "Show all {things}".
-  `DataView` draws it. A picker says `noMatchLine(things, q)`.
+  `DataView` draws it. A picker says `noMatchLine(things, q)`. A tab, a
+  sheet section, a rail or a menu with nothing in it is the same card at
+  `size="inline"`: a title ("No values yet") and, only where the reader's
+  role has a next step, one line or a text action. Never a bare "No X"
+  paragraph (`one-line-empties.test.tsx`).
 - **Current** (10 Oct 2026) — **A plan prompt has one label**, `planLabel`:
   "See {Plan}" when one plan unlocks the thing, "See plans" otherwise.
   Someone who can't change the plan reads who can, as text: "The owner
@@ -330,11 +345,14 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   themselves. A link that is only sometimes to the plans passes
   `when={isPlanHref(href)}`. Plan and billing opens to `billing:read`
   (`mayOpenPlan`), the same rule as its Settings tab and the API (DEC-128).
-  Gap: the setup checklists' plan rows (Home, Settings › Business, a
-  location) still link for everyone.
-- **Gap** — About 55 lines inside a page still word a partial failure by
-  hand ("Reviews couldn't be read just now, so …"). They are true and say
-  what is missing. They don't yet read `couldntLoadLine`.
+  A setup checklist's plan row is row data: `planRow`
+  (`components/settings/ready-rows.tsx`) leaves the button out and puts
+  who can after the row's line, and `PlanAsides` wraps its button in
+  `PlanWay`. The site editor's route group mounts `PlanAccessProvider` as
+  the shell does.
+- **Gap** — A load-more or a search that failed inside a list (Stock's
+  three lists, the order product filter, a picker's search) still prints
+  its action's sentence in a line of its own.
 
 ### Silent catches and API errors
 

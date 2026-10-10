@@ -1,7 +1,8 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
-import Link from "next/link";
+import { TextLink } from "@saroh/ui/text-link";
 
 import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
@@ -100,17 +101,16 @@ export function ServicesListFields({
                         ) : null}
                     </div>
                 ) : services.length === 0 && c.serviceIds.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No services yet.{" "}
-                        <Link
-                            href="/services/new"
-                            className="underline hover:text-foreground"
-                        >
-                            Create a service
-                        </Link>{" "}
-                        first, then add it here. Until then this section shows
-                        nothing on the site.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No services yet"
+                        description="Add one, then add it here. Until then this section shows nothing on the site."
+                        action={
+                            <TextLink href="/services/new">
+                                New service
+                            </TextLink>
+                        }
+                    />
                 ) : (
                     <div className="grid gap-2">
                         {c.serviceIds.length === 0 ? (

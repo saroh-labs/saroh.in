@@ -4,6 +4,7 @@ import { plural } from "@/lib/format/plural";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { DatePicker } from "@saroh/ui/date-picker";
 import {
     Form,
@@ -425,10 +426,11 @@ function SessionPicker({
         <fieldset className="grid gap-3">
             <legend className="mb-1 text-sm font-medium">Sessions</legend>
             {value.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    No sessions yet. Add the first; the next suggests a week
-                    later. A draft can be saved without any.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No sessions yet"
+                    description="Add the first, and the next suggests a week later. A draft can be saved without any."
+                />
             ) : (
                 <ol className="divide-y rounded-[11px] border border-border bg-card">
                     {value.map((iso, i) => (
