@@ -3910,3 +3910,33 @@ the files itself, which is about a second slower and always returns.
 **Rule**: a test runner must not depend on a machine-wide daemon. A step
 that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
 **Category**: tooling · `apps/api.saroh.in/jest.config.js`
+
+## A sign-in that answered 500 never reached error tracking
+
+**Symptom**: rehearsing PostHog on dev, 10 Oct 2026:
+`POST /api/auth/sign-in/social` for Google, on a host with no Google keys,
+answered 500 and logged "ERROR [Better Auth]: … CLIENT_ID_AND_SECRET_REQUIRED".
+Nothing arrived in PostHog, and there was no `unhandled_exception` line.
+**Cause**: every 5xx was reported from `AllExceptionsFilter`, and Better
+Auth's handler is mounted beside Nest, not inside it. It catches what it
+throws and answers the request itself, so the filter never ran. Sign-in,
+sign-up, password reset, email verification and session reads could all
+fail unseen. "Every 5xx goes through the filter" was true of Nest's routes
+only.
+**Fix**: `createAuth` takes `onServerError`, wired to Better Auth's
+`onAPIError.onError` (`packages/auth/src/server-errors.ts`); the API passes
+`reportAuthServerError` (`src/common/auth/report-auth-error.ts`), which
+calls `reportError` with the status, the method, the request id and the
+route's shape (`/api/auth/reset-password/:token`). Only what was answered
+5xx: an `APIError` below 500 (wrong password, unverified email, rate limit,
+validation) is an outcome and is dropped. The reporter is wrapped, so it
+can't throw into a sign-in.
+**Check**: `packages/auth/src/server-errors.test.ts` drives Better Auth's
+real handler: the 500 above reaches the hook once, and a wrong password and
+an invalid body do not. `report-auth-error.spec.ts` pins what is sent and
+that a token, an email and a password are not.
+**Rule**: a handler mounted outside Nest (Better Auth's today) has its own
+way to `reportError`. When one is added, ask where its 5xx goes. Read the
+installed version's source for the hook: `onError` here is handed the
+error and no request, which no type says loudly.
+**Category**: observability · `packages/auth/src/server-errors.ts`

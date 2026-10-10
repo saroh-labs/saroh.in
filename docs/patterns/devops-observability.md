@@ -15,6 +15,9 @@
   `set-cookie`, API keys and sensitive fields never reach the sink.
 - **5xx errors** are logged server-side with the stack and redacted headers; the
   client gets a generic message.
+- **Better Auth's 5xx too.** It answers `/api/auth/*` itself, outside Nest's
+  filter, so `createAuth({ onServerError })` hands its server errors to
+  `reportAuthServerError` (`common/auth/report-auth-error.ts`). Never a 4xx.
 - **Health:** `GET /health`, `/health/live` and `/health/ready`. Readiness fails
   on an unreachable database, an unfinished migration and an unreadable job
   queue.
@@ -86,7 +89,9 @@ must keep:
 - **Errors go through the seam, never straight to an SDK.** The API:
   `reportError()` and `reportJobError()`
   (`src/common/observability/report-error.ts`); only `posthog.ts` beside it
-  imports `posthog-node`. The frontends: `reportError()` from
+  imports `posthog-node`. A handler mounted outside Nest (Better Auth's)
+  never reaches `AllExceptionsFilter`: give it its own way to the seam, for
+  5xx only, with a route's shape and no headers. The frontends: `reportError()` from
   `@saroh/ui/lib/report-error` in a boundary, and nothing else; each app's
   `instrumentation-client.ts`, `instrumentation.ts` and `worker.ts` do the
   rest.
@@ -107,7 +112,8 @@ must keep:
   `posthog_send_failed` (WARN): PostHog refused a batch or couldn't be
   reached; a steady stream means the key or host is wrong, or PostHog is
   down. `error_sink_failed` (WARN): the forwarder itself threw; any at all
-  is a bug in it. `posthog_environment_missing` (ERROR, once at boot): the
+  is a bug in it. `auth_error_report_failed` (WARN): the same, for an
+  error inside Better Auth. `posthog_environment_missing` (ERROR, once at boot): the
   host has a key and no `POSTHOG_ENVIRONMENT`, and nothing is being sent.
   `product_milestone_not_sent` (WARN): the ledger has the milestone and
   PostHog's copy is missing. `job_failed_final` (ERROR): a job failed its

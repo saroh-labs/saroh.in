@@ -35,13 +35,41 @@ which app with `app` (`api` | `application` | `auth` | `admin` | `web` |
 
 | App                                   | From the browser                                                                                                  | From the server                                                                                                                                                                 |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.saroh.in` (`api`)                | —                                                                                                                 | Every 5xx (`AllExceptionsFilter` → `reportError`); a job that failed its **last** attempt (`reportJobError`); the nine milestones                                               |
+| `api.saroh.in` (`api`)                | —                                                                                                                 | Every 5xx (`AllExceptionsFilter` → `reportError`), Better Auth's included (below); a job that failed its **last** attempt (`reportJobError`); the nine milestones               |
 | `app.saroh.in` (`application`)        | Errors: every boundary (`reportError`) and the window's uncaught errors. Session replay, when switched on (below) | Errors while rendering, in a route handler, a Server Action or the proxy (`instrumentation.ts` → `onRequestError`); a crash before Next renders (`worker.ts` → `withCrashPage`) |
 | `accounts.saroh.in` (`auth`)          | Errors only. Never replay: these are the sign-in, sign-up and password pages                                      | The same two                                                                                                                                                                    |
 | `admin.saroh.in` (`admin`)            | Errors only                                                                                                       | The same two                                                                                                                                                                    |
 | `saroh.in` (`web`)                    | Errors only (Google Analytics is separate and unchanged)                                                          | The same two                                                                                                                                                                    |
 | Merchant sites, `saroh.app` (`sites`) | **Nothing, ever**                                                                                                 | The same two, with the site's host and the route's template, and nothing about the visitor                                                                                      |
 | docs, help, templates, the UI gallery | Nothing (their boundaries only log)                                                                               | Nothing                                                                                                                                                                         |
+
+### Errors inside Better Auth
+
+Better Auth answers `/api/auth/*` itself, outside Nest, so
+`AllExceptionsFilter` never sees a failure there. `@saroh/auth`'s
+`createAuth` takes `onServerError`, wired to Better Auth's own
+`onAPIError.onError` (`packages/auth/src/server-errors.ts`), and the API
+passes `reportAuthServerError` (`src/common/auth/report-auth-error.ts`),
+which calls the same `reportError`.
+
+- **Reported:** what Better Auth answered 5xx. A thrown value that isn't its
+  own `APIError` (a missing provider key, the database, a mail sender that
+  threw) is a 500; an `APIError` of 500 or more is its own status.
+- **Never reported:** an `APIError` below 500. A wrong password, an
+  unverified email, a rate limit, a failed validation and a redirect are
+  outcomes, and would spend the quota on nothing.
+- **Carries:** the error, the status, the method, the request id, and the
+  route's shape: `/api/auth/reset-password/:token`, never the token. No
+  body, header, cookie, query string, email or password. The log line's
+  `path` is the same shape, and it has no `headers`.
+- The hook is not handed the request. The method and the path come from the
+  request's context, which `correlationIdMiddleware` sets before Better
+  Auth's handler runs.
+- Setting the hook replaces Better Auth's own logging of these errors:
+  `unhandled_exception` is the line. `auth_error_report_failed` (WARN) means
+  the reporter itself threw; any at all is a bug in it.
+- Not covered: a failure Better Auth turns into a redirect to its error page
+  (a failed provider callback is a 302), which is not a 5xx.
 
 ### An error carries
 
