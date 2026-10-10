@@ -10,6 +10,7 @@ import { navFor, navPathname } from "@/components/shared/nav-items";
 import { TabBarSheet } from "@/components/shared/tab-bar-sheet";
 import type { MobileTab } from "@/lib/nav/mobile-nav";
 import { buildMobileNav } from "@/lib/nav/mobile-nav";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
  * The phone's navigation, below 760px (the "Saroh Tab Bar" design): four
@@ -146,12 +147,12 @@ const tabClass = (on: boolean, marked = on) =>
 function TabCount({ count }: { count: number }) {
     if (count <= 0) return null;
     return (
-        <span
+        <CountBadge
+            count={count}
+            tone="strong"
             aria-hidden
-            className="absolute -top-[5px] left-3 h-4 min-w-4 rounded-full bg-highlight px-1 text-center text-[11px] font-semibold tabular-nums leading-4 text-highlight-foreground"
-        >
-            {count}
-        </span>
+            className="absolute -top-[5px] left-3 min-w-[18px] px-1 py-px"
+        />
     );
 }
 

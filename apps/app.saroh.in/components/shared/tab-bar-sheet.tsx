@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import type { MobileSheetGroup, MobileSheetRow } from "@/lib/nav/mobile-nav";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
  * "Everything else": the More tab's bottom sheet (the "Saroh Tab Bar"
@@ -134,12 +135,12 @@ function SheetRow({ row, onGo }: { row: MobileSheetRow; onGo: () => void }) {
             <span className="min-w-0 flex-1 truncate">{row.label}</span>
             {row.count > 0 ? (
                 // The rail's waiting count: a Saffron-tinted pill.
-                <span
+                <CountBadge
+                    count={row.count}
+                    tone="strong"
                     aria-label={`${row.count} waiting`}
-                    className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-1.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                >
-                    {row.count}
-                </span>
+                    className="shrink-0"
+                />
             ) : null}
         </Link>
     );

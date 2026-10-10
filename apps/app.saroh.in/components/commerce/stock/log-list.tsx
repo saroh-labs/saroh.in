@@ -26,7 +26,8 @@ import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 
 import { chipClass } from "@/components/shared/chip";
-import { pillClass, TEXT_TONE } from "./tones";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { PILL_TONE, TEXT_TONE } from "./tones";
 
 /**
  * A log entry on a phone: a wrapping row whose `order`s put the time, the
@@ -274,15 +275,15 @@ export function LogList({
                                                 </span>
                                             </span>
                                             <span className="max-[759px]:order-6">
-                                                <span
-                                                    className={pillClass(
-                                                        entryTone(e),
-                                                    )}
+                                                <StatusBadge
+                                                    tone={
+                                                        PILL_TONE[entryTone(e)]
+                                                    }
                                                 >
                                                     {e.kind === "REVERSED"
                                                         ? "Undo"
                                                         : e.word}
-                                                </span>
+                                                </StatusBadge>
                                             </span>
                                             <span
                                                 className={cn(

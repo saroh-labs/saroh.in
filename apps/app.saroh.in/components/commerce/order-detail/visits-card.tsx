@@ -18,7 +18,7 @@ import {
     visitWhen,
 } from "@/lib/orders/visits";
 
-import type { PillTone } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { FOCUS, Panel, PanelTitle } from "./parts";
 
 /*
@@ -33,13 +33,6 @@ import { FOCUS, Panel, PanelTitle } from "./parts";
  * visit is moved or cancelled on its booking, which the row opens. Money on
  * a treatment comes back only through the order's refund.
  */
-
-const PILL: Record<PillTone, string> = {
-    brand: "bg-brand-subtle text-brand-subtle-foreground",
-    success: "bg-success-subtle text-success-subtle-foreground",
-    neutral: "bg-muted text-neutral-700 dark:text-muted-foreground",
-    danger: "bg-destructive-subtle text-destructive-subtle-foreground",
-};
 
 /**
  * What a treatment shows where an order shows its kitchen: the visits'
@@ -208,14 +201,11 @@ function VisitRow({
                 </span>
             </span>
             <span className="flex items-center gap-1">
-                <span
-                    className={cn(
-                        "whitespace-nowrap rounded-full px-[9px] py-0.5 text-[11.5px] font-semibold",
-                        PILL[state.tone],
-                    )}
+                <StatusBadge
+                    tone={state.tone === "brand" ? "active" : state.tone}
                 >
                     {state.label}
-                </span>
+                </StatusBadge>
                 {href ? (
                     <ChevronRight
                         aria-hidden

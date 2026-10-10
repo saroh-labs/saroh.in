@@ -417,16 +417,11 @@ function MoreAboutIt({
                             <FieldLabel
                                 htmlFor={f.type === "YES_NO" ? undefined : id}
                                 aside={
-                                    <span
-                                        className={cn(
-                                            "shrink-0 rounded-full px-[7px] py-px text-[11px] font-semibold",
-                                            f.onShop
-                                                ? "bg-success-subtle text-success-subtle-foreground"
-                                                : "bg-muted text-muted-foreground",
-                                        )}
+                                    <StatusBadge
+                                        tone={f.onShop ? "success" : "neutral"}
                                     >
                                         {f.onShop ? "On the shop" : "Team only"}
-                                    </span>
+                                    </StatusBadge>
                                 }
                             >
                                 {f.name}

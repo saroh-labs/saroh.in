@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
@@ -25,6 +24,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import type { StatusTone } from "@/components/shared/status-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ProviderSetupDialog } from "./provider-setup-dialog";
 
@@ -39,30 +39,30 @@ import { ProviderSetupDialog } from "./provider-setup-dialog";
  * domain that needs a person is the accent; disconnected is quiet — nothing
  * is broken about a provider someone chose to disconnect.
  */
-const PILL: Record<ProviderRowState, { label: string; tone: string }> = {
+const PILL: Record<ProviderRowState, { label: string; tone: StatusTone }> = {
     CONNECTED: {
         label: "Connected",
-        tone: "bg-success-subtle text-success-subtle-foreground",
+        tone: "success",
     },
     ATTENTION: {
         label: "Needs attention",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     PENDING: {
         label: "Waiting for DNS",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     FAILED: {
         label: "Action needed",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     DISCONNECTED: {
         label: "Disconnected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
     NOT_CONNECTED: {
         label: "Not connected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
 };
 
@@ -156,14 +156,9 @@ export function ProviderRowView({
                                 {entry.type}
                             </span>
                             {!available ? (
-                                <span
-                                    className={cn(
-                                        "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                        PILL[entry.state].tone,
-                                    )}
-                                >
+                                <StatusBadge tone={PILL[entry.state].tone}>
                                     {PILL[entry.state].label}
-                                </span>
+                                </StatusBadge>
                             ) : null}
                         </div>
                         {entry.note ? (
@@ -298,14 +293,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                         <span className="text-[13.5px] font-semibold">
                             {row.label}
                         </span>
-                        <span
-                            className={cn(
-                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                pill.tone,
-                            )}
-                        >
-                            {pill.label}
-                        </span>
+                        <StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
                     </div>
                     <p className="mt-[3px] text-pretty text-[12px] leading-[1.45] text-muted-foreground">
                         {row.note}

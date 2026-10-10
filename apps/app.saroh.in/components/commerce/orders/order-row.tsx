@@ -18,6 +18,7 @@ import {
 } from "@/lib/orders/list-row";
 import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /**
@@ -166,18 +167,14 @@ function OnlinePaymentText({
 function AttentionTag({ attention }: { attention: RowAttention }) {
     if (attention.state === "none") return null;
     return (
-        <span
-            role="img"
-            aria-label={attention.name}
-            title={attention.state === "shown" ? attention.title : undefined}
-            className={cn(
-                "max-w-[180px] flex-none truncate rounded-full px-1.5 py-px text-[11px] font-bold",
-                attention.state === "shown"
-                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                    : "bg-muted text-muted-foreground",
-            )}
-        >
-            {attention.text}
+        <span role="img" aria-label={attention.name} className="min-w-0">
+            <StatusBadge
+                tone={attention.state === "shown" ? "error" : "neutral"}
+                hint={attention.state === "shown" ? attention.title : undefined}
+                className="max-w-[180px] [&]:shrink"
+            >
+                <span className="truncate">{attention.text}</span>
+            </StatusBadge>
         </span>
     );
 }

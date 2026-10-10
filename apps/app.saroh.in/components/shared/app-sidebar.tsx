@@ -21,6 +21,7 @@ import {
     showsGroupLabel,
 } from "@/components/shared/nav-items";
 import { rememberRail } from "@/lib/nav/rail-cookie";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
  * Primary navigation: a calm, goal-grouped rail.
@@ -333,12 +334,12 @@ export function AppSidebar({
                                                Saffron-tinted pill with 700 text.
                                                It is a count, not a status, so it
                                                does not borrow Warning's hue. */
-                                                        <span
+                                                        <CountBadge
+                                                            count={waiting}
+                                                            tone="strong"
                                                             aria-label={`${waiting} waiting`}
-                                                            className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
-                                                        >
-                                                            {waiting}
-                                                        </span>
+                                                            className="group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
+                                                        />
                                                     ) : null}
                                                 </Link>
                                             </PopoverAnchor>
@@ -485,12 +486,12 @@ function NavFlyout({
                             {child.create ? `+ ${child.label}` : child.label}
                         </span>
                         {(counts?.[child.href] ?? 0) > 0 ? (
-                            <span
+                            <CountBadge
+                                count={counts?.[child.href]}
+                                tone="strong"
                                 aria-label={`${counts?.[child.href]} waiting`}
-                                className="ml-2 inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                            >
-                                {counts?.[child.href]}
-                            </span>
+                                className="ml-2 shrink-0"
+                            />
                         ) : null}
                     </Link>
                 );
@@ -591,12 +592,12 @@ function SiteTree({
                                use — a count is a count wherever it sits, and
                                giving the child a second treatment would
                                suggest it meant something different. */
-                            <span
+                            <CountBadge
+                                count={waiting}
+                                tone="strong"
                                 aria-label={`${waiting} waiting`}
-                                className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-[7px] py-0.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                            >
-                                {waiting}
-                            </span>
+                                className="shrink-0"
+                            />
                         ) : null}
                     </Link>
                 );

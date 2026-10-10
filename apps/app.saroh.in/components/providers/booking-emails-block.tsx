@@ -1,9 +1,9 @@
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { BookingEmails } from "@/lib/providers/booking-emails";
 import {
     CONTACT_EMAIL_HREF,
@@ -22,9 +22,9 @@ import {
 
 const PILL = {
     // Not green: green is for what the business connected itself.
-    sending: "bg-muted text-foreground/80",
-    near: "bg-highlight-subtle text-highlight-subtle-foreground",
-    paused: "bg-highlight-subtle text-highlight-subtle-foreground",
+    sending: "neutral",
+    near: "warning",
+    paused: "warning",
 } as const;
 
 export function BookingEmailsBlock({
@@ -55,14 +55,9 @@ export function BookingEmailsBlock({
                             <span className="text-[13.5px] font-semibold">
                                 {b.status}
                             </span>
-                            <span
-                                className={cn(
-                                    "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                    PILL[b.tone],
-                                )}
-                            >
+                            <StatusBadge tone={PILL[b.tone]}>
                                 {b.pill}
-                            </span>
+                            </StatusBadge>
                         </div>
                         <p className="text-[12.5px] tabular-nums text-foreground/80">
                             {b.usage}

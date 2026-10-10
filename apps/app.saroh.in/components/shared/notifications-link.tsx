@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NOTIFICATIONS_NAV } from "@/components/shared/nav-items";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
  * Notifications, in the top bar beside search and help (2026-09-25).
@@ -37,12 +38,13 @@ export function NotificationsLink({ unread }: { unread: number }) {
         >
             <Icon className="size-4" />
             {unread > 0 ? (
-                <span
+                <CountBadge
+                    count={unread}
+                    max={99}
+                    tone="strong"
                     aria-hidden
-                    className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand-subtle px-1 py-px text-[10px] font-semibold tabular-nums leading-none text-brand-subtle-foreground ring-2 ring-background"
-                >
-                    {unread > 99 ? "99+" : unread}
-                </span>
+                    className="absolute -right-1 -top-1 min-w-[18px] px-1 py-px ring-2 ring-background"
+                />
             ) : null}
         </Link>
     );

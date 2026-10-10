@@ -16,7 +16,8 @@ import {
 } from "@/lib/stock/screen-actions";
 import type { StockCheck, StockChecks } from "@/lib/stock/service";
 
-import { pillClass, SMALL_BUTTON } from "./tones";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { PILL_TONE, SMALL_BUTTON } from "./tones";
 
 const newKey = () => crypto.randomUUID();
 
@@ -146,7 +147,9 @@ export function ChecksList({
                             className="min-w-0 rounded-xl border border-border bg-card px-4 py-3.5"
                         >
                             <div className="flex flex-wrap items-baseline gap-2">
-                                <span className={pillClass(tone)}>{label}</span>
+                                <StatusBadge tone={PILL_TONE[tone]}>
+                                    {label}
+                                </StatusBadge>
                                 <h3 className="flex-[1_1_260px] text-pretty text-[14px] font-semibold">
                                     {title}
                                 </h3>

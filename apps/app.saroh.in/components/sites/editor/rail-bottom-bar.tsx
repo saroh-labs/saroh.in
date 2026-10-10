@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { Layers, MessageSquare, Palette, Plus } from "lucide-react";
 
 import type { RailTab } from "@/components/sites/editor/editor-rail";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 const TABS: readonly { key: RailTab; label: string; icon: LucideIcon }[] = [
     { key: "page", label: "Page", icon: Layers },
@@ -78,12 +79,12 @@ export function RailBottomBar({
                         strokeWidth={1.9}
                     />
                     {openNotes > 0 ? (
-                        <span
+                        <CountBadge
+                            count={openNotes}
+                            tone="strong"
                             aria-hidden
-                            className="absolute -top-[5px] left-3 h-4 min-w-4 rounded-full bg-highlight px-1 text-center text-[11px] font-semibold tabular-nums leading-4 text-highlight-foreground"
-                        >
-                            {openNotes}
-                        </span>
+                            className="absolute -top-[5px] left-3 min-w-[18px] px-1 py-px"
+                        />
                     ) : null}
                 </span>
                 Feedback

@@ -1,6 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, TriangleAlert } from "lucide-react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { AttentionTagInput } from "@/lib/customer-workspace/attention";
 import { hiddenText, tagText } from "@/lib/customer-workspace/attention";
 
@@ -51,10 +52,10 @@ export function AttentionTags({
     );
 }
 
-const PILL =
-    "inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-semibold";
-
-/** One tag: the design's danger pill, uppercase, with its kind in words. */
+/**
+ * One tag: the danger badge, in sentence case, with its kind in words. In a
+ * header it is a size up and carries the warning glyph.
+ */
 export function AttentionTag({
     tag,
     title,
@@ -65,25 +66,16 @@ export function AttentionTag({
     size?: "header" | "row";
 }) {
     return (
-        <span
-            title={title}
-            className={cn(
-                PILL,
-                "bg-destructive-subtle text-destructive-subtle-foreground",
-                size === "header"
-                    ? "gap-[5px] px-2 py-0.5 text-[11px] leading-[1.3]"
-                    : "px-[7px] py-px text-[11px] leading-[1.35]",
-            )}
+        <StatusBadge
+            tone="error"
+            size={size === "header" ? "default" : "sm"}
+            hint={title}
         >
             {size === "header" ? (
-                <TriangleAlert
-                    aria-hidden
-                    strokeWidth={2.4}
-                    className="size-[11px] shrink-0"
-                />
+                <TriangleAlert aria-hidden className="size-3 shrink-0" />
             ) : null}
             {tagText(tag)}
-        </span>
+        </StatusBadge>
     );
 }
 
@@ -96,16 +88,9 @@ function HiddenTag({
     children: React.ReactNode;
 }) {
     return (
-        <span
-            className={cn(
-                "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-muted font-medium text-muted-foreground",
-                size === "header"
-                    ? "px-2 py-0.5 text-[12px] leading-[1.3]"
-                    : "px-[7px] py-px text-[11px] leading-[1.35]",
-            )}
-        >
-            <Lock aria-hidden className="size-[11px] shrink-0" />
+        <StatusBadge tone="neutral" size={size === "header" ? "default" : "sm"}>
+            <Lock aria-hidden className="size-3 shrink-0" />
             {children}
-        </span>
+        </StatusBadge>
     );
 }

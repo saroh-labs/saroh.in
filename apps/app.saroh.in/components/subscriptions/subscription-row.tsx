@@ -14,22 +14,6 @@ import {
     TAB_TONE,
 } from "@/lib/subscriptions/view";
 
-/** A tab's count; a failed renewal's count is red while it has any. */
-export function Count({ n, danger = false }: { n: number; danger?: boolean }) {
-    return (
-        <span
-            className={cn(
-                "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
-                danger && n > 0
-                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                    : "bg-muted text-muted-foreground",
-            )}
-        >
-            {n}
-        </span>
-    );
-}
-
 /** One subscription on the list; it opens the quick look. */
 export function SubscriptionRow({
     sub,
