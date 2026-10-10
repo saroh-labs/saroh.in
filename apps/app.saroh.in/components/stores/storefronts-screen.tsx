@@ -16,6 +16,7 @@ import { pausedWords } from "@/lib/billing/paused";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
 import { newStorefrontHref, storefrontHref } from "@/lib/stores/links";
+import type { LocationDetails } from "@/lib/stores/location-details";
 import type { LocationTab } from "@/lib/stores/location-readiness";
 import {
     LOCATION_SECTIONS,
@@ -23,6 +24,7 @@ import {
     locationReadiness,
     locationSubtitle,
 } from "@/lib/stores/location-readiness";
+import type { LocationPeople } from "@/lib/stores/people";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
     StorefrontKind,
@@ -41,6 +43,7 @@ import {
     locationTabId,
 } from "./location-tabs";
 import { PaymentsSection } from "./payments-section";
+import { PeopleSection } from "./people-section";
 import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
 
@@ -59,8 +62,8 @@ const ordersLabel = (n: number) =>
 /**
  * Sell › Location: one location's own page, titled with its name, with what
  * it still needs to take orders at the top, then its parts by job: The
- * place, Payments, Delivery, Customers, and Pause or close last (the 9 Oct
- * audit). With several locations, the list of them sits on the left and
+ * place, Payments, Delivery, Customers, People, and Pause or close last
+ * (the 9 Oct audit; People joined them on 10 Oct). With several locations, the list of them sits on the left and
  * each one is the same page. A location is a storefront in code and in the
  * API (DEC-069 renamed the words, not the identifiers).
  *
@@ -71,6 +74,8 @@ export function StorefrontsScreen({
     businessName,
     storefronts,
     selected,
+    details,
+    people = null,
     chosenId,
     site,
     canCreate,
@@ -83,6 +88,13 @@ export function StorefrontsScreen({
     storefronts: StorefrontSummary[];
     /** `null` when the chosen storefront could not be read. */
     selected: StorefrontSettings | null;
+    /**
+     * The chosen location's description and logo, for their row in The
+     * place; left out when they couldn't be read, and so is the row.
+     */
+    details?: LocationDetails;
+    /** Who works at the chosen location; `null` when it couldn't be read. */
+    people?: LocationPeople | null;
     /** The one asked for, so a page that failed to read it still names it. */
     chosenId?: string;
     /**
@@ -167,6 +179,8 @@ export function StorefrontsScreen({
                         <StorefrontDetail
                             key={selected.id}
                             store={selected}
+                            details={details}
+                            people={people}
                             businessName={businessName}
                             site={site}
                             canEdit={canEdit}
@@ -272,6 +286,8 @@ function StorefrontList({
 
 function StorefrontDetail({
     store: initial,
+    details,
+    people,
     businessName,
     site,
     canEdit,
@@ -280,6 +296,8 @@ function StorefrontDetail({
     notTakingOrders,
 }: {
     store: StorefrontSettings;
+    details: LocationDetails | undefined;
+    people: LocationPeople | null;
     businessName: string;
     site: SiteSelling | null | undefined;
     canEdit: boolean;
@@ -333,6 +351,7 @@ function StorefrontDetail({
         ...(store.linkSameEmailCustomers !== undefined
             ? [LOCATION_SECTIONS.customers]
             : []),
+        LOCATION_SECTIONS.people,
         ...(closes ? [LOCATION_SECTIONS.closing] : []),
     ];
     const [tab, setTab] = useTabParam<LocationTab>(
@@ -378,7 +397,9 @@ function StorefrontDetail({
                 aria-labelledby={locationTabId(tab)}
                 className="min-w-0 outline-none"
             >
-                {tab === "the-place" ? <PlaceSection {...shared} /> : null}
+                {tab === "the-place" ? (
+                    <PlaceSection {...shared} details={details} />
+                ) : null}
                 {tab === "payments" ? <PaymentsSection {...shared} /> : null}
                 {tab === "delivery" ? <FulfilmentSection {...shared} /> : null}
                 {tab === "customers" ? (
@@ -389,6 +410,9 @@ function StorefrontDetail({
                         save={save}
                         setStore={setStore}
                     />
+                ) : null}
+                {tab === "people" ? (
+                    <PeopleSection store={store} people={people} />
                 ) : null}
                 {tab === "pause-or-close" && closes ? (
                     <ClosingSection

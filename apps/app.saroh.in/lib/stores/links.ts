@@ -18,14 +18,17 @@ export function storefrontHref(storeId: string, section?: string): string {
     return `/commerce/locations${q(storeId)}${tab}`;
 }
 
-/** Its address, description and logo. */
+/** Its description and logo. */
 export function storefrontDetailsHref(storeId: string): string {
     return `/commerce/locations/${encodeURIComponent(storeId)}/details`;
 }
 
-/** Who may work on it, and invitations to it. */
+/**
+ * Who may work on it, and invitations to it: the location's People tab (a
+ * page of its own until 10 Oct; that address still lands here).
+ */
 export function storefrontPeopleHref(storeId: string): string {
-    return `/commerce/locations/${encodeURIComponent(storeId)}/people`;
+    return storefrontHref(storeId, "people");
 }
 
 /** The Categories tab of Product settings (#470) — the business's (#529). */

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/commerce/locations api:stores
+// @covers accounts:/login app:/open app:/commerce/locations app:/commerce/locations/[storeId]/people api:stores
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -69,6 +69,15 @@ test.describe("Locations (DEC-069)", () => {
         await expect(page).toHaveURL(
             new RegExp(`/commerce/locations/${one.id}/details$`),
         );
+
+        // Its people were a page; that address opens the People tab now.
+        await page.goto(`/commerce/locations/${one.id}/people`);
+        await expect(page).toHaveURL(/[?&]section=people$/);
+        await expect(
+            page
+                .getByRole("tablist", { name: "Location settings" })
+                .getByRole("tab", { name: "People" }),
+        ).toHaveAttribute("aria-selected", "true");
     });
 
     test("the tabs keep the open one in the address, and Back returns to the last", async ({
@@ -217,7 +226,8 @@ test.describe(
                 await expect(card.getByRole("textbox")).toHaveCount(0);
 
                 // Pressed until it opens: a press before hydration does nothing.
-                const panel = card.locator("#delivery-pickup-panel");
+                // The sheet draws at page level, outside the tab's region.
+                const panel = page.locator("#delivery-pickup-panel");
                 await expect(async () => {
                     await card
                         .getByRole("button", { name: "Edit pick-up" })
@@ -271,11 +281,11 @@ test.describe(
                 ).toBe(20);
                 await panel.getByRole("button", { name: "Cancel" }).click();
 
-                // Shipping, turned on in its panel, starts on its default.
+                // Shipping, turned on in its sheet, starts on its default.
                 await card
                     .getByRole("button", { name: "Edit shipping" })
                     .click();
-                const shipping = card.locator("#delivery-shipping-panel");
+                const shipping = page.locator("#delivery-shipping-panel");
                 await shipping
                     .getByRole("switch", { name: "Offer shipping" })
                     .click();

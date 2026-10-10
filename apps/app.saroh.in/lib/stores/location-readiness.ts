@@ -23,6 +23,7 @@ export const LOCATION_SECTIONS = {
     payments: { id: "payments", label: "Payments" },
     delivery: { id: "delivery", label: "Delivery" },
     customers: { id: "customers", label: "Customers" },
+    people: { id: "people", label: "People" },
     closing: { id: "pause-or-close", label: "Pause or close" },
 } as const;
 

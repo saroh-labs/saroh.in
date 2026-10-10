@@ -14,7 +14,7 @@ import { currencySymbol } from "@/lib/format/money";
 import type { LateUnit } from "@/lib/stores/late-after";
 
 /**
- * The Delivery edit panel's two fields. A money amount with its
+ * The Delivery edit sheet's two fields. A money amount with its
  * currency's sign inside the box: "[ 40  ₹ ]".
  */
 export function MoneyField({
