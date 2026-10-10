@@ -54,6 +54,13 @@ describe("module map (KTD-8)", () => {
             legacyEntitlementKey: null,
         });
         expect(catalogueModulesFor("WEBSITE")).not.toContain("site-trackers");
+        // A branded QR code is a switch under no module, as trackers are.
+        expect(MODULE_MAP["qr-branding"]).toEqual({
+            registry: null,
+            limitKey: null,
+            legacyEntitlementKey: null,
+        });
+        expect(catalogueModulesFor("WEBSITE")).not.toContain("qr-branding");
     });
 
     it("reads a legacy raise's key as its row", () => {

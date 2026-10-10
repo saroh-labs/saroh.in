@@ -79,6 +79,7 @@ describe("plan keys", () => {
                 "orders",
                 "payments",
                 "products",
+                "qr-branding",
                 "review",
                 "reviewers",
                 "reviews",
