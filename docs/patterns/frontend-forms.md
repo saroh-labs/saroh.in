@@ -63,6 +63,13 @@ refusal keeps the sheet open with what was typed, Cancel, Escape and the
 close button drop the draft, it can't be dismissed while saving, each
 opening is a fresh draft (a `key` per opening) and the keyboard returns to
 the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
+Website › Settings follows it (`components/sites/settings/`): its frame is
+`SettingsSheetFrame` in `settings-sheet.tsx`, a copy of The place's with
+the same classes until the two are lifted into one, and its links are
+`settingsEditHref` in `lib/sites/settings-edit.ts`. Whatever the row needs
+is done inside its sheet or dialog (the share image is uploaded there, Add
+domain shows its DNS records there); an Edit never sends the merchant to
+another page to finish.
 
 ## Rules
 

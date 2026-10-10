@@ -287,7 +287,9 @@ const RYE_PLANS = "/billing/subscriptions?tab=plans";
 
 /* "Connect your own domain" and "Make your link look right when shared":
  * Northwind's site settings. Its seeded domain, northwindsupply.in, waits
- * for DNS; the domain box is typed into and never added. The web address
+ * for DNS; Add domain's dialog is typed into and never added. A row's
+ * field is in its side sheet or dialog (read first, 10 Oct), so a shot of
+ * one opens it and clips the `[role="dialog"]`. The web address
  * is the API's (`site-origin.ts` rendererHost): run the API with
  * RENDERER_URL=https://saroh.app for help-own-domain-1, so it reads
  * northwind.saroh.app as in production, not the local renderer's host. */
@@ -298,7 +300,6 @@ const NW_SETTINGS = "/sites/seed_site_0/settings";
  * with `?section=`. */
 const DOMAIN = "#address";
 const SHARE = "#search-and-sharing";
-const SEARCH = "#search-and-sharing";
 /** The verification codes fold; a shot that shows them opens them first. */
 const OPEN_CODES: Step = { click: "[data-verification-codes] summary" };
 
@@ -560,14 +561,16 @@ const HELP_SHOTS_B: Shot[] = [
         route: NW_SETTINGS,
         viewport: { width: 1280, height: 1400 },
         steps: [
+            { click: `${DOMAIN} button:text-is("Add domain")` },
+            { waitFor: '[role="dialog"] #add-domain-field' },
             {
-                fill: '[aria-label="Domain to add"]',
+                fill: '[role="dialog"] #add-domain-field',
                 value: "www.northwindsupply.in",
             },
-            { click: `${DOMAIN} h3` },
+            { click: '[role="dialog"] h2' },
         ],
-        clip: { selector: DOMAIN, pad: 12 },
-        mark: `${DOMAIN} button:has-text("Add domain")`,
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:text-is("Add domain")',
         alt: "Your own domain at Northwind Supply (demo store): a second domain typed in, ready for Add domain",
         caption: "Your own domain at Northwind Supply, a domain typed in",
     },
@@ -624,12 +627,12 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
-        steps: [{ click: `${SHARE} button:text-is("Add")` }],
-        clip: {
-            selector: `${SHARE} div.grid:has(> div > span:text-is("Share image"))`,
-            pad: 12,
-        },
-        mark: `${SHARE} button:has-text("Choose a photo")`,
+        steps: [
+            { click: `${SHARE} button:text-is("Add")` },
+            { waitFor: '[role="dialog"] #settings-image-field' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:has-text("Choose a photo")',
         alt: "Adding a social share image at Northwind Supply (demo store): Choose a photo, or paste an image address, then Save",
         caption: "Adding a share image at Northwind Supply",
     },
@@ -643,14 +646,15 @@ const HELP_SHOTS_B: Shot[] = [
             {
                 click: `#settings-description button:is(:text-is("Edit"), :text-is("Write"))`,
             },
+            { waitFor: '[role="dialog"] #settings-description-field' },
             {
-                fill: '[aria-label="Search description"]',
+                fill: '[role="dialog"] #settings-description-field',
                 value: "Packaging, cleaning and workshop supplies for small manufacturers in Peenya, Bengaluru. Order by phone or online.",
             },
-            { click: `${SEARCH} h2` },
+            { click: '[role="dialog"] h2' },
         ],
-        clip: { selector: SEARCH, pad: 12 },
-        mark: '[aria-label="Search description"]',
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] #settings-description-field',
         alt: "Search at Northwind Supply (demo store): a description being written, and the preview of how it reads",
         caption: "Writing Northwind Supply's description under Search",
     },
@@ -686,13 +690,15 @@ const HELP_SHOTS_B: Shot[] = [
         viewport: ST_DESK,
         steps: [
             OPEN_CODES,
+            { click: '[data-verification="google"] button:text-is("Add")' },
+            { waitFor: '[role="dialog"] input' },
             {
-                fill: '[data-verification="google"] input',
+                fill: '[role="dialog"] input',
                 value: '<meta name="google-site-verification" content="northwind-demo-search-console-code" />',
             },
         ],
-        clip: { selector: '[data-verification="google"]', pad: 12 },
-        mark: '[data-verification="google"] button:text-is("Save")',
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:text-is("Save")',
         alt: "The Google Search Console field at Northwind Supply (demo store), with Google's HTML tag pasted and the code found in it",
         caption: "Google's tag pasted in at Northwind Supply",
     },
