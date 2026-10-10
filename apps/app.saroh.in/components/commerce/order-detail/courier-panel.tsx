@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -16,17 +17,13 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
-
-const FIELD =
-    "mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11";
-
 /**
  * The courier's details (B10, DEC-045): who took it, their tracking number
  * and, if they gave one, the tracking link — every one optional, since the
@@ -142,13 +139,7 @@ function CourierDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => pickChip(c)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:border-border-strong hover:bg-accent active:bg-accent-active dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {c}
                             </button>
@@ -158,7 +149,7 @@ function CourierDraft({
                 {other ? (
                     <label className="mt-3 block text-[12px] font-medium">
                         Courier&apos;s name
-                        <input
+                        <Input
                             ref={otherRef}
                             type="text"
                             value={otherName}
@@ -167,7 +158,7 @@ function CourierDraft({
                             onChange={(e) => setOtherName(e.target.value)}
                             placeholder="DTDC, India Post…"
                             aria-describedby={`${ids}-other-help`}
-                            className={cn(FIELD, "font-sans")}
+                            className="mt-[5px] w-full font-mono"
                         />
                         <span
                             id={`${ids}-other-help`}
@@ -181,7 +172,7 @@ function CourierDraft({
                     <>
                         <label className="mt-3 block text-[12px] font-medium">
                             Tracking number
-                            <input
+                            <Input
                                 ref={numberRef}
                                 type="text"
                                 value={number}
@@ -191,7 +182,7 @@ function CourierDraft({
                                 onChange={(e) => setNumber(e.target.value)}
                                 placeholder="Leave empty if you don't have it yet"
                                 aria-describedby={`${ids}-number-help`}
-                                className={FIELD}
+                                className="mt-[5px] w-full font-mono"
                             />
                         </label>
                         <p
@@ -204,7 +195,7 @@ function CourierDraft({
                         </p>
                         <label className="mt-3 block text-[12px] font-medium">
                             Tracking link
-                            <input
+                            <Input
                                 type="url"
                                 inputMode="url"
                                 value={link}
@@ -212,7 +203,7 @@ function CourierDraft({
                                 placeholder="https://"
                                 aria-invalid={bad || undefined}
                                 aria-describedby={`${ids}-link-help`}
-                                className={FIELD}
+                                className="mt-[5px] w-full font-mono"
                             />
                         </label>
                         <p
@@ -231,27 +222,30 @@ function CourierDraft({
                     </>
                 ) : null}
             </OrderSheetBody>
-            <OrderSheetFoot busy={busy}>
-                {handover && onPrint ? (
-                    <Button type="button" variant="outline" onClick={onPrint}>
-                        Packing slip
-                    </Button>
-                ) : null}
-                <Button
-                    type="button"
-                    disabled={bad || unnamed || busy}
-                    onClick={() =>
-                        onSave(
-                            courierFields(
-                                { courier: name, number, link },
-                                handover ? undefined : before,
-                            ),
-                        )
-                    }
-                >
-                    {handover ? "Handed over" : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            <OrderSheetFoot
+                saveLabel={handover ? "Mark handed over" : "Save"}
+                saveOff={bad || unnamed}
+                extra={
+                    handover && onPrint ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={onPrint}
+                        >
+                            Packing slip
+                        </Button>
+                    ) : null
+                }
+                onSubmit={() =>
+                    onSave(
+                        courierFields(
+                            { courier: name, number, link },
+                            handover ? undefined : before,
+                        ),
+                    )
+                }
+            />
         </>
     );
 }

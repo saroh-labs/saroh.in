@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { businessTimezone } from "../bookings/staff-availability";
+import { noticeOf } from "../notifications/notice-target";
 import type { MoveNoticePayload } from "./moves.service";
 
 /** The inbox notice a business gets ahead of its plan moving (KTD-4). */
@@ -96,7 +97,8 @@ export class MoveNoticeHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId: sub.organizationId,
-                    type: PLAN_MOVE_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_MOVE_NOTIFICATION_TYPE, {}),
                     title: `Your ${planName} plan changes on ${when}`,
                     body: `Saroh has updated its plans. From ${when}, your business is on the latest ${planName} plan.`,
                 },

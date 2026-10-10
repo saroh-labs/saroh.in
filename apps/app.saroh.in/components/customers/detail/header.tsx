@@ -11,17 +11,12 @@ import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 
-import { Pill } from "@/components/subscriptions/pill";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
-import { scrollToShow } from "@/lib/customer-workspace/tab-scroll";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
-
-/** The ⋯ button: the design's 34px square beside Edit details. */
-const MORE_BTN =
-    "h-8 w-[34px] rounded-[9px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent coarse:size-11";
-
+import { TabStrip } from "@saroh/ui/tabs";
+import { Tip } from "@saroh/ui/tooltip";
 /** A menu row: the design's 8px by 10px, 7px corners. */
 const MENU_ITEM =
     "cursor-pointer items-start rounded-[7px] px-2.5 py-2 text-[13px] active:bg-accent-active data-[disabled]:cursor-not-allowed data-[disabled]:opacity-100";
@@ -103,7 +98,7 @@ export function Header({
                 lead={
                     <div
                         aria-hidden
-                        className="flex size-[52px] items-center justify-center rounded-full bg-brand-subtle font-display text-[18px] font-semibold text-brand-subtle-foreground"
+                        className="flex size-[52px] items-center justify-center rounded-full bg-muted font-display text-[18px] font-semibold text-foreground"
                     >
                         {initials}
                     </div>
@@ -116,7 +111,9 @@ export function Header({
                         <>
                             {tag ? (
                                 <span title={tag.title} className="inline-flex">
-                                    <Pill tone={tag.tone}>{tag.label}</Pill>
+                                    <StatusBadge tone={tag.tone}>
+                                        {tag.label}
+                                    </StatusBadge>
                                 </span>
                             ) : null}
                             {attention}
@@ -137,7 +134,7 @@ export function Header({
                                 // rather than pushing the page sideways.
                                 <a
                                     href={`mailto:${email}`}
-                                    className="min-w-0 max-w-full text-brand transition-colors [overflow-wrap:anywhere] hover:text-foreground active:text-muted-foreground"
+                                    className="min-w-0 max-w-full text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast [overflow-wrap:anywhere] hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     {email}
                                 </a>
@@ -181,32 +178,37 @@ export function Header({
                                 </Link>
                             </Button>
                         ))}
-                        <Button
-                            variant="outline"
+                        <Tip label={canEdit ? undefined : EDIT_OFF}>
+                            <Button
+                                variant="outline"
 
-                            disabled={!canEdit}
-                            title={canEdit ? undefined : EDIT_OFF}
-                            onClick={onEdit}
-                        >
-                            Edit details
-                        </Button>
+                                disabled={!canEdit}
+                                onClick={onEdit}
+                            >
+                                Edit details
+                            </Button>
+                        </Tip>
                         {menu.length ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className={MORE_BTN}
-                                        disabled={!canMore}
-                                        aria-label="More actions"
-                                        title={
+                                    <Tip
+                                        label={
                                             canMore ? "More actions" : MORE_OFF
                                         }
                                     >
-                                        <MoreHorizontal
-                                            aria-hidden
-                                            className="size-4"
-                                        />
-                                    </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-[34px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent"
+                                            disabled={!canMore}
+                                            aria-label="More actions"
+                                        >
+                                            <MoreHorizontal
+                                                aria-hidden
+                                                className="size-4"
+                                            />
+                                        </Button>
+                                    </Tip>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"
@@ -260,10 +262,9 @@ function MenuRow({ item }: { item: MoreItem }) {
 }
 
 /**
- * The section tabs, by business kind: one row that scrolls sideways on a
- * phone rather than wrapping (default 28, C14), keeping the chosen tab in
- * view. Arrow keys move between them, as the design's tablist does; each
- * tab says how many rows sit behind it.
+ * The section tabs, by business kind, on the shared strip: one row that
+ * scrolls sideways on a phone rather than wrapping (default 28, C14),
+ * keeping the chosen tab in view. Each tab says how many rows sit behind it.
  */
 export function Tabs({
     tabs,
@@ -274,70 +275,19 @@ export function Tabs({
     value: TabKey;
     onChange: (key: TabKey) => void;
 }) {
-    const list = useRef<HTMLDivElement>(null);
-    // The chosen tab, whole, in view: on arrival from a `?tab=` link and
-    // after every change. Only sideways — the page itself never moves.
-    useEffect(() => {
-        const row = list.current;
-        const tab = row?.querySelector<HTMLElement>('[aria-selected="true"]');
-        if (!row || !tab) return;
-        const left = scrollToShow(row, {
-            left: tab.offsetLeft,
-            width: tab.offsetWidth,
-        });
-        if (left === null) return;
-        const still = window.matchMedia(
-            "(prefers-reduced-motion: reduce)",
-        ).matches;
-        row.scrollTo({ left, behavior: still ? "auto" : "smooth" });
-    }, [value]);
-    const keys = (e: React.KeyboardEvent) => {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        const i = tabs.findIndex((t) => t.key === value);
-        const n =
-            (i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
-        onChange(tabs[n].key);
-        const buttons =
-            list.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-        buttons?.item(n).focus();
-    };
     return (
-        <div
-            ref={list}
-            role="tablist"
-            aria-label="Customer sections"
-            onKeyDown={keys}
-            className="relative flex flex-nowrap gap-0.5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-            {tabs.map((t) => {
-                const on = t.key === value;
-                return (
-                    <button
-                        key={t.key}
-                        id={`tab-${t.key}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        aria-controls={`panel-${t.key}`}
-                        tabIndex={on ? 0 : -1}
-                        onClick={() => onChange(t.key)}
-                        className={cn(
-                            "inline-flex flex-none items-center whitespace-nowrap px-3.5 py-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                            on
-                                ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                : "font-medium text-muted-foreground hover:text-foreground active:text-foreground/80",
-                        )}
-                    >
-                        {t.label}
-                        {t.count ? (
-                            <span className="ml-1.5 rounded-full bg-muted px-1.5 py-px text-[11px] font-semibold text-muted-foreground">
-                                {t.count}
-                            </span>
-                        ) : null}
-                    </button>
-                );
-            })}
-        </div>
+        <TabStrip
+            label="Customer sections"
+            idPrefix="tab"
+            value={value}
+            onValueChange={onChange}
+            tabs={tabs.map((t) => ({
+                value: t.key,
+                label: t.label,
+                controls: `panel-${t.key}`,
+                // No count on Overview, or where the source failed.
+                count: t.count === null || t.count === 0 ? undefined : t.count,
+            }))}
+        />
     );
 }

@@ -15,6 +15,7 @@ import {
 import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
 import { pageUpdatedIso } from "@/lib/sites/updated";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata = { title: "Pages · Website" };
 
@@ -74,28 +75,27 @@ export default async function SitePagesPage({
     return (
         <div className="flex flex-col gap-4">
             {waiting > 0 ? (
-                <p
-                    role="status"
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-border bg-muted/40 px-4 py-3 text-[13px]"
-                >
-                    <span className="min-w-0 flex-1 text-pretty">
-                        Waiting to be published:{" "}
-                        {describePendingChanges(
-                            site.pendingSectionChanges,
-                            site.pendingSiteChanges,
-                        ) ?? `${waiting} changes`}
-                        .{" "}
-                        {site.currentPublicationId
-                            ? "The public still sees the last published version."
-                            : "Nothing is public until the site is published."}
-                    </span>
-                    <Link
-                        href={editorHref}
-                        className="font-medium underline-offset-4 hover:underline"
-                    >
-                        Review and publish
-                    </Link>
-                </p>
+                <Notice role="status">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <span className="min-w-0 flex-1 text-pretty">
+                            Waiting to be published:{" "}
+                            {describePendingChanges(
+                                site.pendingSectionChanges,
+                                site.pendingSiteChanges,
+                            ) ?? `${waiting} changes`}
+                            .{" "}
+                            {site.currentPublicationId
+                                ? "The public still sees the last published version."
+                                : "Nothing is public until the site is published."}
+                        </span>
+                        <Link
+                            href={editorHref}
+                            className="font-medium underline-offset-4 hover:underline"
+                        >
+                            Review and publish
+                        </Link>
+                    </div>
+                </Notice>
             ) : null}
             <ListCard
                 main="Page"

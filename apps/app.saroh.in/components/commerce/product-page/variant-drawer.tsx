@@ -22,6 +22,7 @@ import {
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
+import { TextLink } from "@saroh/ui/text-link";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -96,11 +97,7 @@ export function VariantDrawer({
                                 </SheetDescription>
                             </div>
                             {overview.canWrite ? (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
-                                >
+                                <Button size="sm" asChild variant="outline">
                                     <Link href={edit("variants")}>Edit</Link>
                                 </Button>
                             ) : null}
@@ -161,7 +158,8 @@ export function VariantDrawer({
                                         </div>
                                         <Badge
                                             variant={WORD_BADGE[openLine.word]}
-                                            className="mt-2.5 rounded-full px-2 text-[11.5px] font-semibold"
+                                            size="sm"
+                                            className="mt-2.5"
                                         >
                                             Customers see:{" "}
                                             {customersSee(openLine)}
@@ -192,15 +190,15 @@ export function VariantDrawer({
                                                         key={o.id}
                                                         className="flex items-center gap-2.5 border-b border-foreground/10 py-2 last:border-0"
                                                     >
-                                                        <Link
+                                                        <TextLink
                                                             href={orderHref(
                                                                 storeId,
                                                                 o.id,
                                                             )}
-                                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                            className="font-mono text-[12px]"
                                                         >
                                                             {o.orderNumber}
-                                                        </Link>
+                                                        </TextLink>
                                                         <span className="min-w-0 flex-1 truncate">
                                                             {o.customer} · ×{" "}
                                                             {o.lines
@@ -223,7 +221,7 @@ export function VariantDrawer({
                                                                     ? "success"
                                                                     : "draft"
                                                             }
-                                                            className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                            size="sm"
                                                         >
                                                             {ORDER_STATUS_LABEL[
                                                                 o.status
@@ -265,7 +263,7 @@ export function VariantDrawer({
                                                         <span
                                                             role="img"
                                                             aria-label={`${r.rating} out of 5`}
-                                                            className="tracking-[1px] text-highlight"
+                                                            className="tracking-[1px] text-foreground"
                                                         >
                                                             {"★".repeat(
                                                                 r.rating,
@@ -334,9 +332,7 @@ function DrawerSection({
 }) {
     return (
         <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {title}
-            </h3>
+            <h3 className="label mb-2">{title}</h3>
             {children}
         </section>
     );

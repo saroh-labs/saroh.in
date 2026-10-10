@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -8,7 +9,8 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
-import { FIELD, FOCUS, StepCard } from "./parts";
+import { Tip } from "@saroh/ui/tooltip";
+import { FIELD, StepCard } from "./parts";
 
 /**
  * How it is paid (B13): cash (what was given, and the change), UPI at the
@@ -63,16 +65,17 @@ export function PayStep({
                 className="flex flex-wrap gap-1.5"
             >
                 {options.map((o) => (
-                    <Chip
-                        key={o.key}
-                        on={pay === o.key}
-                        disabled={o.off !== null}
-                        title={o.off ?? undefined}
-                        onClick={() => onPay(o.key)}
-                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                    >
-                        {o.label}
-                    </Chip>
+                    <Tip label={o.off ?? undefined}>
+                        <Chip
+                            key={o.key}
+                            on={pay === o.key}
+                            disabled={o.off !== null}
+                            onClick={() => onPay(o.key)}
+                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                        >
+                            {o.label}
+                        </Chip>
+                    </Tip>
                 ))}
             </div>
             {pay === "CASH" ? (
@@ -151,32 +154,30 @@ export function PayStep({
                             autoComplete="off"
                             className={FIELD}
                         />
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="xs"
                             type="button"
                             onClick={() => {
                                 onDiscount("");
                                 setDiscounting(false);
                             }}
-                            className={cn(
-                                FOCUS,
-                                "shrink-0 cursor-pointer rounded-lg px-2.5 text-[12.5px] font-semibold text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70",
-                            )}
+                            className="shrink-0 text-muted-foreground"
                         >
                             Remove
-                        </button>
+                        </Button>
                     </div>
                 </div>
             ) : (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => setDiscounting(true)}
-                    className={cn(
-                        FOCUS,
-                        "mt-1.5 cursor-pointer rounded-md px-0 py-1 text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground active:opacity-80",
-                    )}
+                    className="mt-1.5 cursor-pointer px-0 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-80"
                 >
                     + Add a discount
-                </button>
+                </Button>
             )}
         </StepCard>
     );

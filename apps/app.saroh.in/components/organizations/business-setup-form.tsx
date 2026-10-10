@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@saroh/auth/client";
 import { Button } from "@saroh/ui/button";
@@ -41,6 +42,8 @@ import {
     takeLaunchOfferAfterOnboarding,
 } from "@/lib/saroh-billing/checkout-actions";
 
+import { chipClass } from "@/components/shared/chip";
+import { Tip } from "@saroh/ui/tooltip";
 import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
@@ -281,6 +284,7 @@ export function BusinessSetupForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className={cn(
                     "grid gap-5",
@@ -451,7 +455,7 @@ export function BusinessSetupForm({
                                                     )
                                                 }
                                                 className={cn(
-                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                     on
                                                         ? "border-foreground bg-muted"
                                                         : "border-input hover:bg-muted active:bg-accent-active",
@@ -499,12 +503,7 @@ export function BusinessSetupForm({
                                         setOtherCountry(false);
                                         form.setValue("country", c.code);
                                     }}
-                                    className={cn(
-                                        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                        on
-                                            ? "border-foreground bg-foreground text-background"
-                                            : "border-input hover:bg-muted active:bg-accent-active",
-                                    )}
+                                    className={chipClass(on)}
                                 >
                                     <span className="font-mono text-[11px] opacity-70">
                                         {c.code}
@@ -518,12 +517,7 @@ export function BusinessSetupForm({
                             role="radio"
                             aria-checked={otherCountry}
                             onClick={() => setOtherCountry(true)}
-                            className={cn(
-                                "inline-flex h-8 items-center rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                otherCountry
-                                    ? "border-foreground bg-foreground text-background"
-                                    : "border-input hover:bg-muted active:bg-accent-active",
-                            )}
+                            className={chipClass(otherCountry)}
                         >
                             Another country
                         </button>
@@ -547,26 +541,29 @@ export function BusinessSetupForm({
 
                 <div data-setup-kept className="flex gap-2 pt-1">
                     {backTo ? (
-                        <Button asChild variant="outline" className="h-10">
+                        <Button asChild variant="outline">
                             <Link href={backTo}>Back</Link>
                         </Button>
                     ) : null}
-                    <Button
-                        type="submit"
-                        className="wk-press h-10 flex-1 font-semibold"
-                        disabled={busy || taken}
-                        title={
+                    <Tip
+                        label={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
                     >
-                        {busy
-                            ? "Setting up…"
-                            : kind === "BUSINESS"
-                              ? "Create the business"
-                              : "Set it up"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            className="wk-press flex-1"
+                            disabled={taken}
+                            busy={busy}
+                            busyLabel="Setting up…"
+                        >
+                            {kind === "BUSINESS"
+                                ? "Create the business"
+                                : "Set it up"}
+                        </Button>
+                    </Tip>
                 </div>
 
                 <p
@@ -575,9 +572,10 @@ export function BusinessSetupForm({
                 >
                     Signed in as{" "}
                     <span className="text-foreground">{email}</span> ·{" "}
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
-                        className="text-foreground underline-offset-4 hover:underline active:text-muted-foreground"
                         onClick={() => {
                             void authClient.signOut().then(() => {
                                 window.location.href = accountsLoginUrl;
@@ -585,7 +583,7 @@ export function BusinessSetupForm({
                         }}
                     >
                         Sign out
-                    </button>
+                    </Button>
                 </p>
             </form>
         </Form>

@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
@@ -14,7 +15,6 @@ import { Chip } from "@/components/shared/chip";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import { CLASS_CHOICES } from "@/lib/subscriptions/plan-editor";
 
-import { FieldError } from "./details-section";
 import { CHIP } from "./price-section";
 
 /**
@@ -90,7 +90,7 @@ export function ClassesSection({
                     />
                 </>
             ) : null}
-            <FieldError id={ids.err} message={errors.classes} />
+            <FieldError id={ids.err}>{errors.classes}</FieldError>
         </Section>
     );
 }

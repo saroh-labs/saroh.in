@@ -115,7 +115,8 @@ test.describe("phone tab strips (UX-079)", () => {
                 .poll(async () => {
                     const got = await strip(
                         page,
-                        '[role="tablist"][aria-label="Business details"]',
+                        // The shared strip scrolls in the box around the tabs.
+                        '[data-tab-strip]:has([aria-label="Business details"]) [data-scroll-x]',
                         '[aria-selected="true"]',
                     );
                     return {

@@ -5,12 +5,12 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
-import Link from "next/link";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { LocationAddressFields } from "@/components/stores/location-address-fields";
+import { runAction } from "@/lib/api/run-action";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type {
     OrganizationSettings,
@@ -32,6 +32,7 @@ import {
 } from "@/lib/stores/location-address";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type { VisitedLocation } from "@/lib/stores/storefronts";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** Sell › Locations, for a business with no location customers visit yet. */
 const LOCATIONS_HREF = "/commerce/locations";
@@ -142,7 +143,7 @@ export function SiteAddressSheet({
 
     if (listed.length > 0) {
         return (
-            <SettingsSheetFrame
+            <FormSheet
                 id={id}
                 returnFocusTo={returnTo}
                 title={ADDRESS_SHEET.title}
@@ -217,7 +218,7 @@ export function SiteAddressSheet({
                     </ul>
                     <p className={NOTE}>{ADDRESS_SHEET.whileLocations}</p>
                 </div>
-            </SettingsSheetFrame>
+            </FormSheet>
         );
     }
 
@@ -270,9 +271,11 @@ function LocationAddressEdit({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await updateStorefront(location.id, patch);
-        setSaving(false);
+        const result = await runAction(
+            () => updateStorefront(location.id, patch),
+            { setBusy: setSaving },
+        );
+        if (!result) return;
         if (!result.ok) {
             setRefusal(result.error);
             return;
@@ -290,7 +293,7 @@ function LocationAddressEdit({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={id}
             returnFocusTo={returnTo}
             title={`${location.name}: address`}
@@ -316,7 +319,7 @@ function LocationAddressEdit({
                 disabled={saving}
                 refusal={refusal}
             />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -372,9 +375,10 @@ function RegisteredAddressChoice({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await saveOrganizationSettings(sent);
-        setSaving(false);
+        const result = await runAction(() => saveOrganizationSettings(sent), {
+            setBusy: setSaving,
+        });
+        if (!result) return;
         if (!result.ok) {
             if (result.field === "registeredAddressMapUrl") {
                 setLinkRefusal(result.error);
@@ -391,7 +395,7 @@ function RegisteredAddressChoice({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={id}
             returnFocusTo={returnTo}
             title={ADDRESS_SHEET.title}
@@ -407,12 +411,7 @@ function RegisteredAddressChoice({
             <div className="grid gap-4 text-sm">
                 <p className="text-pretty">
                     {ADDRESS_SHEET.noLocation}{" "}
-                    <Link
-                        href={LOCATIONS_HREF}
-                        className="font-medium underline underline-offset-2 hover:text-foreground active:text-muted-foreground"
-                    >
-                        Open Locations
-                    </Link>
+                    <TextLink href={LOCATIONS_HREF}>Open Locations</TextLink>
                 </p>
 
                 <div className="grid gap-1.5">
@@ -487,6 +486,6 @@ function RegisteredAddressChoice({
                     </p>
                 ) : null}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

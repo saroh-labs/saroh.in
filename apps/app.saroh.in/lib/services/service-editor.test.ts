@@ -314,9 +314,17 @@ describe("the words around the editor", () => {
             "",
         );
         expect(statePill(true, true).label).toBe("New");
+        // One word for every kind of thing; the service's own sentence
+        // is the hint.
         expect(statePill(false, false)).toEqual({
-            label: "Not taking bookings",
-            tone: "neutral",
+            label: "Paused",
+            tone: "warning",
+            hint: "Not taking bookings.",
+        });
+        expect(statePill(false, true)).toEqual({
+            label: "Live",
+            tone: "success",
+            hint: "Taking bookings.",
         });
     });
 
@@ -575,5 +583,23 @@ describe("visits (E10)", () => {
         expect(changedSections(draft(), draft({ visits: "4" }))).toEqual([
             "Time",
         ]);
+    });
+});
+
+describe("who takes it, with one person on the diary", () => {
+    it("a new service starts with the one person on it", () => {
+        expect(draftOf(null, ["p1"], "Asia/Kolkata").staffIds).toEqual(["p1"]);
+        expect(draftOf(null, [], "Asia/Kolkata").staffIds).toEqual([]);
+    });
+
+    it("is not asked for when there is nobody to choose between", () => {
+        const named = { ...draftOf(null, [], "Asia/Kolkata"), name: "Trim" };
+        expect(serviceProblems(named, true, false, true)).not.toContain(
+            "Pick who takes it.",
+        );
+        // With two or more on the diary it still is.
+        expect(serviceProblems(named, true, false, false)).toContain(
+            "Pick who takes it.",
+        );
     });
 });

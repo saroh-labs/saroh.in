@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
+import { runAction } from "@/lib/api/run-action";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import {
     invitationSentence,
     reviewEmailNote,
 } from "@/lib/product-reviews/describe";
 import type { InvitationState } from "@/lib/product-reviews/service";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * An order's Reviews section: where its invitation stands, and Invite or
@@ -41,7 +43,8 @@ export function OrderReviews({
 
     const invite = () => {
         startTransition(async () => {
-            const res = await inviteReviews([orderId]);
+            const res = await runAction(() => inviteReviews([orderId]));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -78,15 +81,18 @@ export function OrderReviews({
                 </p>
             </div>
             {canWrite && state.state !== "completed" && !note ? (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending || state.blocked !== null}
-                    title={state.blocked?.message}
-                    onClick={invite}
-                >
-                    {pending ? "Sending…" : verb}
-                </Button>
+                <Tip label={state.blocked?.message}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={state.blocked !== null}
+                        onClick={invite}
+                        busy={pending}
+                        busyLabel="Sending…"
+                    >
+                        {verb}
+                    </Button>
+                </Tip>
             ) : null}
         </section>
     );

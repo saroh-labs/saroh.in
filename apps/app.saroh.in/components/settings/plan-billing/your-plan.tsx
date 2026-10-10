@@ -1,6 +1,4 @@
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { CircleAlert, Info } from "lucide-react";
 import Link from "next/link";
 
 import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
@@ -8,6 +6,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
 import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
 
+import { Notice } from "@saroh/ui/notice";
 import { CheckoutPending } from "./checkout-pending";
 import { card } from "./styles";
 
@@ -95,58 +94,39 @@ export function YourPlan(props: YourPlanProps) {
                 </div>
             </div>
             {props.warning ? (
-                <p
-                    role="note"
-                    className="flex items-start gap-2 border-t border-border/70 px-[18px] py-3 text-[13px] font-medium"
-                >
-                    <CircleAlert
-                        aria-hidden
-                        className="mt-px size-4 shrink-0"
-                    />
+                <Notice tone="warning" role="note" layout="banner">
                     {props.warning}
-                </p>
+                </Notice>
             ) : null}
             {(props.notes ?? []).map((n) => (
-                <div
+                <Notice
                     key={`${n.lead}${n.iso ?? ""}`}
+                    tone={n.tone === "attention" ? "warning" : "neutral"}
                     role="note"
-                    className={cn(
-                        "flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/70 px-[18px] py-3 text-[13px]",
-                        n.tone === "attention" &&
-                            "bg-warning-subtle text-warning-subtle-foreground",
-                    )}
+                    layout="banner"
                 >
-                    <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
-                        {n.tone === "attention" ? (
-                            <CircleAlert
-                                aria-hidden
-                                className="mt-px size-4 shrink-0"
-                            />
-                        ) : (
-                            <Info
-                                aria-hidden
-                                className="mt-px size-4 shrink-0"
-                            />
-                        )}
-                        <span>
-                            {n.lead}
-                            {n.iso ? <ViewerDate iso={n.iso} /> : null}
-                            {n.tail}
-                        </span>
-                    </p>
-                    {n.action ? (
-                        <Button asChild size="sm" variant="outline">
-                            <Link
-                                href={changeHref(
-                                    n.action.planId,
-                                    n.action.cycle,
-                                )}
-                            >
-                                {n.action.label}
-                            </Link>
-                        </Button>
-                    ) : null}
-                </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
+                            <span>
+                                {n.lead}
+                                {n.iso ? <ViewerDate iso={n.iso} /> : null}
+                                {n.tail}
+                            </span>
+                        </p>
+                        {n.action ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link
+                                    href={changeHref(
+                                        n.action.planId,
+                                        n.action.cycle,
+                                    )}
+                                >
+                                    {n.action.label}
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ))}
             {props.pending ? <CheckoutPending pending={props.pending} /> : null}
             {props.footnote ? (

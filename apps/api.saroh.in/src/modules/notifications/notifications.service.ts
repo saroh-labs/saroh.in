@@ -5,6 +5,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { clearStaleLimitNotices } from "../billing/limit-notice-clear";
 import { allows, authorize } from "../organizations/organization-policy";
 import { hiddenNotificationTypes } from "./alert-preferences";
+import { noticeTargetOf } from "./notice-target";
 
 /** Options for {@link NotificationsService.list}. */
 export interface ListNotificationsOptions {
@@ -32,6 +33,10 @@ export interface ListNotificationsOptions {
  * A plan limit notice that no longer stands (the team back under its cap,
  * a new month, a plan move) is cleared before the inbox is read (UX-041,
  * `billing/limit-notice-clear.ts`).
+ *
+ * Every row is read with its `target` (10 Oct 2026): the kind of thing it
+ * opens and that thing's id (`notice-target.ts`), so the inbox draws each
+ * row as a link and never has to guess from the type.
  */
 @Injectable()
 export class NotificationsService {
@@ -42,7 +47,7 @@ export class NotificationsService {
     ) {
         authorize(ctx, "notification:read");
         await clearStaleLimitNotices(ctx.organizationId);
-        return prisma.notification.findMany({
+        const rows = await prisma.notification.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 ...(options.unreadOnly ? { readAt: null } : {}),
@@ -50,6 +55,7 @@ export class NotificationsService {
             },
             orderBy: { createdAt: "desc" },
         });
+        return rows.map((row) => ({ ...row, target: noticeTargetOf(row) }));
     }
 
     /** Count the org's unread notifications (for a nav badge). */
@@ -83,17 +89,46 @@ export class NotificationsService {
 
     /**
      * Mark every unread notification in the org read. Authorizes
-     * `notification:write`; scoped to the ctx org. Returns how many were flipped.
+     * `notification:write`; scoped to the ctx org. Returns how many were flipped,
+     * and the instant they were stamped with: the handle its Undo gives back.
      */
-    async markAllRead(ctx: OrganizationContext): Promise<{ updated: number }> {
+    async markAllRead(
+        ctx: OrganizationContext,
+    ): Promise<{ updated: number; readAt: string }> {
         authorize(ctx, "notification:write");
+        const readAt = new Date();
         const res = await prisma.notification.updateMany({
             where: {
                 organizationId: ctx.organizationId,
                 readAt: null,
                 ...(await this.hiddenFor(ctx)),
             },
-            data: { readAt: new Date() },
+            data: { readAt },
+        });
+        return { updated: res.count, readAt: readAt.toISOString() };
+    }
+
+    /**
+     * Undo one "Mark all as read": the notices that press stamped, and only
+     * those, are unread again. `readAt` is the instant {@link markAllRead}
+     * answered with, so a notice read by opening it before or since keeps
+     * its mark. Scoped to the ctx org and to what this person sees, as the
+     * press was.
+     */
+    async undoMarkAllRead(
+        ctx: OrganizationContext,
+        readAt: string,
+    ): Promise<{ updated: number }> {
+        authorize(ctx, "notification:write");
+        const at = new Date(readAt);
+        if (Number.isNaN(at.getTime())) return { updated: 0 };
+        const res = await prisma.notification.updateMany({
+            where: {
+                organizationId: ctx.organizationId,
+                readAt: at,
+                ...(await this.hiddenFor(ctx)),
+            },
+            data: { readAt: null },
         });
         return { updated: res.count };
     }

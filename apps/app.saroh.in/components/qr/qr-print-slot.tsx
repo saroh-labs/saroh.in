@@ -13,6 +13,7 @@ import {
 } from "@/lib/qr/print";
 import type { QrCodeView } from "@/lib/qr/types";
 
+import { Notice } from "@saroh/ui/notice";
 import { QrPrintThumb } from "./qr-print-thumb";
 import type { QrStyleLock } from "./qr-style-lock";
 import { qrStyleLockOfRefusal } from "./qr-style-lock";
@@ -20,7 +21,7 @@ import { qrStyleLockOfRefusal } from "./qr-style-lock";
 const HEADING = "font-display text-[19px] font-semibold tracking-[-0.02em]";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 /** Said while the maker still shows a sample. */
 export const PRINT_NEEDS_CODE =
@@ -202,27 +203,16 @@ function PrintSection({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    disabled={busy}
-                                    aria-busy={busy || undefined}
                                     aria-describedby={nameId}
                                     onClick={() => void download(print.format)}
+                                    busy={busy}
+                                    busyLabel="Making…"
                                 >
-                                    <span aria-live="polite">
-                                        {busy
-                                            ? "Making the PDF…"
-                                            : failed
-                                              ? "Try again"
-                                              : "Download PDF"}
-                                    </span>
+                                    {failed ? "Try again" : "Download PDF"}
                                 </Button>
                             ) : null}
                             {failed ? (
-                                <p
-                                    role="alert"
-                                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                                >
-                                    {failed}
-                                </p>
+                                <Notice tone="error">{failed}</Notice>
                             ) : null}
                         </li>
                     );
@@ -230,13 +220,9 @@ function PrintSection({
             </ul>
 
             {initialsNote && state === "ready" ? (
-                <p
-                    role="status"
-                    data-qr-print-initials=""
-                    className="rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
+                <Notice role="status" data-qr-print-initials="">
                     {initialsNote}
-                </p>
+                </Notice>
             ) : null}
         </section>
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
@@ -29,6 +30,7 @@ import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 import type { ModuleStates } from "@/lib/sites/template-picker";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { TemplatePicker } from "./template-picker";
 
 /**
@@ -121,7 +123,6 @@ export function CreateSiteForm({
     const [suggestion, setSuggestion] = useState<string | null>(null);
     const { isSubmitting, isDirty } = form.formState;
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("site") });
-    const name = form.watch("name");
     const address = form.watch("subdomain");
 
     async function onSubmit(values: FormValues) {
@@ -157,6 +158,7 @@ export function CreateSiteForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid min-w-0 max-w-2xl gap-5"
             >
@@ -270,9 +272,10 @@ export function CreateSiteForm({
                 <Button
                     type="submit"
                     className="wk-press w-fit"
-                    disabled={isSubmitting || !name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create site"}
+                    Create site
                 </Button>
             </form>
             {guard.dialog}
@@ -335,12 +338,11 @@ export function UseSuggestedAddress({
 }) {
     if (!suggestion || suggestion === current) return null;
     return (
-        <button
-            type="button"
+        <TextLink
             onClick={() => onUse(suggestion)}
-            className="w-fit cursor-pointer rounded-sm text-left text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+            className="w-fit text-left text-xs coarse:min-h-11"
         >
             Use {suggestion}.saroh.app
-        </button>
+        </TextLink>
     );
 }

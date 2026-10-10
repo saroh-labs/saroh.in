@@ -12,10 +12,9 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check, ListFilter, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ListSearch } from "@saroh/ui/list-search";
+import { Check, ListFilter } from "lucide-react";
 
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import type { FilterChoices } from "@/lib/products/filter-choices";
@@ -23,7 +22,7 @@ import type { ListQuery } from "@/lib/products/list-query";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
-    PUBLISHED: "Published",
+    PUBLISHED: "Live",
     DRAFT: "Draft",
     ARCHIVED: "Archived",
 };
@@ -40,58 +39,27 @@ export function CatalogueToolbar({
     go,
     storefronts,
     choices,
+    searching = false,
 }: {
+    /** The list is being read again. */
+    searching?: boolean;
     query: ListQuery;
     /** Replace the address with `patch` applied. */
     go: (patch: Partial<ListQuery>) => void;
     storefronts: CataloguePage["storefronts"];
     choices: FilterChoices;
 }) {
-    const [text, setText] = useState(query.q);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const field = useRef<HTMLInputElement | null>(null);
-    // The address changed elsewhere (a Clear search, the back button): say
-    // so — but never over what someone is still typing.
-    useEffect(() => {
-        if (document.activeElement !== field.current) setText(query.q);
-    }, [query.q]);
-    useEffect(
-        () => () => {
-            if (timer.current) clearTimeout(timer.current);
-        },
-        [],
-    );
-
-    function search(next: string) {
-        setText(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => go({ q: next.trim() }), 300);
-    }
-
     const many = storefronts.byStorefront.length > 1;
     return (
         <>
-            <div className="relative min-w-[200px] max-w-[320px] flex-1">
-                <Search
-                    aria-hidden
-                    className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                    ref={field}
-                    type="search"
-                    value={text}
-                    onChange={(e) => search(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape" && text) {
-                            e.preventDefault();
-                            search("");
-                        }
-                    }}
-                    placeholder="Search products"
-                    aria-label="Search products"
-                    className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
-                />
-            </div>
+            <ListSearch
+                placeholder="Search products"
+                defaultValue={query.q}
+                searching={searching}
+                onSearch={(q) => {
+                    if (q !== query.q) go({ q });
+                }}
+            />
             {many ? (
                 <StorefrontFilter
                     stores={storefronts.byStorefront}
@@ -147,7 +115,7 @@ function FilterMenu({
                 <Button
                     variant="outline"
                     className={cn(
-                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
+                        "gap-[7px] font-medium text-neutral-600 dark:text-foreground",
                         on > 0 && "border-foreground",
                     )}
                     aria-label={
@@ -161,9 +129,7 @@ function FilterMenu({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Status
-                </DropdownMenuLabel>
+                <DropdownMenuLabel className="label">Status</DropdownMenuLabel>
                 {statuses.map((s) => (
                     <DropdownMenuItem
                         key={s ?? "any"}

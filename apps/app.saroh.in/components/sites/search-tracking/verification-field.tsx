@@ -7,7 +7,7 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     NOTE,
     PROBLEM,
@@ -19,6 +19,8 @@ import {
     verificationSavedLine,
 } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
+import { TextLink } from "@saroh/ui/text-link";
 import type { SaveSection } from "./parts";
 import { LineRow } from "./parts";
 
@@ -59,7 +61,10 @@ export function VerificationField({
 
     function submit(code: string | null) {
         startTransition(async () => {
-            const res = await save({ verifications: { [service]: code } });
+            const res = await runAction(() =>
+                save({ verifications: { [service]: code } }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === `verifications.${service}`) {
                     setServerError(res.error);
@@ -106,14 +111,9 @@ export function VerificationField({
                     <span className="mt-1 block" role="status">
                         {verificationSavedLine(service)}{" "}
                         {liveUrl ? (
-                            <a
-                                href={liveUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline underline-offset-2 hover:text-muted-foreground active:text-foreground"
-                            >
+                            <TextLink href={liveUrl} external>
                                 View your live page
-                            </a>
+                            </TextLink>
                         ) : null}
                     </span>
                 ) : null}
@@ -170,7 +170,7 @@ function VerificationSheet({
     const empty = draft.trim() === "";
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={editId}
             title={words.label}
             description={words.where.replace(
@@ -202,7 +202,7 @@ function VerificationSheet({
                 placeholder="Paste the tag or the code"
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-said`}
-                className="font-mono text-sm"
+                className="font-mono"
             />
             <div id={`${id}-said`} aria-live="polite">
                 {problem ? (
@@ -221,6 +221,6 @@ function VerificationSheet({
                     </p>
                 )}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

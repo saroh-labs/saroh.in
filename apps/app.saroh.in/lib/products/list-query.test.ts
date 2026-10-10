@@ -44,7 +44,7 @@ describe("the Products list's address (#519)", () => {
         const query = readListQuery({});
         expect(listHref(query)).toBe("/commerce/products");
         expect(listHref(query, { view: "collections", q: "rye" })).toBe(
-            "/commerce/products?view=collections&q=rye",
+            "/commerce/products?tab=collections&q=rye",
         );
     });
 
@@ -87,11 +87,11 @@ describe("the Products list's address (#519)", () => {
 
     it("links New collection to the Collections chip with the sheet open", () => {
         expect(newCollectionHref(readListQuery({}))).toBe(
-            "/commerce/products?view=collections&new=collection",
+            "/commerce/products?tab=collections&new=collection",
         );
         expect(
             newCollectionHref(readListQuery({ q: "rye", collection: "c1" })),
-        ).toBe("/commerce/products?view=collections&q=rye&new=collection");
+        ).toBe("/commerce/products?tab=collections&q=rye&new=collection");
     });
 
     it("asks the API only for what narrows", () => {

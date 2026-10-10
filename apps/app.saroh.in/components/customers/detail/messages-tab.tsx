@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/customer-workspace/thread";
 import { dayText } from "@/lib/subscriptions/view";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { Empty } from "./parts";
 
 /**
@@ -73,7 +75,7 @@ export function MessagesTab({
         setBusy(true);
         const res = await replyAction(contactId, text).catch(() => ({
             ok: false as const,
-            error: "The connection dropped. Your reply wasn't sent.",
+            error: UNREACHED,
         }));
         setBusy(false);
         if (!res.ok) return showError(res.error);
@@ -142,7 +144,7 @@ export function MessagesTab({
                     <label htmlFor={`${id}-reply`} className="sr-only">
                         Reply to {firstName}
                     </label>
-                    <textarea
+                    <Textarea
                         id={`${id}-reply`}
                         rows={2}
                         value={draft}
@@ -155,7 +157,7 @@ export function MessagesTab({
                         }}
                         aria-describedby={`${id}-note`}
                         placeholder={`Reply to ${firstName}…`}
-                        className="block w-full resize-y rounded-[8px] border border-border bg-card px-2.5 py-2 text-[13px] leading-[1.5] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="w-full resize-y"
                     />
                     <div className="mt-2 flex items-center gap-2">
                         <span
@@ -175,9 +177,10 @@ export function MessagesTab({
                             size="sm"
                             disabled={off}
                             onClick={() => void reply()}
-                            className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                            busy={busy}
+                            busyLabel="Sending…"
                         >
-                            {busy ? "Sending…" : "Send reply"}
+                            Send reply
                         </Button>
                     </div>
                 </div>

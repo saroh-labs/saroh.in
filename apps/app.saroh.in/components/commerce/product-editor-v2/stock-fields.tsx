@@ -1,13 +1,14 @@
 "use client";
 
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount } from "@/lib/products/editor-sections";
 
-import { boxClass, FieldHelp } from "./fields";
+import { Notice } from "@saroh/ui/notice";
+import { FieldHelp } from "./fields";
 
 /**
  * The Stock section's two ways of counting, after the Editor design: one
@@ -45,7 +46,9 @@ export function WholeStock({
                     >
                         On hand
                     </label>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={!isCount(draft.quantity) || qtyBad}
                         id="pe-qty"
                         type="number"
                         min={0}
@@ -54,10 +57,6 @@ export function WholeStock({
                         disabled={ro}
                         aria-label="Quantity on hand"
                         onChange={(e) => onChange({ quantity: e.target.value })}
-                        className={boxClass({
-                            small: true,
-                            bad: !isCount(draft.quantity) || qtyBad,
-                        })}
                     />
                 </div>
                 <div className="min-w-[92px] flex-[0_1_112px]">
@@ -67,7 +66,9 @@ export function WholeStock({
                     >
                         Warn at
                     </label>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={!isCount(draft.lowStockAlert)}
                         id="pe-low"
                         type="number"
                         min={0}
@@ -78,10 +79,6 @@ export function WholeStock({
                             onChange({ lowStockAlert: e.target.value })
                         }
                         aria-label="Warn when on hand reaches"
-                        className={boxClass({
-                            small: true,
-                            bad: !isCount(draft.lowStockAlert),
-                        })}
                     />
                 </div>
                 <div className="min-w-0 flex-[1_1_96px]">
@@ -133,10 +130,7 @@ export function VariantStockTable({
     return (
         <>
             <div
-                className={cn(
-                    GRID,
-                    "pb-[5px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
-                )}
+                className={cn(GRID, "label pb-[5px] text-muted-foreground/80")}
             >
                 <span>Variant</span>
                 <span>On hand</span>
@@ -150,14 +144,19 @@ export function VariantStockTable({
                             {low.includes(l) ? (
                                 <span
                                     aria-hidden
-                                    className="size-[7px] shrink-0 rounded-full bg-highlight"
+                                    className="size-[7px] shrink-0 rounded-full bg-foreground"
                                 />
                             ) : null}
                             <span className="truncate text-[12.5px] font-medium">
                                 {l.title}
                             </span>
                         </span>
-                        <input
+                        <Input
+                            dense
+                            aria-invalid={
+                                !isCount(l.quantity) ||
+                                Number(l.quantity) < l.promised
+                            }
                             type="number"
                             min={0}
                             inputMode="numeric"
@@ -169,14 +168,10 @@ export function VariantStockTable({
                                     quantity: e.target.value,
                                 })
                             }
-                            className={boxClass({
-                                small: true,
-                                bad:
-                                    !isCount(l.quantity) ||
-                                    Number(l.quantity) < l.promised,
-                            })}
                         />
-                        <input
+                        <Input
+                            dense
+                            aria-invalid={!isCount(l.lowStockAlert)}
                             type="number"
                             min={0}
                             inputMode="numeric"
@@ -188,10 +183,6 @@ export function VariantStockTable({
                                     lowStockAlert: e.target.value,
                                 })
                             }
-                            className={boxClass({
-                                small: true,
-                                bad: !isCount(l.lowStockAlert),
-                            })}
                         />
                         <span className="text-right font-display text-[14px] font-semibold tabular-nums">
                             {l.promised}
@@ -223,18 +214,8 @@ export function VariantStockTable({
 /** At or under the warning level: said by name, in the warning's colours. */
 export function LowNote({ children }: { children: ReactNode }) {
     return (
-        <div
-            role="status"
-            className="mt-2.5 flex items-start gap-[9px] rounded-[9px] bg-brand-subtle px-3 py-2.5"
-        >
-            <TriangleAlert
-                aria-hidden
-                className="mt-px size-[15px] shrink-0 text-brand"
-                strokeWidth={1.9}
-            />
-            <span className="text-pretty text-[12px] leading-[1.5] text-brand-subtle-foreground">
-                {children}
-            </span>
-        </div>
+        <Notice tone="warning" className="mt-2.5">
+            {children}
+        </Notice>
     );
 }

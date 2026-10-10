@@ -1,10 +1,12 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
@@ -20,8 +22,8 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { chipClass } from "@/components/shared/chip";
 import { ContactPicker } from "@/components/shared/contact-picker";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     lostChanges,
     lostNew,
@@ -45,6 +47,8 @@ import {
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { copyText } from "@saroh/ui/copy-button";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -120,15 +124,6 @@ function dueFrom(days: number): string {
         59,
         59,
     ).toISOString();
-}
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 /**
@@ -358,7 +353,7 @@ export function InvoiceForm({
                     `${number} issued, but no pay link was made: ${link.error}`,
                 );
             }
-        } else if (await copy(link.data.url)) {
+        } else if (await copyText(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
             );
@@ -417,19 +412,12 @@ export function InvoiceForm({
         );
     }
 
-    const chip = (on: boolean) =>
-        cn(
-            "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
-            on
-                ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
-        );
-
     return (
         <>
             {details.step}
             {guard.dialog}
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(
                     (values) => onSubmit(values, "draft"),
                     onInvalid,
@@ -485,7 +473,7 @@ export function InvoiceForm({
                                             maxLength={15}
                                             autoCapitalize="characters"
                                             placeholder="29AAGFL5531Q1ZO"
-                                            className="h-9 font-mono text-[13px] uppercase"
+                                            className="font-mono uppercase"
                                             aria-invalid={Boolean(
                                                 errors.billToGstin,
                                             )}
@@ -539,20 +527,21 @@ export function InvoiceForm({
                                             id={ids.address}
                                             rows={2}
                                             maxLength={500}
-                                            className="text-[13px]"
                                             disabled={isSubmitting}
                                             {...form.register("billToAddress")}
                                         />
                                     </div>
                                 </div>
                             ) : (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                    className="mt-2 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     + Their GSTIN, state and address
-                                </button>
+                                </Button>
                             )
                         ) : null}
                     </Card>
@@ -587,7 +576,7 @@ export function InvoiceForm({
                                             <Input
                                                 aria-label={`Line ${i + 1}: what it's for`}
                                                 placeholder="What it's for"
-                                                className="col-span-2 h-9 rounded-[8px] text-[13px] sm:col-span-1"
+                                                className="col-span-2 sm:col-span-1"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
                                                     lineErr?.description,
@@ -613,7 +602,7 @@ export function InvoiceForm({
                                                     id={`${ids.lines}-${i}-qty`}
                                                     aria-label={`Line ${i + 1}: quantity`}
                                                     inputMode="numeric"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    className="tabular-nums"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.quantity,
@@ -633,18 +622,25 @@ export function InvoiceForm({
                                                 >
                                                     Price each
                                                 </Label>
-                                                <Input
-                                                    id={`${ids.lines}-${i}-price`}
-                                                    aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                    inputMode="decimal"
-                                                    placeholder="₹ each"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        lineErr?.unitPrice,
-                                                    )}
-                                                    {...form.register(
-                                                        `lines.${i}.unitPrice`,
+                                                <Controller
+                                                    control={form.control}
+                                                    name={`lines.${i}.unitPrice`}
+                                                    render={({ field }) => (
+                                                        <MoneyInput
+                                                            {...field}
+                                                            id={`${ids.lines}-${i}-price`}
+                                                            aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                            currency={currency}
+                                                            onValueChange={
+                                                                field.onChange
+                                                            }
+                                                            disabled={
+                                                                isSubmitting
+                                                            }
+                                                            aria-invalid={Boolean(
+                                                                lineErr?.unitPrice,
+                                                            )}
+                                                        />
                                                     )}
                                                 />
                                             </div>
@@ -681,10 +677,11 @@ export function InvoiceForm({
                                                     )}
                                                 />
                                                 <Input
+                                                    dense
                                                     aria-label={`Line ${i + 1}: HSN or SAC`}
                                                     placeholder="HSN / SAC"
                                                     inputMode="numeric"
-                                                    className="h-8 rounded-[8px] font-mono text-[12px]"
+                                                    className="font-mono"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.hsnSac,
@@ -708,7 +705,9 @@ export function InvoiceForm({
                                 );
                             })}
                         </ul>
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             disabled={isSubmitting}
                             onClick={() =>
@@ -720,10 +719,10 @@ export function InvoiceForm({
                                     hsnSac: "",
                                 })
                             }
-                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                            className="mt-1 py-1.5 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                         >
                             + Add a line
-                        </button>
+                        </Button>
                         {registered ? (
                             <p className="mt-1 text-[12px] text-muted-foreground">
                                 Prices include GST. A line with no rate set is
@@ -744,7 +743,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === "kept"}
                                     onClick={() => form.setValue("due", "kept")}
-                                    className={chip(due === "kept")}
+                                    className={chipClass(due === "kept")}
                                 >
                                     <ViewerDate
                                         iso={draft.dueAt}
@@ -759,7 +758,7 @@ export function InvoiceForm({
                                     role="radio"
                                     aria-checked={due === d.days}
                                     onClick={() => form.setValue("due", d.days)}
-                                    className={chip(due === d.days)}
+                                    className={chipClass(due === d.days)}
                                 >
                                     {d.label}
                                 </button>
@@ -769,9 +768,7 @@ export function InvoiceForm({
                 </div>
 
                 <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Total
-                    </h2>
+                    <h2 className="label">Total</h2>
                     <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
                         {show(total)}
                     </p>
@@ -800,25 +797,19 @@ export function InvoiceForm({
                                     onInvalid,
                                 )()
                             }
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            busy={isSubmitting && intent === "issue"}
+                            busyLabel="Issuing…"
                         >
-                            {isSubmitting && intent === "issue"
-                                ? "Issuing…"
-                                : withLink
-                                  ? "Issue with pay link"
-                                  : "Issue it"}
+                            {withLink ? "Issue with pay link" : "Issue it"}
                         </Button>
                         <Button
                             type="submit"
                             variant="outline"
                             disabled={isSubmitting || noLine}
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            busy={isSubmitting && intent === "draft"}
+                            busyLabel="Saving…"
                         >
-                            {isSubmitting && intent === "draft"
-                                ? "Saving…"
-                                : draft
-                                  ? "Save the draft"
-                                  : "Save as draft"}
+                            {draft ? "Save the draft" : "Save as draft"}
                         </Button>
                     </div>
                     {noLine && typed ? (
@@ -836,9 +827,7 @@ export function InvoiceForm({
 function Card({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );
@@ -893,7 +882,7 @@ function NewContact({
                     type="button"
                     variant={solid ? "default" : "link"}
                     size="sm"
-                    className={solid ? undefined : "h-auto px-0 text-[12.5px]"}
+                    className={solid ? undefined : "h-auto px-0"}
                 >
                     New contact
                 </Button>

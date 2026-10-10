@@ -25,6 +25,39 @@ const actions = vi.hoisted(() => ({
     setMembersCanPause: vi.fn(),
     setPlanArchived: vi.fn(),
 }));
+vi.mock("@saroh/ui/option-select", () => ({
+    OptionSelect: ({
+        id,
+        value,
+        onValueChange,
+        options,
+        disabled,
+        readOnly,
+        ...aria
+    }: {
+        id?: string;
+        value: string;
+        onValueChange: (v: string) => void;
+        options: { value: string; label: string }[];
+        disabled?: boolean;
+        readOnly?: boolean;
+        "aria-label"?: string;
+    }) => (
+        <select
+            id={id}
+            aria-label={aria["aria-label"]}
+            value={value}
+            disabled={Boolean(disabled) || Boolean(readOnly)}
+            onChange={(e) => onValueChange(e.target.value)}
+        >
+            {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                    {o.label}
+                </option>
+            ))}
+        </select>
+    ),
+}));
 vi.mock("@/lib/subscriptions/actions", () => actions);
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),

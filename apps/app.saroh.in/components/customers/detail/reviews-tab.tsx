@@ -1,10 +1,9 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import {
     REPLY_MAX,
@@ -15,12 +14,9 @@ import { stars } from "@/lib/product-reviews/describe";
 import type { Review } from "@/lib/product-reviews/service";
 import { productHref } from "@/lib/products/links";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { Empty } from "./parts";
-
-/** A text action under a review: pointer, hover, focus and pressed. */
-const TEXT_ACTION =
-    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
-
 /**
  * Customer Detail's Reviews tab (C6, after "Saroh Customer Detail"): what
  * this person said about what they bought, newest first — from every store
@@ -69,21 +65,21 @@ export function ReviewsTab({
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
-                                    className="tracking-[1px] text-highlight"
+                                    className="tracking-[1px] text-foreground"
                                 >
                                     {stars(r.rating)}
                                 </span>
                                 {r.productId ? (
-                                    <Link
+                                    <TextLink
                                         href={productHref(
                                             r.storeId,
                                             r.productId,
                                             "reviews",
                                         )}
-                                        className="cursor-pointer rounded-sm text-[13px] font-semibold text-brand underline-offset-2 transition-colors duration-fast hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
+                                        className="text-[13px]"
                                     >
                                         {r.productName}
-                                    </Link>
+                                    </TextLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {r.productName}
@@ -107,9 +103,9 @@ export function ReviewsTab({
                                 </p>
                             )}
                             {hidden ? (
-                                <span className="mt-1.5 inline-block rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
+                                <StatusBadge tone="neutral" className="mt-1.5">
                                     Hidden from the shop
-                                </span>
+                                </StatusBadge>
                             ) : null}
                             {r.reply ? (
                                 <p className="mt-2 rounded-lg bg-muted/60 px-[11px] py-2 text-[13px] leading-[1.5] text-foreground/75">
@@ -122,6 +118,7 @@ export function ReviewsTab({
 
                             {canReply && replying ? (
                                 <form
+                                    onKeyDown={submitOnModEnter}
                                     className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -139,22 +136,24 @@ export function ReviewsTab({
                                         placeholder="Shown under the review, on the shop"
                                         disabled={pending}
                                         autoFocus
-                                        className="min-h-0 rounded-lg px-2.5 py-2 text-[13px] leading-[1.5]"
+                                        className="min-h-0 px-2.5 py-2 leading-[1.5]"
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
+                                            size="sm"
                                             type="submit"
-                                            disabled={pending || !draft.trim()}
-                                            className="h-[30px] rounded-lg px-3 text-[12px] font-semibold"
+                                            disabled={!draft.trim()}
+                                            busy={pending}
+                                            busyLabel="Posting…"
                                         >
                                             Post reply
                                         </Button>
                                         <Button
+                                            size="sm"
                                             type="button"
                                             variant="outline"
                                             onClick={cancelReply}
                                             disabled={pending}
-                                            className="h-[30px] rounded-lg px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
@@ -169,33 +168,30 @@ export function ReviewsTab({
                             {canReply ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply || replying ? null : (
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className={cn(
-                                                TEXT_ACTION,
-                                                "font-semibold text-brand",
-                                            )}
                                         >
                                             Reply
-                                        </button>
+                                        </Button>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="link"
+                                        size="inline"
                                         type="button"
                                         onClick={() =>
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className={cn(
-                                            TEXT_ACTION,
-                                            "text-muted-foreground",
-                                        )}
+                                        className="text-muted-foreground"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : null}
                         </Card>

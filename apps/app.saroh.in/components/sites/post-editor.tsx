@@ -1,6 +1,7 @@
 "use client";
 
 import { EditorLoading } from "@/components/sites/editor-loading";
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -15,11 +16,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { accountSettingsUrl } from "@/lib/accounts";
+import { runAction } from "@/lib/api/run-action";
 import { pausedWords } from "@/lib/billing/paused";
 import {
     createPost,
@@ -30,6 +32,7 @@ import {
 } from "@/lib/content/actions";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
    used: the editor is heavy, and it is created in the browser. */
@@ -157,13 +160,19 @@ export function PostEditor({
                 // What is being sent, so edits made WHILE it is in flight are
                 // not marked saved when it returns.
                 const sent = JSON.stringify(body);
-                const res = postId
-                    ? await updatePost(siteId, postId, {
-                          ...body,
-                          slug: v.slug.trim() || slugFrom(v.title),
-                      })
-                    : await createPost(siteId, body);
-                setSaving(false);
+                const res = await runAction(
+                    () =>
+                        postId
+                            ? updatePost(siteId, postId, {
+                                  ...body,
+                                  slug: v.slug.trim() || slugFrom(v.title),
+                              })
+                            : createPost(siteId, body),
+                    // An autosave that didn't get there says nothing: the
+                    // next one, or Save, tries again.
+                    { setBusy: setSaving, quiet: opts.silent },
+                );
+                if (!res) return null;
                 if (!res.ok) {
                     showError(res.error);
                     return null;
@@ -231,6 +240,8 @@ export function PostEditor({
     // For the case the timer has not yet fired. A way out saves what is
     // waiting first and asks only when that save can't go; closing the
     // tab gets the browser's own warning.
+    // Cmd/Ctrl+S: Save draft, said aloud if it can't (no title yet).
+    useSaveShortcut(() => void save(), !paused);
     const guard = useLeaveGuard({
         dirty,
         lost: title.trim()
@@ -250,13 +261,18 @@ export function PostEditor({
         setPublishing(true);
         // Publish what is on screen, not what was last saved — the merchant
         // pressed publish looking at this.
-        const id = dirty || !postId ? await save({ silent: true }) : postId;
+        const id =
+            dirty || !postId
+                ? await runAction(() => save({ silent: true }))
+                : postId;
         if (!id) {
             setPublishing(false);
             return;
         }
-        const res = await publishPost(siteId, id);
-        setPublishing(false);
+        const res = await runAction(() => publishPost(siteId, id), {
+            setBusy: setPublishing,
+        });
+        if (!res) return;
         if (!res.ok) {
             // At the plan's blog-posts limit (U13): its notice, not a toast.
             if (res.plan) showPlanRefusal(res.plan);
@@ -271,9 +287,10 @@ export function PostEditor({
 
     async function onUnpublish() {
         if (!postId) return;
-        setPublishing(true);
-        const res = await unpublishPost(siteId, postId);
-        setPublishing(false);
+        const res = await runAction(() => unpublishPost(siteId, postId), {
+            setBusy: setPublishing,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -284,13 +301,10 @@ export function PostEditor({
         refreshServer();
     }
 
-    async function onDelete() {
+    async function onDelete(): Promise<ConfirmResult> {
         if (!postId) return;
         const res = await deletePost(siteId, postId);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Post deleted.");
         router.push(`/sites/${siteId}/posts`);
     }
@@ -298,7 +312,7 @@ export function PostEditor({
     return (
         <div className="flex min-h-[calc(100dvh-var(--app-header-h,3.5rem))] flex-col">
             <header className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2">
-                <Button variant="ghost" size="sm" asChild className="-ml-2 h-7">
+                <Button variant="ghost" size="xs" asChild className="-ml-2">
                     <Link href={`/sites/${siteId}/posts`}>← Posts</Link>
                 </Button>
 
@@ -333,8 +347,7 @@ export function PostEditor({
                 <div className="ml-auto flex items-center gap-2">
                     <Button
                         variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
+                        size="xs"
                         onClick={() => setDetailsOpen((v) => !v)}
                         aria-expanded={detailsOpen}
                     >
@@ -342,9 +355,10 @@ export function PostEditor({
                     </Button>
                     <Button
                         variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={paused || saving || !dirty}
+                        size="xs"
+                        disabled={paused || !dirty}
+                        busy={saving}
+                        busyLabel="Saving…"
                         onClick={() => void save()}
                     >
                         Save draft
@@ -352,8 +366,7 @@ export function PostEditor({
                     {live ? (
                         <Button
                             variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
+                            size="xs"
                             disabled={publishing}
                             onClick={() => void onUnpublish()}
                         >
@@ -361,17 +374,14 @@ export function PostEditor({
                         </Button>
                     ) : null}
                     <Button
-                        size="sm"
+                        size="xs"
                         variant="brand"
-                        className="h-7 text-xs"
-                        disabled={paused || publishing || !title.trim()}
+                        disabled={paused || !title.trim()}
                         onClick={() => void onPublish()}
+                        busy={publishing}
+                        busyLabel="Publishing…"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : live
-                              ? "Publish changes"
-                              : "Publish"}
+                        {live ? "Publish changes" : "Publish"}
                     </Button>
                 </div>
             </header>
@@ -415,8 +425,8 @@ export function PostEditor({
                             <h2 className="text-sm font-semibold">Details</h2>
                             <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-6 px-1.5 text-xs"
+                                size="xs"
+                                className="px-1.5"
                                 onClick={() => setDetailsOpen(false)}
                             >
                                 Close
@@ -526,9 +536,9 @@ export function PostEditor({
                                 </p>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
+                                    size="xs"
                                     className={cn(
-                                        "mt-2 h-7 px-1.5 text-xs",
+                                        "mt-2 px-1.5",
                                         "text-destructive hover:text-destructive",
                                     )}
                                     onClick={() => setConfirmDelete(true)}
@@ -541,11 +551,12 @@ export function PostEditor({
                                     title="Delete this post?"
                                     description={
                                         liveAt
-                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. This cannot be undone — to take it down and keep it, use Take off the site instead."
-                                            : "It has never been published, so nobody outside your team has seen it. It cannot be brought back."
+                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. To take it down and keep it, use Take off the site instead. This cannot be undone."
+                                            : "It has never been published, so nobody outside your team has seen it. This cannot be undone."
                                     }
                                     confirmLabel="Delete post"
-                                    onConfirm={() => void onDelete()}
+                                    keepLabel="Keep post"
+                                    onConfirm={onDelete}
                                 />
                             </div>
                         ) : null}
@@ -568,9 +579,7 @@ function Field({
 }) {
     return (
         <div className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                {label}
-            </span>
+            <span className="label">{label}</span>
             {children}
             {hint ? (
                 <p className="text-xs text-muted-foreground">{hint}</p>

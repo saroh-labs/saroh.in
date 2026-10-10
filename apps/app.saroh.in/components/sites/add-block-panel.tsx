@@ -110,9 +110,7 @@ function Group({
 }) {
     return (
         <section aria-label={label} className="space-y-1.5">
-            <h3 className="px-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                {label}
-            </h3>
+            <h3 className="label px-2">{label}</h3>
             <ul className="space-y-1.5">{children}</ul>
         </section>
     );
@@ -142,7 +140,7 @@ function Entry({
                 disabled={disabled}
                 aria-label={disabled ? `${label} — ${hint}` : `Add ${label}`}
                 className={cn(
-                    "flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     disabled
                         ? "cursor-not-allowed text-muted-foreground"
                         : "hover:border-foreground/30 hover:bg-muted",

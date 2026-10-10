@@ -2,9 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@saroh/ui/date-picker";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -24,8 +24,10 @@ import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp, FieldLabel } from "./fields";
+import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: MadeByValues = {
@@ -181,15 +183,12 @@ export function MadeBySection({
                             >
                                 Maker or supplier
                             </FieldLabel>
-                            <input
+                            <Input
                                 id="pe-maker"
                                 {...form.register("maker")}
                                 disabled={ro}
                                 placeholder="Vetiver Labs"
                                 aria-invalid={makerMissing || !!errors.maker}
-                                className={boxClass({
-                                    bad: makerMissing || !!errors.maker,
-                                })}
                             />
                         </div>
                         <div className="min-w-0 flex-[1_1_150px]">
@@ -199,12 +198,11 @@ export function MadeBySection({
                             >
                                 Made in
                             </FieldLabel>
-                            <input
+                            <Input
                                 id="pe-made-in"
                                 {...form.register("madeIn")}
                                 disabled={ro}
                                 placeholder="Pune, India"
-                                className={boxClass()}
                             />
                         </div>
                     </div>
@@ -218,19 +216,22 @@ export function MadeBySection({
                         <FieldLabel
                             htmlFor="pe-supplier-code"
                             aside={
-                                <span className="shrink-0 rounded-full bg-muted px-[7px] py-px text-[11px] font-semibold text-muted-foreground">
+                                <StatusBadge
+                                    tone="neutral"
+                                    className="shrink-0"
+                                >
                                     Team only
-                                </span>
+                                </StatusBadge>
                             }
                         >
                             Supplier&apos;s product code
                         </FieldLabel>
-                        <input
+                        <Input
                             id="pe-supplier-code"
                             {...form.register("supplierCode")}
                             disabled={ro}
                             placeholder="For reordering"
-                            className={boxClass({ mono: true })}
+                            className="font-mono"
                         />
                     </div>
                     <div className="h-4" />
@@ -243,12 +244,11 @@ export function MadeBySection({
             >
                 Warranty
             </FieldLabel>
-            <input
+            <Input
                 id="pe-warranty"
                 {...form.register("warranty")}
                 disabled={ro}
                 placeholder="None"
-                className={boxClass()}
             />
             <FieldHelp className="mb-4 mt-1.5">
                 How long, and what it covers — one line. Leave it empty if there
@@ -304,18 +304,13 @@ export function MadeBySection({
             </div>
             {v.returnsMode === "OWN" ? (
                 <>
-                    <input
+                    <Input
                         {...form.register("returnsText")}
                         disabled={ro}
                         aria-label="This product's returns rule"
                         placeholder="Exchange within 7 days, tags on"
                         aria-invalid={ownMissing || !!errors.returnsText}
-                        className={cn(
-                            boxClass({
-                                bad: ownMissing || !!errors.returnsText,
-                            }),
-                            "mt-2",
-                        )}
+                        className="mt-2"
                     />
                     {ownMissing || errors.returnsText ? (
                         <FieldHelp className="mt-1.5" tone="bad">
@@ -396,12 +391,9 @@ function MoreAboutIt({
                 <span className="text-[11.5px] text-muted-foreground">
                     Asked of everything in {categoryName}.
                 </span>
-                <Link
-                    href={manageHref}
-                    className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
+                <TextLink href={manageHref} className="ml-auto text-[12px]">
                     Manage fields
-                </Link>
+                </TextLink>
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
                 {fields.map((f) => {
@@ -413,16 +405,11 @@ function MoreAboutIt({
                             <FieldLabel
                                 htmlFor={f.type === "YES_NO" ? undefined : id}
                                 aside={
-                                    <span
-                                        className={cn(
-                                            "shrink-0 rounded-full px-[7px] py-px text-[11px] font-semibold",
-                                            f.onShop
-                                                ? "bg-success-subtle text-success-subtle-foreground"
-                                                : "bg-muted text-muted-foreground",
-                                        )}
+                                    <StatusBadge
+                                        tone={f.onShop ? "success" : "neutral"}
                                     >
                                         {f.onShop ? "On the shop" : "Team only"}
-                                    </span>
+                                    </StatusBadge>
                                 }
                             >
                                 {f.name}
@@ -457,7 +444,7 @@ function MoreAboutIt({
                                     ]}
                                 />
                             ) : (
-                                <input
+                                <Input
                                     id={id}
                                     value={value}
                                     disabled={disabled}
@@ -470,7 +457,6 @@ function MoreAboutIt({
                                         onChange(f.id, e.target.value)
                                     }
                                     aria-invalid={!!problem}
-                                    className={boxClass({ bad: !!problem })}
                                 />
                             )}
                             {problem ? (

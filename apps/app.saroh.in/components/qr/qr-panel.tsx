@@ -15,11 +15,13 @@ import { instantOpens, NOT_COUNTED, QR_SHARE_HREF } from "@/lib/qr/panel";
 import type { QrCodeView } from "@/lib/qr/types";
 import { linkWords, opensWords, refusalWords } from "@/lib/qr/words";
 
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 const NOTE = "text-[13px] leading-normal text-foreground/80";
 
@@ -242,23 +244,15 @@ function Saved({
                     without reprinting.
                 </p>
                 {notLive}
-                {problem ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        {problem}
-                    </p>
-                ) : null}
+                {problem ? <Notice tone="error">{problem}</Notice> : null}
                 <div>
                     <Button
                         type="button"
-                        disabled={making}
                         onClick={() => void make(read)}
+                        busy={making}
+                        busyLabel="Making…"
                     >
-                        <span aria-live="polite">
-                            {making ? "Making the code…" : "Make this code"}
-                        </span>
+                        Make this code
                     </Button>
                 </div>
             </div>
@@ -346,16 +340,12 @@ function Drawn({
     }
 
     async function copy() {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                text,
-            );
+        if (!(await copyText(text))) {
+            showError(copyFailedMessage(), text);
+            return;
         }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
     }
 
     return (

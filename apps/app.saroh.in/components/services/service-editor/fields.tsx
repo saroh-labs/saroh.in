@@ -8,8 +8,8 @@ import { useId } from "react";
  * its title, a label over a field, and the grey note under one.
  */
 
-export const LABEL = "block text-[13px] font-medium";
-export const FIELD = "mt-[5px] h-[38px] rounded-[8px] text-[14px] font-normal";
+export const LABEL = "block";
+export const FIELD = "mt-[5px] font-normal";
 export const HELP =
     "mt-1.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground";
 

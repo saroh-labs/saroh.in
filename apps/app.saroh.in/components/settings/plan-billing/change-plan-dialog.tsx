@@ -17,7 +17,6 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatShortDate } from "@/lib/format/datetime";
 import { GST_STATES } from "@/lib/invoices/gst";
@@ -28,7 +27,9 @@ import {
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
 import { quoteSummary } from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { runAction } from "@/lib/api/run-action";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /** The plan picked: which, on which cycle, and what the row's button said. */
@@ -149,13 +150,16 @@ export function ChangePlanDialog({
             return;
         }
         start(async () => {
-            const res = await changePlanAction({
-                plan: picked.planId,
-                cycle: picked.cycle,
-                coupon: code || undefined,
-                billingState: billingState || undefined,
-                gstin: g || undefined,
-            });
+            const res = await runAction(() =>
+                changePlanAction({
+                    plan: picked.planId,
+                    cycle: picked.cycle,
+                    coupon: code || undefined,
+                    billingState: billingState || undefined,
+                    gstin: g || undefined,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === "gstin") setGstinError(res.error);
                 else if (res.field === "coupon" && code) {
@@ -227,9 +231,9 @@ export function ChangePlanDialog({
                     }
                 }}
             >
-                <DialogContent className="max-w-[480px]">
-                    <DialogHeader className="text-left">
-                        <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                <DialogContent size="md">
+                    <DialogHeader>
+                        <DialogTitle>
                             {still
                                 ? "Razorpay hasn't told us yet"
                                 : "Confirming your payment…"}
@@ -254,7 +258,7 @@ export function ChangePlanDialog({
                         </div>
                     )}
                     {still ? (
-                        <DialogFooter className="gap-2 sm:space-x-0">
+                        <DialogFooter>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -286,9 +290,9 @@ export function ChangePlanDialog({
                 if (!open && !pending) onClose();
             }}
         >
-            <DialogContent className="max-w-[480px]">
-                <DialogHeader className="text-left">
-                    <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+            <DialogContent size="md">
+                <DialogHeader>
+                    <DialogTitle>
                         {summary?.title ?? `Change to ${picked?.name ?? ""}`}
                     </DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
@@ -398,7 +402,7 @@ export function ChangePlanDialog({
                     </details>
                 ) : null}
 
-                <DialogFooter className="gap-2 sm:space-x-0">
+                <DialogFooter>
                     <Button
                         type="button"
                         variant="outline"
@@ -418,13 +422,14 @@ export function ChangePlanDialog({
                         <Button
                             type="button"
                             onClick={confirm}
-                            disabled={pending}
-                        >
-                            {pending
-                                ? summary.toPayment
+                            busy={pending}
+                            busyLabel={
+                                summary.toPayment
                                     ? "Opening the payment…"
                                     : "Changing…"
-                                : summary.confirm}
+                            }
+                        >
+                            {summary.confirm}
                         </Button>
                     ) : null}
                 </DialogFooter>

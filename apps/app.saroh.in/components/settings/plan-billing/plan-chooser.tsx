@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
@@ -16,6 +17,8 @@ import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
 import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
+import { Segmented } from "@saroh/ui/segmented";
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
 import { RefreshButton } from "./refresh-button";
@@ -104,7 +107,10 @@ export function PlanChooser({
             .filter((r) => r.cta !== null && r.price !== "₹0")
             .map((r) => r.planId);
         startCheck(async () => {
-            const res = await checkCouponAction({ code, cycle, plans });
+            const res = await runAction(() =>
+                checkCouponAction({ code, cycle, plans }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 setCouponErr(res.error);
                 return;
@@ -130,29 +136,18 @@ export function PlanChooser({
                             : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
                     </span>
                     {yearly.on && rows ? (
-                        <div
-                            role="radiogroup"
-                            aria-label="Billing"
-                            className="flex gap-0.5 rounded-[9px] border border-border bg-muted/50 p-[3px]"
-                        >
-                            {(["month", "year"] as const).map((c) => (
-                                <button
-                                    key={c}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={cycle === c}
-                                    onClick={() => setCycle(c)}
-                                    className={cn(
-                                        "h-7 rounded-md px-3 text-[12.5px] font-semibold text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:h-11",
-                                        cycle === c && "bg-muted",
-                                    )}
-                                >
-                                    {c === "month"
-                                        ? "Monthly"
-                                        : `Yearly · ${yearly.freeMonths} months free`}
-                                </button>
-                            ))}
-                        </div>
+                        <Segmented
+                            label="Billing"
+                            value={cycle}
+                            onValueChange={setCycle}
+                            options={[
+                                { value: "month", label: "Monthly" },
+                                {
+                                    value: "year",
+                                    label: `Yearly · ${yearly.freeMonths} months free`,
+                                },
+                            ]}
+                        />
                     ) : null}
                 </div>
                 {rows === null ? (
@@ -269,21 +264,23 @@ export function PlanChooser({
                                       } of ${checked.planName}, before GST. Used when you start a paid plan above.`
                                     : " · used with the plan you choose above"}
                             </span>
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() => {
                                     setCoupon("");
                                     setChecked(null);
                                     setCouponErr("");
                                 }}
-                                className="rounded-sm text-[12.5px] font-semibold text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         </div>
                     ) : null}
                     {!coupon || couponErr ? (
                         <form
+                            onKeyDown={submitOnModEnter}
                             className="flex flex-wrap items-center gap-2"
                             onSubmit={(e) => {
                                 e.preventDefault();
@@ -291,6 +288,7 @@ export function PlanChooser({
                             }}
                         >
                             <Input
+                                dense
                                 value={couponIn}
                                 onChange={(e) => {
                                     setCouponIn(e.target.value);
@@ -304,15 +302,16 @@ export function PlanChooser({
                                 }
                                 maxLength={32}
                                 autoComplete="off"
-                                className="h-[34px] w-[180px] bg-muted/50 font-mono text-[13px] uppercase coarse:h-11"
+                                className="w-[180px] bg-muted/50 font-mono uppercase"
                             />
                             <Button
                                 type="submit"
                                 variant="outline"
                                 size="sm"
-                                disabled={checking}
+                                busy={checking}
+                                busyLabel="Checking…"
                             >
-                                {checking ? "Checking…" : "Apply"}
+                                Apply
                             </Button>
                             {couponErr ? (
                                 <span

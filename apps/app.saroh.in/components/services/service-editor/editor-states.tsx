@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { backTo, couldntLoad } from "@saroh/ui/lib/state-copy";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The Service Editor when there is nothing to edit (E2, after the design):
@@ -42,12 +43,9 @@ export function ServiceEditorState({
                         <h2 className="mb-2.5 font-display text-[16px] font-semibold tracking-[-0.01em]">
                             That service isn&apos;t here
                         </h2>
-                        <Link
-                            href="/services"
-                            className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                        >
+                        <TextLink href="/services" className="text-[13px]">
                             Back to services
-                        </Link>
+                        </TextLink>
                     </div>
                 </div>
             ) : (

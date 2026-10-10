@@ -38,6 +38,7 @@ import {
     localDateOf,
     localMinuteOf,
     paidText,
+    STATE_LABEL,
     whoFor,
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
@@ -51,8 +52,11 @@ import {
     visitToBook,
 } from "@/lib/services/treatment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { ProgressBar } from "@saroh/ui/progress-bar";
+import { TextLink } from "@saroh/ui/text-link";
 import { ClassSeats } from "./class-seats";
-import { Eyebrow, StatePill } from "./parts";
+import { Eyebrow, STATE_TONE } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,
@@ -165,7 +169,9 @@ function Body({
                             {staff ? ` · ${staff.name}` : ""}
                         </SheetDescription>
                     </div>
-                    <StatePill state={block.state} />
+                    <StatusBadge tone={STATE_TONE[block.state]}>
+                        {STATE_LABEL[block.state]}
+                    </StatusBadge>
                 </div>
             </SheetHeader>
             <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-[18px] py-4">
@@ -472,12 +478,7 @@ function OrderText({
 }) {
     if (!canRead) return <>{orderLabel(treatment)}</>;
     return (
-        <Link
-            href={orderHref(treatment)}
-            className="rounded-sm font-medium underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            {orderLabel(treatment)}
-        </Link>
+        <TextLink href={orderHref(treatment)}>{orderLabel(treatment)}</TextLink>
     );
 }
 
@@ -582,13 +583,15 @@ function MovePanel({
                     })}
                 </div>
             )}
-            <button
+            <Button
+                variant="link"
+                size="inline"
                 type="button"
                 onClick={onKeep}
-                className="mt-2 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground active:bg-accent-active"
+                className="mt-2 text-muted-foreground"
             >
                 Keep the current time
-            </button>
+            </Button>
         </div>
     );
 }
@@ -638,24 +641,12 @@ function ClassLook({
             {!cancelled ? (
                 <Card>
                     <Eyebrow>Places</Eyebrow>
-                    <div
-                        role="progressbar"
-                        aria-label="Places booked"
-                        aria-valuemin={0}
-                        aria-valuemax={s.capacity}
-                        aria-valuenow={live.length}
-                        className="h-2 overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className={cn(
-                                "h-full",
-                                full ? "bg-destructive" : "bg-success",
-                            )}
-                            style={{
-                                width: `${Math.min(100, (live.length / Math.max(1, s.capacity)) * 100)}%`,
-                            }}
-                        />
-                    </div>
+                    <ProgressBar
+                        value={live.length}
+                        max={s.capacity}
+                        tone={full ? "danger" : "success"}
+                        label={`${live.length} of ${s.capacity} places booked`}
+                    />
                     <p className="mt-1.5 text-[12.5px]">
                         {live.length} of {s.capacity} booked
                         {full

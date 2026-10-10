@@ -85,10 +85,13 @@ const config = {
                 input: "hsl(var(--input))",
                 // Form field fill: white on Paper, Sunken on dark.
                 field: "hsl(var(--field))",
-                // One disabled treatment for every variant (brand file §22).
+                // One disabled treatment for every variant (brand file §22):
+                // a fill, a label and an edge of its own, none of them
+                // `muted`, so "you can't" never reads as "nothing here".
                 disabled: {
                     DEFAULT: "hsl(var(--disabled))",
                     foreground: "hsl(var(--disabled-foreground))",
+                    border: "hsl(var(--disabled-border))",
                 },
                 ring: "hsl(var(--ring))",
                 background: "hsl(var(--background))",

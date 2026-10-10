@@ -1,7 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useState } from "react";
 
 import { sentenceStart } from "@/lib/format/sentence";
@@ -16,11 +19,6 @@ import {
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
-
-const FIELD =
-    "block h-9 w-full rounded-lg border border-border bg-card px-2.5 text-[13px] font-normal coarse:h-11";
-
 interface AddressDraft {
     line1: string;
     city: string;
@@ -141,7 +139,7 @@ function EditDraft({
     const money = (n: number) => (format ? format(n) : "");
 
     const note = empty
-        ? "Nothing left — cancel the order with a full refund instead."
+        ? "Nothing left. Cancel the order with a full refund instead."
         : addressMissing
           ? "An address needs its first line, town, state and PIN code."
           : diff > 0
@@ -169,34 +167,24 @@ function EditDraft({
                                 <span className="min-w-0 flex-1 text-[13px]">
                                     {name}
                                 </span>
-                                <button
-                                    type="button"
+                                <IconButton
+                                    label={`One fewer ${name}`}
+                                    icon={<span>−</span>}
+                                    variant="outline"
                                     onClick={() => step(l.id, -1)}
-                                    aria-label={`One fewer ${name}`}
-                                    className={cn(
-                                        FOCUS,
-                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
-                                    )}
-                                >
-                                    −
-                                </button>
+                                />
                                 <span
                                     aria-live="polite"
                                     className="min-w-[22px] text-center text-[13.5px] font-semibold tabular-nums"
                                 >
                                     {qty[l.id]}
                                 </span>
-                                <button
-                                    type="button"
+                                <IconButton
+                                    label={`One more ${name}`}
+                                    icon={<span>+</span>}
+                                    variant="outline"
                                     onClick={() => step(l.id, 1)}
-                                    aria-label={`One more ${name}`}
-                                    className={cn(
-                                        FOCUS,
-                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
-                                    )}
-                                >
-                                    +
-                                </button>
+                                />
                             </div>
                         );
                     })}
@@ -218,19 +206,18 @@ function EditDraft({
                             <span className="tabular-nums">
                                 {money(Number(s.price))}
                             </span>
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() =>
                                     setAdded((a) => a.filter((_, j) => j !== i))
                                 }
                                 aria-label={`Remove ${name}`}
-                                className={cn(
-                                    FOCUS,
-                                    "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground hover:underline active:bg-destructive-subtle coarse:min-h-11",
-                                )}
+                                className="text-destructive hover:text-destructive"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         </div>
                     );
                 })}
@@ -243,25 +230,19 @@ function EditDraft({
                 ) : addable && addable.length > 0 ? (
                     <label className="mt-2.5 block text-[12px] font-medium">
                         Add an item
-                        <select
+                        <OptionSelect
+                            size="sm"
+                            // Picking adds a line and the box empties again.
                             value=""
-                            onChange={(e) => pick(e.target.value)}
-                            className={cn(
-                                FOCUS,
-                                "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
-                            )}
-                        >
-                            <option value="">Choose a product…</option>
-                            {addable.map((s) => (
-                                <option
-                                    key={s.key}
-                                    value={s.key}
-                                    disabled={s.soldOut}
-                                >
-                                    {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={pick}
+                            placeholder="Choose a product…"
+                            className="mt-1 w-full min-w-[150px]"
+                            options={addable.map((s) => ({
+                                value: s.key,
+                                label: `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`,
+                                disabled: s.soldOut,
+                            }))}
+                        />
                     </label>
                 ) : null}
                 {delivery ? (
@@ -269,7 +250,7 @@ function EditDraft({
                         <legend className="text-[12px] font-medium">
                             Delivery address
                         </legend>
-                        <input
+                        <Input
                             aria-label="Street and number"
                             value={addr.line1}
                             onChange={(e) =>
@@ -278,10 +259,10 @@ function EditDraft({
                                     line1: e.target.value,
                                 }))
                             }
-                            className={cn(FIELD, "mt-[5px]")}
+                            className="mt-[5px] w-full"
                         />
                         <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                            <input
+                            <Input
                                 aria-label="Town or city"
                                 placeholder="Town or city"
                                 value={addr.city}
@@ -291,9 +272,9 @@ function EditDraft({
                                         city: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
-                            <input
+                            <Input
                                 aria-label="State"
                                 placeholder="State"
                                 value={addr.state}
@@ -303,9 +284,9 @@ function EditDraft({
                                         state: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
-                            <input
+                            <Input
                                 aria-label="PIN code"
                                 placeholder="PIN"
                                 inputMode="numeric"
@@ -316,14 +297,47 @@ function EditDraft({
                                         postalCode: e.target.value,
                                     }))
                                 }
-                                className={FIELD}
+                                className="w-full"
                             />
                         </div>
                     </fieldset>
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    diff > 0
+                        ? `Save (${money(diff)} more due)`
+                        : diff < 0
+                          ? `Save and refund ${money(-diff)}`
+                          : "Save"
+                }
+                saveOff={off}
+                onSubmit={() =>
+                    onSave({
+                        ...(changed.length
+                            ? {
+                                  lines: changed.map((l) => ({
+                                      itemId: l.id,
+                                      quantity: qty[l.id] ?? 0,
+                                  })),
+                              }
+                            : {}),
+                        ...(added.length ? { add: addedLines(added) } : {}),
+                        ...(addressChanged
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                    })
+                }
                 note={
                     <p
                         aria-live="polite"
@@ -332,51 +346,14 @@ function EditDraft({
                             empty || addressMissing
                                 ? "text-destructive-subtle-foreground"
                                 : diff !== 0
-                                  ? "text-brand-subtle-foreground"
+                                  ? "text-foreground"
                                   : "text-muted-foreground",
                         )}
                     >
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() =>
-                        onSave({
-                            ...(changed.length
-                                ? {
-                                      lines: changed.map((l) => ({
-                                          itemId: l.id,
-                                          quantity: qty[l.id] ?? 0,
-                                      })),
-                                  }
-                                : {}),
-                            ...(added.length ? { add: addedLines(added) } : {}),
-                            ...(addressChanged
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                        })
-                    }
-                >
-                    {diff > 0
-                        ? `Save — ${money(diff)} more due`
-                        : diff < 0
-                          ? `Save and refund ${money(-diff)}`
-                          : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

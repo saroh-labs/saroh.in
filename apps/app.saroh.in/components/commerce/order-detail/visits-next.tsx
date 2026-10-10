@@ -14,7 +14,7 @@ import {
     visitsNextNote,
 } from "@/lib/orders/visits";
 
-import { actionClass } from "./parts";
+import { runAction } from "@/lib/api/run-action";
 
 /**
  * The header's next action for a treatment: "Mark visit N attended" (once
@@ -91,7 +91,10 @@ function NextButton({
     if (attend !== null && canMark) {
         const mark = () =>
             startTransition(async () => {
-                const res = await markVisitAttended(orderId, attend);
+                const res = await runAction(() =>
+                    markVisitAttended(orderId, attend),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                 } else {
@@ -100,13 +103,7 @@ function NextButton({
                 router.refresh();
             });
         return (
-            <Button
-                type="button"
-                className={actionClass("primary")}
-                disabled={busy}
-                aria-busy={busy || undefined}
-                onClick={mark}
-            >
+            <Button type="button" busy={busy} onClick={mark}>
                 {label}
             </Button>
         );
@@ -132,7 +129,6 @@ function NextButton({
                     who: first,
                 }}
                 primaryTrigger
-                triggerClassName={actionClass("primary")}
             />
         );
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus, Upload } from "lucide-react";
@@ -25,6 +26,9 @@ import {
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 
+import { Notice } from "@saroh/ui/notice";
+import { ProgressBar } from "@saroh/ui/progress-bar";
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { LibraryPanel } from "./photo-library-panel";
@@ -195,7 +199,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
     }
 
     const tileBtn =
-        "inline-flex h-6 min-w-6 items-center justify-center rounded-[6px] border border-border bg-card px-1.5 text-[12px] text-foreground/75 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 coarse:h-11 coarse:min-w-11";
+        "inline-flex h-6 min-w-6 items-center justify-center rounded-[6px] border border-border bg-card px-1.5 text-[12px] text-foreground/75 hover:bg-muted disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:h-11 coarse:min-w-11";
     const addTile =
         "flex min-h-[134px] flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-strong p-2 text-center text-[12px] font-semibold disabled:cursor-not-allowed";
 
@@ -279,7 +283,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                 {/* The name line is what it shows, typed in
                                     place — for people who can't see it, and
                                     how the editor names it. */}
-                                <input
+                                <Input
                                     value={photo.alt}
                                     maxLength={LIMITS.alt}
                                     disabled={ro}
@@ -298,7 +302,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                                     placeholder={name}
                                     title={photo.alt || name}
                                     aria-label={`What ${noun} ${i + 1} shows, for people who can't see it`}
-                                    className="-mx-1 h-6 w-[calc(100%+0.5rem)] truncate rounded-[5px] border border-transparent bg-transparent px-1 text-[11.5px] font-medium placeholder:font-normal placeholder:text-muted-foreground hover:border-border focus-visible:border-border focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                                    className="-mx-1 w-[calc(100%+0.5rem)]"
                                 />
                                 <div className="mt-1 flex gap-[3px] coarse:flex-wrap">
                                     <button
@@ -359,7 +363,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Plus aria-hidden className="size-[18px]" strokeWidth={2} />
+                    <Plus aria-hidden className="size-[18px]" />
                     <span>From your photos</span>
                 </button>
                 <button
@@ -373,11 +377,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Upload
-                        aria-hidden
-                        className="size-[18px]"
-                        strokeWidth={2}
-                    />
+                    <Upload aria-hidden className="size-[18px]" />
                     <span>
                         {busy
                             ? `Uploading ${progress ?? 0}%`
@@ -389,38 +389,28 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 {limit.text}
             </FieldHelp>
             {busy ? (
-                <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress ?? 0}
-                    aria-label="Upload progress"
-                    className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${progress ?? 0}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={progress ?? 0}
+                    max={100}
+                    size="xs"
+                    label="Upload progress"
+                    className="mt-2"
+                />
             ) : null}
             {error ? (
-                <div
-                    role="alert"
-                    className="mt-[9px] text-pretty rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12px] leading-[1.5] text-destructive"
-                >
+                <Notice tone="error" className="mt-[9px]">
                     {error}
-                </div>
+                </Notice>
             ) : null}
             {canWrite && !full ? (
-                <button
-                    type="button"
+                <TextLink
                     disabled={ro}
                     aria-expanded={byAddress}
                     onClick={() => setByAddress((o) => !o)}
-                    className="mt-1 text-[11.5px] text-brand hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 coarse:min-h-11"
+                    className="mt-1 text-[11.5px] disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:min-h-11"
                 >
                     {byAddress ? "Close" : "Or add one by its address"}
-                </button>
+                </TextLink>
             ) : null}
             {byAddress && !full && !ro ? (
                 <div className="mt-2">

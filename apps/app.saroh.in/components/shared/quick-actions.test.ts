@@ -93,13 +93,73 @@ describe("the quick actions table", () => {
     });
 });
 
+describe("the daily starts (10 Oct 2026)", () => {
+    const row = (label: string) => {
+        const found = QUICK_ACTIONS.find((a) => a.label === label);
+        if (!found) throw new Error(`no "${label}" row`);
+        return found;
+    };
+
+    it.each([
+        ["New order", "/commerce/orders?new=1", "order:create", "COMMERCE"],
+        ["New booking", "/bookings?new=1", "booking:write", "APPOINTMENTS"],
+        ["New product", "/commerce/products/new", "store:write", "COMMERCE"],
+        ["New customer", "/commerce/customers/new", "contact:write", undefined],
+        [
+            "New discount code",
+            "/commerce/discounts/new",
+            "discount:write",
+            "COMMERCE",
+        ],
+    ])("%s starts at %s, for whoever holds %s", (label, href, action, mod) => {
+        expect(row(label)).toMatchObject({ href, action });
+        expect(row(label).moduleKey).toBe(mod);
+    });
+
+    it("come first: what a shop does forty times a day", () => {
+        expect(QUICK_ACTIONS.slice(0, 5).map((a) => a.label)).toEqual([
+            "New order",
+            "New booking",
+            "New product",
+            "New customer",
+            "New discount code",
+        ]);
+    });
+
+    it("each is offered to its permission alone", () => {
+        expect(labels([...MEMBER, "order:create"])).toEqual(["New order"]);
+        expect(labels([...MEMBER, "store:write"])).toEqual(["New product"]);
+        expect(labels([...MEMBER, "contact:write"])).toEqual(["New customer"]);
+        expect(labels([...MEMBER, "discount:write"])).toEqual([
+            "New discount code",
+        ]);
+    });
+
+    it("a calendar-only person, who books, is offered New booking and nothing else", () => {
+        expect(labels(CALENDAR_ONLY)).toEqual(["New booking"]);
+    });
+
+    it("there is no Take payment: it has no page of its own to open", () => {
+        expect(QUICK_ACTIONS.some((a) => /take payment/i.test(a.label))).toBe(
+            false,
+        );
+    });
+
+    it("says code, never discount, for the thing made", () => {
+        expect(QUICK_ACTIONS.map((a) => a.label)).not.toContain("New discount");
+    });
+});
+
 describe("quickActionsFor", () => {
     it.each([
         ["a Member", MEMBER],
         ["a calendar-only person", CALENDAR_ONLY],
         ["a location's own people", STOREFRONT_TEAM],
-    ])("offers %s nothing that makes something", (_, actions) => {
-        expect(labels(actions)).toEqual([]);
+    ])("offers %s nothing it can't make", (_, actions) => {
+        // A calendar-only person books (`booking:write`): New booking alone.
+        expect(labels(actions)).toEqual(
+            actions.includes("booking:write") ? ["New booking"] : [],
+        );
     });
 
     it("offers a role each row it was given, and no other", () => {
@@ -136,8 +196,14 @@ describe("quickActionsFor", () => {
             siteCount: 1,
             storefronts: { used: 3, limit: 3 },
         }).map((a) => a.label);
-        // Invoicing needs no module (DEC-070).
-        expect(offered).toEqual(["New service", "New invoice"]);
+        // Invoicing needs no module (DEC-070), and a customer is a
+        // contact, whatever is switched on.
+        expect(offered).toEqual([
+            "New booking",
+            "New customer",
+            "New service",
+            "New invoice",
+        ]);
     });
 });
 

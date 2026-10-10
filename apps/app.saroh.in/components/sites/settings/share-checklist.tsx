@@ -5,6 +5,7 @@ import { Check, Circle } from "lucide-react";
 
 import type { ShareStep, ShareStepKey } from "@/lib/sites/settings-page";
 import { readinessCount } from "@/lib/sites/settings-page";
+import { doneOf, ProgressBar } from "@saroh/ui/progress-bar";
 
 /** The verb on an unmet step. */
 const VERB: Record<ShareStepKey, string> = {
@@ -60,20 +61,7 @@ export function ShareChecklist({
                         {done} of {of}
                     </span>
                 </div>
-                <div
-                    role="progressbar"
-                    aria-label="Ready to share"
-                    aria-valuemin={0}
-                    aria-valuemax={of}
-                    aria-valuenow={done}
-                    aria-valuetext={`${done} of ${of} done`}
-                    className="h-1.5 overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-highlight transition-[width] duration-slow"
-                        style={{ width: `${of ? (done / of) * 100 : 0}%` }}
-                    />
-                </div>
+                <ProgressBar value={done} max={of} label={doneOf(done, of)} />
                 <ul className="space-y-1">
                     {steps.map((step) => (
                         <li

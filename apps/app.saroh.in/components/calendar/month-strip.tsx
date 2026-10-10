@@ -80,9 +80,7 @@ export function MonthStrip({
                                     : "border-border hover:border-border-strong",
                             )}
                         >
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                {part.label}
-                            </span>
+                            <span className="label">{part.label}</span>
                             <span
                                 className={cn(
                                     "font-display text-[18px] font-semibold tabular-nums tracking-[-0.02em]",
@@ -101,7 +99,7 @@ export function MonthStrip({
                     variant="outline"
                     size="sm"
                     onClick={exportMonth}
-                    className="ml-auto self-center px-3 text-[12.5px]"
+                    className="ml-auto self-center"
                 >
                     Export the month
                 </Button>

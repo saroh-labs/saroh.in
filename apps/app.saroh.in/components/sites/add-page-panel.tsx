@@ -1,14 +1,17 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { FilePlus } from "lucide-react";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { createPage } from "@/lib/sites/actions";
 import type { ModulePageOffer } from "@/lib/sites/page-menu";
 import type { CreatePageInput, SitePage } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
 
 /** A refusal, in the API's words, and the address it offers instead. */
 interface Refusal {
@@ -20,7 +23,7 @@ interface Refusal {
 
 /** The menu's rows: 34px, the design's option. */
 export const MENU_ROW =
-    "flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent coarse:min-h-11";
+    "flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[0.8125rem] font-medium text-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent coarse:min-h-11";
 
 /**
  * "Add a page" in the editor's page menu (G16): the module pages this site
@@ -52,10 +55,11 @@ export function AddPagePanel({
     const [path, setPath] = useState("");
 
     async function add(input: CreatePageInput, key: string) {
-        setBusy(key);
         setRefusal(null);
-        const res = await createPage(siteId, input);
-        setBusy(null);
+        const res = await runAction(() => createPage(siteId, input), {
+            setBusy: (on) => setBusy(on ? key : null),
+        });
+        if (!res) return;
         if (res.ok) {
             onAdded(res.data);
             return;
@@ -108,6 +112,7 @@ export function AddPagePanel({
 
             {blank ? (
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="grid gap-1.5 p-1"
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -118,34 +123,36 @@ export function AddPagePanel({
                     }}
                 >
                     <Input
+                        dense
                         autoFocus
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Page name"
                         aria-label="Page name"
-                        className="h-8 text-xs"
                     />
                     <Input
+                        dense
                         value={path}
                         onChange={(e) => setPath(e.target.value)}
                         placeholder="/about"
                         aria-label="Page address"
-                        className="h-8 font-mono text-xs"
+                        className="font-mono"
                     />
                     <div className="flex gap-1">
                         <Button
                             type="submit"
                             size="sm"
-                            className="h-8 flex-1 text-xs"
+                            className="flex-1"
                             disabled={busy !== null}
+                            busy={busy === "blank"}
+                            busyLabel="Adding…"
                         >
-                            {busy === "blank" ? "Adding…" : "Add page"}
+                            Add page
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs"
                             onClick={onCancel}
                         >
                             Cancel
@@ -171,42 +178,41 @@ export function AddPagePanel({
             )}
 
             {refusal ? (
-                <div
-                    role="alert"
-                    className="grid gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-2 text-xs leading-relaxed text-destructive"
-                >
-                    <p>{refusal.message}</p>
-                    {refusal.suggestion ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 justify-self-start px-2 text-xs text-foreground"
-                            disabled={busy !== null}
-                            onClick={() => {
-                                const retry = refusal.retry;
-                                const suggestion = refusal.suggestion;
-                                if (
-                                    retry?.kind === undefined ||
-                                    retry.kind === "FREE"
-                                ) {
-                                    // A blank page: put the address in its
-                                    // field, so the merchant sees it before
-                                    // it is added.
-                                    if (suggestion) setPath(suggestion);
-                                    setRefusal(null);
-                                    return;
-                                }
-                                void add(retry, retry.kind);
-                            }}
-                        >
-                            {refusal.retry?.kind === undefined ||
-                            refusal.retry.kind === "FREE"
-                                ? `Use ${refusal.suggestion}`
-                                : `Add it at ${refusal.suggestion}`}
-                        </Button>
-                    ) : null}
-                </div>
+                <Notice tone="error">
+                    <div className="grid gap-1.5">
+                        <p>{refusal.message}</p>
+                        {refusal.suggestion ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                className="justify-self-start text-foreground"
+                                disabled={busy !== null}
+                                onClick={() => {
+                                    const retry = refusal.retry;
+                                    const suggestion = refusal.suggestion;
+                                    if (
+                                        retry?.kind === undefined ||
+                                        retry.kind === "FREE"
+                                    ) {
+                                        // A blank page: put the address in its
+                                        // field, so the merchant sees it before
+                                        // it is added.
+                                        if (suggestion) setPath(suggestion);
+                                        setRefusal(null);
+                                        return;
+                                    }
+                                    void add(retry, retry.kind);
+                                }}
+                            >
+                                {refusal.retry?.kind === undefined ||
+                                refusal.retry.kind === "FREE"
+                                    ? `Use ${refusal.suggestion}`
+                                    : `Add it at ${refusal.suggestion}`}
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ) : null}
         </div>
     );

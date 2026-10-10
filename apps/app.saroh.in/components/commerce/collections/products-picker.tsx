@@ -248,10 +248,7 @@ export function ProductsPicker({
                                                 )}
                                             >
                                                 {on ? (
-                                                    <Check
-                                                        className="size-3"
-                                                        strokeWidth={3}
-                                                    />
+                                                    <Check className="size-3" />
                                                 ) : null}
                                             </span>
                                             <ProductThumb
@@ -301,11 +298,11 @@ function RowButton({
         <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size="icon-xs"
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
-            className="h-7 w-7 shrink-0 rounded-[7px] disabled:bg-transparent [&_svg]:size-3.5"
+            className="shrink-0 disabled:bg-transparent [&_svg]:size-3.5"
         >
             {children}
         </Button>

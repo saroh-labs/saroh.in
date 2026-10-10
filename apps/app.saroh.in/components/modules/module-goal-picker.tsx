@@ -3,14 +3,15 @@
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Need-based module onboarding (#119). Asks what the business needs to *do* —
@@ -279,9 +280,9 @@ export function ModuleGoalPicker({
                                 style={
                                     { "--wk-i": index } as React.CSSProperties
                                 }
-                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-brand/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
+                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
                                     isSelected
-                                        ? "border-brand bg-brand-subtle/40"
+                                        ? "border-border-strong bg-muted"
                                         : "border-border"
                                 }`}
                             >
@@ -303,9 +304,9 @@ export function ModuleGoalPicker({
                                             {goal.title}
                                         </span>
                                         {goal.moduleKey === suggested ? (
-                                            <span className="rounded-full bg-highlight-subtle px-2 py-0.5 text-[11px] font-medium text-highlight-subtle-foreground">
+                                            <StatusBadge tone="active">
                                                 Suggested
-                                            </span>
+                                            </StatusBadge>
                                         ) : null}
                                     </span>
                                     <span
@@ -330,9 +331,7 @@ export function ModuleGoalPicker({
 
             {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
-                    <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Already on
-                    </h2>
+                    <h2 className="label">Already on</h2>
                     <ul className="flex flex-wrap gap-2">
                         {available
                             .filter((g) => alreadyOn.has(g.moduleKey))
@@ -351,12 +350,9 @@ export function ModuleGoalPicker({
                     </ul>
                     <p className="text-sm text-muted-foreground">
                         Turn these off any time in{" "}
-                        <Link
-                            href="/settings/modules"
-                            className="text-brand underline-offset-4 hover:underline"
-                        >
+                        <TextLink href="/settings/modules">
                             Settings → Modules
-                        </Link>
+                        </TextLink>
                         .
                     </p>
                 </div>

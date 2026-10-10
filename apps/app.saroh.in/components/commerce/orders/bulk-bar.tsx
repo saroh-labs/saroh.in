@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { CrmResult } from "@/lib/api/http";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import type { Hold } from "@/lib/hold-undo";
 import { HOLD_UNDO_MS, secondsLeft, startHold } from "@/lib/hold-undo";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
@@ -27,6 +29,7 @@ import {
     printTicketsLabel,
     ticketsHref,
 } from "@/lib/orders/tickets";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The Orders list's bulk bar and its held batch (plan B, B6), after the
@@ -118,7 +121,8 @@ export function BulkBar({
             said,
             () =>
                 startTransition(async () => {
-                    const back = await undoBatch(batchId);
+                    const back = await runAction(() => undoBatch(batchId));
+                    if (!back) return;
                     if (!back.ok) showError(back.error);
                     else showInfo(undoSummary(back.data, nameOf));
                     router.refresh();
@@ -141,7 +145,10 @@ export function BulkBar({
         if (action.disabled || busy) return;
         const batchId = crypto.randomUUID();
         startTransition(async () => {
-            const res = await post(action, batchId, !action.hold);
+            const res = await runAction(() =>
+                post(action, batchId, !action.hold),
+            );
+            if (!res) return router.refresh();
             if (!res.ok) {
                 showError(res.error);
                 router.refresh();
@@ -159,7 +166,11 @@ export function BulkBar({
                     reportCommit(await sendBatchNow(batchId), action);
                 },
                 undo: async () => {
-                    const back = await undoBatch(batchId);
+                    // The hold words a failed Undo from what is thrown.
+                    const back = await runAction(() => undoBatch(batchId), {
+                        quiet: true,
+                    });
+                    if (!back) throw new Error(UNREACHED);
                     if (!back.ok) throw new Error(back.error);
                     showInfo(undoSummary(back.data, nameOf));
                     router.refresh();
@@ -214,38 +225,44 @@ export function BulkBar({
                     ) : null}
                     <div className="ml-auto flex flex-wrap gap-[7px]">
                         {actions.map((action) => (
-                            <button
-                                key={action.kind}
-                                type="button"
-                                onClick={() => run(action)}
-                                disabled={action.disabled !== null || busy}
-                                aria-disabled={action.disabled !== null}
-                                title={action.disabled ?? action.title}
-                                className={cn(
-                                    BAR_BUTTON,
-                                    "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:active:scale-100",
-                                )}
-                            >
-                                {action.label}
-                            </button>
+                            <Tip label={action.disabled ?? action.title}>
+                                <button
+                                    key={action.kind}
+                                    type="button"
+                                    onClick={() => run(action)}
+                                    disabled={action.disabled !== null || busy}
+                                    aria-disabled={action.disabled !== null}
+                                    className={cn(
+                                        BAR_BUTTON,
+                                        "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent disabled:active:scale-100",
+                                    )}
+                                >
+                                    {action.label}
+                                </button>
+                            </Tip>
                         ))}
                         {printable.length > 0 ? (
-                            <a
-                                href={ticketsHref(printable.map((r) => r.id))}
-                                target="_blank"
-                                rel="noopener"
-                                title={
+                            <Tip
+                                label={
                                     printable.length < selected.length
                                         ? `${selected.length - printable.length} of these have no ticket to print`
                                         : "Opens the tickets to print, oldest first"
                                 }
-                                className={cn(
-                                    BAR_BUTTON,
-                                    "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
-                                )}
                             >
-                                {printTicketsLabel(printable.length)}
-                            </a>
+                                <a
+                                    href={ticketsHref(
+                                        printable.map((r) => r.id),
+                                    )}
+                                    target="_blank"
+                                    rel="noopener"
+                                    className={cn(
+                                        BAR_BUTTON,
+                                        "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
+                                    )}
+                                >
+                                    {printTicketsLabel(printable.length)}
+                                </a>
+                            </Tip>
                         ) : null}
                         <button
                             type="button"
@@ -286,10 +303,10 @@ function HeldCard({
     return (
         <div
             role="status"
-            className="pointer-events-auto rounded-[11px] border border-highlight-border bg-brand-subtle px-[15px] py-[11px] shadow-lg"
+            className="pointer-events-auto rounded-[11px] border border-border-strong bg-muted px-[15px] py-[11px] shadow-lg"
         >
             <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex-[1_1_220px] text-[13px] font-semibold tabular-nums text-brand-subtle-foreground">
+                <span className="flex-[1_1_220px] text-[13px] font-semibold tabular-nums text-foreground">
                     {holdTitle(held.count, secondsLeft(left))}
                 </span>
                 <button
@@ -297,7 +314,7 @@ function HeldCard({
                     onClick={onUndo}
                     className={cn(
                         HOLD_BUTTON,
-                        "border border-highlight-border bg-card hover:bg-muted active:bg-muted/80",
+                        "border border-border-strong bg-card hover:bg-muted active:bg-muted/80",
                     )}
                 >
                     Undo all
@@ -307,7 +324,7 @@ function HeldCard({
                     onClick={onNow}
                     className={cn(
                         HOLD_BUTTON,
-                        "text-brand-subtle-foreground hover:bg-highlight-border/30 active:bg-highlight-border/45",
+                        "text-foreground hover:bg-primary-hover active:bg-foreground",
                     )}
                 >
                     Send now
@@ -321,7 +338,7 @@ function HeldCard({
                 className="mt-2 h-[3px] rounded-full bg-foreground/5"
             >
                 <div
-                    className="h-[3px] rounded-full bg-highlight transition-[width] duration-200 ease-linear"
+                    className="h-[3px] rounded-full bg-foreground transition-[width] duration-slow ease-out"
                     style={{ width: `${(left / HOLD_UNDO_MS) * 100}%` }}
                 />
             </div>

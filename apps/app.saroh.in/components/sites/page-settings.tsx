@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -8,9 +9,11 @@ import { useId, useState } from "react";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ChoiceField, SHOW_HIDE } from "@/components/sites/choice-field";
 import { FIELD_LABEL } from "@/components/sites/section-fields/constants";
+import { runAction } from "@/lib/api/run-action";
 import { updatePage } from "@/lib/sites/actions";
 import { fixedAddress } from "@/lib/sites/page-menu";
 import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The open page's own settings, in the editor's page menu (G16): its title,
@@ -71,10 +74,11 @@ export function PageSettings({
     const dirty = Object.keys(changes).length > 0;
 
     async function save(input: UpdatePageInput, done?: string) {
-        setBusy(true);
         setRefusal(null);
-        const res = await updatePage(siteId, page.id, input);
-        setBusy(false);
+        const res = await runAction(() => updatePage(siteId, page.id, input), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             if (input.title !== undefined || input.path !== undefined) {
                 setRefusal({ message: res.error, suggestion: res.suggestion });
@@ -97,6 +101,7 @@ export function PageSettings({
             ) : null}
 
             <form
+                onKeyDown={submitOnModEnter}
                 className="grid gap-3"
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -108,13 +113,13 @@ export function PageSettings({
                         Title
                     </label>
                     <Input
+                        dense
                         id={`${id}-title`}
                         value={title}
                         maxLength={200}
                         disabled={readOnly}
                         onChange={(e) => setTitle(e.target.value)}
                         aria-describedby={`${id}-title-note`}
-                        className="h-8 text-xs"
                     />
                     <p
                         id={`${id}-title-note`}
@@ -140,56 +145,58 @@ export function PageSettings({
                     ) : (
                         <>
                             {unseen ? (
-                                <p className="text-xs leading-relaxed text-highlight">
+                                <p className="text-xs leading-relaxed text-foreground">
                                     {unseen}
                                 </p>
                             ) : null}
                             <Input
+                                dense
                                 id={`${id}-path`}
                                 value={path}
                                 maxLength={200}
                                 disabled={readOnly}
                                 aria-invalid={unseen ? true : undefined}
                                 onChange={(e) => setPath(e.target.value)}
-                                className="h-8 font-mono text-xs"
+                                className="font-mono"
                             />
                         </>
                     )}
                 </div>
 
                 {refusal ? (
-                    <div
-                        role="alert"
-                        className="grid gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-2 text-xs leading-relaxed text-destructive"
-                    >
-                        <p>{refusal.message}</p>
-                        {refusal.suggestion ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 justify-self-start px-2 text-xs text-foreground"
-                                onClick={() => {
-                                    if (refusal.suggestion) {
-                                        setPath(refusal.suggestion);
-                                    }
-                                    setRefusal(null);
-                                }}
-                            >
-                                {`Use ${refusal.suggestion}`}
-                            </Button>
-                        ) : null}
-                    </div>
+                    <Notice tone="error">
+                        <div className="grid gap-1.5">
+                            <p>{refusal.message}</p>
+                            {refusal.suggestion ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
+                                    className="justify-self-start text-foreground"
+                                    onClick={() => {
+                                        if (refusal.suggestion) {
+                                            setPath(refusal.suggestion);
+                                        }
+                                        setRefusal(null);
+                                    }}
+                                >
+                                    {`Use ${refusal.suggestion}`}
+                                </Button>
+                            ) : null}
+                        </div>
+                    </Notice>
                 ) : null}
 
                 {readOnly ? null : (
                     <Button
                         type="submit"
                         size="sm"
-                        className="h-8 justify-self-start px-3 text-xs"
-                        disabled={busy || !dirty}
+                        className="justify-self-start"
+                        disabled={!dirty}
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : "Save"}
+                        Save
                     </Button>
                 )}
             </form>
@@ -241,7 +248,7 @@ export function PageSettings({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 justify-self-start px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className="justify-self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
                             disabled={busy}
                             onClick={onDelete}
                         >

@@ -20,6 +20,6 @@ export const TONE_BADGE: Record<
     NonNullable<BadgeProps["variant"]>
 > = {
     bad: "error",
-    due: "draft",
+    due: "active",
     info: "neutral",
 };

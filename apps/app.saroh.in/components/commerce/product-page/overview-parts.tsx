@@ -1,9 +1,9 @@
-import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { DetailTag } from "@/lib/products/overview-words";
 
 /** Small pieces the product page's Overview is built from, at the design's sizes. */
@@ -81,7 +81,7 @@ export function LinkedCard({
                     aria-label={`Open ${title.toLowerCase()}`}
                     className={cn(
                         FOCUS,
-                        "rounded-sm text-[12px] text-brand hover:text-foreground coarse:min-h-11",
+                        "rounded-sm text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11",
                     )}
                 >
                     Open
@@ -108,14 +108,14 @@ export function LinkedCardLink({
             scroll={false}
             className={cn(
                 FOCUS,
-                "flex min-w-0 flex-col gap-[7px] rounded-[12px] border border-border bg-card px-[15px] py-[13px] text-left transition-colors hover:border-border-strong",
+                "flex min-w-0 flex-col gap-[7px] rounded-[12px] border border-border bg-card px-[15px] py-[13px] text-left transition-colors duration-fast hover:border-border-strong",
             )}
         >
             <span className="flex items-baseline gap-2">
                 <span className="flex-1 text-[11.5px] text-muted-foreground">
                     {title}
                 </span>
-                <span className="text-[12px] text-brand">Open</span>
+                <span className="text-[12px] text-foreground">Open</span>
             </span>
             {children}
         </Link>
@@ -179,23 +179,18 @@ export function PanelLine({
 
 /** On the shop · Team only · Hidden until filled in. */
 export function ShownTag({ tag }: { tag: DetailTag }) {
-    if (tag === "Hidden until filled in") {
-        return (
-            <Badge
-                variant="tag"
-                className="shrink-0 whitespace-nowrap rounded-full border-dashed px-[7px] py-px text-[11px] font-semibold text-muted-foreground"
-            >
-                {tag}
-            </Badge>
-        );
-    }
     return (
-        <Badge
-            variant={tag === "On the shop" ? "success" : "neutral"}
-            className="shrink-0 whitespace-nowrap rounded-full px-[7px] py-px text-[11px] font-semibold"
+        <StatusBadge
+            tone={
+                tag === "Hidden until filled in"
+                    ? "draft"
+                    : tag === "On the shop"
+                      ? "success"
+                      : "neutral"
+            }
         >
             {tag}
-        </Badge>
+        </StatusBadge>
     );
 }
 

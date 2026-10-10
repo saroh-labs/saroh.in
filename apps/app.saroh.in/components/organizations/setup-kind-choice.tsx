@@ -73,7 +73,7 @@ export function SetupKindChoice({
                         onClick={() => onChange(choice.kind)}
                         onKeyDown={(e) => onKeyDown(e, at)}
                         className={cn(
-                            "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             on
                                 ? "border-foreground bg-muted"
                                 : cn(

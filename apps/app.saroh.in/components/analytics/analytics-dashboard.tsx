@@ -42,12 +42,12 @@ function Tile({
 }) {
     const body = (
         <>
-            <span className="flex items-center justify-between gap-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground sm:text-[11px]">
+            <span className="label flex items-center justify-between gap-1 sm:text-[11px]">
                 {label}
                 {href ? (
                     <ChevronRight
                         aria-hidden
-                        className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                        className="size-3.5 shrink-0 opacity-60 transition-opacity duration-fast group-hover:opacity-100"
                     />
                 ) : null}
             </span>
@@ -61,7 +61,7 @@ function Tile({
     return href ? (
         <Link
             href={href}
-            className={`group ${shape} transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+            className={`group ${shape} transition-colors duration-base hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
         >
             {body}
         </Link>
@@ -85,7 +85,7 @@ function DailyVisits({ daily }: { daily: DailyPoint[] }) {
             max > 0 ? Math.max(2, Math.round((d.views / max) * 100)) : 2,
         tone:
             busiest?.date === d.date && d.views > 0
-                ? "bg-brand-700 dark:bg-brand-400"
+                ? "bg-foreground "
                 : "bg-neutral-700 dark:bg-neutral-300",
         readout: dayReadout(d),
         ...(i % wide === 0

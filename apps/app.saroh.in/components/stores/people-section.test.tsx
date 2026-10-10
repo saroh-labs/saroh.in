@@ -28,6 +28,10 @@ vi.mock("@/lib/members/actions", () => ({
 }));
 const showError = vi.fn();
 const showSuccess = vi.fn();
+vi.mock(
+    "@/components/shared/use-hold",
+    () => import("@/components/shared/hold-now.test-kit"),
+);
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
@@ -189,16 +193,17 @@ describe("the roster, read first", () => {
         expect(host.textContent).not.toContain("mira.sen@example.com");
     });
 
-    it("invitations still out are their own group, each with Revoke", async () => {
+    it("invitations still out are their own group, each with Cancel invitation", async () => {
         revoke.mockResolvedValue({ ok: true, data: { ok: true } });
         draw(full);
         expect(host.textContent).toContain("Invited");
         expect(rows("location-invited")).toEqual([
-            "mira.sen@example.comInvited as viewerRevoke",
+            "mira.sen@example.comInvited as viewerCancel invitation",
         ]);
-        await press(button("Revoke"));
+        await press(button("Cancel invitation"));
+        // Gone from the list at once, and cancelled when its hold ends.
+        expect(rows("location-invited")).toEqual([]);
         expect(revoke).toHaveBeenCalledWith("st_hill", "inv_1");
-        expect(showSuccess).toHaveBeenCalledWith("Invitation revoked");
         expect(refresh).toHaveBeenCalled();
     });
 });
@@ -247,7 +252,8 @@ describe("Invite someone", () => {
             "VIEWER",
         );
         expect(showSuccess).toHaveBeenCalledWith(
-            "Invitation sent. When they accept, they're also added to your team, as Location team.",
+            "Sent to kiran.bose@example.com.",
+            "When they accept, they're also added to your team, as Location team.",
         );
         expect(sheet()).toBeNull();
         // The page reads the roster again, so the invitation shows.
@@ -274,7 +280,10 @@ describe("Invite someone", () => {
         await press(button("Invite someone"));
         type(email(), "kiran.bose@example.com");
         await press(button("Send invite"));
-        expect(showError).toHaveBeenCalledWith("Your plan's team is full.");
+        expect(showError).toHaveBeenCalledWith(
+            "That wasn't sent.",
+            "Your plan's team is full.",
+        );
         expect(sheetName()).toBe("Invite someone");
         expect(email()?.value).toBe("kiran.bose@example.com");
         expect(refresh).not.toHaveBeenCalled();

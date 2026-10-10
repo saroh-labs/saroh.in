@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { cn } from "@saroh/ui/lib/utils";
+import { Input } from "@saroh/ui/input";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -27,8 +28,9 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { chipClass } from "@/components/shared/chip";
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp, FieldLabel } from "./fields";
+import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: DetailsValues = {
@@ -151,13 +153,12 @@ export function DetailsSection({
             >
                 {copy.how.label}
             </FieldLabel>
-            <input
+            <Input
                 id="pe-how"
                 {...form.register("howToUse")}
                 disabled={ro}
                 placeholder={copy.how.placeholder}
                 aria-invalid={howLong || !!errors.howToUse}
-                className={boxClass({ bad: howLong || !!errors.howToUse })}
             />
             <FieldHelp
                 className="mb-4 mt-1.5"
@@ -185,17 +186,14 @@ export function DetailsSection({
             >
                 {copy.materials.label}
             </FieldLabel>
-            <textarea
+            <Textarea
                 id="pe-materials"
                 {...form.register("materials")}
                 rows={2}
                 disabled={ro}
                 placeholder={copy.materials.placeholder}
                 aria-invalid={!!errors.materials}
-                className={cn(
-                    boxClass({ bad: !!errors.materials }),
-                    "h-auto resize-y py-2 leading-[1.5]",
-                )}
+                className="resize-y"
             />
             {errors.materials ? (
                 <FieldHelp className="mt-1.5" tone="bad">
@@ -274,12 +272,7 @@ function FulfilmentChips({
                                         : inTableOrder([...picked, c.value]),
                                 )
                             }
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {c.label}
                         </button>
@@ -332,12 +325,7 @@ function Allergens({
                         aria-pressed={on}
                         disabled={disabled}
                         onClick={() => onChange(toggle(ids, a.id))}
-                        className={cn(
-                            "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                            on
-                                ? "border-foreground bg-foreground font-semibold text-background"
-                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                        )}
+                        className={chipClass(on)}
                     >
                         {a.name}
                     </button>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { radixValue } from "@/components/shared/option-select";
+import { radixValue } from "@saroh/ui/option-select";
 
 const WITH_NONE = [
     { value: "", label: "None" },

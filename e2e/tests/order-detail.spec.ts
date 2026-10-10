@@ -315,7 +315,9 @@ test.describe("order detail", () => {
         await expect(
             panel.getByText("Say why you're refunding this amount."),
         ).toBeVisible();
-        await panel.getByLabel("Why").selectOption({ label: "Late" });
+        // The product's own select: open it, then pick from its list.
+        await panel.getByLabel("Why").click();
+        await page.getByRole("option", { name: "Late", exact: true }).click();
         await expect(go).toHaveText("Refund ₹1");
         await go.click();
         await expect(panel).toBeHidden();
@@ -347,13 +349,14 @@ test.describe("order detail", () => {
         // The first of the seed's own products on offer that isn't sold out:
         // never another test's "E2E …" product, which it may be taking away
         // at this moment, nor the line the order already has.
-        const choice = await add
-            .locator("option:not([disabled]):not([value=''])")
-            .filter({ hasNotText: /^E2E / })
-            .first()
-            .getAttribute("value");
-        expect(choice).toBeTruthy();
-        await add.selectOption(choice ?? "");
+        await add.click();
+        const choice = page
+            .getByRole("option")
+            .filter({ hasNotText: /^(E2E |Choose a product)/ })
+            .and(page.locator(":not([data-disabled])"))
+            .first();
+        await expect(choice).toBeVisible();
+        await choice.click();
         await expect(panel.getByText("· added")).toBeVisible();
         await panel.getByRole("button", { name: /^Save/ }).click();
         await expect(panel).toBeHidden();
@@ -402,7 +405,7 @@ test.describe("shipping on order detail", () => {
         await expect(panel.getByText(/^To 14 Lake View Road/)).toBeVisible();
         await panel.getByRole("radio", { name: "Blue Dart" }).click();
         await panel.getByLabel("Tracking number").fill("BD 9920 1140");
-        await panel.getByRole("button", { name: "Handed over" }).click();
+        await panel.getByRole("button", { name: "Mark handed over" }).click();
         await expect(panel).toBeHidden();
 
         await expect(
@@ -432,7 +435,9 @@ test.describe("shipping on order detail", () => {
         const handover = page.getByRole("dialog", {
             name: "Hand to courier",
         });
-        await handover.getByRole("button", { name: "Handed over" }).click();
+        await handover
+            .getByRole("button", { name: "Mark handed over" })
+            .click();
         await expect(handover).toBeHidden();
         await expect(shown(page, /^Handed to Delhivery\./)).toBeVisible();
 
@@ -478,11 +483,11 @@ test.describe("shipping on order detail", () => {
         await expect(name).toBeFocused();
         // No name yet: nothing to hand over to.
         await expect(
-            panel.getByRole("button", { name: "Handed over" }),
+            panel.getByRole("button", { name: "Mark handed over" }),
         ).toBeDisabled();
         await name.fill("DTDC");
         await panel.getByLabel("Tracking number").fill("D 4410 2291");
-        await panel.getByRole("button", { name: "Handed over" }).click();
+        await panel.getByRole("button", { name: "Mark handed over" }).click();
         await expect(panel).toBeHidden();
 
         await expect(
@@ -632,7 +637,8 @@ test.describe("change and cancel on order detail (B9)", () => {
         await expect(
             sheet.getByText(/It stays on record as cancelled, never deleted/),
         ).toBeVisible();
-        await sheet.getByLabel("Why").selectOption({ label: "Late" });
+        await sheet.getByLabel("Why").click();
+        await page.getByRole("option", { name: "Late", exact: true }).click();
         await sheet.getByRole("button", { name: "Cancel order" }).click();
         // The sheet closes into the ten-second hold on the page.
         await expect(sheet).toBeHidden();
@@ -669,7 +675,7 @@ test.describe("change and cancel on order detail (B9)", () => {
         const cancel = page.getByRole("button", { name: "Cancel order…" });
         await expect(cancel).toBeDisabled();
         await expect(cancel).toHaveAttribute(
-            "title",
+            "aria-description",
             "It has been handed over, so it can't be cancelled. Refund it instead.",
         );
         await expect(

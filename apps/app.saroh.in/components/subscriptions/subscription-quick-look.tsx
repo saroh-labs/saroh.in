@@ -7,6 +7,7 @@ import Link from "next/link";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { EmptyState } from "@saroh/ui/data-state";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     Optional,
     Plan,
@@ -29,11 +30,9 @@ import {
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
+import { Notice } from "@saroh/ui/notice";
 
-import { Pill } from "./pill";
-
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /** The steps a quick look offers, by where the subscription stands. */
 const EDITS = {
@@ -104,10 +103,7 @@ export function SubscriptionQuickLook({
             subtitle={`${sub.plan.name} · ${price}`}
             description={`${sub.contact.name}'s subscription: ${sub.plan.name}, ${price}.`}
             footer={
-                <Button
-                    asChild
-                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                >
+                <Button asChild className="min-w-[160px] flex-1">
                     <Link href={`/billing/subscriptions/${sub.id}`}>
                         Open full details
                     </Link>
@@ -178,7 +174,9 @@ function Body({
         <>
             <QuickLookCard className="py-3.5">
                 <div className="flex items-center gap-2">
-                    <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                    <StatusBadge tone={TAB_TONE[tab]}>
+                        {TAB_LABEL[tab]}
+                    </StatusBadge>
                     <span className="flex-1" />
                     <span className="text-[12px] text-muted-foreground">
                         Since {dayText(sub.startedAt, tz, now)}
@@ -192,23 +190,20 @@ function Body({
                     {nextLine}
                 </p>
                 {older ? (
-                    <p className="mt-1.5 text-[12px] text-brand">
+                    <p className="mt-1.5 text-[12px] text-foreground">
                         Keeps {money(sub.price, sub.currency)} — the plan is{" "}
                         {money(older.listPrice, sub.currency)} for new sign-ups
                     </p>
                 ) : null}
                 {sub.pendingPlan && tab !== "cancelled" ? (
-                    <p className="mt-1.5 text-[12px] font-semibold text-brand">
+                    <p className="mt-1.5 text-[12px] font-semibold text-foreground">
                         Changes to {sub.pendingPlan.name} on{" "}
                         {dayText(sub.pendingPlan.from, tz, now)}
                     </p>
                 ) : null}
             </QuickLookCard>
             {tab === "failed" ? (
-                <div
-                    role="alert"
-                    className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px]"
-                >
+                <Notice tone="error">
                     <div className="text-[13px] font-bold text-destructive-subtle-foreground">
                         {failWhy(sub, now)}
                     </div>
@@ -216,7 +211,7 @@ function Body({
                         Saroh doesn&apos;t charge cards — open it to send a new
                         pay link, record a payment, pause or cancel.
                     </div>
-                </div>
+                </Notice>
             ) : null}
             {upcoming.length ? (
                 <QuickLookCard label="Next collections" className="pb-1.5 pt-3">
@@ -228,7 +223,7 @@ function Body({
                             <span className="flex-1 text-[13px] font-semibold">
                                 {u.label}
                             </span>
-                            <Pill tone={u.tone}>{u.state}</Pill>
+                            <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                         </div>
                     ))}
                 </QuickLookCard>
@@ -248,7 +243,9 @@ function Body({
                                 <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
                                     {c.date}
                                 </span>
-                                <Pill tone={c.tone}>{c.result}</Pill>
+                                <StatusBadge tone={c.tone}>
+                                    {c.result}
+                                </StatusBadge>
                                 <span className="flex-1" />
                                 <span className="font-semibold tabular-nums">
                                     {c.amount}

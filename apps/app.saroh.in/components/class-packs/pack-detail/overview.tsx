@@ -11,7 +11,7 @@ import type {
 const H2 = "m-0 font-display text-[15px] font-semibold tracking-[-0.015em]";
 const CARD = "rounded-[12px] border border-border bg-card";
 const QUIET_LINK =
-    "rounded-[4px] text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70";
+    "rounded-[4px] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70";
 
 function Pencil() {
     return (

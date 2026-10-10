@@ -104,7 +104,7 @@ export function formatValue(value: number | null | undefined): string | null {
  * because a lost lead is a fact to learn from, not an error.
  */
 export const LEAD_STATUS = {
-    OPEN: { label: "Open", variant: "draft" },
+    OPEN: { label: "Open", variant: "active" },
     WON: { label: "Won", variant: "success" },
     LOST: { label: "Lost", variant: "neutral" },
 } as const;

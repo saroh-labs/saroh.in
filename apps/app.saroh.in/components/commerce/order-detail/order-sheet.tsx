@@ -1,22 +1,14 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import { Sheet } from "@saroh/ui/sheet";
 import type { ReactNode } from "react";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
-    ACTION_SHEET_FORM,
-    ActionSheetContent,
-    ActionSheetFooter,
-} from "@/components/shared/action-sheet";
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+    useFormSheetDraft,
+} from "@/components/shared/form-sheet";
 
 import { CHANGE_BUTTON_ID } from "./change-panels";
 import type { Panel } from "./panel";
@@ -65,10 +57,12 @@ export function useOrderPanel() {
 }
 
 /**
- * The side sheet a change to an order opens in: its title and a line under
- * it, the fields (`OrderSheetBody`, which scrolls) and, pinned at the foot,
- * what the change does to the money with the button that makes it
- * (`OrderSheetFoot`).
+ * The side sheet a change to an order opens in: the app's one `FormSheet`
+ * (`components/shared/form-sheet.tsx`), drawn by its parts because each
+ * panel's draft is a component of its own, fresh on every opening. Its
+ * title and a line under it, the fields (`OrderSheetBody`, which scrolls)
+ * and, pinned at the foot, what the change does to the money with the
+ * button that makes it (`OrderSheetFoot`).
  *
  * Nothing is recorded until that button. The way out (Cancel, or "Keep
  * order" on the cancel sheet), Escape and the close button drop what was
@@ -100,35 +94,24 @@ export function OrderSheet({
     returnFocus?: () => void;
     children: ReactNode;
 }) {
-    // Said by the draft inside (`useOrderSheetDraft`).
-    const [dirty, setDirty] = useState(false);
     return (
-        <Sheet
+        <FormSheet
             open={open}
-            onOpenChange={(o) => {
-                if (!o && !busy) onClose();
+            title={title}
+            description={description}
+            pending={busy}
+            wide={wide}
+            // The page says where the keyboard goes back to (`useOrderPanel`).
+            returnFocusTo={() => {
+                returnFocus?.();
+                return null;
             }}
+            onClose={onClose}
         >
-            <ActionSheetContent
-                title={title}
-                description={description}
-                dirty={dirty || busy}
-                // Off the paper: "Packing slip" prints the page behind it.
-                className={cn("print:hidden", wide && "sm:max-w-lg")}
-                onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    returnFocus?.();
-                }}
-            >
-                <SheetDirty.Provider value={setDirty}>
-                    <div className={ACTION_SHEET_FORM}>{children}</div>
-                </SheetDirty.Provider>
-            </ActionSheetContent>
-        </Sheet>
+            {children}
+        </FormSheet>
     );
 }
-
-const SheetDirty = createContext<(dirty: boolean) => void>(() => undefined);
 
 /**
  * What is chosen and typed in an order sheet, told to the sheet: once it
@@ -136,24 +119,11 @@ const SheetDirty = createContext<(dirty: boolean) => void>(() => undefined);
  * closes it. Call it once in the sheet's draft, with every value the
  * person can change.
  */
-export function useOrderSheetDraft(draft: unknown) {
-    const setDirty = useContext(SheetDirty);
-    const now = JSON.stringify(draft);
-    const [first] = useState(now);
-    const dirty = now !== first;
-    useEffect(() => {
-        setDirty(dirty);
-        return () => setDirty(false);
-    }, [dirty, setDirty]);
-}
+export const useOrderSheetDraft = useFormSheetDraft;
 
 /** The fields scroll; the inset keeps a focus ring from being clipped. */
 export function OrderSheetBody({ children }: { children: ReactNode }) {
-    return (
-        <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
-            {children}
-        </div>
-    );
+    return <FormSheetBody className="block">{children}</FormSheetBody>;
 }
 
 /**
@@ -162,27 +132,7 @@ export function OrderSheetBody({ children }: { children: ReactNode }) {
  * button on top.
  *
  * The way out reads "Cancel" unless the sheet's own button cancels
- * something: beside "Cancel order" it is "Keep order" (`dismiss`), so the
- * two never read as the same thing.
+ * something: beside "Cancel order" it is "Keep order" (`cancelLabel`), so
+ * the two never read as the same thing.
  */
-export function OrderSheetFoot({
-    busy = false,
-    dismiss = "Cancel",
-    note,
-    children,
-}: {
-    busy?: boolean;
-    /** The way out's label. */
-    dismiss?: string;
-    note?: ReactNode;
-    children: ReactNode;
-}) {
-    return (
-        <div className="border-t border-border pt-3">
-            {note}
-            <ActionSheetFooter busy={busy} cancel={dismiss}>
-                {children}
-            </ActionSheetFooter>
-        </div>
-    );
-}
+export const OrderSheetFoot = FormSheetFoot;

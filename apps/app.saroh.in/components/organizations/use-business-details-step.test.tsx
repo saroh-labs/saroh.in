@@ -4,7 +4,7 @@
  * for want of the registered address opens the step, which reads what is on
  * file, asks for what is missing, saves it to the business profile and runs
  * the action again — its result returned as if nothing had stood in the
- * way. "Not now" answers null; any other failure passes straight through.
+ * way. Cancel answers null; any other failure passes straight through.
  *
  * `react-dom/client` + `act` directly, as the other component tests do.
  */
@@ -275,10 +275,10 @@ describe("the business-details step (DEC-068)", () => {
         expect(action).toHaveBeenCalledTimes(1);
     });
 
-    it("Not now closes it and answers null: nothing to report", async () => {
+    it("Cancel closes it and answers null: nothing to report", async () => {
         action.mockResolvedValue(REFUSED);
         await press("Issue it");
-        await press("Not now");
+        await press("Cancel");
         expect(result).toBeNull();
         expect(action).toHaveBeenCalledTimes(1);
         expect(sheet()).toBeNull();
@@ -313,7 +313,7 @@ describe("the business-details step (DEC-068)", () => {
             expect(t, kind).toContain(
                 "Every invoice prints your address. Add it once and we'll issue it.",
             );
-            await press("Not now");
+            await press("Cancel");
         }
     });
 
@@ -333,7 +333,7 @@ describe("the business-details step (DEC-068)", () => {
             expect(t).toContain(
                 "Every invoice prints your registered address and GSTIN. Add them once and we'll issue it.",
             );
-            await press("Not now");
+            await press("Cancel");
         }
     });
 
@@ -419,7 +419,7 @@ describe("asking up front, from the page's read (#838)", () => {
             ),
         );
         await press("Issue now");
-        await press("Not now");
+        await press("Cancel");
         expect(ready).toBe(false);
         expect(saveOrganizationSettings).not.toHaveBeenCalled();
     });

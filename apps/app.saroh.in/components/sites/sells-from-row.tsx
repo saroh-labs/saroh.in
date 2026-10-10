@@ -7,13 +7,14 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import {
     PROBLEM,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { updateSiteSettings } from "@/lib/sites/actions";
 import {
     SELLS_FROM_ANCHOR,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/sites/sells-from";
 import type { SellsFrom } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+import { Notice } from "@saroh/ui/notice";
 
 /** The question the sheet asks. */
 export const SELLS_FROM_QUESTION =
@@ -74,9 +76,12 @@ export function SellsFromRow({
     function save(picked: string) {
         const choice = sellsFrom.choices.find((c) => c.id === picked);
         startTransition(async () => {
-            const res = await updateSiteSettings(siteId, {
-                storefrontId: picked,
-            });
+            const res = await runAction(() =>
+                updateSiteSettings(siteId, {
+                    storefrontId: picked,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -107,12 +112,9 @@ export function SellsFromRow({
                 }
             >
                 {waiting ? (
-                    <p
-                        role="note"
-                        className="bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground"
-                    >
+                    <Notice tone="warning" role="note">
                         {SHOP_AWAITS_SELLS_FROM}
-                    </p>
+                    </Notice>
                 ) : null}
                 <Row
                     label="Sells from"
@@ -185,7 +187,7 @@ function SellsFromSheet({
     const [picked, setPicked] = useState(current);
     const [tried, setTried] = useState(false);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("sells-from")}
             title="Sells from"
             description="The location whose products your online shop lists at /shop. It applies as soon as you save."
@@ -242,6 +244,6 @@ function SellsFromSheet({
                     Choose a location
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

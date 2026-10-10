@@ -17,8 +17,18 @@
    its words from `@saroh/ui/lib/state-copy`
    (`.agents/skills/saroh-product-states/SKILL.md`).
 3. **Toasts**: the outcome of something the user just did.
-4. **Field messages**: validation, and server errors that name a field
-   (`frontend-forms.md`).
+4. **Field messages**: validation, and server errors that name a field,
+   drawn by `Field` / `FieldError` under the field as an alert
+   (`frontend-forms.md`). Gap: the service editor still joins its
+   problems into one strip under the header, a post with no title says so
+   in a toast, and the product editor draws its own help line.
+5. **`Notice`** (`@saroh/ui/notice`): something to know beside the content
+   that is none of the above. A problem, a warning, a fact, a success that
+   should stay on screen. One component, five tones (`info`, `warning`,
+   `error`, `success`, `neutral`), as a card or an edge-to-edge banner. An
+   error is `role="alert"`, a neutral note `role="note"`, the rest
+   `role="status"`. Never a hand-built box with a role: the scan in
+   `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts` fails one.
 
 ## Rules
 
@@ -26,26 +36,103 @@
 
 - **Current** — **One seam.** `showSuccess`, `showError`, `showWarning` and
   `showInfo` from `@saroh/ui/toast`, all `(message, description?)`. ESLint
-  rejects sonner's `toast` in the apps.
+  rejects sonner's `toast` in the apps. `showSuccess` takes a third
+  argument, one action (`{ label, onClick }`): the way to the thing just
+  made, for an overlay that keeps the merchant where they were.
+- **Current** — **One grammar for what an overlay says when it worked**
+  (UX audit, 10 Oct): "{Thing} saved." or "{Thing} added.", with a full
+  stop, the detail on the second line, and Undo where the write can be
+  taken back. Never "Saved", "Done", "{Thing} updated" or "queued".
 - **Adopted** — **Toast copy is product copy.** Show the API's guarded message
   (`res.error`) or your own sentence — never an exception's `error.message`, an
   API `detail` or a response body. Gap: `saroh.in`'s `join-waitlist.tsx`
   forwards `error.message`.
 - **Adopted** — **Never put the only way to do something in a toast,** and keep
   error toasts on screen long enough to read (15 §5).
-- **Current** — **`showUndo` takes a `duration`** for a screen whose Undo
-  window is a rule of its own (Order Detail's ten-second steps, ADR-008), and
-  **`dismissToasts()` clears the stack** when a screen starts an Undo of its
-  own — two Undos on screen at once, for two different things, is how the
-  wrong one gets pressed.
+- **Current** — **A copy is acknowledged by its button, not a toast.**
+  `CopyButton` says "Copied" for 1.6 seconds and comes back. A toast only
+  where the link was also just made (it says who to send it to). When the
+  browser refuses there is one sentence, `copyFailedMessage()`: "Couldn't
+  copy the link. Select it and copy it instead.", with the link shown
+  selected.
+- **Current** — **One Undo, ten seconds, and it says how it went** (UX
+  audit, 10 Oct). `showUndo(message, undo, options?)` lasts ten seconds
+  everywhere (`UNDO_MS`). No screen has a duration or a timer of its own
+  (`overlay-frames.test.ts`). `undo` returns its result (a promise of
+  `true`, or the action's `{ ok, error }`), and `showUndo` itself says
+  "Undone." or "Couldn't undo. It stays as saved." with the reason under
+  it. So no caller words an Undo's outcome and none fails silently. An
+  `undo` that returns nothing at once has kept the outcome for itself (a
+  hold card that draws its own state). **`dismissToasts()` clears the
+  stack** when a screen starts an Undo of its own: two Undos on screen at
+  once, for two different things, is how the wrong one gets pressed.
 - **Current** — **The ten-second hold is `apps/app.saroh.in/lib/hold-undo.ts`**
   (round-2 G3; default 136), never a timer of a screen's own. `startHold`
   takes `commit` (what happens if nobody presses Undo: on time out, "now",
   or leaving) and `undo`; `createHoldSlot` keeps one hold at a time. A
   failed callback ends the hold as `failed` for the caller to word. The site
-  editor's `use-undo.ts` is the reference caller; B6 and F4 reuse it.
-  `showUndo` returns the toast's id, and `dismissToast(id)` takes that one
-  Undo away when its window closes early, leaving any error toast beside it.
+  editor's `use-undo.ts` is the reference caller of the helper itself.
+  With a toast, use **`useHold`** (`components/shared/use-hold.ts`):
+  `hold(key, message, commit, onUndo)` shows the thing as done and writes
+  it when the ten seconds are up, `send(key, { run, sent })` is the same
+  for anything that tells a customer ("Sending in 10 seconds", then "Sent
+  to {name}."), and `undo(key)` is the screen's own Undo beside the thing.
+  The bookings calendar, Home's Today, invites, sends and held cancels all
+  use it. `showUndo` returns the toast's id, and `dismissToast(id)` takes
+  that one Undo away when its window closes early.
+- **Current** — **Undo or confirm, never both, never neither.** Reversible:
+  do it and offer Undo, no dialog. Irreversible: the one `ConfirmDialog`,
+  which waits for the action and says a refusal inside itself. No way back
+  in the API, but not final yet: hold it (`useHold`).
+
+### A save that got no answer — **Current** (10 Oct 2026)
+
+Two sentences, in `lib/api/unreached.ts`, and no screen words its own:
+
+- **`UNREACHED`**: "We couldn't confirm that was saved. Check your connection, see whether it went through, then try again." It never says nothing changed: a write that timed out
+  may have landed.
+- **`SIGNED_OUT`**: "You've been signed out. Sign in again and what you
+  typed stays here."
+
+How they are reached:
+
+- **A write never throws, and has 20 seconds.** `apiFetch` gives every
+  request that isn't a GET or HEAD a 20-second limit. A network failure
+  or the limit answers as an ordinary error response carrying
+  `UNREACHED`, and a 401 carrying `SIGNED_OUT`. So `mutate`, `destroy`
+  and every service that reads its own response say the same thing
+  through `readError`; `mutate` and `destroy` also mark the result
+  `unreached` or `expired`. Reads are untouched: a failed read still
+  rejects into the page's failed state or boundary.
+- **Signed out is one toast that stays, with a way back.** The shell
+  registers the sentence with `setErrorAction` (`@saroh/ui/toast`), so
+  every `showError(res.error)` that says it draws the same toast with a
+  "Sign in" button. It opens accounts in a new tab: the page and what
+  was typed on it are still there to send again.
+- **A client calls a server action through `runAction`**
+  (`lib/api/run-action.ts`), never `setBusy(true); await save();
+setBusy(false)`:
+
+    ```ts
+    const res = await runAction(() => saveService(id, values), { setBusy });
+    if (!res) return; // it never got there, and has been said
+    if (!res.ok) …
+    ```
+
+    It clears the busy state in a `finally`, says `UNREACHED` once when the
+    action throws (the browser couldn't reach this app) and answers
+    `undefined`. `quiet` with `onUnreached` puts the sentence in the
+    sheet's own error line instead. An `await` inside
+    `startTransition(async () => …)` goes through it too: a server action
+    that throws there reaches the error boundary and replaces the form
+    being typed with an error page.
+
+- **After the guard, undo what was drawn early.** A switch flipped before
+  its save is put back (`if (!res) return setOn(!next)`), a promise a
+  hold is waiting on is resolved, and anything about money is read again,
+  since a reply that was lost may still have gone through.
+- `run-action.test.ts` scans the app: between a busy setter going on and
+  off, and inside a transition, every `await` is one that can't throw.
 
 ### An unreachable API is not a signed-out user — **Current**
 

@@ -80,9 +80,16 @@
   `docs/architecture/adr/ADR-005-ink-and-saffron-brand.md`. Ink `#1C1C1A` is the primary;
   Saffron `#D98A15` is the one accent; Paper `#F5F2EC` is the page, white the
   raised surface.
-- **Current** — **Saffron is punctuation:** the cursor dot, one progress fill,
-  one active state per screen. Two visible accents means one is wrong. Saffron
-  500 is for fills; text in Saffron is 700 on light and 400 on dark.
+- **Current** (10 Oct 2026) — **Saffron is the menu's current-page marker
+  and `Button variant="highlight"`, nothing else in the merchant app.** A link
+  is Ink and underlined, selection (a tab, a table row, a segmented option, a
+  chip) is Ink, a progress fill is Ink, and a tint that says "yours, in play"
+  is the `active` badge (a solid Ink edge). `lib/consistency/shared-pieces.test.ts`
+  fails on `text-brand`, `bg-brand-subtle`, `bg-highlight`, `decoration-brand`,
+  `border-brand` and `hsl(var(--brand))` in `apps/app.saroh.in` outside its
+  two allowed files, the rail and the phone tab bar. The readiness cards
+  carry no tint. Saffron 500 is for fills; text in Saffron is 700 on light
+  and 400 on dark.
 - **Current** — Semantic colours `primary`, `secondary`, `muted`, `accent`,
   `destructive`, `success`, `warning` and `info`, each with `-foreground`; a
   `-subtle` pair for `success`, `warning`, `destructive`, `info`, `brand` and
@@ -139,10 +146,54 @@
   `text-*` over a primitive; add a variant. `Button` has `default`, `brand`,
   `highlight`, `success`, `destructive`, `outline`, `secondary`, `ghost` and
   `link`.
+- **Current** (10 Oct 2026) — **One of each small piece.** A screen never
+  draws its own; the scan in `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts`
+  fails when one does, and its allowlists are the record of what is left.
+
+    | Piece                                 | Where                                                   | The rule                                                                                                                                                                                  |
+    | ------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `TabStrip`                            | `@saroh/ui/tabs`                                        | The one tab look: Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move). |
+    | `SectionList`                         | `components/shared/section-list.tsx`                    | The one vertical list of sections (Settings, Website › Settings).                                                                                                                         |
+    | `Segmented`                           | `@saroh/ui/segmented`                                   | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links.                                                                                               |
+    | `Chip`, `chipClass`                   | `components/shared/chip.tsx`                            | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                       |
+    | `ListSearch`                          | `@saroh/ui/list-search`                                 | "Search {things}" (required), icon, 38px, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. DataView draws it.                                                      |
+    | `StatusBadge`, `Badge`                | `components/shared/status-badge.tsx`, `@saroh/ui/badge` | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                        |
+    | `CountBadge`                          | `@saroh/ui/count-badge`                                 | Unread and tab counts: `neutral`, `strong` (Ink, something waits), `danger`. `null` is "—", never 0.                                                                                      |
+    | `Notice`                              | `@saroh/ui/notice`                                      | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                            |
+    | `TextLink`, `textLinkClass`           | `@saroh/ui/text-link`                                   | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                           |
+    | `IconButton`, `Tip`                   | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`            | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                           |
+    | `CopyButton`, `ShareLink`, `copyText` | `@saroh/ui/copy-button`                                 | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.       |
+    | `ProgressBar`, `doneOf`               | `@saroh/ui/progress-bar`                                | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                 |
+    | `.label`                              | `packages/ui/src/globals.css`                           | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                           |
+
+- **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
+  thing.** Whether customers can get a product, plan, course, pack, post,
+  service or discount code is one of six words, the same whatever the thing:
+  Draft, Scheduled, Live, Paused, Ended, Archived. The thing's own sentence
+  ("Taking bookings.", "Open to sign-ups.", "On sale.") is the badge's hint.
+  The table is `apps/app.saroh.in/lib/status/vocabulary.ts`
+  (`<StatusBadge thing="plan" status={plan.status} />`); database values and
+  API fields keep their names.
 - **Current** — **Status reads through `Badge` variants,** never coloured text.
-  State is a filled pill (`success`, `warning`, `error`, `info`, `draft`): the
-  status tint with its 700 text, always saying the status in words. Kind is the
-  neutral outline `tag`, for categories a shop owner invents.
+  State is a filled pill (`success`, `warning`, `error`, `info`): the
+  status tint with its 700 text, always saying the status in words. `draft`
+  is a dashed neutral edge and `active` ("in play, yours to act on") a solid
+  Ink edge; both were Saffron tints. Kind is the neutral outline `tag`, for
+  categories a shop owner invents.
+- **Current** (10 Oct 2026) — **A screen's tabs are `?tab=`; a list's saved
+  filter is `?view=`.** Products' Collections and Inventory, Invoices and
+  Team moved to `?tab=`; their old `?view=` links still land
+  (`readListQuery`, `tabFromView`, `useTabParam`'s `alias`). The section
+  screens (Settings › Business, Location, Website › Settings) keep
+  `?section=`, which deep links and Search settings use.
+- **Current** — **Overlays come in fixed sizes and one head and foot**
+  (UX audit, 10 Oct), baked into `@saroh/ui/dialog`, `sheet` and
+  `alert-dialog` so no caller patches them: `DialogContent size="sm" |
+"md" | "lg"` (420, 460, 560px), the title in `font-display` at 18px, a
+  30px close target that is 44px on a touch pointer, and a footer that
+  stacks on a phone with `gap-2` and the main button on top. Never pass a
+  footer its own gap or a title its own type. The app draws them through
+  `FormSheet`, `FormDialog` and `ConfirmDialog` (`frontend-forms.md`).
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu
@@ -153,10 +204,41 @@
   and the tables and cards on it are the step up (`--card`). So a table
   container carries `bg-card` itself, not relying on the page behind it
   (`app-shell.tsx`, `data-view.tsx`).
-- **Current** — **Button sizes are 32 / 38 / 45px** (`sm`, `default`, `lg`),
-  set explicitly and weight 600. **Disabled is one treatment for every
-  variant:** the `disabled` surface with an Ink 500 label that still clears
-  4.5:1, never an opacity. Say why a control is disabled, nearby.
+- **Current** — **Button sizes are 28 / 32 / 38 / 45px** (`xs`, `sm`,
+  `default`, `lg`), set explicitly and weight 600, with `icon`, `icon-sm`
+  and `icon-xs` as the same heights square and `inline` (with the `link`
+  variant) for a text action in a line of words. A call site never sets a
+  button's height, radius, type size or padding: pick a size. An icon-only
+  button is `IconButton`, which requires its label.
+- **Current** — **Busy is not disabled.** `Button busy busyLabel="Saving…"`
+  says it is working (`aria-busy`), takes no press and keeps its colour and
+  its width: both labels are laid out in one cell, so nothing beside it
+  moves. One wording per action, the verb's "-ing" form alone ("Saving…",
+  "Adding…", "Making…", "Trying again…"). `disabled` is for "you can't",
+  and a button that only waits on another's action (Cancel while saving)
+  is disabled, not busy.
+- **Current** — **Disabled is one treatment, on tokens of its own:**
+  `--disabled`, `--disabled-foreground` and `--disabled-border`, none of
+  them `muted`, so a disabled button on a muted panel keeps an edge and a
+  disabled value does not read as a placeholder. The label still clears
+  4.5:1. Never `disabled:opacity-*` (ESLint fails it). Say why a control is
+  disabled beside it, or keep it on and explain on submit.
+- **Current** — **A field's states come from the primitive.** `Input`,
+  `Textarea` and the select's box share one hover step, one focus ring
+  (`focus-visible:` only), the disabled tokens, the error look from
+  `aria-invalid`, and a read-only look (a hairline, no fill, the value at
+  full contrast: `readOnly` on a field, `readOnly` on `OptionSelect`).
+  `Input dense` is the 32px field for a table row. Checkbox and radio share
+  one 1.5px edge in `border-input` (3.17:1 on white). `Switch` has a `sm`
+  size. A call site never sets a field's height, radius or type size.
+- **Current** — **No hand-made controls in `app.saroh.in`.** ESLint
+  (`tooling/eslint-config-custom/controls.js`) fails a raw `<button>`,
+  `<input>`, `<select>`, `<textarea>` or `<label>`, `disabled:opacity-*`,
+  and `focus:ring*` / `focus:outline*`. What is still drawn by hand (a row
+  that is a button, a chip, a calendar cell, a file picker, a label that
+  wraps its control) is listed by file in `controls-allowlist.js` with what
+  it is, and `lib/controls-allowlist.test.ts` fails a stale line. Add a
+  line only for a genuinely different control.
 - **Adopted** — **One primary action per screen;** button labels are verb plus
   noun; sentence case everywhere; the product is always "Saroh" (07 §2, §4).
 - **Current** — **One page header: `PageHeader`** (`@saroh/ui/page-header`,
@@ -216,11 +298,19 @@
   Save) calls `useBottomBarInset(ref)` (`lib/hooks/use-bottom-bar-inset.ts`);
   the Toaster adds `--bottom-bar-inset` to its offsets, so a toast never
   covers, and swallows the tap on, the button the merchant reaches for next.
-- **Current** — **Touch targets reach 44px on a touch pointer.** Every `Button`
-  size grows through the `coarse:` variant (`default` and `icon` 40→44px, `sm`
-  32→44px) and keeps its desk height under a mouse; `coarse:` is a pointer
-  media query, not a width. 13 §7 and 14 §5's "40px default" finding predates
-  it. Inputs were not re-checked.
+- **Current** — **Touch targets reach 44px on a touch pointer.** Every
+  primitive carries it through the `coarse:` variant (a pointer media query,
+  not a width) and keeps its desk size under a mouse: every `Button` size,
+  `Input`, the select's box, `Toggle`, menu, select and command items,
+  calendar days and month buttons, the dialog and sheet close, a toast's
+  Undo, cancel and close, and the table's bulk bar. Where growing the box
+  would break a layout (checkbox, radio, switch, a slider's thumb, an
+  inline text button) an unseen area around the control takes the tap.
+  `controls.test.tsx` pins each.
+- **Current** — **A field is 16px on a touch pointer** (`coarse:text-base`
+  on `Input`, `Textarea`, the select's box and the command menu's search),
+  because iOS Safari zooms the page when a smaller field takes focus. A
+  call site never sets a field's type size.
 - **Current** — **A form control on a merchant's site is 16px or more**
   (`text-base` at least). iOS Safari zooms the page when a smaller field
   takes focus, and leaves it zoomed. Each also carries the keyboard and
@@ -259,21 +349,28 @@
   critical fail), checks every visible control's computed cursor and tabs
   through each main screen for a visible ring, desk and phone. Its ALLOW list
   is where a known debt goes, with its reason.
-- **Current** — **A link inside a sentence is underlined at rest.** Colour
-  alone does not tell it from the text around it (axe `link-in-text-block`):
-  Saffron 700 and Ink 500 differ by 1.04:1.
+- **Current** — **A link is Ink and underlined at rest** (`TextLink`).
+  Colour alone does not tell it from the text around it (axe
+  `link-in-text-block`).
 - **Adopted** — **Contrast materially above 4.5:1** for body text, in light and
   dark and every skin (`PRODUCT.md`); never colour alone; the focus ring is never
   removed; `muted-foreground` is never set below 14px or given opacity
   (13 §4); every dialog renders a `DialogTitle` (13 §8).
-- **Adopted** — **Icon-only controls have an accessible name** (an `aria-label`,
-  or an `sr-only` span as `dialog.tsx` does). Gap: the icon buttons in
-  `components/shared/skin-switcher.tsx` and `components/common/ThemeToggle.tsx`.
+- **Current** — **An icon-only control is `IconButton`,** which cannot be
+  made without a `label` (its name and its tooltip). **A hint is `Tip`, never
+  `title=`** on something pressed: it shows on hover and on keyboard focus
+  and is the control's `aria-description`. A thumb sees neither, so a reason
+  a control is off is still written beside it. Gap: `title=` remains on text
+  that is cut with an ellipsis (it carries the whole value), and about 100
+  decorative icons lack `aria-hidden`.
 
 ## Icons
 
-- **Adopted** — **`lucide-react` only**, `size-4` by default, `currentColor`, one
-  meaning per glyph (`Plus` creates, `X` dismisses) (07 §3). Gap: `react-icons`
+- **Current** — **`lucide-react` only**, `size-4` by default, `currentColor`,
+  lucide's own 2px stroke (no `strokeWidth` on an icon), one glyph per
+  meaning: `Plus` creates, `X` dismisses, `Pencil` edits, `ExternalLink`
+  leaves the app, `MoreHorizontal` opens more actions, `TriangleAlert`
+  warns (07 §3). Gap: `react-icons`
   is imported in `accounts.saroh.in` `components/auth/login-form.tsx` and
   `ui.saroh.in` `components/shared/header/index.tsx`.
 
@@ -331,7 +428,9 @@
 - **Current** — **Durations come from the tokens:** 100ms (`fast`) under the
   finger, 140ms (`base`) as the default, 200ms (`slow`) for drawers and sheets,
   always ease-out and never overshooting. That settles the old cap: nothing is
-  longer than 200ms. Exit faster than entry, and never animate position and size
+  longer than 200ms. Every `transition-*` in the merchant app carries
+  `duration-fast`, `-base` or `-slow`; `transition-all`, `animate-pulse`,
+  `ease-linear` and a literal `duration-200` fail the scan. Exit faster than entry, and never animate position and size
   together. Motion only explains a change, so there is no decorative, looping,
   parallax or bounce motion on product surfaces.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind

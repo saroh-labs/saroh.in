@@ -21,7 +21,7 @@ import {
 } from "@/components/organizations/business-form";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import { BusinessSheetFields } from "@/components/organizations/business-sheet-fields";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     defaultNumberFormat,
     formatFields,
@@ -192,7 +192,7 @@ export function BusinessFieldSheet({
 
     return (
         <Form {...form}>
-            <SettingsSheetFrame
+            <FormSheet
                 id={`${BUSINESS_ROW_ID[sheet]}-panel`}
                 returnFocusTo={returnTo}
                 title={words.title}
@@ -244,7 +244,7 @@ export function BusinessFieldSheet({
                         {...printOf(v, settings)}
                     />
                 ) : null}
-            </SettingsSheetFrame>
+            </FormSheet>
         </Form>
     );
 }

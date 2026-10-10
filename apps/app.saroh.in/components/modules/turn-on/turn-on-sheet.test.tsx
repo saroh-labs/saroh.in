@@ -269,7 +269,7 @@ describe("Bookings", () => {
         );
         expect(byLabel("First service").value).toBe("Consultation");
         expect(byLabel("Takes (minutes)").value).toBe("30");
-        expect(byLabel("Price (₹)").value).toBe("500.00");
+        expect(byLabel("Price").value).toBe("500.00");
         // Mon–Sat open, Sunday closed.
         const days = Array.from(
             sheet().querySelectorAll<HTMLButtonElement>('[role="checkbox"]'),
@@ -523,29 +523,29 @@ describe("Website", () => {
 });
 
 describe("Payments and Communications", () => {
-    it("Connect now turns it on and goes to Providers", async () => {
+    it("Turn on and connect turns it on and goes to Providers", async () => {
         await open(["PAYMENTS"]);
         expect(text()).toContain(
             "Online payment stays off until you connect a provider.",
         );
-        await press(button(/^Connect now$/));
+        await press(button(/^Turn on and connect$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
         expect(push).toHaveBeenCalledWith("/settings/providers");
     });
 
-    it("Later turns it on with nothing connected", async () => {
+    it("Turn on turns it on with nothing connected", async () => {
         await open(["PAYMENTS"]);
-        await press(button(/^Later$/));
+        await press(button(/^Turn on$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
         expect(push).toHaveBeenCalledWith("/billing");
     });
 
-    it("Communications brings Contacts, and Later stays where it is", async () => {
+    it("Communications brings Contacts, and Turn on stays where it is", async () => {
         await open(["COMMUNICATIONS"]);
         expect(text()).toContain(
             "Messages go to your contacts, so Contacts comes with it.",
         );
-        await press(button(/^Later$/));
+        await press(button(/^Turn on$/));
         expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
             "CRM",
             "COMMUNICATIONS",
@@ -564,7 +564,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         full: false,
     };
 
-    it("Payments: no Connect now, the plan and How to pay us instead, and Turn on", async () => {
+    it("Payments: no Turn on and connect, the plan and How to pay us instead, and Turn on", async () => {
         locks = { payments: lock, messaging: lock };
         await open(["PAYMENTS"]);
         expect(text()).toContain(
@@ -573,7 +573,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         expect(text()).toContain(
             "How to pay us for customers who pay you directly.",
         );
-        expect(text()).not.toContain("Connect now");
+        expect(text()).not.toContain("Turn on and connect");
         expect(text()).not.toContain("Razorpay or Cashfree");
         expect(
             sheet().querySelector(
@@ -612,9 +612,9 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         );
     });
 
-    it("Grow: Connect now is offered as before", async () => {
+    it("Grow: Turn on and connect is offered", async () => {
         await open(["PAYMENTS"]);
-        expect(text()).toContain("Connect now");
+        expect(text()).toContain("Turn on and connect");
         expect(text()).not.toContain("comes with Grow");
     });
 });

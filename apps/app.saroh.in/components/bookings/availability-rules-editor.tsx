@@ -7,10 +7,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
 import { EmptyState } from "@saroh/ui/data-state";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * Availability windows editor for a Service (S4-003). Each row is one recurring
@@ -113,9 +114,11 @@ export function AvailabilityRulesEditor({
             rules.push({ dayOfWeek: row.dayOfWeek, startMinute, endMinute });
         }
 
-        setSaving(true);
-        const res = await replaceRules(serviceId, rules);
-        setSaving(false);
+        const toSave = rules;
+        const res = await runAction(() => replaceRules(serviceId, toSave), {
+            setBusy: setSaving,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -211,8 +214,10 @@ export function AvailabilityRulesEditor({
                     onClick={onSave}
                     disabled={saving}
                     className="wk-press"
+                    busy={busy}
+                    busyLabel="Saving…"
                 >
-                    {busy ? "Saving…" : "Save availability"}
+                    Save availability
                 </Button>
             </div>
         </div>

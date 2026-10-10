@@ -24,14 +24,11 @@ export function boxClass({
 export function FieldLabel({
     htmlFor,
     children,
-    required,
     aside,
     className,
 }: {
     htmlFor?: string;
     children: ReactNode;
-    /** "Required" beside the label, while creating. */
-    required?: boolean;
     /** Right of the label: a shop switch, or a quiet note. */
     aside?: ReactNode;
     className?: string;
@@ -39,27 +36,15 @@ export function FieldLabel({
     const label = htmlFor ? (
         <label htmlFor={htmlFor} className="flex-1 text-[12.5px] font-medium">
             {children}
-            {required ? <Required /> : null}
         </label>
     ) : (
-        <span className="flex-1 text-[12.5px] font-medium">
-            {children}
-            {required ? <Required /> : null}
-        </span>
+        <span className="flex-1 text-[12.5px] font-medium">{children}</span>
     );
     return (
         <div className={cn("mb-1.5 flex items-center gap-2.5", className)}>
             {label}
             {aside}
         </div>
-    );
-}
-
-function Required() {
-    return (
-        <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">
-            Required
-        </span>
     );
 }
 
@@ -82,7 +67,7 @@ export function FieldHelp({
                 tone === "bad"
                     ? "text-destructive"
                     : tone === "warn"
-                      ? "text-brand-subtle-foreground"
+                      ? "text-foreground"
                       : "text-muted-foreground",
                 className,
             )}

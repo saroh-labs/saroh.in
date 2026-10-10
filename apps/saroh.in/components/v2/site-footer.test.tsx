@@ -40,7 +40,11 @@ describe("SiteFooter", () => {
 
     it("says who makes Saroh, and has no Resources column, Privacy or Terms before they're live", () => {
         render(<SiteFooter />);
-        expect(screen.getByText(MADE_BY)).toBeTruthy();
+        expect(
+            screen.getByText(
+                `${MADE_BY}. © ${new Date().getFullYear()}. All rights reserved.`,
+            ),
+        ).toBeTruthy();
         expect(screen.queryByText("Resources")).toBeNull();
         expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
         expect(screen.queryByRole("link", { name: /Terms/ })).toBeNull();
@@ -92,5 +96,27 @@ describe("SiteFooter", () => {
         expect(tool.parentElement?.firstElementChild?.textContent).toBe(
             "Tools",
         );
+    });
+
+    it("says what the name means under the logo", () => {
+        render(<SiteFooter />);
+        expect(screen.getByText("Let's rise together.")).toBeTruthy();
+        expect(
+            screen.getByText(/sa \(with\) \+ aaroh \(rising\)/),
+        ).toBeTruthy();
+    });
+
+    it("links each of Saroh's accounts by name, as a mark", () => {
+        render(<SiteFooter />);
+        const follow = screen.getByRole("list", { name: "Follow Saroh" });
+        expect(follow.querySelectorAll("a")).toHaveLength(5);
+        for (const [name, href] of [
+            ["Saroh on Instagram", "https://www.instagram.com/sarohlabs"],
+            ["Saroh on GitHub", "https://github.com/saroh-labs/saroh.in"],
+        ] as const) {
+            const link = screen.getByRole("link", { name });
+            expect(link.getAttribute("href")).toBe(href);
+            expect(link.querySelectorAll("svg path").length).toBeGreaterThan(0);
+        }
     });
 });

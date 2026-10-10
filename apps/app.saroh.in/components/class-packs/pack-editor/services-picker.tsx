@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
@@ -16,7 +17,7 @@ import {
 import { formatMoney } from "@/lib/format/money";
 
 import { FailedRead } from "@/components/shared/failed-read";
-import { FieldError, HELP, PackChip, PackSection } from "./parts";
+import { HELP, PackChip, PackSection } from "./parts";
 
 /**
  * Good for (E18): the services a credit pays for, filtered by the pack's
@@ -84,14 +85,14 @@ export function ServicesPicker({
                         : "No classes are taking bookings yet."}{" "}
                     <Link
                         href="/services/new"
-                        className="rounded-[4px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
+                        className="rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
                     >
                         Add a service
                     </Link>{" "}
                     and it can pay for its {units}.
                 </p>
             )}
-            <FieldError id={ids.error} message={error} />
+            <FieldError id={ids.error}>{error}</FieldError>
         </PackSection>
     );
 }

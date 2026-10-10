@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { saveProductCollections } from "@/lib/collections/actions";
 import type { MembershipRow } from "@/lib/collections/rules";
 import { membershipRows, pickedIds, sameList } from "@/lib/collections/rules";
@@ -51,27 +52,21 @@ export function ProductCollectionsSheet({
     async function save() {
         // The hand-picked set as it was, for Undo to put back.
         const previous = pickedIds(start, all);
-        setSaving(true);
-        const res = await saveProductCollections(
-            productId,
-            pickedIds(rows, all),
+        const res = await runAction(
+            () => saveProductCollections(productId, pickedIds(rows, all)),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Its collections weren't saved.", res.error);
             return;
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Collections saved.", () => {
-            void saveProductCollections(productId, previous).then((undo) => {
-                if (!undo.ok)
-                    showError(
-                        "Couldn't undo. The saved collections stay.",
-                        undo.error,
-                    );
-                router.refresh();
-            });
+        showUndo("Collections saved.", async () => {
+            const undo = await saveProductCollections(productId, previous);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -82,12 +77,12 @@ export function ProductCollectionsSheet({
             productName={productName}
             title="Edit collections"
             moreLink={{
-                href: "/commerce/products?view=collections",
+                href: "/commerce/products?tab=collections",
                 label: "All collections",
             }}
             dirty={dirty}
             saving={saving}
-            onSave={() => void save()}
+            onSave={save}
         >
             {rows.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
@@ -128,9 +123,7 @@ export function ProductCollectionsSheet({
                                     r.locked && r.on && "bg-muted-foreground",
                                 )}
                             >
-                                {r.on ? (
-                                    <Check className="size-3" strokeWidth={3} />
-                                ) : null}
+                                {r.on ? <Check className="size-3" /> : null}
                             </span>
                             <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-semibold">

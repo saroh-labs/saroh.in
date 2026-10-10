@@ -2,7 +2,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { ArrowUpRight, Camera } from "lucide-react";
+import { Camera, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { QrButton } from "@/components/qr/qr-button";
@@ -12,9 +12,10 @@ import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { priceLabel } from "@/lib/products/overview-rules";
 import { whereItSells } from "@/lib/products/overview-words";
+import { Notice } from "@saroh/ui/notice";
 
 export const STATUS_BADGE = {
-    PUBLISHED: { label: "Published", variant: "success" },
+    PUBLISHED: { label: "Live", variant: "success" },
     DRAFT: { label: "Draft", variant: "draft" },
     ARCHIVED: { label: "Archived", variant: "neutral" },
 } as const;
@@ -100,9 +101,10 @@ function ShopControls({
             {shopUrl ? (
                 // Live on the shop (UX-082): open it as customers see it.
                 <Button
+                    size="xs"
                     asChild
                     variant="ghost"
-                    className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                    className="gap-1.5 font-medium"
                 >
                     <a
                         href={shopUrl}
@@ -111,31 +113,24 @@ function ShopControls({
                         aria-label="View on the shop — opens in a new tab"
                     >
                         View on the shop
-                        <ArrowUpRight
-                            aria-hidden
-                            className="size-3"
-                            strokeWidth={2}
-                        />
+                        <ExternalLink aria-hidden className="size-3" />
                     </a>
                 </Button>
             ) : (
                 <Button
+                    size="xs"
                     type="button"
                     variant="ghost"
                     disabled
                     aria-describedby="shop-link-why"
-                    className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                    className="gap-1.5 font-medium"
                 >
                     {live
                         ? "View on the shop"
                         : product.status === "ARCHIVED"
                           ? "Not on the shop"
                           : "Not on the shop yet"}
-                    <ArrowUpRight
-                        aria-hidden
-                        className="size-3"
-                        strokeWidth={2}
-                    />
+                    <ExternalLink aria-hidden className="size-3" />
                 </Button>
             )}
         </>
@@ -199,17 +194,11 @@ export function ProductHeader({
                 title={product.name}
                 badge={
                     <>
-                        <Badge
-                            variant={status.variant}
-                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                        >
+                        <Badge variant={status.variant} size="sm">
                             {status.label}
                         </Badge>
                         {paused ? (
-                            <Badge
-                                variant="warning"
-                                className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                            >
+                            <Badge variant="warning" size="sm">
                                 Paused
                             </Badge>
                         ) : null}
@@ -269,11 +258,7 @@ export function ProductHeader({
                                 "flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border-strong bg-muted/60 text-[10.5px] font-semibold text-muted-foreground hover:bg-muted",
                             )}
                         >
-                            <Camera
-                                aria-hidden
-                                className="size-[18px]"
-                                strokeWidth={1.8}
-                            />
+                            <Camera aria-hidden className="size-[18px]" />
                             Add
                         </Link>
                     )
@@ -285,12 +270,5 @@ export function ProductHeader({
 
 /** For anyone who can't change the product: what they can do, and who can. */
 export function AccessLine({ line }: { line: string }) {
-    return (
-        <p
-            role="note"
-            className="text-pretty border-b border-border bg-muted px-4 py-2.5 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground sm:px-[22px]"
-        >
-            {line}
-        </p>
-    );
+    return <Notice layout="banner">{line}</Notice>;
 }

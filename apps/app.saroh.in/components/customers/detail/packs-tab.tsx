@@ -21,7 +21,9 @@ import {
     packTabRows,
 } from "@/lib/customer-workspace/packs";
 
-import { Bar, CARD, Chips, Empty, Failed, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
+import { Bar, CARD, Chips, Empty, Failed } from "./parts";
 
 /** What selling them a pack needs; null when this viewer may not sell. */
 export interface PackSale {
@@ -32,7 +34,7 @@ export interface PackSale {
 const BAR = { ok: "ok", soon: "accent", ended: "off" } as const;
 
 const WHEN = {
-    soon: "text-brand",
+    soon: "text-foreground",
     lost: "text-destructive-subtle-foreground",
     plain: "text-foreground/80",
 } as const;
@@ -86,11 +88,7 @@ export function PacksTab({
                     : ""}
             </p>
             {canSell ? (
-                <Button
-                    variant="outline"
-                    onClick={onSell}
-                    className={SMALL_BUTTON}
-                >
+                <Button size="sm" variant="outline" onClick={onSell}>
                     Sell a pack
                 </Button>
             ) : null}
@@ -113,7 +111,6 @@ export function PacksTab({
                 label="Which packs"
                 value={which}
                 onChange={setWhich}
-                height={32}
                 chips={[
                     {
                         key: "live",
@@ -166,7 +163,7 @@ function PackItem({
                     <div className="flex items-baseline gap-2.5">
                         <Link
                             href={row.href}
-                            className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand/80"
+                            className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                         >
                             {row.name}
                         </Link>
@@ -194,12 +191,12 @@ function PackItem({
                 </div>
                 <div className="flex max-w-[200px] flex-col items-end gap-1">
                     <Button
+                        size="sm"
                         variant="outline"
                         disabled={why !== null}
                         aria-describedby={why ? ids.why : undefined}
                         aria-label={`Extend the ${row.name}`}
                         onClick={onExtend}
-                        className={SMALL_BUTTON}
                     >
                         Extend
                     </Button>
@@ -215,17 +212,16 @@ function PackItem({
             </div>
             {row.uses.length > 0 ? (
                 <div className="mt-2.5 border-t border-foreground/10 pt-2">
-                    <button
-                        type="button"
+                    <TextLink
                         aria-expanded={open}
                         aria-controls={ids.uses}
                         onClick={() => setOpen((o) => !o)}
-                        className="rounded-[4px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70 coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         {open
                             ? `Hide the ${row.unitsWord} booked`
                             : `${row.unitsWord.charAt(0).toUpperCase()}${row.unitsWord.slice(1)} booked · ${row.uses.length}`}
-                    </button>
+                    </TextLink>
                     {open ? (
                         <ul id={ids.uses} className="m-0 mt-1 list-none p-0">
                             {row.uses.map((u) => (
@@ -240,9 +236,9 @@ function PackItem({
                                         <span className="min-w-0 flex-[1_1_140px] font-semibold">
                                             {u.what}
                                         </span>
-                                        <RowPill tone={u.state.tone}>
+                                        <StatusBadge tone={u.state.tone}>
                                             {u.state.label}
-                                        </RowPill>
+                                        </StatusBadge>
                                     </Link>
                                 </li>
                             ))}

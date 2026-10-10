@@ -173,9 +173,7 @@ test.describe("product editor", () => {
             await visibility
                 .getByRole("button", { name: /^Status: Draft/ })
                 .click();
-            await page
-                .getByRole("menuitemradio", { name: /^Published/ })
-                .click();
+            await page.getByRole("menuitemradio", { name: /^Live/ }).click();
             await expect(
                 visibility.getByText(/Saving publishes it for the first time/),
             ).toBeVisible();

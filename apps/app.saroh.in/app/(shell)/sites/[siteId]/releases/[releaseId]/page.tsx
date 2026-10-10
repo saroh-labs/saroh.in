@@ -15,6 +15,7 @@ import {
 import { getReviewState, getSite, listComments } from "@/lib/sites/service";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
 import { readTestRelease } from "@/lib/sites/test-releases-api";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * One test release, read in the workspace (DEC-071, T12).
@@ -109,10 +110,7 @@ export default async function TestReleasePage({
                 }
             />
 
-            <div
-                role="status"
-                className="space-y-1 rounded-lg border bg-muted px-4 py-3 text-sm"
-            >
+            <Notice role="status">
                 <p>
                     {release.status === "live" ? (
                         <>
@@ -148,7 +146,7 @@ export default async function TestReleasePage({
                         aren&apos;t in it.
                     </p>
                 ) : null}
-            </div>
+            </Notice>
 
             <ReleaseReviewView
                 siteId={siteId}

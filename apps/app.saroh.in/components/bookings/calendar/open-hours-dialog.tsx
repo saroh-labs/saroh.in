@@ -1,12 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from "@saroh/ui/dialog";
+import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -30,8 +24,8 @@ import {
 } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { Chip, Eyebrow } from "./parts";
-import { btn } from "./quick-look-types";
 
 export interface HoursTarget {
     staff: StaffView;
@@ -70,18 +64,32 @@ export function OpenHoursDialog({
     onClose: () => void;
 }) {
     return (
-        <Dialog open={target !== null} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-[440px] gap-0 rounded-[14px] px-5 py-[18px]">
-                {target ? (
-                    <Form
-                        key={`${target.staff.id}${target.date}${target.from}${target.mode}`}
-                        target={target}
-                        timezone={timezone}
-                        onClose={onClose}
-                    />
-                ) : null}
-            </DialogContent>
-        </Dialog>
+        <FormDialog
+            open={target !== null}
+            size="md"
+            title={
+                target
+                    ? `${target.mode === "block" ? "Block" : "Open"} ${target.staff.name} from ${clock(target.from)}`
+                    : ""
+            }
+            description={
+                target
+                    ? target.mode === "block"
+                        ? `On ${dayLabel(target.date)}. Customers aren't offered the time you block.`
+                        : `On ${dayLabel(target.date)}. Customers can book the time you open.`
+                    : ""
+            }
+            onClose={onClose}
+        >
+            {target ? (
+                <Form
+                    key={`${target.staff.id}${target.date}${target.from}${target.mode}`}
+                    target={target}
+                    timezone={timezone}
+                    onClose={onClose}
+                />
+            ) : null}
+        </FormDialog>
     );
 }
 
@@ -119,17 +127,17 @@ function Form({
     );
     const bad = block
         ? hit.length
-            ? `That overlaps ${hit.map((b) => `${blockTitle(b)} at ${clock(b.start)}`).join(", ")} — move or cancel it first.`
+            ? `That overlaps ${hit.map((b) => `${blockTitle(b)} at ${clock(b.start)}`).join(", ")}. Move or cancel it first.`
             : ""
         : works || (scope === "week" && weeklyClash)
-          ? `${staff.name} already works part of that time — pick a closed time, or change hours on Availability.`
+          ? `${staff.name} already works part of that time. Pick a closed time, or change hours on Availability.`
           : "";
     const note =
         bad ||
         (block
             ? "Customers won't be offered this time. It shows as time off on the calendar."
             : scope === "week"
-              ? `Adds to ${staff.name}'s weekly hours — the same as on Availability.`
+              ? `Adds to ${staff.name}'s weekly hours, the same as on Availability.`
               : `A one-off. ${staff.name}'s weekly hours don't change.`);
 
     async function save() {
@@ -138,12 +146,16 @@ function Form({
         const range = `${clock(from)}–${clock(to)}`;
         if (block) {
             const startAt = zonedInstant(date, from, timezone).toISOString();
-            const res = await addTimeOff(staff.id, {
-                startAt,
-                endAt: zonedInstant(date, to, timezone).toISOString(),
-                reason: "Blocked from the calendar",
-            });
-            setSaving(false);
+            const res = await runAction(
+                () =>
+                    addTimeOff(staff.id, {
+                        startAt,
+                        endAt: zonedInstant(date, to, timezone).toISOString(),
+                        reason: "Blocked from the calendar",
+                    }),
+                { setBusy: setSaving },
+            );
+            if (!res) return;
             if (!res.ok) return showError(res.error);
             const added = res.data.staff.timeOff.find(
                 (t) => Date.parse(t.startAt) === Date.parse(startAt),
@@ -152,47 +164,53 @@ function Form({
             router.refresh();
             showUndo(
                 `Blocked ${range} for ${staff.name}. Nobody can book it.`,
-                () => {
-                    if (!added) return;
-                    void removeTimeOff(staff.id, added.id).then((back) => {
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    });
+                async () => {
+                    if (!added) return false;
+                    const back = await removeTimeOff(staff.id, added.id);
+                    router.refresh();
+                    return back;
                 },
             );
             return;
         }
         if (scope === "week") {
             const before = staff.hours;
-            const res = await replaceStaffHours(staff.id, [
-                ...before,
-                {
-                    dayOfWeek: weekdayOf(date),
-                    startMinute: from,
-                    endMinute: to,
-                },
-            ]);
-            setSaving(false);
+            const res = await runAction(
+                () =>
+                    replaceStaffHours(staff.id, [
+                        ...before,
+                        {
+                            dayOfWeek: weekdayOf(date),
+                            startMinute: from,
+                            endMinute: to,
+                        },
+                    ]),
+                { setBusy: setSaving },
+            );
+            if (!res) return;
             if (!res.ok) return showError(res.error);
             onClose();
             router.refresh();
             showUndo(
                 `${staff.name} now works ${range} every ${dayName}.`,
-                () => {
-                    void replaceStaffHours(staff.id, before).then((back) => {
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    });
+                async () => {
+                    const back = await replaceStaffHours(staff.id, before);
+                    router.refresh();
+                    return back;
                 },
             );
             return;
         }
-        const res = await addExtraHours(staff.id, {
-            date,
-            startMinute: from,
-            endMinute: to,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                addExtraHours(staff.id, {
+                    date,
+                    startMinute: from,
+                    endMinute: to,
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         const added = res.data.extraHours.find(
             (x) =>
@@ -204,29 +222,20 @@ function Form({
         router.refresh();
         showUndo(
             `Opened ${range} for ${staff.name} on ${dayLabel(date)} only.`,
-            () => {
-                if (!added) return;
-                void removeExtraHours(staff.id, added.id).then((back) => {
-                    if (!back.ok) showError(back.error);
-                    router.refresh();
-                });
+            async () => {
+                if (!added) return false;
+                const back = await removeExtraHours(staff.id, added.id);
+                router.refresh();
+                return back;
             },
         );
     }
 
     return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                void save();
-            }}
-        >
-            <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                {block ? "Block" : "Open"} {staff.name} from {clock(from)}
-            </DialogTitle>
-            <DialogDescription className="mb-3 mt-[3px] text-[12.5px] text-muted-foreground">
+        <>
+            <p className="mb-3 text-[12.5px] text-muted-foreground">
                 {dayLabel(date)} · {clock(from)}–{clock(to)}
-            </DialogDescription>
+            </p>
             <Eyebrow id="oh-for">For</Eyebrow>
             <div
                 role="radiogroup"
@@ -274,27 +283,12 @@ function Form({
             >
                 {note}
             </p>
-            <div className="mt-3.5 flex justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={btn.ghost}
-                    onClick={onClose}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    className={btn.primary}
-                    disabled={Boolean(bad) || saving}
-                >
-                    {saving
-                        ? "Saving…"
-                        : block
-                          ? "Block it"
-                          : "Open for bookings"}
-                </Button>
-            </div>
-        </form>
+            <FormDialogFoot
+                saveLabel={block ? "Block time" : "Open time"}
+                savingLabel={block ? "Blocking…" : "Opening…"}
+                pending={saving}
+                onSubmit={save}
+            />
+        </>
     );
 }

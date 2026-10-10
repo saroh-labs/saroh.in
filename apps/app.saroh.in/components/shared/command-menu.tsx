@@ -9,9 +9,16 @@ import {
     CommandList,
 } from "@saroh/ui/command";
 import {
+    CalendarCheck,
+    CalendarClock,
     CircleHelp,
+    Clock,
     Globe,
+    Package,
     Receipt,
+    ReceiptText,
+    Repeat,
+    RotateCw,
     SlidersHorizontal,
     Target,
     UserRound,
@@ -30,6 +37,8 @@ import {
     helpUrl,
 } from "@/lib/help/links";
 import { mayNavigate } from "@/lib/nav/leave-request";
+import type { Recent } from "@/lib/search/recents";
+import { readRecents, rememberRecent } from "@/lib/search/recents";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
@@ -61,12 +70,36 @@ const KIND_META: Record<
     SearchKind,
     { icon: typeof UserRound; heading: string }
 > = {
-    contact: { icon: UserRound, heading: "Contacts" },
-    lead: { icon: Target, heading: "Leads" },
+    // One person backs both screens (DEC-041), so one group finds them.
+    contact: { icon: UserRound, heading: "Customers and contacts" },
     order: { icon: Receipt, heading: "Orders" },
+    booking: { icon: CalendarCheck, heading: "Bookings" },
+    product: { icon: Package, heading: "Products" },
+    invoice: { icon: ReceiptText, heading: "Invoices" },
+    service: { icon: CalendarClock, heading: "Services" },
+    subscription: { icon: Repeat, heading: "Subscriptions" },
+    lead: { icon: Target, heading: "Leads" },
 };
 
-const KIND_ORDER: SearchKind[] = ["contact", "lead", "order"];
+/** The order the groups are drawn in: who, then what they did. */
+const KIND_ORDER: SearchKind[] = [
+    "contact",
+    "order",
+    "booking",
+    "product",
+    "invoice",
+    "service",
+    "subscription",
+    "lead",
+];
+
+/** Said when the search itself couldn't be read. Never "Nothing matches". */
+export const SEARCH_FAILED = "Search isn't answering. Try again.";
+
+/** A recent's icon, by the kind it was found as. */
+function recentIcon(kind: string): typeof UserRound {
+    return kind in KIND_META ? KIND_META[kind as SearchKind].icon : Clock;
+}
 
 /**
  * Help articles, reachable from the same box as everything else.
@@ -165,8 +198,14 @@ export function CommandMenu({
     stockTracked = null,
     roleKey = null,
     kind,
+    recentsScope = "",
 }: {
     moduleKeys?: string[] | null;
+    /**
+     * Whose recents these are: the open business's id. What someone opened
+     * in one business is not offered in another.
+     */
+    recentsScope?: string;
     /**
      * What is being set up (DEC-070): the Business settings page is "Your
      * details" for Just me and A site for my work.
@@ -200,6 +239,12 @@ export function CommandMenu({
     const [query, setQuery] = useState("");
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
+    // The query the search couldn't be read for, and how often it was
+    // asked again ("Try again").
+    const [failedFor, setFailedFor] = useState<string | null>(null);
+    const [attempt, setAttempt] = useState(0);
+    // The last five things opened from here, read when the menu opens.
+    const [recents, setRecents] = useState<Recent[]>([]);
     const groups = navFor({
         role,
         roleKey,
@@ -222,17 +267,21 @@ export function CommandMenu({
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
+                setRecents(readRecents(recentsScope));
                 setOpen((o) => !o);
             }
         };
-        const onOpen = () => setOpen(true);
+        const onOpen = () => {
+            setRecents(readRecents(recentsScope));
+            setOpen(true);
+        };
         document.addEventListener("keydown", onKey);
         window.addEventListener(OPEN_EVENT, onOpen);
         return () => {
             document.removeEventListener("keydown", onKey);
             window.removeEventListener(OPEN_EVENT, onOpen);
         };
-    }, []);
+    }, [recentsScope]);
 
     /*
      * One in-flight request at a time, and late replies are discarded.
@@ -255,14 +304,30 @@ export function CommandMenu({
         const timer = setTimeout(() => {
             setSearching(true);
             void fetch(`/api/search?q=${encodeURIComponent(trimmed)}`)
-                .then((r) => (r.ok ? r.json() : { hits: [] }))
-                .then((data: { hits?: SearchHit[] }) => {
+                .then((r) => {
+                    // Not answered is not "found nothing".
+                    if (!r.ok) throw new Error("search failed");
+                    return r.json() as Promise<{
+                        hits?: SearchHit[];
+                        failed?: boolean;
+                    }>;
+                })
+                .then((data) => {
                     if (mine !== generation.current) return;
-                    setHits(data.hits ?? []);
+                    if (data.failed || !Array.isArray(data.hits)) {
+                        setHits([]);
+                        setFailedFor(trimmed);
+                        return;
+                    }
+                    setHits(data.hits);
+                    setFailedFor(null);
                 })
                 .catch(() => {
-                    // A failed search is an empty search, not a broken palette.
-                    if (mine === generation.current) setHits([]);
+                    // The palette still works: its pages and actions are
+                    // its own. But it says the search didn't answer.
+                    if (mine !== generation.current) return;
+                    setHits([]);
+                    setFailedFor(trimmed);
                 })
                 .finally(() => {
                     if (mine === generation.current) setSearching(false);
@@ -270,17 +335,34 @@ export function CommandMenu({
         }, DEBOUNCE_MS);
 
         return () => clearTimeout(timer);
-    }, [query]);
+    }, [query, attempt]);
 
     const go = (href: string) => {
         setOpen(false);
         setQuery("");
         setHits([]);
+        setFailedFor(null);
         // An open edit may hold the page: it asks, and goes if discarded.
         if (mayNavigate(href)) router.push(href);
     };
 
+    /** Open a thing search found, and remember it for next time. */
+    const openHit = (hit: SearchHit) => {
+        setRecents(
+            rememberRecent(recentsScope, {
+                kind: hit.kind,
+                id: hit.id,
+                title: hit.title,
+                href: hit.href,
+            }),
+        );
+        go(hit.href);
+    };
+
+    const needle = query.trim().toLowerCase();
     const typed = query.trim().length >= 2;
+    // Only for the query on screen: a shortened or new one starts clean.
+    const failed = typed && !searching && failedFor === query.trim();
     /*
      * Derived, not stored. `hits` only ever holds the last SUCCESSFUL response,
      * so a query the merchant has shortened back below the threshold shows
@@ -295,7 +377,6 @@ export function CommandMenu({
     })).filter((g) => g.rows.length > 0);
 
     // Navigation and actions are filtered here because cmdk's own filter is off.
-    const needle = query.trim().toLowerCase();
     const matches = (label: string) =>
         !needle || label.toLowerCase().includes(needle);
     const visibleActions = actions.filter((a) => matches(a.label));
@@ -307,30 +388,83 @@ export function CommandMenu({
 
     return (
         <CommandDialog
-            label="Search the workspace"
-            description="Find a contact, lead or order, start something new, or jump to a section."
+            label="Search Saroh"
+            description="Find a customer, order, booking, product or invoice, start something new, or jump to a page."
             open={open}
             onOpenChange={(next) => {
+                if (next) setRecents(readRecents(recentsScope));
                 setOpen(next);
-                if (!next) setQuery("");
+                if (!next) {
+                    setQuery("");
+                    setFailedFor(null);
+                }
             }}
             shouldFilter={false}
         >
             <CommandInput
                 value={query}
                 onValueChange={setQuery}
-                placeholder="Search contacts, leads and orders…"
+                placeholder="Search customers, orders, bookings, products…"
             />
             <CommandList>
                 <CommandEmpty>
-                    {/* Three different states, because they call for three
-                        different responses from the person reading them. */}
+                    {/* Four different states, because they call for four
+                        different responses from the person reading them. A
+                        search that didn't answer is never "Nothing
+                        matches": that would say the customer isn't there. */}
                     {!typed
                         ? "Type at least two characters to search."
                         : busy
                           ? "Searching…"
-                          : noMatchLine("pages or actions", query)}
+                          : failed
+                            ? SEARCH_FAILED
+                            : noMatchLine("pages or actions", query)}
                 </CommandEmpty>
+
+                {/* The search didn't answer. Said even when pages or
+                    actions below match what was typed, with the way to
+                    ask again. */}
+                {failed ? (
+                    <CommandGroup heading="Search">
+                        <p
+                            role="status"
+                            className="px-2 pb-1.5 pt-1 text-sm text-foreground"
+                        >
+                            {SEARCH_FAILED}
+                        </p>
+                        <CommandItem
+                            value="search:try-again"
+                            onSelect={() => {
+                                setFailedFor(null);
+                                setAttempt((n) => n + 1);
+                            }}
+                        >
+                            <RotateCw className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                            Try again
+                        </CommandItem>
+                    </CommandGroup>
+                ) : null}
+
+                {/* Nothing typed yet: what this person opened last. */}
+                {!needle && recents.length > 0 ? (
+                    <CommandGroup heading="Recent">
+                        {recents.map((recent) => {
+                            const Icon = recentIcon(recent.kind);
+                            return (
+                                <CommandItem
+                                    key={`recent:${recent.kind}:${recent.id}`}
+                                    value={`recent:${recent.kind}:${recent.id}`}
+                                    onSelect={() => go(recent.href)}
+                                >
+                                    <Icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                        {recent.title}
+                                    </span>
+                                </CommandItem>
+                            );
+                        })}
+                    </CommandGroup>
+                ) : null}
 
                 {byKind.map(({ kind, rows }) => {
                     const Icon = KIND_META[kind].icon;
@@ -343,7 +477,7 @@ export function CommandMenu({
                                 <CommandItem
                                     key={`${hit.kind}:${hit.id}`}
                                     value={`${hit.kind}:${hit.id}`}
-                                    onSelect={() => go(hit.href)}
+                                    onSelect={() => openHit(hit)}
                                 >
                                     <Icon className="mr-2 size-4 shrink-0 text-muted-foreground" />
                                     <span className="truncate">

@@ -7,6 +7,7 @@ import { Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { dismissStorefrontTeamNotice } from "@/lib/organizations/member-actions";
 import type { StorefrontTeamNoticePerson } from "@/lib/organizations/members";
 
@@ -44,9 +45,10 @@ export function StorefrontTeamNotice({
     if (people.length === 0) return null;
 
     async function dismiss() {
-        setDismissing(true);
-        const res = await dismissStorefrontTeamNotice();
-        setDismissing(false);
+        const res = await runAction(() => dismissStorefrontTeamNotice(), {
+            setBusy: setDismissing,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -81,11 +83,11 @@ export function StorefrontTeamNotice({
                 <Button
                     size="sm"
                     variant="outline"
-                    disabled={dismissing}
                     onClick={dismiss}
-                    className="text-[12.5px]"
+                    busy={dismissing}
+                    busyLabel="Dismissing…"
                 >
-                    {dismissing ? "Dismissing…" : "Dismiss"}
+                    Dismiss
                 </Button>
             </div>
             <ul>
@@ -114,7 +116,6 @@ export function StorefrontTeamNotice({
                                 variant="outline"
                                 onClick={() => onChangeRole(p.userId)}
                                 aria-label={`Change ${name}’s role`}
-                                className="text-[12.5px]"
                             >
                                 Change role
                             </Button>

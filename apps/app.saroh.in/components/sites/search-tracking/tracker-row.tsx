@@ -1,6 +1,5 @@
 import type { TrackerKind } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
-import Link from "next/link";
 
 import type { TrackerView } from "@/lib/sites/search-tracking";
 import {
@@ -10,6 +9,7 @@ import {
     trackerRunsLine,
 } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * One tool in the trackers list (DEC-108, U7), connected or not, on one
@@ -114,13 +114,7 @@ function StandingLine({
     if (standing === "locked" && lock) {
         return tracker ? (
             <p className="text-sm" data-kept>
-                {lock.kept}{" "}
-                <Link
-                    href={lock.href}
-                    className="underline underline-offset-2 hover:text-muted-foreground active:text-foreground"
-                >
-                    {lock.cta}
-                </Link>
+                {lock.kept} <TextLink href={lock.href}>{lock.cta}</TextLink>
             </p>
         ) : null;
     }

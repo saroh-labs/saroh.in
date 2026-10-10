@@ -8,14 +8,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
 import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { readInvoice } from "@/lib/invoices/actions";
 import { newPayLink } from "@/lib/invoices/link-actions";
@@ -40,6 +41,11 @@ import {
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
+import {
+    copyFailedMessage,
+    copyText as writeClipboard,
+} from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 
 type Read =
     | { state: "loading" }
@@ -159,24 +165,23 @@ export function InvoiceQuickLook({
         linkSight({ linkOut, held: remembered !== null }) === "unseen";
 
     async function copyText(url: string, made: boolean) {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess(
-                made
-                    ? `Pay link copied. Send it to ${who.name}.`
-                    : "Pay link copied.",
-            );
-        } catch {
-            showError("Couldn't copy it. Select the link below and copy it.");
+        if (!(await writeClipboard(url))) {
+            showError(copyFailedMessage());
+            return;
         }
+        // A toast only when the link was also just made: it says who to
+        // send it to. A plain copy is acknowledged by the button.
+        if (made) showSuccess(`Pay link copied. Send it to ${who.name}.`);
+        else showSuccess("Pay link copied.");
     }
 
     async function copyLink() {
         if (!i) return;
         if (shown) return copyText(shown, false);
-        setBusy(true);
-        const res = await newPayLink(i.id, full?.updatedAt);
-        setBusy(false);
+        const res = await runAction(() => newPayLink(i.id, full?.updatedAt), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return reportFailure(res);
         setShown(res.data.url);
         await copyText(res.data.url, true);
@@ -220,7 +225,7 @@ export function InvoiceQuickLook({
                     )}
                 </>
             }
-            status={<InvoicePill label={pill.label} variant={pill.variant} />}
+            status={<StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>}
             description={`${paperTitle(i)} for ${who.name}, ${money(i.total)}.`}
             footer={
                 <>
@@ -229,7 +234,6 @@ export function InvoiceQuickLook({
                             type="button"
                             variant="outline"
                             onClick={() => setShown(remembered)}
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             Show link again
                         </Button>
@@ -241,7 +245,6 @@ export function InvoiceQuickLook({
                             onClick={() =>
                                 unseen ? setConfirming(true) : void copyLink()
                             }
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             {copyLinkLabel({
                                 busy,
@@ -250,27 +253,21 @@ export function InvoiceQuickLook({
                             })}
                         </Button>
                     ) : null}
-                    <Button
-                        asChild
-                        className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                    >
+                    <Button asChild className="min-w-[160px] flex-1">
                         <Link href={invoiceHref(i.id)}>Open invoice</Link>
                     </Button>
                 </>
             }
         >
             {i.standing === "OVERDUE" && i.dueAt ? (
-                <div
-                    role="alert"
-                    className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     {late.before} — due{" "}
                     <ViewerDate
                         iso={i.dueAt}
                         variant="dayMonth"
                         timeZone={timeZone}
                     />
-                </div>
+                </Notice>
             ) : null}
 
             <QuickLookCard label="Billed to">

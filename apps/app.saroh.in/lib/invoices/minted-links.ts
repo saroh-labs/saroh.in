@@ -155,7 +155,7 @@ export function copyLinkLabel(state: {
     shown: boolean;
     linkOut: boolean;
 }): string {
-    if (state.busy) return "Making a link…";
+    if (state.busy) return "Making…";
     if (state.shown) return "Copy link";
     if (state.linkOut) return UNSEEN_LINK.action;
     return "Copy pay link";
@@ -186,7 +186,7 @@ export const UNSEEN_LINK = {
     action: "Make a new link",
     confirmTitle: "Make a new pay link?",
     confirmLabel: "Make a new link",
-    cancelLabel: "Keep the old one",
+    keepLabel: "Keep the old link",
 } as const;
 
 /**

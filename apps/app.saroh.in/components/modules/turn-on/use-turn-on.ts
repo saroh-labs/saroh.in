@@ -4,6 +4,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
@@ -165,7 +166,7 @@ export function useTurnOn({
                 setupFor(key, sent),
             ).catch(() => ({
                 ok: false as const,
-                error: "Saroh couldn't be reached. Try again.",
+                error: UNREACHED,
                 fields: {},
             }));
             if (!res.ok) {

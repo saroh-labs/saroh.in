@@ -1,15 +1,9 @@
 "use client";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { MessageSquareQuote, Send } from "lucide-react";
@@ -24,6 +18,8 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { InviteReviewsSheet } from "@/components/stores/invite-reviews-sheet";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
@@ -81,7 +77,7 @@ export function ReviewsView({
                     <span className="flex items-center gap-2">
                         <span
                             aria-label={`${r.rating} out of 5 stars`}
-                            className="text-[13px] tracking-[1px] text-highlight"
+                            className="text-[13px] tracking-[1px] text-foreground"
                         >
                             {stars(r.rating)}
                         </span>
@@ -219,25 +215,32 @@ function ReviewSheet({
     const router = useRouter();
     const [reply, setReply] = useState("");
     const [pending, startTransition] = useTransition();
+    const [tried, setTried] = useState(false);
     const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
     // A fresh reply box per review opened (the saved reply to edit, if any).
     if (review && review.id !== loadedFor) {
         setLoadedFor(review.id);
         setReply(review.reply ?? "");
+        setTried(false);
     }
 
     const hidden = review?.status === "HIDDEN";
 
+    const empty = tried && !reply.trim();
     const saveReply = () => {
+        setTried(true);
         if (!review || !reply.trim()) return;
         startTransition(async () => {
-            const res = await replyToReview(review.id, reply.trim());
+            const res = await runAction(() =>
+                replyToReview(review.id, reply.trim()),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            showSuccess(review.reply ? "Reply updated" : "Reply posted");
+            showSuccess(review.reply ? "Reply saved." : "Reply posted.");
             onClose();
             router.refresh();
         });
@@ -247,7 +250,8 @@ function ReviewSheet({
         if (!review) return;
         const next = !hidden;
         startTransition(async () => {
-            const res = await setReviewHidden(review.id, next);
+            const res = await runAction(() => setReviewHidden(review.id, next));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -255,119 +259,128 @@ function ReviewSheet({
             onClose();
             router.refresh();
             if (next) {
-                showUndo("Review hidden — it stays here, marked.", () => {
-                    void setReviewHidden(review.id, false).then(() =>
-                        router.refresh(),
-                    );
-                });
+                showUndo(
+                    "Review hidden.",
+                    async () => {
+                        const back = await runAction(
+                            () => setReviewHidden(review.id, false),
+                            { quiet: true },
+                        );
+                        if (!back) return { ok: false, error: UNREACHED };
+                        router.refresh();
+                        return back;
+                    },
+                    { description: "It stays here, marked." },
+                );
             } else {
-                showSuccess("Review shown again");
+                showSuccess("Review shown again.");
             }
         });
     };
 
     return (
-        <Sheet open={review !== null} onOpenChange={(o) => !o && onClose()}>
-            <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-                {review ? (
+        <FormSheet
+            open={review !== null}
+            title={review?.productName ?? "Review"}
+            description={
+                review ? (
                     <>
-                        <SheetHeader>
-                            <SheetTitle>{review.productName}</SheetTitle>
-                            <SheetDescription>
-                                {review.displayName} · invited to{" "}
-                                {review.invitedTo} ·{" "}
-                                <ViewerDate iso={review.createdAt} />
-                            </SheetDescription>
-                        </SheetHeader>
-                        <div className="mt-5 space-y-5">
-                            <div>
-                                <p
-                                    aria-label={`${review.rating} out of 5 stars`}
-                                    className="text-[18px] tracking-[2px] text-highlight"
-                                >
-                                    {stars(review.rating)}
-                                </p>
-                                <p className="mt-2 whitespace-pre-line text-[14px] leading-[1.55]">
-                                    {review.body ?? (
-                                        <span className="text-muted-foreground">
-                                            No comment left.
-                                        </span>
-                                    )}
-                                </p>
-                                {hidden ? (
-                                    <Badge variant="neutral" className="mt-3">
-                                        Hidden
-                                    </Badge>
-                                ) : null}
-                            </div>
-
-                            {canWrite ? (
-                                <form
-                                    className="grid gap-2"
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        saveReply();
-                                    }}
-                                >
-                                    <label
-                                        htmlFor="review-reply"
-                                        className="text-[12.5px] font-medium"
-                                    >
-                                        {review.reply
-                                            ? "Your reply (edit it here)"
-                                            : "Reply in public"}
-                                    </label>
-                                    <Textarea
-                                        id="review-reply"
-                                        value={reply}
-                                        rows={4}
-                                        maxLength={1000}
-                                        onChange={(e) =>
-                                            setReply(e.target.value)
-                                        }
-                                        aria-describedby="review-reply-note"
-                                    />
-                                    <p
-                                        id="review-reply-note"
-                                        className="text-[11.5px] text-muted-foreground"
-                                    >
-                                        {hidden
-                                            ? "This review is hidden, so the reply isn't visible to anyone yet."
-                                            : "One reply per review, shown with it. You can change it later."}
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            type="submit"
-                                            disabled={pending || !reply.trim()}
-                                        >
-                                            {review.reply
-                                                ? "Save reply"
-                                                : "Post reply"}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            disabled={pending}
-                                            onClick={toggleHidden}
-                                        >
-                                            {hidden ? "Show again" : "Hide"}
-                                        </Button>
-                                    </div>
-                                </form>
-                            ) : review.reply ? (
-                                <div className="rounded-lg bg-muted p-3">
-                                    <p className="text-[11.5px] font-medium text-muted-foreground">
-                                        The business replied
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-line text-[13.5px]">
-                                        {review.reply}
-                                    </p>
-                                </div>
+                        {review.displayName} · invited to {review.invitedTo} ·{" "}
+                        <ViewerDate iso={review.createdAt} />
+                    </>
+                ) : (
+                    ""
+                )
+            }
+            pending={pending}
+            dirty={review ? reply !== (review.reply ?? "") : false}
+            doneOnly={!canWrite}
+            doneLabel="Close"
+            saveLabel={review?.reply ? "Save" : "Post reply"}
+            savingLabel={review?.reply ? "Saving…" : "Posting…"}
+            fieldsClassName="block"
+            extra={
+                canWrite ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={toggleHidden}
+                    >
+                        {hidden ? "Show review" : "Hide review"}
+                    </Button>
+                ) : null
+            }
+            onClose={onClose}
+            onSubmit={saveReply}
+        >
+            {review ? (
+                <>
+                    <div className="space-y-5">
+                        <div>
+                            <p
+                                aria-label={`${review.rating} out of 5 stars`}
+                                className="text-[18px] tracking-[2px] text-foreground"
+                            >
+                                {stars(review.rating)}
+                            </p>
+                            <p className="mt-2 whitespace-pre-line text-[14px] leading-[1.55]">
+                                {review.body ?? (
+                                    <span className="text-muted-foreground">
+                                        No comment left.
+                                    </span>
+                                )}
+                            </p>
+                            {hidden ? (
+                                <Badge variant="neutral" className="mt-3">
+                                    Hidden
+                                </Badge>
                             ) : null}
                         </div>
-                    </>
-                ) : null}
-            </SheetContent>
-        </Sheet>
+
+                        {canWrite ? (
+                            <div className="grid gap-2">
+                                <label
+                                    htmlFor="review-reply"
+                                    className="text-[12.5px] font-medium"
+                                >
+                                    {review.reply
+                                        ? "Your reply (edit it here)"
+                                        : "Reply in public"}
+                                </label>
+                                <Textarea
+                                    id="review-reply"
+                                    value={reply}
+                                    rows={4}
+                                    maxLength={1000}
+                                    onChange={(e) => setReply(e.target.value)}
+                                    aria-invalid={empty || undefined}
+                                    aria-describedby="review-reply-note"
+                                />
+                                <p
+                                    id="review-reply-note"
+                                    className="text-[11.5px] text-muted-foreground"
+                                >
+                                    {empty
+                                        ? "Write the reply first."
+                                        : hidden
+                                          ? "This review is hidden, so the reply isn't visible to anyone yet."
+                                          : "One reply per review, shown with it. You can change it later."}
+                                </p>
+                            </div>
+                        ) : review.reply ? (
+                            <div className="rounded-lg bg-muted p-3">
+                                <p className="text-[11.5px] font-medium text-muted-foreground">
+                                    The business replied
+                                </p>
+                                <p className="mt-1 whitespace-pre-line text-[13.5px]">
+                                    {review.reply}
+                                </p>
+                            </div>
+                        ) : null}
+                    </div>
+                </>
+            ) : null}
+        </FormSheet>
     );
 }

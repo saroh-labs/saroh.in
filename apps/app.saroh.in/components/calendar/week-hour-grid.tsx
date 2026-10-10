@@ -1,11 +1,13 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { GRID_PX, hourLabels } from "@/lib/calendar/hour-layout";
 import type { HourDay } from "@/lib/calendar/week-hours";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { TONE_BORDER, TONE_FILL } from "./tones";
 import { STRIPED } from "./week-columns";
 
@@ -66,23 +68,21 @@ export function WeekHourGrid({
                                 col.outside
                                     ? "cursor-default bg-neutral-50 dark:bg-muted"
                                     : col.selected
-                                      ? "cursor-pointer bg-brand-subtle hover:brightness-[0.98] active:brightness-95"
+                                      ? "cursor-pointer bg-muted hover:brightness-[0.98] active:brightness-95"
                                       : "cursor-pointer bg-transparent hover:bg-muted/60 active:bg-muted",
                                 col.isToday &&
-                                    "shadow-[inset_0_2px_0_hsl(var(--highlight))]",
+                                    "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
                             )}
                         >
                             <span className="flex items-baseline gap-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                    {col.dow}
-                                </span>
+                                <span className="label">{col.dow}</span>
                                 <span
                                     className={cn(
                                         "font-display text-[17px] font-semibold",
                                         col.outside
                                             ? "text-neutral-400 dark:text-muted-foreground"
                                             : col.isToday
-                                              ? "text-brand"
+                                              ? "text-foreground"
                                               : col.past
                                                 ? "text-muted-foreground"
                                                 : "text-foreground",
@@ -137,32 +137,35 @@ export function WeekHourGrid({
                             )}
                         >
                             {allDay.map((chip) => (
-                                <Link
-                                    key={chip.key}
-                                    href={chip.href}
-                                    title={chip.full}
-                                    aria-label={chip.full}
-                                    className={cn(
-                                        "block truncate rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold text-layer-foreground transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
-                                        chip.bad
-                                            ? "bg-destructive-subtle-foreground"
-                                            : TONE_FILL[chip.tone],
-                                        // Quieter in colour, not see-through (4.5:1).
-                                        col.past && "saturate-50",
-                                    )}
-                                >
-                                    {chip.title}
-                                </Link>
+                                <Tip label={chip.full}>
+                                    <Link
+                                        key={chip.key}
+                                        href={chip.href}
+                                        aria-label={chip.full}
+                                        className={cn(
+                                            "block truncate rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold text-layer-foreground transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
+                                            chip.bad
+                                                ? "bg-destructive-subtle-foreground"
+                                                : TONE_FILL[chip.tone],
+                                            // Quieter in colour, not see-through (4.5:1).
+                                            col.past && "saturate-50",
+                                        )}
+                                    >
+                                        {chip.title}
+                                    </Link>
+                                </Tip>
                             ))}
                             {allDayMore > 0 ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => onPick(col.date)}
                                     aria-haspopup="dialog"
-                                    className="cursor-pointer rounded-[4px] px-0.5 text-left text-[11px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
+                                    className="cursor-pointer px-0.5 text-left text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
                                     {allDayMore} more — open the day
-                                </button>
+                                </Button>
                             ) : null}
                         </div>
                     ))}
@@ -212,43 +215,44 @@ export function WeekHourGrid({
                                 />
                             ))}
                             {blocks.map((b) => (
-                                <Link
-                                    key={b.key}
-                                    href={b.href}
-                                    title={b.full}
-                                    aria-label={b.full}
-                                    className={cn(
-                                        "absolute box-border block overflow-hidden rounded-md border-0 border-l-[3px] px-1.5 py-[3px] text-foreground shadow-[0_0_0_1px_hsl(var(--border))] transition-[filter,box-shadow] duration-fast hover:brightness-[0.97] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-[0.93] dark:hover:brightness-110",
-                                        TONE_BORDER[b.tone],
-                                        b.bad
-                                            ? "bg-destructive-subtle"
-                                            : "bg-card",
-                                        col.past && "opacity-[0.85]",
-                                        b.struck && "line-through",
-                                        b.startsEarlier && "rounded-t-none",
-                                        b.endsLater && "rounded-b-none",
-                                    )}
-                                    style={{
-                                        top: b.top,
-                                        height: b.height,
-                                        left: `calc(${b.left}% + 2px)`,
-                                        width: `calc(${b.width}% - 4px)`,
-                                    }}
-                                >
-                                    <span className="block truncate text-[10.5px] tabular-nums opacity-[0.85]">
-                                        {b.startsEarlier ? (
-                                            <span aria-hidden>↑ </span>
-                                        ) : null}
-                                        {b.time}
-                                        {b.flag ? ` · ${b.flag.label}` : ""}
-                                        {b.endsLater ? (
-                                            <span aria-hidden> ↓</span>
-                                        ) : null}
-                                    </span>
-                                    <span className="block truncate text-[11.5px] font-semibold leading-[1.25]">
-                                        {b.title}
-                                    </span>
-                                </Link>
+                                <Tip label={b.full}>
+                                    <Link
+                                        key={b.key}
+                                        href={b.href}
+                                        aria-label={b.full}
+                                        className={cn(
+                                            "absolute box-border block overflow-hidden rounded-md border-0 border-l-[3px] px-1.5 py-[3px] text-foreground shadow-[0_0_0_1px_hsl(var(--border))] transition-[filter,box-shadow] duration-fast hover:brightness-[0.97] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-[0.93] dark:hover:brightness-110",
+                                            TONE_BORDER[b.tone],
+                                            b.bad
+                                                ? "bg-destructive-subtle"
+                                                : "bg-card",
+                                            col.past && "opacity-[0.85]",
+                                            b.struck && "line-through",
+                                            b.startsEarlier && "rounded-t-none",
+                                            b.endsLater && "rounded-b-none",
+                                        )}
+                                        style={{
+                                            top: b.top,
+                                            height: b.height,
+                                            left: `calc(${b.left}% + 2px)`,
+                                            width: `calc(${b.width}% - 4px)`,
+                                        }}
+                                    >
+                                        <span className="block truncate text-[10.5px] tabular-nums opacity-[0.85]">
+                                            {b.startsEarlier ? (
+                                                <span aria-hidden>↑ </span>
+                                            ) : null}
+                                            {b.time}
+                                            {b.flag ? ` · ${b.flag.label}` : ""}
+                                            {b.endsLater ? (
+                                                <span aria-hidden> ↓</span>
+                                            ) : null}
+                                        </span>
+                                        <span className="block truncate text-[11.5px] font-semibold leading-[1.25]">
+                                            {b.title}
+                                        </span>
+                                    </Link>
+                                </Tip>
                             ))}
                         </div>
                     ))}

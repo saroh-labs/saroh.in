@@ -253,18 +253,18 @@ describe("adding a category", () => {
         render();
         openSheet();
         act(() => button("New category")?.click());
-        const input = sheet()?.querySelector("input");
+        // The one-field dialog (drawn in place here, as Rename's is).
+        const input = rename()?.querySelector("input");
         if (!input) throw new Error("No name field");
         return input;
     }
 
-    it("puts the name field under the list, which stays", () => {
+    it("opens a one-field dialog, and the list stays", () => {
         const input = startAdding();
         expect(input.labels?.[0]?.textContent).toBe("Category name");
         expect(sheet()?.textContent).toContain("News");
         expect(button("Add category")).toBeDefined();
-        expect(button("Cancel")).toBeDefined();
-        expect(button("New category")).toBeUndefined();
+        expect(button("Cancel", rename() ?? undefined)).toBeDefined();
     });
 
     it("keeps the field and what was typed when it is refused", async () => {
@@ -281,11 +281,11 @@ describe("adding a category", () => {
         expect(showError).toHaveBeenCalledWith(
             "A category with that name already exists.",
         );
-        expect(sheet()?.querySelector("input")?.value).toBe(" News ");
+        expect(rename()?.querySelector("input")?.value).toBe(" News ");
         expect(refresh).not.toHaveBeenCalled();
     });
 
-    it("puts the field away once it is added, and the sheet stays", async () => {
+    it("closes the dialog once it is added, and the sheet stays", async () => {
         createPostCategory.mockResolvedValue({
             ok: true,
             data: { id: "c3" },
@@ -293,17 +293,17 @@ describe("adding a category", () => {
         const input = startAdding();
         typeInto(input, "Events");
         await submit(input.form);
-        expect(showSuccess).toHaveBeenCalledWith("Category created");
+        expect(showSuccess).toHaveBeenCalledWith("Category added.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(sheet()).not.toBe(null);
-        expect(sheet()?.querySelector("input")).toBe(null);
+        expect(rename()).toBe(null);
         expect(button("New category")).toBeDefined();
     });
 
-    it("Cancel puts the field away and sends nothing", () => {
+    it("Cancel closes the dialog and sends nothing", () => {
         startAdding();
-        act(() => button("Cancel")?.click());
-        expect(sheet()?.querySelector("input")).toBe(null);
+        act(() => button("Cancel", rename() ?? undefined)?.click());
+        expect(rename()).toBe(null);
         expect(createPostCategory).not.toHaveBeenCalled();
     });
 });
@@ -359,7 +359,7 @@ describe("renaming a category", () => {
         const input = startRenaming();
         typeInto(input, "Updates");
         await submit(input.form);
-        expect(showSuccess).toHaveBeenCalledWith("Renamed to Updates");
+        expect(showSuccess).toHaveBeenCalledWith("Category saved.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(rename()).toBe(null);
         expect(sheet()).not.toBe(null);

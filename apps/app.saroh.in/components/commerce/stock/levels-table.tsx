@@ -68,7 +68,7 @@ export function LevelsTable({
                 <div
                     className={cn(
                         DESK_GRID,
-                        "gap-3 border-b border-border py-[11px] pb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground max-[759px]:hidden",
+                        "label gap-3 border-b border-border py-[11px] pb-2 max-[759px]:hidden",
                     )}
                 >
                     <span className="sticky left-0 z-10 -ml-4 bg-card pl-4">
@@ -99,7 +99,7 @@ export function LevelsTable({
                                         row.productId,
                                         "variants",
                                     )}
-                                    className="sticky left-0 z-10 -ml-4 grid min-w-0 gap-px bg-card pl-4 text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
+                                    className="sticky left-0 z-10 -ml-4 grid min-w-0 gap-px bg-card pl-4 text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
                                 >
                                     <span className="text-[13.5px] font-semibold [overflow-wrap:anywhere] min-[760px]:truncate">
                                         {row.productName}
@@ -194,6 +194,7 @@ function Cell({
             <div className="grid min-w-0 gap-[3px] max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-center max-[759px]:gap-x-2">
                 <StoreLabel name={store} />
                 <Input
+                    dense
                     type="text"
                     inputMode="numeric"
                     autoComplete="off"
@@ -202,7 +203,7 @@ function Cell({
                     aria-label={label}
                     aria-invalid={diff.tone === "danger" || undefined}
                     onChange={(e) => onValue(key, e.target.value, cell.onHand)}
-                    className="h-8 w-[92px] rounded-[8px] border-border-strong bg-card px-[9px] text-[13px] tabular-nums coarse:h-11"
+                    className="w-[92px] border-border-strong bg-card px-[9px] tabular-nums"
                 />
                 <span
                     className={cn("text-[11.5px]", TEXT_TONE[diff.tone])}

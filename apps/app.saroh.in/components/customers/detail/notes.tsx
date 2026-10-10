@@ -3,18 +3,16 @@
 import { Button } from "@saroh/ui/button";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { Sheet, SheetTrigger } from "@saroh/ui/sheet";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError, showUndo } from "@saroh/ui/toast";
+import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
-    ACTION_SHEET_BODY,
-    ACTION_SHEET_FORM,
-    ActionSheetContent,
-    ActionSheetFooter,
-} from "@/components/shared/action-sheet";
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import {
     addNoteAction,
@@ -23,14 +21,11 @@ import {
 import type { DetailNote } from "@/lib/customer-workspace/detail";
 import { dayText } from "@/lib/subscriptions/view";
 
+import { runAction } from "@/lib/api/run-action";
 import { Empty } from "./parts";
 
 /** The design's limit: a note is a line or two, not a document. */
 const MAX = 500;
-
-/** The page's small button, as the tab's other actions are drawn. */
-const SMALL = "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * Notes the team keeps about a customer — never shown to them. Text only
  * (Z2a): an allergy goes on Needs attention, which Order Detail's banner
@@ -59,7 +54,6 @@ export function Notes({
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [dirty, setDirty] = useState(false);
     const [gone, setGone] = useState<string[]>([]);
     const addRef = useRef<HTMLButtonElement>(null);
     const shown = rows.filter((n) => !gone.includes(n.id));
@@ -87,22 +81,16 @@ export function Notes({
             return showError(res.error);
         }
         router.refresh();
-        showUndo("Note deleted.", () => {
-            void addNoteAction(contactId, { body: n.body }).then((back) => {
-                if (!back.ok) showError(back.error);
-                router.refresh();
-            });
+        showUndo("Note deleted.", async () => {
+            const back = await addNoteAction(contactId, { body: n.body });
+            if (back.ok) setGone((g) => g.filter((x) => x !== n.id));
+            router.refresh();
+            return back;
         });
     }
 
     return (
-        <Sheet
-            open={open}
-            onOpenChange={(next) => {
-                setOpen(next);
-                setDirty(false);
-            }}
-        >
+        <>
             <div className="mb-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
                 <p className="min-w-0 flex-[1_1_240px] text-[12.5px] text-muted-foreground">
                     Team only. Never shown to the customer.{" "}
@@ -111,11 +99,13 @@ export function Notes({
                         : "Everyone on the team can read them. Your role can't add them."}
                 </p>
                 {canWrite && !empty ? (
-                    <SheetTrigger asChild>
-                        <Button ref={addRef} size="sm" className={SMALL}>
-                            Add note
-                        </Button>
-                    </SheetTrigger>
+                    <Button
+                        ref={addRef}
+                        size="sm"
+                        onClick={() => setOpen(true)}
+                    >
+                        Add note
+                    </Button>
                 ) : null}
             </div>
             {canWrite ? null : (
@@ -128,11 +118,9 @@ export function Notes({
                     title="No notes yet"
                     action={
                         canWrite ? (
-                            <SheetTrigger asChild>
-                                <Button size="sm" className={SMALL}>
-                                    Add note
-                                </Button>
-                            </SheetTrigger>
+                            <Button size="sm" onClick={() => setOpen(true)}>
+                                Add note
+                            </Button>
                         ) : undefined
                     }
                 >
@@ -159,13 +147,15 @@ export function Notes({
                                 {dayText(n.createdAt, timeZone, now)}
                             </span>
                             {canWrite && n.createdByUserId === userId ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => void remove(n)}
-                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-destructive-subtle coarse:min-h-11"
+                                    className="text-muted-foreground"
                                 >
                                     Delete
-                                </button>
+                                </Button>
                             ) : null}
                         </div>
                         <div className="mt-1 whitespace-pre-line text-[13.5px] leading-[1.55] text-foreground/75">
@@ -174,21 +164,15 @@ export function Notes({
                     </article>
                 ))}
             </div>
-            <ActionSheetContent
+            <FormSheet
+                open={open}
                 title="Add note"
                 description="Team only. Never shown to the customer. An allergy goes on Needs attention, where orders are checked against it."
-                dirty={dirty}
+                onClose={() => setOpen(false)}
             >
-                <NoteForm
-                    contactId={contactId}
-                    onDone={() => {
-                        setOpen(false);
-                        setDirty(false);
-                    }}
-                    onDirtyChange={setDirty}
-                />
-            </ActionSheetContent>
-        </Sheet>
+                <NoteForm contactId={contactId} onDone={() => setOpen(false)} />
+            </FormSheet>
+        </>
     );
 }
 
@@ -199,34 +183,36 @@ export function Notes({
 function NoteForm({
     contactId,
     onDone,
-    onDirtyChange,
 }: {
     contactId: string;
     onDone: () => void;
-    onDirtyChange: (dirty: boolean) => void;
 }) {
     const router = useRouter();
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
+    const [tried, setTried] = useState(false);
     const textId = useId();
     const text = draft.trim();
     const over = text.length > MAX;
-    const off = busy || !text || over;
+    const empty = tried && !text;
 
-    async function add(e: React.FormEvent) {
-        e.preventDefault();
-        if (off) return;
-        setBusy(true);
-        const res = await addNoteAction(contactId, { body: text });
-        setBusy(false);
+    async function add() {
+        setTried(true);
+        if (!text || over) return;
+        const res = await runAction(
+            () => addNoteAction(contactId, { body: text }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
+        showSuccess("Note added.");
         onDone();
         router.refresh();
     }
 
     return (
-        <form onSubmit={(e) => void add(e)} className={ACTION_SHEET_FORM}>
-            <div className={ACTION_SHEET_BODY}>
+        <>
+            <FormSheetBody className="gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor={textId}>Note</Label>
                     <Textarea
@@ -234,34 +220,34 @@ function NoteForm({
                         rows={5}
                         value={draft}
                         disabled={busy}
-                        aria-invalid={over}
+                        aria-invalid={over || empty}
                         aria-describedby={`${textId}-count`}
-                        onChange={(e) => {
-                            setDraft(e.target.value);
-                            onDirtyChange(e.target.value.trim() !== "");
-                        }}
+                        onChange={(e) => setDraft(e.target.value)}
                         placeholder="e.g. Collects on Saturdays before 8"
                     />
                     <span
                         id={`${textId}-count`}
                         className={cn(
                             "text-[12px]",
-                            over
+                            over || empty
                                 ? "text-destructive-subtle-foreground"
                                 : "text-muted-foreground",
                         )}
                     >
-                        {over
-                            ? `Over ${MAX} characters`
-                            : `${text.length} / ${MAX}`}
+                        {empty
+                            ? "Write the note first."
+                            : over
+                              ? `Over ${MAX} characters`
+                              : `${text.length} / ${MAX}`}
                     </span>
                 </div>
-            </div>
-            <ActionSheetFooter busy={busy}>
-                <Button type="submit" disabled={off}>
-                    {busy ? "Adding…" : "Add note"}
-                </Button>
-            </ActionSheetFooter>
-        </form>
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel="Add note"
+                savingLabel="Adding…"
+                pending={busy}
+                onSubmit={add}
+            />
+        </>
     );
 }

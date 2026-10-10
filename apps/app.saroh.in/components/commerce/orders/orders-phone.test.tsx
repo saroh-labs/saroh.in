@@ -76,8 +76,8 @@ describe("OrderCard on a phone", () => {
         const closed = renderToStaticMarkup(
             <OrderCard row={row()} showStore={false} onOpen={noop} />,
         );
-        expect(open).toContain("border-highlight-border");
-        expect(closed).not.toContain("border-highlight-border");
+        expect(open).toContain("border-border-strong");
+        expect(closed).not.toContain("border-border-strong");
     });
 });
 

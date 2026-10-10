@@ -133,7 +133,8 @@ export function draftOf(
             meetingUrl: "",
             price: "",
             deposit: "NONE",
-            staffIds: [],
+            // The one person on the diary, when there is only one.
+            staffIds: [...staffIds],
             showOnBookingPage: true,
             taking: true,
             timezone,
@@ -177,12 +178,16 @@ function isHttps(link: string): boolean {
  * Everything that stops the draft being saved, in the order the page reads,
  * each as a sentence. Nobody taking it is refused only when the business
  * has people on the diary; with none, a service keeps its own weekly hours.
+ * With exactly one person there is nobody to choose between, so it is not
+ * asked for: a new service starts with them on it (`draftOf`).
  */
 export function serviceProblems(
     draft: ServiceDraft,
     hasStaff: boolean,
     /** No storefront to sell a treatment from (E10). */
     noStorefront = false,
+    /** Exactly one person is on the diary. */
+    onePerson = false,
 ): string[] {
     const problems: string[] = [];
     if (!draft.name.trim()) problems.push("Add a name.");
@@ -224,7 +229,7 @@ export function serviceProblems(
             "A deposit is part of the price. Set a price first, or take nothing at booking.",
         );
     }
-    if (hasStaff && draft.staffIds.length === 0) {
+    if (hasStaff && !onePerson && draft.staffIds.length === 0) {
         problems.push("Pick who takes it.");
     }
     if (!(strictWhole(draft.bufferBefore) <= 1440)) {
@@ -351,11 +356,13 @@ export function stateLine({
 export function statePill(
     isNew: boolean,
     taking: boolean,
-): { label: string; tone: "neutral" | "success" } {
+): { label: string; tone: "neutral" | "success" | "warning"; hint?: string } {
     if (isNew) return { label: "New", tone: "neutral" };
+    // "Live" and "Paused", as every kind of thing says it; the service's
+    // own sentence is the hint.
     return taking
-        ? { label: "Taking bookings", tone: "success" }
-        : { label: "Not taking bookings", tone: "neutral" };
+        ? { label: "Live", tone: "success", hint: "Taking bookings." }
+        : { label: "Paused", tone: "warning", hint: "Not taking bookings." };
 }
 
 /**

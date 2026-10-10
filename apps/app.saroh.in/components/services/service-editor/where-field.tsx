@@ -45,7 +45,6 @@ export function WhereField({
                     <Chip
                         key={value}
                         on={where === value}
-                        className="h-[34px] text-[13px]"
                         onClick={() => onChange({ where: value })}
                     >
                         {label}

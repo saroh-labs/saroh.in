@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
+import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
@@ -25,6 +26,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<
     VersionBadgeTone,
@@ -120,11 +122,10 @@ export function SiteVersions({
     function onRestore(publicationId: string) {
         const override = gate.kind === "override";
         startTransition(async () => {
-            const res = await restorePublication(
-                siteId,
-                publicationId,
-                override,
+            const res = await runAction(() =>
+                restorePublication(siteId, publicationId, override),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 // The setting was turned on since this page was read: the
@@ -170,7 +171,6 @@ export function SiteVersions({
                                             <Badge
                                                 key={b.label}
                                                 variant={BADGE[b.tone]}
-                                                className="whitespace-nowrap"
                                             >
                                                 {b.label}
                                             </Badge>
@@ -228,16 +228,14 @@ export function SiteVersions({
                                                         ? "destructive"
                                                         : "brand"
                                                 }
-                                                disabled={pending}
                                                 onClick={() => onRestore(p.id)}
+                                                busy={pending}
+                                                busyLabel="Restoring…"
                                             >
-                                                {pending
-                                                    ? "Restoring…"
-                                                    : gate.kind ===
-                                                            "override" ||
-                                                        changesRequested
-                                                      ? "Restore without approval"
-                                                      : "Yes, restore"}
+                                                {gate.kind === "override" ||
+                                                changesRequested
+                                                    ? "Restore without approval"
+                                                    : "Yes, restore"}
                                             </Button>
                                             <Button
                                                 size="sm"
@@ -313,12 +311,9 @@ function RestoreConfirm({
                     : null}
             </p>
             {gate.kind === "override" ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note">
                     {RESTORE_OVERRIDE_LINE}
-                </p>
+                </Notice>
             ) : null}
         </div>
     );
@@ -366,10 +361,7 @@ function ScheduledList({
                                         <span className="text-sm font-medium [overflow-wrap:anywhere]">
                                             {releaseTitle(release)}
                                         </span>
-                                        <Badge
-                                            variant="info"
-                                            className="whitespace-nowrap"
-                                        >
+                                        <Badge variant="info">
                                             {status.label}
                                         </Badge>
                                     </div>

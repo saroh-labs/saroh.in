@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Input } from "@saroh/ui/input";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
@@ -22,11 +22,12 @@ import {
     slugify,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import type { CategoryChoice } from "./category-picker";
 import { CategoryPicker } from "./category-picker";
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, Count, FieldHelp, FieldLabel, MoneyBox } from "./fields";
+import { Count, FieldHelp, FieldLabel, MoneyBox } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: BasicsValues = {
@@ -66,6 +67,7 @@ export function BasicsSection({
     storeId,
     currency,
     symbol,
+    gstRegistered,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -74,6 +76,8 @@ export function BasicsSection({
     storeId: string;
     currency: string;
     symbol: string;
+    /** Only a GST-registered business sets a rate and an HSN code. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -160,18 +164,13 @@ export function BasicsSection({
 
     return (
         <SectionCard k="basics" title="Basics">
-            <FieldLabel htmlFor="pe-name" required={creating}>
-                Name
-            </FieldLabel>
-            <input
+            <FieldLabel htmlFor="pe-name">Name</FieldLabel>
+            <Input
                 id="pe-name"
                 {...form.register("name")}
                 disabled={ro}
                 placeholder="Vitamin C brightening serum"
                 aria-invalid={nameEmpty || nameLong || !!errors.name}
-                className={boxClass({
-                    bad: nameEmpty || nameLong || !!errors.name,
-                })}
             />
             <div className="mb-4 mt-1.5 flex items-baseline gap-2.5">
                 <FieldHelp
@@ -217,16 +216,13 @@ export function BasicsSection({
                         <span className="font-mono text-[12px] text-muted-foreground">
                             /products/
                         </span>
-                        <input
+                        <Input
+                            dense
                             id="pe-slug"
                             {...form.register("slug")}
                             disabled={ro}
                             aria-invalid={!slugOk || !!errors.slug}
-                            className={`${boxClass({
-                                bad: !slugOk || !v.slug || !!errors.slug,
-                                mono: true,
-                                small: true,
-                            })} min-w-0 flex-[1_1_150px] rounded-[7px] px-[9px]`}
+                            className="min-w-0 flex-[1_1_150px] font-mono"
                         />
                         <Count value={v.slug.length} max={LIMITS.slug} />
                     </div>
@@ -256,18 +252,16 @@ export function BasicsSection({
 
             <div className="flex flex-wrap gap-3.5">
                 <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-price" required={creating}>
-                        Price
-                    </FieldLabel>
+                    <FieldLabel htmlFor="pe-price">Price</FieldLabel>
                     <MoneyBox symbol={symbol}>
-                        <input
+                        <Input
                             id="pe-price"
                             {...form.register("price")}
                             inputMode="decimal"
                             disabled={ro}
                             placeholder="549"
                             aria-invalid={priceBad || !!errors.price}
-                            className={`${boxClass({ bad: priceBad || !!errors.price })} pl-6`}
+                            className="pl-6"
                         />
                     </MoneyBox>
                     <FieldHelp
@@ -286,14 +280,14 @@ export function BasicsSection({
                 <div className="min-w-0 flex-[1_1_150px]">
                     <FieldLabel htmlFor="pe-mrp">MRP</FieldLabel>
                     <MoneyBox symbol={symbol}>
-                        <input
+                        <Input
                             id="pe-mrp"
                             {...form.register("mrp")}
                             inputMode="decimal"
                             disabled={ro}
                             placeholder={v.price || "699"}
                             aria-invalid={mrpBad || !!errors.mrp}
-                            className={`${boxClass({ bad: mrpBad || !!errors.mrp })} pl-6`}
+                            className="pl-6"
                         />
                     </MoneyBox>
                     <FieldHelp
@@ -334,55 +328,56 @@ export function BasicsSection({
                 </FieldHelp>
             </div>
 
-            {/* GST (ADR-008): printed on a registered business's tax invoice. */}
-            <div className="mt-4 flex flex-wrap gap-3.5">
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
-                    <OptionSelect
-                        id="pe-gst"
-                        value={v.gstRate as GstRateValue}
-                        onValueChange={(rate) =>
-                            form.setValue("gstRate", rate, {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                            })
-                        }
-                        options={GST_RATE_OPTIONS}
-                        disabled={ro}
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={errors.gstRate ? "bad" : "quiet"}
-                    >
-                        {errors.gstRate?.message ??
-                            "Included in the price. Bread and other nil-rated goods are 0%."}
-                    </FieldHelp>
+            {/* GST (ADR-008): printed on a registered business's tax invoice,
+                so only a registered business is asked. A rate or a code
+                already saved stays in view either way. */}
+            {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
+                <div className="mt-4 flex flex-wrap gap-3.5">
+                    <div className="min-w-0 flex-[1_1_150px]">
+                        <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
+                        <OptionSelect
+                            id="pe-gst"
+                            value={v.gstRate as GstRateValue}
+                            onValueChange={(rate) =>
+                                form.setValue("gstRate", rate, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                })
+                            }
+                            options={GST_RATE_OPTIONS}
+                            disabled={ro}
+                        />
+                        <FieldHelp
+                            className="mt-1.5"
+                            tone={errors.gstRate ? "bad" : "quiet"}
+                        >
+                            {errors.gstRate?.message ??
+                                "Included in the price. Bread and other nil-rated goods are 0%."}
+                        </FieldHelp>
+                    </div>
+                    <div className="min-w-0 flex-[1_1_150px]">
+                        <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
+                        <Input
+                            id="pe-hsn"
+                            {...form.register("hsnCode")}
+                            inputMode="numeric"
+                            disabled={ro}
+                            placeholder="1905 90 10"
+                            aria-invalid={hsnBad || !!errors.hsnCode}
+                            className="font-mono"
+                        />
+                        <FieldHelp
+                            className="mt-1.5"
+                            tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
+                        >
+                            {hsnBad
+                                ? "An HSN code is 4 to 8 digits."
+                                : (errors.hsnCode?.message ??
+                                  "Team only. Printed on tax invoices.")}
+                        </FieldHelp>
+                    </div>
                 </div>
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
-                    <input
-                        id="pe-hsn"
-                        {...form.register("hsnCode")}
-                        inputMode="numeric"
-                        disabled={ro}
-                        placeholder="1905 90 10"
-                        aria-invalid={hsnBad || !!errors.hsnCode}
-                        className={boxClass({
-                            bad: hsnBad || !!errors.hsnCode,
-                            mono: true,
-                        })}
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
-                    >
-                        {hsnBad
-                            ? "An HSN code is 4 to 8 digits."
-                            : (errors.hsnCode?.message ??
-                              "Team only. Printed on tax invoices.")}
-                    </FieldHelp>
-                </div>
-            </div>
+            ) : null}
         </SectionCard>
     );
 }

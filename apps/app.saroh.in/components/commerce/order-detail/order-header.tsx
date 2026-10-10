@@ -9,7 +9,7 @@ import { howWords } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
 import type { OrderRead } from "@/lib/orders/read";
 
-import { StatusPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
 
 /**
  * The order's page header: "Sell › Orders › #1063", its number and status, how long it has waited ("Late" in words and
@@ -50,7 +50,9 @@ export function OrderHeading({
             ]}
             title={number}
             badge={
-                <StatusPill tone={standing.tone}>{standing.label}</StatusPill>
+                <StatusBadge size="default" tone={standing.tone}>
+                    {standing.label}
+                </StatusBadge>
             }
             actions={
                 <div className="flex max-w-full flex-wrap items-center gap-2 print:hidden">
@@ -65,7 +67,7 @@ export function OrderHeading({
                             className={cn(
                                 "rounded-full border px-2 py-0.5 text-[12px] font-bold tabular-nums",
                                 age.late
-                                    ? "border-highlight-border bg-brand-subtle text-brand-subtle-foreground"
+                                    ? "border-border-strong bg-muted text-foreground"
                                     : "border-transparent bg-muted text-neutral-700 dark:text-muted-foreground",
                             )}
                         >

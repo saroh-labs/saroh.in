@@ -1,7 +1,8 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { refundableQuantity } from "@/lib/orders/lifecycle";
@@ -24,12 +25,7 @@ import { FOCUS } from "./parts";
 export interface CancelChoice {
     reason: string | null;
     tell: boolean;
-}
-
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
-/**
+} /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
  * refund sheet with every line ticked (the design's option B): a cancel
  * refunds what is left on the order, so there is no "another amount" and
@@ -122,31 +118,25 @@ function CancelDraft({
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
-                        <select
+                        <OptionSelect<RefundReason | "">
+                            size="sm"
                             value={reason}
-                            onChange={(e) =>
-                                setReason(e.target.value as RefundReason | "")
-                            }
-                            className={cn(FOCUS, FIELD, "cursor-pointer")}
-                        >
-                            <option value="">Choose a reason</option>
-                            {REFUND_REASONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={setReason}
+                            placeholder="Choose a reason"
+                            options={REFUND_REASONS}
+                            className="w-full min-w-[150px]"
+                        />
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
-                            <input
+                            Say why (optional)
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
                         </label>
                     ) : null}
@@ -163,7 +153,7 @@ function CancelDraft({
                     </label>
                 ) : (
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        Nothing is sent to {first} — let them know by email or
+                        Nothing is sent to {first}. Let them know by email or
                         phone.
                     </p>
                 )}
@@ -171,7 +161,10 @@ function CancelDraft({
             <OrderSheetFoot
                 // Its button cancels the order, so the way out says what
                 // it keeps: never "Cancel" beside "Cancel order".
-                dismiss="Keep order"
+                cancelLabel="Keep order"
+                tone="destructive"
+                saveLabel={confirm}
+                savingLabel="Cancelling…"
                 note={
                     <p
                         id={`${ids}-how`}
@@ -180,21 +173,13 @@ function CancelDraft({
                         {says}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    variant="destructive"
-                    aria-describedby={`${ids}-how`}
-                    onClick={() =>
-                        onConfirm({
-                            reason: reasonText(reason, other),
-                            tell: canTell && tell,
-                        })
-                    }
-                >
-                    {confirm}
-                </Button>
-            </OrderSheetFoot>
+                onSubmit={() =>
+                    onConfirm({
+                        reason: reasonText(reason, other),
+                        tell: canTell && tell,
+                    })
+                }
+            />
         </>
     );
 }

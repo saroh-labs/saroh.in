@@ -1,21 +1,14 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { FormDialog } from "@/components/shared/form-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { addSession } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
@@ -45,19 +38,17 @@ export function AddSessionDialog({
     open,
     onOpenChange,
     course,
-    onCloseAutoFocus,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     course: CourseDetail;
-    /** Where the keyboard goes when it closes: the button that opened it. */
-    onCloseAutoFocus?: (event: Event) => void;
 }) {
     const router = useRouter();
     const ids = { day: useId(), time: useId() };
     const [day, setDay] = useState(() => nextSession(course).day);
     const [time, setTime] = useState(() => nextSession(course).time);
     const [busy, setBusy] = useState(false);
+    const [tried, setTried] = useState(false);
     const on = course.enrolled;
     const tz = course.service.timezone;
 
@@ -69,83 +60,72 @@ export function AddSessionDialog({
             const next = nextSession(course);
             setDay(next.day);
             setTime(next.time);
+            setTried(false);
         }
     }
 
     async function add() {
+        setTried(true);
         if (!day) return;
-        setBusy(true);
-        const res = await addSession(
-            course.id,
-            wallClockToIso(ymd(day), time, tz),
+        const res = await runAction(
+            () => addSession(course.id, wallClockToIso(ymd(day), time, tz)),
+            { setBusy },
         );
-        setBusy(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             on > 0
-                ? `Session added, and ${on} ${on === 1 ? "person" : "people"} booked on it`
-                : "Session added",
+                ? `Session added. ${on} ${on === 1 ? "person is" : "people are"} booked on it.`
+                : "Session added.",
         );
         onOpenChange(false);
         router.refresh();
     }
 
     return (
-        <Dialog
+        <FormDialog
             open={open}
-            onOpenChange={(o) => (busy ? undefined : onOpenChange(o))}
+            size="md"
+            title="Add session"
+            description={
+                on > 0
+                    ? `It goes on the schedule for ${course.service.name}, and the ${on === 1 ? "1 person" : `${on} people`} on this course ${on === 1 ? "is" : "are"} booked on it. Times are in ${tz}.`
+                    : `It goes on the schedule for ${course.service.name}. Times are in ${tz}.`
+            }
+            pending={busy}
+            saveLabel={on > 0 ? `Add and book ${on}` : "Add session"}
+            savingLabel="Adding…"
+            onClose={() => onOpenChange(false)}
+            onSubmit={add}
         >
-            <DialogContent
-                className="sm:max-w-[440px]"
-                onCloseAutoFocus={onCloseAutoFocus}
-            >
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Add session
-                    </DialogTitle>
-                    <DialogDescription>
-                        {on > 0
-                            ? `It goes on the schedule for ${course.service.name}, and the ${on === 1 ? "1 person" : `${on} people`} on this course ${on === 1 ? "is" : "are"} booked on it. Times are in ${tz}.`
-                            : `It goes on the schedule for ${course.service.name}. Times are in ${tz}.`}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-wrap gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.day}>Date</Label>
-                        <DatePicker
-                            id={ids.day}
-                            value={day}
-                            onValueChange={setDay}
-                            className="w-[11rem]"
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.time}>Time</Label>
-                        <TimeSelect
-                            id={ids.time}
-                            value={time}
-                            onValueChange={setTime}
-                            stepMinutes={15}
-                        />
-                    </div>
+            <div className="flex flex-wrap gap-4">
+                <div className="grid gap-1.5">
+                    <Label htmlFor={ids.day}>Date</Label>
+                    <DatePicker
+                        id={ids.day}
+                        value={day}
+                        onValueChange={setDay}
+                        className="w-[11rem]"
+                    />
                 </div>
-                <DialogFooter>
-                    <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button disabled={busy || !day} onClick={() => void add()}>
-                        {busy
-                            ? "Adding…"
-                            : on > 0
-                              ? `Add and book ${on}`
-                              : "Add session"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                <div className="grid gap-1.5">
+                    <Label htmlFor={ids.time}>Time</Label>
+                    <TimeSelect
+                        id={ids.time}
+                        value={time}
+                        onValueChange={setTime}
+                        stepMinutes={15}
+                    />
+                </div>
+            </div>
+            {tried && !day ? (
+                <p
+                    role="alert"
+                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                >
+                    Pick a date.
+                </p>
+            ) : null}
+        </FormDialog>
     );
 }

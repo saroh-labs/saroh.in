@@ -1,15 +1,18 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { runAction } from "@/lib/api/run-action";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** A character that is a letter: letters change case, digits and punctuation do not. */
 const isLetter = (ch: string) => ch.toUpperCase() !== ch.toLowerCase();
@@ -90,9 +93,11 @@ export function BlockFeedback({
     async function send() {
         const body = reply.trim();
         if (!body || sectionKey === undefined) return;
-        setSending(true);
-        const res = await createComment(siteId, { pageId, sectionKey, body });
-        setSending(false);
+        const res = await runAction(
+            () => createComment(siteId, { pageId, sectionKey, body }),
+            { setBusy: setSending },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -174,7 +179,7 @@ export function BlockFeedback({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-xs text-muted-foreground"
+                        className="text-muted-foreground"
                         aria-expanded={showSettled}
                         onClick={() => setShowSettled((v) => !v)}
                     >
@@ -220,6 +225,7 @@ export function BlockFeedback({
             ) : null}
 
             <form
+                onKeyDown={submitOnModEnter}
                 className="grid gap-2 border-t pt-4"
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -241,22 +247,23 @@ export function BlockFeedback({
                     onChange={(e) => setReply(e.target.value)}
                 />
                 <div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={sending || reply.trim() === ""}
-                        title={
+                    <Tip
+                        label={
                             reply.trim() === ""
                                 ? "Write something first"
                                 : undefined
                         }
                     >
-                        {sending
-                            ? "Sending…"
-                            : open.length === 0
-                              ? "Add note"
-                              : "Reply"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={reply.trim() === ""}
+                            busy={sending}
+                            busyLabel="Sending…"
+                        >
+                            {open.length === 0 ? "Add note" : "Reply"}
+                        </Button>
+                    </Tip>
                 </div>
             </form>
         </div>

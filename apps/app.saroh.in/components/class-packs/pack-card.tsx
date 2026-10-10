@@ -5,13 +5,10 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
-import { Pill } from "@/components/subscriptions/pill";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackCardView } from "@/lib/class-packs/pack-cards";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /**
  * One pack on the Packs list (round-2 E15, after "Saroh Packs"): its
@@ -51,7 +48,7 @@ export function PackCard({
                 {card.href ? (
                     <Link
                         href={card.href}
-                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand"
+                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {card.name}
                     </Link>
@@ -61,9 +58,9 @@ export function PackCard({
                     </span>
                 )}
                 {card.badges.map((b) => (
-                    <Pill key={b.label} tone={b.tone}>
+                    <StatusBadge key={b.label} tone={b.tone}>
                         {b.label}
-                    </Pill>
+                    </StatusBadge>
                 ))}
             </div>
             <div className="mt-2 flex flex-wrap items-baseline gap-2">
@@ -108,7 +105,7 @@ export function PackCard({
                             key={n.text}
                             className={
                                 n.tone === "accent"
-                                    ? "font-semibold text-brand"
+                                    ? "font-semibold text-foreground"
                                     : "text-muted-foreground"
                             }
                         >
@@ -128,11 +125,7 @@ export function PackCard({
             {card.openHref || canSell || canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                     {card.openHref ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
-                        >
+                        <Button asChild variant="outline">
                             <Link
                                 href={card.openHref}
                                 aria-label={`Open ${card.name}`}
@@ -144,7 +137,6 @@ export function PackCard({
                     {canSell && card.showSell ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={card.sellDisabled}
                             aria-describedby={
                                 card.sellDisabled && card.why
@@ -157,11 +149,7 @@ export function PackCard({
                         </Button>
                     ) : null}
                     {canWrite ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
-                        >
+                        <Button asChild variant="outline">
                             <Link
                                 href={card.editHref}
                                 aria-label={`Edit ${card.name}`}
@@ -173,7 +161,6 @@ export function PackCard({
                     {canWrite && card.canArchive ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={busy}
                             onClick={onArchive}
                         >

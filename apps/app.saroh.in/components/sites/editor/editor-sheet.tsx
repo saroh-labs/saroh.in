@@ -88,13 +88,9 @@ export function EditorSheet({
                     <div className="flex shrink-0 px-4 pt-3">
                         <Dialog.Close
                             aria-label={closeLabel}
-                            className="flex items-center gap-[7px] rounded pb-2.5 pt-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                            className="flex items-center gap-[7px] rounded pb-2.5 pt-0.5 text-xs font-semibold text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                         >
-                            <X
-                                aria-hidden
-                                className="size-3.5"
-                                strokeWidth={2}
-                            />
+                            <X aria-hidden className="size-3.5" />
                             Close
                         </Dialog.Close>
                     </div>

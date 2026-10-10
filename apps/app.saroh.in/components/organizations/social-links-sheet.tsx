@@ -13,7 +13,8 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
@@ -105,9 +106,11 @@ export function SocialLinksSheet({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await saveOrganizationSettings({ socialLinks: patch });
-        setSaving(false);
+        const result = await runAction(
+            () => saveOrganizationSettings({ socialLinks: patch }),
+            { setBusy: setSaving },
+        );
+        if (!result) return;
         if (!result.ok) {
             const network = socialNetworkOfField(result.field);
             if (network) {
@@ -126,7 +129,7 @@ export function SocialLinksSheet({
     const phoneShown = phone ? phoneLabel(phone) : "";
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={formId}
             returnFocusTo={returnTo}
             title={words.title}
@@ -230,6 +233,6 @@ export function SocialLinksSheet({
                     {refusal}
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

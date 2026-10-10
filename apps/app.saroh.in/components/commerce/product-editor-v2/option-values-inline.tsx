@@ -1,9 +1,12 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { parseOptionValues } from "@/lib/products/option-values";
 import { addOption, addOptionValue } from "@/lib/products/settings-actions";
 
@@ -40,7 +43,8 @@ export function OptionValuesInline({
         if (values.length === 0) return;
         start(async () => {
             if (!optionId) {
-                const made = await addOption(optName, values);
+                const made = await runAction(() => addOption(optName, values));
+                if (!made) return;
                 if (!made.ok) {
                     showError(made.error);
                     return;
@@ -48,7 +52,10 @@ export function OptionValuesInline({
                 onOption(made.data.id);
             } else {
                 for (const value of values) {
-                    const res = await addOptionValue(optionId, value);
+                    const res = await runAction(() =>
+                        addOptionValue(optionId, value),
+                    );
+                    if (!res) return;
                     if (!res.ok) {
                         showError(`${value}: ${res.error}`);
                         return;
@@ -68,7 +75,8 @@ export function OptionValuesInline({
             <label htmlFor={id} className="text-[12px] font-medium">
                 Add {opt} values
             </label>
-            <input
+            <Input
+                dense
                 id={id}
                 value={typed}
                 disabled={locked || pending}
@@ -80,16 +88,19 @@ export function OptionValuesInline({
                     }
                 }}
                 placeholder="S, M, L"
-                className="h-8 min-w-0 flex-[1_1_160px] rounded-[8px] border border-border bg-card px-2.5 text-[12.5px] coarse:h-11"
+                className="min-w-0 flex-[1_1_160px]"
             />
-            <button
+            <Button
+                size="sm"
                 type="button"
-                disabled={locked || pending || values.length === 0}
+                disabled={locked || values.length === 0}
                 onClick={add}
-                className="h-8 shrink-0 rounded-[8px] bg-foreground px-[13px] text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
+                className="shrink-0"
+                busy={pending}
+                busyLabel="Adding…"
             >
-                {pending ? "Adding…" : "Add"}
-            </button>
+                Add
+            </Button>
             <span className="w-full text-[11.5px] text-muted-foreground">
                 Separate them with commas. They join Settings › Options, so
                 every product spells them the same way.

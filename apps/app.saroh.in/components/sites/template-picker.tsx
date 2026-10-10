@@ -184,7 +184,7 @@ function TemplateCard({
                         value={template.id}
                         aria-labelledby={`${id}-name`}
                         aria-describedby={described || undefined}
-                        className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-primary text-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-primary text-primary outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground"
                     >
                         <RadioGroupPrimitive.Indicator className="size-2 rounded-full bg-current" />
                     </RadioGroupPrimitive.Item>
@@ -346,7 +346,7 @@ function ColourwayChoice({
                             value={cw.id}
                             className={cn(
                                 "flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors duration-fast coarse:min-h-11",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:text-disabled-foreground",
                                 active
                                     ? "border-foreground ring-1 ring-foreground"
                                     : "border-border hover:bg-muted active:bg-accent-active",

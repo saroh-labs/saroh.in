@@ -1,11 +1,9 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { CategoryNode } from "@/lib/collections/rules";
 import {
     categoryChoices,
@@ -13,6 +11,9 @@ import {
     ruleNote,
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
+import { Notice } from "@saroh/ui/notice";
+import { OptionSelect } from "@saroh/ui/option-select";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The collection sheet's fields (#524), at the product page sheets' scale:
@@ -20,22 +21,7 @@ import { productSettingsHref } from "@/lib/products/links";
  * the sheet's check or the API's — under it.
  */
 
-const LABEL = "block text-[12.5px] font-medium";
-
-export function FieldError({
-    id,
-    children,
-}: {
-    id?: string;
-    children?: string;
-}) {
-    if (!children) return null;
-    return (
-        <p id={id} role="alert" className="text-[12px] text-destructive">
-            {children}
-        </p>
-    );
-}
+const LABEL = "block";
 
 export function NameField({
     value,
@@ -62,7 +48,6 @@ export function NameField({
                 disabled={disabled}
                 aria-invalid={!!error}
                 aria-describedby={error ? "collection-name-error" : undefined}
-                className="h-9 rounded-[8px] text-[13px]"
             />
             <FieldError id="collection-name-error">{error}</FieldError>
         </div>
@@ -96,7 +81,7 @@ export function DescriptionField({
                 disabled={disabled}
                 placeholder="What's in it, in a line."
                 aria-invalid={!!error}
-                className="rounded-[8px] text-[13px] leading-[1.55]"
+                className="leading-[1.55]"
             />
             <FieldError>{error}</FieldError>
         </div>
@@ -128,12 +113,9 @@ export function CategoryField({
             {categories.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
                     There are no categories yet.{" "}
-                    <Link
-                        href={productSettingsHref("categories")}
-                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
+                    <TextLink href={productSettingsHref("categories")}>
                         Manage categories
-                    </Link>
+                    </TextLink>
                 </p>
             ) : (
                 <OptionSelect
@@ -144,7 +126,6 @@ export function CategoryField({
                     placeholder="Pick a category"
                     disabled={disabled}
                     aria-invalid={!!error}
-                    className="h-9 rounded-[8px] text-[13px]"
                 />
             )}
             <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
@@ -176,14 +157,7 @@ export function SheetNotices({
                     or admin can.
                 </p>
             ) : null}
-            {loadError ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] border border-destructive/40 px-3 py-2.5 text-[12.5px] text-destructive"
-                >
-                    {loadError}
-                </p>
-            ) : null}
+            {loadError ? <Notice tone="error">{loadError}</Notice> : null}
             {loading ? (
                 <p
                     role="status"
@@ -194,40 +168,5 @@ export function SheetNotices({
                 </p>
             ) : null}
         </>
-    );
-}
-
-/** "You have changes that are not saved", with Discard and Keep editing. */
-export function DiscardBar({
-    onDiscard,
-    onKeep,
-}: {
-    onDiscard: () => void;
-    onKeep: () => void;
-}) {
-    return (
-        <div
-            role="alert"
-            className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5 text-[12.5px] text-brand-subtle-foreground"
-        >
-            <span className="flex-[1_1_180px]">
-                You have changes that are not saved.
-            </span>
-            <Button
-                type="button"
-                variant="outline"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
-                onClick={onDiscard}
-            >
-                Discard
-            </Button>
-            <Button
-                type="button"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                onClick={onKeep}
-            >
-                Keep editing
-            </Button>
-        </div>
     );
 }

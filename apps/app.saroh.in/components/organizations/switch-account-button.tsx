@@ -44,10 +44,11 @@ export function SwitchAccountButton({
     return (
         <Button
             variant="brand"
-            disabled={pending}
             onClick={() => void switchAccount()}
+            busy={pending}
+            busyLabel="Signing out…"
         >
-            {pending ? "Signing out…" : label}
+            {label}
         </Button>
     );
 }

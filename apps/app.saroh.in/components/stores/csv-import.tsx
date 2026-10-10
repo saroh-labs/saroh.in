@@ -19,6 +19,7 @@ import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
 import { applyImport, previewImport } from "@/lib/imports/actions";
@@ -30,6 +31,7 @@ import type {
     PreviewResult,
     RowIssue,
 } from "@/lib/imports/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * CSV import (#175) — pick a file, check the mapping, see what will happen,
@@ -150,11 +152,14 @@ export function CsvImport({
             next: DuplicatePolicy,
         ) => {
             startTransition(async () => {
-                const res = await previewImport(storeId, descriptor.entity, {
-                    csv: text,
-                    mapping: nextMapping,
-                    policy: next,
-                });
+                const res = await runAction(() =>
+                    previewImport(storeId, descriptor.entity, {
+                        csv: text,
+                        mapping: nextMapping,
+                        policy: next,
+                    }),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     setError(res.error);
                     setPreview(null);
@@ -203,12 +208,15 @@ export function CsvImport({
 
     function onImport(createAtMost?: number) {
         startTransition(async () => {
-            const res = await applyImport(storeId, descriptor.entity, {
-                csv,
-                mapping,
-                policy,
-                ...(createAtMost === undefined ? {} : { createAtMost }),
-            });
+            const res = await runAction(() =>
+                applyImport(storeId, descriptor.entity, {
+                    csv,
+                    mapping,
+                    policy,
+                    ...(createAtMost === undefined ? {} : { createAtMost }),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // More rows than the plan's products limit (U13): its notice.
                 if (res.plan) showPlanRefusal(res.plan);
@@ -541,33 +549,36 @@ export function CsvImport({
                             ) : null}
 
                             {room?.over && meter ? (
-                                <div
-                                    role="status"
-                                    className="flex flex-wrap items-center gap-3 rounded-[10px] border border-brand-300 bg-brand-subtle px-3.5 py-3 dark:border-brand-700"
-                                >
-                                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
-                                        {room.words}{" "}
-                                        {room.fits > 0
-                                            ? `Import the first ${room.fits}, or upgrade for more.`
-                                            : "Upgrade to bring them in."}
-                                    </p>
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href={meter.href}>
-                                            {planLabel(meter.upgradeTo)}
-                                        </Link>
-                                    </Button>
-                                </div>
+                                <Notice tone="info">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
+                                            {room.words}{" "}
+                                            {room.fits > 0
+                                                ? `Import the first ${room.fits}, or upgrade for more.`
+                                                : "Upgrade to bring them in."}
+                                        </p>
+                                        <Button
+                                            asChild
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            <Link href={meter.href}>
+                                                {planLabel(meter.upgradeTo)}
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </Notice>
                             ) : null}
 
                             <div className="flex flex-wrap items-center gap-3 border-t pt-5">
                                 <Button
                                     variant="brand"
                                     onClick={() => onImport(fits ?? undefined)}
-                                    disabled={pending || willWrite === 0}
+                                    disabled={willWrite === 0}
+                                    busy={pending}
+                                    busyLabel="Importing…"
                                 >
-                                    {pending
-                                        ? "Working…"
-                                        : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
+                                    {`Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
                                 </Button>
                                 <Button
                                     variant="outline"

@@ -3996,3 +3996,39 @@ row that names no permission; `organization-policy.spec.ts` pins the refusal's
 shape.
 **Category**: access · `docs/patterns/frontend-error-feedback.md`,
 `docs/patterns/backend-auth-and-access.md`
+
+## Every screen drew its own tabs, pills, notices and links
+
+**Symptom**: a UX audit (10 Oct 2026) counted fourteen tab strips in two
+colours and three type sizes, about twenty pill components and ninety pills
+drawn by hand (six of them in capitals), eighty-five boxed alerts in
+thirty-four styles, a hundred Saffron links, seventeen clipboard calls with
+nine failure sentences, and seven words for "customers can get it".
+**Cause**: each screen was built from its design file alone. The library had
+a tooltip, an alert and a progress bar that nothing used, so the next screen
+copied the last screen's markup and changed it.
+**Fix**: one of each, in `@saroh/ui` (`TabStrip`, `Segmented`, `ListSearch`,
+`Notice`, `TextLink`, `IconButton`, `Tip`, `CopyButton`, `ShareLink`,
+`ProgressBar`, `CountBadge`, the `.label` utility) and in
+`components/shared` (`StatusBadge`, `SectionList`, `Chip`), with the status
+words in `lib/status/vocabulary.ts`. Every call site was moved and the old
+pieces deleted.
+**Check**: `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts` fails a
+hand-rolled `role="tablist"`, a boxed alert outside `Notice`,
+`navigator.clipboard` outside the copy pieces, `uppercase` outside `.label`,
+any Saffron class outside the menu's marker, and a transition with a literal
+duration. Its allowlists name what is left, each with its reason.
+**Category**: design system · `docs/patterns/frontend-design-system.md`
+
+## A tooltip made a jsdom test take seconds
+
+**Symptom**: wrapping a button in the library's tooltip timed out twenty
+component tests in `apps/app.saroh.in` at 5s each.
+**Cause**: the one `packages/ui/vitest.setup.ts` already describes. jsdom's
+selector engine answers `:modal` and `:popover-open` by recursing to a stack
+overflow, and floating-ui asks both of every positioned tooltip. The app had
+no setup file, so it had no fix.
+**Fix**: `apps/app.saroh.in/vitest.setup.ts` mirrors the library's patch (a
+no-op under `node`), wired through `setupFiles`.
+**Check**: the suite itself: the order sheets' tests press tooltipped buttons.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`

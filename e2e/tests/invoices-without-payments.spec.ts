@@ -159,7 +159,9 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
             await action(page, "Issue it").click();
             const confirm = page.getByRole("alertdialog");
             await expect(confirm).not.toContainText("pay link");
-            await confirm.getByRole("button", { name: "Issue it" }).click();
+            await confirm
+                .getByRole("button", { name: "Issue invoice" })
+                .click();
             await expect
                 .poll(
                     async () =>
@@ -188,7 +190,9 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 .getByRole("combobox", { name: "How it was paid" })
                 .click();
             await page.getByRole("option", { name: "Cash" }).click();
-            await dialog.getByRole("button", { name: "Mark it paid" }).click();
+            await dialog
+                .getByRole("button", { name: "Record payment" })
+                .click();
             await expect
                 .poll(
                     async () =>

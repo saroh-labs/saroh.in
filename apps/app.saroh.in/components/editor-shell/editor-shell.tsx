@@ -1,11 +1,13 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
@@ -26,6 +28,7 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
 
@@ -180,6 +183,8 @@ export function EditorShell<V extends Record<string, unknown>>(
     if (refused) errors[refused.field] = refused.message;
 
     const settled = isSettled(save);
+    // It saves by itself, so Cmd/Ctrl+S saves what is waiting now.
+    useSaveShortcut(() => void editor.flush(), canEdit);
     // It saves by itself, so a way out saves what is waiting first and
     // asks only when that save fails (or the record is in a conflict).
     const guard = useLeaveGuard({
@@ -223,15 +228,15 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function discard() {
-        setConfirm(null);
+    /** From its confirm, which waits and says a refusal itself. */
+    async function discard(): Promise<ConfirmResult> {
         setBusy(true);
         try {
             const res = await editor.discard();
             if (!res) return;
             if (!res.ok) {
-                if (!res.conflict) showError(res.error);
-                return;
+                // A conflict is the page's own state, with Reload.
+                return res.conflict ? true : { ok: false, error: res.error };
             }
             setRefused(null);
             showSuccess("Changes discarded.");
@@ -241,10 +246,10 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function remove() {
-        setConfirm(null);
+    async function remove(): Promise<ConfirmResult> {
         setBusy(true);
-        const res = await editor.remove();
+        // Stays busy while it leaves; anything else gives the control back.
+        const res = await runAction(() => editor.remove());
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);
@@ -252,7 +257,7 @@ export function EditorShell<V extends Record<string, unknown>>(
             return;
         }
         setBusy(false);
-        if (res && !res.conflict) showError(res.error);
+        if (res && !res.conflict) return { ok: false, error: res.error };
     }
 
     async function reload() {
@@ -344,9 +349,9 @@ export function EditorShell<V extends Record<string, unknown>>(
                         : "Your unpublished changes go."
                 } What's live stays as it is. This cannot be undone.`}
                 confirmLabel="Discard changes"
-                cancelLabel="Keep changes"
+                keepLabel="Keep changes"
                 icon={RotateCcw}
-                onConfirm={() => void discard()}
+                onConfirm={discard}
             />
             <ConfirmDialog
                 open={confirm === "delete"}
@@ -354,8 +359,8 @@ export function EditorShell<V extends Record<string, unknown>>(
                 title={`Delete ${title}?`}
                 description={`The draft goes, with everything typed into it. It was never published, so nobody loses anything. This cannot be undone.`}
                 confirmLabel="Delete draft"
-                cancelLabel="Keep draft"
-                onConfirm={() => void remove()}
+                keepLabel="Keep draft"
+                onConfirm={remove}
             />
             {guard.dialog}
         </main>

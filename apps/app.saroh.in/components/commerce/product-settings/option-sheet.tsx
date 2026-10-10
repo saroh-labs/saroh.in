@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
     addOption,
@@ -123,11 +123,10 @@ export function OptionSheet({
         if (!res.ok) return showError(res.error);
         setOpen(false);
         router.refresh();
-        showUndo(`${nd} added.`, () => {
-            void removeOption(res.data.id).then((undo) => {
-                if (!undo.ok) showError(undo.error);
-                router.refresh();
-            });
+        showUndo(`${nd} added.`, async () => {
+            const back = await removeOption(res.data.id);
+            router.refresh();
+            return back;
         });
     }
 
@@ -165,25 +164,28 @@ export function OptionSheet({
             renamed
                 ? `${o.name} is now ${nd}. Customers see the new name.`
                 : `${nd} saved.`,
-            () => {
-                void (async () => {
-                    for (const step of undo.reverse()) {
-                        const back = await step();
-                        if (!back.ok) {
-                            showError(
-                                `Couldn't undo every change to ${nd}. Check its values.`,
-                            );
-                            break;
-                        }
+            async () => {
+                let undone = true;
+                for (const step of undo.reverse()) {
+                    const back = await step();
+                    if (!back.ok) {
+                        undone = false;
+                        break;
                     }
-                    router.refresh();
-                })();
+                }
+                router.refresh();
+                return undone
+                    ? true
+                    : {
+                          ok: false,
+                          error: `Not every change to ${nd} went back. Check its values.`,
+                      };
             },
         );
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -330,7 +332,7 @@ export function OptionSheet({
                             : "Type a value and press Enter, or add them later.")}
                 </p>
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -351,7 +353,7 @@ function RemoveValue({
             className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:cursor-not-allowed coarse:size-9"
             onClick={onClick}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </button>
     );
 }

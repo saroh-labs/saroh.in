@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -37,18 +39,23 @@ export function AlsoSell({
     const flip = (f: AlsoSellFeature) => {
         if (!f.on) return setPicked([f.key]);
         startTransition(async () => {
-            const res = await set(f.key, false);
+            const res = await runAction(() => set(f.key, false));
+            if (!res) return;
             if (!res.ok) {
                 // The API says why in a sentence.
                 showError(refusalSentence(res));
                 return;
             }
             router.refresh();
-            showUndo(alsoSellToast(f.label, false), () => {
-                void set(f.key, true).then((back) => {
-                    if (!back.ok) showError(refusalSentence(back));
-                    router.refresh();
+            showUndo(alsoSellToast(f.label, false), async () => {
+                const back = await runAction(() => set(f.key, true), {
+                    quiet: true,
                 });
+                if (!back) return { ok: false, error: UNREACHED };
+                router.refresh();
+                return back.ok
+                    ? true
+                    : { ok: false, error: refusalSentence(back) };
             });
         });
     };

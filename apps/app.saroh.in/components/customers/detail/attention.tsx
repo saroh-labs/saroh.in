@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
@@ -25,6 +26,7 @@ import {
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { AttentionSheet } from "./attention-sheet";
 import { CARD, LABEL } from "./parts";
 
@@ -123,10 +125,6 @@ export function HeaderAttention({ state }: { state: AttentionState }) {
         />
     );
 }
-
-const TEXT_BTN =
-    "text-[12px] text-muted-foreground transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11";
-
 /**
  * Overview's Needs attention card: each entry with its detail and who added
  * it, Edit and Remove for a role that may, and what this role can't see.
@@ -150,13 +148,12 @@ export function AttentionCard({
             <div className="flex items-baseline gap-2">
                 <span className={cn(LABEL, "flex-1")}>Needs attention</span>
                 {canWrite && state.read ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={state.add}
-                        className="text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Add
-                    </button>
+                    </TextLink>
                 ) : null}
             </div>
             {!state.read ? (
@@ -185,25 +182,26 @@ export function AttentionCard({
                                 <span className="flex-1" />
                                 {canWrite ? (
                                     <span className="flex gap-3">
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => state.edit(e)}
                                             aria-label={`Edit ${tagText(e)}`}
-                                            className={TEXT_BTN}
+                                            className="text-muted-foreground"
                                         >
                                             Edit
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => state.remove(e)}
                                             aria-label={`Remove ${tagText(e)}`}
-                                            className={cn(
-                                                TEXT_BTN,
-                                                "hover:text-destructive-subtle-foreground active:bg-destructive-subtle",
-                                            )}
+                                            className="text-muted-foreground"
                                         >
                                             Remove
-                                        </button>
+                                        </Button>
                                     </span>
                                 ) : null}
                             </div>

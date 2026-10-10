@@ -113,7 +113,7 @@ export function CustomersList({
     return (
         <div>
             {heading}
-            <Filters query={query} page={page} go={go} />
+            <Filters query={query} page={page} go={go} searching={navigating} />
             {notice}
             <div aria-busy={navigating}>
                 <Rows
@@ -143,7 +143,6 @@ export function CustomersList({
                         size="sm"
                         disabled={page.page <= 1}
                         onClick={() => go({ page: page.page - 1 })}
-                        className="h-[30px] rounded-[8px] px-3 text-[12.5px]"
                     >
                         Previous
                     </Button>
@@ -153,7 +152,6 @@ export function CustomersList({
                         size="sm"
                         disabled={page.page >= pages}
                         onClick={() => go({ page: page.page + 1 })}
-                        className="h-[30px] rounded-[8px] px-3 text-[12.5px]"
                     >
                         Next
                     </Button>

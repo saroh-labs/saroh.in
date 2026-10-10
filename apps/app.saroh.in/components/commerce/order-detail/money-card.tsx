@@ -12,7 +12,8 @@ import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
-import { actionClass, FOCUS, Panel, PanelTitle } from "./parts";
+import { Notice } from "@saroh/ui/notice";
+import { FOCUS, Panel, PanelTitle } from "./parts";
 import { RecordPayment } from "./record-payment";
 
 const KIND_LABEL: Record<string, string> = {
@@ -190,11 +191,7 @@ export function MoneyCard({
                 </div>
             ) : null}
             {money.refundsBeingConfirmed.map((r) => (
-                <div
-                    key={r.id}
-                    role="status"
-                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
-                >
+                <Notice role="status" className="mt-2" key={r.id}>
                     <p className="text-pretty">
                         <span className="font-semibold">
                             {format(n(r.amount))} refund not confirmed yet.
@@ -208,21 +205,17 @@ export function MoneyCard({
                         <Button
                             type="button"
                             variant="outline"
-                            className={cn(actionClass("ghost"), "mt-2")}
+                            className="mt-2"
                             disabled={busy}
                             onClick={() => onRetryRefund(r.id)}
                         >
                             Try again
                         </Button>
                     ) : null}
-                </div>
+                </Notice>
             ))}
             {(money.owedBack ?? []).map((p) => (
-                <div
-                    key={p.id}
-                    role="status"
-                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
-                >
+                <Notice role="status" className="mt-2" key={p.id}>
                     <p className="text-pretty">
                         <span className="font-semibold">
                             {format(n(p.amount))} owed back to the customer.
@@ -236,7 +229,7 @@ export function MoneyCard({
                             through.
                         </span>
                     </p>
-                </div>
+                </Notice>
             ))}
             {!invoice && taxed ? (
                 <div className="pt-[3px] text-[12.5px] text-muted-foreground">

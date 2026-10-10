@@ -1,13 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { ArrowUpRight } from "lucide-react";
+import { showSuccess } from "@saroh/ui/toast";
+import { ExternalLink, Unplug } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
     disconnectCommsProvider,
@@ -25,7 +25,10 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
-import { ProviderSetupDialog } from "./provider-setup-dialog";
+import type { StatusTone } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { CopyButton } from "@saroh/ui/copy-button";
+import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 /*
  * One row of Settings → Providers (`provider-list.tsx`): a provider with
@@ -38,30 +41,30 @@ import { ProviderSetupDialog } from "./provider-setup-dialog";
  * domain that needs a person is the accent; disconnected is quiet — nothing
  * is broken about a provider someone chose to disconnect.
  */
-const PILL: Record<ProviderRowState, { label: string; tone: string }> = {
+const PILL: Record<ProviderRowState, { label: string; tone: StatusTone }> = {
     CONNECTED: {
         label: "Connected",
-        tone: "bg-success-subtle text-success-subtle-foreground",
+        tone: "success",
     },
     ATTENTION: {
         label: "Needs attention",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     PENDING: {
         label: "Waiting for DNS",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     FAILED: {
         label: "Action needed",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     DISCONNECTED: {
         label: "Disconnected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
     NOT_CONNECTED: {
         label: "Not connected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
 };
 
@@ -105,7 +108,7 @@ export function ProviderRowView({
 
     const setupDialog = (trigger: string, urgent: boolean) =>
         entry.setup.kind === "payments" ? (
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="payments"
                 label={entry.name}
                 trigger={trigger}
@@ -115,7 +118,7 @@ export function ProviderRowView({
                 webhooks={webhooks}
             />
         ) : (
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="messaging"
                 label={entry.name}
                 trigger={trigger}
@@ -126,15 +129,15 @@ export function ProviderRowView({
             />
         );
 
-    async function disconnect() {
+    async function disconnect(): Promise<ConfirmResult> {
         const target = entry.target;
         if (!target) return;
         const res =
             target.kind === "payments"
                 ? await disconnectPaymentProvider(target.provider)
                 : await disconnectCommsProvider(target.channel);
-        if (!res.ok) return showError(res.error);
-        showSuccess(`${entry.name} disconnected`);
+        if (!res.ok) return { ok: false, error: res.error };
+        showSuccess(`${entry.name} disconnected.`);
         router.refresh();
     }
 
@@ -155,14 +158,9 @@ export function ProviderRowView({
                                 {entry.type}
                             </span>
                             {!available ? (
-                                <span
-                                    className={cn(
-                                        "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                        PILL[entry.state].tone,
-                                    )}
-                                >
+                                <StatusBadge tone={PILL[entry.state].tone}>
                                     {PILL[entry.state].label}
-                                </span>
+                                </StatusBadge>
                             ) : null}
                         </div>
                         {entry.note ? (
@@ -193,9 +191,9 @@ export function ProviderRowView({
                     {(available || entry.state === "DISCONNECTED") &&
                     entry.lock ? (
                         <>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                            <StatusBadge tone="neutral">
                                 {entry.lock.comesWith}
-                            </span>
+                            </StatusBadge>
                             <Button asChild variant="outline" size="sm">
                                 <Link href={entry.lock.href}>
                                     {entry.lock.cta}
@@ -219,7 +217,7 @@ export function ProviderRowView({
                                 aria-label={`Manage ${entry.name} — opens ${entry.name}'s dashboard`}
                             >
                                 Manage
-                                <ArrowUpRight aria-hidden className="size-4" />
+                                <ExternalLink aria-hidden className="size-4" />
                             </a>
                         </Button>
                     ) : null}
@@ -240,7 +238,7 @@ export function ProviderRowView({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="px-2.5 text-foreground/80"
+                            className="text-foreground/80"
                             aria-expanded={open}
                             aria-controls={open ? detailsId : undefined}
                             onClick={() => setOpen((o) => !o)}
@@ -274,8 +272,10 @@ export function ProviderRowView({
                     }}
                     title={`Disconnect ${entry.name}?`}
                     description={entry.consequence}
-                    confirmLabel="Disconnect"
-                    onConfirm={() => void disconnect()}
+                    confirmLabel={`Disconnect ${entry.name}`}
+                    keepLabel={`Keep ${entry.name}`}
+                    icon={Unplug}
+                    onConfirm={disconnect}
                 />
             ) : null}
         </div>
@@ -297,14 +297,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                         <span className="text-[13.5px] font-semibold">
                             {row.label}
                         </span>
-                        <span
-                            className={cn(
-                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                pill.tone,
-                            )}
-                        >
-                            {pill.label}
-                        </span>
+                        <StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
                     </div>
                     <p className="mt-[3px] text-pretty text-[12px] leading-[1.45] text-muted-foreground">
                         {row.note}
@@ -322,7 +315,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="px-2.5 text-foreground/80"
+                            className="text-foreground/80"
                             aria-expanded={open}
                             aria-controls={open ? detailsId : undefined}
                             onClick={() => setOpen((o) => !o)}
@@ -356,21 +349,13 @@ function RefLine({ label, code }: ProviderRef) {
             <code className="break-all rounded-md bg-muted px-[7px] py-0.5 font-mono text-[12px] text-foreground">
                 {code}
             </code>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-[12px]"
+            <CopyButton
+                value={code}
+                label="Copy"
+                thing={label.toLowerCase()}
+                icon={false}
                 aria-label={`Copy ${label.toLowerCase()}`}
-                onClick={() => {
-                    navigator.clipboard.writeText(code).then(
-                        () => showSuccess(`Copied ${code}`),
-                        () => showError("Could not copy — select it instead."),
-                    );
-                }}
-            >
-                Copy
-            </Button>
+            />
         </div>
     );
 }

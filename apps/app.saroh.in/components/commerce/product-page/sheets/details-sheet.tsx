@@ -20,7 +20,6 @@ import {
     ChoicePills,
     ShopSwitch,
 } from "@/components/commerce/product-sections/shop-switch";
-import { OptionSelect } from "@/components/shared/option-select";
 import { patchProduct } from "@/lib/products/actions";
 import {
     LIMITS,
@@ -30,6 +29,7 @@ import {
 } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { QuickSheet } from "../quick-sheet";
 
@@ -124,12 +124,10 @@ export function DetailsSheet({
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Details saved.", () => {
-            void patchProduct(storeId, product.id, before).then((undo) => {
-                if (!undo.ok)
-                    showError("Couldn't undo. The saved details stay.");
-                router.refresh();
-            });
+        showUndo("Details saved.", async () => {
+            const undo = await patchProduct(storeId, product.id, before);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -145,8 +143,8 @@ export function DetailsSheet({
             fullEditorHref={productEditHref(storeId, product.id, "details")}
             dirty={isDirty}
             saving={isSubmitting}
-            note={firstError ?? (isDirty ? undefined : "No changes yet")}
-            onSave={() => void form.handleSubmit(save)()}
+            note={firstError}
+            onSave={() => form.handleSubmit(save)()}
         >
             <Form {...form}>
                 <div className="flex flex-col gap-4">

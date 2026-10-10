@@ -190,7 +190,8 @@ describe("Take ₹X at the desk", () => {
         typeInto(cashGiven(), "300");
         expect(dialog().textContent).toContain("Short ₹200");
         expect(dialog().textContent).toContain("That's ₹200 short.");
-        expect(button(/^Take ₹500 cash$/).disabled).toBe(true);
+        // The button stays on: what is wrong is already said.
+        expect(button(/^Take ₹500 cash$/).disabled).toBe(false);
     });
 
     it("takes cash with what was given, says the change, and refreshes", async () => {
@@ -265,14 +266,16 @@ describe("Take ₹X at the desk", () => {
     it("never offers a link for what's left after a deposit, or without a provider", () => {
         openTake({ byLink: false });
         expect(chip("Send a pay link").disabled).toBe(true);
-        expect(chip("Send a pay link").title).toContain("take the rest here");
+        expect(
+            chip("Send a pay link").getAttribute("aria-description"),
+        ).toContain("take the rest here");
         act(() => root.unmount());
         root = createRoot(host);
         openTake({ canLink: false });
         expect(chip("Send a pay link").disabled).toBe(true);
-        expect(chip("Send a pay link").title).toContain(
-            "No payment provider connected",
-        );
+        expect(
+            chip("Send a pay link").getAttribute("aria-description"),
+        ).toContain("No payment provider connected");
     });
 });
 

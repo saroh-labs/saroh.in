@@ -1,12 +1,13 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError } from "@saroh/ui/toast";
-import { Info } from "lucide-react";
-import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 
 import { useSettingsUndo } from "@/components/organizations/use-settings-undo";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { saveAlert, undoAlert } from "@/lib/notifications/actions";
 import type {
     AlertCell,
@@ -21,6 +22,8 @@ import {
     alertUndo,
     withAlert,
 } from "@/lib/notifications/preferences";
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** The grid's columns: the alert, then 56px a channel (76px from sm). */
 const GRID_COLS: Record<number, string> = {
@@ -68,14 +71,18 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
         };
         startTransition(async () => {
             flipShown(change);
-            const result = await saveAlert(change);
+            const result = await runAction(() => saveAlert(change));
+            if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Your alerts are as they were.");
                 return;
             }
             const undo = alertUndo(change);
             offer(alertSaved(change), async () => {
-                const back = await undoAlert(undo);
+                const back = await runAction(() => undoAlert(undo), {
+                    quiet: true,
+                });
+                if (!back) return { ok: false, error: UNREACHED };
                 return back.ok
                     ? { ok: true }
                     : { ok: false, error: back.error };
@@ -97,27 +104,24 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                 </span>
             </div>
             {grid.notes.map((note) => (
-                <p
-                    key={note.id}
-                    role="note"
-                    className="flex items-start gap-2 text-pretty border-b border-border/70 bg-muted/50 px-[18px] py-2.5 text-[12.5px] text-foreground/80"
-                >
-                    <Info aria-hidden className="mt-px size-3.5 shrink-0" />
-                    <span>
-                        {note.text}
-                        {note.link ? (
-                            <>
-                                {" "}
-                                <Link
-                                    href={note.link.href}
-                                    className="wk-press cursor-pointer rounded-sm font-semibold text-foreground underline underline-offset-2 hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/60"
-                                >
-                                    {note.link.label}
-                                </Link>
-                            </>
-                        ) : null}
-                    </span>
-                </p>
+                <Notice layout="banner" key={note.id}>
+                    <div>
+                        <span>
+                            {note.text}
+                            {note.link ? (
+                                <>
+                                    {" "}
+                                    <TextLink
+                                        href={note.link.href}
+                                        className="wk-press"
+                                    >
+                                        {note.link.label}
+                                    </TextLink>
+                                </>
+                            ) : null}
+                        </span>
+                    </div>
+                </Notice>
             ))}
             {grid.rows.length > 0 ? (
                 <div
@@ -129,7 +133,7 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
                     <div
                         role="row"
                         className={cn(
-                            "grid items-center px-[18px] py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                            "label grid items-center px-[18px] py-2",
                             cols,
                         )}
                     >
@@ -201,36 +205,14 @@ function AlertSwitch({
     onFlip: () => void;
 }) {
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={cell.on}
+        <Switch
+            checked={cell.on}
             aria-disabled={cell.disabled || busy || undefined}
+            aria-busy={busy || undefined}
             aria-label={cell.label}
             disabled={cell.disabled}
-            onClick={onFlip}
-            className={cn(
-                "wk-press shrink-0 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                cell.disabled
-                    ? "cursor-not-allowed opacity-50"
-                    : busy
-                      ? "cursor-progress"
-                      : "cursor-pointer hover:bg-muted active:bg-border",
-            )}
-        >
-            <span
-                className={cn(
-                    "relative block h-6 w-[42px] rounded-full transition-colors duration-fast",
-                    cell.on ? "bg-foreground" : "bg-border",
-                )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        cell.on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+            onCheckedChange={onFlip}
+            className="wk-press"
+        />
     );
 }

@@ -241,15 +241,14 @@ describe("QrPrintSlot — downloading", () => {
         ];
         await draw();
         await click(buttonOf("standee"));
-        expect(buttonOf("standee")?.textContent).toBe("Making the PDF…");
-        expect(buttonOf("standee")?.disabled).toBe(true);
+        expect(buttonOf("standee")?.textContent).toBe("Making…");
         expect(buttonOf("standee")?.getAttribute("aria-busy")).toBe("true");
         expect(buttonOf("card")?.disabled).toBe(false);
 
         // Another file, while the first is still being made.
         await click(buttonOf("card"));
         expect(saved).toEqual(["glow-studio-qr-h7c-card.pdf"]);
-        expect(buttonOf("standee")?.textContent).toBe("Making the PDF…");
+        expect(buttonOf("standee")?.textContent).toBe("Making…");
 
         await act(async () => {
             finish(pdf("glow-studio-qr-h7c-standee.pdf"));

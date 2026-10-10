@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -23,6 +24,7 @@ import {
     untrackedLine,
 } from "@/lib/products/tracking";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
@@ -255,15 +257,16 @@ export function StockSection({
                         ? `No stock count yet. Each of the ${product.variants.length} variants gets its own, so a small one can run out before a large one.`
                         : "No stock count yet. Add one to see how many you have and get a warning when it runs low."}
                 </p>
-                <button
+                <Button
+                    variant="outline"
                     type="button"
                     disabled={blocked}
                     onClick={() => setOpened(true)}
-                    className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
+                    className="gap-[7px]"
                 >
-                    <Plus aria-hidden className="size-3.5" strokeWidth={2.2} />
+                    <Plus aria-hidden className="size-3.5" />
                     Add stock
-                </button>
+                </Button>
                 {hasVariants && !canWrite && !ro ? (
                     <FieldHelp className="mt-2">{SPLIT_NEEDS_WRITE}</FieldHelp>
                 ) : null}
@@ -293,13 +296,12 @@ export function StockSection({
                     onChange={(patch) => setDraft({ ...draft, ...patch })}
                 />
                 {hasVariants && canWrite ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => setOpened(true)}
-                        className="mt-2 text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                        className="mt-2 text-[12px] coarse:min-h-11"
                     >
                         Count each variant instead
-                    </button>
+                    </TextLink>
                 ) : null}
                 {lowNow ? (
                     <LowNote>

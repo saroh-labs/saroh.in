@@ -235,8 +235,11 @@ describe("Rename", () => {
 
     it("points a taken name at Merge, unsent", async () => {
         s.type(open(), "Lip care");
+        // What is wrong is said when Save is pressed.
+        await s.submit(s.dialog());
+        expect(actions.renameCategory).not.toHaveBeenCalled();
         expect(s.dialog()?.textContent).toContain(
-            "That name is taken — use Merge to combine them.",
+            "That name is taken. Use Merge to combine them.",
         );
         await s.submit(s.dialog());
         expect(actions.renameCategory).not.toHaveBeenCalled();
@@ -325,45 +328,44 @@ describe("Merge", () => {
 });
 
 describe("Delete", () => {
-    it("asks first, saying where its products go", () => {
-        render();
-        s.press("Delete Serums");
-        expect(s.title(s.confirm())).toBe("Delete Serums?");
-        expect(s.confirm()?.textContent).toContain(
-            "Its 3 products move to Uncategorized. The products themselves are not touched.",
-        );
-        expect(s.button("Rename Serums")).toBeDefined();
-        expect(actions.removeCategory).not.toHaveBeenCalled();
-    });
-
-    it("says one product moves, and none when none use it", () => {
-        render(catalogue({ categories: [cat("c2", "Lip care", 1)] }));
-        s.press("Delete Lip care");
-        expect(s.confirm()?.textContent).toContain(
-            "Its 1 product moves to Uncategorized.",
-        );
-        s.press("Keep it", s.confirm());
-        render(catalogue({ categories: [cat("c9", "Empty", 0)] }));
-        s.press("Delete Empty");
-        expect(s.confirm()?.textContent).toContain("No products use it.");
-    });
-
-    it("deletes on confirm, with Undo", async () => {
+    it("asks nothing: it goes at once, with Undo, saying where its products went", async () => {
         actions.removeCategory.mockResolvedValue({ ok: true, data: {} });
         render();
         s.press("Delete Serums");
-        s.press("Delete category", s.confirm());
         await s.settle();
+        // It can be undone, so there is no confirm.
+        expect(s.confirm()).toBe(null);
         expect(actions.removeCategory).toHaveBeenCalledWith("c1");
         expect(showUndo.mock.calls[0][0]).toBe("Serums deleted.");
-        expect(s.confirm()).toBe(null);
+        expect(showUndo.mock.calls[0][2]).toEqual({
+            description: "Its 3 products are now Uncategorized.",
+        });
     });
 
-    it("keeps it on Keep it", () => {
+    it("says one product moved, and nothing when none used it", async () => {
+        actions.removeCategory.mockResolvedValue({ ok: true, data: {} });
+        render(catalogue({ categories: [cat("c2", "Lip care", 1)] }));
+        s.press("Delete Lip care");
+        await s.settle();
+        expect(showUndo.mock.calls[0][2]).toEqual({
+            description: "Its 1 product is now Uncategorized.",
+        });
+        showUndo.mockClear();
+        render(catalogue({ categories: [cat("c9", "Empty", 0)] }));
+        s.press("Delete Empty");
+        await s.settle();
+        expect(showUndo.mock.calls[0][2]).toEqual({});
+    });
+
+    it("says a refusal, and offers no Undo", async () => {
+        actions.removeCategory.mockResolvedValue({
+            ok: false,
+            error: "It couldn't be deleted.",
+        });
         render();
         s.press("Delete Serums");
-        s.press("Keep it", s.confirm());
-        expect(s.confirm()).toBe(null);
-        expect(actions.removeCategory).not.toHaveBeenCalled();
+        await s.settle();
+        expect(showError).toHaveBeenCalledWith("It couldn't be deleted.");
+        expect(showUndo).not.toHaveBeenCalled();
     });
 });

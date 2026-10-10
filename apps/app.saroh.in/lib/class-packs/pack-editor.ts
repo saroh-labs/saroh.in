@@ -80,7 +80,7 @@ export const PACK_DETAIL_PAGE = true as boolean;
 /** The header's and the leave dialog's words for a pack (D6's `EditorCopy`). */
 export const PACK_COPY: EditorCopy = {
     noun: "pack",
-    liveLabel: "On sale",
+    liveLabel: "Live",
     liveClean: "On sale · no changes",
     draftSaved: "Draft · saved — not on the booking page",
     draftFirstSaved:

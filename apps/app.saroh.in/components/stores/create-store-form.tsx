@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -38,7 +39,6 @@ export function CreateStoreForm() {
         },
     });
     const { isSubmitting, isDirty } = form.formState;
-    const name = form.watch("name");
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("location") });
 
     async function onSubmit(values: FormValues) {
@@ -60,6 +60,7 @@ export function CreateStoreForm() {
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="grid max-w-md gap-4"
             >
@@ -80,25 +81,13 @@ export function CreateStoreForm() {
                         </FormItem>
                     )}
                 />
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Description (optional)</FormLabel>
-                            <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
                 <Button
                     type="submit"
                     className="wk-press justify-self-start"
-                    disabled={isSubmitting || !name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create location"}
+                    Create location
                 </Button>
             </form>
             {guard.dialog}

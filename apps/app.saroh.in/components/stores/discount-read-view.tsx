@@ -9,10 +9,10 @@ import { reachOf, ruleOf } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 
 const STATE: Record<DiscountState, string> = {
-    ACTIVE: "Active",
+    ACTIVE: "Live",
     SCHEDULED: "Scheduled",
-    EXPIRED: "Expired",
-    EXHAUSTED: "Used up",
+    EXPIRED: "Ended",
+    EXHAUSTED: "Ended (used up)",
 };
 
 /**

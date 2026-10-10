@@ -60,7 +60,7 @@ export function StorefrontFilter({
                 <Button
                     variant="outline"
                     className={cn(
-                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
+                        "gap-[7px] font-medium text-neutral-600 dark:text-foreground",
                         current && "border-foreground",
                     )}
                     aria-label={`Location filter: ${current?.name ?? "all locations"}. Change it.`}
@@ -71,9 +71,7 @@ export function StorefrontFilter({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[244px]">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </DropdownMenuLabel>
+                <DropdownMenuLabel className="label">{label}</DropdownMenuLabel>
                 {choices.map((c) => {
                     const on = c.id === value;
                     return (

@@ -67,7 +67,7 @@ test.describe("Products list", () => {
             const look = page.getByRole("dialog", { name });
             await expect(look).toBeVisible();
             await expect(look.getByText("1 of 1")).toBeVisible();
-            await expect(look.getByText("Published")).toBeVisible();
+            await expect(look.getByText("Live", { exact: true })).toBeVisible();
 
             // J at the last product stays on it.
             await page.keyboard.press("j");
@@ -78,7 +78,7 @@ test.describe("Products list", () => {
             await expect(page.getByText(/Stopped selling/)).toBeVisible();
             await expect(look.getByText("Archived")).toBeVisible();
             await page.getByRole("button", { name: "Undo" }).click();
-            await expect(look.getByText("Published")).toBeVisible();
+            await expect(look.getByText("Live", { exact: true })).toBeVisible();
             await page.keyboard.press("Escape");
 
             // Duplicate opens a draft copy in the Editor.

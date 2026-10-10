@@ -1,5 +1,6 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -8,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
@@ -40,6 +41,10 @@ import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
+import { Notice } from "@saroh/ui/notice";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -107,7 +112,16 @@ export function ServiceEditor({
     const hasStaff = people.length > 0;
     const isNew = service === null;
     const [saved, setSaved] = useState(() =>
-        draftOf(service, service ? staffFor(service.id, people) : [], timezone),
+        draftOf(
+            service,
+            service
+                ? staffFor(service.id, people)
+                : // One person on the diary: they take it, unasked.
+                  people.length === 1 && people[0]
+                  ? [people[0].id]
+                  : [],
+            timezone,
+        ),
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
@@ -124,9 +138,15 @@ export function ServiceEditor({
     const noStorefront =
         !wasTreatment && (hasStorefront === false || refusedStorefront);
 
+    const [tried, setTried] = useState(false);
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
-    const problems = serviceProblems(draft, hasStaff, noStorefront);
+    const problems = serviceProblems(
+        draft,
+        hasStaff,
+        noStorefront,
+        people.length === 1,
+    );
     const bad = problems.length > 0;
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
     const pill = statePill(isNew, draft.taking);
@@ -166,7 +186,12 @@ export function ServiceEditor({
     }
 
     async function save() {
-        if (!canEdit || bad || saving || (!dirty && !isNew)) return;
+        if (!canEdit || saving || (!dirty && !isNew)) return;
+        if (bad) {
+            // Say what is missing instead of a button that does nothing.
+            setTried(true);
+            return;
+        }
         setSaving(true);
         const input = serviceInput(draft, currency);
         const message = savedMessage({
@@ -177,19 +202,23 @@ export function ServiceEditor({
             hasPerson: draft.staffIds.length > 0,
         });
         if (service) {
-            const res = await updateService(
-                service.id,
-                serviceUpdate(draft, currency),
+            const res = await runAction(() =>
+                updateService(service.id, serviceUpdate(draft, currency)),
             );
-            if (!res.ok) {
+            if (!res?.ok) {
                 setSaving(false);
-                refused(res.error);
+                if (res) refused(res.error);
                 return;
             }
-            const whoError = staff
-                ? await setWho(service.id, draft.staffIds)
-                : null;
-            setSaving(false);
+            const who = await runAction(
+                async () => ({
+                    error: staff
+                        ? await setWho(service.id, draft.staffIds)
+                        : null,
+                }),
+                { setBusy: setSaving, quiet: true },
+            );
+            const whoError = who ? who.error : UNREACHED;
             router.refresh();
             if (whoError) {
                 setSaved({ ...draft, staffIds: saved.staffIds });
@@ -200,13 +229,17 @@ export function ServiceEditor({
             showSuccess(message);
             return;
         }
-        const res = await createService(input);
-        if (!res.ok) {
+        const res = await runAction(() => createService(input));
+        if (!res?.ok) {
             setSaving(false);
-            refused(res.error);
+            if (res) refused(res.error);
             return;
         }
-        const whoError = await setWho(res.data.id, draft.staffIds);
+        const who = await runAction(
+            async () => ({ error: await setWho(res.data.id, draft.staffIds) }),
+            { quiet: true },
+        );
+        const whoError = who ? who.error : UNREACHED;
         if (whoError) {
             showError(`Added, but who takes it didn't save: ${whoError}`);
         } else {
@@ -215,20 +248,32 @@ export function ServiceEditor({
         router.replace(`/services/${res.data.id}`);
     }
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!service) return;
         setSaving(true);
-        const res = await archiveService(service.id);
-        if (!res.ok) {
+        // The confirm says a refusal, and one that never got there.
+        const res = await runAction(() => archiveService(service.id), {
+            quiet: true,
+        });
+        if (!res?.ok) {
             setSaving(false);
-            showError(res.error);
-            return;
+            return { ok: false, error: res ? res.error : UNREACHED };
         }
-        showSuccess(`${service.name} deleted`);
+        showSuccess("Service deleted.");
         router.push(SERVICES_HREF);
     }
 
-    const saveOff = bad || (!dirty && !isNew) || saving;
+    // What is wrong is said under the header once there is a name, or
+    // once Add service was pressed without one. The button is off only
+    // while that reason is on screen, never off with nothing said.
+    const problemsShown =
+        canEdit &&
+        bad &&
+        (dirty || isNew) &&
+        (draft.name.trim() !== "" || tried);
+    const saveOff = saving || (!dirty && !isNew) || problemsShown;
+    // Cmd/Ctrl+S: the page's one Save (it knows when there is nothing to).
+    useSaveShortcut(() => void save(), canEdit);
     const crumb = service ? service.name : "New service";
 
     return (
@@ -246,14 +291,18 @@ export function ServiceEditor({
                         crumb,
                     ]}
                     title={title}
-                    badge={<StatePill label={pill.label} tone={pill.tone} />}
+                    badge={
+                        <StatusBadge tone={pill.tone} hint={pill.hint}>
+                            {pill.label}
+                        </StatusBadge>
+                    }
                     description={
                         <div
                             role="status"
                             className={cn(
                                 "text-[12.5px]",
                                 dirty && canEdit
-                                    ? "text-brand"
+                                    ? "text-foreground"
                                     : "text-muted-foreground",
                             )}
                         >
@@ -295,12 +344,10 @@ export function ServiceEditor({
                                     type="button"
                                     disabled={saveOff}
                                     onClick={() => void save()}
+                                    busy={saving}
+                                    busyLabel="Saving…"
                                 >
-                                    {saving
-                                        ? "Saving…"
-                                        : isNew
-                                          ? "Add service"
-                                          : "Save changes"}
+                                    {isNew ? "Add service" : "Save changes"}
                                 </Button>
                             </div>
                         ) : (
@@ -311,13 +358,10 @@ export function ServiceEditor({
                     }
                 />
             </div>
-            {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
-                <div
-                    role="alert"
-                    className="bg-destructive-subtle px-4 py-[9px] text-[12.5px] text-destructive-subtle-foreground sm:px-[26px]"
-                >
+            {problemsShown ? (
+                <Notice tone="error" layout="banner">
                     {problems.join(" ")}
-                </div>
+                </Notice>
             ) : null}
 
             <fieldset
@@ -386,9 +430,10 @@ export function ServiceEditor({
                     open={confirmDelete}
                     onOpenChange={setConfirmDelete}
                     title={`Delete ${service.name}?`}
-                    description="It leaves your services and can no longer be booked. Bookings already made keep it. This cannot be undone — to stop bookings for now, choose Stop taking bookings instead."
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, choose Stop taking bookings instead. This cannot be undone."
                     confirmLabel="Delete service"
-                    onConfirm={() => void remove()}
+                    keepLabel="Keep service"
+                    onConfirm={remove}
                 />
             ) : null}
         </main>

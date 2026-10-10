@@ -59,7 +59,8 @@ export const FROZEN_IN_RELEASE = [
 // A release's status
 // ---------------------------------------------------------------------------
 
-export type ReleaseTone = "success" | "draft" | "neutral" | "error" | "info";
+export type ReleaseTone =
+    "success" | "draft" | "active" | "neutral" | "error" | "info";
 
 export interface ReleaseStatusCopy {
     label: string;
@@ -120,7 +121,7 @@ export function releaseStatusCopy(
                         "The scheduled go-live didn't happen. Go live now, or schedule it again.",
                 };
             }
-            return { label: "Ready", tone: "draft", line: made };
+            return { label: "Ready", tone: "active", line: made };
     }
 }
 

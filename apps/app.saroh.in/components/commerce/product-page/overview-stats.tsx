@@ -99,7 +99,7 @@ export function AvailabilityCard({
                     scroll={false}
                     className={cn(
                         FOCUS,
-                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-brand transition-colors hover:text-foreground active:text-muted-foreground",
+                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground",
                     )}
                 >
                     {held}
@@ -107,21 +107,12 @@ export function AvailabilityCard({
             ) : null}
             {a.short ? (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    <Button
-                        asChild
-                        size="sm"
-                        className="h-[30px] rounded-lg px-[11px] text-[12.5px]"
-                    >
+                    <Button asChild size="sm">
                         <Link href={href("stock")} scroll={false}>
                             Add stock
                         </Link>
                     </Button>
-                    <Button
-                        asChild
-                        size="sm"
-                        variant="outline"
-                        className="h-[30px] rounded-lg px-[11px] text-[12.5px]"
-                    >
+                    <Button asChild size="sm" variant="outline">
                         <Link href={href("orders")} scroll={false}>
                             See the orders
                         </Link>
@@ -147,7 +138,7 @@ export function VariantsStat({
         <ProductStat
             className={
                 href
-                    ? "h-full transition-colors hover:border-border-strong"
+                    ? "h-full transition-colors duration-fast hover:border-border-strong"
                     : undefined
             }
             label="Variants"

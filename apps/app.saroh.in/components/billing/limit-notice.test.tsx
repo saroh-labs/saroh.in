@@ -22,7 +22,8 @@ describe("LimitNoticeBlock", () => {
             <LimitNoticeBlock full soft {...props} />,
         );
         expect(html).not.toContain("destructive");
-        expect(html).toContain("bg-brand-subtle");
+        // The warning tint: Saffron is kept for the menu's marker.
+        expect(html).toContain("bg-warning-subtle");
         expect(html).toContain('role="status"');
     });
 });

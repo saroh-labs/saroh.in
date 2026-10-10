@@ -71,7 +71,7 @@ export function ContactPicker({
                     aria-invalid={invalid}
                     disabled={disabled}
                     className={cn(
-                        "flex h-10 w-full min-w-0 justify-between bg-field font-normal",
+                        "flex w-full min-w-0 justify-between bg-field font-normal",
                         !picked && "text-muted-foreground",
                     )}
                 >

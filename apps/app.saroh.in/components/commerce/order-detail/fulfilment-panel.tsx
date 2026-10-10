@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -15,6 +15,7 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -22,10 +23,6 @@ import {
     useOrderSheetDraft,
 } from "./order-sheet";
 import { FOCUS } from "./parts";
-
-const FIELD =
-    "block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
 interface AddressDraft {
     line1: string;
     city: string;
@@ -168,13 +165,7 @@ function FulfilmentDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => choose(o.type)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {o.label}
                             </button>
@@ -186,7 +177,8 @@ function FulfilmentDraft({
                         <legend className="text-[12px] font-medium">
                             Address
                         </legend>
-                        <input
+                        <Input
+                            dense
                             aria-label="Street and number"
                             value={addr.line1}
                             onChange={(e) =>
@@ -195,10 +187,11 @@ function FulfilmentDraft({
                                     line1: e.target.value,
                                 }))
                             }
-                            className={cn(FOCUS, FIELD, "mt-1")}
+                            className="mt-1 w-full"
                         />
                         <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                            <input
+                            <Input
+                                dense
                                 aria-label="Town or city"
                                 placeholder="Town or city"
                                 value={addr.city}
@@ -208,9 +201,10 @@ function FulfilmentDraft({
                                         city: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="State"
                                 placeholder="State"
                                 value={addr.state}
@@ -220,9 +214,10 @@ function FulfilmentDraft({
                                         state: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="PIN code"
                                 placeholder="PIN"
                                 inputMode="numeric"
@@ -233,7 +228,7 @@ function FulfilmentDraft({
                                         postalCode: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
                         </div>
                     </fieldset>
@@ -241,7 +236,8 @@ function FulfilmentDraft({
                 {moved ? (
                     <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
                         Delivery charge
-                        <input
+                        <Input
+                            dense
                             type="text"
                             inputMode="decimal"
                             value={charge}
@@ -249,7 +245,7 @@ function FulfilmentDraft({
                             placeholder="₹"
                             aria-invalid={typed.kind === "bad" || undefined}
                             aria-describedby={`${ids}-note`}
-                            className={cn(FOCUS, FIELD, "tabular-nums")}
+                            className="w-full tabular-nums"
                         />
                     </label>
                 ) : null}
@@ -273,7 +269,38 @@ function FulfilmentDraft({
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    moved && cents !== null
+                        ? saveLabel({
+                              differenceCents: difference,
+                              paid,
+                              linkable,
+                              format: money,
+                          })
+                        : "Save"
+                }
+                saveOff={off}
+                onSubmit={() => {
+                    if (cents === null) return;
+                    onSave({
+                        fulfilment: pick,
+                        shipping: typed.kind === "ok" ? typed.money : "0",
+                        ...(delivery
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(canTell ? { tell } : {}),
+                    });
+                }}
                 note={
                     <p
                         id={`${ids}-note`}
@@ -288,42 +315,7 @@ function FulfilmentDraft({
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    disabled={off}
-                    onClick={() => {
-                        if (cents === null) return;
-                        onSave({
-                            fulfilment: pick,
-                            shipping: typed.kind === "ok" ? typed.money : "0",
-                            ...(delivery
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                            ...(canTell ? { tell } : {}),
-                        });
-                    }}
-                >
-                    {moved && cents !== null
-                        ? saveLabel({
-                              differenceCents: difference,
-                              paid,
-                              linkable,
-                              format: money,
-                          })
-                        : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -46,6 +45,10 @@ import type {
 import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
+import { chipClass } from "@/components/shared/chip";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
+import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
@@ -185,23 +188,37 @@ export function AvailabilityEditor({
         ]);
         let failed: string | null = null;
         for (const op of ops) {
-            const res =
-                op.kind === "hours"
-                    ? await replaceStaffHours(op.staffId, op.hours)
-                    : op.kind === "addOff"
-                      ? op.off.staffId
-                          ? await addTimeOff(op.off.staffId, rangeOf(op.off))
-                          : await addClosure({
-                                ...rangeOf(op.off),
-                                fromDate: op.off.fromDate,
-                            })
-                      : op.kind === "removeOff"
-                        ? await removeTimeOffMany(op.staffId, op.before.ids)
-                        : op.kind === "removeClosure"
-                          ? await removeClosures(op.before.ids)
-                          : op.kind === "removeExtra"
-                            ? await removeExtraHours(op.staffId, op.before.id)
-                            : await updateBookingRules(op.rules);
+            const res = await runAction(
+                async () =>
+                    op.kind === "hours"
+                        ? await replaceStaffHours(op.staffId, op.hours)
+                        : op.kind === "addOff"
+                          ? op.off.staffId
+                              ? await addTimeOff(
+                                    op.off.staffId,
+                                    rangeOf(op.off),
+                                )
+                              : await addClosure({
+                                    ...rangeOf(op.off),
+                                    fromDate: op.off.fromDate,
+                                })
+                          : op.kind === "removeOff"
+                            ? await removeTimeOffMany(op.staffId, op.before.ids)
+                            : op.kind === "removeClosure"
+                              ? await removeClosures(op.before.ids)
+                              : op.kind === "removeExtra"
+                                ? await removeExtraHours(
+                                      op.staffId,
+                                      op.before.id,
+                                  )
+                                : await updateBookingRules(op.rules),
+                // Said below, with what did save.
+                { quiet: true },
+            );
+            if (!res) {
+                failed = UNREACHED;
+                break;
+            }
             if (!res.ok) {
                 failed = res.error;
                 break;
@@ -236,8 +253,9 @@ export function AvailabilityEditor({
             return;
         }
         setDraft(null);
-        showUndo(savedText(ops), () => {
-            void undo(done).then(() => router.refresh());
+        showUndo(savedText(ops), async () => {
+            await undo(done);
+            router.refresh();
         });
         if (outside.length) {
             showWarning(
@@ -296,7 +314,7 @@ export function AvailabilityEditor({
     });
 
     const saveBar = dirty ? (
-        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
+        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
             <span
                 role="status"
                 className="flex-[1_1_240px] text-[12.5px] text-foreground"
@@ -305,18 +323,17 @@ export function AvailabilityEditor({
             </span>
             <Button
                 variant="outline"
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
                 disabled={saving}
                 onClick={() => setDraft(null)}
             >
                 Discard
             </Button>
             <Button
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                disabled={saving}
                 onClick={() => void save()}
+                busy={saving}
+                busyLabel="Saving…"
             >
-                {saving ? "Saving…" : "Save changes"}
+                Save changes
             </Button>
         </div>
     ) : null;
@@ -395,13 +412,7 @@ export function AvailabilityEditor({
                     In-person bookings are only offered while you&apos;re open,
                     so hours outside your opening hours aren&apos;t bookable in
                     person. Opening hours are in{" "}
-                    <Link
-                        href={HOURS}
-                        className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-                    >
-                        Settings › Hours
-                    </Link>
-                    .
+                    <TextLink href={HOURS}>Settings › Hours</TextLink>.
                 </p>
             ) : null}
             {canEdit ? null : (
@@ -423,12 +434,7 @@ export function AvailabilityEditor({
                             role="radio"
                             aria-checked={on}
                             onClick={() => setWho(p.id)}
-                            className={cn(
-                                "inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                                on
-                                    ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                    : "border-border bg-card font-medium hover:border-border-strong",
-                            )}
+                            className={chipClass(on)}
                         >
                             <span
                                 aria-hidden

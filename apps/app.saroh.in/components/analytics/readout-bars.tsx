@@ -100,7 +100,7 @@ export function ReadoutBars({
                             <span
                                 aria-hidden
                                 className={cn(
-                                    "ease-[cubic-bezier(0.25,1,0.5,1)] block min-h-[3px] w-full rounded-t-[3px] transition-opacity duration-150",
+                                    "ease-[cubic-bezier(0.25,1,0.5,1)] block min-h-[3px] w-full rounded-t-[3px] transition-opacity duration-base",
                                     bar.tone,
                                     !active && "group-hover:opacity-80",
                                     active &&

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { getDataExportLink, startDataExport } from "@/lib/data-export/actions";
 import type { DataExportLine } from "@/lib/data-export/words";
 import {
@@ -39,7 +40,8 @@ export function DataExportPanel({
 
     const start = () =>
         startStarting(async () => {
-            const result = await startDataExport();
+            const result = await runAction(() => startDataExport());
+            if (!result) return;
             if (!result.ok) {
                 showError("Your data couldn't be prepared", result.error);
                 return;
@@ -86,10 +88,12 @@ export function DataExportPanel({
                     <Button
                         type="button"
                         onClick={start}
-                        disabled={inProgress || starting}
+                        disabled={inProgress}
+                        busy={starting}
+                        busyLabel="Starting…"
                     >
                         <Download aria-hidden className="size-4" />
-                        {starting ? "Starting…" : "Prepare a download"}
+                        Prepare a download
                     </Button>
                     {inProgress ? (
                         <>
@@ -104,12 +108,13 @@ export function DataExportPanel({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={checking}
                                 onClick={() =>
                                     startChecking(() => router.refresh())
                                 }
+                                busy={checking}
+                                busyLabel="Checking…"
                             >
-                                {checking ? "Checking…" : "Check again"}
+                                Check again
                             </Button>
                         </>
                     ) : null}
@@ -160,10 +165,10 @@ export function DataExportPanel({
                                         size="sm"
                                         disabled={opening !== null}
                                         onClick={() => void download(line.id)}
+                                        busy={opening === line.id}
+                                        busyLabel="Starting…"
                                     >
-                                        {opening === line.id
-                                            ? "Starting…"
-                                            : "Download"}
+                                        Download
                                     </Button>
                                 ) : null}
                             </li>
