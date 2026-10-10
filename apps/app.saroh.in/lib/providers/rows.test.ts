@@ -61,7 +61,8 @@ const HEALTH: ProviderHealth[] = [
         key: "DOMAINS",
         label: "Domains",
         status: "NOT_CONFIGURED",
-        message: "No custom domain connected — you're using a Saroh subdomain.",
+        message:
+            "No custom domain connected. You're using a saroh.app web address.",
         actionHref: "/sites",
     },
 ];
