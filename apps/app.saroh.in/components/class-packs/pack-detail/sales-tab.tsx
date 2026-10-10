@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import type {
     MonthRow,
     PriceHistory,
@@ -51,7 +52,7 @@ export function SalesTab({
             <PermissionDeniedState
                 title="You can't see this pack's sales"
                 description="Your role doesn't reach what the pack has taken."
-                note="An owner or admin can change what your role reaches in Team."
+                note={WHO_CAN_CHANGE}
             />
         );
     }

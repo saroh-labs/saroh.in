@@ -5,6 +5,7 @@ import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { showError } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { olderPackEvents } from "@/lib/class-packs/actions";
 import {
     EARLIER_UNRECORDED,
@@ -52,7 +53,7 @@ export function ActivityTab({
             <PermissionDeniedState
                 title="You can't see this pack's activity"
                 description="Your role doesn't reach the pack's history."
-                note="An owner or admin can change what your role reaches in Team."
+                note={WHO_CAN_CHANGE}
             />
         );
     }

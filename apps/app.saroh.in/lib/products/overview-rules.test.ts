@@ -261,7 +261,7 @@ describe("the header", () => {
                 canReply: false,
             }),
         ).toBe(
-            "You're signed in as Member. You can change stock counts here. An owner or admin can change what you can do in Team.",
+            "You're signed in as Member. You can change stock counts here. An owner or admin can change this in Settings › Team.",
         );
         expect(
             accessLine({

@@ -1,3 +1,5 @@
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+
 /**
  * Whether this person may do `action` here, from the permissions the API
  * resolved for their role (ADR-008) — and only from those.
@@ -28,8 +30,7 @@ export function permitsFor(
  * What a screen says beside a desk payment it can't offer (FB-1): shown,
  * disabled, with why — never a missing button.
  */
-export const CANT_TAKE_PAYMENTS =
-    "Your role can't take payments — ask an owner or admin.";
+export const CANT_TAKE_PAYMENTS = `Your role can't take payments. ${WHO_CAN_CHANGE}`;
 
 /**
  * The same, for an invoice's Mark paid. Said in the invoice's read-only

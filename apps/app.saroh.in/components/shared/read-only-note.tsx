@@ -1,5 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 
+import { whoCanChangeLine } from "@/components/shared/who-can-change";
+
 /**
  * The one read-only treatment: a quiet note above what a role can see but not
  * change.
@@ -9,14 +11,18 @@ import { cn } from "@saroh/ui/lib/utils";
  * page pretends to be editable, and the reader is told who can change what
  * their role reaches. `children` replaces the first sentence where a screen
  * holds something other than settings ("Your role can read this invoice but
- * not change it."); the pointer to Team stays the same everywhere.
+ * not change it."); who can change it is `whoCanChangeLine`, the same
+ * sentence everywhere.
  */
 export function ReadOnlyNote({
     children = "Your role can read these settings but not change them.",
     className,
     id,
+    ownerOnly = false,
 }: {
     children?: React.ReactNode;
+    /** What only the owner changes: the note says so. */
+    ownerOnly?: boolean;
     className?: string;
     /** For a disabled control the note explains (`aria-describedby`). */
     id?: string;
@@ -30,8 +36,7 @@ export function ReadOnlyNote({
                 className,
             )}
         >
-            {children} An owner or admin can change what your role reaches in
-            Team.
+            {children} {whoCanChangeLine(ownerOnly)}
         </p>
     );
 }

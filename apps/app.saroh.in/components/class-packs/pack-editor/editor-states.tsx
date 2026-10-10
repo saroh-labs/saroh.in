@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { PackCrumbs } from "./pack-crumbs";
 
 export type PackEditorStateKind =
@@ -85,7 +86,7 @@ export function PackEditorState({
                                     ? "Your role doesn't reach class packs."
                                     : "You can see packs and who holds them, but not make or change one."
                             }
-                            note="An owner or admin can change what your role reaches in Team."
+                            note={WHO_CAN_CHANGE}
                             action={
                                 <Button asChild variant="outline">
                                     {state === "forbidden" ? (

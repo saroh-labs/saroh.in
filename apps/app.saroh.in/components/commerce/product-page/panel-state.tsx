@@ -1,3 +1,4 @@
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { cn } from "@saroh/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { Lock, TriangleAlert } from "lucide-react";
@@ -114,7 +115,7 @@ export function PanelForbidden({ what }: { what: string }) {
         <TabState
             icon={Lock}
             title={`Your role can't see ${what}`}
-            description="Everything else about the product is here. An owner or admin can change what your role reaches in Team."
+            description={`Everything else about the product is here. ${WHO_CAN_CHANGE}`}
         />
     );
 }

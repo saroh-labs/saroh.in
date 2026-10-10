@@ -8,6 +8,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
@@ -125,8 +126,9 @@ export default async function ProvidersSettingsPage() {
                 different facts about the same screen (#177, §30). */}
             {result.status === "denied" ? (
                 <PermissionDeniedState
-                    title="Provider health is limited to owners and admins"
-                    description="It can name the credentials an organization depends on, so it is kept to the roles that manage them. An owner or admin can tell you whether anything needs attention."
+                    title="You can't open provider health"
+                    description="It can name the credentials a business depends on, so it is kept to the roles that manage them."
+                    note={WHO_CAN_CHANGE}
                 />
             ) : !view?.any ? (
                 <EmptyState

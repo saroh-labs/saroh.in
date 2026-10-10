@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { AccessDenied } from "@/components/shared/access-denied";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { permitsFor } from "@/lib/organizations/permits";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { readPlanEditor } from "@/lib/subscriptions/plan-drafts";
@@ -33,8 +35,11 @@ export default async function EditPlanPage({
     if (organization?.actions && !may("subscription:read")) {
         return (
             <AccessDenied
-                title="You can't open this plan"
-                description={`Your role in ${organization.name} can't see plans — their prices and money stay with the roles that can. An owner or admin can change that in Team.`}
+                {...whoCanChange({
+                    thing: "Plans",
+                    business: organization.name,
+                    role: knownRoleName(organization),
+                })}
             />
         );
     }

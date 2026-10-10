@@ -11,6 +11,7 @@ import { CustomerDetailScreen } from "@/components/customers/detail/detail-scree
 import type { PackSale } from "@/components/customers/detail/packs-tab";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels, moduleOn, sellPacksOnly } from "@/lib/contacts/panels";
@@ -48,6 +49,7 @@ import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { sellsProducts } from "@/lib/orders/sells-products";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
@@ -99,8 +101,11 @@ export default async function PersonPage({
     if (organization?.actions && !may("contact:read")) {
         return (
             <AccessDenied
-                title="You can't open contacts"
-                description={`Your role in ${organization.name} can't see the people the business knows. An owner or admin can change that in Team.`}
+                {...whoCanChange({
+                    thing: "Contacts",
+                    business: organization.name,
+                    role: knownRoleName(organization),
+                })}
             />
         );
     }

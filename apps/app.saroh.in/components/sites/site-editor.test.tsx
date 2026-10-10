@@ -1344,7 +1344,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         click(button("Header"));
         expect(field("Site name").disabled).toBe(true);
         expect(host.textContent).toContain(
-            "Your role can change this page's blocks but not the site's name or footer. An owner or admin can change what your role reaches in Team.",
+            "Your role can change this page's blocks but not the site's name or footer. An owner or admin can change this in Settings › Team.",
         );
         click(button("Footer"));
         expect(field("Footer line").disabled).toBe(true);

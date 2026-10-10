@@ -60,7 +60,8 @@ describe("OrdersLocked", () => {
     );
 
     it("explains, says who can change it, and keeps the heading", () => {
-        expect(html).toContain("You do not have access to this");
+        expect(html).toContain("open Orders<");
+        expect(html).not.toContain("You do not have access to this");
         expect(html).toContain("Why.");
         expect(html).toContain("Who can change it.");
         expect(html).toContain(">Orders</h1>");
@@ -75,7 +76,7 @@ describe("OrdersLocked", () => {
 describe("OrderLocked", () => {
     it("is the design's card with the way back", () => {
         const html = renderToStaticMarkup(<OrderLocked text="Your role." />);
-        expect(html).toContain("You can&#x27;t open orders");
+        expect(html).toContain("You can&#x27;t open Orders");
         expect(html).toContain("Your role.");
         expect(html).toContain("Back to Home");
         expect(html).not.toContain('role="alert"');

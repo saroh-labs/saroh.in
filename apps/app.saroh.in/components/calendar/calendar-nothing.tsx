@@ -3,6 +3,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { CalendarDays } from "lucide-react";
 
 import { AccessDenied } from "@/components/shared/access-denied";
+import { whoCanChange } from "@/components/shared/who-can-change";
 
 /**
  * A business with nothing the calendar can lay out for this person: none of
@@ -30,12 +31,5 @@ export function CalendarNothing() {
  * No retry — nothing failed.
  */
 export function CalendarLocked() {
-    return (
-        <AccessDenied
-            title="You can't open the calendar"
-            description="Your role can't see orders, bookings, subscriptions or invoices, so there's nothing to show. An owner can give you access in Team."
-            note={null}
-            backLabel="Back to Home"
-        />
-    );
+    return <AccessDenied {...whoCanChange({ thing: "Calendar" })} />;
 }

@@ -116,7 +116,7 @@ export default async function OrganizationSettingsPage() {
             ) : (
                 <EmptyState
                     title="Not available"
-                    description="Choose an organization to view its settings."
+                    description="Choose a business to view its settings."
                 />
             )}
         </SettingsPanel>

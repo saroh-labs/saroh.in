@@ -362,7 +362,7 @@ describe("the booking page's Take ₹X", () => {
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
         expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments — ask an owner or admin.",
+            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
         );
         // No desk at all (an older page): nothing to say.
         renderDetail(detail({}));
@@ -497,7 +497,7 @@ describe("the calendar quick look's Take ₹X", () => {
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
         expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments — ask an owner or admin.",
+            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
         );
     });
 

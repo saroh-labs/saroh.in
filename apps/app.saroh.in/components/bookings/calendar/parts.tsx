@@ -1,8 +1,11 @@
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
+import { whoCanChange } from "@/components/shared/who-can-change";
 import type { DiaryState } from "@/lib/services/diary";
 import { STATE_LABEL } from "@/lib/services/diary";
 
@@ -70,52 +73,33 @@ function Chevron() {
 }
 
 /**
- * Bookings, locked for a role that can't read them (E5, the design's locked
- * state): a card that says why and who can change it — not an error, and no
- * retry, because trying again does the same thing.
+ * Bookings, locked for a role that can't read them (E5): the named denied
+ * state, with why and who can change it. Not an error, and no retry, because
+ * trying again does the same thing.
+ *
+ * It was a dashed card drawn by hand. Dashed is the shape of "nothing here
+ * yet" (`EmptyState`), and a denial is a wall: `PermissionDeniedState`, the
+ * one card every denial is drawn with, in `whoCanChange`'s words.
  */
 export function BookingsLocked({
+    business,
     role,
-    roleLabel,
 }: {
-    role: string;
-    /** What the role is called on screen, for a role the business made. */
-    roleLabel: string | null;
+    /** The business's name. */
+    business: string;
+    /** What the role is called on screen, when known (`knownRoleName`). */
+    role: string | null;
 }) {
-    const text =
-        role === "REVIEWER"
-            ? "Your role is Reviewer, which can see the website but not bookings. An owner or admin can change that in Team."
-            : `Your role${roleLabel ? ` is ${roleLabel}, which` : ""} doesn't include bookings. An owner or admin can change that in Team.`;
     return (
-        <div className="px-[22px] py-[60px] max-[759px]:px-4" role="note">
-            <div className="flex flex-col items-center gap-[9px] rounded-[12px] border border-dashed border-border-strong px-6 py-9 text-center">
-                <svg
-                    aria-hidden
-                    viewBox="0 0 24 24"
-                    className="size-7 text-muted-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M6 11 H18 V20 H6 Z M8.5 11 V8 A3.5 3.5 0 0 1 15.5 8 V11" />
-                </svg>
-                <h1 className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                    You can&apos;t open bookings
-                </h1>
-                <p className="max-w-[46ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                    {text}
-                </p>
-                <div className="mt-1.5 flex flex-wrap justify-center gap-2">
-                    <Link
-                        href="/"
-                        className="inline-flex h-[38px] items-center rounded-[9px] border border-border bg-card px-4 text-[14px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11"
-                    >
-                        Back to Home
-                    </Link>
-                </div>
-            </div>
+        <div className="px-[22px] py-[60px] max-[759px]:px-4">
+            <PermissionDeniedState
+                {...whoCanChange({ thing: "Bookings", business, role })}
+                action={
+                    <Button asChild variant="outline" className="wk-press">
+                        <Link href="/">Back to Home</Link>
+                    </Button>
+                }
+            />
         </div>
     );
 }

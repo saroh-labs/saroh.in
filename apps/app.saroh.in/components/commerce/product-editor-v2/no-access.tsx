@@ -1,5 +1,6 @@
 import { AccessDenied } from "@/components/shared/access-denied";
-import { noAccessLine, roleName } from "@/lib/products/editor-labels";
+import { whoCanChange } from "@/components/shared/who-can-change";
+import { knownRoleName } from "@/lib/organizations/role-name";
 
 /**
  * The editor for a role that can't see products (#525), after the Editor
@@ -12,18 +13,17 @@ export function NoProductAccess({
     organization: {
         name: string;
         role?: string | null;
+        roleKey?: string | null;
         roleLabel?: string | null;
     };
 }) {
     return (
         <AccessDenied
-            title="You can't open this product"
-            description={noAccessLine(
-                roleName(organization),
-                organization.name,
-            )}
-            note={null}
-            backLabel="Go to Home"
+            {...whoCanChange({
+                thing: "Products",
+                business: organization.name,
+                role: knownRoleName(organization),
+            })}
         />
     );
 }

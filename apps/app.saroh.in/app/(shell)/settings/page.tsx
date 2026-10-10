@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { settingsPagesFor } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -25,7 +27,13 @@ export default async function SettingsPage() {
 
     return (
         <PageContainer>
-            <AccessDenied description="Settings are limited to certain roles in this business. An owner or admin can change what you can reach." />
+            <AccessDenied
+                {...whoCanChange({
+                    thing: "Settings",
+                    business: org?.name,
+                    role: org ? knownRoleName(org) : null,
+                })}
+            />
         </PageContainer>
     );
 }

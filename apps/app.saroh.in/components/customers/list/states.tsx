@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { newStorefrontHref } from "@/lib/stores/links";
 
@@ -46,10 +47,7 @@ export function ListLocked() {
     return (
         <>
             <ListHeading count={null} />
-            <PermissionDeniedState
-                title="Customers aren't part of your role"
-                description="An owner can give you access in Team."
-            />
+            <PermissionDeniedState {...whoCanChange({ thing: "Customers" })} />
         </>
     );
 }

@@ -1,3 +1,4 @@
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
 
 import type { PackKind } from "./pack-cards";
@@ -183,7 +184,7 @@ export function extendFailure(
         return `That sale isn't here any more. Refresh to see who has the pack now.`;
     }
     if (res.status === 403) {
-        return "Your role can't extend packs. An owner or admin can change that in Team.";
+        return `Your role can't extend packs. ${WHO_CAN_CHANGE}`;
     }
     if (res.status === 400) return res.error;
     return `Couldn't extend ${first}'s pack. Nothing has changed — try again.`;

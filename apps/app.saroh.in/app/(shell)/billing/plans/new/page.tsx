@@ -4,10 +4,12 @@ import Link from "next/link";
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { membershipPlansLock } from "@/lib/billing/access";
 import { permitsFor } from "@/lib/organizations/permits";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -33,8 +35,11 @@ export default async function NewPlanPage() {
     if (organization?.actions && !may("subscription:write")) {
         return (
             <AccessDenied
-                title="You can't make plans"
-                description={`Your role in ${organization.name} can't make or change plans. An owner or admin can change that in Team.`}
+                {...whoCanChange({
+                    thing: "New plan",
+                    business: organization.name,
+                    role: knownRoleName(organization),
+                })}
                 backHref={may("subscription:read") ? PLANS_HREF : "/"}
                 backLabel={
                     may("subscription:read") ? "Back to plans" : "Back to Home"

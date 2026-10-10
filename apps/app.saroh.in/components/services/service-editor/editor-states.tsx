@@ -1,11 +1,15 @@
 import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 import Link from "next/link";
+
+import { whoCanChange } from "@/components/shared/who-can-change";
 
 /**
  * The Service Editor when there is nothing to edit (E2, after the design):
  * a service that isn't here, a read that failed, or a role that can't see
- * services. A failed read is never "isn't here".
+ * services. A failed read is never "isn't here", and a role that can't is
+ * never a failed read: it gets the denied card, with no retry, because
+ * nothing broke.
  */
 export function ServiceEditorState({
     state,
@@ -54,34 +58,45 @@ export function ServiceEditorState({
                 </div>
             ) : (
                 <div className="px-[22px] py-[60px] max-[759px]:px-4">
-                    <FailedState
-                        title={
-                            state === "cant-add"
-                                ? "Your role can't add services"
-                                : state === "forbidden"
-                                  ? "Your role can't see services"
-                                  : "Couldn't load this service"
-                        }
-                        description={
-                            state === "forbidden" || state === "cant-add"
-                                ? "An owner or admin can change what your role reaches in Team."
-                                : "The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
-                        }
-                        action={
-                            <div className="flex flex-wrap justify-center gap-2">
-                                {state === "failed" ? (
+                    {state === "failed" ? (
+                        <FailedState
+                            title="Couldn't load this service"
+                            description="The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
+                            action={
+                                <div className="flex flex-wrap justify-center gap-2">
                                     <Button asChild>
                                         <Link href={retryHref}>Try again</Link>
                                     </Button>
-                                ) : null}
+                                    <Button asChild variant="outline">
+                                        <Link href="/services">
+                                            Back to services
+                                        </Link>
+                                    </Button>
+                                </div>
+                            }
+                        />
+                    ) : (
+                        <PermissionDeniedState
+                            {...whoCanChange({
+                                thing:
+                                    state === "cant-add"
+                                        ? "New service"
+                                        : "Services",
+                            })}
+                            action={
                                 <Button asChild variant="outline">
-                                    <Link href="/services">
-                                        Back to services
-                                    </Link>
+                                    {state === "cant-add" ? (
+                                        <Link href="/services">
+                                            Back to services
+                                        </Link>
+                                    ) : (
+                                        // The list would only say the same.
+                                        <Link href="/">Back to Home</Link>
+                                    )}
                                 </Button>
-                            </div>
-                        }
-                    />
+                            }
+                        />
+                    )}
                 </div>
             )}
         </main>
