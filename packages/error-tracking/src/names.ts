@@ -26,7 +26,10 @@ export function trackedEnvironment(
 
 /** The tracker's address without a trailing slash, or the default. */
 export function trackingHost(host: string | undefined): string {
-    const value = (host ?? "").trim().replace(/\/+$/u, "");
+    // By hand, not a regular expression: a pattern over repeated slashes
+    // backtracks on a long run of them.
+    let value = (host ?? "").trim();
+    while (value.endsWith("/")) value = value.slice(0, -1);
     return value || DEFAULT_TRACKING_HOST;
 }
 

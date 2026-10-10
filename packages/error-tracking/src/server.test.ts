@@ -292,4 +292,41 @@ describe("parseStack", () => {
     it("is empty for no stack", () => {
         expect(parseStack(undefined)).toEqual([]);
     });
+
+    it("reads a frame with a line and no column, and one with neither", () => {
+        const frames = parseStack(
+            ["    at run (/app/a.js:7)", "    at native"].join("\n"),
+        );
+        expect(frames[1]).toMatchObject({
+            function: "run",
+            filename: "/app/a.js",
+            lineno: 7,
+        });
+        expect(frames[1]).not.toHaveProperty("colno");
+        expect(frames[0]).toMatchObject({ filename: "native" });
+    });
+
+    // CodeQL js/polynomial-redos (PR #926): these were regular expressions
+    // that backtracked on a crafted line; a stack is text others can shape.
+    it("stays fast on a line built to make a pattern backtrack", () => {
+        const hostile = [
+            `    at ${" ".repeat(900)}`,
+            `    at ${"a (".repeat(300)}`,
+            `    at ${" ".repeat(50_000)}x`,
+        ].join("\n");
+        const started = performance.now();
+        expect(() => parseStack(hostile)).not.toThrow();
+        expect(performance.now() - started).toBeLessThan(200);
+    });
+});
+
+describe("trackingHost", () => {
+    it("drops trailing slashes, however many, quickly", () => {
+        expect(trackingHost("https://eu.i.posthog.com///")).toBe(
+            "https://eu.i.posthog.com",
+        );
+        const started = performance.now();
+        trackingHost(`https://x${"/".repeat(100_000)}y`);
+        expect(performance.now() - started).toBeLessThan(200);
+    });
 });
