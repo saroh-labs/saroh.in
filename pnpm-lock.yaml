@@ -1645,6 +1645,9 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 3.4.19(tsx@4.23.11)(yaml@2.9.0)
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
       use-debounce:
         specifier: ^10.1.1
         version: 10.1.1(react@19.2.8)
