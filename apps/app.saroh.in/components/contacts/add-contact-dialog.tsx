@@ -109,7 +109,7 @@ export function AddContactDialog({
         <FormSheet
             open={open}
             trigger={trigger ?? <Button>New contact</Button>}
-            title="Add contact"
+            title="New contact"
             description={description}
             pending={saving}
             saveLabel="Add contact"

@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Add customer" };
+export const metadata = { title: "New customer" };
 
 /**
  * Sell → Customers → Add customer (DEC-056, C14). Someone who has not
@@ -19,7 +19,7 @@ export default async function NewCustomerPage() {
     // Asked before the form is drawn: `contact:write` is what the API asks of
     // the save (`requireCan`).
     const access = await requireCan("contact:write", {
-        thing: "Add customer",
+        thing: "New customer",
         back: {
             href: "/commerce/customers",
             label: "Back to Customers",
@@ -40,9 +40,9 @@ export default async function NewCustomerPage() {
                     >
                         Customers
                     </Link>,
-                    "Add customer",
+                    "New customer",
                 ]}
-                title="Add customer"
+                title="New customer"
                 description="An email is enough; the rest is whatever you know. They join your business, not one location, and show on Customers straight away."
             />
             <AddCustomerForm />

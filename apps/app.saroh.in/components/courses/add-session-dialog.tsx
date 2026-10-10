@@ -83,7 +83,7 @@ export function AddSessionDialog({
         <FormDialog
             open={open}
             size="md"
-            title="Add session"
+            title="New session"
             description={
                 on > 0
                     ? `It goes on the schedule for ${course.service.name}, and the ${count(on, "person", "people")} on this course ${plural(on, "is", "are")} booked on it. Times are in ${tz}.`

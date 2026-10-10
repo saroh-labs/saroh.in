@@ -12,9 +12,9 @@ export default function Loading() {
                 <Link key="1" href="/commerce/customers">
                     Customers
                 </Link>,
-                "Add customer",
+                "New customer",
             ]}
-            title="Add customer"
+            title="New customer"
             label="Loading the customer form"
         />
     );

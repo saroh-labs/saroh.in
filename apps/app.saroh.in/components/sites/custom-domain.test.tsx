@@ -126,7 +126,7 @@ describe("Add domain", () => {
         expect(host.querySelector("input, form")).toBeNull();
         expect(dialog()).toBeNull();
         await press(item("Add domain", host));
-        expect(dialogName()).toBe("Add a domain");
+        expect(dialogName()).toBe("New domain");
         expect(field()?.labels?.[0]?.textContent).toBe("Domain to add");
         expect(dialog()?.textContent).toContain(
             "A domain you already own, like www.yourshop.in.",
@@ -144,7 +144,7 @@ describe("Add domain", () => {
         await press(item("Add domain", dialog() ?? document));
         // A pasted address is taken down to its domain before it is sent.
         expect(claim).toHaveBeenCalledWith("site_rye", "shop.example.com");
-        expect(dialogName()).toBe("Add a domain");
+        expect(dialogName()).toBe("New domain");
         expect(field()?.value).toBe("https://Shop.Example.com/");
         expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe(
             "Your own domain isn't in your plan.",
@@ -199,7 +199,7 @@ describe("Add domain", () => {
         expect(document.activeElement).toBe(item("Add domain", host));
         // The next opening starts empty, on the first step.
         await press(item("Add domain", host));
-        expect(dialogName()).toBe("Add a domain");
+        expect(dialogName()).toBe("New domain");
         expect(field()?.value).toBe("");
         expect(dialog()?.textContent).toContain(
             "Add another domain for this site.",

@@ -8,7 +8,7 @@ import { requireSession } from "@/lib/session";
  * Sell → Discounts: the business's codes. One read — a code is one row that
  * belongs to the business, not something to fan out per storefront.
  */
-export const metadata = { title: "Discounts" };
+export const metadata = { title: "Discount codes" };
 
 export default async function DiscountsPage() {
     await requireSession();

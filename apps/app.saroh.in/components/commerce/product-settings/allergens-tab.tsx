@@ -83,7 +83,7 @@ export function AllergensTab({
                     Add allergen
                 </Button>
             }
-            title="Add allergen"
+            title="New allergen"
             note="Customers see it as you name it here."
             label="Allergen name"
             placeholder="Celery"

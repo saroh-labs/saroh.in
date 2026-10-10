@@ -544,7 +544,7 @@ test.describe("availability and services", () => {
         const timeOff = page.getByRole("region", { name: "Time off" });
         await expect(timeOff.getByRole("textbox")).toHaveCount(0);
         await timeOff.getByRole("button", { name: "Add time off" }).click();
-        const sheet = page.getByRole("dialog", { name: "Add time off" });
+        const sheet = page.getByRole("dialog", { name: "New time off" });
         await expect(sheet).toBeVisible();
         await sheet.getByLabel(/^Reason/).fill("E2E day off");
         await sheet.getByRole("button", { name: "Add day off" }).click();

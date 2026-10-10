@@ -166,7 +166,7 @@ export function Notes({
             </div>
             <FormSheet
                 open={open}
-                title="Add note"
+                title="New note"
                 description="Team only. Never shown to the customer. An allergy goes on Needs attention, where orders are checked against it."
                 onClose={() => setOpen(false)}
             >

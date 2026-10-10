@@ -119,7 +119,7 @@ export function AddSectionDialog({
                 ) : (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Add a section</DialogTitle>
+                            <DialogTitle>New section</DialogTitle>
                             <DialogDescription>
                                 Each is shown with example content in your
                                 site&apos;s colours.
