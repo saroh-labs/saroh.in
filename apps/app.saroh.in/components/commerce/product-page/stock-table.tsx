@@ -143,7 +143,6 @@ export function StockTable({
                                                     {t.title}
                                                     <ChevronRight
                                                         aria-hidden
-                                                        strokeWidth={2.2}
                                                         className="size-3 text-muted-foreground"
                                                     />
                                                 </button>
@@ -391,7 +390,7 @@ export function StockCards({
                         className={cn(
                             "relative -mx-1.5 flex items-start gap-2 rounded-md border-b border-border px-1.5 py-3",
                             open &&
-                                "transition-colors hover:bg-muted/60 active:bg-muted",
+                                "transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
                         )}
                     >
                         <div className="grid min-w-0 flex-1 gap-1">
@@ -492,7 +491,6 @@ export function StockCards({
                         {open ? (
                             <ChevronRight
                                 aria-hidden
-                                strokeWidth={2.2}
                                 className="mt-1 size-3.5 flex-none text-muted-foreground"
                             />
                         ) : null}

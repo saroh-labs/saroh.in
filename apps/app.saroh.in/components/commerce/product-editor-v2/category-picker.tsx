@@ -87,7 +87,6 @@ export function CategoryPicker({
                     <ChevronDown
                         aria-hidden
                         className="size-[13px] text-muted-foreground"
-                        strokeWidth={2}
                     />
                 </button>
             </PopoverTrigger>
@@ -127,7 +126,6 @@ export function CategoryPicker({
                                         <Check
                                             aria-hidden
                                             className="size-3.5"
-                                            strokeWidth={2.4}
                                         />
                                     ) : null}
                                 </CommandItem>
@@ -147,7 +145,7 @@ export function CategoryPicker({
                 </Command>
                 <Link
                     href={manageHref}
-                    className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-foreground active:text-muted-foreground"
+                    className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                 >
                     Manage categories
                 </Link>

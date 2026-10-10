@@ -18,9 +18,9 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import {
-    ArrowUpRight,
     Ban,
     Check,
+    ExternalLink,
     Link2,
     MoreHorizontal,
     Printer,
@@ -168,7 +168,7 @@ export function OrderRowMenu({
                 return (
                     <DropdownMenuItem key="open" asChild className={ITEM}>
                         <Link href={item.href}>
-                            <ArrowUpRight aria-hidden />
+                            <ExternalLink aria-hidden />
                             {item.label}
                         </Link>
                     </DropdownMenuItem>

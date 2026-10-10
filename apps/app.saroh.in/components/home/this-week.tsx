@@ -31,7 +31,7 @@ export function ThisWeek({ rows }: { rows: WeekRow[] }) {
                     >
                         <Link
                             href={row.href}
-                            className="grid gap-0.5 px-4 py-3 text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted"
+                            className="grid gap-0.5 px-4 py-3 text-foreground transition-colors duration-fast hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted"
                         >
                             <span className="text-xs text-muted-foreground">
                                 {row.label}

@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { Ellipsis } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -101,10 +101,9 @@ export function TabBar({
                             className={tabClass(open, false)}
                         >
                             <span className="relative">
-                                <Ellipsis
+                                <MoreHorizontal
                                     aria-hidden
                                     className="size-[21px]"
-                                    strokeWidth={1.9}
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                 />
@@ -169,7 +168,6 @@ function TabLink({ tab }: { tab: MobileTab }) {
                 <Icon
                     aria-hidden
                     className="size-[21px]"
-                    strokeWidth={1.9}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                 />

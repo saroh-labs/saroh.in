@@ -149,11 +149,7 @@ export function DayPanel({
                             className="gap-1.5 px-3 text-[12.5px] font-semibold"
                         >
                             <Link href={s.href}>
-                                <Plus
-                                    aria-hidden
-                                    className="size-3"
-                                    strokeWidth={2.2}
-                                />
+                                <Plus aria-hidden className="size-3" />
                                 {s.label}
                             </Link>
                         </Button>
@@ -274,7 +270,7 @@ export function DayPanel({
                         {more > 0 ? (
                             <Link
                                 href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-foreground active:text-muted-foreground"
+                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                             >
                                 {more} more — open {layer.label}
                             </Link>

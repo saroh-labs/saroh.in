@@ -145,7 +145,7 @@ export function QuickLook({
                             <SheetClose asChild>
                                 <IconButton
                                     label="Close (Esc)"
-                                    icon={<X strokeWidth={2.1} />}
+                                    icon={<X />}
                                     variant="ghost"
                                 />
                             </SheetClose>

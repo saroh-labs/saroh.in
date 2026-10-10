@@ -199,7 +199,7 @@ function Answers({ figures }: { figures: TakingsFigures }) {
                         How sales are counted
                         <ChevronRight
                             aria-hidden
-                            className="size-4 transition-transform duration-150 group-open:rotate-90"
+                            className="size-4 transition-transform duration-base group-open:rotate-90"
                         />
                     </summary>
                     <ul className="mb-1 mt-1 max-w-[68ch] list-disc space-y-1 pl-4">
@@ -251,13 +251,13 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                     <li key={t.key} className="min-w-0">
                         <Link
                             href={t.href}
-                            className="group flex h-full flex-col rounded-[11px] border border-border px-[13px] py-3 transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="group flex h-full flex-col rounded-[11px] border border-border px-[13px] py-3 transition-colors duration-base hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <span className="label flex items-center justify-between gap-1">
                                 {t.label}
                                 <ChevronRight
                                     aria-hidden
-                                    className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                                    className="size-3.5 shrink-0 opacity-60 transition-opacity duration-fast group-hover:opacity-100"
                                 />
                             </span>
                             <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground [overflow-wrap:anywhere] min-[380px]:text-[22px]">

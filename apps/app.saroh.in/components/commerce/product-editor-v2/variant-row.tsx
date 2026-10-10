@@ -128,11 +128,7 @@ export function VariantRowView({
                         aria-label={`Remove ${title || "this variant"}`}
                         className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
                     >
-                        <Trash2
-                            aria-hidden
-                            className="size-[15px]"
-                            strokeWidth={1.9}
-                        />
+                        <Trash2 aria-hidden className="size-[15px]" />
                     </button>
                 </Tip>
             </div>

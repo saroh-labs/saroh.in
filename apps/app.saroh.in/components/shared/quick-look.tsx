@@ -134,7 +134,7 @@ export function QuickLook({
                                 : "size-[34px] rounded-[9px] bg-muted text-muted-foreground hover:bg-secondary-hover hover:text-foreground",
                         )}
                     >
-                        <X aria-hidden className="size-4" strokeWidth={2} />
+                        <X aria-hidden className="size-4" />
                         <span className="sr-only">{closeLabel}</span>
                     </SheetClose>
                 </div>

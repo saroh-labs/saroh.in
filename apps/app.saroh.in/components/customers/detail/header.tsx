@@ -139,7 +139,7 @@ export function Header({
                                 // rather than pushing the page sideways.
                                 <a
                                     href={`mailto:${email}`}
-                                    className="min-w-0 max-w-full text-foreground underline decoration-border-strong underline-offset-4 transition-colors [overflow-wrap:anywhere] hover:decoration-foreground active:text-muted-foreground"
+                                    className="min-w-0 max-w-full text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast [overflow-wrap:anywhere] hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     {email}
                                 </a>

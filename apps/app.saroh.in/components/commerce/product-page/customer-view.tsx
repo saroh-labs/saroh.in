@@ -154,13 +154,13 @@ export function CustomerView({
                     <span
                         aria-hidden
                         className={cn(
-                            "relative inline-block h-[18px] w-[30px] rounded-full transition-colors",
+                            "relative inline-block h-[18px] w-[30px] rounded-full transition-colors duration-fast",
                             notes ? "bg-foreground" : "bg-border-strong",
                         )}
                     >
                         <span
                             className={cn(
-                                "absolute top-[2px] size-[14px] rounded-full bg-background transition-[left]",
+                                "absolute top-[2px] size-[14px] rounded-full bg-background transition-[left] duration-fast",
                                 notes ? "left-[14px]" : "left-[2px]",
                             )}
                         />

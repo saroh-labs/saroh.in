@@ -113,7 +113,7 @@ export function CollectionsPanel({
                         onClick={() => setSheet({ id: null })}
                         className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
                     >
-                        <Plus className="size-3" strokeWidth={2} aria-hidden />
+                        <Plus className="size-3" aria-hidden />
                         New collection
                     </Button>
                 ) : null}
@@ -153,7 +153,6 @@ export function CollectionsPanel({
                                     {canWrite ? (
                                         <Pencil
                                             className="size-3"
-                                            strokeWidth={2}
                                             aria-hidden
                                         />
                                     ) : null}

@@ -81,7 +81,7 @@ export function TrackStockSwitch({
                 disabled={locked || pending}
                 onClick={() => (tracked ? setAsking(true) : flip(true))}
                 className={cn(
-                    "relative h-[22px] w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed coarse:after:absolute coarse:after:-inset-[11px] coarse:after:content-['']",
+                    "relative h-[22px] w-9 shrink-0 rounded-full transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed coarse:after:absolute coarse:after:-inset-[11px] coarse:after:content-['']",
                     tracked ? "bg-foreground" : "bg-border-strong",
                     pending && "cursor-wait opacity-70",
                 )}

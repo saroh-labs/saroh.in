@@ -274,7 +274,7 @@ export function StylePanel({
                                                     background: `hsl(${swatch.hsl})`,
                                                 }}
                                                 className={cn(
-                                                    "h-7 w-7 rounded border transition-[box-shadow]",
+                                                    "h-7 w-7 rounded border transition-[box-shadow] duration-fast",
                                                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                                                     active
                                                         ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"

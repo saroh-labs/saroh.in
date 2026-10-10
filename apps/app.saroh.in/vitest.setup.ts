@@ -8,6 +8,7 @@
  * top layer here, so the answer is false at once. A no-op under `node`.
  */
 if (typeof Element !== "undefined") {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- called with its element below
     const matches = Element.prototype.matches;
     Element.prototype.matches = function (this: Element, selector: string) {
         if (selector === ":modal" || selector === ":popover-open") return false;

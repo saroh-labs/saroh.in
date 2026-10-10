@@ -202,7 +202,6 @@ export function PagesPanel({
                             {current ? (
                                 <Check
                                     aria-hidden
-                                    strokeWidth={2.2}
                                     className="size-3.5 shrink-0 text-foreground"
                                 />
                             ) : null}
@@ -336,7 +335,7 @@ function Disclosure({
             <ChevronRight
                 aria-hidden
                 className={cn(
-                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform duration-fast",
                     open && "rotate-90",
                 )}
             />

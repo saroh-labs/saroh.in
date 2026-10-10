@@ -2,7 +2,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { ArrowUpRight, Camera } from "lucide-react";
+import { Camera, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { QrButton } from "@/components/qr/qr-button";
@@ -112,11 +112,7 @@ function ShopControls({
                         aria-label="View on the shop — opens in a new tab"
                     >
                         View on the shop
-                        <ArrowUpRight
-                            aria-hidden
-                            className="size-3"
-                            strokeWidth={2}
-                        />
+                        <ExternalLink aria-hidden className="size-3" />
                     </a>
                 </Button>
             ) : (
@@ -132,11 +128,7 @@ function ShopControls({
                         : product.status === "ARCHIVED"
                           ? "Not on the shop"
                           : "Not on the shop yet"}
-                    <ArrowUpRight
-                        aria-hidden
-                        className="size-3"
-                        strokeWidth={2}
-                    />
+                    <ExternalLink aria-hidden className="size-3" />
                 </Button>
             )}
         </>
@@ -264,11 +256,7 @@ export function ProductHeader({
                                 "flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border-strong bg-muted/60 text-[10.5px] font-semibold text-muted-foreground hover:bg-muted",
                             )}
                         >
-                            <Camera
-                                aria-hidden
-                                className="size-[18px]"
-                                strokeWidth={1.8}
-                            />
+                            <Camera aria-hidden className="size-[18px]" />
                             Add
                         </Link>
                     )

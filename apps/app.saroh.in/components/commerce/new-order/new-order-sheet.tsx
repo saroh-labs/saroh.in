@@ -109,7 +109,7 @@ export function NewOrderSheet({
                             "grid size-[34px] cursor-pointer place-items-center rounded-[9px] bg-muted text-muted-foreground transition-colors duration-fast hover:bg-border hover:text-foreground active:scale-95 coarse:size-11",
                         )}
                     >
-                        <X aria-hidden className="size-4" strokeWidth={2} />
+                        <X aria-hidden className="size-4" />
                     </SheetClose>
                 </div>
                 {open ? (

@@ -534,7 +534,7 @@ export function InvoiceForm({
                                 <button
                                     type="button"
                                     onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-foreground active:text-muted-foreground"
+                                    className="mt-2 py-1 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     + Their GSTIN, state and address
                                 </button>
@@ -705,7 +705,7 @@ export function InvoiceForm({
                                     hsnSac: "",
                                 })
                             }
-                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-foreground active:text-muted-foreground"
+                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                         >
                             + Add a line
                         </button>

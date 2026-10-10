@@ -754,7 +754,7 @@ function Swatches({
                             aria-pressed={current === c}
                             onClick={() => onPick(c)}
                             className={cn(
-                                "size-6 rounded border transition-transform",
+                                "size-6 rounded border transition-transform duration-fast",
                                 current === c &&
                                     "ring-2 ring-ring ring-offset-1",
                             )}

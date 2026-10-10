@@ -453,7 +453,7 @@ export function BusinessSetupForm({
                                                     )
                                                 }
                                                 className={cn(
-                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                     on
                                                         ? "border-foreground bg-muted"
                                                         : "border-input hover:bg-muted active:bg-accent-active",

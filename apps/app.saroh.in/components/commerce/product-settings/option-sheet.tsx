@@ -351,7 +351,7 @@ function RemoveValue({
             className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:cursor-not-allowed coarse:size-9"
             onClick={onClick}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </button>
     );
 }

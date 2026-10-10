@@ -369,7 +369,7 @@ function Row({
             <li>
                 <Link
                     href={WEB_ADDRESS_SETTINGS_HREF}
-                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
                 >
                     <span
                         aria-hidden="true"
@@ -391,7 +391,7 @@ function Row({
             <button
                 type="button"
                 onClick={() => onJump(flag.pageId, flag.sectionIndex)}
-                className="flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-muted"
+                className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted"
             >
                 {/* The design's flag dot: 4px, amber #c99f6f (spec §7). */}
                 <span

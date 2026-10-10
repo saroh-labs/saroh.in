@@ -129,8 +129,8 @@ export function DomainRecords({
                         aria-hidden
                         className={
                             open
-                                ? "size-4 rotate-180 transition-transform"
-                                : "size-4 transition-transform"
+                                ? "size-4 rotate-180 transition-transform duration-fast"
+                                : "size-4 transition-transform duration-fast"
                         }
                     />
                 </Button>

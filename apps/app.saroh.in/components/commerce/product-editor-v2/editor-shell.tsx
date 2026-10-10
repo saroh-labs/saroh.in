@@ -251,11 +251,7 @@ function EditorBody({
                         href={PRODUCTS_HREF}
                         className="flex items-center gap-[7px] rounded-[8px] px-[9px] py-1.5 text-[12.5px] text-foreground/75 hover:bg-muted hover:text-foreground"
                     >
-                        <ChevronLeft
-                            aria-hidden
-                            className="size-[15px]"
-                            strokeWidth={2}
-                        />
+                        <ChevronLeft aria-hidden className="size-[15px]" />
                         Products
                     </Link>
                     <span

@@ -28,7 +28,7 @@ const NEEDS_NOTE: Partial<Record<string, string>> = {
 
 /** A job's card, whether it opens the Turn on sheet or goes somewhere. */
 const CARD =
-    "wk-press flex min-h-11 w-full min-w-0 cursor-pointer flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-wait disabled:opacity-60";
+    "wk-press flex min-h-11 w-full min-w-0 cursor-pointer flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors duration-fast hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-wait disabled:opacity-60";
 
 export function FirstRunJobs({
     modules,

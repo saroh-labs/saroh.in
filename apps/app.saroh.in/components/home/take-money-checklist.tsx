@@ -195,7 +195,7 @@ function AsideRow({ item }: { item: ReadyAside }) {
     return (
         <Link
             href={item.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors duration-fast hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <span
                 aria-hidden
@@ -221,7 +221,7 @@ function StepRow({ step }: { step: ReadyStep }) {
     return (
         <Link
             href={step.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors duration-fast hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <span
                 aria-hidden
@@ -234,9 +234,7 @@ function StepRow({ step }: { step: ReadyStep }) {
                           : "border-[1.5px] border-border-strong",
                 )}
             >
-                {step.done ? (
-                    <Check className="size-3" strokeWidth={3} />
-                ) : null}
+                {step.done ? <Check className="size-3" /> : null}
             </span>
             <span className="grid min-w-0 gap-0.5">
                 <span

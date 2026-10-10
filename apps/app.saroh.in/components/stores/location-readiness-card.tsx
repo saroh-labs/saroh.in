@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { ArrowUpRight, Check } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import type {
@@ -169,7 +169,7 @@ function ViewLink({ view }: { view: { label: string; href: string } }) {
             className="inline-flex min-h-6 items-center gap-0.5 rounded-sm text-[12.5px] font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
         >
             {view.label}
-            <ArrowUpRight aria-hidden className="size-3.5" />
+            <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only">(opens in a new tab)</span>
         </a>
     );

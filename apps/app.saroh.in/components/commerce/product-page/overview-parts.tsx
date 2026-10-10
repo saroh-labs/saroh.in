@@ -108,7 +108,7 @@ export function LinkedCardLink({
             scroll={false}
             className={cn(
                 FOCUS,
-                "flex min-w-0 flex-col gap-[7px] rounded-[12px] border border-border bg-card px-[15px] py-[13px] text-left transition-colors hover:border-border-strong",
+                "flex min-w-0 flex-col gap-[7px] rounded-[12px] border border-border bg-card px-[15px] py-[13px] text-left transition-colors duration-fast hover:border-border-strong",
             )}
         >
             <span className="flex items-baseline gap-2">

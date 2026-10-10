@@ -60,7 +60,7 @@ export function ScopeNotice({
             </span>
             <TextLink
                 href={clearHref}
-                className="text-[13px] transition-opacity coarse:inline-flex coarse:min-h-11 coarse:items-center"
+                className="text-[13px] transition-opacity duration-fast coarse:inline-flex coarse:min-h-11 coarse:items-center"
             >
                 Show all invoices
             </TextLink>

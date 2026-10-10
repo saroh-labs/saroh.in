@@ -69,7 +69,7 @@ export function TabBarSheet({
                             aria-label="Close"
                             className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border-0 bg-muted text-foreground/75 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card coarse:size-11"
                         >
-                            <X aria-hidden className="size-4" strokeWidth={2} />
+                            <X aria-hidden className="size-4" />
                         </Dialog.Close>
                     </div>
                     <div className="px-2.5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-2">
@@ -128,7 +128,6 @@ function SheetRow({ row, onGo }: { row: MobileSheetRow; onGo: () => void }) {
             <Icon
                 aria-hidden
                 className="size-[19px] shrink-0"
-                strokeWidth={1.9}
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />

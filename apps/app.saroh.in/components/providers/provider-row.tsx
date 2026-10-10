@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ArrowUpRight } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -216,7 +216,7 @@ export function ProviderRowView({
                                 aria-label={`Manage ${entry.name} — opens ${entry.name}'s dashboard`}
                             >
                                 Manage
-                                <ArrowUpRight aria-hidden className="size-4" />
+                                <ExternalLink aria-hidden className="size-4" />
                             </a>
                         </Button>
                     ) : null}

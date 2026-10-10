@@ -54,11 +54,7 @@ export function RailBottomBar({
                         onClick={() => onTab(key)}
                         className={tabClass(on)}
                     >
-                        <Icon
-                            aria-hidden
-                            className="size-[21px]"
-                            strokeWidth={1.9}
-                        />
+                        <Icon aria-hidden className="size-[21px]" />
                         {label}
                     </button>
                 );
@@ -73,11 +69,7 @@ export function RailBottomBar({
                 className={tabClass(feedbackOpen)}
             >
                 <span className="relative">
-                    <MessageSquare
-                        aria-hidden
-                        className="size-[21px]"
-                        strokeWidth={1.9}
-                    />
+                    <MessageSquare aria-hidden className="size-[21px]" />
                     {openNotes > 0 ? (
                         <CountBadge
                             count={openNotes}

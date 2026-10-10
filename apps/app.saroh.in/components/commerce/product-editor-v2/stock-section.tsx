@@ -262,7 +262,7 @@ export function StockSection({
                     onClick={() => setOpened(true)}
                     className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
                 >
-                    <Plus aria-hidden className="size-3.5" strokeWidth={2.2} />
+                    <Plus aria-hidden className="size-3.5" />
                     Add stock
                 </button>
                 {hasVariants && !canWrite && !ro ? (

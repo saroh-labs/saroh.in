@@ -147,7 +147,7 @@ export function PanelDivider({
              */}
             <span
                 aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background transition-colors group-hover:border-ring group-hover:bg-ring group-focus-visible:border-ring group-focus-visible:bg-ring"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background transition-colors duration-fast group-hover:border-ring group-hover:bg-ring group-focus-visible:border-ring group-focus-visible:bg-ring"
             />
         </div>
     );

@@ -362,7 +362,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Plus aria-hidden className="size-[18px]" strokeWidth={2} />
+                    <Plus aria-hidden className="size-[18px]" />
                     <span>From your photos</span>
                 </button>
                 <button
@@ -376,11 +376,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Upload
-                        aria-hidden
-                        className="size-[18px]"
-                        strokeWidth={2}
-                    />
+                    <Upload aria-hidden className="size-[18px]" />
                     <span>
                         {busy
                             ? `Uploading ${progress ?? 0}%`

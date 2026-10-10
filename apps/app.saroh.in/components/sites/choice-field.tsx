@@ -56,7 +56,7 @@ export function ChoiceField<V extends string | boolean>({
                                 if (!on) onChange(option);
                             }}
                             className={cn(
-                                "h-8 cursor-pointer rounded-lg border px-3 text-[0.78125rem] text-foreground transition-[background-color,border-color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97] disabled:cursor-not-allowed disabled:text-muted-foreground disabled:active:scale-100 coarse:h-11",
+                                "h-8 cursor-pointer rounded-lg border px-3 text-[0.78125rem] text-foreground transition-[background-color,border-color,transform] duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97] disabled:cursor-not-allowed disabled:text-muted-foreground disabled:active:scale-100 coarse:h-11",
                                 on
                                     ? "border-foreground bg-secondary font-semibold"
                                     : "border-border bg-card font-medium hover:bg-secondary disabled:hover:bg-card",

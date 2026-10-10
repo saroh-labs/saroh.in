@@ -141,7 +141,7 @@ export default async function ChoosePage({
                 Starting something new?{" "}
                 <Link
                     href="/onboarding"
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground underline-offset-4 transition-colors duration-fast hover:underline"
                 >
                     Add a business
                 </Link>

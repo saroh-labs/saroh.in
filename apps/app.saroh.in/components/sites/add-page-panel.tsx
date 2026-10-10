@@ -21,7 +21,7 @@ interface Refusal {
 
 /** The menu's rows: 34px, the design's option. */
 export const MENU_ROW =
-    "flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent coarse:min-h-11";
+    "flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[0.8125rem] font-medium text-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent coarse:min-h-11";
 
 /**
  * "Add a page" in the editor's page menu (G16): the module pages this site

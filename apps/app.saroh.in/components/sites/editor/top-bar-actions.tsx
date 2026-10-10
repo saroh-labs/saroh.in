@@ -11,13 +11,13 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {
     ChevronDown,
-    Ellipsis,
     Eye,
     FlaskConical,
     Link2,
     ListChecks,
     MessageSquare,
     Monitor,
+    MoreHorizontal,
     Plus,
     Smartphone,
     Tablet,
@@ -151,7 +151,7 @@ export function TopBarActions({
                                     aria-pressed={p.device === d.key}
                                     aria-label={`Show at ${d.label.toLowerCase()} width`}
                                     className={cn(
-                                        "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
+                                        "flex h-full w-8 items-center justify-center rounded transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
                                         p.device === d.key
                                             ? "bg-secondary text-foreground"
                                             : "text-muted-foreground hover:text-foreground",
@@ -192,7 +192,10 @@ export function TopBarActions({
                             aria-label="More: preview, feedback and test releases"
                             className={cn(ACTION, "w-[34px] px-0")}
                         >
-                            <Ellipsis aria-hidden className="size-[15px]" />
+                            <MoreHorizontal
+                                aria-hidden
+                                className="size-[15px]"
+                            />
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -362,7 +365,7 @@ function ShareChoice({
             type="button"
             disabled={disabled}
             onClick={onSelect}
-            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 coarse:min-h-11"
+            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 coarse:min-h-11"
         >
             <span aria-hidden className="mt-0.5 text-muted-foreground">
                 {icon}

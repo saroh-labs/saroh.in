@@ -146,11 +146,7 @@ export function ProductCollectionsTab({
                             aria-label="Edit collections"
                             className={EDIT_BUTTON}
                         >
-                            <Pencil
-                                className="size-3"
-                                strokeWidth={2}
-                                aria-hidden
-                            />
+                            <Pencil className="size-3" aria-hidden />
                             Edit
                         </Button>
                     ) : null}

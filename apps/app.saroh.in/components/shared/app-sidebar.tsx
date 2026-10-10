@@ -315,10 +315,7 @@ export function AppSidebar({
                                                                     "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
                                                         )}
                                                     >
-                                                        <Icon
-                                                            className="size-[19px] shrink-0"
-                                                            strokeWidth={1.9}
-                                                        />
+                                                        <Icon className="size-[19px] shrink-0" />
                                                         <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
                                                             {item.label}
                                                         </span>
@@ -477,7 +474,7 @@ function NavFlyout({
                         aria-current={on ? "page" : undefined}
                         className={cn(
                             "relative flex items-center rounded-[7px] py-2 pl-4 pr-3 text-[12.5px] transition-colors duration-fast",
-                            "before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
+                            "duration-fast before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
                             // A Paper wash over the Ink, never a white
                             // fill — which on this surface would read as a
                             // second card (brand file §13).

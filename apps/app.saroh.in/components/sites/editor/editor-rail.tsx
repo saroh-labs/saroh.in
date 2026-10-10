@@ -183,7 +183,7 @@ export function EditorRail({
                                                 // the surface it would settle on, so
                                                 // the feedback is the outcome arriving
                                                 // early rather than a separate effect.
-                                                "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors coarse:h-11",
+                                                "group relative flex h-10 w-full items-center gap-1 rounded-md pr-2 text-left text-[0.8125rem] transition-colors duration-fast coarse:h-11",
                                                 /*
                                                  * The selected row carries a bar
                                                  * on its edge as well as a fill,
@@ -412,7 +412,7 @@ function FixedBlockRow({
                 onClick={onSelect}
                 aria-current={selected ? "true" : undefined}
                 className={cn(
-                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors coarse:h-11",
+                    "relative flex h-10 w-full items-center gap-2.5 rounded-md pl-5 pr-2 text-left text-[0.8125rem] transition-colors duration-fast coarse:h-11",
                     railRowState(selected),
                 )}
             >

@@ -220,7 +220,7 @@ function VisitRow({
             className={cn(
                 FOCUS,
                 grid,
-                "-mx-2 cursor-pointer rounded-lg px-2 text-foreground transition-colors duration-100 hover:bg-muted active:bg-muted/70 coarse:min-h-11",
+                "-mx-2 cursor-pointer rounded-lg px-2 text-foreground transition-colors duration-fast hover:bg-muted active:bg-muted/70 coarse:min-h-11",
             )}
         >
             {body}

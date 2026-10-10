@@ -154,7 +154,6 @@ export function VisibilitySection({
                         <ChevronDown
                             aria-hidden
                             className="size-[13px] text-muted-foreground"
-                            strokeWidth={2}
                         />
                     </button>
                 </DropdownMenuTrigger>
@@ -191,11 +190,7 @@ export function VisibilitySection({
                                     </span>
                                 </span>
                                 {o.value === status ? (
-                                    <Check
-                                        aria-hidden
-                                        className="size-3.5"
-                                        strokeWidth={2.4}
-                                    />
+                                    <Check aria-hidden className="size-3.5" />
                                 ) : null}
                             </DropdownMenuRadioItem>
                         ))}
