@@ -9,6 +9,7 @@ import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
+import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton, ctaClasses } from "./cta";
 
 /**
@@ -109,6 +110,7 @@ export default function ServicesListSection({
      */
     bookHref?: string;
 }) {
+    const source = useQrSource();
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", services: given } : { kind: "loading" },
     );
@@ -273,6 +275,7 @@ export default function ServicesListSection({
                                                 href={serviceHref(
                                                     bookHref,
                                                     service.id,
+                                                    source,
                                                 )}
                                                 aria-label={
                                                     label
@@ -313,9 +316,19 @@ function said(value: string | null | undefined): string | null {
     return trimmed === undefined || trimmed === "" ? null : trimmed;
 }
 
-/** The booking page, opened on one service. */
-function serviceHref(bookHref: string, serviceId: string): string {
-    return `${bookHref}?service=${encodeURIComponent(serviceId)}`;
+/**
+ * The booking page, opened on one service. On a page a QR code's scan
+ * opened, the link carries the scan's tag on (`qr-source.ts`).
+ */
+function serviceHref(
+    bookHref: string,
+    serviceId: string,
+    source: string | null,
+): string {
+    return withQrSource(
+        `${bookHref}?service=${encodeURIComponent(serviceId)}`,
+        source,
+    );
 }
 
 const focusRing =
@@ -344,6 +357,7 @@ function ServiceCards({
     label: string | null;
     bookHref?: string;
 }) {
+    const source = useQrSource();
     const words = label ?? "Book";
     return (
         <ul className="mt-8 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
@@ -373,7 +387,11 @@ function ServiceCards({
                             </span>
                             {bookHref ? (
                                 <a
-                                    href={serviceHref(bookHref, service.id)}
+                                    href={serviceHref(
+                                        bookHref,
+                                        service.id,
+                                        source,
+                                    )}
                                     aria-label={`${words}: ${service.name}`}
                                     className={cn(
                                         cardButton,
@@ -510,6 +528,7 @@ function PriceCard({
     service: PublicService;
     bookHref?: string;
 }) {
+    const source = useQrSource();
     const price =
         content.showPrices !== false
             ? formatPrice(service.priceCents, service.currency)
@@ -551,7 +570,7 @@ function PriceCard({
                     <CtaButton content={content.cta} />
                 ) : bookHref ? (
                     <a
-                        href={serviceHref(bookHref, service.id)}
+                        href={serviceHref(bookHref, service.id, source)}
                         aria-label={`${words}: ${service.name}`}
                         className={cn(
                             button,

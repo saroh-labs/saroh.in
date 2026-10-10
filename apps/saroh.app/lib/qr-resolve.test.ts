@@ -4,6 +4,7 @@ import {
     qrCodeOf,
     qrRedirect,
     qrRedirectLocation,
+    qrSourceTag,
     scanQrCode,
 } from "./qr-resolve";
 
@@ -57,6 +58,29 @@ describe("qrCodeOf", () => {
             "h7c%2F",
         ]) {
             expect(qrCodeOf(bad)).toBeNull();
+        }
+    });
+});
+
+describe("qrSourceTag", () => {
+    it("passes on a QR code's tag, and nothing else", () => {
+        expect(qrSourceTag("qr-h7c")).toBe("qr-h7c");
+        expect(qrSourceTag("qr-K9DQ2X")).toBe("qr-k9dq2x");
+        for (const bad of [
+            undefined,
+            null,
+            7,
+            { code: "h7c" },
+            "",
+            "h7c",
+            "qr-",
+            "qr-h7",
+            "qr-toolong1",
+            "qr-h7c&organizationId=org_other",
+            "newsletter",
+            "cuid_of_a_row",
+        ]) {
+            expect(qrSourceTag(bad)).toBeNull();
         }
     });
 });

@@ -154,6 +154,16 @@ describe("the key a page is kept under (#863)", () => {
         );
     });
 
+    it("keeps the page a QR scan opened apart from the page itself", async () => {
+        // `?src=qr-<code>` is read in the browser only, so both are the
+        // same drawing; and being keyed apart, a tagged request could never
+        // answer a visitor who asked for the plain page.
+        const plain = await key(req("https://rye.saroh.app/book"));
+        const scanned = await key(req("https://rye.saroh.app/book?src=qr-h7c"));
+        expect(scanned).not.toBe(plain);
+        expect(new URL(plain).searchParams.has("src")).toBe(false);
+    });
+
     it("keeps a client navigation's RSC answer apart from the page", async () => {
         const page = await key(req("https://rye.saroh.app/about"));
         const rsc = await key(

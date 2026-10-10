@@ -44,6 +44,21 @@ export function qrCodeOf(segment: string | undefined): string | null {
     return QR_CODE_SHAPE.test(code) ? code : null;
 }
 
+/**
+ * A tag a booking or a checkout sent back, as this server passes it on:
+ * `qr-<code>`, lower-cased, or null for anything else. The page reads it
+ * from its own address in the browser (`@saroh/site-blocks` `qr-source.ts`)
+ * and it arrives as a server action's argument, so it is checked here like
+ * every other field. The API decides whether the code is this site's.
+ */
+export function qrSourceTag(value: unknown): string | null {
+    if (typeof value !== "string" || !value.startsWith(QR_SOURCE_PREFIX)) {
+        return null;
+    }
+    const code = qrCodeOf(value.slice(QR_SOURCE_PREFIX.length));
+    return code ? `${QR_SOURCE_PREFIX}${code}` : null;
+}
+
 export interface QrScanRequest {
     /** The API's origin (`serverApiUrl()`). */
     apiUrl: string;

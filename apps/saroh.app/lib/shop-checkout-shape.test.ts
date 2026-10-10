@@ -91,6 +91,26 @@ describe("what the site's server sends on", () => {
             }),
         ).toBeNull();
     });
+
+    it("passes on a QR code's tag with a start, and drops anything else there", () => {
+        const start = {
+            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+            fulfilment: "PICKUP",
+            key: "abcdefgh",
+        };
+        expect(startBody({ ...start, source: "qr-h7c" })).toEqual({
+            ...start,
+            source: "qr-h7c",
+        });
+        for (const source of ["newsletter", "qr-", 7, "cuid_of_a_row", null]) {
+            // Never a reason to refuse the order: it just goes without.
+            expect(startBody({ ...start, source })).toEqual(start);
+        }
+        // A quote writes nothing, so it never carries one.
+        expect(
+            quoteBody({ lines: start.lines, source: "qr-h7c" }),
+        ).not.toHaveProperty("source");
+    });
 });
 
 describe("the API's answers", () => {
