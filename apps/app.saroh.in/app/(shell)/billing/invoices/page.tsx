@@ -32,6 +32,8 @@ export default async function InvoicesPage({
     searchParams,
 }: {
     searchParams: Promise<{
+        tab?: string;
+        /** The tab's name before every screen's tabs became `?tab=`. */
         view?: string;
         since?: string;
         source?: string;
@@ -49,7 +51,7 @@ export default async function InvoicesPage({
             <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
         );
     }
-    const { view, since } = query;
+    const { tab, view, since } = query;
     const paidSince = sinceParam({ since });
     const only = scopeFromQuery(query);
     const [{ rows: invoices, truncated }, business, paid, scope] =
@@ -78,7 +80,7 @@ export default async function InvoicesPage({
                           }
                         : null
                 }
-                initialTab={tabFromView(view)}
+                initialTab={tabFromView(tab ?? view)}
                 initialChip={chipFromQuery(query.source)}
                 scope={scope}
                 // From Home's "Last 24 hours" (F6): the invoices paid since.

@@ -21,10 +21,14 @@ export function copyFailedMessage(thing = "link") {
  */
 export async function copyText(value: string): Promise<boolean> {
     try {
-        if (typeof navigator === "undefined" || !navigator.clipboard) {
-            return false;
-        }
-        await navigator.clipboard.writeText(value);
+        // Missing on an insecure page and in older browsers, whatever the
+        // type says.
+        const clipboard =
+            typeof navigator === "undefined"
+                ? undefined
+                : (navigator.clipboard as Clipboard | undefined);
+        if (!clipboard) return false;
+        await clipboard.writeText(value);
         return true;
     } catch {
         return false;
@@ -134,7 +138,7 @@ export function CopyButton({
             type="button"
             variant={variant}
             size={size}
-            disabled={disabled || busy}
+            disabled={disabled === true || busy}
             onClick={press}
             data-copy-state={state}
             className={cn("gap-1.5", className)}
@@ -193,6 +197,9 @@ export interface ShareLinkProps extends CopyButtonProps {
     shareLabel?: string;
 }
 
+/** What `canShare` reads never changes while the page is open. */
+const subscribeNever = () => () => undefined;
+
 /** A thumb, and a browser that can open the phone's share sheet. */
 function canShare() {
     return (
@@ -225,10 +232,14 @@ export function ShareLink({
     disabled,
     ...copy
 }: ShareLinkProps) {
-    const [share, setShare] = React.useState(false);
+    // False on the server and for the first paint, then what the device is.
+    const share = React.useSyncExternalStore(
+        subscribeNever,
+        canShare,
+        () => false,
+    );
     const [fellBack, setFellBack] = React.useState(false);
     const [busy, setBusy] = React.useState(false);
-    React.useEffect(() => setShare(canShare()), []);
 
     if (!share || fellBack) {
         return (
@@ -269,7 +280,7 @@ export function ShareLink({
             type="button"
             variant={variant}
             size={size}
-            disabled={disabled || busy}
+            disabled={disabled === true || busy}
             onClick={press}
             className={cn("gap-1.5", className)}
         >

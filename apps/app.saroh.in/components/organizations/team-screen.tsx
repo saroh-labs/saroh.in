@@ -99,6 +99,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { TabStrip } from "@saroh/ui/tabs";
 import { InviteDiaryPerson } from "./invite-diary-person";
 import { LastActiveLine } from "./last-active-line";
 import {
@@ -186,7 +187,7 @@ function isBuiltIn(key: string): key is OrganizationRole {
     return (ROLES as readonly string[]).includes(key);
 }
 
-/** The Team screen's two views, as `?view=` names them. */
+/** The Team screen's two tabs, as `?tab=` names them. */
 const TEAM_TABS = ["roles", "people"] as const;
 
 /**
@@ -280,7 +281,10 @@ export function TeamScreen({
     paused?: PausedTeam;
 }) {
     // In the address, so Search settings can open Roles.
-    const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
+    const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people", {
+        // The tab was `?view=` until every screen's tabs became `?tab=`.
+        alias: "view",
+    });
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
@@ -372,43 +376,17 @@ export function TeamScreen({
                     }
                     readOnlyNote={readOnlyNote}
                 />
-                <div className="flex items-end gap-3 border-b border-border">
-                    <div
-                        role="group"
-                        aria-label="View"
-                        className="flex gap-0.5"
-                    >
-                        {tabs.map((t) => {
-                            const on = t.id === tab;
-                            return (
-                                <button
-                                    key={t.id}
-                                    type="button"
-                                    aria-pressed={on}
-                                    onClick={() => setTab(t.id)}
-                                    className={cn(
-                                        "flex items-center gap-2 rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                        on
-                                            ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                            : "font-medium text-muted-foreground hover:text-foreground",
-                                    )}
-                                >
-                                    {t.label}
-                                    <span
-                                        className={cn(
-                                            "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                            on
-                                                ? "bg-muted text-foreground"
-                                                : "bg-foreground/[0.04] text-muted-foreground",
-                                        )}
-                                    >
-                                        {t.count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                <TabStrip
+                    label="Team"
+                    idPrefix="team-tab"
+                    value={tab}
+                    onValueChange={setTab}
+                    tabs={tabs.map((t) => ({
+                        value: t.id,
+                        label: t.label,
+                        count: t.count,
+                    }))}
+                />
             </div>
 
             {limitNotice}

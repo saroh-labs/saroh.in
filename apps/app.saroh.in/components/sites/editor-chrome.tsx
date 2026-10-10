@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { TabStrip } from "@saroh/ui/tabs";
 import { useRef } from "react";
 
 /**
@@ -31,39 +31,20 @@ export function EditorTabs<T extends string>({
     onSelect: (tab: T) => void;
 }) {
     return (
-        <div
-            role="tablist"
-            aria-label={label}
-            className="flex shrink-0 items-end gap-4 border-b px-4"
-        >
-            {tabs.map((tab) => (
-                <button
-                    key={tab.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={value === tab.key}
-                    onClick={() => onSelect(tab.key)}
-                    className={cn(
-                        "relative -mb-px flex h-10 items-center gap-1.5 border-b-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:h-11",
-                        value === tab.key
-                            ? "border-highlight text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                >
-                    {tab.label}
-                    {/*
-                     * The count rides the tab rather than a separate badge:
-                     * the number only means anything next to the word it
-                     * counts.
-                     */}
-                    {tab.count ? (
-                        <span className="rounded-full bg-secondary px-1.5 text-[0.6875rem] tabular-nums leading-4 text-highlight">
-                            {tab.count}
-                        </span>
-                    ) : null}
-                </button>
-            ))}
-        </div>
+        <TabStrip
+            label={label}
+            value={value}
+            onValueChange={onSelect}
+            className="shrink-0"
+            listClassName="px-2"
+            // The count rides the tab: the number only means anything next
+            // to the word it counts. None at zero.
+            tabs={tabs.map((tab) => ({
+                value: tab.key,
+                label: tab.label,
+                count: tab.count ? tab.count : undefined,
+            }))}
+        />
     );
 }
 

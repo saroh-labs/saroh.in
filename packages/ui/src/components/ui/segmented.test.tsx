@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { Segmented } from "./segmented";
 
+const noop = () => undefined;
 const classes = (el: Element) => (el.getAttribute("class") ?? "").split(/\s+/);
 
 function View({
@@ -99,7 +100,7 @@ describe("Segmented, button mode", () => {
             <Segmented
                 label="Kind"
                 value=""
-                onValueChange={() => {}}
+                onValueChange={noop}
                 options={[
                     { value: "a", label: "One" },
                     { value: "b", label: "Two" },
@@ -122,7 +123,7 @@ describe("Segmented, button mode", () => {
             <Segmented
                 label="Layout"
                 value="t"
-                onValueChange={() => {}}
+                onValueChange={noop}
                 options={[
                     { value: "t", label: null, icon: <svg />, name: "Table" },
                     { value: "l", label: null, icon: <svg />, name: "List" },

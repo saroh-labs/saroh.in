@@ -22,9 +22,21 @@ export function useTabParam<K extends string>(
     param: string,
     keys: readonly K[],
     fallback: K,
-    { history = "replace" }: { history?: "replace" | "push" } = {},
+    {
+        history = "replace",
+        alias,
+    }: {
+        history?: "replace" | "push";
+        /** The parameter's old name, still read so a saved link lands. */
+        alias?: string;
+    } = {},
 ): [K, (key: K) => void] {
-    const fromUrl = tabFromParam(useSearchParams().get(param), keys, fallback);
+    const search = useSearchParams();
+    const fromUrl = tabFromParam(
+        search.get(param) ?? (alias ? search.get(alias) : null),
+        keys,
+        fallback,
+    );
     const [tab, setLocal] = useState(fromUrl);
     const [seen, setSeen] = useState(fromUrl);
     // The address moved: follow it, in render rather than an effect.
@@ -37,6 +49,7 @@ export function useTabParam<K extends string>(
         // after this render, so setting it here would snap the tab back.
         setLocal(key);
         const url = new URL(window.location.href);
+        if (alias) url.searchParams.delete(alias);
         if (key === fallback) url.searchParams.delete(param);
         else url.searchParams.set(param, key);
         if (url.href === window.location.href) return;

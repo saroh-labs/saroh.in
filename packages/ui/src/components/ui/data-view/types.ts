@@ -129,7 +129,10 @@ export interface DataViewProps<TRow> {
     error?: string | null;
     /** What a row is, for counts and states: "3 products", "No products match…". */
     noun?: { one: string; other: string };
-    /** Placeholder for the search field, e.g. "Search products". */
+    /**
+     * The search field's placeholder and name: "Search products". Without
+     * one it is "Search {noun}". Never "Search…".
+     */
     searchPlaceholder?: string;
     /**
      * Hide the Table/List switch. The viewport still decides — a table above

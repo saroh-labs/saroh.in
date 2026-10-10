@@ -521,7 +521,9 @@ describe("SiteEditor shell", () => {
             "Not published · 2 blocks, footer",
         );
         // The pill says it, so the line beside it does not say it twice.
-        expect($("nav[aria-label=Breadcrumb] span[title]")).toBeNull();
+        expect(
+            $("nav[aria-label=Breadcrumb] span[title]:not([role=status])"),
+        ).toBeNull();
         expect(button("Publish").title).toBe("Put live: 2 blocks, footer");
     });
 
@@ -575,7 +577,9 @@ describe("SiteEditor shell", () => {
         });
         // The design's pill for an approval that still covers the draft.
         expect($("[role=status]")?.textContent).toBe("Approved");
-        const line = $("nav[aria-label=Breadcrumb] span[title]");
+        const line = $(
+            "nav[aria-label=Breadcrumb] span[title]:not([role=status])",
+        );
         expect(line?.textContent).toMatch(
             /^2 sections and .+ changed · Approved by Asha · 3 open notes$/,
         );
@@ -1084,7 +1088,8 @@ describe("SiteEditor shell", () => {
         expect($("[role=status]")?.textContent).toBe("In review");
         // The pill says In review, so the line says what would go live.
         expect(
-            $("nav[aria-label=Breadcrumb] span[title]")?.textContent,
+            $("nav[aria-label=Breadcrumb] span[title]:not([role=status])")
+                ?.textContent,
         ).toContain("1 section changed");
         expect(button("Publish").disabled).toBe(false);
         await press(button("Publish"));

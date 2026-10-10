@@ -11,10 +11,11 @@ afterEach(() => {
 });
 
 const field = () => screen.getByRole("searchbox");
+const noop = () => undefined;
 
 describe("ListSearch", () => {
     it("is named by its placeholder, which the caller must give", () => {
-        render(<ListSearch placeholder="Search orders" onSearch={() => {}} />);
+        render(<ListSearch placeholder="Search orders" onSearch={noop} />);
         expect(
             screen.getByRole("searchbox", { name: "Search orders" }),
         ).toHaveAttribute("placeholder", "Search orders");
@@ -72,7 +73,6 @@ describe("ListSearch", () => {
         const onSearch = vi.fn();
         const onKeyDown = vi.fn();
         render(
-            // eslint-disable-next-line jsx-a11y/no-static-element-interactions
             <div onKeyDown={onKeyDown}>
                 <ListSearch placeholder="Search orders" onSearch={onSearch} />
             </div>,
@@ -85,7 +85,7 @@ describe("ListSearch", () => {
     it('"/" focuses it from anywhere but another field', () => {
         render(
             <>
-                <ListSearch placeholder="Search orders" onSearch={() => {}} />
+                <ListSearch placeholder="Search orders" onSearch={noop} />
                 <input aria-label="Other" />
                 <button type="button">Elsewhere</button>
             </>,
@@ -106,7 +106,7 @@ describe("ListSearch", () => {
     it('"/" does nothing while a dialog is open, or with the shortcut off', () => {
         const { rerender } = render(
             <>
-                <ListSearch placeholder="Search orders" onSearch={() => {}} />
+                <ListSearch placeholder="Search orders" onSearch={noop} />
                 <div role="dialog" aria-label="Refund">
                     <button type="button">In the dialog</button>
                 </div>
@@ -122,7 +122,7 @@ describe("ListSearch", () => {
                 <ListSearch
                     placeholder="Search orders"
                     shortcut={false}
-                    onSearch={() => {}}
+                    onSearch={noop}
                 />
                 <button type="button">Elsewhere</button>
             </>,
@@ -135,14 +135,14 @@ describe("ListSearch", () => {
 
     it("says it is searching, to the eye and to a screen reader", () => {
         const { rerender } = render(
-            <ListSearch placeholder="Search orders" onSearch={() => {}} />,
+            <ListSearch placeholder="Search orders" onSearch={noop} />,
         );
         expect(screen.queryByRole("status")).toBeNull();
         rerender(
             <ListSearch
                 placeholder="Search orders"
                 searching
-                onSearch={() => {}}
+                onSearch={noop}
             />,
         );
         expect(screen.getByRole("status")).toHaveTextContent("Searching…");
@@ -150,7 +150,7 @@ describe("ListSearch", () => {
 
     it("has an icon, one height, 44px and 16px type on touch, the full width on a phone", () => {
         const { container } = render(
-            <ListSearch placeholder="Search orders" onSearch={() => {}} />,
+            <ListSearch placeholder="Search orders" onSearch={noop} />,
         );
         expect(container.querySelector("svg[aria-hidden]")).not.toBeNull();
         const c = field().className.split(/\s+/);

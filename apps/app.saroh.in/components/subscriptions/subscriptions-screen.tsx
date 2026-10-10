@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { Repeat, Search } from "lucide-react";
+import { ListSearch } from "@saroh/ui/list-search";
+import { Repeat } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -28,17 +28,15 @@ import {
     TAB_LABEL,
 } from "@/lib/subscriptions/view";
 
+import { TabStrip } from "@saroh/ui/tabs";
 import { PaymentsCrumbs } from "./payments-crumbs";
 import { PlansTab } from "./plans-tab";
 import { SubscribeDialog } from "./subscribe-dialog";
 import { SubscriptionQuickLook } from "./subscription-quick-look";
-import { Count, SubscriptionRow } from "./subscription-row";
+import { SubscriptionRow } from "./subscription-row";
 
 const TABS: ListTab[] = ["active", "failed", "paused", "cancelled"];
 const SEARCH_FROM = 8;
-
-const TAB_CLASS =
-    "inline-flex items-center px-3.5 py-2.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11";
 
 /**
  * Payments → Subscriptions, after "Saroh Subscriptions": who is on which
@@ -198,79 +196,42 @@ export function SubscriptionsScreen({
                 ) : (
                     <div className="mb-3" />
                 )}
-                <div className="flex flex-wrap items-end gap-x-0.5 border-b border-border">
-                    {/* `contents`, so the tabs and the search wrap as one
-                        row on a phone, as the design's do. */}
-                    <div
-                        role="tablist"
-                        aria-label="Subscriptions"
-                        className="contents"
-                    >
-                        {TABS.map((t) => {
-                            const on = t === tab;
-                            const n = count(t);
-                            return (
-                                <button
-                                    key={t}
-                                    type="button"
-                                    role="tab"
-                                    id={`tab-${t}`}
-                                    aria-selected={on}
-                                    aria-controls="subscriptions-panel"
-                                    onClick={() => pick(t)}
-                                    className={cn(
-                                        TAB_CLASS,
-                                        on
-                                            ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                            : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
-                                    )}
-                                >
-                                    {TAB_LABEL[t]}
-                                    <Count n={n} danger={t === "failed"} />
-                                </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            role="tab"
-                            id="tab-plans"
-                            aria-selected={onPlans}
-                            aria-controls="subscriptions-panel"
-                            onClick={() => pick("plans")}
-                            className={cn(
-                                TAB_CLASS,
-                                onPlans
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
-                            )}
-                        >
-                            Plans
-                            {/* No count when they couldn't be read: a 0
-                                would say there are none. */}
-                            {planRead ? (
-                                <Count n={plansOnTab(planRead)} />
-                            ) : null}
-                        </button>
-                    </div>
-                    {/* Search earns its row only on a list long enough to
-                        need it; a phone has little room to spare. */}
-                    {!onPlans && subscriptions.length > SEARCH_FROM ? (
-                        <label className="relative mb-1.5 ml-auto flex w-full items-center sm:w-[220px]">
-                            <span className="sr-only">Search subscribers</span>
-                            <Search
-                                aria-hidden
-                                className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground"
-                            />
-                            <Input
-                                type="search"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search by name or plan"
-                                className="h-8 rounded-[8px] pl-8 text-[12.5px]"
-                            />
-                        </label>
-                    ) : null}
-                </div>
+                <TabStrip
+                    label="Subscriptions"
+                    idPrefix="tab"
+                    value={tab}
+                    onValueChange={pick}
+                    tabs={[
+                        ...TABS.map((t) => ({
+                            value: t as ScreenTab,
+                            label: TAB_LABEL[t],
+                            controls: "subscriptions-panel",
+                            count: count(t),
+                            countTone:
+                                t === "failed" && count(t) > 0
+                                    ? ("danger" as const)
+                                    : ("neutral" as const),
+                        })),
+                        {
+                            value: "plans" as ScreenTab,
+                            label: "Plans",
+                            controls: "subscriptions-panel",
+                            // No count when they couldn't be read: a 0
+                            // would say there are none.
+                            count: planRead ? plansOnTab(planRead) : undefined,
+                        },
+                    ]}
+                />
+                {/* Search earns its row only on a list long enough to
+                    need it; a phone has little room to spare. */}
+                {!onPlans && subscriptions.length > SEARCH_FROM ? (
+                    <ListSearch
+                        placeholder="Search subscriptions by name or plan"
+                        defaultValue={query}
+                        onSearch={setQuery}
+                        className="mt-3"
+                    />
+                ) : null}
             </div>
             <div
                 id="subscriptions-panel"

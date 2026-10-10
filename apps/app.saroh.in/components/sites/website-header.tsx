@@ -12,7 +12,6 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { useEdgeFade } from "@saroh/ui/scroll-x";
 import {
     Check,
     ChevronDown,
@@ -23,13 +22,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef } from "react";
 
 import { QrButton } from "@/components/qr/qr-button";
 import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 
+import { TabStrip } from "@saroh/ui/tabs";
 import { PostCategoriesSheet } from "./post-categories-sheet";
 
 export interface WebsiteHeaderSite {
@@ -162,13 +161,6 @@ export function WebsiteHeader({
               ];
     const active =
         tabs.find((t) => pathname.startsWith(t.href))?.id ?? tabs[0].id;
-    // On a phone the tabs scroll sideways: the strip fades on the side with
-    // more, and the open tab is scrolled into view (UX-079).
-    const strip = useRef<HTMLElement>(null);
-    const fade = useEdgeFade(strip, {
-        current: '[aria-current="page"]',
-        revealKey: pathname,
-    });
 
     // Switching site keeps the tab you were on, where the other site has it.
     const switchTo = (id: string) =>
@@ -242,44 +234,16 @@ export function WebsiteHeader({
                     </>
                 }
             />
-            <nav
-                ref={strip}
-                aria-label="Website"
-                data-scroll-x=""
-                style={fade}
-                className="flex gap-1 overflow-x-auto border-b border-border"
-            >
-                {tabs.map((t) => {
-                    const on = t.id === active;
-                    return (
-                        <Link
-                            key={t.id}
-                            href={t.href}
-                            aria-current={on ? "page" : undefined}
-                            className={cn(
-                                "flex shrink-0 items-center gap-2 px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {t.label}
-                            {t.count === undefined ? null : (
-                                <span
-                                    className={cn(
-                                        "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                        on
-                                            ? "bg-muted text-foreground"
-                                            : "bg-foreground/[0.04] text-muted-foreground",
-                                    )}
-                                >
-                                    {t.count}
-                                </span>
-                            )}
-                        </Link>
-                    );
-                })}
-            </nav>
+            <TabStrip
+                label="Website"
+                value={active}
+                tabs={tabs.map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                    href: t.href,
+                    count: t.count,
+                }))}
+            />
         </div>
     );
 }

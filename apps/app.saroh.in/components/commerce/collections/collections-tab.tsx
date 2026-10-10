@@ -117,7 +117,7 @@ export function ProductCollectionsTab({
                             Add to a collection
                         </Button>
                     ) : null}
-                    <StateLink href="/commerce/products?view=collections">
+                    <StateLink href="/commerce/products?tab=collections">
                         Open Products
                     </StateLink>
                 </TabState>

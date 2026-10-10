@@ -287,7 +287,7 @@ function CollectionField({
                 <p className="text-sm text-muted-foreground">
                     No collections yet.{" "}
                     <Link
-                        href="/commerce/products?view=collections"
+                        href="/commerce/products?tab=collections"
                         className="underline hover:text-foreground"
                     >
                         Make one in Sell › Products

@@ -30,6 +30,19 @@ import { TextLink } from "./text-link";
 
 const classes = (el: Element) => (el.getAttribute("class") ?? "").split(/\s+/);
 
+function must<T>(value: T | null | undefined): T {
+    if (value === null || value === undefined) throw new Error("not found");
+    return value;
+}
+
+/** A press whose handler is async: let its promises settle inside `act`. */
+async function press(el: Element) {
+    await act(async () => {
+        fireEvent.click(el);
+        await Promise.resolve();
+    });
+}
+
 describe("Badge", () => {
     it("is a span that says its status in words, with no hover, focus ring or transition", () => {
         render(<Badge variant="success">Live</Badge>);
@@ -56,7 +69,7 @@ describe("Badge", () => {
         expect(classes(screen.getByText("Paused"))).toContain("text-[11px]");
         const dot = container.querySelector("[data-badge-dot]");
         expect(dot).toHaveAttribute("aria-hidden");
-        expect(classes(dot as Element)).toContain("bg-current");
+        expect(classes(must(dot))).toContain("bg-current");
     });
 
     it("draft is neutral, not Saffron", () => {
@@ -90,7 +103,7 @@ describe("CountBadge", () => {
         const { rerender, container } = render(
             <CountBadge count={3} tone="strong" />,
         );
-        const el = () => container.querySelector("[data-count-badge]")!;
+        const el = () => must(container.querySelector("[data-count-badge]"));
         expect(classes(el())).toContain("bg-primary");
         rerender(<CountBadge count={3} tone="danger" />);
         expect(classes(el())).toContain("bg-destructive-subtle");
@@ -160,14 +173,14 @@ describe("Notice", () => {
         "%s uses a subtle pair, never an alpha tint or Saffron",
         (tone) => {
             render(<Notice tone={tone}>Words.</Notice>);
-            const el = document.querySelector(`[data-notice="${tone}"]`)!;
+            const el = must(document.querySelector(`[data-notice="${tone}"]`));
             expect(el.className).not.toMatch(/\/\d|brand|highlight/);
         },
     );
 
     it("is a card by default and a banner edge to edge", () => {
         const { rerender } = render(<Notice>Words.</Notice>);
-        const el = () => document.querySelector("[data-notice]")!;
+        const el = () => must(document.querySelector("[data-notice]"));
         expect(classes(el())).toContain("rounded-lg");
         rerender(<Notice layout="banner">Words.</Notice>);
         expect(classes(el())).not.toContain("rounded-lg");
@@ -329,7 +342,9 @@ describe("ProgressBar", () => {
         );
         const bar = () => screen.getByRole("progressbar");
         expect(classes(bar())).toContain("h-1");
-        expect(classes(bar().firstElementChild!)).toContain("bg-foreground");
+        expect(classes(must(bar().firstElementChild))).toContain(
+            "bg-foreground",
+        );
         rerender(<ProgressBar value={1} max={2} label="Half" size="sm" />);
         expect(classes(bar())).toContain("h-1.5");
         expect(bar().innerHTML).not.toMatch(/brand|highlight|transition-all/);
@@ -364,9 +379,7 @@ describe("CopyButton", () => {
             <CopyButton value="https://pay.example/1" onCopied={onCopied} />,
         );
         const button = screen.getByRole("button", { name: "Copy link" });
-        await act(async () => {
-            fireEvent.click(button);
-        });
+        await press(button);
         expect(writeText).toHaveBeenCalledWith("https://pay.example/1");
         expect(screen.getByRole("button", { name: "Copied" })).toBe(button);
         expect(onCopied).toHaveBeenCalledWith("https://pay.example/1");
@@ -381,7 +394,7 @@ describe("CopyButton", () => {
         expect(COPIED_MS).toBe(1600);
     });
 
-    it("announces the swap politely", async () => {
+    it("announces the swap politely", () => {
         setClipboard(vi.fn().mockResolvedValue(undefined));
         render(<CopyButton value="x" />);
         const label = screen.getByText("Copy link");
@@ -394,15 +407,13 @@ describe("CopyButton", () => {
         render(
             <CopyButton value="https://pay.example/1" onCopied={onCopied} />,
         );
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
-        });
+        await press(screen.getByRole("button", { name: "Copy link" }));
         expect(screen.getByRole("alert")).toHaveTextContent(
             "Couldn't copy the link. Select it and copy it instead.",
         );
-        const shown = screen.getByRole("textbox", {
+        const shown = screen.getByRole<HTMLInputElement>("textbox", {
             name: "The link",
-        }) as HTMLInputElement;
+        });
         expect(shown).toHaveValue("https://pay.example/1");
         expect(shown).toHaveAttribute("readonly");
         expect(shown.selectionStart).toBe(0);
@@ -415,9 +426,7 @@ describe("CopyButton", () => {
     it("names what it copies in the label and the failure", async () => {
         setClipboard(vi.fn().mockRejectedValue(new Error("denied")));
         render(<CopyButton value="SAVE10" label="Copy code" thing="code" />);
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
-        });
+        await press(screen.getByRole("button", { name: "Copy code" }));
         expect(screen.getByRole("alert")).toHaveTextContent(
             "Couldn't copy the code. Select it and copy it instead.",
         );
@@ -434,13 +443,9 @@ describe("CopyButton", () => {
             .mockResolvedValueOnce("https://pay.example/new")
             .mockResolvedValueOnce(null);
         render(<CopyButton value={make} />);
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
-        });
+        await press(screen.getByRole("button", { name: "Copy link" }));
         expect(writeText).toHaveBeenCalledWith("https://pay.example/new");
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button"));
-        });
+        await press(screen.getByRole("button"));
         expect(writeText).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole("alert")).toBeNull();
     });
@@ -505,9 +510,7 @@ describe("ShareLink", () => {
                 title="Rye & Co."
             />,
         );
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Share" }));
-        });
+        await press(screen.getByRole("button", { name: "Share" }));
         expect(share).toHaveBeenCalledWith({
             url: "https://pay.example/1",
             text: "Pay for order 1042",
@@ -526,13 +529,9 @@ describe("ShareLink", () => {
             configurable: true,
         });
         render(<ShareLink value="https://pay.example/1" />);
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Share" }));
-        });
+        await press(screen.getByRole("button", { name: "Share" }));
         expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Share" }));
-        });
+        await press(screen.getByRole("button", { name: "Share" }));
         expect(
             screen.getByRole("button", { name: "Copy link" }),
         ).toBeInTheDocument();

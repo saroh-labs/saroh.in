@@ -119,7 +119,7 @@ test.describe("orders list", () => {
         const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
         for (const [name, n] of [
             ["All", all.counts.all],
             ["Open", all.counts.open],
@@ -130,7 +130,7 @@ test.describe("orders list", () => {
 
         await tab(page, "Open").click();
         await expect(page).toHaveURL(/tab=open/);
-        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "true");
+        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "page");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
             await expect(
@@ -176,7 +176,7 @@ test.describe("orders list", () => {
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
         await page.getByRole("button", { name: "View all orders" }).click();
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
     });
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {

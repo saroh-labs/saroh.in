@@ -82,7 +82,7 @@ export function ProductCollectionsSheet({
             productName={productName}
             title="Edit collections"
             moreLink={{
-                href: "/commerce/products?view=collections",
+                href: "/commerce/products?tab=collections",
                 label: "All collections",
             }}
             dirty={dirty}

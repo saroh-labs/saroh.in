@@ -1,14 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import {
     dismissToasts,
     showError,
     showSuccess,
     showUndo,
 } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
@@ -24,6 +22,7 @@ import {
 import { countStock, undoStock } from "@/lib/stock/screen-actions";
 import type { StockChecks, StockLevels, StockLog } from "@/lib/stock/service";
 
+import { TabStrip } from "@saroh/ui/tabs";
 import { ChecksList } from "./checks-list";
 import { CountBar } from "./count-bar";
 import { EntrySheet } from "./entry-sheet";
@@ -184,29 +183,32 @@ export function StockScreen({
         checks === "failed"
             ? null
             : Object.values(checks.counts).reduce((a, b) => a + b, 0);
+    // A count, as every other strip shows one: how many lines need
+    // someone (in Ink), how many checks are open (in red). Checks that
+    // couldn't be read are a dash, never 0.
     const tabs: {
         id: Tab;
         label: string;
-        meta?: { text: string; tone: "plain" | "attention" | "danger" };
+        count?: number | null;
+        tone?: "strong" | "danger";
     }[] = [
         {
             id: "levels",
             label: "Levels",
-            meta:
-                needsYou > 0
-                    ? { text: `${needsYou} need you`, tone: "attention" }
-                    : undefined,
+            count: needsYou > 0 ? needsYou : undefined,
+            tone: "strong",
         },
         { id: "log", label: "Log" },
         {
             id: "checks",
             label: "Checks",
-            meta:
+            count:
                 checkCount === null
-                    ? { text: "Couldn't load", tone: "danger" }
+                    ? null
                     : checkCount > 0
-                      ? { text: String(checkCount), tone: "danger" }
+                      ? checkCount
                       : undefined,
+            tone: "danger",
         },
     ];
 
@@ -248,47 +250,17 @@ export function StockScreen({
                 }
             />
 
-            <nav
-                aria-label="Stock views"
-                className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1"
-            >
-                {tabs.map((t) => {
-                    const on = t.id === tab;
-                    return (
-                        <Link
-                            key={t.id}
-                            href={href({
-                                tab: t.id === "levels" ? undefined : t.id,
-                            })}
-                            scroll={false}
-                            aria-current={on ? "page" : undefined}
-                            className={cn(
-                                "flex shrink-0 items-center gap-[7px] whitespace-nowrap rounded-t-md px-3 py-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {t.label}
-                            {t.meta ? (
-                                <span
-                                    className={cn(
-                                        "rounded-full px-[7px] py-px text-[11px] font-semibold tabular-nums",
-                                        t.meta.tone === "attention" &&
-                                            "bg-brand-subtle text-brand-subtle-foreground",
-                                        t.meta.tone === "danger" &&
-                                            "bg-destructive-subtle text-destructive-subtle-foreground",
-                                        t.meta.tone === "plain" &&
-                                            "bg-muted text-muted-foreground",
-                                    )}
-                                >
-                                    {t.meta.text}
-                                </span>
-                            ) : null}
-                        </Link>
-                    );
-                })}
-            </nav>
+            <TabStrip
+                label="Stock views"
+                value={tab}
+                tabs={tabs.map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                    href: href({ tab: t.id === "levels" ? undefined : t.id }),
+                    count: t.count,
+                    countTone: t.tone,
+                }))}
+            />
 
             <div className="flex flex-col gap-3.5">
                 {tab === "levels" ? (
