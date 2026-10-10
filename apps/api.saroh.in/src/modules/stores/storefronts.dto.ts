@@ -195,7 +195,7 @@ export class UpdateStorefrontDto {
     guestCheckout?: boolean;
 
     /**
-     * "Pay when you collect" and "Pay on delivery" at the site's checkout,
+     * "Pay at pick-up" and "Pay on delivery" at the site's checkout,
      * beside paying online (a plan without online payments offers them
      * whatever this says).
      */

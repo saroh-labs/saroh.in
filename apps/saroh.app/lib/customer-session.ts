@@ -247,5 +247,13 @@ export async function getSignedInCustomer(): Promise<SignedInCustomer | null> {
     const call = await accountFetch("session");
     if (!call?.ok || !call.res.ok) return null;
     const body: unknown = await call.res.json().catch(() => null);
-    return isCustomer(body) ? { email: body.email, name: body.name } : null;
+    if (!isCustomer(body)) return null;
+    // The phone the business has for them: the booking page's optional
+    // "Phone" starts with it. Absent from an older API.
+    const phone = (body as { phone?: unknown }).phone;
+    return {
+        email: body.email,
+        name: body.name,
+        phone: typeof phone === "string" && phone.trim() ? phone.trim() : null,
+    };
 }

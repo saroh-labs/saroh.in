@@ -187,3 +187,57 @@ describe("a paused diary person on the booking page (#800, real database)", () =
         expect(people.map((p) => p.id).sort()).toEqual([asha, ravi].sort());
     });
 });
+
+describe("asking for one person, and for later dates, on the booking page (real database)", () => {
+    beforeEach(() => {
+        jest.spyOn(overLimit, "pausedNow").mockResolvedValue(null);
+    });
+
+    it("names who takes a one-to-one, by name and id alone", async () => {
+        const days = await publicBookings.publicDays(both, monday(0));
+        expect(
+            [...days.staff].sort((a, b) => a.name.localeCompare(b.name)),
+        ).toEqual([
+            { id: asha, name: "Asha Iyer" },
+            { id: ravi, name: "Ravi Kumar" },
+        ]);
+    });
+
+    it("keeps to the person asked for; anyone else's id is whoever is free", async () => {
+        const withRavi = await publicBookings.publicDays(both, monday(0), {
+            staffId: ravi,
+        });
+        const starts = withRavi.days.flatMap((d) => d.starts);
+        expect(starts.length).toBeGreaterThan(0);
+        expect(starts.every((s) => s.staffId === ravi)).toBe(true);
+        // Ravi is booked 09:00 two Mondays out: not offered with him then.
+        expect(starts.map((s) => s.startAt)).not.toContain(
+            monday(9, 2).toISOString(),
+        );
+
+        const anyone = await publicBookings.publicDays(both, monday(0));
+        const stranger = await publicBookings.publicDays(both, monday(0), {
+            staffId: "someone_elses_id",
+        });
+        expect(stranger.days).toEqual(anyone.days);
+        // With anyone, Asha takes the hour Ravi is booked.
+        expect(
+            anyone.days
+                .flatMap((d) => d.starts)
+                .find((s) => s.startAt === monday(9, 2).toISOString()),
+        ).toMatchObject({ staffId: asha });
+    });
+
+    it("reads the two weeks after, and never past twelve weeks", async () => {
+        const now = monday(0);
+        const next = await publicBookings.publicDays(both, now, { skip: 14 });
+        expect(next.days).toHaveLength(14);
+        expect(next.days[0]!.date).toBe(
+            monday(0, 3).toISOString().slice(0, 10),
+        );
+        const far = await publicBookings.publicDays(both, now, { skip: 500 });
+        expect(far.days[0]!.date).toBe(
+            monday(0, 11).toISOString().slice(0, 10),
+        );
+    });
+});

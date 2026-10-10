@@ -5,6 +5,11 @@ import { useEffect, useId, useRef } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
+import {
+    SHEET_CLOSE_SIZE,
+    SHEET_HEIGHT,
+    useScrollLock,
+} from "../lib/sheet-shell";
 import { cn } from "../lib/utils";
 
 /**
@@ -14,6 +19,10 @@ import { cn } from "../lib/utils";
  *
  * It takes focus when it opens, keeps Tab inside, closes on Escape and gives
  * focus back to whatever opened it. Drawn in the site's own tokens only.
+ *
+ * A `footer` is pinned to the sheet's foot while the rest scrolls above it:
+ * the bag's total and its button stay under the thumb however long the bag
+ * is. The page behind is held still while the sheet is open.
  */
 
 export const sheetButton = (off: boolean) =>
@@ -34,15 +43,19 @@ export function SheetFrame({
     title,
     lead,
     onClose,
+    footer,
     children,
 }: {
     title: string;
     lead?: ReactNode;
     onClose: () => void;
+    /** Pinned to the foot of the sheet; the rest scrolls above it. */
+    footer?: ReactNode;
     children: ReactNode;
 }) {
     const ids = useId();
     const sheet = useRef<HTMLDivElement>(null);
+    useScrollLock();
 
     // Focus in on open; back to the opener on close.
     useEffect(() => {
@@ -92,34 +105,53 @@ export function SheetFrame({
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
                 {...NO_CAPTURE_ATTRS}
-                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-h-[88vh] max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${NO_CAPTURE_CLASS}`}
+                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto flex max-w-[560px] flex-col overflow-hidden rounded-t-[calc(var(--site-radius)+18px)] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`}
             >
-                <div className="flex items-center gap-2.5">
-                    <h2
-                        id={`${ids}-title`}
-                        className="font-site-heading flex-1 text-[21px] font-semibold tracking-[-0.015em]"
-                    >
-                        {title}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Close"
-                        className={cn(
-                            "text-site-fg size-[34px] shrink-0 cursor-pointer rounded-full text-base hover:opacity-80 active:scale-95",
-                            quietFill,
-                            focusRing,
-                        )}
-                    >
-                        ✕
-                    </button>
+                <div
+                    data-sheet-scroll=""
+                    className={cn(
+                        "min-h-0 flex-1 overflow-y-auto overscroll-contain px-[18px] pt-[18px]",
+                        footer
+                            ? "pb-4"
+                            : "pb-[calc(20px+env(safe-area-inset-bottom))]",
+                    )}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <h2
+                            id={`${ids}-title`}
+                            className="font-site-heading flex-1 text-[21px] font-semibold tracking-[-0.015em]"
+                        >
+                            {title}
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close"
+                            className={cn(
+                                "text-site-fg shrink-0 cursor-pointer rounded-full text-base hover:opacity-80 active:scale-95",
+                                SHEET_CLOSE_SIZE,
+                                quietFill,
+                                focusRing,
+                            )}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    {lead ? (
+                        <div className="text-site-body mt-1.5 text-sm leading-normal">
+                            {lead}
+                        </div>
+                    ) : null}
+                    {children}
                 </div>
-                {lead ? (
-                    <div className="text-site-body mt-1.5 text-sm leading-normal">
-                        {lead}
+                {footer ? (
+                    <div
+                        data-sheet-footer=""
+                        className="border-site-border bg-site-surface shrink-0 border-t px-[18px] pb-[calc(16px+env(safe-area-inset-bottom))] pt-1"
+                    >
+                        {footer}
                     </div>
                 ) : null}
-                {children}
             </div>
         </>
     );

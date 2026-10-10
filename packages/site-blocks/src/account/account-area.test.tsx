@@ -91,7 +91,7 @@ describe("the account's words", () => {
     it("a plan says when it renews, pauses or ends", () => {
         expect(planLine(PLAN)).toBe("Next payment 18 Oct 2026");
         expect(planLine({ ...PLAN, status: "PAUSED", renewsAt: null })).toBe(
-            "Paused — nothing is charged until you resume",
+            "Paused. Nothing is charged until you resume",
         );
         expect(
             planLine({ ...PLAN, renewsAt: null, endsAt: PLAN.renewsAt }),

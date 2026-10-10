@@ -156,7 +156,7 @@ function Choose({
         } else {
             setProblem(
                 outcome === "failed"
-                    ? "Autopay wasn't set up. Nothing was taken — try again, or pick another way."
+                    ? "Autopay wasn't set up. Nothing was taken. Try again, or pick another way."
                     : "We couldn't open the payment window. Try again in a moment.",
             );
         }

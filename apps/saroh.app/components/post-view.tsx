@@ -1,3 +1,4 @@
+import { siteImage } from "@saroh/site-blocks";
 import Link from "next/link";
 
 /**
@@ -85,6 +86,7 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                 <img
                     src={post.image}
                     alt=""
+                    {...siteImage("above")}
                     className="mb-8 w-full rounded-[var(--site-radius)]"
                 />
             ) : null}
@@ -142,6 +144,7 @@ export function PostIndex({
                                     <img
                                         src={post.image}
                                         alt=""
+                                        {...siteImage()}
                                         className="hidden aspect-[1.91/1] w-40 shrink-0 rounded-[var(--site-radius)] object-cover sm:block"
                                     />
                                 ) : null}

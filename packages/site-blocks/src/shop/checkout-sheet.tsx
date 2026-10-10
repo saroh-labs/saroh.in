@@ -47,7 +47,7 @@ type Phase =
 export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
 
 /**
- * An order placed to be paid at the handover ("Pay when you collect", "Pay
+ * An order placed to be paid at the handover ("Pay at pick-up", "Pay
  * on delivery"): nothing to pay now, so the sheet says it is placed and
  * still to be paid, and leads to its confirmation page.
  */
@@ -62,7 +62,7 @@ export function OrderPlacedToPay({
     businessName: string;
     /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
-    /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
+    /** "Pay at pick-up" or "Pay on delivery", as the bag offered it. */
     toPay: string;
     onClose: () => void;
 }) {

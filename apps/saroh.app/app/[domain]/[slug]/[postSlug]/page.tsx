@@ -8,6 +8,7 @@ import {
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
+import { canonical, titled } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 /**
@@ -43,7 +44,9 @@ export async function generateMetadata({
         : shareImages(resolved.snapshot.site);
 
     return shareable(resolved, {
-        title: post.title,
+        // "‹Post› · ‹Business›" in the tab and in search; the share card
+        // keeps the post's own title, with the site's name beside it.
+        title: titled(post.title, name),
         description,
         openGraph: {
             title: post.title,
@@ -60,7 +63,7 @@ export async function generateMetadata({
             description,
             images,
         },
-        metadataBase: new URL(`https://${domain}`),
+        ...canonical(resolved, domain, `/${slug}/${postSlug}`),
     });
 }
 

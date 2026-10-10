@@ -546,7 +546,7 @@ export function SiteHeader({
             <div className="max-w-site-content mx-auto flex min-h-11 items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
                 <Link
                     href={to("/")}
-                    aria-label={`${name} — home`}
+                    aria-label={`${name}, home`}
                     className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
                 >
                     <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">

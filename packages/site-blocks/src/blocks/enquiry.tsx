@@ -78,7 +78,7 @@ function askedFromUrl(): string | null {
 
 /** The site's words when the form couldn't be read. */
 export const ENQUIRY_FALLBACK_ERROR =
-    "Something went wrong — please check your details and try again.";
+    "Something went wrong. Please check your details and try again.";
 
 /**
  * What a refused enquiry says to the visitor (UX-066), from the API's error
@@ -100,7 +100,7 @@ export function enquiryErrorMessage(
         field?.label.trim() ? field.label : (field?.name ?? "")
     ).trim();
     if (details?.reason === "invalid_email") {
-        return "That email doesn't look right — check for a missing @ or a typo.";
+        return "That email doesn't look right. Check for a missing @ or a typo.";
     }
     if (details?.reason === "required") {
         return label
@@ -241,7 +241,7 @@ function EnquiryForm({
                 setState({
                     kind: "error",
                     message:
-                        "You've sent this a few times — please wait a moment and try again.",
+                        "You've sent this a few times. Please wait a moment and try again.",
                 });
                 return;
             }
@@ -261,7 +261,7 @@ function EnquiryForm({
             setState({
                 kind: "error",
                 message:
-                    "We couldn't reach the server — please check your connection and try again.",
+                    "We couldn't reach the server. Please check your connection and try again.",
             });
         }
     }
@@ -272,7 +272,7 @@ function EnquiryForm({
                 <div className="border-site-border bg-site-surface rounded-[var(--site-radius)] border p-8 text-center">
                     <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ??
-                            "Thanks — we'll be in touch soon."}
+                            "Thanks, we'll be in touch soon."}
                     </p>
                 </div>
             </section>

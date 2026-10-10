@@ -1146,6 +1146,7 @@ describe("SitesService public read (drafts never leak)", () => {
         const publishedAt = new Date("2026-07-18T00:00:00.000Z");
         siteFindFirst.mockResolvedValue({
             id: "site_1",
+            subdomain: "acme",
             currentPublication: { snapshot: { pages: [] }, publishedAt },
         });
 
@@ -1174,6 +1175,8 @@ describe("SitesService public read (drafts never leak)", () => {
             select: {
                 id: true,
                 organizationId: true,
+                // Its own address, for the host it is primarily served at.
+                subdomain: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
@@ -1187,6 +1190,8 @@ describe("SitesService public read (drafts never leak)", () => {
             publishedAt,
             siteId: "site_1",
             icon: null,
+            // No custom domain of its own: its Saroh address.
+            primaryHost: expect.stringMatching(/^acme\./),
         });
     });
 

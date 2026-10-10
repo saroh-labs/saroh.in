@@ -148,3 +148,53 @@ describe("who the booking is with (DEC-121)", () => {
         expect(container.textContent).not.toMatch(/responsible/);
     });
 });
+
+/**
+ * What happens next: the card says an email went only when the API says
+ * one does, to the signed-in customer's address.
+ */
+describe("the booked card says whether a message is coming", () => {
+    function card(reach: BookResult["reach"], email: string | null) {
+        return render(
+            <DoneCard
+                phase={{
+                    kind: "done",
+                    booking: { ...BOOKING, reach },
+                    paid: false,
+                    price: null,
+                    when: "Mon 12 Oct, 10:00",
+                    first: "Asha",
+                }}
+                headingRef={createRef()}
+                business="Rye"
+                where={null}
+                rules={{
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: null,
+                }}
+                email={email}
+                onAgain={() => undefined}
+            />,
+        );
+    }
+
+    it("says the address it emailed when an email goes", () => {
+        card("EMAIL", "asha@example.com");
+        expect(
+            screen.getByText("We've emailed asha@example.com."),
+        ).toBeVisible();
+        expect(screen.queryByText("It's saved in your account.")).toBeNull();
+    });
+
+    it("says it is saved in their account when none goes, or the API didn't say", () => {
+        for (const reach of ["ACCOUNT", "NONE", undefined] as const) {
+            const { unmount } = card(reach, "asha@example.com");
+            expect(
+                screen.getByText("It's saved in your account."),
+            ).toBeVisible();
+            expect(screen.queryByText(/We've emailed/)).toBeNull();
+            unmount();
+        }
+    });
+});

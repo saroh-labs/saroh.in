@@ -326,9 +326,12 @@ export class PublicInvoicesService {
                     ? businessPayInstructionsOf(found.organizationId)
                     : undefined,
             ]);
-            // No way to pay set: a way to reach the business instead (UX-007).
+            // A way to reach the business: with no way to pay set (UX-007),
+            // and under Pay, for the customer with a question about the
+            // bill before they pay it. Not beside "How to pay us", which
+            // says how already.
             const businessContact =
-                payInstructions === null
+                payInstructions === null || (owed && payOnline)
                     ? await businessContactOf(found.organizationId)
                     : undefined;
             const view: PublicInvoiceView = autopay

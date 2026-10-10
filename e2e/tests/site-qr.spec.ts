@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { northwind } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { signInOnSheet } from "./site-codes";
+import { nameThenBook, signInOnSheet } from "./site-codes";
 
 /**
  * A QR code's short link on a live site, end to end: the owner makes a code
@@ -236,13 +236,14 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await expect(time).toHaveAttribute("aria-checked", "true");
 
         // The steps never leave the address the scan opened.
-        await phone.getByLabel("Name").fill("Asha Rao");
         await phone.getByRole("radio", { name: /Pay at the desk/ }).click();
         await phone
             .getByRole("button", { name: "Continue to sign in" })
             .first()
             .click();
         await signInOnSheet(phone, email);
+        // A new account: its name is asked once signed in.
+        await nameThenBook(phone, "Asha Rao");
         await expect(
             phone.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });

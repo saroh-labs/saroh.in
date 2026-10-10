@@ -197,7 +197,7 @@ describe("Free takes money offline", () => {
             "hash_1",
         );
         expect(quote.payments).toEqual([
-            { type: "ON_HANDOVER", label: "Pay when you collect" },
+            { type: "ON_HANDOVER", label: "Pay at pick-up" },
         ]);
         // Its ways are kept to those it can be paid for.
         expect((priceBag as jest.Mock).mock.calls[0][3]).toEqual({
@@ -264,6 +264,7 @@ describe("Free takes money offline", () => {
             key: "key-12345678", // gitleaks:allow (a checkout's idempotency key)
             payment: "ON_HANDOVER",
             address: {
+                phone: "98450 12345",
                 line1: "12 Hill Road",
                 city: "Mumbai",
                 state: "Maharashtra",

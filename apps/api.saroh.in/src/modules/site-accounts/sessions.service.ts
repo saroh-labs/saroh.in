@@ -44,6 +44,11 @@ export interface SignedInCustomer {
     email: string;
     /** The contact's name, or null until the customer gives one. */
     name: string | null;
+    /**
+     * The contact's phone, or null: the booking page fills its optional
+     * "Phone" with it, so a returning customer never types it twice.
+     */
+    phone: string | null;
 }
 
 type Db = Pick<Prisma.TransactionClient, "customerSession">;
@@ -152,14 +157,21 @@ export class SessionsService {
             },
             select: {
                 email: true,
-                contact: { select: { firstName: true, lastName: true } },
+                contact: {
+                    select: { firstName: true, lastName: true, phone: true },
+                },
             },
         });
         const name = [account.contact.firstName, account.contact.lastName]
             .map((part) => part?.trim() ?? "")
             .filter(Boolean)
             .join(" ");
-        return { email: account.email, name: name || null };
+        const phone = account.contact.phone?.trim();
+        return {
+            email: account.email,
+            name: name || null,
+            phone: phone === undefined || phone === "" ? null : phone,
+        };
     }
 
     /** Sign out: this session only. */

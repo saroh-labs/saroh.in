@@ -59,6 +59,8 @@ function isCard(v: unknown): v is ShopListingCard {
         // What the options are (DEC-073 #12); an older API sends none.
         (v.optionName === undefined || isStringOrNull(v.optionName)) &&
         isStringOrNull(v.blurb) &&
+        // The category it is filed under; an older API sends none.
+        (v.categoryName === undefined || isStringOrNull(v.categoryName)) &&
         typeof v.soldOut === "boolean" &&
         // What the card's Add to bag holds (an older API sends neither).
         (v.listingId === undefined || isString(v.listingId)) &&

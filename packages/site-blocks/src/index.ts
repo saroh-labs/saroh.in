@@ -155,6 +155,14 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 export { formatAmount } from "./lib/money";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
+export { shopFactsLine } from "./lib/shop-facts";
+export type { ShopFactsInput } from "./lib/shop-facts";
+export { siteImage } from "./lib/site-image";
+export type { ImagePlace, SiteImageProps } from "./lib/site-image";
+export { emailed, reachOrNull, toldText } from "./lib/told";
+export type { NoticeReach } from "./lib/told";
+export { NO_REACH, ReachLinks, hasReach, reachOf } from "./reach-links";
+export type { BusinessReach } from "./reach-links";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.

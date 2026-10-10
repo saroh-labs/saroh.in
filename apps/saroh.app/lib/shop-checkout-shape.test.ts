@@ -9,6 +9,7 @@ import {
     problemOf,
     quoteBody,
     resultOf,
+    savedAddressOf,
     startBody,
 } from "./shop-checkout-shape";
 
@@ -237,6 +238,137 @@ describe("the API's answers", () => {
     });
 });
 
+describe("the note for the business", () => {
+    const bag = {
+        lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+        fulfilment: "PICKUP",
+        key: "key-12345678",
+    };
+
+    it("is sent on trimmed, cut at what a note may run to, and left out when empty", () => {
+        expect(startBody({ ...bag, notes: "  No nuts, please " })?.notes).toBe(
+            "No nuts, please",
+        );
+        expect(
+            (startBody({ ...bag, notes: "x".repeat(900) })?.notes as string)
+                .length,
+        ).toBe(500);
+        expect(startBody({ ...bag, notes: "   " })).not.toHaveProperty("notes");
+        expect(startBody({ ...bag, notes: 7 })).not.toHaveProperty("notes");
+    });
+});
+
+describe("the facts a product page says before the bag", () => {
+    const options = {
+        canOrder: true,
+        storefront: { name: "Hill Road" },
+        currency: "INR",
+        ways: [
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: "60.00" },
+        ],
+    };
+
+    it("takes the location's free delivery amount, absent from an older API", () => {
+        expect(isCheckoutOptions(options)).toBe(true);
+        expect(
+            isCheckoutOptions({ ...options, freeDeliveryOver: "999.00" }),
+        ).toBe(true);
+        expect(isCheckoutOptions({ ...options, freeDeliveryOver: null })).toBe(
+            true,
+        );
+        expect(isCheckoutOptions({ ...options, freeDeliveryOver: 999 })).toBe(
+            false,
+        );
+    });
+
+    it("takes a line's returns rule, absent from an older API", () => {
+        const line = {
+            listingId: "l1",
+            variantId: null,
+            slug: "sourdough",
+            name: "Sourdough",
+            variantTitle: null,
+            image: null,
+            unitPrice: "250.00",
+            quantity: 1,
+            amount: "250.00",
+            state: "ok",
+            available: null,
+        };
+        const quote = (returns?: unknown) => ({
+            currency: "INR",
+            lines: [returns === undefined ? line : { ...line, returns }],
+            ways: [],
+            fulfilment: null,
+            subtotal: "250.00",
+            delivery: "0.00",
+            total: "250.00",
+            ready: false,
+        });
+        expect(isQuote(quote())).toBe(true);
+        expect(isQuote(quote("Exchange within 7 days"))).toBe(true);
+        expect(isQuote(quote(null))).toBe(true);
+        expect(isQuote(quote(7))).toBe(false);
+    });
+});
+
+describe("a returning customer's last delivery", () => {
+    it("is rebuilt field by field, and null when they have had none", () => {
+        expect(savedAddressOf({ address: null })).toEqual({ address: null });
+        expect(
+            savedAddressOf({
+                address: {
+                    name: "Asha Rao",
+                    phone: "98450 12345",
+                    line1: "12 Hill Road",
+                    line2: null,
+                    city: "Mumbai",
+                    state: "Maharashtra",
+                    postalCode: "400050",
+                    orderId: "o_1",
+                },
+                contactId: "c_1",
+            }),
+        ).toEqual({
+            address: {
+                name: "Asha Rao",
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+        });
+    });
+
+    it("refuses an answer that isn't one", () => {
+        expect(savedAddressOf(null)).toBeNull();
+        expect(savedAddressOf({})).toBeNull();
+        expect(savedAddressOf({ address: "12 Hill Road" })).toBeNull();
+        expect(
+            savedAddressOf({ address: { line1: "12 Hill Road", city: 7 } }),
+        ).toBeNull();
+    });
+
+    it("says a delivery refused for its phone in the page's words", () => {
+        expect(
+            problemOf(400, {
+                error: {
+                    message: "Add a phone number for the delivery.",
+                    details: { reason: "phone", field: "address.phone" },
+                },
+            }),
+        ).toEqual({
+            ok: false,
+            reason: "invalid",
+            message: "Add a phone number for the delivery.",
+        });
+        expect(problemOf(400, {}).message).toBe(
+            "Check the details and try again.",
+        );
+    });
+});
+
 describe("where to ask about ordering", () => {
     const section = (type: string, formId?: string) => ({
         type,
@@ -341,9 +473,7 @@ describe("paying at the handover (2026-10-06)", () => {
         expect(
             isQuote({
                 ...quote,
-                payments: [
-                    { type: "ON_HANDOVER", label: "Pay when you collect" },
-                ],
+                payments: [{ type: "ON_HANDOVER", label: "Pay at pick-up" }],
             }),
         ).toBe(true);
         expect(

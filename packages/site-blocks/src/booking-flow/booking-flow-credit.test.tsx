@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
+import { viewport } from "../test-viewport";
 import type { CreditFor, Result, SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -250,7 +251,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your 5 classes pack — 3 left, use by 12 Nov.",
+                "Used 1 credit from your 5 classes pack. 3 left, use by 12 Nov.",
             ),
         ).toBeInTheDocument();
         const [body] = bookBodies();
@@ -284,7 +285,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your membership — 2 left in October.",
+                "Used 1 credit from your membership. 2 left in October.",
             ),
         ).toBeInTheDocument();
         expect(bookBodies()[0]).toMatchObject({
@@ -306,7 +307,7 @@ describe("a class credit online (A10)", () => {
         await screen.findByRole("radio", { name: /Use 1 credit/ });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
@@ -391,9 +392,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         // Signed out, no credit is offered: paying is the only way.
         expect(
             screen.queryByRole("radio", { name: /Use 1 credit/ }),
@@ -432,11 +430,7 @@ describe("a class credit online (A10)", () => {
     });
 
     it("on a phone, the credit found after signing in is a note, not the red error (P2)", async () => {
-        window.matchMedia = vi.fn(() => ({
-            matches: true,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-        })) as unknown as typeof window.matchMedia;
+        viewport("phone");
         serve();
         const credit = creditReads(PACK);
         render(
@@ -447,9 +441,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
         );
@@ -491,9 +482,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),

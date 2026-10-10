@@ -317,7 +317,7 @@ describe("BuyPackSheet", () => {
         await press(screen.getByRole("button", { name: "Buy · ₹4,500" }));
         await win.answer("failed");
         expect(screen.getByRole("alert").textContent).toBe(
-            "The payment didn't go through. Nothing was taken — try again.",
+            "The payment didn't go through. Nothing was taken. Try again.",
         );
     });
 

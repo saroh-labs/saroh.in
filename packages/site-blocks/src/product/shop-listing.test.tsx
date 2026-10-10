@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { readBag } from "../shop/bag-store";
 import type { ShopListingCard } from "./shop-listing";
-import ShopListing from "./shop-listing";
+import ShopListing, { categoriesOf } from "./shop-listing";
 
 const sourdough: ShopListingCard = {
     slug: "sourdough",
@@ -202,5 +202,80 @@ describe("ShopListing (G11)", () => {
             render(<ShopListing products={[offered]} />);
             expect(screen.queryByRole("button")).toBeNull();
         });
+    });
+});
+
+describe("browsing the shop by category", () => {
+    const card = (
+        slug: string,
+        categoryName: string | null,
+    ): ShopListingCard => ({
+        slug,
+        name: slug,
+        currency: "INR",
+        price: "100.00",
+        mrp: null,
+        priceFrom: false,
+        image: { url: `https://img.test/${slug}.jpg`, alt: slug },
+        variantTitles: [],
+        blurb: null,
+        categoryName,
+        soldOut: false,
+    });
+    const products = [
+        card("sourdough", "Bread"),
+        card("croissant", "Pastry"),
+        card("rye", " Bread "),
+        card("gift-card", null),
+    ];
+
+    it("offers the products' own categories as chips, All first, and narrows the list", () => {
+        render(<ShopListing products={products} />);
+        const chips = screen.getByRole("radiogroup", { name: "Category" });
+        expect(
+            Array.from(chips.querySelectorAll("button")).map(
+                (b) => b.textContent,
+            ),
+        ).toEqual(["All", "Bread", "Pastry"]);
+        expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
+            "aria-checked",
+            "true",
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(4);
+
+        fireEvent.click(screen.getByRole("radio", { name: "Bread" }));
+        expect(
+            screen.getAllByRole("listitem").map((li) => li.textContent),
+        ).toEqual([
+            expect.stringContaining("sourdough"),
+            expect.stringContaining("rye"),
+        ]);
+        fireEvent.click(screen.getByRole("radio", { name: "All" }));
+        expect(screen.getAllByRole("listitem")).toHaveLength(4);
+        // 44px under a finger.
+        expect(
+            screen.getByRole("radio", { name: "Pastry" }).className,
+        ).toContain("coarse:min-h-11");
+    });
+
+    it("offers no chips without a choice to make", () => {
+        render(
+            <ShopListing
+                products={[card("sourdough", "Bread"), card("rye", "Bread")]}
+            />,
+        );
+        expect(
+            screen.queryByRole("radiogroup", { name: "Category" }),
+        ).toBeNull();
+        expect(
+            categoriesOf([card("a", null), card("b", undefined as never)]),
+        ).toEqual([]);
+    });
+
+    it("draws each card's photo square", () => {
+        const { container } = render(<ShopListing products={products} />);
+        const photo = container.querySelector("img");
+        expect(photo?.parentElement?.className).toContain("aspect-square");
+        expect(photo?.parentElement?.className).not.toContain("h-[140px]");
     });
 });

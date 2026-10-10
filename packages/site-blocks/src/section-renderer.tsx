@@ -50,6 +50,7 @@ import VisitUsSection from "./blocks/visit-us";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
+import type { BusinessReach } from "./reach-links";
 import { sectionRendersNothing } from "./section-empty";
 import type { SiteFixtures } from "./site-fixtures";
 
@@ -93,8 +94,21 @@ export default function SectionRenderer({
     productGrid,
     fixtures,
     modulePage = false,
+    reach,
+    first = false,
 }: {
     section: Section;
+    /**
+     * The page's first section: a hero here is what the page opens on, and
+     * its photo is fetched first (`lib/site-image.ts`).
+     */
+    first?: boolean;
+    /**
+     * How to reach the business (the public contact read): the booking
+     * block offers a call and a message when it has no time to offer.
+     * Absent where no site is live.
+     */
+    reach?: BusinessReach | null;
     /**
      * The business's live data, given (`site-fixtures.ts`): the blocks that
      * read it in the browser draw these instead and fetch nothing. Only the
@@ -169,6 +183,7 @@ export default function SectionRenderer({
                     visit={fixtures?.visit}
                     today={fixtures?.today}
                     now={now}
+                    priority={first}
                 />
             );
         case "richText":
@@ -306,6 +321,7 @@ export default function SectionRenderer({
                     content={section.content as RenderedBooking}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
+                    reach={reach}
                 />
             );
         default:
@@ -383,8 +399,11 @@ export function PageSections({
     fixtures,
     top = null,
     modulePage = top !== null,
+    reach,
 }: {
     sections: Section[];
+    /** How to reach the business, for the blocks that offer it. */
+    reach?: BusinessReach | null;
     /**
      * A module page's title (and lead), drawn above its sections (DEC-073
      * #9), as the design's Book, Prices and Shop pages open. The first
@@ -461,6 +480,8 @@ export function PageSections({
                         productGrid={productGrids?.[i]}
                         fixtures={fixtures}
                         modulePage={modulePage}
+                        reach={reach}
+                        first={i === 0}
                     />
                 );
                 return (

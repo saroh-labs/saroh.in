@@ -28,6 +28,9 @@ const BODY = {
     },
     refunded: false,
     toPay: null,
+    // How they hear about it (the API's notice reach), and where.
+    reach: "NONE",
+    email: "asha@example.com",
 };
 
 describe("confirmationOf", () => {
@@ -108,8 +111,8 @@ describe("confirmationOf", () => {
 describe("an order paid at the handover (2026-10-06)", () => {
     it("keeps what is still to pay, and reads an older API's answer as nothing", () => {
         expect(
-            confirmationOf({ ...BODY, toPay: "Pay when you collect" })?.toPay,
-        ).toBe("Pay when you collect");
+            confirmationOf({ ...BODY, toPay: "Pay at pick-up" })?.toPay,
+        ).toBe("Pay at pick-up");
         const { toPay: _gone, ...older } = BODY;
         expect(confirmationOf(older)?.toPay).toBeNull();
     });
@@ -164,5 +167,21 @@ describe("isOrderRef", () => {
         expect(isOrderRef("../account")).toBe(false);
         expect(isOrderRef("")).toBe(false);
         expect(isOrderRef("a".repeat(65))).toBe(false);
+    });
+});
+
+describe("what happens next", () => {
+    it("keeps a reach it knows and the account's address, and reads anything else as nothing promised", () => {
+        expect(confirmationOf({ ...BODY, reach: "EMAIL" })).toMatchObject({
+            reach: "EMAIL",
+            email: "asha@example.com",
+        });
+        expect(confirmationOf({ ...BODY, reach: "SMS" })?.reach).toBeNull();
+        const { reach: _r, email: _e, ...older } = BODY;
+        expect(confirmationOf(older)).toMatchObject({
+            reach: null,
+            email: null,
+        });
+        expect(confirmationOf({ ...BODY, email: 7 })?.email).toBeNull();
     });
 });
