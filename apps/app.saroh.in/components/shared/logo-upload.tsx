@@ -27,6 +27,10 @@ export interface LogoValue {
  * the library and hands the picture back through `onChange`; Remove hands
  * back `null`. The form that holds the value saves it with its own Save. A
  * wrong file or a failed upload is said under the field.
+ *
+ * A logo that stands in while there is none (a location's, which uses the
+ * business's) is `standIn`: its picture is drawn where the initial would
+ * be, and `removeLabel` says what Remove goes back to.
  */
 export function LogoUpload({
     value,
@@ -36,6 +40,8 @@ export function LogoUpload({
     onBusy,
     purpose = "business-logo",
     hint = "Square, under 1 MB. PNG, JPG or WebP.",
+    standIn = null,
+    removeLabel = "Remove",
 }: {
     /** The logo in the draft; `null` for none. */
     value: LogoValue | null;
@@ -50,6 +56,10 @@ export function LogoUpload({
     purpose?: "business-logo" | "site-image";
     /** Said under the buttons while nothing is wrong. */
     hint?: string;
+    /** The logo shown while there is none: its address and whose it is. */
+    standIn?: { url: string; alt: string } | null;
+    /** What the button that takes the logo off says. */
+    removeLabel?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const {
@@ -86,6 +96,13 @@ export function LogoUpload({
                 <img
                     src={value.url}
                     alt="Logo"
+                    className="size-14 flex-none rounded-xl border border-border bg-white object-cover"
+                />
+            ) : standIn ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
+                <img
+                    src={standIn.url}
+                    alt={standIn.alt}
                     className="size-14 flex-none rounded-xl border border-border bg-white object-cover"
                 />
             ) : (
@@ -136,7 +153,7 @@ export function LogoUpload({
                                 onChange(null);
                             }}
                         >
-                            Remove
+                            {removeLabel}
                         </Button>
                     ) : null}
                 </div>

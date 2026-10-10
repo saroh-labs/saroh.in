@@ -41,6 +41,13 @@ vi.mock("@/lib/members/actions", () => ({
     revokeInvitation: vi.fn(),
     updateMemberRole: vi.fn(),
 }));
+// The logo is uploaded through the media library: a picked file becomes
+// the picture this answers with.
+const upload = vi.fn();
+const uploading = vi.hoisted(() => ({ busy: false }));
+vi.mock("@/components/sites/media-picker", () => ({
+    useImageUpload: () => ({ upload, busy: uploading.busy, error: null }),
+}));
 const showError = vi.fn();
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -83,7 +90,14 @@ const hill: StorefrontSettings = {
     effectiveProvider: null,
     providers: [],
 };
-const bare: LocationDetails = { description: null, logo: null };
+const bare: LocationDetails = {
+    description: null,
+    logo: null,
+    businessLogo: null,
+};
+/** The business logo, and a location's own. */
+const RYE = "https://cdn.example.com/rye.png";
+const OWN = { url: "https://cdn.example.com/hill.png", mediaId: "m_hill" };
 
 let root: Root;
 let host: HTMLDivElement;
@@ -107,6 +121,8 @@ beforeEach(() => {
     root = createRoot(host);
     update.mockReset();
     updateDetails.mockReset();
+    upload.mockReset();
+    uploading.busy = false;
     showError.mockReset();
     showSuccess.mockReset();
     refresh.mockReset();
@@ -243,7 +259,7 @@ describe("The place's rows", () => {
         expect(says("kind")).toBe("Yes, they visit");
         expect(says("address")).toBe("12 Hill Road, Bandra");
         expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
-        expect(says("details")).toBe("No description or logo yet");
+        expect(says("details")).toBe("No description yet · no logo yet");
         expect(sheet()).toBeNull();
         expect(host.querySelector("input, textarea, form")).toBeNull();
         expect(update).not.toHaveBeenCalled();
@@ -563,73 +579,274 @@ describe("the Opening hours sheet", () => {
 });
 
 describe("the Description and logo sheet", () => {
-    it("Edit opens the two fields the details page had, and no name or web address", async () => {
+    const open = () => press(edit("Edit description and logo"));
+    /** What the sheet says about the logo in its draft. */
+    const logoSays = () =>
+        sheet()?.querySelector('[data-testid="location-logo-state"]')
+            ?.textContent;
+    /** The picture in the sheet, by its alt; the tile has none. */
+    const picture = () => sheet()?.querySelector<HTMLImageElement>("img");
+    const description = () =>
+        labelled("Description") as unknown as HTMLTextAreaElement | null;
+    const pick = async (type = "image/png") => {
+        const picker =
+            sheet()?.querySelector<HTMLInputElement>('input[type="file"]');
+        if (!picker) throw new Error("No file field");
+        await act(async () => {
+            Object.defineProperty(picker, "files", {
+                value: [new File(["x"], "logo.png", { type })],
+                configurable: true,
+            });
+            picker.dispatchEvent(new Event("change", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+    };
+
+    it("the row says whose logo it is, and shows it small", () => {
+        draw({}, { details: { ...bare, businessLogo: RYE } });
+        expect(says("details")).toBe(
+            "Using your business logo · no description yet",
+        );
+        const thumb = () =>
+            host.querySelector<HTMLImageElement>(
+                '[data-testid="location-logo-thumb"]',
+            );
+        expect(thumb()?.getAttribute("src")).toBe(RYE);
+
         draw(
             {},
-            { details: { description: "Sourdough since 2019", logo: null } },
+            {
+                details: {
+                    description: "Sourdough since 2019",
+                    logo: OWN,
+                    businessLogo: RYE,
+                },
+            },
         );
-        expect(says("details")).toBe("Description added, no logo yet");
-        await press(edit("Edit description and logo"));
+        expect(says("details")).toBe("Description added · own logo");
+        expect(thumb()?.getAttribute("src")).toBe(OWN.url);
+
+        draw({}, { details: bare });
+        expect(thumb()).toBeNull();
+    });
+
+    it("opens on the description and the logo, with no web link to type and no name or web address", async () => {
+        draw(
+            {},
+            {
+                details: {
+                    description: "Sourdough since 2019",
+                    logo: null,
+                    businessLogo: RYE,
+                },
+            },
+        );
+        expect(says("details")).toBe(
+            "Description added · using your business logo",
+        );
+        await open();
         expect(sheetName()).toBe("Description and logo");
-        expect(labelled("Description")?.value).toBe("Sourdough since 2019");
-        expect(labelled("Logo address")?.value).toBe("");
-        expect(sheet()?.querySelectorAll("input")).toHaveLength(2);
+        expect(description()?.tagName).toBe("TEXTAREA");
+        expect(description()?.value).toBe("Sourdough since 2019");
+        expect(description()?.maxLength).toBe(500);
+        expect(sheet()?.textContent).toContain("20 of 500");
+        // The logo is uploaded: the only input is the file picker.
+        expect(labelled("Logo address")).toBeNull();
+        expect(sheet()?.textContent).not.toContain("Logo address");
+        expect(
+            Array.from(sheet()?.querySelectorAll("input") ?? []).map(
+                (i) => i.type,
+            ),
+        ).toEqual(["file"]);
         expect(sheet()?.textContent).not.toContain("Web address");
         expect(sheet()?.querySelector('[name="slug"]')).toBeNull();
         expect(sheet()?.querySelector('[name="name"]')).toBeNull();
+        // Nothing in it leaves the sheet.
+        expect(sheet()?.querySelector("a")).toBeNull();
     });
 
-    it("Save sends both through the details action, with the name as it is", async () => {
-        updateDetails.mockResolvedValue({ ok: true, data: { id: hill.id } });
+    it("with no logo of its own it says it uses the business logo, and shows it", async () => {
+        draw({}, { details: { ...bare, businessLogo: RYE } });
+        await open();
+        expect(logoSays()).toBe("Using your business logo");
+        expect(picture()?.getAttribute("src")).toBe(RYE);
+        expect(picture()?.alt).toBe("Your business logo");
+        expect(item("Upload logo")).toBeTruthy();
+        expect(item("Use your business logo")).toBeUndefined();
+        expect(sheet()?.textContent).toContain(
+            "Upload one to give this location its own.",
+        );
+    });
+
+    it("with its own it shows that, with Replace and the way back to the business logo", async () => {
+        draw({}, { details: { ...bare, logo: OWN, businessLogo: RYE } });
+        expect(says("details")).toBe("Own logo · no description yet");
+        await open();
+        expect(logoSays()).toBe("This location has its own logo");
+        expect(picture()?.getAttribute("src")).toBe(OWN.url);
+        expect(item("Replace")).toBeTruthy();
+        expect(item("Use your business logo")).toBeTruthy();
+    });
+
+    it("with none anywhere it shows the initial and offers the upload, without sending anyone to Settings", async () => {
         draw();
-        await press(edit("Edit description and logo"));
-        type(labelled("Description"), " Sourdough since 2019 ");
-        type(labelled("Logo address"), "https://example.com/logo.png");
+        await open();
+        expect(logoSays()).toBe("No logo yet");
+        expect(picture()).toBeNull();
+        expect(item("Upload logo")).toBeTruthy();
+        expect(sheet()?.textContent).toContain(
+            "A logo added in Settings › Business shows here too.",
+        );
+        expect(sheet()?.querySelector("a")).toBeNull();
+    });
+
+    it("an upload becomes the location's logo only on Save, sent as its library image", async () => {
+        upload.mockResolvedValue({ src: OWN.url, mediaId: OWN.mediaId });
+        updateDetails.mockResolvedValue({ ok: true, data: { id: hill.id } });
+        draw({}, { details: { ...bare, businessLogo: RYE } });
+        await open();
+        type(description(), " Sourdough since 2019 ");
+        await pick();
+        expect(upload).toHaveBeenCalledTimes(1);
+        expect(logoSays()).toBe("This location has its own logo");
+        expect(picture()?.getAttribute("src")).toBe(OWN.url);
+        // Nothing saved yet: the row still says the business logo.
         expect(updateDetails).not.toHaveBeenCalled();
+        expect(says("details")).toBe(
+            "Using your business logo · no description yet",
+        );
+
         await press(item("Save"));
         expect(updateDetails).toHaveBeenCalledTimes(1);
         expect(updateDetails).toHaveBeenCalledWith(hill.id, {
             name: "Hill Road",
             description: "Sourdough since 2019",
-            logo: "https://example.com/logo.png",
+            logoMediaId: OWN.mediaId,
         });
         expect(showSuccess).toHaveBeenCalledWith("Details saved");
         expect(sheet()).toBeNull();
-        expect(says("details")).toBe("Description and logo added");
+        expect(says("details")).toBe("Description added · own logo");
         expect(refresh).toHaveBeenCalled();
         // Not the location's own settings route.
         expect(update).not.toHaveBeenCalled();
     });
 
-    it("Cancel saves nothing and returns to the row's Edit", async () => {
+    it("Use your business logo goes back to it on Save", async () => {
+        updateDetails.mockResolvedValue({ ok: true, data: { id: hill.id } });
+        draw({}, { details: { ...bare, logo: OWN, businessLogo: RYE } });
+        await open();
+        await press(item("Use your business logo"));
+        expect(logoSays()).toBe("Using your business logo");
+        expect(picture()?.getAttribute("src")).toBe(RYE);
+        expect(updateDetails).not.toHaveBeenCalled();
+
+        await press(item("Save"));
+        expect(updateDetails).toHaveBeenCalledWith(hill.id, {
+            name: "Hill Road",
+            description: null,
+            logoMediaId: null,
+        });
+        expect(says("details")).toBe(
+            "Using your business logo · no description yet",
+        );
+    });
+
+    it("with no business logo, an own logo's way out is Remove", async () => {
+        updateDetails.mockResolvedValue({ ok: true, data: { id: hill.id } });
+        draw({}, { details: { ...bare, logo: OWN } });
+        await open();
+        expect(item("Use your business logo")).toBeUndefined();
+        await press(item("Remove"));
+        expect(logoSays()).toBe("No logo yet");
+        await press(item("Save"));
+        expect(updateDetails.mock.calls[0]?.[1]).toMatchObject({
+            logoMediaId: null,
+        });
+        expect(says("details")).toBe("No description yet · no logo yet");
+    });
+
+    it("a logo typed in as an address before uploads is kept: a description save sends no logo", async () => {
+        const typed = { url: "https://example.com/logo.png", mediaId: null };
+        updateDetails.mockResolvedValue({ ok: true, data: { id: hill.id } });
+        draw({}, { details: { ...bare, logo: typed, businessLogo: RYE } });
+        await open();
+        expect(logoSays()).toBe("This location has its own logo");
+        expect(picture()?.getAttribute("src")).toBe(typed.url);
+        type(description(), "Sourdough since 2019");
+        await press(item("Save"));
+        expect(updateDetails).toHaveBeenCalledWith(hill.id, {
+            name: "Hill Road",
+            description: "Sourdough since 2019",
+        });
+        expect(says("details")).toBe("Description added · own logo");
+    });
+
+    it("Save with nothing changed closes without a write", async () => {
+        draw({}, { details: { ...bare, logo: OWN, businessLogo: RYE } });
+        await open();
+        await press(item("Save"));
+        expect(updateDetails).not.toHaveBeenCalled();
+        expect(sheet()).toBeNull();
+    });
+
+    it("a wrong file is said under the logo and nothing is uploaded", async () => {
         draw();
-        await press(edit("Edit description and logo"));
-        type(labelled("Description"), "Sourdough since 2019");
+        await open();
+        await pick("image/gif");
+        expect(upload).not.toHaveBeenCalled();
+        expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
+            "That file isn't a PNG, JPG or WebP image.",
+        );
+        expect(logoSays()).toBe("No logo yet");
+    });
+
+    it("Save waits while a logo is uploading", async () => {
+        uploading.busy = true;
+        draw();
+        await open();
+        expect(item("Save")?.disabled).toBe(true);
+        expect(item("Uploading…")?.disabled).toBe(true);
+    });
+
+    it("Cancel saves nothing, even after an upload, and returns to the row's Edit", async () => {
+        upload.mockResolvedValue({ src: OWN.url, mediaId: OWN.mediaId });
+        draw({}, { details: { ...bare, businessLogo: RYE } });
+        await open();
+        type(description(), "Sourdough since 2019");
+        await pick();
         await press(item("Cancel"));
         expect(updateDetails).not.toHaveBeenCalled();
         expect(sheet()).toBeNull();
-        expect(says("details")).toBe("No description or logo yet");
+        expect(says("details")).toBe(
+            "Using your business logo · no description yet",
+        );
         expect(document.activeElement).toBe(edit("Edit description and logo"));
-        await press(edit("Edit description and logo"));
-        expect(labelled("Description")?.value).toBe("");
+        // Opened again, it starts from what is saved.
+        await open();
+        expect(description()?.value).toBe("");
+        expect(logoSays()).toBe("Using your business logo");
     });
 
-    it("a refusal that names the logo is said under it; any other in a toast; both keep it open", async () => {
+    it("a refusal that names the logo is said under it; any other in a toast; both keep it open with the draft", async () => {
+        upload.mockResolvedValue({ src: OWN.url, mediaId: OWN.mediaId });
         updateDetails.mockResolvedValue({
             ok: false,
-            error: "Enter a web address that starts with https://",
+            error: "A logo is under 1 MB. Choose a smaller image.",
             field: "logo",
         });
         draw();
-        await press(edit("Edit description and logo"));
-        type(labelled("Logo address"), "logo.png");
+        await open();
+        type(description(), "Sourdough since 2019");
+        await pick();
         await press(item("Save"));
-        expect(sheet()?.textContent).toContain(
-            "Enter a web address that starts with https://",
+        expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
+            "A logo is under 1 MB. Choose a smaller image.",
         );
         expect(showError).not.toHaveBeenCalled();
         expect(sheetName()).toBe("Description and logo");
-        expect(labelled("Logo address")?.value).toBe("logo.png");
+        expect(description()?.value).toBe("Sourdough since 2019");
+        expect(picture()?.getAttribute("src")).toBe(OWN.url);
 
         updateDetails.mockResolvedValue({
             ok: false,
@@ -638,7 +855,16 @@ describe("the Description and logo sheet", () => {
         await press(item("Save"));
         expect(showError).toHaveBeenCalledWith("Could not save that.");
         expect(sheetName()).toBe("Description and logo");
-        expect(says("details")).toBe("No description or logo yet");
+        expect(says("details")).toBe("No description yet · no logo yet");
+    });
+
+    it("a read-only role reads the row, logo and all, with no Edit", () => {
+        draw({}, { canEdit: false, details: { ...bare, businessLogo: RYE } });
+        expect(says("details")).toBe(
+            "Using your business logo · no description yet",
+        );
+        expect(edit("Edit description and logo")).toBeNull();
+        expect(sheet()).toBeNull();
     });
 
     it("has no row, and so no sheet, when they couldn't be read", () => {

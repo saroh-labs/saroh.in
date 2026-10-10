@@ -82,7 +82,15 @@ test.describe("Locations (DEC-069)", () => {
         await expect(
             details.getByLabel("Description", { exact: true }),
         ).toBeVisible();
-        await expect(details.getByLabel("Logo address")).toBeVisible();
+        // The logo is uploaded here, or the business's is used (DEC-120):
+        // no web link to type, and nothing that leaves the sheet.
+        const logo = details.getByRole("group", { name: "Logo" });
+        await expect(logo).toBeVisible();
+        await expect(
+            logo.getByRole("button", { name: /^(Upload logo|Replace)$/ }),
+        ).toBeVisible();
+        await expect(details.getByText("Logo address")).toHaveCount(0);
+        await expect(details.getByRole("link")).toHaveCount(0);
         // Closed unsaved, it leaves the address as the page's own.
         await details.getByRole("button", { name: "Cancel" }).click();
         await expect(details).toBeHidden();
