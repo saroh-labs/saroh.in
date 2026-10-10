@@ -12,7 +12,7 @@ import {
 } from "@/lib/usage-sharing/sharing";
 
 /**
- * "Help improve Saroh" (DEC-123), Settings › Your profile: whether this
+ * "Help improve Saroh" (DEC-125), Settings › Your profile: whether this
  * person shares how they use the workspace as masked recordings. Shown only
  * where recording is switched on at all; on unless they turn it off.
  *

@@ -8,7 +8,7 @@ import {
 } from "../../../scripts/check-merchant-site-tracking.mjs";
 
 /**
- * Merchant sites never load a tracker of Saroh's (DEC-123): a site's
+ * Merchant sites never load a tracker of Saroh's (DEC-125): a site's
  * visitors are the merchant's customers. The rule and its reasons are in
  * `scripts/check-merchant-site-tracking.mjs` (`pnpm run
  * check:merchant-site-tracking`, in prepush and CI); this runs the same scan

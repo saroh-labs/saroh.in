@@ -80,7 +80,7 @@ Before the split, one API restart signed out every user.
 - **Adopted** — **Show `error.digest` as a reference** — the only handle a user
   can give support. Report the error with `reportError(error, { boundary,
 digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
-  to PostHog where the app registered a reporter and has a key (DEC-123: the
+  to PostHog where the app registered a reporter and has a key (DEC-125: the
   workspace, accounts, admin and saroh.in; never a merchant site, whose
   boundaries only log). Never import a tracker's SDK in a boundary or a
   component. Never call `console.error` directly in a

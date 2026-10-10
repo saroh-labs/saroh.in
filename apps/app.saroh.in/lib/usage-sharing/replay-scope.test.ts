@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Session replay is the workspace's signed-in shell and nowhere else
- * (DEC-123): never accounts (sign-in, sign-up, passwords), never the admin
+ * (DEC-125): never accounts (sign-in, sign-up, passwords), never the admin
  * console, never saroh.in, never a merchant site. The recorder's own rules
  * refuse every app but this one (`replayDecision`, tested in
  * `@saroh/error-tracking`); this pins the other half, in the sources:

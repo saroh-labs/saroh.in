@@ -729,7 +729,7 @@ function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
 export class SitesService {
     constructor(
         private readonly entitlements: EntitlementService,
-        /** The activation ledger, for the first publish (DEC-123). */
+        /** The activation ledger, for the first publish (DEC-125). */
         @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
@@ -2100,7 +2100,7 @@ export class SitesService {
             };
         });
         // The first time one of the business's websites went live
-        // (DEC-123). After the commit; stored once by the ledger, and it
+        // (DEC-125). After the commit; stored once by the ledger, and it
         // swallows its own errors.
         await this.activation?.firstSitePublished(ctx.organizationId, site.id);
         return published;

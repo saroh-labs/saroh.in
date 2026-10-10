@@ -40,7 +40,7 @@ const ALLOWED: Record<string, string> = {
     "modules/sites/site-create.ts":
         "a new site starts from the kind's template (K15)",
     "modules/analytics/product-milestones.ts":
-        "a milestone says what kind of business reached it (DEC-123); nothing is decided from it",
+        "a milestone says what kind of business reached it (DEC-125); nothing is decided from it",
 };
 
 /**

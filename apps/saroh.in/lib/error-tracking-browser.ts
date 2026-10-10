@@ -4,7 +4,7 @@ import { env } from "@/env";
 import { TRACKED_APP, trackedEnv } from "@/lib/error-tracking";
 
 /**
- * The browser's error reporter for saroh.in (DEC-123). Null without a key:
+ * The browser's error reporter for saroh.in (DEC-125). Null without a key:
  * then nothing is loaded and nothing is sent. With one, the SDK is fetched
  * (from this app's own bundle, never from PostHog) only when there is a
  * first error to send.

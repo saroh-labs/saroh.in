@@ -1,4 +1,4 @@
-// The API's door to PostHog (DEC-123), against a fake transport: no SDK
+// The API's door to PostHog (DEC-125), against a fake transport: no SDK
 // client is ever made and nothing reaches a network.
 const constructed: unknown[][] = [];
 jest.mock("posthog-node", () => ({
@@ -47,7 +47,7 @@ const ctx = {
     organizationId: "cmf3k2x9w0001abcd1234efgh",
 };
 
-describe("PostHog in the API (DEC-123)", () => {
+describe("PostHog in the API (DEC-125)", () => {
     beforeEach(() => {
         constructed.length = 0;
         jest.spyOn(structuredLogger, "error").mockImplementation(

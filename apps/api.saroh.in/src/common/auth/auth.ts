@@ -29,7 +29,7 @@ export const auth: Auth = createAuth({
         sendChangeEmailConfirmationEmail(to, url, newEmail),
     sendDeleteAccountVerification: ({ to, url }) =>
         sendDeleteAccountEmail(to, url),
-    // The `signed_up` product milestone (DEC-123): the user's id, nothing
+    // The `signed_up` product milestone (DEC-125): the user's id, nothing
     // else. A no-op unless PostHog is on.
     onUserCreated: ({ id }) => signedUp(id),
 });

@@ -115,7 +115,7 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
                 this.lostLease(job, "failed");
             } else if (attempt >= job.maxAttempts) {
                 // That was the last attempt: the job is FAILED for good.
-                // Logged at ERROR and sent to the error tracker (DEC-123)
+                // Logged at ERROR and sent to the error tracker (DEC-125)
                 // with its type and ids, never its payload.
                 reportJobError(err, {
                     jobId: job.id,

@@ -46,7 +46,7 @@ import { TestReleasesService } from "./test-releases.service";
  */
 @Module({
     imports: [
-        // The activation ledger: the first publish (DEC-123).
+        // The activation ledger: the first publish (DEC-125).
         AnalyticsCoreModule,
         BillingModule,
         forwardRef(() => OrganizationsModule),

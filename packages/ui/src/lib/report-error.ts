@@ -4,7 +4,7 @@
  * Vendor-neutral on purpose: this file knows no tracker. Until one is
  * registered with {@link setErrorReporter}, it logs to the console exactly as
  * the boundaries did before. The workspace, accounts, the admin console and
- * saroh.in register PostHog's (DEC-123) in their `instrumentation-client.ts`,
+ * saroh.in register PostHog's (DEC-125) in their `instrumentation-client.ts`,
  * only when the app has a key; merchant sites, docs, help, templates and the
  * UI gallery register nothing, so their boundaries only log.
  *

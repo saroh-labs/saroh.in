@@ -31,7 +31,7 @@
         "NEXT_PUBLIC_ROOT_DOMAIN",
         "NEXT_PUBLIC_VERCEL_ENV",
         "NEXT_PUBLIC_VERCEL_URL",
-        // PostHog (DEC-123): the public project key, its host and the
+        // PostHog (DEC-125): the public project key, its host and the
         // workspace's session-replay switch are compiled into the browser
         // bundle, so a build with them differs from one without.
         "NEXT_PUBLIC_POSTHOG_KEY",
@@ -45,7 +45,7 @@
     ],
     "globalPassThroughEnv": [
         "PORT",
-        // PostHog on the servers (DEC-123): the api's and the merchant
+        // PostHog on the servers (DEC-125): the api's and the merchant
         // sites' own, read per request, never compiled into a browser bundle.
         "POSTHOG_KEY",
         "POSTHOG_HOST",

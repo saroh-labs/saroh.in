@@ -40,7 +40,7 @@ export const env = createEnv({
         // `production` whatever their switch says.
         VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
         /**
-         * PostHog (DEC-123), SERVER ONLY, and on purpose not `NEXT_PUBLIC_`:
+         * PostHog (DEC-125), SERVER ONLY, and on purpose not `NEXT_PUBLIC_`:
          * a merchant site's visitors are the merchant's customers, and
          * nothing of PostHog's may reach their browsers. With a key, an
          * error thrown while this server renders a page is reported with

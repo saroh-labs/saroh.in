@@ -4,7 +4,7 @@ import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 import type { UsageSharing } from "./sharing";
 
 /**
- * The signed-in person's "Help improve Saroh" choice (DEC-123), kept by the
+ * The signed-in person's "Help improve Saroh" choice (DEC-125), kept by the
  * API on their user row. Server-only: forwards the session cookie through
  * the shared HTTP plumbing, as every workspace read does.
  */

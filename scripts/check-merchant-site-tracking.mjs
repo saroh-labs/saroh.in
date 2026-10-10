@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Merchant sites never load a tracker of Saroh's (DEC-123).
+ * Merchant sites never load a tracker of Saroh's (DEC-125).
  *
  * A merchant site's visitors are the merchant's customers: Saroh processes
  * their data only for the merchant (the Privacy Policy). So nothing of
@@ -144,7 +144,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const problems = problemsIn(files);
     if (problems.length) {
         console.error(
-            "check:merchant-site-tracking: merchant sites never load a tracker of Saroh's (DEC-123):\n  " +
+            "check:merchant-site-tracking: merchant sites never load a tracker of Saroh's (DEC-125):\n  " +
                 problems.join("\n  "),
         );
         process.exit(1);

@@ -20,7 +20,7 @@ export default {
         {
             brand: "saroh",
             // The crash also goes to PostHog when this Worker has a key
-            // (DEC-123): scrubbed, the path as a route, never its query.
+            // (DEC-125): scrubbed, the path as a route, never its query.
             report: (error, { request, env }) =>
                 reportWorkerCrash(error, request, {
                     key: env.NEXT_PUBLIC_POSTHOG_KEY,

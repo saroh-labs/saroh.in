@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { browserTracking } from "@/lib/error-tracking-browser";
 
 /**
- * The signed-in shell's part in PostHog (DEC-123). Draws nothing, and does
+ * The signed-in shell's part in PostHog (DEC-125). Draws nothing, and does
  * nothing at all without a PostHog key.
  *
  * - Errors reported from the workspace carry the person's and the

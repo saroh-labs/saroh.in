@@ -90,7 +90,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     // Whether masked session recording is switched on for this environment
-    // (DEC-123): a PostHog key and the replay switch. Off, nothing is read.
+    // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
     const recordingOn = replaySwitchedOn({
         key: env.NEXT_PUBLIC_POSTHOG_KEY,
         replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
@@ -165,7 +165,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         activeOrg?.lifecycleStatus === "PENDING_DELETION"
             ? closingOrNull()
             : null,
-        // "Help improve Saroh" (DEC-123): the person's own choice, read
+        // "Help improve Saroh" (DEC-125): the person's own choice, read
         // before the recorder could start, and only where session
         // recording is switched on at all. Null when unread: not recorded.
         recordingOn ? usageSharingOrNull() : null,
@@ -233,7 +233,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 Skip to content
             </a>
             {/*
-             * PostHog in the signed-in shell (DEC-123): internal ids beside
+             * PostHog in the signed-in shell (DEC-125): internal ids beside
              * the workspace's error reports, and the masked session
              * recording when it is switched on and this person shares.
              * Draws nothing; does nothing without a key.

@@ -45,7 +45,7 @@
     // apps' checks read them. Secrets come from GitHub (deploy workflow).
     "vars": {
         "VERCEL_ENV": "preview",
-        // PostHog (DEC-123): errors and, when switched on, masked session replay. Off until the
+        // PostHog (DEC-125): errors and, when switched on, masked session replay. Off until the
         // project's public key (phc_…, not a secret) is set here. The
         // host defaults to https://eu.i.posthog.com.
         "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers
@@ -78,7 +78,7 @@
             ],
             "vars": {
                 "VERCEL_ENV": "production",
-                // PostHog (DEC-123): errors and, when switched on, masked session replay. Off until the
+                // PostHog (DEC-125): errors and, when switched on, masked session replay. Off until the
                 // project's public key (phc_…, not a secret) is set here. The
                 // host defaults to https://eu.i.posthog.com.
                 "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers

@@ -1,6 +1,6 @@
 /**
  * `@saroh/error-tracking`: the scrubber and the names every app shares when
- * it reports an error (DEC-123). Nothing in this entry touches the network.
+ * it reports an error (DEC-125). Nothing in this entry touches the network.
  *
  *  - `@saroh/error-tracking/server` posts an exception to PostHog with
  *    `fetch` (Workers, Next's server, the merchant sites' server side).

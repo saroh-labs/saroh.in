@@ -18,7 +18,7 @@ import { structuredLogger } from "../logging/structured-logger";
  * {@link ServerErrorEvent}, a smaller and scrubbed shape. Tracker-side
  * scrubbing is a second net, not the first.
  *
- * The tracker is PostHog (DEC-123), installed by `installTelemetry`
+ * The tracker is PostHog (DEC-125), installed by `installTelemetry`
  * (`posthog.ts`) when `POSTHOG_KEY` is set. Without it there is no sink and
  * nothing leaves the process. The scrubbing is `@saroh/error-tracking`'s,
  * the one scrubber every app shares.

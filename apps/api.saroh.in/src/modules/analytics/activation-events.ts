@@ -40,7 +40,7 @@ import { ProductMilestones } from "./product-milestones";
  * before?", and no race between two concurrent creates can record two firsts.
  *
  * **The ledger is also the source of the product milestones sent to PostHog**
- * (DEC-123). When `record()` says a row was stored, not replayed,
+ * (DEC-125). When `record()` says a row was stored, not replayed,
  * `ProductMilestones` is told its type; it sends the matching milestone once
  * and never holds this up. So a milestone can't be sent twice for a
  * business, and nothing here knows about PostHog.
@@ -122,7 +122,7 @@ export class ActivationEvents {
     }
 
     /**
-     * The product funnel's other firsts (DEC-123). Safe to call on every
+     * The product funnel's other firsts (DEC-125). Safe to call on every
      * create, publish, connect and completed checkout, as the ones above
      * are: only the first is stored. Each carries an id or a key, never a
      * credential or a price.
@@ -211,7 +211,7 @@ export class ActivationEvents {
                 visitorHash: null,
             });
             // Stored for the first time, not a replay: the one moment a
-            // product milestone may be sent (DEC-123). Returns at once.
+            // product milestone may be sent (DEC-125). Returns at once.
             if (!stored.deduped) {
                 this.milestones?.ledgerStored(type, organizationId);
             }

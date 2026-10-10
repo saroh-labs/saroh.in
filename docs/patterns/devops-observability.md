@@ -75,7 +75,7 @@ errors) are kept one year.
   either sets it to match the policy and writes it down in the host's own
   runbook, which is not in this public repository.
 
-## Error tracking and product events: PostHog — **Current** (DEC-123)
+## Error tracking and product events: PostHog — **Current** (DEC-125)
 
 What is sent from where, the scrubber's rules, the limits and how to switch
 it on: `docs/architecture/ERROR_TRACKING_AND_UPTIME.md`. The rules a change

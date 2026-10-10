@@ -1,6 +1,6 @@
 /**
  * The one scrubber every error passes through before it leaves Saroh
- * (DEC-123). The API, the Workers and the browser reporter all call it; a
+ * (DEC-125). The API, the Workers and the browser reporter all call it; a
  * tracker's own scrubbing is a second net, never the first.
  *
  * What it removes from an error's words and stack, in this order:

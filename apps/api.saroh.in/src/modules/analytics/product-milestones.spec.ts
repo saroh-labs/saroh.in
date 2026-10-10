@@ -1,4 +1,4 @@
-// The product milestones (DEC-123): what is sent, once, and what never is.
+// The product milestones (DEC-125): what is sent, once, and what never is.
 // The ledger is a fake that dedupes as the real one does; PostHog is a fake
 // transport. No database, no network.
 jest.mock("posthog-node", () => ({ PostHog: class {} }));
@@ -48,7 +48,7 @@ function build() {
 /** Let the fire-and-forget read and send finish. */
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-describe("product milestones (DEC-123)", () => {
+describe("product milestones (DEC-125)", () => {
     beforeEach(() => {
         jest.spyOn(structuredLogger, "warn").mockImplementation(
             () => undefined,

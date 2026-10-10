@@ -4,7 +4,7 @@ import type { AppTrackingSettings } from "@saroh/error-tracking/server";
 import { env } from "@/env";
 
 /**
- * This app's PostHog settings (DEC-123), for the admin console. Exceptions only.
+ * This app's PostHog settings (DEC-125), for the admin console. Exceptions only.
  * Everything is off without a key: `NEXT_PUBLIC_POSTHOG_KEY` is the project's
  * public key, the same one the browser gets, so the server reads it too.
  */

@@ -30,7 +30,7 @@ model User {
   emailVerified Boolean @default(false)
 
   // "Help improve Saroh": whether this person shares how they use the
-  // workspace, as masked session recordings (DEC-123). Null: never chosen,
+  // workspace, as masked session recordings (DEC-125). Null: never chosen,
   // which reads as yes only where recording is switched on at all. False:
   // they said no, on every device. Theirs, not a business's.
   sharesUsage Boolean?

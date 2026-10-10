@@ -17,7 +17,7 @@ import {
 } from "./event-contract";
 
 /**
- * The workspace's product milestones, sent to PostHog (DEC-123).
+ * The workspace's product milestones, sent to PostHog (DEC-125).
  *
  * These nine events are the whole list. Nothing else about how a business
  * uses the workspace is sent, from the server or from the browser.

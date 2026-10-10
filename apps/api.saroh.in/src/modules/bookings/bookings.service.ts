@@ -310,7 +310,7 @@ export class BookingsService {
                 showOnBookingPage: dto.showOnBookingPage ?? true,
             },
         });
-        // The business's first bookable service (DEC-123). Stored once by
+        // The business's first bookable service (DEC-125). Stored once by
         // the ledger; it swallows its own errors, as every activation does.
         await this.activation?.firstServiceCreated(
             ctx.organizationId,

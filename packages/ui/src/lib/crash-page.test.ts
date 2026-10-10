@@ -123,7 +123,7 @@ describe("withCrashPage", () => {
         expect(await res.text()).toBe("");
     });
 
-    it("hands the error to the tracker without waiting for it (DEC-123)", async () => {
+    it("hands the error to the tracker without waiting for it (DEC-125)", async () => {
         const error = new Error("boom");
         const waitUntil = vi.fn();
         const env = { KEY: "k" };

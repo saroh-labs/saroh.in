@@ -63,7 +63,7 @@ interface Completed {
     from: string | null;
     to: string;
     at: string;
-    /** The paid plan's key, when the business moved onto it now (DEC-123). */
+    /** The paid plan's key, when the business moved onto it now (DEC-125). */
     upgradedTo?: string;
 }
 
@@ -123,7 +123,7 @@ export class BillingWebhookService {
          * that builds the service by hand without it writes none.
          */
         @Optional() private readonly invoices?: SarohInvoicesService,
-        /** The activation ledger, for the first paid plan (DEC-123). */
+        /** The activation ledger, for the first paid plan (DEC-125). */
         @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
@@ -273,7 +273,7 @@ export class BillingWebhookService {
             outcome: AuditOutcome.Success,
             metadata: { from: c.from, to: c.to, at: c.at },
         });
-        // The business's first move onto a paid plan (DEC-123): the plan's
+        // The business's first move onto a paid plan (DEC-125): the plan's
         // key, never a price. After the commit, and it swallows its errors.
         if (c.upgradedTo) {
             await this.activation?.firstPlanUpgraded(

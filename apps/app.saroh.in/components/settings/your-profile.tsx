@@ -19,7 +19,7 @@ import { UsageSharingCard } from "./usage-sharing-card";
  * choices in this business (F14, `alerts-grid.tsx`).
  *
  * "Help improve Saroh" is a third card, not in the design, shown only where
- * session recording is switched on (DEC-123, `usage-sharing-card.tsx`).
+ * session recording is switched on (DEC-125, `usage-sharing-card.tsx`).
  */
 export function YourProfile({
     name,
@@ -34,7 +34,7 @@ export function YourProfile({
     accountUrl: string;
     alerts: AlertPreferencesRead;
     /**
-     * "Help improve Saroh" (DEC-123): whether you share how you use the
+     * "Help improve Saroh" (DEC-125): whether you share how you use the
      * workspace. Undefined where session recording is not switched on (or
      * the choice couldn't be read), and the card is then left out.
      */

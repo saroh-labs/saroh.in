@@ -24,7 +24,7 @@ import { ProductMilestones } from "./product-milestones";
  * `AnalyticsModule` re-exports this, so existing consumers are unaffected.
  */
 @Module({
-    // `ProductMilestones` (DEC-123) has no DI dependencies either: it is
+    // `ProductMilestones` (DEC-125) has no DI dependencies either: it is
     // told what the ledger stored and sends the matching milestone.
     providers: [AnalyticsService, ActivationEvents, ProductMilestones],
     exports: [AnalyticsService, ActivationEvents, ProductMilestones],

@@ -41,7 +41,7 @@ export default {
         {
             // No home link: on a host whose Worker failed, home fails too.
             brand: "neutral",
-            // With a key (DEC-123), the crash is reported from the Worker:
+            // With a key (DEC-125), the crash is reported from the Worker:
             // the site's host and the path as a route, nothing about the
             // visitor. The visitor's browser is never involved.
             report: (error, { request, env }) =>

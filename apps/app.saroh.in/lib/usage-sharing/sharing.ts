@@ -1,5 +1,5 @@
 /**
- * "Help improve Saroh" (DEC-123): the rules for the workspace's masked
+ * "Help improve Saroh" (DEC-125): the rules for the workspace's masked
  * session recordings that are this app's to decide. The recorder's own rules
  * (who may be recorded at all, and what a recording can hold) are in
  * `@saroh/error-tracking/browser`; the person's choice is kept by the API on

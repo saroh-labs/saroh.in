@@ -25,7 +25,7 @@ export const env = createEnv({
         // origins, so a fresh clone needs no extra config.
         NEXT_PUBLIC_APP_URL: z.string().url().optional(),
         /**
-         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
          * sent. The browser SDK is used for exceptions only.
          */

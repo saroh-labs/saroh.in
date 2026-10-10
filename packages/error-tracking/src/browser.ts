@@ -11,7 +11,7 @@ import {
 } from "./scrub";
 
 /**
- * The browser half (DEC-123): exceptions from app, accounts, admin and
+ * The browser half (DEC-125): exceptions from app, accounts, admin and
  * saroh.in, and the workspace's masked session replay. Merchant sites never
  * import this file (scripts/check-merchant-site-tracking.mjs).
  *

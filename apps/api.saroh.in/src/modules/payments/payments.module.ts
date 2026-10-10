@@ -34,7 +34,7 @@ import { SEND_REFUND_TYPE, SendRefundHandler } from "./send-refund.handler";
  */
 @Module({
     imports: [
-        // The activation ledger: the first provider connected (DEC-123).
+        // The activation ledger: the first provider connected (DEC-125).
         AnalyticsCoreModule,
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,

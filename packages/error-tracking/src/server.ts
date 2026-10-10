@@ -13,7 +13,7 @@ import { routeTemplate, scrubContext, scrubError } from "./scrub";
  * each Next app's server (`instrumentation.ts` → `onRequestError`) and its
  * Worker's crash wrapper (`worker.ts`). One `fetch` to PostHog's capture
  * address; no SDK, no script, nothing a browser ever loads. This is the only
- * way a merchant site reports anything (DEC-123).
+ * way a merchant site reports anything (DEC-125).
  *
  * Without a key it does nothing at all: no request, no timer.
  */

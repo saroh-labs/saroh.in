@@ -80,7 +80,7 @@ describe("JobWorkerService.runOnce", () => {
         expect(queue.jobs[0].processedAt).toBeInstanceOf(Date);
     });
 
-    describe("the error tracker (DEC-123)", () => {
+    describe("the error tracker (DEC-125)", () => {
         const seen: ServerErrorEvent[] = [];
         beforeEach(() => {
             seen.length = 0;

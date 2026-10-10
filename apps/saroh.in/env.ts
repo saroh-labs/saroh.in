@@ -70,7 +70,7 @@ export const env = createEnv({
             .regex(/^G-[A-Z0-9]+$/)
             .optional(),
         /**
-         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
          * sent. The browser SDK is used for exceptions only.
          */

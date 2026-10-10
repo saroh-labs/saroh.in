@@ -6,7 +6,7 @@ import type { UpdateUsageSharingDto } from "./usage-sharing.dto";
 
 /**
  * "Help improve Saroh": the signed-in person's own choice to share how they
- * use the workspace (DEC-123), Settings › Your profile.
+ * use the workspace (DEC-125), Settings › Your profile.
  *
  * It is the person's, not the business's: stored on their user row, so it
  * is the same in every business they belong to and on every device. `null`

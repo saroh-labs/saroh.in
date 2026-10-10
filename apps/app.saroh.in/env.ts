@@ -45,7 +45,7 @@ export const env = createEnv({
             .enum(["development", "preview", "production"])
             .optional(),
         /**
-         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
          * sent. The browser SDK is used for exceptions only, and for the workspace's masked session replay when
          * NEXT_PUBLIC_POSTHOG_REPLAY is "on" (off by default).

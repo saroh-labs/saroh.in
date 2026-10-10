@@ -17,7 +17,7 @@ import type { ErrorSink, ServerErrorEvent } from "./report-error";
 import { setErrorSink } from "./report-error";
 
 /**
- * The API's one door to PostHog (DEC-123): unhandled errors, and the
+ * The API's one door to PostHog (DEC-125): unhandled errors, and the
  * workspace's product milestones. Nothing else in the API imports the SDK.
  *
  * **Off without `POSTHOG_KEY`.** No client is made, nothing is queued, and

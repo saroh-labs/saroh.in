@@ -3,7 +3,7 @@ import type { AppTrackingSettings } from "@saroh/error-tracking/server";
 import { env } from "@/env";
 
 /**
- * The merchant sites' error reporting (DEC-123): SERVER SIDE ONLY.
+ * The merchant sites' error reporting (DEC-125): SERVER SIDE ONLY.
  *
  * A merchant site's visitors are the merchant's customers; Saroh processes
  * their data only for the merchant. So no tracker script, no SDK and no

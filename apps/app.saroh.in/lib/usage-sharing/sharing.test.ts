@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { replaySwitchedOn, sharesUsageNow } from "./sharing";
 
-describe("replaySwitchedOn (DEC-123)", () => {
+describe("replaySwitchedOn (DEC-125)", () => {
     it("needs both a key and the switch exactly on", () => {
         expect(replaySwitchedOn({ key: "phc_x", replay: "on" })).toBe(true);
         for (const settings of [

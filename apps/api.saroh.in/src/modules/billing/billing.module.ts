@@ -92,7 +92,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  */
 @Module({
     imports: [
-        // The activation ledger: the first paid plan (DEC-123). Imports
+        // The activation ledger: the first paid plan (DEC-125). Imports
         // nothing itself, so it adds no cycle.
         AnalyticsCoreModule,
         AuditModule,

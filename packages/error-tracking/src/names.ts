@@ -1,6 +1,6 @@
 /**
  * The names and limits every app shares when it reports to PostHog
- * (DEC-123). One PostHog project holds development and production, so every
+ * (DEC-125). One PostHog project holds development and production, so every
  * event says which environment and which app it came from.
  */
 

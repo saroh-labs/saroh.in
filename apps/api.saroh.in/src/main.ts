@@ -166,7 +166,7 @@ async function bootstrap() {
         new LoggingInterceptor(),
     );
     app.useGlobalFilters(new AllExceptionsFilter());
-    // PostHog: errors and the workspace's milestones (DEC-123). Off unless
+    // PostHog: errors and the workspace's milestones (DEC-125). Off unless
     // POSTHOG_KEY is set. With it on, a stop signal first sends what is
     // queued (two seconds at most), then exits as it would have anyway: a
     // milestone is sent once, so one lost at a deploy is lost for good.

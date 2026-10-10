@@ -18,7 +18,7 @@ import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
  * picks their own", F14). A failed alerts read throws to this tab's
  * boundary rather than showing choices nobody made.
  *
- * "Help improve Saroh" (DEC-123) is here too, only where session recording
+ * "Help improve Saroh" (DEC-125) is here too, only where session recording
  * is switched on for this environment: a switch that did nothing would not
  * be true. It is left out when the choice couldn't be read, rather than
  * shown as a choice nobody made.

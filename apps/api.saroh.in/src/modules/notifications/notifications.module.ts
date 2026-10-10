@@ -56,7 +56,7 @@ import { UsageSharingService } from "./usage-sharing.service";
     controllers: [
         NotificationsController,
         NotificationPreferencesController,
-        // "Help improve Saroh" (DEC-123): the person's own, beside their alerts.
+        // "Help improve Saroh" (DEC-125): the person's own, beside their alerts.
         UsageSharingController,
     ],
     providers: [

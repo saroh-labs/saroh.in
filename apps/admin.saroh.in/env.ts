@@ -37,7 +37,7 @@ export const env = createEnv({
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
         NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
         /**
-         * PostHog (DEC-123): the project's PUBLIC key (`phc_…`) and its
+         * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
          * sent. The browser SDK is used for exceptions only.
          */

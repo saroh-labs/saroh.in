@@ -165,7 +165,7 @@
 - **Current** — **`--warning` is a fill;** text on a pale tint uses
   `--warning-subtle-foreground`.
 
-## Session recordings: mark what isn't text — **Current** (DEC-123)
+## Session recordings: mark what isn't text — **Current** (DEC-125)
 
 The workspace's signed-in shell can be recorded for a sample of sessions
 (`POSTHOG_REPLAY`, off by default; never any other app, never a merchant

@@ -9,7 +9,7 @@ import type { UsageSharingView } from "./usage-sharing.service";
 import { UsageSharingService } from "./usage-sharing.service";
 
 /**
- * The signed-in person's "Help improve Saroh" choice (DEC-123), Settings ›
+ * The signed-in person's "Help improve Saroh" choice (DEC-125), Settings ›
  * Your profile. Beside their alerts, and like them there is no user id in
  * the path: it is always the session's, so nobody can read or change
  * another person's. Reached through the business they are working in, as

@@ -218,7 +218,7 @@ export interface WithCrashPageOptions<
         error: string;
     }) => void;
     /**
-     * Send the error to the error tracker (DEC-123). Handed the error and
+     * Send the error to the error tracker (DEC-125). Handed the error and
      * the request as they are: what leaves is the reporter's to scrub
      * (`@saroh/error-tracking/server`). The crash page never waits for it:
      * a promise it returns is given to `ctx.waitUntil`, and whatever it

@@ -313,7 +313,7 @@ const envSchema = z.object({
         .max(3650)
         .optional(),
 
-    // PostHog (DEC-123): unhandled errors and the workspace's product
+    // PostHog (DEC-125): unhandled errors and the workspace's product
     // milestones. Off when POSTHOG_KEY is unset: every 5xx is still logged
     // and nothing leaves the process. The key is the project's PUBLIC key
     // (`phc_…`, the one browsers get), so it is a setting, not a secret.

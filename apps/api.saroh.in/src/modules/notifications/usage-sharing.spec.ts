@@ -1,4 +1,4 @@
-// "Help improve Saroh" (DEC-123): the person's own choice, read and written
+// "Help improve Saroh" (DEC-125): the person's own choice, read and written
 // for the session's user only, and nothing but a boolean accepted.
 jest.mock("@saroh/database", () => ({
     prisma: { user: { findUnique: jest.fn(), update: jest.fn() } },
@@ -20,7 +20,7 @@ const ctx = {
     role: "STAFF",
 } as unknown as OrganizationContext;
 
-describe("UsageSharingService (DEC-123)", () => {
+describe("UsageSharingService (DEC-125)", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("reads the session's own user, and only that column", async () => {

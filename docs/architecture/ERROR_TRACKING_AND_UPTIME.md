@@ -1,6 +1,6 @@
 # Error tracking and uptime (#103)
 
-> **Status (2026-10-10): the tracker is PostHog (DEC-123), wired and switched
+> **Status (2026-10-10): the tracker is PostHog (DEC-125), wired and switched
 > off.** Errors from every app, nine workspace milestones from the API, and
 > a masked session replay in the workspace. **Nothing is sent anywhere until
 > a key is set**, and replay stays off after that until its own switch is on.

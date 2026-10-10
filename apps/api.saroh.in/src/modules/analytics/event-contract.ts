@@ -195,7 +195,7 @@ const firstBookingV1: EventValidator = (props) => ({
 });
 
 /**
- * The milestones added for the product funnel (DEC-123), v1. Each is stored
+ * The milestones added for the product funnel (DEC-125), v1. Each is stored
  * once per Organization, as the `first.*` contracts are, and carries an id
  * or a key only: the service or site that was first, which provider (its
  * name, never a key), which plan (its key, never a price).
@@ -250,7 +250,7 @@ export const FIRST_ORDER_CREATED_TYPE = "first.order.created";
 export const FIRST_BOOKING_CREATED_TYPE = "first.booking.created";
 export const IMPORT_COMPLETED_TYPE = "import.completed";
 /**
- * The product funnel's other firsts (DEC-123): the first bookable service,
+ * The product funnel's other firsts (DEC-125): the first bookable service,
  * the first time any of the business's websites went live, the first payment
  * provider connected and the first move onto a paid plan. "First" is the
  * first since these were recorded (10 Oct 2026): a business that had
