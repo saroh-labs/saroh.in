@@ -200,7 +200,7 @@ export function OrderActions({
                     title={confirm.title}
                     description={confirm.body}
                     confirmLabel={confirm.verb}
-                    cancelLabel="Not yet"
+                    cancelLabel={confirm.keep}
                     onConfirm={() => {
                         const p = pending;
                         setPending(null);
@@ -216,12 +216,15 @@ function confirmCopy(p: Pending): {
     title: string;
     body: string;
     verb: string;
+    /** The way out: never "Cancel" beside "Cancel order". */
+    keep: string;
 } {
     if (p.kind === "cancel") {
         return {
             title: "Cancel this order?",
             body: "Its reserved stock goes back on the shelves. A cancelled order stays in the list, and it cannot be reopened.",
             verb: "Cancel order",
+            keep: "Keep order",
         };
     }
     const bodies: Record<PaymentStatus, string> = {
@@ -236,5 +239,6 @@ function confirmCopy(p: Pending): {
         title: `Record this order as ${PAYMENT_LABEL[p.to].toLowerCase()}?`,
         body: `${bodies[p.to]} This cannot be taken back.`,
         verb: `Record as ${PAYMENT_LABEL[p.to].toLowerCase()}`,
+        keep: "Not yet",
     };
 }

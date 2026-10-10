@@ -399,7 +399,7 @@ export function CancelInvoiceDialog({
                         variant="outline"
                         onClick={() => onOpenChange(false)}
                     >
-                        Keep it
+                        Keep invoice
                     </Button>
                     {byCredit ? (
                         <Button
