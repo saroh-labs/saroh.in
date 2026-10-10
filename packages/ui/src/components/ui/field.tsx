@@ -23,7 +23,8 @@ import { Label } from "./label";
  * - The control gets its `id`, `aria-describedby` and `aria-invalid` here.
  *   A single control is passed as the child and is given them. Where the
  *   control is not the direct child (a box with a button beside it), pass
- *   a function and spread what it receives onto the control.
+ *   a function and spread what it receives onto the control. The line under
+ *   the field has the id `${id}-note`, for a control wired by hand.
  *
  * It needs no form library: `error` is a string from anywhere (a `useState`
  * draft, a Server Action's field error, react-hook-form's `fieldState`).
@@ -51,8 +52,11 @@ export interface FieldProps extends Omit<
     /** Writes "(optional)" after the label. */
     optional?: boolean;
     /**
-     * The control's id, when the caller needs to know it. Otherwise one is
-     * made (a child's own `id` wins).
+     * The id of a control the caller wires by hand (one inside a wrapper,
+     * say). The label points at it and nothing is added to the child: the
+     * caller gives the control this `id`, `aria-invalid`, and
+     * `aria-describedby={`${id}-note`}`. Without it the child is wired
+     * here (a child's own `id` wins).
      */
     htmlFor?: string;
     /**
@@ -62,9 +66,13 @@ export interface FieldProps extends Omit<
     group?: boolean;
     /** The label is for screen readers only (a cell in a table of fields). */
     labelHidden?: boolean;
+    /**
+     * One control (it is given the wiring), a function that places the
+     * wiring itself, or several controls, which the label then names as a
+     * group.
+     */
     children:
-        | React.ReactElement<Record<string, unknown>>
-        | ((control: FieldControlProps) => React.ReactNode);
+        React.ReactNode | ((control: FieldControlProps) => React.ReactNode);
 }
 
 const hasText = (node: React.ReactNode) =>
@@ -76,20 +84,26 @@ function Field({
     error,
     optional = false,
     htmlFor,
-    group = false,
+    group: asGroup = false,
     labelHidden = false,
     className,
     children,
     ...props
 }: FieldProps) {
     const made = React.useId();
-    const childId =
-        typeof children === "function"
-            ? undefined
-            : (children.props.id as string | undefined);
+    const single =
+        typeof children !== "function" &&
+        React.isValidElement<Record<string, unknown>>(children)
+            ? children
+            : null;
+    // Several controls under one label are a group, asked for or not.
+    const group = asGroup || (typeof children !== "function" && !single);
+    const childId = single?.props.id as string | undefined;
     const id = htmlFor ?? childId ?? `${made}-control`;
-    const labelId = `${made}-label`;
-    const noteId = `${made}-note`;
+    // Named after the control, so a caller that knows the control's id
+    // knows the note's (`${id}-note`) without asking.
+    const labelId = `${id}-label`;
+    const noteId = `${id}-note`;
     const invalid = hasText(error);
     const noted = invalid || hasText(hint);
 
@@ -102,16 +116,18 @@ function Field({
     let body: React.ReactNode;
     if (typeof children === "function") {
         body = children(control);
-    } else if (group) {
+    } else if (group || !single || htmlFor !== undefined) {
         body = children;
     } else {
-        const own = children.props["aria-describedby"] as string | undefined;
-        body = React.cloneElement(children, {
+        const own = single.props["aria-describedby"] as string | undefined;
+        body = React.cloneElement(single, {
             ...control,
-            ...(noted && own ? { "aria-describedby": `${own} ${noteId}` } : {}),
+            ...(noted && own && !own.split(" ").includes(noteId)
+                ? { "aria-describedby": `${own} ${noteId}` }
+                : {}),
             // A control that already says it is invalid keeps saying so.
-            ...(children.props["aria-invalid"] !== undefined && !invalid
-                ? { "aria-invalid": children.props["aria-invalid"] }
+            ...(single.props["aria-invalid"] !== undefined && !invalid
+                ? { "aria-invalid": single.props["aria-invalid"] }
                 : {}),
         });
     }

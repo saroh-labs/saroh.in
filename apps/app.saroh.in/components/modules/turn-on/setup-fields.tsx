@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
@@ -15,8 +16,6 @@ import type {
     WebsiteTemplateChoice,
 } from "@/lib/modules/turn-on-schema";
 import { usesLine } from "@/lib/sites/template-picker";
-
-import { Field, INPUT } from "./field";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
 
@@ -77,10 +76,10 @@ export function SellFields({
     return (
         <>
             <Field
-                id={`${id}-name`}
+                htmlFor={`${id}-name`}
                 label="Location name"
                 error={errors.storefrontName}
-                note="Where you sell in person. Your business name, unless you'd call it something else."
+                hint="Where you sell in person. Your business name, unless you'd call it something else."
             >
                 <Input
                     id={`${id}-name`}
@@ -98,7 +97,6 @@ export function SellFields({
                             },
                         }))
                     }
-                    className={INPUT}
                 />
             </Field>
             <fieldset
@@ -176,7 +174,11 @@ export function WebsiteFields({
     const w = draft.WEBSITE;
     return (
         <>
-            <Field id={`${id}-name`} label="Site name" error={errors.siteName}>
+            <Field
+                htmlFor={`${id}-name`}
+                label="Site name"
+                error={errors.siteName}
+            >
                 <Input
                     id={`${id}-name`}
                     value={w.siteName}
@@ -192,14 +194,13 @@ export function WebsiteFields({
                             WEBSITE: { ...d.WEBSITE, siteName: e.target.value },
                         }))
                     }
-                    className={INPUT}
                 />
             </Field>
             <Field
-                id={`${id}-address`}
+                htmlFor={`${id}-address`}
                 label="Web address"
                 error={errors.address}
-                note={
+                hint={
                     w.address
                         ? `Customers find you at ${w.address}.saroh.app`
                         : "Letters, numbers and hyphens."
@@ -229,10 +230,7 @@ export function WebsiteFields({
                                 },
                             }))
                         }
-                        className={cn(
-                            INPUT,
-                            "min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                        )}
+                        className="min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                     <span
                         id={`${id}-suffix`}

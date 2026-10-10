@@ -1,5 +1,6 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -21,7 +22,6 @@ import type { VisitUsContent } from "@/lib/sites/service";
 import { visitPlaceChoice } from "@/lib/sites/visit-place";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 const LOCATIONS = "/commerce/locations";

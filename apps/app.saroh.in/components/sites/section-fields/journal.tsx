@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveVariant } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
@@ -13,7 +14,6 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 

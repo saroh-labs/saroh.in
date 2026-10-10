@@ -1,6 +1,7 @@
 "use client";
 
 import { EditorLoading } from "@/components/sites/editor-loading";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import {
     Select,
@@ -34,7 +35,6 @@ const RichTextEditor = dynamic(
 );
 
 import type { RichTextContent } from "@/lib/sites/service";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { TextPhotoFields } from "./text-photo";

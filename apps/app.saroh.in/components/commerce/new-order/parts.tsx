@@ -11,7 +11,7 @@ export const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
 /** The sheet's inputs: 38px, 8px corners, 13.5px text. */
-export const FIELD = "h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]";
+export const FIELD = "bg-card";
 
 /** A small bordered button: "Change", "−", "+". */
 export const SMALL_BUTTON = cn(

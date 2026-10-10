@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useId } from "react";
@@ -9,7 +10,6 @@ import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { RichTextContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 
 type Photo = Pick<RichTextContent, "image" | "imageSide">;

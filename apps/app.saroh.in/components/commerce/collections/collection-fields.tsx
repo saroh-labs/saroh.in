@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
@@ -20,22 +21,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
  * the sheet's check or the API's — under it.
  */
 
-const LABEL = "block text-[12.5px] font-medium";
-
-export function FieldError({
-    id,
-    children,
-}: {
-    id?: string;
-    children?: string;
-}) {
-    if (!children) return null;
-    return (
-        <p id={id} role="alert" className="text-[12px] text-destructive">
-            {children}
-        </p>
-    );
-}
+const LABEL = "block";
 
 export function NameField({
     value,

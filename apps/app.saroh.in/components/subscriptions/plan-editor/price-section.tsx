@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
@@ -22,8 +23,6 @@ import {
     MAIN_INTERVALS,
     MORE_INTERVALS,
 } from "@/lib/subscriptions/plan-editor";
-
-import { FieldError } from "./details-section";
 
 export const CHIP = "h-[34px] px-3 text-[13px]";
 
@@ -82,7 +81,7 @@ export function PriceSection({
                 onChange={(e) => set({ price: e.target.value })}
                 className={cn(FIELD, "w-[140px] max-w-full")}
             />
-            <FieldError id={ids.priceErr} message={errors.price} />
+            <FieldError id={ids.priceErr}>{errors.price}</FieldError>
             <p
                 id={ids.limit}
                 aria-live="polite"

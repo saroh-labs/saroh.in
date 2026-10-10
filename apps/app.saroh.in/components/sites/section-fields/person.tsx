@@ -7,6 +7,7 @@ import {
     resolveVariant,
 } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
@@ -24,7 +25,6 @@ import {
     withCtaAction,
     withCtaLabel,
 } from "./cta-action-fields";
-import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";

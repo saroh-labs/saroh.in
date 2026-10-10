@@ -1,11 +1,11 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { TestimonialsContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
 

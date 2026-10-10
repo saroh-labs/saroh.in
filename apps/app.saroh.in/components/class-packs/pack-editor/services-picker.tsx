@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
@@ -16,7 +17,7 @@ import {
 import { formatMoney } from "@/lib/format/money";
 
 import { FailedRead } from "@/components/shared/failed-read";
-import { FieldError, HELP, PackChip, PackSection } from "./parts";
+import { HELP, PackChip, PackSection } from "./parts";
 
 /**
  * Good for (E18): the services a credit pays for, filtered by the pack's
@@ -91,7 +92,7 @@ export function ServicesPicker({
                     and it can pay for its {units}.
                 </p>
             )}
-            <FieldError id={ids.error} message={error} />
+            <FieldError id={ids.error}>{error}</FieldError>
         </PackSection>
     );
 }

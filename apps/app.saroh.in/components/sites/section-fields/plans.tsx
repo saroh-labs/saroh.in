@@ -1,6 +1,7 @@
 "use client";
 
 import { PLANS_BUTTON, PLANS_JOIN } from "@saroh/site-blocks";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
@@ -12,7 +13,6 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 /**

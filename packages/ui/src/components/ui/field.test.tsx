@@ -120,6 +120,34 @@ describe("Field", () => {
         expect(box).toHaveAccessibleDescription("Taken.");
     });
 
+    it("a control wired by hand keeps its wiring, and the note is named after it", () => {
+        const { container } = render(
+            <Field label="Address" htmlFor="site-address" hint="Letters only.">
+                <div>
+                    <Input
+                        id="site-address"
+                        aria-describedby="site-address-note"
+                    />
+                    <span>.saroh.app</span>
+                </div>
+            </Field>,
+        );
+        expect(container.querySelectorAll("#site-address")).toHaveLength(1);
+        expect(screen.getByLabelText("Address")).toHaveAccessibleDescription(
+            "Letters only.",
+        );
+    });
+
+    it("several controls under one label are a group without asking", () => {
+        render(
+            <Field label="Size">
+                <Input aria-label="Width" />
+                <Input aria-label="Height" />
+            </Field>,
+        );
+        expect(screen.getByRole("group", { name: "Size" })).toBeInTheDocument();
+    });
+
     it("a group of controls is named by the label", () => {
         render(
             <Field label="Days" group error="Pick a day.">

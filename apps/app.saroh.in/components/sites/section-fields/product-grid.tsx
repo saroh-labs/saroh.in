@@ -1,5 +1,6 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import Link from "next/link";
 
 import { resolveVariant } from "@saroh/block-contract";
@@ -27,7 +28,6 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 

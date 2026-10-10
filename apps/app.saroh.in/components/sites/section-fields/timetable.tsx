@@ -2,6 +2,7 @@
 
 import { TIMETABLE_MAX_SERVICES } from "@saroh/block-contract";
 import { Checkbox } from "@saroh/ui/checkbox";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
@@ -9,7 +10,6 @@ import { Textarea } from "@saroh/ui/textarea";
 
 import type { TimetableContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
