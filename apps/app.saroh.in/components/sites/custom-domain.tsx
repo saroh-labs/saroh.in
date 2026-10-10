@@ -2,12 +2,14 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
 import { DomainRecords } from "@/components/sites/domain-records";
+import type { SheetControl } from "@/components/sites/settings/settings-sheet";
+import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
 import {
     claimDomain,
@@ -21,9 +23,9 @@ import {
     DEFAULT_CNAME_TARGET,
     domainView,
 } from "@/lib/domains/domain-view";
-import { bareHostname } from "@/lib/domains/hostname";
 import type { SiteDomain } from "@/lib/domains/service";
 import { exactDate } from "@/lib/sites/format-date";
+import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
 
 /**
  * A merchant's own domain, on the site settings screen (#200, #861).
@@ -46,6 +48,10 @@ import { exactDate } from "@/lib/sites/format-date";
  * with what is wrong in words). Which is which is `lib/domains/domain-view.ts`;
  * an instance without hosting set up says what it said before, and never
  * "Live".
+ *
+ * Read first (owner, 10 Oct): the domains are cards, and one "Add domain"
+ * button under them opens the dialog that takes the hostname and then shows
+ * its records (`add-domain-dialog.tsx`). No field sits open on the page.
  */
 
 /** Where a verified domain points when the api doesn't say. Per deployment. */
@@ -61,24 +67,37 @@ const TOAST = {
 function Block({
     children,
     domain,
+    id,
 }: {
     children: React.ReactNode;
     /** The hostname a domain's block is for (a handle for browser specs). */
     domain?: string;
+    id?: string;
 }) {
     return (
-        <div className="space-y-3 px-4 py-3" data-domain={domain}>
+        <div id={id} className="space-y-3 px-4 py-3" data-domain={domain}>
             {children}
         </div>
     );
 }
 
-export function CustomDomain({ siteId }: { siteId: string }) {
+export function CustomDomain({
+    siteId,
+    sheet,
+}: {
+    siteId: string;
+    /** The screen's own, so a link can open Add domain; ours when left out. */
+    sheet?: SheetControl;
+}) {
     const zone = useBusinessZone();
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [hostname, setHostname] = useState("");
-    const [formError, setFormError] = useState<string | null>(null);
+    const own = useSheetControl();
+    const adding = sheet ?? own;
+    // The domain the open dialog added: it shows that one's records next.
+    const [added, setAdded] = useState<{ id: string; opened: number } | null>(
+        null,
+    );
     const [busy, setBusy] = useState<string | null>(null);
     const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
@@ -101,26 +120,16 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         };
     }, [siteId]);
 
-    async function add() {
-        // A pasted https://…/ address is taken down to its domain (UX-066).
-        const value = bareHostname(hostname);
-        if (!value) return;
-        setBusy("add");
-        setFormError(null);
-        const res = await claimDomain(siteId, value);
-        setBusy(null);
-        if (!res.ok) {
-            // The api's own words: a taken hostname (409), a plan without
-            // custom domains (403), a malformed name (400, plain since
-            // UX-066). Each says what to do.
-            setFormError(res.error);
-            return;
-        }
+    async function claim(hostname: string) {
+        const res = await claimDomain(siteId, hostname);
+        // The api's own words, said in the dialog under what was typed.
+        if (!res.ok) return { ok: false as const, error: res.error };
         setDomains((prev) => [res.data, ...(prev ?? [])]);
-        setHostname("");
+        setAdded({ id: res.data.id, opened: adding.opened });
         showSuccess(
             `${res.data.hostname} added. Now add the record below at your registrar.`,
         );
+        return { ok: true as const };
     }
 
     async function check(domain: SiteDomain) {
@@ -161,6 +170,19 @@ export function CustomDomain({ siteId }: { siteId: string }) {
             </Block>
         );
     }
+
+    // The dialog's second step, from the list, so a check there shows here.
+    const addedDomain =
+        added?.opened === adding.opened
+            ? domains.find((d) => d.id === added.id)
+            : undefined;
+    const addedNow = addedDomain
+        ? {
+              domain: addedDomain,
+              view: domainView(addedDomain, CNAME_TARGET),
+              line: checkLine(addedDomain, zone),
+          }
+        : null;
 
     return (
         <>
@@ -297,49 +319,38 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                 );
             })}
 
-            <Block>
-                <form
-                    className="flex flex-wrap items-start gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        void add();
-                    }}
-                >
-                    <div className="min-w-0 flex-1 space-y-1">
-                        <Input
-                            value={hostname}
-                            onChange={(e) => {
-                                setHostname(e.target.value);
-                                if (formError) setFormError(null);
-                            }}
-                            placeholder="shop.example.com"
-                            aria-label="Domain to add"
-                            autoCapitalize="none"
-                            autoCorrect="off"
-                            spellCheck={false}
-                        />
-                        {formError ? (
-                            <p className="text-xs text-destructive">
-                                {formError}
-                            </p>
-                        ) : (
-                            <p className="text-xs text-muted-foreground">
-                                {domains.length === 0
-                                    ? "A domain you already own, like www.yourshop.in."
-                                    : "Add another domain for this site."}
-                            </p>
-                        )}
-                    </div>
+            <Block id={SETTINGS_ROW_ID.domain}>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <p className="min-w-0 text-sm text-muted-foreground">
+                        {domains.length === 0
+                            ? "No domain of your own yet."
+                            : "Add another domain for this site."}
+                    </p>
                     <Button
-                        type="submit"
+                        id={settingsEditId("domain")}
+                        type="button"
                         size="sm"
-                        variant="brand"
-                        disabled={busy === "add" || hostname.trim() === ""}
+                        variant="outline"
+                        aria-haspopup="dialog"
+                        onClick={adding.show}
                     >
-                        {busy === "add" ? "Adding…" : "Add domain"}
+                        Add domain
                     </Button>
-                </form>
+                </div>
             </Block>
+
+            {adding.opened > 0 ? (
+                <AddDomainDialog
+                    key={adding.opened}
+                    open={adding.open}
+                    first={domains.length === 0}
+                    added={addedNow}
+                    checking={busy === addedNow?.domain.id}
+                    onClaim={claim}
+                    onCheck={(domain) => void check(domain)}
+                    onClose={adding.close}
+                />
+            ) : null}
         </>
     );
 }
