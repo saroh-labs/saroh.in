@@ -47,6 +47,7 @@ import {
 } from "./business-tax-settings";
 import { businessTypeRead, businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
+import { mapLinkRead, mapLinkWrite } from "./map-link";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
 import { authorize } from "./organization-policy";
@@ -127,6 +128,12 @@ export interface OrganizationSettings {
      * (DEC-125), while no location customers visit has an address.
      */
     siteShowsRegisteredAddress: boolean;
+    /**
+     * The registered address's place on Google Maps (DEC-125), which "Get
+     * directions" opens while the website shows that address; null when
+     * none is set.
+     */
+    registeredAddressMapUrl: string | null;
 }
 
 /**
@@ -148,6 +155,7 @@ const SITE_CONTACT_COLUMNS: ReadonlySet<string> = new Set([
     "contactEmail",
     "socialLinks",
     "siteShowsRegisteredAddress",
+    "registeredAddressMapUrl",
     "addressLine1",
     "addressLine2",
     "city",
@@ -204,6 +212,7 @@ const PROFILE_SELECT = {
     postalCode: true,
     socialLinks: true,
     siteShowsRegisteredAddress: true,
+    registeredAddressMapUrl: true,
     ...PAY_SELECT,
 } as const;
 
@@ -231,6 +240,7 @@ interface ProfileRow {
     postalCode: string | null;
     socialLinks?: unknown;
     siteShowsRegisteredAddress?: boolean | null;
+    registeredAddressMapUrl?: string | null;
     payUpiId?: string | null;
     payBankAccountName?: string | null;
     payBankAccountNumber?: string | null;
@@ -252,6 +262,7 @@ function splitProfile(
             payInstructions: payInstructionsView(null),
             socialLinks: {},
             siteShowsRegisteredAddress: false,
+            registeredAddressMapUrl: null,
         };
     }
     const {
@@ -276,6 +287,7 @@ function splitProfile(
         payNote: _pn,
         socialLinks,
         siteShowsRegisteredAddress,
+        registeredAddressMapUrl,
         ...profile
     } = p;
     return {
@@ -291,6 +303,7 @@ function splitProfile(
         payInstructions: payInstructionsView(p),
         socialLinks: socialLinksRead(socialLinks),
         siteShowsRegisteredAddress: siteShowsRegisteredAddress ?? false,
+        registeredAddressMapUrl: mapLinkRead(registeredAddressMapUrl),
     };
 }
 
@@ -433,13 +446,24 @@ export class OrganizationSettingsService {
                   )?.socialLinks,
               )
             : {};
-        const siteData =
-            dto.siteShowsRegisteredAddress === undefined
+        // The registered address's Google Maps link: Google's own map
+        // pages only, refused on its field otherwise.
+        const map = mapLinkWrite(dto.registeredAddressMapUrl);
+        if ("problem" in map) {
+            throw new BadRequestException({
+                message: map.problem,
+                details: { field: "registeredAddressMapUrl" },
+            });
+        }
+        const siteData = {
+            ...(dto.siteShowsRegisteredAddress === undefined
                 ? {}
                 : {
                       siteShowsRegisteredAddress:
                           dto.siteShowsRegisteredAddress,
-                  };
+                  }),
+            ...("url" in map ? { registeredAddressMapUrl: map.url } : {}),
+        };
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),

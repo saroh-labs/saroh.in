@@ -16,6 +16,7 @@ import { AuditService } from "../audit/audit.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { MediaService } from "../media/media.service";
 import { OrganizationSettingsService } from "../organizations/organization-settings.service";
+import { StorefrontsService } from "../stores/storefronts.service";
 import { PublicContactService } from "./public-contact.service";
 
 const settings = new OrganizationSettingsService(
@@ -23,6 +24,7 @@ const settings = new OrganizationSettingsService(
     {} as MediaService,
 );
 const contacts = new PublicContactService(new FixedWindowRateLimiter(1_000));
+const storefronts = new StorefrontsService();
 
 let seq = 0;
 const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
@@ -80,7 +82,7 @@ describe("a business's contact details on its site (real database)", () => {
             socialLinks: {
                 instagram: "@rye.bakery",
                 whatsapp: "+91 98450 12345",
-                googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
+                telegram: "@rye_co",
             },
             profile: {
                 phone: "+91 98450 12345",
@@ -90,7 +92,7 @@ describe("a business's contact details on its site (real database)", () => {
         expect(saved.socialLinks).toEqual({
             instagram: "https://www.instagram.com/rye.bakery",
             whatsapp: "https://wa.me/919845012345",
-            googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
+            telegram: "https://t.me/rye_co",
         });
         expect(await read(rye.siteId)).toEqual({
             phone: "+919845012345",
@@ -102,10 +104,7 @@ describe("a business's contact details on its site (real database)", () => {
                     url: "https://www.instagram.com/rye.bakery",
                 },
                 { network: "whatsapp", url: "https://wa.me/919845012345" },
-                {
-                    network: "googleMaps",
-                    url: "https://maps.app.goo.gl/AbC123xyZ",
-                },
+                { network: "telegram", url: "https://t.me/rye_co" },
             ],
         });
 
@@ -115,18 +114,15 @@ describe("a business's contact details on its site (real database)", () => {
         });
         expect((await read(rye.siteId)).social).toEqual([
             { network: "instagram", url: "https://www.instagram.com/rye" },
-            {
-                network: "googleMaps",
-                url: "https://maps.app.goo.gl/AbC123xyZ",
-            },
+            { network: "telegram", url: "https://t.me/rye_co" },
         ]);
         expect((await settings.get(rye.ctx)).socialLinks).toEqual({
             instagram: "https://www.instagram.com/rye",
-            googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
+            telegram: "https://t.me/rye_co",
         });
 
         await settings.update(rye.ctx, {
-            socialLinks: { instagram: "", googleMaps: "" },
+            socialLinks: { instagram: "", telegram: "" },
             profile: { phone: "", contactEmail: "" },
         });
         expect(await read(rye.siteId)).toEqual({
@@ -167,6 +163,7 @@ describe("a business's contact details on its site (real database)", () => {
                 name: "Indiranagar",
                 address: "12th Main",
                 hours: null,
+                mapUrl: null,
             },
         ]);
 
@@ -206,8 +203,17 @@ describe("a business's contact details on its site (real database)", () => {
                 name: null,
                 address: "14 Hill Road\nBengaluru 560038",
                 hours: null,
+                mapUrl: null,
             },
         ]);
+        // Its own place on the map, which Get directions opens.
+        const mapped = await settings.update(asha.ctx, {
+            registeredAddressMapUrl: "g.page/asha-rao",
+        });
+        expect(mapped.registeredAddressMapUrl).toBe("https://g.page/asha-rao");
+        expect((await read(asha.siteId)).places[0]?.mapUrl).toBe(
+            "https://g.page/asha-rao",
+        );
         expect(await settings.siteContact(asha.ctx)).toMatchObject({
             registeredAddressChosen: true,
         });
@@ -216,6 +222,38 @@ describe("a business's contact details on its site (real database)", () => {
             siteShowsRegisteredAddress: false,
         });
         expect((await read(asha.siteId)).places).toEqual([]);
+    });
+
+    it("gives a location's Google Maps link, saved through the location's own update", async () => {
+        const kavi = await business("Kavi Dental");
+        const org = kavi.ctx.organizationId;
+        const shop = await location(org, "Indiranagar", "SHOP", "12th Main");
+
+        const saved = await storefronts.update(org, shop.id, {
+            mapUrl: "https://www.google.co.in/maps/place/Kavi+Dental",
+        });
+        expect(saved.mapUrl).toBe(
+            "https://www.google.com/maps/place/Kavi+Dental",
+        );
+        expect((await read(kavi.siteId)).places[0]?.mapUrl).toBe(
+            "https://www.google.com/maps/place/Kavi+Dental",
+        );
+
+        // Anything but Google's own map pages is refused, on its field.
+        const refusal = await storefronts
+            .update(org, shop.id, { mapUrl: "https://evil.example/maps" })
+            .catch((e: unknown) => e);
+        expect(refusal).toBeInstanceOf(BadRequestException);
+        expect((refusal as BadRequestException).getResponse()).toMatchObject({
+            field: "mapUrl",
+        });
+        expect((await storefronts.get(org, shop.id)).mapUrl).toBe(
+            "https://www.google.com/maps/place/Kavi+Dental",
+        );
+
+        // Cleared: directions fall back to a search for the address.
+        await storefronts.update(org, shop.id, { mapUrl: null });
+        expect((await read(kavi.siteId)).places[0]?.mapUrl).toBeNull();
     });
 
     it("never shows one business's details on another's site", async () => {

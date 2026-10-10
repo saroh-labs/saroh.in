@@ -26,7 +26,6 @@ export const SOCIAL_NETWORKS = [
     "youtube",
     "x",
     "linkedin",
-    "googleMaps",
     "pinterest",
     "telegram",
 ] as const;
@@ -40,7 +39,6 @@ export const SOCIAL_LABELS: Readonly<Record<SocialNetwork, string>> = {
     youtube: "YouTube",
     x: "X",
     linkedin: "LinkedIn",
-    googleMaps: "Google Maps",
     pinterest: "Pinterest",
     telegram: "Telegram",
 };
@@ -53,12 +51,11 @@ export const SOCIAL_PLACEHOLDERS: Readonly<Record<SocialNetwork, string>> = {
     youtube: "@yourchannel or youtube.com/@yourchannel",
     x: "@yourname or x.com/yourname",
     linkedin: "linkedin.com/company/yourname",
-    googleMaps: "maps.app.goo.gl/… or g.page/yourname",
     pinterest: "yourname or pinterest.com/yourname",
     telegram: "@yourname or t.me/yourname",
 };
 
-/** The longest value a field takes: a Google Maps place link runs long. */
+/** The longest value a field takes. */
 export const SOCIAL_INPUT_MAX = 600;
 
 /** The links a business has set, each a canonical address. */
@@ -68,6 +65,7 @@ export type SocialCheck =
     { ok: true; url: string } | { ok: false; problem: string };
 
 const refuse = (problem: string): SocialCheck => ({ ok: false, problem });
+const TOO_LONG = "That link is too long.";
 const keep = (url: string): SocialCheck => ({ ok: true, url });
 
 /** A handle typed alone: no path, no scheme, no spaces. */
@@ -321,9 +319,45 @@ const MAPS_GOOGLE_HOST =
     /^maps\.google\.(com|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})$/;
 const SHORT_CODE = /^[A-Za-z0-9_-]{1,60}$/;
 
+/** What the Google Maps link field accepts, shown as its placeholder. */
+export const MAP_LINK_PLACEHOLDER = "maps.app.goo.gl/… or g.page/yourname";
+
+/** The longest a map link runs: a place's long address is long. */
+export const MAP_LINK_MAX = 600;
+
+const NOT_A_MAP_LINK =
+    "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.";
+
+/**
+ * A place's Google Maps link (DEC-125): what "Get directions" opens for an
+ * address. Not a social link: it belongs to the address it is the map of,
+ * a location's or the registered one. The same promise as a social link's:
+ * only Google's own map pages are kept, each rebuilt into one canonical
+ * address, never a redirect and never another site. Pure.
+ */
+export function normaliseMapLink(raw: string): SocialCheck {
+    const typed = raw.trim();
+    if (typed === "") return refuse("Enter a link, or leave it empty.");
+    if (typed.length > MAP_LINK_MAX) return refuse(TOO_LONG);
+    const check = googleMaps(typed);
+    return check.ok && check.url.length > MAP_LINK_MAX
+        ? refuse(TOO_LONG)
+        : check;
+}
+
+/**
+ * A stored map link as it may be drawn, or null: re-checked on the way
+ * out, so a value that isn't already Google's own canonical address is
+ * never a link on a page.
+ */
+export function mapLinkOrNull(stored: unknown): string | null {
+    if (typeof stored !== "string") return null;
+    const check = normaliseMapLink(stored);
+    return check.ok && check.url === stored ? stored : null;
+}
+
 function googleMaps(raw: string): SocialCheck {
-    const wrong =
-        "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.";
+    const wrong = NOT_A_MAP_LINK;
     const url = typedUrl(raw);
     if (!url) return refuse(wrong);
     const parts = segments(url);
@@ -427,8 +461,6 @@ export function normaliseSocialLink(
         : check;
 }
 
-const TOO_LONG = "That link is too long.";
-
 function checkFor(network: SocialNetwork, typed: string): SocialCheck {
     switch (network) {
         case "facebook":
@@ -437,8 +469,6 @@ function checkFor(network: SocialNetwork, typed: string): SocialCheck {
             return youtube(typed);
         case "linkedin":
             return linkedin(typed);
-        case "googleMaps":
-            return googleMaps(typed);
         case "whatsapp":
             return whatsapp(typed);
         default:
@@ -448,7 +478,7 @@ function checkFor(network: SocialNetwork, typed: string): SocialCheck {
 
 /**
  * A link as a person reads where it opens: "instagram.com/rye",
- * "wa.me/919845012345". A long Google Maps address is cut to its start.
+ * "wa.me/919845012345". A long one is cut to its start.
  */
 export function socialLinkShown(url: string): string {
     const shown = url.replace(/^https:\/\/(www\.)?/, "").replace(/\/$/, "");
@@ -490,7 +520,7 @@ export function socialLinkItems(links: SocialLinks): SocialLinkItem[] {
     });
 }
 
-/** "Instagram, WhatsApp, Google Maps", or "" when none is set. */
+/** "Instagram, WhatsApp, YouTube", or "" when none is set. */
 export function socialLinksSummary(links: SocialLinks): string {
     return socialLinkItems(links)
         .map((item) => item.label)

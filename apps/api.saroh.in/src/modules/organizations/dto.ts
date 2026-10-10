@@ -20,7 +20,7 @@ import {
 } from "class-validator";
 
 import type { SocialNetwork } from "@saroh/block-contract";
-import { SOCIAL_INPUT_MAX } from "@saroh/block-contract";
+import { MAP_LINK_MAX, SOCIAL_INPUT_MAX } from "@saroh/block-contract";
 
 import {
     MAX_COUNTER_DIGITS,
@@ -360,7 +360,6 @@ export class SocialLinksDto implements Partial<Record<SocialNetwork, string>> {
     @SocialLink() youtube?: string;
     @SocialLink() x?: string;
     @SocialLink() linkedin?: string;
-    @SocialLink() googleMaps?: string;
     @SocialLink() pinterest?: string;
     @SocialLink() telegram?: string;
 }
@@ -421,6 +420,17 @@ export class UpdateOrganizationDto {
     @IsOptional()
     @IsBoolean()
     siteShowsRegisteredAddress?: boolean;
+
+    /**
+     * The registered address's place on Google Maps (DEC-125): what "Get
+     * directions" opens while the website shows that address. "" clears
+     * it. Only Google's own map links are kept; the settings save checks
+     * it and names the field (`map-link.ts`).
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(MAP_LINK_MAX, { message: "That link is too long." })
+    registeredAddressMapUrl?: string;
 }
 
 /**

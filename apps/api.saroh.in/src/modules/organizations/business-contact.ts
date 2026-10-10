@@ -6,6 +6,7 @@ import type { PublicOpeningDay } from "../sites/public-visit.service";
 import { publicWeek, registeredAddress } from "../sites/public-visit.service";
 import { publicPhone } from "./business-phone";
 import { socialLinksRead } from "./business-social";
+import { mapLinkRead } from "./map-link";
 
 /**
  * How to reach a business, as its website shows it (DEC-125): the one read
@@ -45,6 +46,11 @@ export interface PublicPlace {
     address: string;
     /** The location's week, or null when none is saved. */
     hours: PublicOpeningDay[] | null;
+    /**
+     * The address's own place on Google Maps, which "Get directions" opens;
+     * null: a search for the address.
+     */
+    mapUrl: string | null;
 }
 
 export interface PublicSocialLink {
@@ -80,6 +86,7 @@ export async function businessPublicContactOf(
                 contactEmail: true,
                 socialLinks: true,
                 siteShowsRegisteredAddress: true,
+                registeredAddressMapUrl: true,
                 addressLine1: true,
                 addressLine2: true,
                 city: true,
@@ -96,7 +103,9 @@ export async function businessPublicContactOf(
             take: PLACES_MAX,
             select: {
                 name: true,
-                settings: { select: { address: true, openingHours: true } },
+                settings: {
+                    select: { address: true, openingHours: true, mapUrl: true },
+                },
             },
         }),
     ]);
@@ -110,6 +119,7 @@ export async function businessPublicContactOf(
                       name: shop.name,
                       address,
                       hours: publicWeek(shop.settings?.openingHours),
+                      mapUrl: mapLinkRead(shop.settings?.mapUrl),
                   },
               ]
             : [];
@@ -122,6 +132,7 @@ export async function businessPublicContactOf(
                 name: null,
                 address,
                 hours: null,
+                mapUrl: mapLinkRead(profile.registeredAddressMapUrl),
             });
         }
     }

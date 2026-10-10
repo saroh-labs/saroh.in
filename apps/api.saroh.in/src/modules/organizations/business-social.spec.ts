@@ -25,7 +25,6 @@ const SET: Record<SocialNetwork, [string, string]> = {
         "linkedin.com/company/rye-bakery",
         "https://www.linkedin.com/company/rye-bakery",
     ],
-    googleMaps: ["https://g.page/rye-bakery", "https://g.page/rye-bakery"],
     pinterest: ["ryebakery", "https://www.pinterest.com/ryebakery/"],
     telegram: ["@ryebakery", "https://t.me/ryebakery"],
 };
@@ -38,10 +37,6 @@ const REPLACED: Record<SocialNetwork, [string, string]> = {
     youtube: ["youtube.com/c/Rye", "https://www.youtube.com/c/Rye"],
     x: ["@rye", "https://x.com/rye"],
     linkedin: ["in/asha-rao", "https://www.linkedin.com/in/asha-rao"],
-    googleMaps: [
-        "https://maps.app.goo.gl/AbC123xyZ",
-        "https://maps.app.goo.gl/AbC123xyZ",
-    ],
     pinterest: ["pinterest.com/rye_co", "https://www.pinterest.com/rye_co/"],
     telegram: ["t.me/rye_co", "https://t.me/rye_co"],
 };
@@ -173,6 +168,8 @@ describe("socialLinksRead", () => {
                 facebook: "https://evil.example/rye",
                 x: "javascript:alert(1)",
                 other: "https://www.instagram.com/rye",
+                // A place's map, not a social link: dropped if ever stored.
+                googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
             }),
         ).toEqual({ instagram: "https://www.instagram.com/rye" });
         expect(socialLinksRead(null)).toEqual({});

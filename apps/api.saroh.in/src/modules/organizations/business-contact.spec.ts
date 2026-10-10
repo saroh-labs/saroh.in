@@ -31,6 +31,7 @@ const PROFILE = {
         instagram: "https://www.instagram.com/rye",
     },
     siteShowsRegisteredAddress: false,
+    registeredAddressMapUrl: null,
     addressLine1: "14 Hill Road",
     addressLine2: null,
     city: "Bengaluru",
@@ -95,6 +96,7 @@ describe("businessPublicContactOf", () => {
                 settings: {
                     address: " 12th Main\nIndiranagar ",
                     openingHours: WEEK,
+                    mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
                 },
             },
         ]);
@@ -105,6 +107,7 @@ describe("businessPublicContactOf", () => {
                 name: "Indiranagar",
                 address: "12th Main\nIndiranagar",
                 hours: WEEK,
+                mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
             },
         ]);
     });
@@ -128,6 +131,7 @@ describe("businessPublicContactOf", () => {
         profileFind.mockResolvedValue({
             ...PROFILE,
             siteShowsRegisteredAddress: true,
+            registeredAddressMapUrl: "https://g.page/rye-bakery",
         });
         expect((await businessPublicContactOf("org_1")).places).toEqual([
             {
@@ -135,6 +139,7 @@ describe("businessPublicContactOf", () => {
                 name: null,
                 address: "14 Hill Road\nBengaluru 560038",
                 hours: null,
+                mapUrl: "https://g.page/rye-bakery",
             },
         ]);
     });
@@ -167,5 +172,19 @@ describe("businessPublicContactOf", () => {
             places: [],
             social: [],
         });
+    });
+
+    it("never serves a map link that isn't Google's own", async () => {
+        storesFind.mockResolvedValue([
+            {
+                name: "Indiranagar",
+                settings: {
+                    address: "12th Main",
+                    mapUrl: "https://evil.example/maps",
+                },
+            },
+        ]);
+        const { places } = await businessPublicContactOf("org_1");
+        expect(places[0]?.mapUrl).toBeNull();
     });
 });

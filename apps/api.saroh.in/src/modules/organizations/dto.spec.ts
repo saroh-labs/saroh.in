@@ -236,7 +236,7 @@ describe("social links and the registered address choice (DEC-125)", () => {
                 socialLinks: {
                     instagram: "@rye",
                     whatsapp: "+91 98450 12345",
-                    googleMaps: "",
+                    telegram: "",
                 },
             }),
         ).toBeNull();
@@ -248,6 +248,13 @@ describe("social links and the registered address choice (DEC-125)", () => {
                 socialLinks: { myspace: "https://myspace.com/rye" },
             }),
         ).toMatchObject({ statusCode: 400 });
+        // Google Maps is a place's map, not a social link.
+        expect(
+            await through({ socialLinks: { googleMaps: "g.page/rye" } }),
+        ).toMatchObject({ statusCode: 400 });
+        expect(
+            await through({ registeredAddressMapUrl: "g.page/rye" }),
+        ).toBeNull();
     });
 
     it("refuses a value that isn't text, or runs too long", async () => {

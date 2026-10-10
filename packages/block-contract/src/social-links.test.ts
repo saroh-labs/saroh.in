@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { SocialNetwork } from "./social-links";
 import {
+    mapLinkOrNull,
+    normaliseMapLink,
     normaliseSocialLink,
     parseSocialLinks,
     SOCIAL_LABELS,
@@ -78,26 +80,6 @@ const KEPT: Record<SocialNetwork, [string, string][]> = {
         ],
         ["company/rye-bakery", "https://www.linkedin.com/company/rye-bakery"],
     ],
-    googleMaps: [
-        [
-            "https://maps.app.goo.gl/AbC123xyZ",
-            "https://maps.app.goo.gl/AbC123xyZ",
-        ],
-        ["g.page/rye-bakery", "https://g.page/rye-bakery"],
-        [
-            "https://g.page/r/CabcDEF123/review",
-            "https://g.page/r/CabcDEF123/review",
-        ],
-        ["goo.gl/maps/AbC123", "https://goo.gl/maps/AbC123"],
-        [
-            "https://www.google.co.in/maps/place/Rye+Bakery/@12.97,77.59,17z",
-            "https://www.google.com/maps/place/Rye+Bakery/@12.97,77.59,17z",
-        ],
-        [
-            "https://maps.google.com/?cid=1234567890",
-            "https://maps.google.com/?cid=1234567890",
-        ],
-    ],
     pinterest: [
         ["ryebakery", "https://www.pinterest.com/ryebakery/"],
         ["in.pinterest.com/ryebakery/", "https://www.pinterest.com/ryebakery/"],
@@ -162,7 +144,6 @@ describe("normaliseSocialLink (DEC-125)", () => {
         expect(url("telegram", "https://x.com/rye")).toBeNull();
         expect(url("youtube", "https://youtu.be/dQw4w9WgXcQ")).toBeNull();
         expect(url("linkedin", "https://x.com/in/rye")).toBeNull();
-        expect(url("googleMaps", "https://maps.evil.example/x")).toBeNull();
         expect(url("whatsapp", "https://t.me/919845012345")).toBeNull();
     });
 
@@ -179,22 +160,6 @@ describe("normaliseSocialLink (DEC-125)", () => {
         expect(url("telegram", "t.me/+AbCdEf123")).toBeNull();
         expect(url("linkedin", "linkedin.com/feed")).toBeNull();
         expect(url("linkedin", "ryebakery")).toBeNull();
-    });
-
-    it("keeps only Google's map pages, never its redirects", () => {
-        expect(
-            url(
-                "googleMaps",
-                "https://www.google.com/url?q=https://evil.example",
-            ),
-        ).toBeNull();
-        expect(url("googleMaps", "https://google.com/search?q=rye")).toBeNull();
-        expect(url("googleMaps", "https://maps.google.com/url?q=x")).toBeNull();
-        expect(url("googleMaps", "rye bakery, 14 hill road")).toBeNull();
-        // The fragment is dropped; the place stays.
-        expect(url("googleMaps", "https://google.com/maps/place/Rye#x")).toBe(
-            "https://www.google.com/maps/place/Rye",
-        );
     });
 
     it("takes WhatsApp as a number with its country code", () => {
@@ -259,7 +224,7 @@ describe("socialLinkShown", () => {
             "wa.me/919845012345",
         );
         expect(
-            socialLinkShown(`https://www.google.com/maps/${"a".repeat(80)}`),
+            socialLinkShown(`https://www.facebook.com/${"a".repeat(80)}`),
         ).toHaveLength(58);
     });
 });
@@ -286,6 +251,8 @@ describe("parseSocialLinks", () => {
                 x: "@rye",
                 youtube: 42,
                 myspace: "https://myspace.com/rye",
+                // Google Maps is a place's map now, not a social link.
+                googleMaps: "https://maps.app.goo.gl/AbC123xyZ",
             }),
         ).toEqual({});
         for (const junk of [null, undefined, "x", 3, [], ["a"]]) {
@@ -297,18 +264,101 @@ describe("parseSocialLinks", () => {
 describe("socialLinkItems and socialLinksSummary", () => {
     it("lists what is set, in the networks' order", () => {
         const links = {
-            googleMaps: "https://g.page/rye",
+            youtube: "https://www.youtube.com/@rye",
             instagram: "https://www.instagram.com/rye",
             whatsapp: "https://wa.me/919845012345",
         };
         expect(socialLinkItems(links).map((i) => i.network)).toEqual([
             "instagram",
             "whatsapp",
-            "googleMaps",
+            "youtube",
         ]);
-        expect(socialLinksSummary(links)).toBe(
-            "Instagram, WhatsApp, Google Maps",
-        );
+        expect(socialLinksSummary(links)).toBe("Instagram, WhatsApp, YouTube");
         expect(socialLinksSummary({})).toBe("");
+    });
+});
+
+describe("normaliseMapLink (DEC-125)", () => {
+    const map = (raw: string) => {
+        const check = normaliseMapLink(raw);
+        return check.ok ? check.url : null;
+    };
+    const KEPT_MAPS: [string, string][] = [
+        [
+            "https://maps.app.goo.gl/AbC123xyZ",
+            "https://maps.app.goo.gl/AbC123xyZ",
+        ],
+        [
+            "maps.app.goo.gl/AbC123xyZ?g_st=ic",
+            "https://maps.app.goo.gl/AbC123xyZ",
+        ],
+        ["g.page/rye-bakery", "https://g.page/rye-bakery"],
+        [
+            "https://g.page/r/CabcDEF123/review",
+            "https://g.page/r/CabcDEF123/review",
+        ],
+        ["goo.gl/maps/AbC123", "https://goo.gl/maps/AbC123"],
+        [
+            "https://www.google.co.in/maps/place/Rye+Bakery/@12.97,77.59,17z",
+            "https://www.google.com/maps/place/Rye+Bakery/@12.97,77.59,17z",
+        ],
+        [
+            "https://maps.google.com/?cid=1234567890",
+            "https://maps.google.com/?cid=1234567890",
+        ],
+    ];
+
+    it("keeps Google's own map links, as one address each", () => {
+        for (const [typed, kept] of KEPT_MAPS) {
+            expect(map(typed), typed).toBe(kept);
+            // And a kept address normalises to itself.
+            expect(map(kept)).toBe(kept);
+            expect(mapLinkOrNull(kept)).toBe(kept);
+        }
+    });
+
+    it("refuses another site, a script and Google's redirects", () => {
+        for (const bad of [
+            "https://evil.example/maps",
+            "https://maps.evil.example/x",
+            "javascript:alert(1)",
+            "https://www.google.com/url?q=https://evil.example",
+            "https://google.com/search?q=rye",
+            "https://maps.google.com/url?q=x",
+            "https://maps.app.goo.gl.evil.example/AbC",
+            "rye bakery, 14 hill road",
+            "@rye",
+        ]) {
+            expect(normaliseMapLink(bad), bad).toEqual({
+                ok: false,
+                problem:
+                    "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.",
+            });
+        }
+        expect(normaliseMapLink("  ").ok).toBe(false);
+        expect(
+            normaliseMapLink(`https://www.google.com/maps/${"a".repeat(600)}`),
+        ).toEqual({
+            ok: false,
+            problem: "That link is too long.",
+        });
+    });
+
+    it("drops the fragment and keeps the place", () => {
+        expect(map("https://google.com/maps/place/Rye#x")).toBe(
+            "https://www.google.com/maps/place/Rye",
+        );
+    });
+
+    it("never serves a stored value that isn't already canonical", () => {
+        for (const junk of [
+            null,
+            3,
+            "https://evil.example",
+            "g.page/rye",
+            "https://www.google.co.in/maps/place/Rye",
+        ]) {
+            expect(mapLinkOrNull(junk)).toBeNull();
+        }
     });
 });

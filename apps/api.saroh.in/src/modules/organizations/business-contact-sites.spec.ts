@@ -140,6 +140,10 @@ describe("saving what the site shows of the business", () => {
         ],
         ["the registered address choice", { siteShowsRegisteredAddress: true }],
         ["the registered address", { registeredAddress: { city: "Mysuru" } }],
+        [
+            "the registered address's map link",
+            { registeredAddressMapUrl: "g.page/rye-bakery" },
+        ],
     ])("%s queue the business's published sites", async (_what, dto) => {
         await service.update(ctx, dto);
         expect(siteFindMany).toHaveBeenCalledWith({
@@ -156,6 +160,33 @@ describe("saving what the site shows of the business", () => {
                 payload: { cause: "contact", siteIds: ["site_1"] },
             },
         ]);
+    });
+
+    it("keeps a map link as Google's own address, and refuses any other on its field", async () => {
+        await service.update(ctx, {
+            registeredAddressMapUrl: "https://www.google.co.in/maps/place/Rye",
+        });
+        const write = profileUpsert.mock.calls[0][0] as { update: unknown };
+        expect(write.update).toEqual({
+            registeredAddressMapUrl: "https://www.google.com/maps/place/Rye",
+        });
+
+        profileUpsert.mockClear();
+        const refusal = await service
+            .update(ctx, {
+                registeredAddressMapUrl: "https://evil.example/maps",
+            })
+            .catch((e: unknown) => e);
+        expect(refusal).toBeInstanceOf(BadRequestException);
+        expect((refusal as BadRequestException).getResponse()).toMatchObject({
+            details: { field: "registeredAddressMapUrl" },
+        });
+        expect(profileUpsert).not.toHaveBeenCalled();
+
+        await service.update(ctx, { registeredAddressMapUrl: "" });
+        expect(
+            (profileUpsert.mock.calls[0][0] as { update: unknown }).update,
+        ).toEqual({ registeredAddressMapUrl: null });
     });
 
     it("queues nothing for a save the site doesn't show", async () => {
@@ -198,6 +229,7 @@ describe("what the site shows, for the workspace", () => {
             contactEmail: null,
             socialLinks: { instagram: "https://www.instagram.com/rye" },
             siteShowsRegisteredAddress: true,
+            registeredAddressMapUrl: null,
             addressLine1: null,
             addressLine2: null,
             city: null,
