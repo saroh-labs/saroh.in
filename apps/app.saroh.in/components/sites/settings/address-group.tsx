@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { CopyValue } from "@/components/sites/search-tracking/parts";
 import { Absent, Group, Row, Section } from "@/components/sites/settings-rows";
 import type { SiteAddress } from "@/lib/sites/share-links";
@@ -21,7 +22,7 @@ export function breakable(host: string): React.ReactNode[] {
 export const WEB_ADDRESS_HREF = "/settings/organization#web-address";
 
 /**
- * Address: the web address once, with Copy, View while the site is live,
+ * Address: the web address once, with Copy, its QR code, View while live,
  * and Change where the owner may change it (`WEB_ADDRESS_CHANGE`, the
  * API's `canChange`), which opens its one place, Settings › Business. Then
  * the business's own domain (`domain` is `CustomDomain`, or nothing for a
@@ -35,7 +36,10 @@ export function AddressGroup({
     live,
     canChangeAddress,
     domain,
+    siteId,
 }: {
+    /** The site, for its QR code; without it the QR button is left out. */
+    siteId?: string;
     address: SiteAddress | null;
     live: boolean;
     canChangeAddress: boolean;
@@ -54,6 +58,19 @@ export function AddressGroup({
                                     value={`https://${address.platformHost}`}
                                     label="Web address"
                                 />
+                                {siteId ? (
+                                    <QrButton
+                                        variant="ghost"
+                                        link={{
+                                            mode: "saved",
+                                            kind: "SITE",
+                                            siteId,
+                                            url: `https://${address.platformHost}`,
+                                            what: "your website",
+                                            from: "Website settings",
+                                        }}
+                                    />
+                                ) : null}
                                 {live ? (
                                     <Button variant="outline" size="sm" asChild>
                                         <a

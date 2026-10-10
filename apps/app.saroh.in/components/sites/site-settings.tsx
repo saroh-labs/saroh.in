@@ -69,6 +69,7 @@ export function SiteSettings({
             panels={{
                 address: (
                     <AddressGroup
+                        siteId={site.id}
                         address={address}
                         live={live}
                         canChangeAddress={canChangeAddress}

@@ -25,6 +25,11 @@ vi.mock("@/lib/sites/actions", () => ({
     updateSiteSettings: vi.fn(),
     setPublishNeedsApproval: vi.fn(),
 }));
+// The address row's QR button: its panel reads only when opened.
+vi.mock("@/lib/qr/actions", () => ({
+    openQrPanel: vi.fn(),
+    makeQrPanelCode: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));

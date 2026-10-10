@@ -67,7 +67,8 @@ async function optional<T>(path: string): Promise<T | null> {
     }
 }
 
-function mayChange(org: Organization | null): boolean {
+/** `site:update`: may make, change and retire a code. */
+export function mayChange(org: Organization | null): boolean {
     return org?.actions
         ? org.actions.includes("site:update")
         : org?.role === "OWNER" || org?.role === "ADMIN";

@@ -210,8 +210,8 @@ export function QrMaker({
                     </div>
                 </div>
             </div>
-            {/* SLOT (plan U6): "Ready to print" goes here, between the
-                maker and "Your QR codes", as the design has it. */}
+            {/* "Ready to print": the saved code as PDFs, between the maker
+                and "Your QR codes", as the design has it. */}
             <QrPrintSlot
                 siteId={input.siteId}
                 code={bound}

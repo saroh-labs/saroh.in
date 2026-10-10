@@ -21,6 +21,8 @@ const REASONS: readonly QrRefusalReason[] = [
     "retired",
     "too-many",
     "no-free-code",
+    "no-address",
+    "unencodable",
 ];
 
 function detailsOf(body: unknown): Record<string, unknown> {

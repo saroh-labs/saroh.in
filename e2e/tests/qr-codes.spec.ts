@@ -1,4 +1,4 @@
-// @covers app:/settings/share app:/open site:/q/[id] api:sites api:organizations api:billing
+// @covers app:/settings/share app:/api/qr-codes/[siteId]/[qrCodeId]/print app:/sites/[siteId]/pages app:/open site:/q/[id] api:sites api:organizations api:billing
 import type { APIRequestContext, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -17,7 +17,10 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * after it is one the site's `/q/<code>` really answers, that the count the
  * list reads is the one that scan wrote, that a download is a real file
  * (the PNG is drawn on a canvas from the SVG), and that the three columns
- * and the list fit a phone with nothing hidden sideways.
+ * and the list fit a phone with nothing hidden sideways. And that "Ready to
+ * print" hands over a real PDF through the app's own route, under the name
+ * the API gives it (plan U6), and that the QR button in the Website header
+ * opens the very code Settings › Share lists (plan U7).
  *
  * The test owns its data: its own code on Northwind's site, placed
  * "Other…" with a stamp no other test shares (so the maker never matches
@@ -132,6 +135,48 @@ test("the owner makes a QR code, a phone scans it, and the list counts it", asyn
             );
         }
 
+        // Ready to print: one file, through the app's own route. Print
+        // files follow the plan, so the stack's own answer decides which
+        // of the two true screens this is.
+        const print = page.locator("[data-qr-print]");
+        const { included } = await nw.get<{ included: boolean }>(codes);
+        if (included) {
+            await expect(print).toHaveAttribute("data-qr-print", "ready");
+            const [response, file] = await Promise.all([
+                page.waitForResponse(
+                    (r) =>
+                        r.url().includes(`/api/qr-codes/${siteId}/`) &&
+                        r.url().includes("format=tent"),
+                ),
+                page.waitForEvent("download"),
+                print
+                    .locator('[data-qr-print-format="tent"]')
+                    .getByRole("button", { name: "Download PDF" })
+                    .click(),
+            ]);
+            expect(response.status()).toBe(200);
+            expect(response.headers()["content-type"]).toContain(
+                "application/pdf",
+            );
+            expect(response.headers()["content-disposition"]).toContain(
+                `-qr-${code}-tent.pdf`,
+            );
+            expect(file.suggestedFilename()).toMatch(
+                new RegExp(`^northwind[a-z0-9-]*-qr-${code}-tent\\.pdf$`),
+            );
+            // The other three were never held up by it.
+            await expect(
+                print.getByRole("button", { name: "Download PDF" }),
+            ).toHaveCount(4);
+        } else {
+            // A preview with the way up, and no button that would be refused.
+            await expect(print).toHaveAttribute("data-qr-print", "locked");
+            await expect(print.locator("[data-qr-print-lock]")).toContainText(
+                "print files",
+            );
+            await expect(print.getByRole("button")).toHaveCount(0);
+        }
+
         // A phone scans the printed code: the site forwards it, tagged.
         const scan = await request.get(`${LIVE}/q/${code}`, {
             maxRedirects: 0,
@@ -173,4 +218,95 @@ test("the owner makes a QR code, a phone scans it, and the list counts it", asyn
             await nw.post(`${codes}/${left.id}/retire`);
         }
     }
+});
+
+/**
+ * The QR button beside the address in the Website header (plan U7) opens
+ * the site's own saved code, in place, and it is the same code Settings ›
+ * Share lists.
+ *
+ * Its data: one code for the website placed "Website screen", which is the
+ * place the header's button looks for first. Made once if it isn't there
+ * and never retired, so desk and phone can share it and no other test's
+ * code (each placed at its own stamp, and retired) is ever the one shown.
+ */
+test("the Website header's QR button opens the code Settings › Share lists", async ({
+    page,
+}, testInfo) => {
+    const FROM = "Website screen";
+    await useSession(page);
+    const nw = northwind(page.request);
+    const siteId = await northwindSite(page.request);
+    const codes = `/sites/${siteId}/qr-codes`;
+    interface SiteCode extends QrCode {
+        place: string;
+        target: { kind: string };
+    }
+    const held = async () =>
+        (await nw.get<{ codes: SiteCode[] }>(codes)).codes.filter(
+            (c) =>
+                !c.retired &&
+                c.target.kind === "SITE" &&
+                c.place === "OTHER" &&
+                c.placeNote === FROM,
+        );
+    if ((await held()).length === 0) {
+        await nw.post(codes, {
+            targetKind: "SITE",
+            place: "OTHER",
+            placeNote: FROM,
+            style: "PLAIN",
+        });
+    }
+    const mine = (await held()).map((c) => c.code);
+    expect(mine.length).toBeGreaterThan(0);
+
+    await page.goto(`/open/${NORTHWIND_ORG}`);
+    await page.goto(`/sites/${siteId}/pages`);
+    await expect(
+        page.getByRole("heading", { name: "Website", level: 1 }),
+    ).toBeVisible();
+
+    await page
+        .getByRole("button", { name: "QR code for your website" })
+        .click();
+    const panel = page.getByRole("dialog", {
+        name: "QR code for your website",
+    });
+    const link = panel.locator("[data-qr-link]");
+    await expect(link).toHaveText(/\/q\/[0-9a-z]{3,6}$/);
+    const shown = (await link.textContent()) ?? "";
+    const code = shown.slice(shown.lastIndexOf("/") + 1);
+    // The saved code on the Saroh address, not a QR of the public link.
+    expect(shown).toBe(`northwind.${renderer.host}/q/${code}`);
+    expect(mine).toContain(code);
+    await expect(panel.locator("[data-qr-panel]")).toHaveAttribute(
+        "data-qr-panel",
+        "code",
+    );
+
+    // Its file comes from the panel: nothing sends them elsewhere for it.
+    const [file] = await Promise.all([
+        page.waitForEvent("download"),
+        panel.getByRole("button", { name: "Download SVG" }).click(),
+    ]);
+    expect(file.suggestedFilename()).toMatch(
+        new RegExp(`^northwind[a-z0-9-]*-qr-${code}\\.svg$`),
+    );
+    if (testInfo.project.name.startsWith("phone")) {
+        await expectNothingHiddenSideways(page);
+    }
+
+    // Closing it puts focus back on the button that opened it.
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(
+        page.getByRole("button", { name: "QR code for your website" }),
+    ).toBeFocused();
+
+    // The same code, in the list.
+    await page.goto("/settings/share");
+    const row = page.locator(`[data-qr-row="${code}"]`);
+    await expect(row).toContainText(FROM);
+    await expect(row).toContainText("Website");
 });

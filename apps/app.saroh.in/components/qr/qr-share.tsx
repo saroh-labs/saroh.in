@@ -15,6 +15,7 @@ import { opensWords, placeWords } from "@/lib/qr/words";
 import { QrCodesList } from "./qr-codes-list";
 import type { DownloadEnv } from "./qr-download";
 import { QrMaker } from "./qr-maker";
+import { QrPrintSlot } from "./qr-print-slot";
 import { QrViewer } from "./qr-viewer";
 
 const HEADING = "font-display text-[19px] font-semibold tracking-[-0.02em]";
@@ -44,7 +45,7 @@ export function mergeCodes(
  * Share"): the maker, then "Your QR codes".
  *
  * Someone who may only look (`site:read`) gets the list and a code to
- * view and download, with no controls. A site not yet published can still
+ * view and download, its print files too, with no controls. A site not yet published can still
  * have codes made: one line says they open once it is.
  */
 export function QrShare({
@@ -159,12 +160,21 @@ export function QrShare({
                     />
                 </div>
             ) : viewing ? (
-                <QrViewer
-                    code={viewing}
-                    origin={view.origin}
-                    business={business}
-                    env={env}
-                />
+                <div>
+                    <QrViewer
+                        code={viewing}
+                        origin={view.origin}
+                        business={business}
+                        env={env}
+                    />
+                    {/* Downloading a print file is reading the site. */}
+                    <QrPrintSlot
+                        siteId={site.id}
+                        code={viewing}
+                        lock={screen.lock}
+                        business={business}
+                    />
+                </div>
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
