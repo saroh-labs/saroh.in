@@ -35,6 +35,7 @@ import type {
 } from "@/lib/subscriptions/service";
 import { payRows } from "@/lib/subscriptions/view";
 
+import { runAction } from "@/lib/api/run-action";
 import { Pill } from "../pill";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
@@ -122,8 +123,10 @@ export function PlanDetail({
         const to = plan.status !== "ARCHIVED";
         setBusy(true);
         start(async () => {
-            const res = await setPlanArchived(plan.id, to);
-            setBusy(false);
+            const res = await runAction(() => setPlanArchived(plan.id, to), {
+                setBusy,
+            });
+            if (!res) return;
             if (!res.ok) {
                 // A plan without memberships refuses Sell again: its notice.
                 reportFailure(res);
@@ -136,7 +139,10 @@ export function PlanDetail({
                 archiveToast(plan, to),
                 () =>
                     start(async () => {
-                        const back = await setPlanArchived(plan.id, !to);
+                        const back = await runAction(() =>
+                            setPlanArchived(plan.id, !to),
+                        );
+                        if (!back) return;
                         if (!back.ok) reportFailure(back);
                         setOlder([]);
                         router.refresh();
@@ -152,9 +158,12 @@ export function PlanDetail({
         setLoadingMore(true);
         setMoreFailed(false);
         start(async () => {
-            const res = await loadPlanEvents(plan.id, cursor);
-            setLoadingMore(false);
-            if (res.state !== "ok") {
+            // A read: its own "couldn't load" line says it.
+            const res = await runAction(() => loadPlanEvents(plan.id, cursor), {
+                setBusy: setLoadingMore,
+                quiet: true,
+            });
+            if (res?.state !== "ok") {
                 setMoreFailed(true);
                 return;
             }

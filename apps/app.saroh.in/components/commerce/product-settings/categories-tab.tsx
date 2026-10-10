@@ -18,6 +18,7 @@ import {
     restoreCategory,
 } from "@/lib/products/settings-actions";
 
+import { runAction } from "@/lib/api/run-action";
 import { CategoryMergeSheet } from "./category-merge-sheet";
 import { NameDialog } from "./name-dialog";
 import { bigBtn, rowBtn, TabIntro } from "./product-settings";
@@ -56,7 +57,11 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     /** An Undo, or a delete: the call, then the list as it now is. */
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }

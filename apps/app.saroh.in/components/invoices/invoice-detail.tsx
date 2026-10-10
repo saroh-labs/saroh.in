@@ -31,6 +31,7 @@ import { QrButton } from "@/components/qr/qr-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
@@ -198,11 +199,10 @@ export function InvoiceDetail({
     const dialog = (d: Dialog) => (v: boolean) => setOpen(v ? d : null);
 
     async function makeLink() {
-        setBusy(true);
-        const res = await details.run(() =>
-            newPayLink(invoice.id, invoice.updatedAt),
+        const res = await runAction(
+            () => details.run(() => newPayLink(invoice.id, invoice.updatedAt)),
+            { setBusy },
         );
-        setBusy(false);
         if (!res) return;
         // A plan without online payments: its notice and the way up.
         if (!res.ok) return reportFailure(res);
@@ -217,10 +217,11 @@ export function InvoiceDetail({
 
     /** No pay link can be made (#833): a link to view it and how to pay. */
     async function makeViewLink() {
-        setBusy(true);
         // It replaces the pay link this tab made, which is forgotten.
-        const res = await details.run(() => newViewLink(invoice.id));
-        setBusy(false);
+        const res = await runAction(
+            () => details.run(() => newViewLink(invoice.id)),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) return reportFailure(res);
         setViewUrl(res.data.url);
@@ -261,9 +262,10 @@ export function InvoiceDetail({
     const print = () => window.print();
 
     async function downloadPdf() {
-        setDownloading(true);
-        const res = await downloadInvoicePdf(invoice);
-        setDownloading(false);
+        const res = await runAction(() => downloadInvoicePdf(invoice), {
+            setBusy: setDownloading,
+        });
+        if (!res) return;
         if (!res.ok) showError(res.error);
     }
     // Reading the invoice is enough: the PDF is the paper the page shows.

@@ -24,6 +24,7 @@ import {
     draftWatch,
     useDraftChanged,
 } from "@/components/shared/use-draft-changed";
+import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
 
 export interface LeadContactOption {
@@ -124,25 +125,32 @@ export function AddLeadDialog({
         if (Object.keys(next).length > 0) return;
 
         const [firstName, ...rest] = name.trim().split(/\s+/);
-        setSaving(true);
-        const res = await createLead({
-            title: title.trim(),
-            ...(stage ? { stageId: stage } : {}),
-            ...(worth.trim()
-                ? { value: Math.round(Number(worth.trim()) * 100) }
-                : {}),
-            ...(who === "known"
-                ? { contactId }
-                : {
-                      contact: {
-                          email: email.trim(),
-                          ...(firstName ? { firstName } : {}),
-                          ...(rest.length ? { lastName: rest.join(" ") } : {}),
-                          ...(phone.trim() ? { phone: phone.trim() } : {}),
-                      },
-                  }),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createLead({
+                    title: title.trim(),
+                    ...(stage ? { stageId: stage } : {}),
+                    ...(worth.trim()
+                        ? { value: Math.round(Number(worth.trim()) * 100) }
+                        : {}),
+                    ...(who === "known"
+                        ? { contactId }
+                        : {
+                              contact: {
+                                  email: email.trim(),
+                                  ...(firstName ? { firstName } : {}),
+                                  ...(rest.length
+                                      ? { lastName: rest.join(" ") }
+                                      : {}),
+                                  ...(phone.trim()
+                                      ? { phone: phone.trim() }
+                                      : {}),
+                              },
+                          }),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

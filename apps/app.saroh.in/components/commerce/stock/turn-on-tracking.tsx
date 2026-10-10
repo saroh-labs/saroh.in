@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
 
 /**
@@ -37,7 +38,10 @@ export function TurnOnTracking() {
                 confirmLabel="Turn on Track stock"
                 onConfirm={() =>
                     start(async () => {
-                        const res = await setBusinessStockTracking(true);
+                        const res = await runAction(() =>
+                            setBusinessStockTracking(true),
+                        );
+                        if (!res) return;
                         if (!res.ok) {
                             showError(res.error);
                             return;

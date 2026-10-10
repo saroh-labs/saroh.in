@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { CrmResult } from "@/lib/api/http";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import type { Hold } from "@/lib/hold-undo";
 import { HOLD_UNDO_MS, secondsLeft, startHold } from "@/lib/hold-undo";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
@@ -118,7 +120,8 @@ export function BulkBar({
             said,
             () =>
                 startTransition(async () => {
-                    const back = await undoBatch(batchId);
+                    const back = await runAction(() => undoBatch(batchId));
+                    if (!back) return;
                     if (!back.ok) showError(back.error);
                     else showInfo(undoSummary(back.data, nameOf));
                     router.refresh();
@@ -141,7 +144,10 @@ export function BulkBar({
         if (action.disabled || busy) return;
         const batchId = crypto.randomUUID();
         startTransition(async () => {
-            const res = await post(action, batchId, !action.hold);
+            const res = await runAction(() =>
+                post(action, batchId, !action.hold),
+            );
+            if (!res) return router.refresh();
             if (!res.ok) {
                 showError(res.error);
                 router.refresh();
@@ -159,7 +165,11 @@ export function BulkBar({
                     reportCommit(await sendBatchNow(batchId), action);
                 },
                 undo: async () => {
-                    const back = await undoBatch(batchId);
+                    // The hold words a failed Undo from what is thrown.
+                    const back = await runAction(() => undoBatch(batchId), {
+                        quiet: true,
+                    });
+                    if (!back) throw new Error(UNREACHED);
                     if (!back.ok) throw new Error(back.error);
                     showInfo(undoSummary(back.data, nameOf));
                     router.refresh();

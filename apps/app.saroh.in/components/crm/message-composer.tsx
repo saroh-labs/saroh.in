@@ -20,6 +20,7 @@ import { sendFailureWords } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
 
+import { runAction } from "@/lib/api/run-action";
 import { ComposerNotice } from "./composer-notice";
 
 /**
@@ -84,18 +85,21 @@ export function MessageComposer({
         e.preventDefault();
         const text = body.trim();
         if (!text || !composes) return;
-        setBusy(true);
-        const res = await sendMessage({
-            leadId,
-            channel,
-            contactId,
-            subject:
-                channel === "EMAIL" && subject.trim()
-                    ? subject.trim()
-                    : undefined,
-            body: text,
-        });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                sendMessage({
+                    leadId,
+                    channel,
+                    contactId,
+                    subject:
+                        channel === "EMAIL" && subject.trim()
+                            ? subject.trim()
+                            : undefined,
+                    body: text,
+                }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(sendFailureWords(res.error, channel));
             return;

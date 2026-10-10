@@ -11,6 +11,7 @@ import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
 import { bigBtn, rowBtn, TabIntro } from "./product-settings";
 
@@ -38,7 +39,11 @@ export function FieldsTab({
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }

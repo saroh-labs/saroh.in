@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { LogoValue } from "@/components/shared/logo-upload";
 import { LogoUpload } from "@/components/shared/logo-upload";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { runAction } from "@/lib/api/run-action";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
@@ -49,9 +50,11 @@ export function BusinessLogoSheet({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await saveBusinessLogo(logo?.mediaId ?? null);
-        setSaving(false);
+        const result = await runAction(
+            () => saveBusinessLogo(logo?.mediaId ?? null),
+            { setBusy: setSaving },
+        );
+        if (!result) return;
         if (!result.ok) {
             setRefusal(result.error);
             return;

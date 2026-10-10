@@ -32,6 +32,7 @@ import type {
 } from "@/lib/stores/storefronts";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
 import { ClosingSection } from "./closing-section";
 import { FulfilmentSection } from "./fulfilment-section";
 import { LocationReadinessCard } from "./location-readiness-card";
@@ -230,7 +231,10 @@ function StorefrontDetail({
      */
     const save: Saver = (input, said, onFail, inline, onSaved) => {
         startTransition(async () => {
-            const res = await updateStorefront(store.id, input);
+            const res = await runAction(() =>
+                updateStorefront(store.id, input),
+            );
+            if (!res) return;
             if (!res.ok) {
                 onFail?.();
                 if (inline) inline(res.error);

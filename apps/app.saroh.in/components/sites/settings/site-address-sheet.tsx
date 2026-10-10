@@ -11,6 +11,7 @@ import { useState } from "react";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { LocationAddressFields } from "@/components/stores/location-address-fields";
+import { runAction } from "@/lib/api/run-action";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type {
     OrganizationSettings,
@@ -270,9 +271,11 @@ function LocationAddressEdit({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await updateStorefront(location.id, patch);
-        setSaving(false);
+        const result = await runAction(
+            () => updateStorefront(location.id, patch),
+            { setBusy: setSaving },
+        );
+        if (!result) return;
         if (!result.ok) {
             setRefusal(result.error);
             return;
@@ -372,9 +375,10 @@ function RegisteredAddressChoice({
             return;
         }
         setRefusal(null);
-        setSaving(true);
-        const result = await saveOrganizationSettings(sent);
-        setSaving(false);
+        const result = await runAction(() => saveOrganizationSettings(sent), {
+            setBusy: setSaving,
+        });
+        if (!result) return;
         if (!result.ok) {
             if (result.field === "registeredAddressMapUrl") {
                 setLinkRefusal(result.error);

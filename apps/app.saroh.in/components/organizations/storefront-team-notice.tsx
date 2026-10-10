@@ -7,6 +7,7 @@ import { Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { dismissStorefrontTeamNotice } from "@/lib/organizations/member-actions";
 import type { StorefrontTeamNoticePerson } from "@/lib/organizations/members";
 
@@ -44,9 +45,10 @@ export function StorefrontTeamNotice({
     if (people.length === 0) return null;
 
     async function dismiss() {
-        setDismissing(true);
-        const res = await dismissStorefrontTeamNotice();
-        setDismissing(false);
+        const res = await runAction(() => dismissStorefrontTeamNotice(), {
+            setBusy: setDismissing,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

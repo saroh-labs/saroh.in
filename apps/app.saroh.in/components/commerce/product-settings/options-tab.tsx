@@ -11,6 +11,7 @@ import type { CatalogueView } from "@/lib/products/settings";
 import { addOption, removeOption } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { OptionSheet } from "./option-sheet";
 import { bigBtn, rowBtn, TabIntro } from "./product-settings";
 
@@ -31,7 +32,11 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }

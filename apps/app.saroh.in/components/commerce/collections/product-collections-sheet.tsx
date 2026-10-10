@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { saveProductCollections } from "@/lib/collections/actions";
 import type { MembershipRow } from "@/lib/collections/rules";
 import { membershipRows, pickedIds, sameList } from "@/lib/collections/rules";
@@ -51,12 +52,11 @@ export function ProductCollectionsSheet({
     async function save() {
         // The hand-picked set as it was, for Undo to put back.
         const previous = pickedIds(start, all);
-        setSaving(true);
-        const res = await saveProductCollections(
-            productId,
-            pickedIds(rows, all),
+        const res = await runAction(
+            () => saveProductCollections(productId, pickedIds(rows, all)),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Its collections weren't saved.", res.error);
             return;

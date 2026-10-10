@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { runAction } from "@/lib/api/run-action";
 import { issueInvoice } from "@/lib/invoices/actions";
 import { remindWithLink, sendWithLink } from "@/lib/invoices/link-actions";
 import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
@@ -62,7 +63,9 @@ export function SendDialog({
         setBusy(true);
         let number = invoice.number;
         if (mode === "draft") {
-            const issued = await details.run(() => issueInvoice(invoice.id));
+            const issued = await runAction(() =>
+                details.run(() => issueInvoice(invoice.id)),
+            );
             if (!issued) return setBusy(false);
             if (!issued.ok) {
                 setBusy(false);
@@ -70,10 +73,15 @@ export function SendDialog({
             }
             number = issued.data.number ?? number;
         }
-        const res = await details.run(() =>
-            reminder ? remindWithLink(invoice.id) : sendWithLink(invoice.id),
+        const res = await runAction(
+            () =>
+                details.run(() =>
+                    reminder
+                        ? remindWithLink(invoice.id)
+                        : sendWithLink(invoice.id),
+                ),
+            { setBusy },
         );
-        setBusy(false);
         if (!res) return;
         onOpenChange(false);
         router.refresh();

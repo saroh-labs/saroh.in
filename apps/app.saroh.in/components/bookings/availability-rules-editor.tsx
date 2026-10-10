@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -113,9 +114,11 @@ export function AvailabilityRulesEditor({
             rules.push({ dayOfWeek: row.dayOfWeek, startMinute, endMinute });
         }
 
-        setSaving(true);
-        const res = await replaceRules(serviceId, rules);
-        setSaving(false);
+        const toSave = rules;
+        const res = await runAction(() => replaceRules(serviceId, toSave), {
+            setBusy: setSaving,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

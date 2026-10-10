@@ -14,6 +14,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { CrmResult } from "@/lib/api/http";
+import { runAction } from "@/lib/api/run-action";
 
 /**
  * A record's "…" menu with one thing in it: delete, for good.
@@ -61,7 +62,11 @@ export function DeleteMenu<T>({
 
     async function commit() {
         setBusy(true);
-        const res = await onDelete();
+        const res = await runAction(onDelete);
+        if (!res) {
+            setBusy(false);
+            return;
+        }
         if (!res.ok) {
             setBusy(false);
             showError(res.error);

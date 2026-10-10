@@ -10,6 +10,7 @@ import { showError } from "@saroh/ui/toast";
 import { useState, useTransition } from "react";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { runAction } from "@/lib/api/run-action";
 import { olderPackEvents } from "@/lib/class-packs/actions";
 import {
     EARLIER_UNRECORDED,
@@ -78,7 +79,8 @@ export function ActivityTab({
     function older() {
         if (!cursor) return;
         start(async () => {
-            const res = await olderPackEvents(packId, cursor);
+            const res = await runAction(() => olderPackEvents(packId, cursor));
+            if (!res) return;
             if (res.state !== "ok") {
                 showError(
                     "Couldn't load older activity. Nothing has changed — try again.",

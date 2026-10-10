@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
+import { runAction } from "@/lib/api/run-action";
 import { actionClass } from "./parts";
 
 async function copy(text: string): Promise<boolean> {
@@ -56,7 +57,8 @@ export function usePayLink({
     const make = () => {
         setConfirming(false);
         startTransition(async () => {
-            const res = await makeOrderPayLink(orderId);
+            const res = await runAction(() => makeOrderPayLink(orderId));
+            if (!res) return;
             if (!res.ok) {
                 reportFailure(res);
                 return;

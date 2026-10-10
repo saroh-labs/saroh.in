@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setPlanChargeTiming } from "@/lib/subscriptions/actions";
 import type {
     AutopayChargeTiming,
@@ -60,7 +61,10 @@ export function PlanAutopayTiming({
         const before = value;
         setValue(next);
         start(async () => {
-            const res = await setPlanChargeTiming(planId, next);
+            const res = await runAction(() =>
+                setPlanChargeTiming(planId, next),
+            );
+            if (!res) return setValue(before);
             if (!res.ok) {
                 setValue(before);
                 showError(res.error);

@@ -42,6 +42,7 @@ import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { runAction } from "@/lib/api/run-action";
 import { Chip, Eyebrow } from "./parts";
 import { btn } from "./quick-look-types";
 
@@ -196,13 +197,22 @@ function Form({
         setSaving(true);
         setError(null);
         const paidWith = paidWithFor(payNow);
-        const res = await bookByHand(serviceId, {
-            startAt: zonedInstant(date, at, timezone).toISOString(),
-            idempotencyKey: attempt,
-            staffId: staff.id,
-            ...(paidWith ? { paidWith } : {}),
-            ...booker,
-        });
+        const res = await runAction(
+            () =>
+                bookByHand(serviceId, {
+                    startAt: zonedInstant(date, at, timezone).toISOString(),
+                    idempotencyKey: attempt,
+                    staffId: staff.id,
+                    ...(paidWith ? { paidWith } : {}),
+                    ...booker,
+                }),
+            // Said here, where the choice is.
+            { quiet: true, onUnreached: setError },
+        );
+        if (!res) {
+            setSaving(false);
+            return;
+        }
         if (!res.ok && res.plan) {
             // At the plan's bookings-a-month limit (U13): its notice.
             setSaving(false);
@@ -219,10 +229,14 @@ function Form({
         }
         const booked = `Booked ${pick ? pickName(pick) : "them"} with ${staff.name} at ${clock(at)}.`;
         if (payNow === "LINK") {
-            const link = await makePayLink(res.data.id);
-            setSaving(false);
-            setDone({ booked, bookingId: res.data.id, link });
+            // It is booked either way: a link that couldn't be made is
+            // made again from the booking.
+            const link = await runAction(() => makePayLink(res.data.id), {
+                setBusy: setSaving,
+            });
             router.refresh();
+            if (link) setDone({ booked, bookingId: res.data.id, link });
+            else onClose();
             return;
         }
         setSaving(false);

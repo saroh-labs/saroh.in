@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import {
     payBookingWithPack,
     takePackOffBooking,
@@ -41,9 +42,11 @@ export function BookingPackControl({
     async function use() {
         const chosen = usable.find((p) => p.id === pick);
         if (!chosen) return;
-        setBusy(true);
-        const res = await payBookingWithPack(bookingId, chosen.id);
-        setBusy(false);
+        const res = await runAction(
+            () => payBookingWithPack(bookingId, chosen.id),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             router.refresh();
@@ -56,9 +59,10 @@ export function BookingPackControl({
     }
 
     async function takeOff() {
-        setBusy(true);
-        const res = await takePackOffBooking(bookingId);
-        setBusy(false);
+        const res = await runAction(() => takePackOffBooking(bookingId), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             res.data.returned

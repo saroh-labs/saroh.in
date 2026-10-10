@@ -24,6 +24,7 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { InviteReviewsSheet } from "@/components/stores/invite-reviews-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
@@ -232,7 +233,10 @@ function ReviewSheet({
     const saveReply = () => {
         if (!review || !reply.trim()) return;
         startTransition(async () => {
-            const res = await replyToReview(review.id, reply.trim());
+            const res = await runAction(() =>
+                replyToReview(review.id, reply.trim()),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -247,7 +251,8 @@ function ReviewSheet({
         if (!review) return;
         const next = !hidden;
         startTransition(async () => {
-            const res = await setReviewHidden(review.id, next);
+            const res = await runAction(() => setReviewHidden(review.id, next));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

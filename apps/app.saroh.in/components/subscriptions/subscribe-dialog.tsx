@@ -19,6 +19,7 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { invoiceMoney } from "@/lib/invoices/money";
 import { subscribe } from "@/lib/subscriptions/actions";
 import { renewalWords } from "@/lib/subscriptions/autopay";
@@ -81,14 +82,17 @@ export function SubscribeDialog({
     async function save() {
         if (!contactId) return showError("Choose who is subscribing.");
         if (!plan) return showError("Choose a plan.");
-        setBusy(true);
-        const res = await subscribe({
-            contactId,
-            planId: plan.id,
-            ...(start ? { startDate: ymd(start) } : {}),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                subscribe({
+                    contactId,
+                    planId: plan.id,
+                    ...(start ? { startDate: ymd(start) } : {}),
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) {
             // The plan's notice replaces this dialog, with the way up.
             if (res.plan) onOpenChange(false);

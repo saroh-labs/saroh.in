@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { QrButton } from "@/components/qr/qr-button";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import {
     createPreviewLink,
     listPreviewLinks,
@@ -89,9 +90,10 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
     const active = (links ?? []).filter((l) => l.state === "active");
 
     async function create() {
-        setBusy("create");
-        const res = await createPreviewLink(siteId, days);
-        setBusy(null);
+        const res = await runAction(() => createPreviewLink(siteId, days), {
+            setBusy: (on) => setBusy(on ? "create" : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -107,9 +109,10 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
     }
 
     async function revoke(link: SitePreviewLinkView) {
-        setBusy(link.id);
-        const res = await revokePreviewLink(siteId, link.id);
-        setBusy(null);
+        const res = await runAction(() => revokePreviewLink(siteId, link.id), {
+            setBusy: (on) => setBusy(on ? link.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

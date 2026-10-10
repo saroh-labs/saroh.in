@@ -15,6 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import {
     confirmAttentionAction,
     removeAttentionAction,
@@ -217,7 +218,7 @@ function SuggestionCard({
             toSuggestionInput(draft, choices),
         ).catch(() => ({
             ok: false as const,
-            error: "The connection dropped before it was added.",
+            error: UNREACHED,
             field: undefined,
         }));
         setSaving(false);

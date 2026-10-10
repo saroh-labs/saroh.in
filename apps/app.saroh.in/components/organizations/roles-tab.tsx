@@ -23,6 +23,7 @@ import { useMemo, useState, useTransition } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FailedRead } from "@/components/shared/failed-read";
+import { runAction } from "@/lib/api/run-action";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
@@ -368,10 +369,13 @@ function RoleDetail({
 
     const save = () =>
         startTransition(async () => {
-            const res = await updateRole(role.key, {
-                ...(labelChanged ? { label: label.trim() } : {}),
-                ...(actionsChanged ? { actions: Array.from(granted) } : {}),
-            });
+            const res = await runAction(() =>
+                updateRole(role.key, {
+                    ...(labelChanged ? { label: label.trim() } : {}),
+                    ...(actionsChanged ? { actions: Array.from(granted) } : {}),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -382,7 +386,8 @@ function RoleDetail({
 
     const remove = () =>
         startTransition(async () => {
-            const res = await deleteRole(role.key);
+            const res = await runAction(() => deleteRole(role.key));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -655,7 +660,10 @@ function NewRoleDialog({
     const create = () =>
         startTransition(async () => {
             setError(null);
-            const res = await createRole({ label: label.trim(), actions });
+            const res = await runAction(() =>
+                createRole({ label: label.trim(), actions }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // Custom roles aren't in the plan (U13): the way up, from
                 // its own notice once this dialog is out of the way.

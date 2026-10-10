@@ -26,6 +26,7 @@ import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
 import { chipClass, pillClass, TEXT_TONE } from "./tones";
 
 /**
@@ -188,15 +189,22 @@ export function LogList({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
+            if (!cursor) return;
             setLoadError(null);
-            const res = await loadLogPage({
-                kind: logKinds(filter.kind),
-                storefront: filter.store === "all" ? undefined : filter.store,
-                product: filter.product || undefined,
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            const res = await runAction(
+                () =>
+                    loadLogPage({
+                        kind: logKinds(filter.kind),
+                        storefront:
+                            filter.store === "all" ? undefined : filter.store,
+                        product: filter.product || undefined,
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;

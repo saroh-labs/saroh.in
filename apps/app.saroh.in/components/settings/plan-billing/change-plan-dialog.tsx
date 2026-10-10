@@ -29,6 +29,7 @@ import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
 import { quoteSummary } from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
+import { runAction } from "@/lib/api/run-action";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /** The plan picked: which, on which cycle, and what the row's button said. */
@@ -149,13 +150,16 @@ export function ChangePlanDialog({
             return;
         }
         start(async () => {
-            const res = await changePlanAction({
-                plan: picked.planId,
-                cycle: picked.cycle,
-                coupon: code || undefined,
-                billingState: billingState || undefined,
-                gstin: g || undefined,
-            });
+            const res = await runAction(() =>
+                changePlanAction({
+                    plan: picked.planId,
+                    cycle: picked.cycle,
+                    coupon: code || undefined,
+                    billingState: billingState || undefined,
+                    gstin: g || undefined,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === "gstin") setGstinError(res.error);
                 else if (res.field === "coupon" && code) {

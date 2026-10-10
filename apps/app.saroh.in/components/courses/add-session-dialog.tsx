@@ -16,6 +16,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { addSession } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
@@ -74,12 +75,11 @@ export function AddSessionDialog({
 
     async function add() {
         if (!day) return;
-        setBusy(true);
-        const res = await addSession(
-            course.id,
-            wallClockToIso(ymd(day), time, tz),
+        const res = await runAction(
+            () => addSession(course.id, wallClockToIso(ymd(day), time, tz)),
+            { setBusy },
         );
-        setBusy(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
             on > 0

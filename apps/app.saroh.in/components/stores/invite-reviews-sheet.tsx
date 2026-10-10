@@ -16,6 +16,7 @@ import { useState, useTransition } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import type {
@@ -64,7 +65,10 @@ export function InviteReviewsSheet({
 
     const send = () => {
         startTransition(async () => {
-            const res = await inviteReviews(Array.from(picked));
+            const res = await runAction(() =>
+                inviteReviews(Array.from(picked)),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

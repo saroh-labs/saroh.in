@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import { productEditHref, productHref } from "@/lib/products/links";
 import {
@@ -40,7 +41,10 @@ export function StartTrackingButton({
 
     function turnOn() {
         start(async () => {
-            const res = await setProductStockTracking(productId, true);
+            const res = await runAction(() =>
+                setProductStockTracking(productId, true),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -85,7 +89,10 @@ export function StopTrackingButton({
     function turnOff() {
         setAsking(false);
         start(async () => {
-            const res = await setProductStockTracking(productId, false);
+            const res = await runAction(() =>
+                setProductStockTracking(productId, false),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // "3 are promised to open orders — fulfil or cancel them
                 // first." — the API counts every storefront.

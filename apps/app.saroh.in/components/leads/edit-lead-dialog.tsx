@@ -18,6 +18,7 @@ import { PenLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { updateLead } from "@/lib/leads/actions";
 
 /**
@@ -60,14 +61,17 @@ export function EditLeadDialog({
             );
         }
         setError(null);
-        setSaving(true);
-        const res = await updateLead(leadId, {
-            title: nextTitle.trim(),
-            ...(worth.trim()
-                ? { value: Math.round(Number(worth.trim()) * 100) }
-                : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                updateLead(leadId, {
+                    title: nextTitle.trim(),
+                    ...(worth.trim()
+                        ? { value: Math.round(Number(worth.trim()) * 100) }
+                        : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         setOpen(false);
         showSuccess("Saved");

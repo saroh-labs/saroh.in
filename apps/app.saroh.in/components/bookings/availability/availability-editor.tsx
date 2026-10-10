@@ -46,6 +46,8 @@ import type {
 import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
@@ -185,23 +187,37 @@ export function AvailabilityEditor({
         ]);
         let failed: string | null = null;
         for (const op of ops) {
-            const res =
-                op.kind === "hours"
-                    ? await replaceStaffHours(op.staffId, op.hours)
-                    : op.kind === "addOff"
-                      ? op.off.staffId
-                          ? await addTimeOff(op.off.staffId, rangeOf(op.off))
-                          : await addClosure({
-                                ...rangeOf(op.off),
-                                fromDate: op.off.fromDate,
-                            })
-                      : op.kind === "removeOff"
-                        ? await removeTimeOffMany(op.staffId, op.before.ids)
-                        : op.kind === "removeClosure"
-                          ? await removeClosures(op.before.ids)
-                          : op.kind === "removeExtra"
-                            ? await removeExtraHours(op.staffId, op.before.id)
-                            : await updateBookingRules(op.rules);
+            const res = await runAction(
+                async () =>
+                    op.kind === "hours"
+                        ? await replaceStaffHours(op.staffId, op.hours)
+                        : op.kind === "addOff"
+                          ? op.off.staffId
+                              ? await addTimeOff(
+                                    op.off.staffId,
+                                    rangeOf(op.off),
+                                )
+                              : await addClosure({
+                                    ...rangeOf(op.off),
+                                    fromDate: op.off.fromDate,
+                                })
+                          : op.kind === "removeOff"
+                            ? await removeTimeOffMany(op.staffId, op.before.ids)
+                            : op.kind === "removeClosure"
+                              ? await removeClosures(op.before.ids)
+                              : op.kind === "removeExtra"
+                                ? await removeExtraHours(
+                                      op.staffId,
+                                      op.before.id,
+                                  )
+                                : await updateBookingRules(op.rules),
+                // Said below, with what did save.
+                { quiet: true },
+            );
+            if (!res) {
+                failed = UNREACHED;
+                break;
+            }
             if (!res.ok) {
                 failed = res.error;
                 break;

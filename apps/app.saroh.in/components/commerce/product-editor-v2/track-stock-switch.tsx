@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import type { TrackingControl } from "@/lib/products/tracking";
 import {
@@ -49,7 +50,10 @@ export function TrackStockSwitch({
 
     function flip(next: boolean) {
         start(async () => {
-            const res = await setProductStockTracking(productId, next);
+            const res = await runAction(() =>
+                setProductStockTracking(productId, next),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (next) showError(res.error);
                 // "3 are promised to open orders — fulfil or cancel them

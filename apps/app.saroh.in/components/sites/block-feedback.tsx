@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { runAction } from "@/lib/api/run-action";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
@@ -90,9 +91,11 @@ export function BlockFeedback({
     async function send() {
         const body = reply.trim();
         if (!body || sectionKey === undefined) return;
-        setSending(true);
-        const res = await createComment(siteId, { pageId, sectionKey, body });
-        setSending(false);
+        const res = await runAction(
+            () => createComment(siteId, { pageId, sectionKey, body }),
+            { setBusy: setSending },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

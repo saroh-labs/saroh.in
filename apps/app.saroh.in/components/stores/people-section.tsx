@@ -32,6 +32,7 @@ import {
 } from "@/lib/stores/people";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
 
@@ -109,9 +110,11 @@ export function PeopleSection({
     const alone = onlyOwnerHere(people);
 
     async function onChangeRole(userId: string, next: MemberRole) {
-        setBusy(userId);
-        const res = await updateMemberRole(store.id, userId, next);
-        setBusy(null);
+        const res = await runAction(
+            () => updateMemberRole(store.id, userId, next),
+            { setBusy: (on) => setBusy(on ? userId : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -121,9 +124,10 @@ export function PeopleSection({
     }
 
     async function onRemove(userId: string) {
-        setBusy(userId);
-        const res = await removeMember(store.id, userId);
-        setBusy(null);
+        const res = await runAction(() => removeMember(store.id, userId), {
+            setBusy: (on) => setBusy(on ? userId : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -133,9 +137,11 @@ export function PeopleSection({
     }
 
     async function onRevoke(invitationId: string) {
-        setBusy(invitationId);
-        const res = await revokeInvitation(store.id, invitationId);
-        setBusy(null);
+        const res = await runAction(
+            () => revokeInvitation(store.id, invitationId),
+            { setBusy: (on) => setBusy(on ? invitationId : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

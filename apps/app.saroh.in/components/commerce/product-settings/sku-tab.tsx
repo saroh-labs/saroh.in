@@ -13,6 +13,7 @@ import {
 import { patternProblem } from "@/lib/products/sku-pattern";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
 
@@ -86,7 +87,10 @@ export function SkuTab({
         if (problem || !dirty) return;
         const before = saved;
         start(async () => {
-            const res = await saveSkuPattern(pattern.trim(), suggest);
+            const res = await runAction(() =>
+                saveSkuPattern(pattern.trim(), suggest),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -97,10 +101,10 @@ export function SkuTab({
                 `Pattern saved. The editor suggests ${rows[0]?.next ?? "it"}-style SKUs.`,
                 () =>
                     start(async () => {
-                        const undo = await saveSkuPattern(
-                            before.pattern,
-                            before.suggest,
+                        const undo = await runAction(() =>
+                            saveSkuPattern(before.pattern, before.suggest),
                         );
+                        if (!undo) return;
                         if (!undo.ok) return showError(undo.error);
                         setSaved(before);
                         setPattern(before.pattern);

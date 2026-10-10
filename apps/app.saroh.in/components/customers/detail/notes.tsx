@@ -23,6 +23,7 @@ import {
 import type { DetailNote } from "@/lib/customer-workspace/detail";
 import { dayText } from "@/lib/subscriptions/view";
 
+import { runAction } from "@/lib/api/run-action";
 import { Empty } from "./parts";
 
 /** The design's limit: a note is a line or two, not a document. */
@@ -216,9 +217,11 @@ function NoteForm({
     async function add(e: React.FormEvent) {
         e.preventDefault();
         if (off) return;
-        setBusy(true);
-        const res = await addNoteAction(contactId, { body: text });
-        setBusy(false);
+        const res = await runAction(
+            () => addNoteAction(contactId, { body: text }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         onDone();
         router.refresh();

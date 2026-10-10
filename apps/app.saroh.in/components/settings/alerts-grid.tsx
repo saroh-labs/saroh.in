@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 
 import { useSettingsUndo } from "@/components/organizations/use-settings-undo";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { saveAlert, undoAlert } from "@/lib/notifications/actions";
 import type {
     AlertCell,
@@ -68,14 +70,18 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
         };
         startTransition(async () => {
             flipShown(change);
-            const result = await saveAlert(change);
+            const result = await runAction(() => saveAlert(change));
+            if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Your alerts are as they were.");
                 return;
             }
             const undo = alertUndo(change);
             offer(alertSaved(change), async () => {
-                const back = await undoAlert(undo);
+                const back = await runAction(() => undoAlert(undo), {
+                    quiet: true,
+                });
+                if (!back) return { ok: false, error: UNREACHED };
                 return back.ok
                     ? { ok: true }
                     : { ok: false, error: back.error };

@@ -38,6 +38,7 @@ import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
 
+import { runAction } from "@/lib/api/run-action";
 import { useOrderStep } from "./use-order-step";
 
 /** Pointer, hover, focus and pressed on every item (the standing rule). */
@@ -86,10 +87,13 @@ export function OrderRowMenu({
         startTransition(async () => {
             // The one cancel (B9): nothing was paid, so nothing goes back;
             // a treatment's visits are cancelled with it.
-            const res = await cancelOrder(row.id, {
-                reason: null,
-                idempotencyKey: crypto.randomUUID(),
-            });
+            const res = await runAction(() =>
+                cancelOrder(row.id, {
+                    reason: null,
+                    idempotencyKey: crypto.randomUUID(),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

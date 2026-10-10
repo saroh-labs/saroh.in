@@ -16,6 +16,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import {
     addAttentionAction,
     updateAttentionAction,
@@ -136,7 +137,7 @@ export function AttentionSheet({
                 : addAttentionAction(contactId, input)
         ).catch(() => ({
             ok: false as const,
-            error: "The connection dropped before it was saved.",
+            error: UNREACHED,
             field: undefined,
         }));
         setSaving(false);

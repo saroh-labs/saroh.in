@@ -32,6 +32,7 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
@@ -193,9 +194,7 @@ function EditorBody({
             });
         } catch {
             setCreatingNow(false);
-            showError(
-                "Couldn't create it — the connection dropped. Everything you entered is still here.",
-            );
+            showError(UNREACHED);
             return;
         }
         if (!res.ok) {

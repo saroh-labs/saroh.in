@@ -12,6 +12,7 @@ import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import {
     claimDomain,
     listSiteDomains,
@@ -134,9 +135,10 @@ export function CustomDomain({
     }
 
     async function check(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await verifyDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => verifyDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -150,9 +152,10 @@ export function CustomDomain({
     }
 
     async function remove(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await removeDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => removeDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
+        if (!res) return;
         setConfirmRemove(null);
         if (!res.ok) {
             showError(res.error);

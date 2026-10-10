@@ -22,6 +22,7 @@ import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
 
+import { runAction } from "@/lib/api/run-action";
 import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
@@ -192,13 +193,12 @@ function NewOrderBody({
 
     async function create() {
         if (o.problem || saving || !o.pick || !o.way) return;
-        setSaving(true);
         // A pay link waits for the registered address (DEC-068): asked in
         // place, then the order is made.
-        const res = await details.run(() =>
-            makeNewOrder(o.storeId, request(o)),
+        const res = await runAction(
+            () => details.run(() => makeNewOrder(o.storeId, request(o))),
+            { setBusy: setSaving },
         );
-        setSaving(false);
         if (!res) return;
         if (!res.ok) {
             // At the plan's orders-a-month limit (U13): its notice too.

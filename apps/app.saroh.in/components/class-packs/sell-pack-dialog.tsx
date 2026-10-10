@@ -19,6 +19,7 @@ import { Chip } from "@/components/shared/chip";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { sellPack } from "@/lib/class-packs/actions";
 import type { PackKind } from "@/lib/class-packs/pack-cards";
 import { money, packKind } from "@/lib/class-packs/pack-cards";
@@ -126,9 +127,11 @@ export function SellPackDialog({
 
     async function save() {
         if (!pack || !contactId || !paidBy || blocked) return;
-        setBusy(true);
-        const res = await sellPack(pack.id, contactId, paidBy);
-        setBusy(false);
+        const res = await runAction(
+            () => sellPack(pack.id, contactId, paidBy),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(sellFailure(res.error, pack.name, who));
         showSuccess(soldMessage(who, pack, today, Boolean(res.data.invoiceId)));
         onOpenChange(false);

@@ -15,6 +15,7 @@ import {
     timingOptions,
 } from "@/lib/subscriptions/autopay-timing";
 
+import { runAction } from "@/lib/api/run-action";
 import { TimingCard } from "./timing-card";
 
 /**
@@ -48,7 +49,8 @@ export function AutopayTimingSetting({
         const before = value;
         setValue(next);
         start(async () => {
-            const res = await setAutopayChargeTiming(next);
+            const res = await runAction(() => setAutopayChargeTiming(next));
+            if (!res) return setValue(before);
             if (!res.ok) {
                 setValue(before);
                 showError(res.error);

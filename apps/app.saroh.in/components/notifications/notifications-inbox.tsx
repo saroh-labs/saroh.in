@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
+import { runAction } from "@/lib/api/run-action";
 import { personHref } from "@/lib/contacts/person-href";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
@@ -57,7 +58,8 @@ export function NotificationsInbox({
 
     const markOne = (id: string, quiet = false) => {
         startTransition(async () => {
-            const res = await markNotificationRead(id);
+            const res = await runAction(() => markNotificationRead(id));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -69,7 +71,8 @@ export function NotificationsInbox({
 
     const markAll = () => {
         startTransition(async () => {
-            const res = await markAllNotificationsRead();
+            const res = await runAction(() => markAllNotificationsRead());
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

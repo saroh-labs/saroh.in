@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setActiveOrganization } from "@/lib/organizations/actions";
 import { PAUSED_LABEL } from "@/lib/organizations/choose";
 import type {
@@ -84,7 +85,10 @@ export function OrganizationSwitcher({
         // fallback for a missing or stale cookie, and re-selecting it is the
         // only way to write the cookie back. The action is membership-guarded.
         startTransition(async () => {
-            const res = await setActiveOrganization(organizationId);
+            const res = await runAction(() =>
+                setActiveOrganization(organizationId),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

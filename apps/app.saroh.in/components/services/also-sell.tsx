@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -37,7 +38,8 @@ export function AlsoSell({
     const flip = (f: AlsoSellFeature) => {
         if (!f.on) return setPicked([f.key]);
         startTransition(async () => {
-            const res = await set(f.key, false);
+            const res = await runAction(() => set(f.key, false));
+            if (!res) return;
             if (!res.ok) {
                 // The API says why in a sentence.
                 showError(refusalSentence(res));

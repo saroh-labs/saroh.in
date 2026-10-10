@@ -13,6 +13,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { createStaff } from "@/lib/staff/actions";
 
 /**
@@ -58,13 +59,16 @@ export function AddPersonDialog({
 
     async function add() {
         if (!name.trim() || saving) return;
-        setSaving(true);
         setError(null);
-        const res = await createStaff({
-            name: name.trim(),
-            title: title.trim() || undefined,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createStaff({
+                    name: name.trim(),
+                    title: title.trim() || undefined,
+                }),
+            { setBusy: setSaving, quiet: true, onUnreached: setError },
+        );
+        if (!res) return;
         if (!res.ok) {
             setError(res.error);
             return;

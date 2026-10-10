@@ -16,6 +16,7 @@ import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { saveStages } from "@/lib/pipelines/actions";
 
 interface Row {
@@ -86,18 +87,21 @@ export function StagesDialog({
         rows.some((r, i) => r.was?.name !== r.name || r.was.order !== i);
 
     async function save() {
-        setSaving(true);
-        const res = await saveStages(
-            pipelineId,
-            rows.map((r, i) => ({
-                id: r.id,
-                name: r.name.trim(),
-                order: i,
-                was: r.was,
-            })),
-            removed.flatMap((r) => (r.id ? [r.id] : [])),
+        const res = await runAction(
+            () =>
+                saveStages(
+                    pipelineId,
+                    rows.map((r, i) => ({
+                        id: r.id,
+                        name: r.name.trim(),
+                        order: i,
+                        was: r.was,
+                    })),
+                    removed.flatMap((r) => (r.id ? [r.id] : [])),
+                ),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Some of the stage changes were not saved.", res.error);
             router.refresh();

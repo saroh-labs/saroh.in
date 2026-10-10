@@ -31,6 +31,7 @@ import {
     draftWatch,
     useDraftChanged,
 } from "@/components/shared/use-draft-changed";
+import { runAction } from "@/lib/api/run-action";
 import { packsFor } from "@/lib/class-packs/actions";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { PackPurchase } from "@/lib/class-packs/service";
@@ -236,12 +237,15 @@ export function NewBookingDialog({
     /** The treatment's next visit (E10): on its order, nothing to pay. */
     async function saveVisit(v: VisitToBook) {
         if (!service || !picked) return;
-        setSaving(true);
-        const res = await bookVisit(v.orderId, {
-            visitNumber: v.visitNumber,
-            startAt: picked,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                bookVisit(v.orderId, {
+                    visitNumber: v.visitNumber,
+                    startAt: picked,
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok && res.plan) {
             // At the plan's bookings-a-month limit (U13): its notice, and
             // the time stays picked for when there's room.
@@ -271,14 +275,17 @@ export function NewBookingDialog({
         setSaving(true);
         setPackRefusal(null);
         const paidWith = paying ? undefined : paidWithFor(payNow);
-        const res = await bookByHand(service.id, {
-            startAt: picked,
-            idempotencyKey: attempt,
-            ...(paying ? { packPurchaseId: pack.id } : {}),
-            ...(paidWith ? { paidWith } : {}),
-            ...booker,
-        });
-        if (!res.ok) setSaving(false);
+        const res = await runAction(() =>
+            bookByHand(service.id, {
+                startAt: picked,
+                idempotencyKey: attempt,
+                ...(paying ? { packPurchaseId: pack.id } : {}),
+                ...(paidWith ? { paidWith } : {}),
+                ...booker,
+            }),
+        );
+        if (!res?.ok) setSaving(false);
+        if (!res) return;
         if (!res.ok && res.field === "packPurchaseId") {
             // The pack changed while this was open — its last class went on
             // another booking, say. Nothing was booked; read its packs again

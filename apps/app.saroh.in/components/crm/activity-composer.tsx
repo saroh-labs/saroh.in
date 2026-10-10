@@ -12,6 +12,7 @@ import {
     ACTION_SHEET_FORM,
     ActionSheetFooter,
 } from "@/components/shared/action-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
 
 /**
@@ -42,9 +43,10 @@ export function ActivityComposer({
         e.preventDefault();
         const text = body.trim();
         if (!text) return;
-        setBusy(true);
-        const res = await logActivity(leadId, text);
-        setBusy(false);
+        const res = await runAction(() => logActivity(leadId, text), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

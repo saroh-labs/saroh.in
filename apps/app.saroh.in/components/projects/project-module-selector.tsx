@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     deselectProjectModuleAction,
     selectProjectModuleAction,
@@ -55,9 +56,12 @@ function ProjectModuleRow({
 
     const toggle = (next: boolean) => {
         startTransition(async () => {
-            const result = next
-                ? await selectProjectModuleAction(projectId, module.key)
-                : await deselectProjectModuleAction(projectId, module.key);
+            const result = await runAction(() =>
+                next
+                    ? selectProjectModuleAction(projectId, module.key)
+                    : deselectProjectModuleAction(projectId, module.key),
+            );
+            if (!result) return;
             if (result.ok) {
                 showSuccess(
                     next

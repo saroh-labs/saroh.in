@@ -14,6 +14,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { cancelAutopay, sendAutopayLink } from "@/lib/subscriptions/actions";
 import type { AutopayPanel } from "@/lib/subscriptions/autopay";
 import {
@@ -185,7 +186,7 @@ function SendLinkBody({
             email && card.emailTo !== null,
         ).catch((): { ok: false; error: string } => ({
             ok: false,
-            error: "Saroh couldn't be reached. Nothing was sent — try again.",
+            error: UNREACHED,
         }));
         setBusy(false);
         if (!res.ok) {
@@ -363,7 +364,7 @@ function CancelBody({
         const res = await cancelAutopay(subscriptionId).catch(
             (): { ok: false; error: string } => ({
                 ok: false,
-                error: "Saroh couldn't be reached. Nothing changed — try again.",
+                error: UNREACHED,
             }),
         );
         setBusy(false);

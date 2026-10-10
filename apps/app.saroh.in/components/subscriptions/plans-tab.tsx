@@ -21,6 +21,7 @@ import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
 import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { runAction } from "@/lib/api/run-action";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
 import { Pill } from "./pill";
@@ -73,8 +74,11 @@ export function PlansTab({
     function setArchived(plan: Plan, archived: boolean) {
         setBusyId(plan.id);
         start(async () => {
-            const res = await setPlanArchived(plan.id, archived);
-            setBusyId(null);
+            const res = await runAction(
+                () => setPlanArchived(plan.id, archived),
+                { setBusy: (on) => setBusyId(on ? plan.id : null) },
+            );
+            if (!res) return;
             if (!res.ok) {
                 // A plan without memberships refuses Sell again: its notice.
                 reportFailure(res);
@@ -94,7 +98,10 @@ export function PlansTab({
                 archiveToast(plan, archived),
                 () =>
                     start(async () => {
-                        const back = await setPlanArchived(plan.id, !archived);
+                        const back = await runAction(() =>
+                            setPlanArchived(plan.id, !archived),
+                        );
+                        if (!back) return;
                         if (!back.ok) reportFailure(back);
                         router.refresh();
                     }),

@@ -40,6 +40,8 @@ import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -177,19 +179,23 @@ export function ServiceEditor({
             hasPerson: draft.staffIds.length > 0,
         });
         if (service) {
-            const res = await updateService(
-                service.id,
-                serviceUpdate(draft, currency),
+            const res = await runAction(() =>
+                updateService(service.id, serviceUpdate(draft, currency)),
             );
-            if (!res.ok) {
+            if (!res?.ok) {
                 setSaving(false);
-                refused(res.error);
+                if (res) refused(res.error);
                 return;
             }
-            const whoError = staff
-                ? await setWho(service.id, draft.staffIds)
-                : null;
-            setSaving(false);
+            const who = await runAction(
+                async () => ({
+                    error: staff
+                        ? await setWho(service.id, draft.staffIds)
+                        : null,
+                }),
+                { setBusy: setSaving, quiet: true },
+            );
+            const whoError = who ? who.error : UNREACHED;
             router.refresh();
             if (whoError) {
                 setSaved({ ...draft, staffIds: saved.staffIds });
@@ -200,13 +206,17 @@ export function ServiceEditor({
             showSuccess(message);
             return;
         }
-        const res = await createService(input);
-        if (!res.ok) {
+        const res = await runAction(() => createService(input));
+        if (!res?.ok) {
             setSaving(false);
-            refused(res.error);
+            if (res) refused(res.error);
             return;
         }
-        const whoError = await setWho(res.data.id, draft.staffIds);
+        const who = await runAction(
+            async () => ({ error: await setWho(res.data.id, draft.staffIds) }),
+            { quiet: true },
+        );
+        const whoError = who ? who.error : UNREACHED;
         if (whoError) {
             showError(`Added, but who takes it didn't save: ${whoError}`);
         } else {
@@ -218,10 +228,10 @@ export function ServiceEditor({
     async function remove() {
         if (!service) return;
         setSaving(true);
-        const res = await archiveService(service.id);
-        if (!res.ok) {
+        const res = await runAction(() => archiveService(service.id));
+        if (!res?.ok) {
             setSaving(false);
-            showError(res.error);
+            if (res) showError(res.error);
             return;
         }
         showSuccess(`${service.name} deleted`);

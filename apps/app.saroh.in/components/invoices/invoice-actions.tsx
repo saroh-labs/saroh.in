@@ -30,6 +30,7 @@ import { useId, useState } from "react";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import {
     creditInvoice,
     deleteInvoice,
@@ -85,9 +86,10 @@ export function IssueDialog({
     });
 
     async function issue() {
-        setBusy(true);
-        const res = await details.run(() => issueInvoice(invoice.id));
-        setBusy(false);
+        const res = await runAction(
+            () => details.run(() => issueInvoice(invoice.id)),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${res.data.number ?? "Invoice"} issued`);
@@ -198,14 +200,19 @@ export function RecordPaymentDialog({
     }
 
     async function save() {
-        setBusy(true);
-        const res = await recordPayment(invoice.id, {
-            method,
-            ...(reference.trim() ? { reference: reference.trim() } : {}),
-            ...(note.trim() ? { note: note.trim() } : {}),
-            ...(paidOn ? { paidAt: paidOn.toISOString() } : {}),
-        });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                recordPayment(invoice.id, {
+                    method,
+                    ...(reference.trim()
+                        ? { reference: reference.trim() }
+                        : {}),
+                    ...(note.trim() ? { note: note.trim() } : {}),
+                    ...(paidOn ? { paidAt: paidOn.toISOString() } : {}),
+                }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${invoice.number ?? "Invoice"} marked paid`);
         onOpenChange(false);
@@ -335,14 +342,16 @@ export function CancelInvoiceDialog({
             );
             return;
         }
-        setBusy(kind);
-        const res =
-            kind === "credit"
-                ? await creditInvoice(invoice.id, reason.trim())
-                : kind === "void"
-                  ? await voidInvoice(invoice.id, reason.trim())
-                  : await reissueInvoice(invoice.id, reason.trim());
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                kind === "credit"
+                    ? creditInvoice(invoice.id, reason.trim())
+                    : kind === "void"
+                      ? voidInvoice(invoice.id, reason.trim())
+                      : reissueInvoice(invoice.id, reason.trim()),
+            { setBusy: (on) => setBusy(on ? kind : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         onOpenChange(false);
         setReason("");

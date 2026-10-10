@@ -16,6 +16,7 @@ import {
 import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { readInvoice } from "@/lib/invoices/actions";
 import { newPayLink } from "@/lib/invoices/link-actions";
@@ -174,9 +175,10 @@ export function InvoiceQuickLook({
     async function copyLink() {
         if (!i) return;
         if (shown) return copyText(shown, false);
-        setBusy(true);
-        const res = await newPayLink(i.id, full?.updatedAt);
-        setBusy(false);
+        const res = await runAction(() => newPayLink(i.id, full?.updatedAt), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return reportFailure(res);
         setShown(res.data.url);
         await copyText(res.data.url, true);

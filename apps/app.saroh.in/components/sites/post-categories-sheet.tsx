@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { CategoryRow } from "@/components/shared/category-row";
+import { runAction } from "@/lib/api/run-action";
 import {
     createPostCategory,
     deletePostCategory,
@@ -90,9 +91,11 @@ export function PostCategoriesSheet({
 
     async function onAdd(e: React.FormEvent) {
         e.preventDefault();
-        setBusy(true);
-        const res = await createPostCategory(siteId, { name: name.trim() });
-        setBusy(false);
+        const res = await runAction(
+            () => createPostCategory(siteId, { name: name.trim() }),
+            { setBusy },
+        );
+        if (!res) return;
         // A refusal keeps the field open with what was typed.
         if (!res.ok) {
             showError(res.error);

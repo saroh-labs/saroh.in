@@ -32,6 +32,7 @@ import {
 import { step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
+import { runAction } from "@/lib/api/run-action";
 import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
 import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
 import { CatalogueHeader } from "./catalogue/catalogue-header";
@@ -160,9 +161,11 @@ export function CatalogueScreen({
     async function loadMore(): Promise<CatalogueRow[] | null> {
         const cursor = extraCursor ?? data.nextCursor;
         if (!cursor || loadingMore) return null;
-        setLoadingMore(true);
-        const res = await loadCataloguePage({ ...filter, cursor, limit: PAGE });
-        setLoadingMore(false);
+        const res = await runAction(
+            () => loadCataloguePage({ ...filter, cursor, limit: PAGE }),
+            { setBusy: setLoadingMore },
+        );
+        if (!res) return null;
         if (!res.ok) {
             showError("More products couldn't be loaded.", res.error);
             return null;

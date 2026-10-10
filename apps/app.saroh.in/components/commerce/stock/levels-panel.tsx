@@ -13,6 +13,7 @@ import type { StockLevels } from "@/lib/stock/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Boxes } from "lucide-react";
 
+import { runAction } from "@/lib/api/run-action";
 import { LevelsTable } from "./levels-table";
 import { chipClass } from "./tones";
 
@@ -109,15 +110,21 @@ export function LevelsPanel({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
+            if (!cursor) return;
             setLoadError(null);
-            const res = await loadLevelsPage({
-                storefront: storefrontView ? show : undefined,
-                q: q || undefined,
-                needs: show === "needs",
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            const res = await runAction(
+                () =>
+                    loadLevelsPage({
+                        storefront: storefrontView ? show : undefined,
+                        q: q || undefined,
+                        needs: show === "needs",
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;

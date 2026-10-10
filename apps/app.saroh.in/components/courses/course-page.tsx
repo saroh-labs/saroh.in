@@ -38,6 +38,7 @@ import { formatTimeRange } from "@/lib/format/datetime";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { invoiceMoney } from "@/lib/invoices/money";
 
+import { runAction } from "@/lib/api/run-action";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -83,9 +84,10 @@ export function CoursePage({
     const tab = courseTab({ ...course, sessions: course.sessions });
 
     async function setStatus(status: CourseDetail["status"], done: string) {
-        setBusy(true);
-        const res = await updateCourse(course.id, { status });
-        setBusy(false);
+        const res = await runAction(() => updateCourse(course.id, { status }), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(done);
         router.refresh();
@@ -561,13 +563,16 @@ function CancelEnrolmentDialog({
     const n = enrollment.upcoming;
 
     async function confirm() {
-        setBusy(true);
-        const res = await cancelEnrollment(
-            course.id,
-            enrollment.id,
-            voidToo && open ? open.id : undefined,
+        const res = await runAction(
+            () =>
+                cancelEnrollment(
+                    course.id,
+                    enrollment.id,
+                    voidToo && open ? open.id : undefined,
+                ),
+            { setBusy },
         );
-        setBusy(false);
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             router.refresh();

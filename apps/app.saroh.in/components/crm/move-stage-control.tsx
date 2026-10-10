@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { moveLead } from "@/lib/leads/actions";
 import type { LeadStage } from "@/lib/leads/service";
 
@@ -33,9 +34,10 @@ export function MoveStageControl({
 
     async function onChange(stageId: string) {
         if (stageId === currentStageId) return;
-        setBusy(true);
-        const res = await moveLead(leadId, stageId);
-        setBusy(false);
+        const res = await runAction(() => moveLead(leadId, stageId), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

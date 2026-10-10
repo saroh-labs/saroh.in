@@ -30,6 +30,7 @@ import {
 } from "@/lib/collections/rules";
 import type { CollectionDetail } from "@/lib/collections/service";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     CategoryField,
     DescriptionField,
@@ -187,16 +188,18 @@ export function CollectionSheet({
             setErrors({ [problem.field]: problem.message });
             return;
         }
-        setSaving(true);
-        const res =
-            collectionId !== null
-                ? await saveCollection(
-                      collectionId,
-                      changes.patch,
-                      changes.products,
-                  )
-                : await saveNewCollection(createBody(values));
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                collectionId !== null
+                    ? saveCollection(
+                          collectionId,
+                          changes.patch,
+                          changes.products,
+                      )
+                    : saveNewCollection(createBody(values)),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             const field = (
                 ["name", "description", "categoryId", "productIds"] as const

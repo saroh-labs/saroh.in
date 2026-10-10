@@ -24,6 +24,7 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SaveOutcome } from "./parts";
 
 /**
@@ -73,10 +74,13 @@ export function TrackerSetupDialog({
     function submit() {
         if (!value) return;
         startTransition(async () => {
-            const res = await onSave(kind, {
-                id: value,
-                ...(kind === "posthog" && region ? { region } : {}),
-            });
+            const res = await runAction(() =>
+                onSave(kind, {
+                    id: value,
+                    ...(kind === "posthog" && region ? { region } : {}),
+                }),
+            );
+            if (!res) return;
             if (res.ok) {
                 onClose();
                 return;

@@ -38,6 +38,7 @@ import {
     pickable,
 } from "@/lib/customer-workspace/merge";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { AccountBox, Choice } from "./merge-parts";
 import { MergeSearch } from "./merge-search";
 
@@ -165,7 +166,7 @@ export function MergeDialog({
             mergeBody(preview, hereId, loaded.picks, carry, confirmed),
         ).catch(() => ({
             ok: false as const,
-            error: "Couldn't reach Saroh to merge them. Nothing has changed.",
+            error: UNREACHED,
         }));
         setMerging(false);
         if (!res.ok) return setFailure(res.error);

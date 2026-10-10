@@ -21,6 +21,7 @@ import {
 } from "@/lib/products/quick-look";
 import { addedWords } from "@/lib/stock/levels";
 
+import { runAction } from "@/lib/api/run-action";
 import { TONE_TEXT } from "./tones";
 
 /**
@@ -159,15 +160,18 @@ function ShelfRow({
 
     async function add() {
         if (units === null || storeId === null || saving) return;
-        setSaving(true);
-        const res = await addQuickStock({
-            storeId,
-            productId,
-            variantId: shelf.variantId,
-            units,
-            idempotencyKey: key,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                addQuickStock({
+                    storeId,
+                    productId,
+                    variantId: shelf.variantId,
+                    units,
+                    idempotencyKey: key,
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError("The stock didn't change.", res.error);
             return;
