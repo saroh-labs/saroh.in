@@ -608,7 +608,7 @@ function CancelEnrolmentDialog({
                 ) : null}
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
-                        Keep them on
+                        Keep enrolment
                     </Button>
                     <Button
                         variant="destructive"

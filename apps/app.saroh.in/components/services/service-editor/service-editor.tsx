@@ -5,14 +5,13 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
 import { useState } from "react";
 
 import { StatePill } from "@/components/bookings/calendar/parts";
-import { LeaveDialog } from "@/components/commerce/product-editor-v2/editor-parts";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
+import { joinAnd } from "@/lib/editor-shell/state";
 import {
     archiveService,
     createService,
@@ -112,7 +111,6 @@ export function ServiceEditor({
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
-    const [leaving, setLeaving] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const set = (patch: Partial<ServiceDraft>) =>
         setDraft((d) => ({ ...d, ...patch }));
@@ -134,15 +132,14 @@ export function ServiceEditor({
     const pill = statePill(isNew, draft.taking);
     const title = draft.name.trim() || (service?.name ?? "New service");
 
-    useLeaveGuard(canEdit && dirty && !saving);
-
-    /** A link out of the page asks first while there are unsaved changes. */
-    const guard = (href: string) => (e: MouseEvent) => {
-        if (canEdit && dirty && !saving) {
-            e.preventDefault();
-            setLeaving(href);
-        }
-    };
+    // Every link out of the page asks first while there are unsaved
+    // changes: the breadcrumbs, the rail, and "Add a location" under Time.
+    const guard = useLeaveGuard({
+        dirty: canEdit && dirty && !saving,
+        lost: isNew
+            ? "The service isn't created yet, so nothing you've entered will be kept."
+            : `Your changes to ${joinAnd(changed)} will be lost.`,
+    });
 
     /** Who takes it, written to each person whose list changes. */
     async function setWho(serviceId: string, want: string[]) {
@@ -242,7 +239,6 @@ export function ServiceEditor({
             >
                 <Link
                     href="/bookings"
-                    onClick={guard("/bookings")}
                     className="text-muted-foreground hover:text-foreground"
                 >
                     Bookings
@@ -250,7 +246,6 @@ export function ServiceEditor({
                 <Chevron />
                 <Link
                     href={SERVICES_HREF}
-                    onClick={guard(SERVICES_HREF)}
                     className="text-muted-foreground hover:text-foreground"
                 >
                     Services
@@ -397,15 +392,7 @@ export function ServiceEditor({
                 </aside>
             </fieldset>
 
-            <LeaveDialog
-                open={leaving !== null}
-                onOpenChange={(open) => {
-                    if (!open) setLeaving(null);
-                }}
-                href={leaving ?? SERVICES_HREF}
-                creating={isNew}
-                sections={changed}
-            />
+            {guard.dialog}
             {service ? (
                 <ConfirmDialog
                     open={confirmDelete}

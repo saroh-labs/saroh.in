@@ -242,7 +242,7 @@ export function OrderRowMenu({
                 title={`Cancel order ${ref}?`}
                 description="Nothing was paid on it. Its reserved stock goes back on the shelves, and a cancelled order stays in the list. It can't be reopened."
                 confirmLabel="Cancel order"
-                cancelLabel="Keep it"
+                cancelLabel="Keep order"
                 onConfirm={() => {
                     setCancelling(false);
                     cancel();

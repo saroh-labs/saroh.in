@@ -287,7 +287,12 @@ export function DraftPreview({
              * the editor (G5), anything else in a new tab. On the editing
              * canvas a click selects the block, so a button can be edited
              * without leaving; ⌘/Ctrl-click opens the link there.
+             *
+             * These are not ways off the editor, so the leave guard
+             * (`components/shared/use-leave-guard.tsx`) leaves them to
+             * the handler below.
              */
+            data-leave-guard="off"
             onClickCapture={(e) => {
                 const anchor = (e.target as HTMLElement).closest("a");
                 if (!anchor) return;

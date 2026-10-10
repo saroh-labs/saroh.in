@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
     addOption,
@@ -18,7 +19,7 @@ import {
     renameOption,
 } from "@/lib/products/settings-actions";
 
-import { PROBLEM, SettingsSheet } from "./settings-sheet";
+import { PROBLEM } from "./product-settings";
 
 type Option = CatalogueView["options"][number];
 const MAX = 40;
@@ -182,13 +183,15 @@ export function OptionSheet({
     }
 
     return (
-        <SettingsSheet
+        <SettingsSheetFrame
             trigger={trigger}
             open={open}
-            onOpenChange={(o) => {
-                if (o) reset();
-                setOpen(o);
+            onOpen={() => {
+                reset();
+                setOpen(true);
             }}
+            onClose={() => setOpen(false)}
+            fieldsClassName="gap-4"
             title={option ? `Edit ${option.name}` : "New option"}
             description={
                 option
@@ -196,8 +199,8 @@ export function OptionSheet({
                     : "A way customers choose between variants, such as Size or Shade, and the values it offers."
             }
             pending={busy}
-            submitLabel={option ? "Save" : "Add option"}
-            busyLabel={option ? "Saving…" : "Adding…"}
+            saveLabel={option ? "Save" : "Add option"}
+            savingLabel={option ? "Saving…" : "Adding…"}
             onSubmit={(e) => {
                 e.preventDefault();
                 setTried(true);
@@ -327,7 +330,7 @@ export function OptionSheet({
                             : "Type a value and press Enter, or add them later.")}
                 </p>
             </div>
-        </SettingsSheet>
+        </SettingsSheetFrame>
     );
 }
 

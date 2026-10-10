@@ -7,10 +7,10 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import {
     NOTE,
     PROBLEM,
-    SettingsSheetFrame,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
 import {
@@ -171,7 +171,7 @@ function VerificationSheet({
 
     return (
         <SettingsSheetFrame
-            editId={editId}
+            returnFocusTo={editId}
             title={words.label}
             description={words.where.replace(
                 "{host}",

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
@@ -49,7 +50,11 @@ export function AddCustomerForm() {
         resolver: zodResolver(formSchema),
         defaultValues: { email: "", firstName: "", lastName: "", phone: "" },
     });
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
+    const guard = useLeaveGuard({
+        dirty: isDirty,
+        lost: "The customer isn't added yet, so nothing you've entered will be kept.",
+    });
 
     async function onSubmit(values: FormValues) {
         setHolder(null);
@@ -168,6 +173,7 @@ export function AddCustomerForm() {
                     </Button>
                 </div>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

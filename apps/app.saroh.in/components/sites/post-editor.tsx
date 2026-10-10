@@ -16,8 +16,8 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { MediaPicker } from "@/components/sites/media-picker";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { pausedWords } from "@/lib/billing/paused";
 import {
@@ -229,8 +229,16 @@ export function PostEditor({
         if (post) router.refresh();
     }, [post, router]);
 
-    // The browser's own guard, for the case the timer has not yet fired.
-    useLeaveGuard(dirty);
+    // For the case the timer has not yet fired. A way out saves what is
+    // waiting first and asks only when that save can't go; closing the
+    // tab gets the browser's own warning.
+    const guard = useLeaveGuard({
+        dirty,
+        lost: title.trim()
+            ? "Your latest changes to this post couldn't be saved, and will be lost if you leave now."
+            : "A post saves once it has a title, so what you've written will be lost.",
+        flush: async () => (await save({ silent: true })) !== null,
+    });
 
     function touched<T>(setter: (v: T) => void) {
         return (v: T) => {
@@ -545,6 +553,7 @@ export function PostEditor({
                     </aside>
                 ) : null}
             </div>
+            {guard.dialog}
         </div>
     );
 }

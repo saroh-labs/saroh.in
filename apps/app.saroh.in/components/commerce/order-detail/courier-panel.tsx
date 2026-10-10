@@ -16,7 +16,12 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 import { FOCUS } from "./parts";
 
 const FIELD =
@@ -92,6 +97,7 @@ function CourierDraft({
     const [otherName, setOtherName] = useState("");
     const [number, setNumber] = useState(before?.number ?? "");
     const [link, setLink] = useState(before?.url ?? "");
+    useOrderSheetDraft([courier, otherName, number, link]);
     const numberRef = useRef<HTMLInputElement>(null);
     const otherRef = useRef<HTMLInputElement>(null);
     const own = courier === OWN_DRIVER;

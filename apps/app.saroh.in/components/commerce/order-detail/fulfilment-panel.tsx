@@ -15,7 +15,12 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 import { FOCUS } from "./parts";
 
 const FIELD =
@@ -109,6 +114,7 @@ function FulfilmentDraft({
         postalCode: address?.postalCode ?? "",
     });
     const [tell, setTell] = useState(canTell);
+    useOrderSheetDraft([pick, charge, addr, tell]);
 
     const choose = (type: FulfilmentType) => {
         setPick(type);

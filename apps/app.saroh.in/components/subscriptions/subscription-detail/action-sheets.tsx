@@ -357,7 +357,7 @@ function CancelBody({
             ) : null}
             <Footer>
                 <Button variant="outline" className={BTN} onClick={onClose}>
-                    Keep it
+                    Keep subscription
                 </Button>
                 <Button
                     variant="destructive"

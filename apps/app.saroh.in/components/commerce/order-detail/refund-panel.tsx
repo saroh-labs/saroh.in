@@ -14,7 +14,12 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 import { FOCUS } from "./parts";
 
 export interface RefundChoice {
@@ -101,6 +106,7 @@ function RefundDraft({
     const [other, setOther] = useState("");
     const [typed, setTyped] = useState("");
     const [stock, setStock] = useState<"back" | "off">("off");
+    useOrderSheetDraft([picked, reason, other, typed, stock]);
     const worth = (l: OrderReadLine) =>
         Number(l.price ?? 0) * refundableQuantity(l);
     const sum = open.reduce((n, l) => n + (picked[l.id] ? worth(l) : 0), 0);

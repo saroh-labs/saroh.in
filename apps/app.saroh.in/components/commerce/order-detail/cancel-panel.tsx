@@ -13,7 +13,12 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 import { FOCUS } from "./parts";
 
 export interface CancelChoice {
@@ -86,6 +91,7 @@ function CancelDraft({
     const [reason, setReason] = useState<RefundReason | "">("");
     const [other, setOther] = useState("");
     const [tell, setTell] = useState(canTell);
+    useOrderSheetDraft([reason, other, tell]);
 
     return (
         <>
@@ -163,6 +169,9 @@ function CancelDraft({
                 )}
             </OrderSheetBody>
             <OrderSheetFoot
+                // Its button cancels the order, so the way out says what
+                // it keeps: never "Cancel" beside "Cancel order".
+                dismiss="Keep order"
                 note={
                     <p
                         id={`${ids}-how`}

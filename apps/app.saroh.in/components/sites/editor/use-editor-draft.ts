@@ -11,7 +11,6 @@ import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
 import { withVariant } from "@/components/sites/section-fields/variant-field";
 import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { saveDraftSections } from "@/lib/sites/actions";
 import { insertPosition } from "@/lib/sites/editor-positions";
@@ -107,8 +106,8 @@ export function useEditorDraft({
         JSON.stringify(livePlan.toSend) === lastSavedJson;
 
     // Unfinished sections that were never saved live only in this tab, and the
-    // bar reads "Saved · …" for everything else (review of #328).
-    useLeaveGuard(dirty);
+    // bar reads "Saved · …" for everything else (review of #328): `dirty`
+    // and `onlyHeldBack` reach the leave guard through `use-editor-leave.ts`.
 
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {

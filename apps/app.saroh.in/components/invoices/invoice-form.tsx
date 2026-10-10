@@ -22,6 +22,11 @@ import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
+import {
+    lostChanges,
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/use-leave-guard";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
@@ -181,7 +186,9 @@ export function InvoiceForm({
         address: useId(),
         lines: useId(),
     };
-    const [intent, setIntent] = useState<"issue" | "draft">("issue");
+    // Which button is working, for its label. Never what a submit does:
+    // Enter in a field is the form's own submit, and that saves the draft.
+    const [intent, setIntent] = useState<"issue" | "draft">("draft");
     // Someone added from Who (UX-047) joins the list here, chosen.
     const [added, setAdded] = useState<AddedContact[]>([]);
     const contacts = [...added, ...listed];
@@ -235,7 +242,7 @@ export function InvoiceForm({
                   gstRate: "",
                   hsnSac: "",
               });
-    const { isSubmitting, errors } = form.formState;
+    const { isSubmitting, isDirty, errors } = form.formState;
     const lines = useWatch({ control: form.control, name: "lines" });
     const due = useWatch({ control: form.control, name: "due" });
 
@@ -255,11 +262,8 @@ export function InvoiceForm({
         formatMoneyMajor(cents / 100, currency) ?? String(cents / 100);
     const withLink = providerConnected;
 
-    async function onSubmit(values: FormValues) {
-        // Missing details are asked for at once, before the save (#838):
-        // asked after it, the sheet waited on a save, a refusal and a read.
-        // Closed without saving, the draft is still kept, as below.
-        const detailsReady = intent === "issue" ? await details.ensure() : true;
+    /** Keep it as a draft. Null when refused, which is said on the form. */
+    async function save(values: FormValues) {
         const input = {
             contactId: values.contactId,
             ...(draft ? {} : { currency, tax: "0" }),
@@ -299,14 +303,26 @@ export function InvoiceForm({
             } else {
                 showError(saved.error);
             }
-            return;
+            return null;
         }
-        const id = saved.data.id;
+        return saved.data;
+    }
+
+    const savedAsDraft = (who: string | undefined) =>
+        `Saved as a draft for ${who ?? "them"}. No number yet.`;
+
+    async function onSubmit(values: FormValues, want: "issue" | "draft") {
+        setIntent(want);
+        // Missing details are asked for at once, before the save (#838):
+        // asked after it, the sheet waited on a save, a refusal and a read.
+        // Closed without saving, the draft is still kept, as below.
+        const detailsReady = want === "issue" ? await details.ensure() : true;
+        const saved = await save(values);
+        if (!saved) return;
+        const id = saved.id;
         const to = `/billing/invoices/${id}`;
-        if (intent === "draft") {
-            showSuccess(
-                `Saved as a draft for ${saved.data.contact?.name ?? "them"}. No number yet.`,
-            );
+        if (want === "draft") {
+            showSuccess(savedAsDraft(saved.contact?.name));
             router.push(to);
             return;
         }
@@ -361,6 +377,23 @@ export function InvoiceForm({
         }
     }
 
+    // Leaving with lines typed asks first, and can keep them as a draft.
+    const guard = useLeaveGuard({
+        dirty: isDirty,
+        lost: draft ? lostChanges("this draft") : lostNew("invoice"),
+        save: async () => {
+            let kept = false;
+            await form.handleSubmit(async (values) => {
+                setIntent("draft");
+                const saved = await save(values);
+                if (!saved) return;
+                kept = true;
+                showSuccess(savedAsDraft(saved.contact?.name));
+            }, onInvalid)();
+            return kept;
+        },
+    });
+
     function onContactAdded(c: AddedContact) {
         setAdded((a) => [c, ...a]);
         form.setValue("contactId", c.id, { shouldValidate: true });
@@ -395,8 +428,12 @@ export function InvoiceForm({
     return (
         <>
             {details.step}
+            {guard.dialog}
             <form
-                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                onSubmit={form.handleSubmit(
+                    (values) => onSubmit(values, "draft"),
+                    onInvalid,
+                )}
                 className="flex flex-wrap items-start gap-4"
                 noValidate
             >
@@ -751,10 +788,18 @@ export function InvoiceForm({
                             : " — Saroh doesn't send it; print it or share it yourself."}
                     </p>
                     <div className="mt-3 flex flex-col gap-2">
+                        {/* Issuing numbers the invoice and locks its lines, so
+                            it takes a press of this button. The form's one
+                            submit, which Enter runs, is the draft below. */}
                         <Button
-                            type="submit"
+                            type="button"
                             disabled={isSubmitting || noLine}
-                            onClick={() => setIntent("issue")}
+                            onClick={() =>
+                                void form.handleSubmit(
+                                    (values) => onSubmit(values, "issue"),
+                                    onInvalid,
+                                )()
+                            }
                             className="h-10 rounded-[10px] text-[13.5px]"
                         >
                             {isSubmitting && intent === "issue"
@@ -767,7 +812,6 @@ export function InvoiceForm({
                             type="submit"
                             variant="outline"
                             disabled={isSubmitting || noLine}
-                            onClick={() => setIntent("draft")}
                             className="h-10 rounded-[10px] text-[13.5px]"
                         >
                             {isSubmitting && intent === "draft"

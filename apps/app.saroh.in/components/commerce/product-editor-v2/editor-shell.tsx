@@ -8,13 +8,14 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
 import { currencySymbol } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
 import {
+    joinAnd,
     partitionSections,
     saveHint,
     SECTION_ORDER,
@@ -34,12 +35,7 @@ import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
 import { DetailsSection } from "./details-section";
-import {
-    LeaveDialog,
-    NextSteps,
-    ReadOnlyNote,
-    StatusPill,
-} from "./editor-parts";
+import { NextSteps, ReadOnlyNote, StatusPill } from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
@@ -148,7 +144,6 @@ function EditorBody({
     const symbol = currencySymbol(currency);
     const [createStatus, setCreateStatus] = useState<ProductStatus>("DRAFT");
     const [creatingNow, setCreatingNow] = useState(false);
-    const [leaving, setLeaving] = useState(false);
     // Creating: what the chosen category starts a product with. Sections
     // take it for the fields the merchant hasn't touched.
     const [defaults, setDefaults] = useState(initialDefaults);
@@ -175,7 +170,12 @@ function EditorBody({
     const createBad = SECTION_ORDER.some((k) => problems[k]);
     const firstBad = SECTION_ORDER.map((k) => problems[k]).find(Boolean) ?? "";
 
-    useLeaveGuard(canEdit && dirty.length > 0 && !creatingNow);
+    const guard = useLeaveGuard({
+        dirty: canEdit && dirty.length > 0 && !creatingNow,
+        lost: creating
+            ? "The product isn't created yet, so nothing you've entered will be kept."
+            : `Your changes to ${joinAnd(dirty.map((k) => names[k]))} will be lost.`,
+    });
 
     async function create() {
         if (!canWrite || createBad || creatingNow) return;
@@ -246,12 +246,6 @@ function EditorBody({
                 <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
                     <Link
                         href={PRODUCTS_HREF}
-                        onClick={(e) => {
-                            if (canEdit && dirty.length > 0) {
-                                e.preventDefault();
-                                setLeaving(true);
-                            }
-                        }}
                         className="flex items-center gap-[7px] rounded-[8px] px-[9px] py-1.5 text-[12.5px] text-foreground/75 hover:bg-muted hover:text-foreground"
                     >
                         <ChevronLeft
@@ -426,13 +420,7 @@ function EditorBody({
                 </div>
             </div>
 
-            <LeaveDialog
-                open={leaving}
-                onOpenChange={setLeaving}
-                href={PRODUCTS_HREF}
-                creating={creating}
-                sections={dirty.map((k) => names[k])}
-            />
+            {guard.dialog}
         </main>
     );
 }

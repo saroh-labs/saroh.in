@@ -1,7 +1,6 @@
 import { showError } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
 import { footerFromLine, footerLineField } from "@/lib/sites/footer-line";
 import type { SiteFooter, SitesResult } from "@/lib/sites/service";
@@ -160,8 +159,8 @@ export function useSiteChrome({
 
     const saving = nameSave.saving || footerSave.saving;
     const dirty = nameSave.dirty || footerSave.dirty;
-    // A name or footer still going out is work a closed tab would lose.
-    useLeaveGuard(dirty);
+    // A name or footer still going out is work leaving would lose: it
+    // reaches the leave guard as `chromeDirty` (`use-editor-leave.ts`).
 
     return {
         canUpdate,

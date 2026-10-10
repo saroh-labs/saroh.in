@@ -461,10 +461,9 @@ describe("naming what would be lost", () => {
                 created: true,
                 noun: "plan",
             }),
-        ).toEqual({
-            title: "Leave with unsaved changes?",
-            body: "Your changes to price and name aren't saved, and will be lost if you leave now.",
-        });
+        ).toBe(
+            "Your changes to price and name aren't saved, and will be lost if you leave now.",
+        );
     });
 
     it("words it for a conflict, naming who", () => {
@@ -480,7 +479,7 @@ describe("naming what would be lost", () => {
                 fields: ["price"],
                 created: true,
                 noun: "plan",
-            }).body,
+            }),
         ).toBe(
             "Priya changed this plan, so your changes to price aren't saved and will be lost.",
         );
@@ -494,9 +493,8 @@ describe("naming what would be lost", () => {
                 created: false,
                 noun: "pack",
             }),
-        ).toEqual({
-            title: "Leave without saving it?",
-            body: "Nothing you've entered is kept — the pack saves as a draft once it has a name.",
-        });
+        ).toBe(
+            "Nothing you've entered is kept, because the pack saves as a draft once it has a name.",
+        );
     });
 });

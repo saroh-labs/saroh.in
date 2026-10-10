@@ -17,6 +17,7 @@ import {
     useEditorLayout,
     useEditorSheets,
 } from "@/components/sites/editor/use-editor-layout";
+import { useEditorLeave } from "@/components/sites/editor/use-editor-leave";
 import { useEditorReview } from "@/components/sites/editor/use-editor-review";
 import {
     activeSection,
@@ -162,6 +163,16 @@ export function SiteEditor({
      */
     const unsaved =
         dirty || draft.saving || siteStyle.styleDirty || chrome.chromeDirty;
+    // A link out waits for the editor's own save, and asks only when the
+    // work can't save by itself.
+    const leaveGuard = useEditorLeave({
+        unsaved,
+        stuck:
+            draft.onlyHeldBack ||
+            draft.conflict ||
+            draft.saveError ||
+            chrome.chromeFailed,
+    });
 
     const add = useAddBlock({
         insertSection: draft.insertSection,
@@ -370,6 +381,7 @@ export function SiteEditor({
                     onJump={jumpToFlag}
                 />
             ) : null}
+            {leaveGuard.dialog}
         </div>
     );
 }

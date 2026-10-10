@@ -3910,3 +3910,40 @@ the files itself, which is about a second slower and always returns.
 **Rule**: a test runner must not depend on a machine-wide daemon. A step
 that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
 **Category**: tooling · `apps/api.saroh.in/jest.config.js`
+## Enter in an invoice field issued the invoice
+
+**Symptom**: pressing Enter in any field of a new or draft invoice numbered
+it and locked its lines (UX audit, 10 Oct). Nothing on screen said Enter
+would do the irreversible thing.
+**Cause**: the form had two `type="submit"` buttons and chose between them
+with an `intent` state that started as `"issue"`. Enter is the form's own
+submit: it runs the first submit button in the form, which was "Issue it".
+**Fix**: the form's one submit is Save as draft; Issue is a `type="button"`
+that calls the submit itself. The course form had the opposite fault (its
+primary was a `type="button"`, so Enter ran "Save as draft") and is fixed
+the same way round.
+**Check**: `components/invoices/invoice-form.enter.test.tsx` and
+`components/courses/course-form.enter.test.tsx` pin which button is the
+form's submit and what submitting the form does.
+**Category**: forms · `docs/patterns/frontend-forms.md` (Enter runs the
+form's first submit button, so that button is the reversible one)
+
+## Typed work was lost to a stray tap, a link or a Cancel
+
+**Symptom**: fourteen create and edit flows guarded leaving in six different
+ways or not at all; every settings sheet dropped its draft on a press
+outside; a stock count's Cancel dropped every number typed (UX audit, 10
+Oct).
+**Cause**: each flow and each sheet wrote its own leave dialog,
+`beforeunload` and `SheetContent`, so the rule was whatever the last author
+remembered. Two frames were copies "until the two are lifted into one".
+**Fix**: one guard (`components/shared/use-leave-guard.tsx`), one sheet
+frame (`components/shared/settings-sheet-frame.tsx`) that reads whether its
+draft changed from its own fields (`use-draft-changed.ts`), and Undo on the
+count's Cancel (`components/commerce/stock/use-count-mode.ts`).
+**Check**: `components/shared/leave-guard-flows.test.ts` lists the flows and
+fails one that words its own question; `settings-sheet-frame.test.tsx`
+lists the sheets and fails one that draws its own `SheetContent`;
+`cancel-way-out.test.ts` fails a `ConfirmDialog` that pairs a Cancel verb
+with the default "Cancel".
+**Category**: forms · `docs/patterns/frontend-forms.md`

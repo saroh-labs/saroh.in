@@ -7,6 +7,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type {
     SiteFooter,
     SiteNavigationItem,
@@ -15,7 +16,7 @@ import type {
 import { settingsEditId } from "@/lib/sites/settings-edit";
 
 import { MenuEditor } from "./menu-editor";
-import { NOTE, SettingsSheetFrame } from "./settings-sheet";
+import { NOTE } from "./settings-sheet";
 
 /* On demand and browser-only, for the same reasons as in the editor. */
 const RichTextEditor = dynamic(
@@ -63,7 +64,7 @@ export function MenuSheet({
         <SettingsSheetFrame
             {...frame}
             wide
-            editId={settingsEditId("menu")}
+            returnFocusTo={settingsEditId("menu")}
             title="Menu"
             description="The links at the top of every page, in this order."
             onSubmit={(e) => {
@@ -99,7 +100,7 @@ export function FooterSheet({
         <SettingsSheetFrame
             {...frame}
             wide
-            editId={settingsEditId("footer")}
+            returnFocusTo={settingsEditId("footer")}
             title="Footer"
             description="The line at the foot of every page."
             onSubmit={(e) => {
@@ -177,7 +178,7 @@ export function PostsPathSheet({
     return (
         <SettingsSheetFrame
             {...frame}
-            editId={settingsEditId("posts-path")}
+            returnFocusTo={settingsEditId("posts-path")}
             title="Posts path"
             description="Where your posts live on your site."
             onSubmit={(e) => {

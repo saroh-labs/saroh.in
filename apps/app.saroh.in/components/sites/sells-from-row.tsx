@@ -7,11 +7,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import {
     PROBLEM,
-    SettingsSheetFrame,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
 import { updateSiteSettings } from "@/lib/sites/actions";
@@ -186,7 +186,7 @@ function SellsFromSheet({
     const [tried, setTried] = useState(false);
     return (
         <SettingsSheetFrame
-            editId={settingsEditId("sells-from")}
+            returnFocusTo={settingsEditId("sells-from")}
             title="Sells from"
             description="The location whose products your online shop lists at /shop. It applies as soon as you save."
             open={open}
