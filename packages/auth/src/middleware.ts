@@ -21,7 +21,7 @@ export interface AuthMiddlewareOptions {
      * Where a visitor with no session goes instead of `loginUrl`, for a path
      * that has a better first page; null for the login. An invitation link
      * (`/join/:token`) opens the invitation itself — the business, who asked
-     * and the role — rather than "Log in · Welcome back" (UX-029).
+     * and the role — rather than "Sign in · Welcome back" (UX-029).
      */
     signedOutUrl?: (pathname: string) => string | null;
 }
