@@ -10,8 +10,8 @@ import { useTransition } from "react";
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
+import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { NameDialog } from "./name-dialog";
 import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
 
 const MAX = 30;

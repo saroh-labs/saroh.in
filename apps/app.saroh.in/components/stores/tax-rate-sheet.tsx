@@ -4,7 +4,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 import { taxRateField, taxRateValid } from "@/lib/stores/tax-rate";
 
@@ -19,7 +19,7 @@ export const TAX_RATE_ROW_ID = "location-tax-rate";
  * its note and its bounds.
  *
  * Drawn in the app's one sheet frame
- * (`components/shared/settings-sheet-frame.tsx`), which says how it saves
+ * (`components/shared/form-sheet.tsx`), which says how it saves
  * and closes. A refusal keeps the sheet open with what was typed. The row
  * gives each opening its own `key`, so it starts from the saved rate.
  */
@@ -41,7 +41,7 @@ export function TaxRateSheet({
     const changed = valid && Number(rate) !== Number(store.taxRate);
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${TAX_RATE_ROW_ID}-panel`}
             returnFocusTo={() =>
                 document.querySelector<HTMLElement>(
@@ -100,6 +100,6 @@ export function TaxRateSheet({
                     ? "A percentage of the order's items, before delivery."
                     : "A percentage from 0 to 100, with up to 2 decimals."}
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

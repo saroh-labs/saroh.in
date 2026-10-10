@@ -223,8 +223,8 @@ test.describe("selling, end to end (#122)", () => {
                     .getByRole("status")
                     .filter({ hasText: "Pay on collection" });
                 await expect(banner).toBeVisible();
-                const record = page.getByRole("alertdialog", {
-                    name: "Record this order as paid?",
+                const record = page.getByRole("dialog", {
+                    name: "Record as paid",
                 });
                 await pressUntil(
                     banner.getByRole("button", { name: "Mark paid" }),
@@ -274,8 +274,8 @@ test.describe("selling, end to end (#122)", () => {
                 await page
                     .getByRole("menuitem", { name: "Record as refunded" })
                     .click();
-                const refund = page.getByRole("alertdialog", {
-                    name: "Record a refund?",
+                const refund = page.getByRole("dialog", {
+                    name: "Record a refund",
                 });
                 await expect(
                     refund.getByRole("radio", { name: /Full amount/ }),

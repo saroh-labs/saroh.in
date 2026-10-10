@@ -512,7 +512,7 @@ describe("a refusal", () => {
         render();
         await press(button("Edit items or address"));
         await press(button("One more Seeded loaf", dialog()));
-        await press(button("Save — ₹120 more due", dialog()));
+        await press(button("Save (₹120 more due)", dialog()));
 
         expect(actions.editBeforePreparing).toHaveBeenCalledWith("o1", {
             lines: [{ itemId: "l1", quantity: 3 }],
@@ -551,7 +551,7 @@ describe("a refusal", () => {
         render(readyToShip());
         await press(button("Hand to courier"));
         type(field("Tracking number"), "BD 9920 1140");
-        await press(button("Handed over", dialog()));
+        await press(button("Mark handed over", dialog()));
 
         expect(toast.showError).toHaveBeenCalledWith("It isn't paid yet.");
         expect(dialogName()).toBe("Hand to courier");
@@ -590,7 +590,7 @@ describe("a save", () => {
         render();
         await press(button("Edit items or address"));
         await press(button("One more Seeded loaf", dialog()));
-        await press(button("Save — ₹120 more due", dialog()));
+        await press(button("Save (₹120 more due)", dialog()));
 
         expect(button("Cancel", dialog()).disabled).toBe(true);
         await escape();
@@ -615,7 +615,7 @@ describe("a save", () => {
         render(readyToShip());
         await press(button("Hand to courier"));
         type(field("Tracking number"), "BD 9920 1140");
-        await press(button("Handed over", dialog()));
+        await press(button("Mark handed over", dialog()));
 
         expect(actions.moveStage).toHaveBeenCalledWith("o1", {
             to: "HANDED_TO_COURIER",

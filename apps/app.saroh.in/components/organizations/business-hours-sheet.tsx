@@ -15,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import type { UndoOutcome } from "@/components/organizations/use-settings-undo";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import type { WeekText } from "@/lib/organizations/opening-hours";
@@ -142,7 +142,7 @@ export function BusinessHoursSheet({
 
     return (
         <Form {...form}>
-            <SettingsSheetFrame
+            <FormSheet
                 id={`${BUSINESS_ROW_ID.hours}-panel`}
                 returnFocusTo={returnTo}
                 title={WORDS.title}
@@ -200,7 +200,7 @@ export function BusinessHoursSheet({
                     while you&apos;re closed are ready from the next opening
                     time.
                 </p>
-            </SettingsSheetFrame>
+            </FormSheet>
         </Form>
     );
 }

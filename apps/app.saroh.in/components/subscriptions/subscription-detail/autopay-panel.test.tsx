@@ -84,7 +84,15 @@ function render(p: AutopayPanel, openSend: boolean) {
     });
 }
 
-const dialog = () => document.querySelector('[role="dialog"]');
+// jsdom has none, and a tick box inside a form measures itself.
+(globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+};
+
+const dialog = () =>
+    document.querySelector('[role="dialog"], [role="alertdialog"]');
 
 describe("opening the set-up sheet from Home (D14)", () => {
     it("opens Send a set-up link straight away when asked", () => {

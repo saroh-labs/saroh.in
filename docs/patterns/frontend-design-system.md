@@ -143,6 +143,14 @@
   State is a filled pill (`success`, `warning`, `error`, `info`, `draft`): the
   status tint with its 700 text, always saying the status in words. Kind is the
   neutral outline `tag`, for categories a shop owner invents.
+- **Current** — **Overlays come in fixed sizes and one head and foot**
+  (UX audit, 10 Oct), baked into `@saroh/ui/dialog`, `sheet` and
+  `alert-dialog` so no caller patches them: `DialogContent size="sm" |
+"md" | "lg"` (420, 460, 560px), the title in `font-display` at 18px, a
+  30px close target that is 44px on a touch pointer, and a footer that
+  stacks on a phone with `gap-2` and the main button on top. Never pass a
+  footer its own gap or a title its own type. The app draws them through
+  `FormSheet`, `FormDialog` and `ConfirmDialog` (`frontend-forms.md`).
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu

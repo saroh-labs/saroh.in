@@ -249,10 +249,13 @@ describe("adding a session", () => {
         expect(buttons("Add and book 3", d)).toHaveLength(1);
     });
 
-    it("can't be added without a date", () => {
+    it("can't be added without a date, and says so when pressed", async () => {
         render(courseOf({ sessions: [], sessionsLeft: 0 }));
         const d = open();
-        expect(buttons("Add session", d)[0]?.disabled).toBe(true);
+        expect(buttons("Add session", d)[0]?.disabled).toBe(false);
+        await press(buttons("Add session", d)[0]);
+        expect(addSession).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain("Pick a date.");
     });
 
     it("stays open with what was chosen when it is refused", async () => {
@@ -280,7 +283,7 @@ describe("adding a session", () => {
         render(courseOf());
         const d = open();
         await press(buttons("Add session", d)[0]);
-        expect(showSuccess).toHaveBeenCalledWith("Session added");
+        expect(showSuccess).toHaveBeenCalledWith("Session added.");
         expect(dialog()).toBe(null);
         expect(refresh).toHaveBeenCalledTimes(1);
     });

@@ -26,26 +26,48 @@
 
 - **Current** — **One seam.** `showSuccess`, `showError`, `showWarning` and
   `showInfo` from `@saroh/ui/toast`, all `(message, description?)`. ESLint
-  rejects sonner's `toast` in the apps.
+  rejects sonner's `toast` in the apps. `showSuccess` takes a third
+  argument, one action (`{ label, onClick }`): the way to the thing just
+  made, for an overlay that keeps the merchant where they were.
+- **Current** — **One grammar for what an overlay says when it worked**
+  (UX audit, 10 Oct): "{Thing} saved." or "{Thing} added.", with a full
+  stop, the detail on the second line, and Undo where the write can be
+  taken back. Never "Saved", "Done", "{Thing} updated" or "queued".
 - **Adopted** — **Toast copy is product copy.** Show the API's guarded message
   (`res.error`) or your own sentence — never an exception's `error.message`, an
   API `detail` or a response body. Gap: `saroh.in`'s `join-waitlist.tsx`
   forwards `error.message`.
 - **Adopted** — **Never put the only way to do something in a toast,** and keep
   error toasts on screen long enough to read (15 §5).
-- **Current** — **`showUndo` takes a `duration`** for a screen whose Undo
-  window is a rule of its own (Order Detail's ten-second steps, ADR-008), and
-  **`dismissToasts()` clears the stack** when a screen starts an Undo of its
-  own — two Undos on screen at once, for two different things, is how the
-  wrong one gets pressed.
+- **Current** — **One Undo, ten seconds, and it says how it went** (UX
+  audit, 10 Oct). `showUndo(message, undo, options?)` lasts ten seconds
+  everywhere (`UNDO_MS`). No screen has a duration or a timer of its own
+  (`overlay-frames.test.ts`). `undo` returns its result (a promise of
+  `true`, or the action's `{ ok, error }`), and `showUndo` itself says
+  "Undone." or "Couldn't undo. It stays as saved." with the reason under
+  it. So no caller words an Undo's outcome and none fails silently. An
+  `undo` that returns nothing at once has kept the outcome for itself (a
+  hold card that draws its own state). **`dismissToasts()` clears the
+  stack** when a screen starts an Undo of its own: two Undos on screen at
+  once, for two different things, is how the wrong one gets pressed.
 - **Current** — **The ten-second hold is `apps/app.saroh.in/lib/hold-undo.ts`**
   (round-2 G3; default 136), never a timer of a screen's own. `startHold`
   takes `commit` (what happens if nobody presses Undo: on time out, "now",
   or leaving) and `undo`; `createHoldSlot` keeps one hold at a time. A
   failed callback ends the hold as `failed` for the caller to word. The site
-  editor's `use-undo.ts` is the reference caller; B6 and F4 reuse it.
-  `showUndo` returns the toast's id, and `dismissToast(id)` takes that one
-  Undo away when its window closes early, leaving any error toast beside it.
+  editor's `use-undo.ts` is the reference caller of the helper itself.
+  With a toast, use **`useHold`** (`components/shared/use-hold.ts`):
+  `hold(key, message, commit, onUndo)` shows the thing as done and writes
+  it when the ten seconds are up, `send(key, { run, sent })` is the same
+  for anything that tells a customer ("Sending in 10 seconds", then "Sent
+  to {name}."), and `undo(key)` is the screen's own Undo beside the thing.
+  The bookings calendar, Home's Today, invites, sends and held cancels all
+  use it. `showUndo` returns the toast's id, and `dismissToast(id)` takes
+  that one Undo away when its window closes early.
+- **Current** — **Undo or confirm, never both, never neither.** Reversible:
+  do it and offer Undo, no dialog. Irreversible: the one `ConfirmDialog`,
+  which waits for the action and says a refusal inside itself. No way back
+  in the API, but not final yet: hold it (`useHold`).
 
 ### An unreachable API is not a signed-out user — **Current**
 

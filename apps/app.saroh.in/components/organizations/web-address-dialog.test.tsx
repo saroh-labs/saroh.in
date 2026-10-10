@@ -228,7 +228,8 @@ describe("the Change dialog", () => {
             "Customers signed in on your site will need to sign in again",
         );
         expect(said.indexOf("sign in again")).toBeLessThan(
-            said.indexOf("Change web address"),
+            // The title says it too: the button is the last of them.
+            said.lastIndexOf("Change web address"),
         );
     });
 
@@ -318,7 +319,8 @@ describe("the Change dialog", () => {
         await settle(10);
         expect(saveWebAddress).toHaveBeenLastCalledWith("rye-bakery-2");
         expect(showSuccess).toHaveBeenCalledWith(
-            "Your web address is now rye-bakery-2.saroh.app",
+            "Web address changed.",
+            "It is now rye-bakery-2.saroh.app.",
         );
         expect(refresh).toHaveBeenCalled();
         expect(host.querySelector('[role="dialog"]')).toBe(null);

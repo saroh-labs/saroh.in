@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
 
-import { useHeld } from "@/components/bookings/calendar/use-held";
+import { useHold } from "@/components/shared/use-hold";
 import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
 import { clockNow, todayView } from "@/lib/home/today";
@@ -26,7 +26,7 @@ type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
  *
  * Arrived and No-show write the booking's own outcome (#241) for someone
  * who holds `booking:write`, and are held for Undo first, as the calendar
- * holds them (`useHeld`): the row reads "Arrived 09:32" at once, and Undo
+ * holds them (`useHold`): the row reads "Arrived 09:32" at once, and Undo
  * drops it before anything is written. Without `booking:write` the states
  * show and nothing can be marked. A refusal (a booking cancelled meanwhile)
  * puts the row back and says why.
@@ -34,7 +34,7 @@ type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
 export function Today({ today, now }: { today: HomeToday; now: string }) {
     const headingId = useId();
     const router = useRouter();
-    const { hold } = useHeld();
+    const { hold } = useHold();
     const [marked, setMarked] = useState<Partial<Record<string, Marked>>>({});
 
     const view = useMemo(() => {

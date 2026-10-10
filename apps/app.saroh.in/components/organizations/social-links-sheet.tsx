@@ -13,7 +13,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
@@ -126,7 +126,7 @@ export function SocialLinksSheet({
     const phoneShown = phone ? phoneLabel(phone) : "";
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={formId}
             returnFocusTo={returnTo}
             title={words.title}
@@ -230,6 +230,6 @@ export function SocialLinksSheet({
                     {refusal}
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

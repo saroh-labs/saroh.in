@@ -39,8 +39,8 @@ import {
 
 import { Pill } from "../pill";
 import { SubscribeDialog } from "../subscribe-dialog";
-import type { Step } from "./action-sheets";
-import { ActionSheet } from "./action-sheets";
+import type { Step } from "./action-dialogs";
+import { ActionDialog } from "./action-dialogs";
 import { AutopayActions } from "./autopay-panel";
 import { ChangesCard } from "./changes-card";
 import {
@@ -456,7 +456,7 @@ export function SubscriptionDetail({
                 </div>
             </div>
 
-            <ActionSheet
+            <ActionDialog
                 step={step}
                 onClose={() => setStep(null)}
                 busy={busy}

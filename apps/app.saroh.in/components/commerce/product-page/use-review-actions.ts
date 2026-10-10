@@ -62,12 +62,13 @@ export function useReviewActions() {
             router.refresh();
             if (hide) {
                 showUndo(
-                    "Review hidden from the shop — it stays here, marked.",
-                    () => {
-                        void setReviewHidden(id, false).then(() =>
-                            router.refresh(),
-                        );
+                    "Review hidden from the shop.",
+                    async () => {
+                        const back = await setReviewHidden(id, false);
+                        router.refresh();
+                        return back;
                     },
+                    { description: "It stays here, marked." },
                 );
             } else {
                 showSuccess("Review shown on the shop again.");

@@ -1,14 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
+import { FormDialog } from "@/components/shared/form-dialog";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -106,6 +98,7 @@ export function SellPackDialog({
     );
     const [paidBy, setPaidBy] = useState<DeskPaidBy | "">("");
     const [busy, setBusy] = useState(false);
+    const [tried, setTried] = useState(false);
     // Read once, when the dialog is made: "today" for the use-by date.
     const [today] = useState(() => Date.now());
 
@@ -125,6 +118,7 @@ export function SellPackDialog({
     const missing = !contactId || !paidBy || !pack;
 
     async function save() {
+        setTried(true);
         if (!pack || !contactId || !paidBy || blocked) return;
         setBusy(true);
         const res = await sellPack(pack.id, contactId, paidBy);
@@ -134,6 +128,7 @@ export function SellPackDialog({
         onOpenChange(false);
         setContactId(initialContactId ?? "");
         setPaidBy("");
+        setTried(false);
         router.refresh();
     }
 
@@ -141,155 +136,135 @@ export function SellPackDialog({
     const nobody = contacts.length === 0;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[440px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                        {fixed ? `Sell ${fixed.name}` : "Sell a pack"}
-                    </DialogTitle>
-                    <DialogDescription className="text-[12.5px]">
-                        {pack
-                            ? sellTerms(pack, today)
-                            : "Classes come off when they book and go back if they cancel in time."}
-                    </DialogDescription>
-                </DialogHeader>
-                {nothingToSell ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        There is no pack on sale yet.{" "}
-                        <Link
-                            href="/class-packs/new"
-                            className="font-medium text-foreground underline underline-offset-4 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                            Make one
-                        </Link>{" "}
-                        first.
+        <FormDialog
+            open={open}
+            size="md"
+            title={fixed ? `Sell ${fixed.name}` : "Sell a pack"}
+            description={
+                pack
+                    ? sellTerms(pack, today)
+                    : "Classes come off when they book and go back if they cancel in time."
+            }
+            pending={busy}
+            doneOnly={Boolean(nothingToSell) || nobody}
+            doneLabel="Close"
+            saveLabel={sellLabel(pack, paidBy, invoicesOnSale)}
+            savingLabel="Selling…"
+            fieldsClassName="block"
+            footNote={
+                tried && missing ? (
+                    <p
+                        id={ids.missing}
+                        role="alert"
+                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                    >
+                        Choose a customer and how they paid.
                     </p>
-                ) : nobody ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        A pack is sold to one of your customers, and there is
-                        nobody there yet — or Customers is not open to you. Add
-                        them in Customers first.
-                    </p>
-                ) : (
-                    <div className="grid gap-3">
-                        {fixed ? null : (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={ids.pack}>Pack</Label>
-                                <OptionSelect
-                                    id={ids.pack}
-                                    value={packId}
-                                    onValueChange={setPackId}
-                                    aria-describedby={`${ids.pack}-help`}
-                                    options={onSale.map((p) => ({
-                                        value: p.id,
-                                        label: `${p.name} · ${money(p.price, p.currency)}`,
-                                    }))}
-                                />
-                                {pack ? (
-                                    <p
-                                        id={`${ids.pack}-help`}
-                                        className="text-[12px] leading-[1.5] text-muted-foreground"
-                                    >
-                                        Usable on {usableOn(pack.services)}.
-                                    </p>
-                                ) : null}
-                            </div>
-                        )}
+                ) : null
+            }
+            onClose={() => {
+                setTried(false);
+                onOpenChange(false);
+            }}
+            onSubmit={save}
+        >
+            {nothingToSell ? (
+                <p className="text-[13px] text-muted-foreground">
+                    There is no pack on sale yet.{" "}
+                    <Link
+                        href="/class-packs/new"
+                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                        Make one
+                    </Link>{" "}
+                    first.
+                </p>
+            ) : nobody ? (
+                <p className="text-[13px] text-muted-foreground">
+                    A pack is sold to one of your customers, and there is nobody
+                    there yet, or Customers is not open to you. Add them in
+                    Customers first.
+                </p>
+            ) : (
+                <div className="grid gap-3">
+                    {fixed ? null : (
                         <div className="grid gap-1.5">
-                            <Label htmlFor={ids.who}>Customer</Label>
-                            <ContactPicker
-                                id={ids.who}
-                                contacts={contacts}
-                                value={contactId}
-                                onValueChange={setContactId}
-                                placeholder="Choose a customer"
-                                aria-invalid={blocked ? true : undefined}
-                                aria-describedby={
-                                    blocked ? ids.block : undefined
-                                }
+                            <Label htmlFor={ids.pack}>Pack</Label>
+                            <OptionSelect
+                                id={ids.pack}
+                                value={packId}
+                                onValueChange={setPackId}
+                                aria-describedby={`${ids.pack}-help`}
+                                options={onSale.map((p) => ({
+                                    value: p.id,
+                                    label: `${p.name} · ${money(p.price, p.currency)}`,
+                                }))}
                             />
-                            {blocked ? (
+                            {pack ? (
                                 <p
-                                    id={ids.block}
-                                    role="alert"
-                                    className="text-[12.5px] font-medium text-destructive"
+                                    id={`${ids.pack}-help`}
+                                    className="text-[12px] leading-[1.5] text-muted-foreground"
                                 >
-                                    {blocked}
-                                </p>
-                            ) : holding ? (
-                                <p className="text-[12.5px] text-foreground/80">
-                                    {holding}
+                                    Usable on {usableOn(pack.services)}.
                                 </p>
                             ) : null}
                         </div>
-                        <div className="grid gap-1.5">
-                            <div
-                                id={ids.paid}
-                                className="text-[12.5px] font-medium"
+                    )}
+                    <div className="grid gap-1.5">
+                        <Label htmlFor={ids.who}>Customer</Label>
+                        <ContactPicker
+                            id={ids.who}
+                            contacts={contacts}
+                            value={contactId}
+                            onValueChange={setContactId}
+                            placeholder="Choose a customer"
+                            aria-invalid={blocked ? true : undefined}
+                            aria-describedby={blocked ? ids.block : undefined}
+                        />
+                        {blocked ? (
+                            <p
+                                id={ids.block}
+                                role="alert"
+                                className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                             >
-                                Paid by
-                            </div>
-                            <div
-                                role="radiogroup"
-                                aria-labelledby={ids.paid}
-                                className="flex flex-wrap gap-1.5"
-                            >
-                                {DESK_PAID_BY.map((m) => (
-                                    <Chip
-                                        key={m.value}
-                                        on={paidBy === m.value}
-                                        onClick={() => setPaidBy(m.value)}
-                                    >
-                                        {m.label}
-                                    </Chip>
-                                ))}
-                            </div>
-                        </div>
-                        {pack ? (
-                            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                                {sellNote(pack, invoicesOnSale)}
+                                {blocked}
+                            </p>
+                        ) : holding ? (
+                            <p className="text-[12.5px] text-foreground/80">
+                                {holding}
                             </p>
                         ) : null}
                     </div>
-                )}
-                <DialogFooter className="gap-2 sm:gap-2">
-                    {missing && !nothingToSell && !nobody ? (
-                        <p
-                            id={ids.missing}
-                            className="text-[12px] text-muted-foreground sm:mr-auto sm:self-center"
+                    <div className="grid gap-1.5">
+                        <div
+                            id={ids.paid}
+                            className="text-[12.5px] font-medium"
                         >
-                            Choose a customer and how they paid.
+                            Paid by
+                        </div>
+                        <div
+                            role="radiogroup"
+                            aria-labelledby={ids.paid}
+                            className="flex flex-wrap gap-1.5"
+                        >
+                            {DESK_PAID_BY.map((m) => (
+                                <Chip
+                                    key={m.value}
+                                    on={paidBy === m.value}
+                                    onClick={() => setPaidBy(m.value)}
+                                >
+                                    {m.label}
+                                </Chip>
+                            ))}
+                        </div>
+                    </div>
+                    {pack ? (
+                        <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                            {sellNote(pack, invoicesOnSale)}
                         </p>
                     ) : null}
-                    <Button
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={
-                            busy ||
-                            Boolean(nothingToSell) ||
-                            nobody ||
-                            missing ||
-                            Boolean(blocked)
-                        }
-                        aria-describedby={
-                            blocked
-                                ? ids.block
-                                : missing
-                                  ? ids.missing
-                                  : undefined
-                        }
-                        onClick={() => void save()}
-                    >
-                        {busy
-                            ? "Selling…"
-                            : sellLabel(pack, paidBy, invoicesOnSale)}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </div>
+            )}
+        </FormDialog>
     );
 }

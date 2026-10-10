@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { SiteDetail, SiteIconSaved } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
@@ -62,7 +62,7 @@ export function SiteIconSheet({
     const shapeNote = chosen ? siteIconShapeNote(chosen) : null;
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("icon")}
             title="Site icon"
             description="The small picture beside your site's name in a browser tab, in bookmarks and on a phone's home screen."
@@ -159,6 +159,6 @@ export function SiteIconSheet({
             ) : (
                 <p className={NOTE}>{WITHOUT[without]}</p>
             )}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

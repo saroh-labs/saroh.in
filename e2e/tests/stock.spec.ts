@@ -124,7 +124,7 @@ test.describe("Stock screen", () => {
                 .click();
             await page.getByRole("option", { name, exact: true }).click();
             await sheet.getByLabel("How many").fill("2");
-            await sheet.getByRole("button", { name: "Record" }).click();
+            await sheet.getByRole("button", { name: "Record stock" }).click();
             await expect(
                 page.getByText("Recorded 2 wasted — 5 on hand now."),
             ).toBeVisible();
@@ -149,9 +149,6 @@ test.describe("Stock screen", () => {
                 await expect(
                     dialog.getByText(/^Only 5 can be moved/),
                 ).toBeVisible();
-                await expect(
-                    dialog.getByRole("button", { name: "Move" }),
-                ).toBeDisabled();
                 await dialog.getByRole("button", { name: "Cancel" }).click();
             }
         } finally {

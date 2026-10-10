@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useMemo, useState } from "react";
 
+import { OptionSelect } from "@/components/shared/option-select";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { stockWords } from "@/lib/products/catalogue";
 import { addQuickStock } from "@/lib/products/list-actions";
@@ -89,17 +90,16 @@ export function StockBlock({
                     {canStock && where.length > 1 ? (
                         <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                             Add at
-                            <select
+                            <OptionSelect
+                                size="sm"
                                 value={addAt ?? ""}
-                                onChange={(e) => setAddAt(e.target.value)}
-                                className="h-[30px] rounded-[7px] border border-border bg-card py-0 pl-2 pr-8 text-[12.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
-                            >
-                                {where.map((p) => (
-                                    <option key={p.storeId} value={p.storeId}>
-                                        {p.storeName}
-                                    </option>
-                                ))}
-                            </select>
+                                onValueChange={setAddAt}
+                                options={where.map((p) => ({
+                                    value: p.storeId,
+                                    label: p.storeName,
+                                }))}
+                                className="h-[30px] w-auto min-w-[140px] rounded-[7px] text-[12.5px] coarse:h-11"
+                            />
                         </label>
                     ) : null}
                     {stock.shelves.map((s) => (

@@ -3,6 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Link2Off } from "lucide-react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import {
@@ -67,16 +68,17 @@ export function NewLinkConfirm({
     onOpenChange: (open: boolean) => void;
     /** Who the invoice is billed to: the one to send the new link. */
     who: string;
-    onConfirm: () => void;
+    onConfirm: () => ConfirmResult | Promise<ConfirmResult>;
 }) {
     return (
         <ConfirmDialog
+            tone="neutral"
             open={open}
             onOpenChange={onOpenChange}
             title={UNSEEN_LINK.confirmTitle}
             description={newLinkWarning(who)}
             confirmLabel={UNSEEN_LINK.confirmLabel}
-            cancelLabel={UNSEEN_LINK.cancelLabel}
+            keepLabel={UNSEEN_LINK.keepLabel}
             onConfirm={onConfirm}
             icon={Link2Off}
         />

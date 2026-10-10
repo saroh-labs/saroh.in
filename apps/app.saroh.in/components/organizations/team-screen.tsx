@@ -19,14 +19,6 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
-import {
     Form,
     FormControl,
     FormField,
@@ -36,12 +28,6 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -49,11 +35,10 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import {
-    draftWatch,
-    useDraftChanged,
-} from "@/components/shared/use-draft-changed";
+import { FormSheet } from "@/components/shared/form-sheet";
+import { useHold } from "@/components/shared/use-hold";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
 import {
@@ -508,7 +493,7 @@ export function TeamScreen({
                 onClose={() => setRemoving(null)}
             />
             {canManage ? (
-                <InviteDialog
+                <InviteSheet
                     open={inviteOpen}
                     onOpenChange={setInviteOpen}
                     organizationName={organizationName}
@@ -736,8 +721,10 @@ function PeopleTab({
  *
  * Resend is the API's own re-invite: inviting an address that already has an
  * invitation refreshes it in place — a new link, a fresh week, a new email —
- * and the old link stops working. Cancel withdraws it for good; there is no
- * undo, because the link it voided cannot be revived, only replaced.
+ * and the old link stops working. Cancel withdraws it for good, and the
+ * link it voids cannot be revived, only replaced. So it is held: the row
+ * goes at once with Undo, and it is cancelled when the ten seconds are up
+ * (`useHold`). Resend tells someone, so it waits its ten seconds too.
  */
 function PendingInvites({
     invitations,
@@ -751,41 +738,48 @@ function PendingInvites({
 }) {
     const router = useRouter();
     const zone = useBusinessZone();
-    const [busy, setBusy] = useState<{
-        id: string;
-        action: "resend" | "cancel";
-    } | null>(null);
+    const { hold, send, pending } = useHold();
+    const [cancelled, setCancelled] = useState<readonly string[]>([]);
+    const shown = invitations.filter((i) => !cancelled.includes(i.id));
 
-    async function resend(invitation: OrganizationInvitation) {
+    function resend(invitation: OrganizationInvitation) {
         const role = invitation.roleKey ?? invitation.role;
-        setBusy({ id: invitation.id, action: "resend" });
-        const res = await inviteMember({
-            email: invitation.email,
-            role,
-            ...(role === "REVIEWER" ? { siteIds: invitation.siteIds } : {}),
+        send(`resend:${invitation.id}`, {
+            description: `A new link goes to ${invitation.email}. The old one stops working.`,
+            run: () =>
+                inviteMember({
+                    email: invitation.email,
+                    role,
+                    ...(role === "REVIEWER"
+                        ? { siteIds: invitation.siteIds }
+                        : {}),
+                }),
+            sent: `Sent to ${invitation.email}.`,
+            onSent: () => router.refresh(),
         });
-        setBusy(null);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess(`Invite sent again to ${invitation.email}.`);
-        router.refresh();
     }
 
-    async function cancel(invitation: OrganizationInvitation) {
-        setBusy({ id: invitation.id, action: "cancel" });
-        const res = await revokeInvitation(invitation.id);
-        setBusy(null);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess(
-            `Invite to ${invitation.email} cancelled — the link no longer works.`,
+    function cancel(invitation: OrganizationInvitation) {
+        const back = () =>
+            setCancelled((ids) => ids.filter((id) => id !== invitation.id));
+        setCancelled((ids) => [...ids, invitation.id]);
+        hold(
+            `invitation:${invitation.id}`,
+            "Invitation cancelled.",
+            async () => {
+                const res = await revokeInvitation(invitation.id);
+                if (!res.ok) {
+                    showError("The invitation wasn't cancelled.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
+            { description: "Its link no longer works." },
         );
-        router.refresh();
     }
+
+    if (shown.length === 0) return null;
 
     return (
         <section
@@ -796,9 +790,11 @@ function PendingInvites({
                 Invited · not joined yet
             </p>
             <ul>
-                {invitations.map((invitation, i) => {
+                {shown.map((invitation, i) => {
                     const role = invitation.roleKey ?? invitation.role;
-                    const mine = busy?.id === invitation.id;
+                    const resending = pending.includes(
+                        `resend:${invitation.id}`,
+                    );
                     // The API refuses to re-invite at a role that can do more
                     // than the person sending it.
                     const beyond = !book.withinReach(role);
@@ -842,7 +838,7 @@ function PendingInvites({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={!!busy || beyond}
+                                    disabled={resending || beyond}
                                     title={
                                         beyond
                                             ? "Can do more than you can"
@@ -851,21 +847,16 @@ function PendingInvites({
                                     onClick={() => resend(invitation)}
                                     aria-label={`Resend the invite to ${invitation.email}`}
                                 >
-                                    {mine && busy.action === "resend"
-                                        ? "Sending…"
-                                        : "Resend"}
+                                    {resending ? "Sending…" : "Resend"}
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={!!busy}
                                     onClick={() => cancel(invitation)}
-                                    aria-label={`Cancel the invite to ${invitation.email}`}
+                                    aria-label={`Cancel the invitation to ${invitation.email}`}
                                     className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                                 >
-                                    {mine && busy.action === "cancel"
-                                        ? "Cancelling…"
-                                        : "Cancel invite"}
+                                    Cancel invitation
                                 </Button>
                             </div>
                         </li>
@@ -940,7 +931,7 @@ function MemberDrawer({
     }
 
     async function save() {
-        if (!member || !changed) return;
+        if (!member) return;
         // A reviewer holds named sites; making someone one needs sites they
         // already have, or a fresh reviewer invitation.
         if (role === "REVIEWER" && member.siteIds.length === 0) {
@@ -971,162 +962,132 @@ function MemberDrawer({
             return;
         }
         showSuccess(
+            roleChanged ? "Role saved." : "Permissions saved.",
             roleChanged
                 ? `${nameOf(member)} is now ${book.labelOf(role)} in ${organizationName}.`
-                : `${nameOf(member)}’s permissions in ${organizationName} are saved.`,
+                : undefined,
         );
         close();
         router.refresh();
     }
 
     return (
-        <Sheet
+        <FormSheet
             open={!!member}
-            onOpenChange={(open) => {
-                if (!open) close();
-            }}
+            eyebrow={member?.email}
+            title={member ? nameOf(member) : "Team member"}
+            description={`Their role in ${organizationName}, and anything extra they may do. It applies as soon as you save.`}
+            pending={saving}
+            dirty={changed}
+            saveOff={outranks}
+            extra={
+                /* Everyone else is removed from their row. An owner and
+                   the viewer have no Remove there, so this is the one way
+                   to remove a second owner, or to leave. */
+                member && !locked && (current === "OWNER" || member.isSelf) ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
+                        disabled={saving}
+                        onClick={() => {
+                            // A role picked and not saved must not follow
+                            // the sheet to the next person it opens for.
+                            setDraft(null);
+                            onRemove(member);
+                        }}
+                    >
+                        Remove from {organizationName}
+                    </Button>
+                ) : null
+            }
+            onClose={close}
+            onSubmit={save}
         >
-            <SheetContent
-                side="right"
-                className="flex w-[396px] max-w-[90vw] flex-col gap-0 p-0 sm:max-w-[396px]"
-            >
-                {member ? (
-                    <>
-                        <div className="flex items-center gap-[11px] border-b border-muted px-[18px] py-4 pr-12">
-                            <Avatar size="panel" ringTone={roleRingTone(role)}>
-                                <AvatarFallback>
-                                    {avatarInitials(member.name, member.email)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                                <SheetTitle className="font-display text-[17px] font-semibold tracking-[-0.025em]">
-                                    {nameOf(member)}
-                                </SheetTitle>
-                                <SheetDescription className="mt-0.5 truncate text-[11.5px]">
-                                    {member.email}
-                                </SheetDescription>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-[18px]">
-                            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                Role in {organizationName}
-                            </p>
-                            <div
-                                role="radiogroup"
-                                aria-label="Role"
-                                className="flex flex-col gap-[5px]"
-                            >
-                                {book.all.map(({ key: r }) => {
-                                    const on = r === role;
-                                    const beyond = !book.withinReach(r);
-                                    return (
-                                        <button
-                                            key={r}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={on}
-                                            disabled={locked || beyond}
-                                            onClick={() => setDraft(r)}
-                                            className={cn(
-                                                "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
-                                                on
-                                                    ? "border-border-strong bg-foreground/[0.03]"
-                                                    : "border-muted hover:border-border-strong active:bg-accent-active",
-                                            )}
-                                        >
-                                            <RoleDot role={r} />
-                                            <span className="min-w-0 flex-1">
-                                                <span
-                                                    className={cn(
-                                                        "block text-[13px]",
-                                                        on
-                                                            ? "font-semibold"
-                                                            : "font-medium",
-                                                    )}
-                                                >
-                                                    {book.labelOf(r)}
-                                                </span>
-                                                <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                                                    {beyond
-                                                        ? "Can do more than you can"
-                                                        : book.plainOf(r)}
-                                                </span>
+            {member ? (
+                <>
+                    <div>
+                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            Role in {organizationName}
+                        </p>
+                        <div
+                            role="radiogroup"
+                            aria-label="Role"
+                            className="flex flex-col gap-[5px]"
+                        >
+                            {book.all.map(({ key: r }) => {
+                                const on = r === role;
+                                const beyond = !book.withinReach(r);
+                                return (
+                                    <button
+                                        key={r}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={on}
+                                        disabled={locked || beyond}
+                                        onClick={() => setDraft(r)}
+                                        className={cn(
+                                            "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
+                                            on
+                                                ? "border-border-strong bg-foreground/[0.03]"
+                                                : "border-muted hover:border-border-strong active:bg-accent-active",
+                                        )}
+                                    >
+                                        <RoleDot role={r} />
+                                        <span className="min-w-0 flex-1">
+                                            <span
+                                                className={cn(
+                                                    "block text-[13px]",
+                                                    on
+                                                        ? "font-semibold"
+                                                        : "font-medium",
+                                                )}
+                                            >
+                                                {book.labelOf(r)}
                                             </span>
-                                            {on ? (
-                                                <Check
-                                                    aria-hidden
-                                                    className="size-4 shrink-0"
-                                                />
-                                            ) : null}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                                                {beyond
+                                                    ? "Can do more than you can"
+                                                    : book.plainOf(r)}
+                                            </span>
+                                        </span>
+                                        {on ? (
+                                            <Check
+                                                aria-hidden
+                                                className="size-4 shrink-0"
+                                            />
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
-                            <ExtraPermissions
-                                roleLabel={book.labelOf(role)}
-                                groups={extras.groups}
-                                lockedReason={extras.lockedReason}
-                                disabled={saving}
-                                onToggle={extras.toggle}
+                        <ExtraPermissions
+                            roleLabel={book.labelOf(role)}
+                            groups={extras.groups}
+                            lockedReason={extras.lockedReason}
+                            disabled={saving}
+                            onToggle={extras.toggle}
+                        />
+
+                        <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
+                            <Info
+                                aria-hidden
+                                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                             />
-
-                            <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
-                                <Info
-                                    aria-hidden
-                                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                                />
-                                <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
-                                    {lastOwner
-                                        ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
-                                        : outranks
-                                          ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
-                                          : (extras.summary ??
-                                            `${book.labelOf(role)}: ${book.blurbOf(role)}`)}
-                                </p>
-                            </div>
+                            <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
+                                {lastOwner
+                                    ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
+                                    : outranks
+                                      ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
+                                      : (extras.summary ??
+                                        `${book.labelOf(role)}: ${book.blurbOf(role)}`)}
+                            </p>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
-                            <Button
-                                onClick={save}
-                                disabled={!changed || saving || outranks}
-                            >
-                                {saving
-                                    ? "Saving…"
-                                    : changed
-                                      ? "Save changes"
-                                      : "No changes yet"}
-                            </Button>
-                            <Button variant="outline" onClick={close}>
-                                Cancel
-                            </Button>
-                            {/* Everyone else is removed from their row.
-                                An owner and the viewer have no Remove
-                                there, so this is the one way to remove a
-                                second owner, or to leave. */}
-                            {!locked &&
-                            (current === "OWNER" || member.isSelf) ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        // A role picked and not saved must
-                                        // not follow the drawer to the next
-                                        // person it opens for.
-                                        setDraft(null);
-                                        onRemove(member);
-                                    }}
-                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
-                                >
-                                    Remove from {organizationName}
-                                </button>
-                            ) : null}
-                        </div>
-                    </>
-                ) : null}
-            </SheetContent>
-        </Sheet>
+                    </div>
+                </>
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -1152,19 +1113,16 @@ function RemoveMember({
     const router = useRouter();
     const name = member ? nameOf(member) : "They";
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!member) return;
         const res = await removeMember(member.userId);
-        onClose();
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
+        if (!res.ok) return { ok: false, error: res.error };
         const links = res.data.revokedLinks;
         showSuccess(
+            `${name} removed.`,
             links > 0
-                ? `${name} removed — they can no longer open ${organizationName}, and ${links} share link${links === 1 ? "" : "s"} they made stopped working`
-                : `${name} removed — they can no longer open ${organizationName}`,
+                ? `They can no longer open ${organizationName}, and ${links} share link${links === 1 ? "" : "s"} they made stopped working.`
+                : `They can no longer open ${organizationName}.`,
         );
         router.refresh();
     }
@@ -1180,8 +1138,9 @@ function RemoveMember({
                 member?.storefronts && member.storefronts.length > 0
                     ? ` They come off ${new Intl.ListFormat("en", { type: "conjunction" }).format(member.storefronts.map((s) => s.name))} too.`
                     : ""
-            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
+            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again. This cannot be undone.`}
             confirmLabel="Remove from team"
+            keepLabel="Keep on team"
             onConfirm={remove}
         />
     );
@@ -1191,14 +1150,19 @@ function RemoveMember({
 
 /**
  * "Invite to <business>" ("Saroh Settings" design): an email, a role picked
- * from a list that says what each one is for, Cancel and Send invite.
+ * from a list that says what each one is for, Cancel and Send invite. A
+ * side sheet, as inviting someone to a location is (`InvitePersonSheet`).
+ *
+ * An invite tells someone, so it waits ten seconds with Undo (`useHold`):
+ * the sheet closes, keeping what was typed, and a refusal or an Undo
+ * opens it again with that.
  *
  * Owner is not offered — the design invites people to run the day, and a
  * second owner is made from the Edit drawer once they have joined. Roles the
  * business invented are offered beside the built-ins; one that can do more
  * than the person inviting is shown and disabled, because the API refuses it.
  */
-function InviteDialog({
+function InviteSheet({
     open,
     onOpenChange,
     organizationName,
@@ -1255,11 +1219,7 @@ function InviteDialog({
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
-    const {
-        attach: draftRef,
-        touch: draftTouch,
-        changed: draftChanged,
-    } = useDraftChanged();
+    const { send } = useHold();
     const role = useWatch({ control: form.control, name: "role" });
     const staffId = useWatch({ control: form.control, name: "staffId" });
     // Someone already on the diary takes bookings, so holds a seat
@@ -1281,253 +1241,223 @@ function InviteDialog({
         );
     }
 
-    function setOpen(next: boolean) {
-        if (!next)
-            form.reset({
-                email: "",
-                role: startRole,
-                siteIds: [],
-                staffId: "",
-            });
-        onOpenChange(next);
+    const blank = () =>
+        form.reset({
+            email: "",
+            role: startRole,
+            siteIds: [],
+            staffId: "",
+        });
+
+    function close() {
+        blank();
+        onOpenChange(false);
     }
 
-    async function submit(values: InviteValues) {
-        const res = await inviteMember({
-            email: values.email.trim().toLowerCase(),
-            role: values.role,
-            ...(values.role === "REVIEWER" ? { siteIds: values.siteIds } : {}),
-            ...(values.staffId ? { staffId: values.staffId } : {}),
+    function submit(values: InviteValues) {
+        const email = values.email.trim().toLowerCase();
+        // What the API said, for when the sheet opens again.
+        let onEmail: string | null = null;
+        let planned = false;
+        // Closed with what was typed kept: a refusal or an Undo needs it.
+        onOpenChange(false);
+        send(`invite:${email}`, {
+            description: `${email} joins as ${book.labelOf(values.role)}.`,
+            run: async () => {
+                const res = await inviteMember({
+                    email,
+                    role: values.role,
+                    ...(values.role === "REVIEWER"
+                        ? { siteIds: values.siteIds }
+                        : {}),
+                    ...(values.staffId ? { staffId: values.staffId } : {}),
+                });
+                if (res.ok) return { ok: true };
+                // The plan's team limit (U13): its notice, not a toast.
+                if (res.plan) {
+                    planned = true;
+                    showPlanRefusal(res.plan);
+                    return { ok: false, error: "", said: true };
+                }
+                // A refusal about the address ("already in this business")
+                // goes on the field; anything else is a toast.
+                if (res.field === "email") onEmail = res.error;
+                return {
+                    ok: false,
+                    error: res.error,
+                    said: res.field === "email",
+                };
+            },
+            sent: `Sent to ${email}.`,
+            onSent: () => {
+                blank();
+                onSent();
+                router.refresh();
+            },
+            onBack: () => {
+                if (planned) return blank();
+                onOpenChange(true);
+                if (onEmail) form.setError("email", { message: onEmail });
+            },
         });
-        if (!res.ok) {
-            // The plan's team limit (U13): its notice, not a toast.
-            if (res.plan) {
-                onOpenChange(false);
-                showPlanRefusal(res.plan);
-                return;
-            }
-            // A refusal about the address ("already in this workspace") goes
-            // on the field; anything else is a toast.
-            if (res.field === "email") {
-                form.setError("email", { message: res.error });
-            } else {
-                showError(res.error);
-            }
-            return;
-        }
-        showSuccess(
-            `Invite sent to ${res.data.email} — they join as ${book.labelOf(values.role)}.`,
-        );
-        setOpen(false);
-        onSent();
-        router.refresh();
     }
 
     const errorText =
         "text-[12.5px] font-normal text-destructive-subtle-foreground";
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent
-                className="max-w-[440px] gap-0 overflow-hidden p-0 sm:rounded-[14px]"
-                // A stray press outside must not drop an invite half
-                // written: once something is typed or picked, only
-                // Cancel, Escape and the close button leave. As every
-                // sheet does (`components/shared/settings-sheet-frame.tsx`).
-                onInteractOutside={(e) => {
-                    if (sending || draftChanged()) e.preventDefault();
-                }}
+        <Form {...form}>
+            <FormSheet
+                open={open}
+                title={`Invite to ${organizationName}`}
+                description="They get an email with a link. It adds them to this business only."
+                pending={sending}
+                saveLabel="Send invite"
+                savingLabel="Sending…"
+                fieldsClassName="gap-3.5"
+                onClose={close}
+                onSubmit={(e) => void form.handleSubmit(submit)(e)}
             >
-                <Form {...form}>
-                    <form
-                        ref={draftRef}
-                        {...draftWatch(draftTouch)}
-                        onSubmit={form.handleSubmit(submit)}
-                        noValidate
-                    >
-                        <DialogHeader className="space-y-1 px-[22px] pb-1 pt-[18px] text-left">
-                            <DialogTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                                Invite to {organizationName}
-                            </DialogTitle>
-                            <DialogDescription className="text-[13px]">
-                                They get an email with a link. It adds them to
-                                this business only.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="grid max-h-[60vh] gap-3.5 overflow-y-auto px-[22px] py-3.5">
-                            <FormField
-                                control={form.control}
-                                name="email"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-1.5">
-                                        <FormLabel className="text-[12.5px] font-medium">
-                                            Email
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="email"
-                                                autoComplete="off"
-                                                placeholder="name@example.in"
-                                                disabled={sending}
-                                                className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage
-                                            role="alert"
-                                            className={errorText}
-                                        />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <InviteDiaryPerson
-                                people={diaryPeople}
-                                value={staffId ?? ""}
-                                disabled={sending}
-                                onPick={pickDiaryPerson}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="role"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-1.5">
-                                        <p
-                                            id="invite-role-label"
-                                            className="text-[12.5px] font-medium"
-                                        >
-                                            Role
-                                        </p>
-                                        {!staffId &&
-                                        (seatReason ?? viewOnlyReason) ? (
-                                            <p className="text-[12px] leading-[1.45] text-muted-foreground">
-                                                {seatReason ?? viewOnlyReason}
-                                            </p>
-                                        ) : null}
-                                        <div
-                                            role="radiogroup"
-                                            aria-labelledby="invite-role-label"
-                                            className="grid gap-1.5"
-                                        >
-                                            {offered.map((offer) => {
-                                                const r = offer.key;
-                                                return (
-                                                    <RoleChoice
-                                                        key={r}
-                                                        name={field.name}
-                                                        value={r}
-                                                        label={book.labelOf(r)}
-                                                        blurb={book.blurbOf(r)}
-                                                        checked={
-                                                            r === field.value
-                                                        }
-                                                        // The API refuses to
-                                                        // invite anyone at a role
-                                                        // that can do more than
-                                                        // the inviter.
-                                                        beyond={
-                                                            !book.withinReach(r)
-                                                        }
-                                                        // Full seats take no one
-                                                        // who needs one; full
-                                                        // view-only places take
-                                                        // no one view-only.
-                                                        noRoom={noRoom(offer)}
-                                                        disabled={sending}
-                                                        onPick={() =>
-                                                            field.onChange(r)
-                                                        }
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    </FormItem>
-                                )}
-                            />
-
-                            {role === "REVIEWER" ? (
-                                <FormField
-                                    control={form.control}
-                                    name="siteIds"
-                                    render={({ field }) => (
-                                        <FormItem className="space-y-1.5">
-                                            <p className="text-[12.5px] font-medium">
-                                                Websites they may review
-                                            </p>
-                                            {sites.length === 0 ? (
-                                                <p className="text-[12.5px] text-muted-foreground">
-                                                    You have no websites yet.
-                                                    Make one first, then invite
-                                                    someone to review it.
-                                                </p>
-                                            ) : (
-                                                sites.map((site) => {
-                                                    const on =
-                                                        field.value.includes(
-                                                            site.id,
-                                                        );
-                                                    return (
-                                                        <label
-                                                            key={site.id}
-                                                            className="flex items-center gap-2 text-[13px]"
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={on}
-                                                                onChange={() =>
-                                                                    field.onChange(
-                                                                        on
-                                                                            ? field.value.filter(
-                                                                                  (
-                                                                                      s,
-                                                                                  ) =>
-                                                                                      s !==
-                                                                                      site.id,
-                                                                              )
-                                                                            : [
-                                                                                  ...field.value,
-                                                                                  site.id,
-                                                                              ],
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    sending
-                                                                }
-                                                                className="size-4 rounded-[4px] border-border-strong"
-                                                            />
-                                                            {site.name}
-                                                        </label>
-                                                    );
-                                                })
-                                            )}
-                                            <FormMessage
-                                                role="alert"
-                                                className={errorText}
-                                            />
-                                        </FormItem>
-                                    )}
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                            <FormLabel className="text-[12.5px] font-medium">
+                                Email
+                            </FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="email"
+                                    autoComplete="off"
+                                    placeholder="name@example.in"
+                                    disabled={sending}
+                                    className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
+                                    {...field}
                                 />
-                            ) : null}
-                        </div>
+                            </FormControl>
+                            <FormMessage role="alert" className={errorText} />
+                        </FormItem>
+                    )}
+                />
 
-                        <DialogFooter className="gap-2 border-t border-muted bg-foreground/[0.03] px-[22px] py-3 sm:justify-end">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setOpen(false)}
+                <InviteDiaryPerson
+                    people={diaryPeople}
+                    value={staffId ?? ""}
+                    disabled={sending}
+                    onPick={pickDiaryPerson}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                            <p
+                                id="invite-role-label"
+                                className="text-[12.5px] font-medium"
                             >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={sending}>
-                                {sending ? "Sending…" : "Send invite"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
+                                Role
+                            </p>
+                            {!staffId && (seatReason ?? viewOnlyReason) ? (
+                                <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                                    {seatReason ?? viewOnlyReason}
+                                </p>
+                            ) : null}
+                            <div
+                                role="radiogroup"
+                                aria-labelledby="invite-role-label"
+                                className="grid gap-1.5"
+                            >
+                                {offered.map((offer) => {
+                                    const r = offer.key;
+                                    return (
+                                        <RoleChoice
+                                            key={r}
+                                            name={field.name}
+                                            value={r}
+                                            label={book.labelOf(r)}
+                                            blurb={book.blurbOf(r)}
+                                            checked={r === field.value}
+                                            // The API refuses to
+                                            // invite anyone at a role
+                                            // that can do more than
+                                            // the inviter.
+                                            beyond={!book.withinReach(r)}
+                                            // Full seats take no one
+                                            // who needs one; full
+                                            // view-only places take
+                                            // no one view-only.
+                                            noRoom={noRoom(offer)}
+                                            disabled={sending}
+                                            onPick={() => field.onChange(r)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </FormItem>
+                    )}
+                />
+
+                {role === "REVIEWER" ? (
+                    <FormField
+                        control={form.control}
+                        name="siteIds"
+                        render={({ field }) => (
+                            <FormItem className="space-y-1.5">
+                                <p className="text-[12.5px] font-medium">
+                                    Websites they may review
+                                </p>
+                                {sites.length === 0 ? (
+                                    <p className="text-[12.5px] text-muted-foreground">
+                                        You have no websites yet. Make one
+                                        first, then invite someone to review it.
+                                    </p>
+                                ) : (
+                                    sites.map((site) => {
+                                        const on = field.value.includes(
+                                            site.id,
+                                        );
+                                        return (
+                                            <label
+                                                key={site.id}
+                                                className="flex items-center gap-2 text-[13px]"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={on}
+                                                    onChange={() =>
+                                                        field.onChange(
+                                                            on
+                                                                ? field.value.filter(
+                                                                      (s) =>
+                                                                          s !==
+                                                                          site.id,
+                                                                  )
+                                                                : [
+                                                                      ...field.value,
+                                                                      site.id,
+                                                                  ],
+                                                        )
+                                                    }
+                                                    disabled={sending}
+                                                    className="size-4 rounded-[4px] border-border-strong"
+                                                />
+                                                {site.name}
+                                            </label>
+                                        );
+                                    })
+                                )}
+                                <FormMessage
+                                    role="alert"
+                                    className={errorText}
+                                />
+                            </FormItem>
+                        )}
+                    />
+                ) : null}
+            </FormSheet>
+        </Form>
     );
 }
 

@@ -5,8 +5,8 @@ import { useRef } from "react";
 
 import type { TestReleaseActions } from "@/components/sites/editor/top-bar-actions";
 import type { EditorTestReleases } from "@/components/sites/editor/use-test-releases";
-import { GoLiveSheet } from "@/components/sites/test-releases/go-live-sheet";
-import { MakeTestReleaseSheet } from "@/components/sites/test-releases/make-test-release-sheet";
+import { GoLiveDialog } from "@/components/sites/test-releases/go-live-dialog";
+import { MakeTestReleaseDialog } from "@/components/sites/test-releases/make-test-release-dialog";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import { goLiveGate, wentLiveToast, whenIn } from "@/lib/sites/test-releases";
 
@@ -61,7 +61,7 @@ export function TestReleaseSheets({
     );
     return (
         <>
-            <MakeTestReleaseSheet
+            <MakeTestReleaseDialog
                 siteId={siteId}
                 open={releases.making}
                 onOpenChange={(open) => {
@@ -78,7 +78,7 @@ export function TestReleaseSheets({
                     void releases.refresh();
                 }}
             />
-            <GoLiveSheet
+            <GoLiveDialog
                 siteId={siteId}
                 target={target}
                 gate={

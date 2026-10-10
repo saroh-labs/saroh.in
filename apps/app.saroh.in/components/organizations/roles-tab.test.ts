@@ -76,24 +76,23 @@ function switchFor(html: string, roleKey: string, action: string): string {
 }
 
 describe("RolesTab within reach (F19)", () => {
-    it("locks a permission the viewer doesn't hold, with the reason", () => {
+    it("reads a role the viewer may change, and offers Edit role", () => {
         const html = render(
             invented("counter", "Counter", ["order:read"]),
             MANAGER_ACTIONS,
         );
-        expect(switchFor(html, "counter", "payment:manage")).toContain(
-            'disabled=""',
+        // The panel is read: its switches show what is saved. Changing
+        // them, and the name, is the side sheet Edit role opens, where a
+        // permission the viewer lacks is locked with the reason.
+        for (const action of ["order:read", "store:write", "payment:manage"]) {
+            expect(switchFor(html, "counter", action)).toContain('disabled=""');
+        }
+        expect(html).toContain("Edit role");
+        expect(html).toContain("Remove role");
+        expect(html).not.toContain('id="role-name-counter"');
+        expect(NOT_YOURS_TO_GIVE).toBe(
+            "You don't have this yourself, so you can't give it.",
         );
-        expect(html).toContain(NOT_YOURS_TO_GIVE.replace(/'/g, "&#x27;"));
-        // What they hold stays theirs to give or take away.
-        expect(switchFor(html, "counter", "store:write")).not.toContain(
-            'disabled=""',
-        );
-        expect(switchFor(html, "counter", "order:read")).not.toContain(
-            'disabled=""',
-        );
-        // And the role itself can be renamed.
-        expect(html).toContain('id="role-name-counter"');
     });
 
     it("shows a role above the viewer read-only, saying what it has that they don't", () => {
@@ -104,7 +103,7 @@ describe("RolesTab within reach (F19)", () => {
         for (const action of ["order:read", "store:write", "payment:manage"]) {
             expect(switchFor(html, "senior", action)).toContain('disabled=""');
         }
-        expect(html).not.toContain('id="role-name-senior"');
+        expect(html).not.toContain("Edit role");
         expect(html).not.toContain("Remove role");
         expect(html).toContain(
             aboveRoleNote(["Manage payments"]).replace(/'/g, "&#x27;"),
@@ -117,12 +116,9 @@ describe("RolesTab within reach (F19)", () => {
                 invented("senior", "Senior", ["order:read", "payment:manage"]),
                 mine,
             );
-            expect(switchFor(html, "senior", "payment:manage")).not.toContain(
-                'disabled=""',
-            );
-            expect(html).not.toContain(
-                NOT_YOURS_TO_GIVE.replace(/'/g, "&#x27;"),
-            );
+            // Nothing it has is beyond them, so it is theirs to edit.
+            expect(html).toContain("Edit role");
+            expect(html).toContain("Remove role");
         }
     });
 });

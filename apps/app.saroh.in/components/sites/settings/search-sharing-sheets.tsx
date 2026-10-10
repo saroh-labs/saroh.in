@@ -7,7 +7,7 @@ import { ShareCards } from "@saroh/ui/share-cards";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { updateSiteSettings } from "@/lib/sites/actions";
 import { settingsEditId } from "@/lib/sites/settings-edit";
@@ -93,7 +93,7 @@ export function TitleSheet({
     const { saved, open, pending, onClose } = props;
     const [title, setTitle] = useState(saved.seoTitle);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("title")}
             title="Title"
             description="What search results and shared links call your site."
@@ -120,7 +120,7 @@ export function TitleSheet({
                     : `Left empty, your site's name is used: ${name}.`}
             </p>
             <Preview {...props} draft={{ seoTitle: title }} />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -132,7 +132,7 @@ export function DescriptionSheet({
     const { saved, open, pending, onClose } = props;
     const [description, setDescription] = useState(saved.seoDescription);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("description")}
             title="Description"
             description="A line or two under the title in search results and shared links."
@@ -159,7 +159,7 @@ export function DescriptionSheet({
                 {lengthLine(description.length, DESCRIPTION_GUIDE)}
             </p>
             <Preview {...props} draft={{ seoDescription: description }} />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -179,7 +179,7 @@ export function ShareImageSheet({
     const { saved, open, pending, onClose } = props;
     const image = useShareImage(saved.image);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={settingsEditId("image")}
             title="Share image"
             description="The picture apps show beside your link when it is shared."
@@ -229,6 +229,6 @@ export function ShareImageSheet({
                 {...props}
                 draft={{ image: { url: image.url, facts: image.facts } }}
             />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
