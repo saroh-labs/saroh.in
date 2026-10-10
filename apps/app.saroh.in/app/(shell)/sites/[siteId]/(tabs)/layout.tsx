@@ -6,7 +6,7 @@ import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
-import { listPosts } from "@/lib/content/service";
+import { listPostCategories, listPosts } from "@/lib/content/service";
 import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
@@ -74,6 +74,12 @@ export default async function WebsiteTabsLayout({
                   .reduce((n, f) => n + f.submissionCount, 0)
         : undefined;
 
+    // The Posts tab's "Categories" sheet, for someone who may change them.
+    // A failed read is `null`, which the sheet says, never an empty list.
+    const postCategories = site.can.edit
+        ? await listPostCategories(siteId).catch(() => null)
+        : undefined;
+
     const summaries = (
         sites.some((s) => s.id === site.id) ? sites : [site]
     ).map((s) => ({
@@ -117,6 +123,7 @@ export default async function WebsiteTabsLayout({
                     pageCount={site.pages.length}
                     postCount={posts?.length ?? null}
                     formEntries={formEntries}
+                    postCategories={postCategories}
                 />
                 {thisPaused ? (
                     <PausedNote>{pausedWords("site")}</PausedNote>

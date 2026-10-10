@@ -50,6 +50,7 @@ import {
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
+import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
 import { DayByPerson } from "./day-by-person";
@@ -519,6 +520,7 @@ export function CalendarScreen({
     return (
         <>
             <BookingsTopBar page="Calendar">
+                <BookingsViewSwitch current="calendar" />
                 <div
                     role="radiogroup"
                     aria-label="Layout"
@@ -696,7 +698,7 @@ export function CalendarScreen({
                     </AgendaMonth>
                 ) : null}
 
-                <RulesNote rules={rules} canHours={can.hours} />
+                <RulesNote rules={rules} />
             </div>
 
             <BookingQuickLook
@@ -836,32 +838,14 @@ export function rulesSentence(rules: BookingRules | null): string {
     return `${book}${cancel}. Free times are worked out from availability, minus bookings and the gap after each.`;
 }
 
-function RulesNote({
-    rules,
-    canHours,
-}: {
-    rules: BookingRules | null;
-    canHours: boolean;
-}) {
-    // The links sit on their own row, each a whole tap target on a phone:
-    // inline in the sentence, "Change hours and rules" wrapped across two
-    // lines and shared one with "Every booking as a list".
-    const link =
-        "inline-flex items-center text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground coarse:min-h-11";
+// The rules as they stand. Changing them is Availability, in the rail; the
+// calendar links there only where hours are what is missing ("Add who takes
+// bookings", "Add someone"). The list is the header's Calendar | List switch.
+function RulesNote({ rules }: { rules: BookingRules | null }) {
     return (
-        <div className="mt-3 text-[11.5px] text-muted-foreground">
-            <p>{rulesSentence(rules)}</p>
-            <div className="mt-1 flex flex-wrap gap-x-4">
-                {canHours ? (
-                    <Link href="/bookings/availability" className={link}>
-                        Change hours and rules
-                    </Link>
-                ) : null}
-                <Link href="/bookings/all" className={link}>
-                    Every booking as a list
-                </Link>
-            </div>
-        </div>
+        <p className="mt-3 text-[11.5px] text-muted-foreground">
+            {rulesSentence(rules)}
+        </p>
     );
 }
 
