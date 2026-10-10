@@ -74,6 +74,7 @@ export function SiteSettingsRead({
                 panels={{
                     address: (
                         <AddressGroup
+                            siteId={site.id}
                             address={address}
                             live={live}
                             canChangeAddress={false}

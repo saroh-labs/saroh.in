@@ -25,6 +25,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
@@ -62,6 +63,7 @@ export function WebsiteHeader({
     sites,
     address,
     liveUrl = null,
+    qrUrl = null,
     canEdit,
     mayCreate,
     pageCount,
@@ -80,6 +82,12 @@ export function WebsiteHeader({
      * a reader) is where the draft is seen.
      */
     liveUrl?: string | null;
+    /**
+     * `https://` + the address whenever the site has one, published or
+     * not: what its QR code is for. Null (no address yet) leaves the QR
+     * button out. The panel says when the site isn't published.
+     */
+    qrUrl?: string | null;
     /** `can.edit` for this site: author tabs, or the reading ones. */
     canEdit: boolean;
     mayCreate: boolean;
@@ -186,6 +194,22 @@ export function WebsiteHeader({
                             previewHref={base}
                             siteName={site.name.trim() || "Untitled site"}
                         />
+                        {qrUrl ? (
+                            // Icon alone, so the line stays one line on a phone.
+                            <QrButton
+                                compact="always"
+                                variant="ghost"
+                                className="-my-1"
+                                link={{
+                                    mode: "saved",
+                                    kind: "SITE",
+                                    siteId: site.id,
+                                    url: qrUrl,
+                                    what: "your website",
+                                    from: "Website screen",
+                                }}
+                            />
+                        ) : null}
                         <StateBadge state={site.state} />
                         {site.paused ? (
                             <span

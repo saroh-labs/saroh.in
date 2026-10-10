@@ -115,6 +115,7 @@ export default async function WebsiteTabsLayout({
                     liveUrl={
                         site.currentPublication && reached ? reached.url : null
                     }
+                    qrUrl={reached?.url ?? null}
                     canEdit={site.can.edit}
                     mayCreate={navRoleCan(
                         organization?.role ?? null,

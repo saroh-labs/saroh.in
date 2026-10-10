@@ -26,6 +26,7 @@ import {
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { QrButton } from "@/components/qr/qr-button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -303,6 +304,20 @@ export function InvoiceDetail({
             >
                 <Copy aria-hidden className="size-4" />
             </Button>
+            <QrButton
+                compact="always"
+                link={{
+                    mode: "instant",
+                    url,
+                    what:
+                        urlKind === "view"
+                            ? "this invoice's link"
+                            : "this invoice's pay link",
+                    opens: urlKind === "view" ? "invoice" : "pay",
+                    fileName:
+                        urlKind === "view" ? "invoice-link-qr" : "pay-link-qr",
+                }}
+            />
         </div>
     ) : null;
     const actions = detailActions({

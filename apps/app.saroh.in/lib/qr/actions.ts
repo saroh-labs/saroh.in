@@ -1,5 +1,8 @@
 "use server";
 
+import type { QrPanelRead, QrSavedLink } from "./panel";
+import { panelCodeInput } from "./panel";
+import { readQrPanel } from "./panel-read";
 import {
     createQrCode as createQrCodeApi,
     retireQrCode as retireQrCodeApi,
@@ -27,4 +30,23 @@ export async function updateQrCode(
 
 export async function retireQrCode(siteId: string, qrCodeId: string) {
     return retireQrCodeApi(siteId, qrCodeId);
+}
+
+/**
+ * What a QR button's panel shows for a saved link: the code its target
+ * already has, and whether this person may make one. A read; it never
+ * writes, so opening a panel makes nothing.
+ */
+export async function openQrPanel(
+    want: Pick<QrSavedLink, "kind" | "ref" | "siteId" | "from">,
+): Promise<QrPanelRead> {
+    return readQrPanel(want);
+}
+
+/** "Make this code" in a QR button's panel: a plain code for its target. */
+export async function makeQrPanelCode(
+    siteId: string,
+    want: Pick<QrSavedLink, "kind" | "ref" | "from">,
+) {
+    return createQrCodeApi(siteId, panelCodeInput(want));
 }

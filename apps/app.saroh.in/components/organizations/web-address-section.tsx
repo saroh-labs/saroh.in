@@ -15,6 +15,7 @@ import {
     suffixOf,
 } from "@/lib/organizations/web-address";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { WebAddressDialog } from "./web-address-dialog";
 
 /**
@@ -149,6 +150,17 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                             your website (opens in a new tab)
                                         </span>
                                     </a>
+                                    <QrButton
+                                        compact="always"
+                                        variant="ghost"
+                                        link={{
+                                            mode: "saved",
+                                            kind: "SITE",
+                                            url: view.links.site,
+                                            what: "your website",
+                                            from: "Business settings",
+                                        }}
+                                    />
                                 </>
                             ) : null}
                         </span>

@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
 import {
@@ -162,6 +163,18 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                     >
                                         Copy
                                     </Button>
+                                    <QrButton
+                                        compact="always"
+                                        variant="ghost"
+                                        className="size-6"
+                                        link={{
+                                            mode: "instant",
+                                            url: previewUrl(secrets[link.id]),
+                                            what: "this preview link",
+                                            opens: "preview",
+                                            fileName: "preview-link-qr",
+                                        }}
+                                    />
                                 </div>
                             ) : (
                                 <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
