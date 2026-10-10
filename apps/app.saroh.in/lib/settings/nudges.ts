@@ -130,7 +130,7 @@ function seller(
         label: "Add your business's legal name, address and a contact",
         why: "Customers must be able to see who they're buying from.",
         cta: "Add details",
-        href: business("address"),
+        href: businessEditHref("address"),
         broken: false,
         left: !set,
     };
