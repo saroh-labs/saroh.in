@@ -1,7 +1,63 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { SiteAddressLink } from "./website-header";
+import { SiteAddressLink, WebsiteHeader } from "./website-header";
+
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+    usePathname: () => "/sites/site_1/posts",
+    useSearchParams: () => new URLSearchParams(),
+}));
+vi.mock("@/lib/content/actions", () => ({
+    createPostCategory: vi.fn(),
+    updatePostCategory: vi.fn(),
+    deletePostCategory: vi.fn(),
+}));
+
+/**
+ * The Posts tab's actions: categories are managed here, in a sheet its
+ * "Categories" button opens, not on a page of their own outside the tabs.
+ */
+describe("the Posts tab's Categories button", () => {
+    const site = {
+        id: "site_1",
+        name: "Rehearsal Bakery",
+        state: { label: "Live", tone: "live" as const },
+    };
+    const header = (over: Partial<Parameters<typeof WebsiteHeader>[0]> = {}) =>
+        renderToStaticMarkup(
+            <WebsiteHeader
+                site={site}
+                sites={[site]}
+                address="rehearsal-bakery.saroh.app"
+                canEdit
+                mayCreate={false}
+                pageCount={3}
+                postCount={2}
+                postCategories={[]}
+                {...over}
+            />,
+        );
+
+    it("is a button that opens a sheet, beside New post", () => {
+        const html = header();
+        expect(html).toMatch(
+            /<button[^>]*aria-haspopup="dialog"[^>]*>Categories<\/button>/,
+        );
+        expect(html).not.toContain("/posts/categories");
+        expect(html).toContain('href="/sites/site_1/posts/new"');
+    });
+
+    it("is still offered when the categories couldn't be read", () => {
+        expect(header({ postCategories: null })).toContain(">Categories<");
+    });
+
+    it("isn't offered to someone who can't change the site", () => {
+        const html = header({ canEdit: false, postCategories: undefined });
+        expect(html).not.toContain(">Categories<");
+        expect(html).not.toContain("New post");
+    });
+});
 
 /**
  * The Website header's address (owner, 9 Oct): a link to the live site in

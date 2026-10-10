@@ -3,7 +3,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import { DatePicker } from "@saroh/ui/date-picker";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     Dialog,
     DialogContent,
@@ -14,17 +14,15 @@ import {
 } from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
-import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { personHref } from "@/lib/contacts/person-href";
 import {
-    addSession,
     cancelEnrollment,
     removeSession,
     updateCourse,
@@ -36,11 +34,11 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { CourseDetail, Enrollment } from "@/lib/courses/service";
-import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { invoiceMoney } from "@/lib/invoices/money";
 
+import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
 const STANDING_WORD = {
@@ -233,6 +231,15 @@ function Sessions({
     now: string;
 }) {
     const router = useRouter();
+    const [adding, setAdding] = useState(false);
+    const trigger = useRef<HTMLButtonElement>(null);
+    const refocus = useRef(false);
+    const count = course.sessions.length;
+    useEffect(() => {
+        if (!refocus.current) return;
+        refocus.current = false;
+        trigger.current?.focus();
+    }, [count]);
     const tz = course.service.timezone;
     const now = Date.parse(nowIso);
     const month = (iso: string) =>
@@ -260,16 +267,41 @@ function Sessions({
         router.refresh();
     }
 
+    // One "Add session" button: in the empty line while there are none, by
+    // the heading once there are. Whichever is on screen opens the dialog
+    // and takes the keyboard back when it closes, including when the first
+    // session moves the button from one place to the other.
+    const canAdd = canWrite && course.status !== "ARCHIVED";
+    const empty = course.sessions.length === 0;
+    const addButton = (
+        <Button
+            ref={trigger}
+            variant="outline"
+            size={empty ? "default" : "sm"}
+            onClick={() => setAdding(true)}
+        >
+            Add session
+        </Button>
+    );
+
     return (
         <section className="flex min-w-0 flex-col gap-2.5">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Sessions
-            </h2>
-            {course.sessions.length === 0 ? (
-                <p className="rounded-[11px] border border-dashed border-border-strong px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No sessions yet. Add one below; a course opens once it has a
-                    session.
-                </p>
+            <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Sessions
+                </h2>
+                {canAdd && !empty ? addButton : null}
+            </div>
+            {empty ? (
+                <EmptyState
+                    title="No sessions yet"
+                    description={
+                        canAdd
+                            ? "Add the first one, then the course can open for enrolment."
+                            : "A course can open for enrolment once it has a session."
+                    }
+                    action={canAdd ? addButton : undefined}
+                />
             ) : (
                 <ol className="divide-y overflow-hidden rounded-[11px] border border-border bg-card">
                     {course.sessions.map((s) => {
@@ -336,82 +368,20 @@ function Sessions({
                 shows on the schedule with its attendees and takes a seat there
                 too. Times are in {tz}.
             </p>
-            {canWrite && course.status !== "ARCHIVED" ? (
-                <AddSession course={course} />
+            {canAdd ? (
+                <AddSessionDialog
+                    open={adding}
+                    onOpenChange={setAdding}
+                    course={course}
+                    onCloseAutoFocus={(e) => {
+                        e.preventDefault();
+                        trigger.current?.focus();
+                        // The first session moves the button to the heading.
+                        refocus.current = empty;
+                    }}
+                />
             ) : null}
         </section>
-    );
-}
-
-function AddSession({ course }: { course: CourseDetail }) {
-    const router = useRouter();
-    const ids = { day: useId(), time: useId() };
-    const last = course.sessions.at(-1);
-    const [day, setDay] = useState<Date | undefined>(
-        last ? new Date(Date.parse(last.startAt) + 7 * 86_400_000) : undefined,
-    );
-    const [time, setTime] = useState(
-        last
-            ? new Intl.DateTimeFormat("en-GB", {
-                  timeZone: course.service.timezone,
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hourCycle: "h23",
-              }).format(new Date(last.startAt))
-            : "18:30",
-    );
-    const [busy, setBusy] = useState(false);
-    const on = course.enrolled;
-
-    async function add() {
-        if (!day) return;
-        setBusy(true);
-        const res = await addSession(
-            course.id,
-            wallClockToIso(ymd(day), time, course.service.timezone),
-        );
-        setBusy(false);
-        if (!res.ok) return showError(res.error);
-        showSuccess(
-            on > 0
-                ? `Session added, and ${on} ${on === 1 ? "person" : "people"} booked on it`
-                : "Session added",
-        );
-        router.refresh();
-    }
-
-    return (
-        <div className="flex flex-wrap items-end gap-2 pt-1">
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.day}>New session</Label>
-                <DatePicker
-                    id={ids.day}
-                    value={day}
-                    onValueChange={setDay}
-                    className="w-[11rem]"
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.time}>Time</Label>
-                <TimeSelect
-                    id={ids.time}
-                    value={time}
-                    onValueChange={setTime}
-                    stepMinutes={15}
-                />
-            </div>
-            <Button
-                variant="outline"
-                disabled={busy || !day}
-                onClick={() => void add()}
-            >
-                {busy
-                    ? "Adding…"
-                    : on > 0
-                      ? `Add and book ${on}`
-                      : "Add session"}
-            </Button>
-        </div>
     );
 }
 

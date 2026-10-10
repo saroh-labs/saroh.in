@@ -99,6 +99,19 @@ components/shared/             app shell, navigation, command menu
   drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
   `inspector-host`). A new editor panel or piece of editor state goes there,
   not back into `site-editor.tsx`.
+- **Current** — **A QR beside a link is `QrButton`** (DEC-118,
+  `components/qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
+  drawing. A page that stays (the website, the shop, the booking page, a
+  product) takes `mode: "saved"`: the panel finds the target's code or
+  offers "Make this code" as a press of its own, so opening it never
+  writes. A link that belongs to one record (a pay link, a preview link)
+  takes `mode: "instant"`: drawn in the browser, nothing saved, and it says
+  it isn't counted. Draw the button only where there is a link to open
+  (absent, not broken), and let the panel finish the job: make, download
+  and copy happen in it; "More options" is never a required step. A file
+  the API draws (a print PDF) comes through the app's own route
+  (`app/api/qr-codes/…/print`, as an invoice's PDF does), so the session
+  stays server-side.
 - **Current** — **The editor's page menu offers what the API lists** (round-2
   G16): `components/sites/pages-panel.tsx` (the list), `page-settings.tsx`
   (the open page's title, address, In the menu, On the site, Delete) and

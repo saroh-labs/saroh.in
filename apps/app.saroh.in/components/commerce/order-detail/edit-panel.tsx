@@ -10,7 +10,8 @@ import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 import { addedLines } from "@/lib/orders/sellables";
 
-import { actionClass, FOCUS, PanelTitle, WorkPanel } from "./parts";
+import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import { FOCUS } from "./parts";
 
 const FIELD =
     "block h-9 w-full rounded-lg border border-border bg-card px-2.5 text-[13px] font-normal coarse:h-11";
@@ -37,20 +38,35 @@ const draftOf = (a: DeliveryAddress | null): AddressDraft => ({
  * (nothing is sent to the customer — Saroh sends no messages), less goes
  * back to how they paid. The API reprices it; the figure here is what the
  * lines cost.
+ *
+ * A side sheet over the order: the lines scroll, and what the change does
+ * to the money stays at the foot with Save.
  */
 export function EditPanel({
-    number,
-    first,
-    lines,
-    address,
-    delivery,
-    refundTo,
-    format,
-    addable = null,
-    busy,
-    onCancel,
-    onSave,
-}: {
+    open,
+    returnFocus,
+    ...draft
+}: EditProps & {
+    open: boolean;
+    /** Put the keyboard back on the button that opened it. */
+    returnFocus?: () => void;
+}) {
+    return (
+        <OrderSheet
+            open={open}
+            title={`Edit ${draft.number}`}
+            description="Quantities, items and the address can change until preparing starts."
+            busy={draft.busy}
+            wide
+            onClose={draft.onCancel}
+            returnFocus={returnFocus}
+        >
+            <EditDraft {...draft} />
+        </OrderSheet>
+    );
+}
+
+interface EditProps {
     number: string;
     first: string;
     lines: OrderReadLine[];
@@ -67,7 +83,20 @@ export function EditPanel({
     busy: boolean;
     onCancel: () => void;
     onSave: (input: EditOrderInput) => void;
-}) {
+}
+
+/** What is changed in the sheet: a fresh one each time it opens. */
+function EditDraft({
+    first,
+    lines,
+    address,
+    delivery,
+    refundTo,
+    format,
+    addable = null,
+    busy,
+    onSave,
+}: EditProps) {
     const [qty, setQty] = useState<Record<string, number>>(() =>
         Object.fromEntries(lines.map((l) => [l.id, l.quantity])),
     );
@@ -124,186 +153,189 @@ export function EditPanel({
         }));
 
     return (
-        <WorkPanel label="Edit order">
-            <PanelTitle>Edit {number}</PanelTitle>
-            <div className="mt-2.5 flex flex-col gap-1.5">
-                {lines.map((l) => {
-                    const name = `${l.name ?? "A product that no longer exists"}${l.variantTitle ? `, ${l.variantTitle}` : ""}`;
+        <>
+            <OrderSheetBody>
+                <div className="flex flex-col gap-1.5">
+                    {lines.map((l) => {
+                        const name = `${l.name ?? "A product that no longer exists"}${l.variantTitle ? `, ${l.variantTitle}` : ""}`;
+                        return (
+                            <div key={l.id} className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1 text-[13px]">
+                                    {name}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => step(l.id, -1)}
+                                    aria-label={`One fewer ${name}`}
+                                    className={cn(
+                                        FOCUS,
+                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
+                                    )}
+                                >
+                                    −
+                                </button>
+                                <span
+                                    aria-live="polite"
+                                    className="min-w-[22px] text-center text-[13.5px] font-semibold tabular-nums"
+                                >
+                                    {qty[l.id]}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => step(l.id, 1)}
+                                    aria-label={`One more ${name}`}
+                                    className={cn(
+                                        FOCUS,
+                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
+                                    )}
+                                >
+                                    +
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+                {added.map((s, i) => {
+                    const name = `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}`;
                     return (
-                        <div key={l.id} className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 text-[13px]">
-                                {name}
+                        <div
+                            // A pick has no id of its own; its place is its key.
+                            key={`${s.key}-${i}`}
+                            className="mt-1.5 flex items-center gap-2 border-t border-border py-[7px] text-[13px]"
+                        >
+                            <span className="min-w-0 flex-1">
+                                {name}{" "}
+                                <span className="text-muted-foreground">
+                                    · added
+                                </span>
+                            </span>
+                            <span className="tabular-nums">
+                                {money(Number(s.price))}
                             </span>
                             <button
                                 type="button"
-                                onClick={() => step(l.id, -1)}
-                                aria-label={`One fewer ${name}`}
+                                onClick={() =>
+                                    setAdded((a) => a.filter((_, j) => j !== i))
+                                }
+                                aria-label={`Remove ${name}`}
                                 className={cn(
                                     FOCUS,
-                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
+                                    "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground hover:underline active:bg-destructive-subtle coarse:min-h-11",
                                 )}
                             >
-                                −
-                            </button>
-                            <span
-                                aria-live="polite"
-                                className="min-w-[22px] text-center text-[13.5px] font-semibold tabular-nums"
-                            >
-                                {qty[l.id]}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => step(l.id, 1)}
-                                aria-label={`One more ${name}`}
-                                className={cn(
-                                    FOCUS,
-                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
-                                )}
-                            >
-                                +
+                                Remove
                             </button>
                         </div>
                     );
                 })}
-            </div>
-            {added.map((s, i) => {
-                const name = `${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}`;
-                return (
-                    <div
-                        // A pick has no id of its own; its place is its key.
-                        key={`${s.key}-${i}`}
-                        className="mt-1.5 flex items-center gap-2 border-t border-border py-[7px] text-[13px]"
-                    >
-                        <span className="min-w-0 flex-1">
-                            {name}{" "}
-                            <span className="text-muted-foreground">
-                                · added
-                            </span>
-                        </span>
-                        <span className="tabular-nums">
-                            {money(Number(s.price))}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setAdded((a) => a.filter((_, j) => j !== i))
-                            }
-                            aria-label={`Remove ${name}`}
+                {addable === "unavailable" ? (
+                    <p className="mt-2.5 text-[12px] text-muted-foreground">
+                        The products couldn&apos;t be loaded, so nothing can be
+                        added right now. Quantities and the address still
+                        change.
+                    </p>
+                ) : addable && addable.length > 0 ? (
+                    <label className="mt-2.5 block text-[12px] font-medium">
+                        Add an item
+                        <select
+                            value=""
+                            onChange={(e) => pick(e.target.value)}
                             className={cn(
                                 FOCUS,
-                                "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground hover:underline active:bg-destructive-subtle coarse:min-h-11",
+                                "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
                             )}
                         >
-                            Remove
-                        </button>
-                    </div>
-                );
-            })}
-            {addable === "unavailable" ? (
-                <p className="mt-2.5 text-[12px] text-muted-foreground">
-                    The products couldn&apos;t be loaded, so nothing can be
-                    added right now. Quantities and the address still change.
-                </p>
-            ) : addable && addable.length > 0 ? (
-                <label className="mt-2.5 block text-[12px] font-medium">
-                    Add an item
-                    <select
-                        value=""
-                        onChange={(e) => pick(e.target.value)}
+                            <option value="">Choose a product…</option>
+                            {addable.map((s) => (
+                                <option
+                                    key={s.key}
+                                    value={s.key}
+                                    disabled={s.soldOut}
+                                >
+                                    {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                ) : null}
+                {delivery ? (
+                    <fieldset className="mt-3">
+                        <legend className="text-[12px] font-medium">
+                            Delivery address
+                        </legend>
+                        <input
+                            aria-label="Street and number"
+                            value={addr.line1}
+                            onChange={(e) =>
+                                setAddr((a) => ({
+                                    ...a,
+                                    line1: e.target.value,
+                                }))
+                            }
+                            className={cn(FIELD, "mt-[5px]")}
+                        />
+                        <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
+                            <input
+                                aria-label="Town or city"
+                                placeholder="Town or city"
+                                value={addr.city}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        city: e.target.value,
+                                    }))
+                                }
+                                className={FIELD}
+                            />
+                            <input
+                                aria-label="State"
+                                placeholder="State"
+                                value={addr.state}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        state: e.target.value,
+                                    }))
+                                }
+                                className={FIELD}
+                            />
+                            <input
+                                aria-label="PIN code"
+                                placeholder="PIN"
+                                inputMode="numeric"
+                                value={addr.postalCode}
+                                onChange={(e) =>
+                                    setAddr((a) => ({
+                                        ...a,
+                                        postalCode: e.target.value,
+                                    }))
+                                }
+                                className={FIELD}
+                            />
+                        </div>
+                    </fieldset>
+                ) : null}
+            </OrderSheetBody>
+            <OrderSheetFoot
+                busy={busy}
+                note={
+                    <p
+                        aria-live="polite"
                         className={cn(
-                            FOCUS,
-                            "mt-1 block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11",
+                            "text-pretty text-[12.5px] leading-[1.5]",
+                            empty || addressMissing
+                                ? "text-destructive-subtle-foreground"
+                                : diff !== 0
+                                  ? "text-brand-subtle-foreground"
+                                  : "text-muted-foreground",
                         )}
                     >
-                        <option value="">Choose a product…</option>
-                        {addable.map((s) => (
-                            <option
-                                key={s.key}
-                                value={s.key}
-                                disabled={s.soldOut}
-                            >
-                                {`${s.name}${s.variantTitle ? `, ${s.variantTitle}` : ""}${format ? ` · ${format(Number(s.price))}` : ""}${s.soldOut ? " · sold out here" : ""}`}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-            ) : null}
-            {delivery ? (
-                <fieldset className="mt-3">
-                    <legend className="text-[12px] font-medium">
-                        Delivery address
-                    </legend>
-                    <input
-                        aria-label="Street and number"
-                        value={addr.line1}
-                        onChange={(e) =>
-                            setAddr((a) => ({ ...a, line1: e.target.value }))
-                        }
-                        className={cn(FIELD, "mt-[5px]")}
-                    />
-                    <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                        <input
-                            aria-label="Town or city"
-                            placeholder="Town or city"
-                            value={addr.city}
-                            onChange={(e) =>
-                                setAddr((a) => ({ ...a, city: e.target.value }))
-                            }
-                            className={FIELD}
-                        />
-                        <input
-                            aria-label="State"
-                            placeholder="State"
-                            value={addr.state}
-                            onChange={(e) =>
-                                setAddr((a) => ({
-                                    ...a,
-                                    state: e.target.value,
-                                }))
-                            }
-                            className={FIELD}
-                        />
-                        <input
-                            aria-label="PIN code"
-                            placeholder="PIN"
-                            inputMode="numeric"
-                            value={addr.postalCode}
-                            onChange={(e) =>
-                                setAddr((a) => ({
-                                    ...a,
-                                    postalCode: e.target.value,
-                                }))
-                            }
-                            className={FIELD}
-                        />
-                    </div>
-                </fieldset>
-            ) : null}
-            <p
-                aria-live="polite"
-                className={cn(
-                    "mt-2.5 text-pretty text-[12.5px] leading-[1.5]",
-                    empty || addressMissing
-                        ? "text-destructive-subtle-foreground"
-                        : diff !== 0
-                          ? "text-brand-subtle-foreground"
-                          : "text-muted-foreground",
-                )}
+                        {note}
+                    </p>
+                }
             >
-                {note}
-            </p>
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <Button
                     type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="button"
-                    className={actionClass("primary")}
                     disabled={off}
                     onClick={() =>
                         onSave({
@@ -338,7 +370,7 @@ export function EditPanel({
                           ? `Save and refund ${money(-diff)}`
                           : "Save"}
                 </Button>
-            </div>
-        </WorkPanel>
+            </OrderSheetFoot>
+        </>
     );
 }

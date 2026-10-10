@@ -49,6 +49,7 @@ environment can't shorten the first.
 never a number in a handler; and a thing a deletion removes is first asked
 "a secret, or a record with a period?". `docs/patterns/backend-jobs.md` →
 Retention.
+
 ## Seed — the dev environment's businesses claimed providers they couldn't use
 
 **Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
@@ -3845,6 +3846,7 @@ controller with a `stores` route and fails one without the guard; the same
 spec names every write route of the order, booking, payment, invoice,
 membership, class pack and course controllers as wind-down or refused.
 **Category**: lifecycle · `apps/api.saroh.in/src/common/guards/store-lifecycle.guard.ts`
+
 ## A browser spec that only passed on weekdays
 
 **Symptom**: `public-booking.spec.ts` › "pay at the desk…" failed on desk and
@@ -3858,3 +3860,53 @@ Northwind is open but nobody takes the service the label is "no times"
 can be in; read the function that writes the words, not one day's screen
 (`saroh-browser-tests` skill: date-dependent assertions).
 **Category**: browser tests · `e2e/tests/public-booking.spec.ts`
+
+## Every merchant's tab showed the framework's default icon
+
+**Symptom**: every merchant site, on its Saroh address and on its own domain,
+showed the same black circle with a triangle in the browser tab: the
+framework's default mark, not the merchant's and not chosen by anyone.
+**Cause**: `apps/saroh.app/app/favicon.ico` was the file the app was scaffolded
+with. Next serves `app/favicon.ico` on every host, and the middleware's
+matcher skips dotted root paths, so no merchant route was ever asked. The
+"merchant sites never inherit Saroh's brand" gates (`check:blocks`) look at
+tokens and typefaces, not at metadata files.
+**Fix**: the file is gone and the renderer ships no icon of its own. A site
+shows its own icon, else the business logo, else a plain tile with its
+initial (DEC-124); `/favicon.ico` and `/site-icon.svg` are in the
+middleware's matcher and answered per host.
+**Check**: `apps/saroh.app/lib/site-icon.test.ts` fails if `favicon.*`,
+`icon.*` or `apple-icon.*` appears under `apps/saroh.app/app`, or
+`public/favicon.ico`; `app/[domain]/layout.test.ts` and
+`favicon.ico/route.test.ts` pin the three cases.
+**Category**: merchant sites · `apps/saroh.app/lib/site-icon.ts`
+
+## A test that is quick locally times out at 5s on CI
+
+**Symptom**: PR #925's "Unit tests" failed on three cases in
+`packages/ui/src/lib/qr-art.decode.test.ts` with "Test timed out in
+5000ms". `pnpm prepush --all` had passed on the same tree.
+**Cause**: each case draws eight QR versions in five colours and reads every
+one back through a real decoder. Run alone on the laptop that is under a
+second. On CI's runners, beside every other package's tests, it took 5.3 to
+5.6s, past vitest's 5s default.
+**Fix**: the three cases carry their own 30s limit, with a comment saying why.
+**Rule**: a test that does real work in a loop (decoding, rasterising,
+hashing many inputs) gets an explicit timeout. CI ran this one six times
+slower than the laptop, so the local time says little.
+**Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
+
+## The gate's quick API test step hung for ever on watchman
+
+**Symptom**: `pnpm prepush` (and so `git push`) sat on `api-unit:changed`
+for ten minutes or more with jest at 0% CPU, four times in one day, in the
+batch worktree and in three agent worktrees. Killed by hand, the step
+failed and the push was refused.
+**Cause**: jest uses watchman to find changed files when watchman is
+installed. With many worktrees of the same repo open, watchman never
+answered `--changedSince`, and jest waits without a timeout.
+**Fix**: `watchman: false` in `apps/api.saroh.in/jest.config.js`. Jest crawls
+the files itself, which is about a second slower and always returns.
+**Rule**: a test runner must not depend on a machine-wide daemon. A step
+that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
+**Category**: tooling · `apps/api.saroh.in/jest.config.js`

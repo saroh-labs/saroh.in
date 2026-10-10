@@ -14,7 +14,8 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { actionClass, FOCUS, PanelTitle, WorkPanel } from "./parts";
+import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import { FOCUS } from "./parts";
 
 export interface RefundChoice {
     /** Null: everything still refundable, delivery included. */
@@ -45,16 +46,34 @@ const FIELD =
  * reason, and puts nothing back on the shelf. The amount on the button is
  * what the lines paid; the API works out the exact sum (a discount is
  * spread across the lines), and caps another amount at what is left.
+ *
+ * A side sheet over the order: the lines scroll, and how the money goes
+ * back stays at the foot with the Refund button and its amount.
  */
 export function RefundPanel({
-    lines,
-    remaining,
-    shipping,
-    how,
-    format,
-    onCancel,
-    onRefund,
-}: {
+    open,
+    returnFocus,
+    ...draft
+}: RefundProps & {
+    open: boolean;
+    /** Put the keyboard back on the button that opened it. */
+    returnFocus?: () => void;
+}) {
+    return (
+        <OrderSheet
+            open={open}
+            title="What are you refunding?"
+            description="Tick the lines to refund, or type another amount."
+            wide
+            onClose={draft.onCancel}
+            returnFocus={returnFocus}
+        >
+            <RefundDraft {...draft} />
+        </OrderSheet>
+    );
+}
+
+interface RefundProps {
     lines: OrderReadLine[];
     /** Paid and not yet refunded on the whole order. */
     remaining: number;
@@ -64,7 +83,17 @@ export function RefundPanel({
     format: (amount: number) => string;
     onCancel: () => void;
     onRefund: (choice: RefundChoice) => void;
-}) {
+}
+
+/** What is chosen in the sheet: a fresh one each time it opens. */
+function RefundDraft({
+    lines,
+    remaining,
+    shipping,
+    how,
+    format,
+    onRefund,
+}: RefundProps) {
     const ids = useId();
     const open = lines.filter((l) => refundableQuantity(l) > 0);
     const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -88,155 +117,164 @@ export function RefundPanel({
     const off = typedAmount.kind === "bad" || needsWhy || amount === 0;
 
     return (
-        <WorkPanel label="Refund">
-            <PanelTitle>What are you refunding?</PanelTitle>
-            <div className="mt-2.5 flex flex-col gap-1">
-                {open.map((l) => {
-                    const on = !!picked[l.id];
-                    return (
-                        <button
-                            key={l.id}
-                            type="button"
-                            role="checkbox"
-                            aria-checked={on}
-                            onClick={() =>
-                                setPicked((p) => ({ ...p, [l.id]: !p[l.id] }))
-                            }
-                            className={cn(
-                                FOCUS,
-                                "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted active:bg-accent-active coarse:min-h-11",
-                            )}
-                        >
-                            <span
-                                aria-hidden
+        <>
+            <OrderSheetBody>
+                <div className="flex flex-col gap-1">
+                    {open.map((l) => {
+                        const on = !!picked[l.id];
+                        return (
+                            <button
+                                key={l.id}
+                                type="button"
+                                role="checkbox"
+                                aria-checked={on}
+                                onClick={() =>
+                                    setPicked((p) => ({
+                                        ...p,
+                                        [l.id]: !p[l.id],
+                                    }))
+                                }
                                 className={cn(
-                                    "size-4 shrink-0 rounded",
-                                    on
-                                        ? "border-[5px] border-foreground"
-                                        : "border-[1.5px] border-border-strong",
+                                    FOCUS,
+                                    "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted active:bg-accent-active coarse:min-h-11",
                                 )}
-                            />
-                            <span className="min-w-0 flex-1">
-                                {refundableQuantity(l)} ×{" "}
-                                {l.name ?? "A product that no longer exists"}
-                                {l.variantTitle ? `, ${l.variantTitle}` : ""}
-                            </span>
-                            <span className="tabular-nums">
-                                {format(worth(l))}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-            <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                <label className="grid gap-1 text-[12px] font-medium">
-                    Why
-                    <select
-                        value={reason}
-                        onChange={(e) =>
-                            setReason(e.target.value as RefundReason | "")
-                        }
-                        aria-invalid={needsWhy || undefined}
-                        aria-describedby={
-                            needsWhy ? `${ids}-why-help` : undefined
-                        }
-                        className={cn(FOCUS, FIELD)}
-                    >
-                        <option value="">Choose a reason</option>
-                        {REFUND_REASONS.map((r) => (
-                            <option key={r.value} value={r.value}>
-                                {r.label}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                {reason === "other" ? (
-                    <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                        Say why
-                        <input
-                            type="text"
-                            value={other}
-                            maxLength={REFUND_REASON_MAX}
-                            onChange={(e) => setOther(e.target.value)}
-                            placeholder="Optional"
-                            className={cn(FOCUS, FIELD, "w-full")}
-                        />
-                    </label>
-                ) : null}
-                <label className="grid gap-1 text-[12px] font-medium">
-                    Or another amount
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        value={typed}
-                        onChange={(e) => setTyped(e.target.value)}
-                        placeholder="₹"
-                        aria-label="Refund another amount, in rupees"
-                        aria-invalid={typedAmount.kind === "bad" || undefined}
-                        aria-describedby={
-                            typedAmount.kind === "bad"
-                                ? `${ids}-amount-help`
-                                : undefined
-                        }
-                        className={cn(FOCUS, FIELD, "w-[110px] tabular-nums")}
-                    />
-                </label>
-                {putBackUnits > 0 ? (
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "size-4 shrink-0 rounded",
+                                        on
+                                            ? "border-[5px] border-foreground"
+                                            : "border-[1.5px] border-border-strong",
+                                    )}
+                                />
+                                <span className="min-w-0 flex-1">
+                                    {refundableQuantity(l)} ×{" "}
+                                    {l.name ??
+                                        "A product that no longer exists"}
+                                    {l.variantTitle
+                                        ? `, ${l.variantTitle}`
+                                        : ""}
+                                </span>
+                                <span className="tabular-nums">
+                                    {format(worth(l))}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <label className="grid gap-1 text-[12px] font-medium">
-                        Stock
+                        Why
                         <select
-                            value={stock}
+                            value={reason}
                             onChange={(e) =>
-                                setStock(e.target.value as "back" | "off")
+                                setReason(e.target.value as RefundReason | "")
+                            }
+                            aria-invalid={needsWhy || undefined}
+                            aria-describedby={
+                                needsWhy ? `${ids}-why-help` : undefined
                             }
                             className={cn(FOCUS, FIELD)}
                         >
-                            <option value="back">Put back in stock</option>
-                            <option value="off">Write off</option>
+                            <option value="">Choose a reason</option>
+                            {REFUND_REASONS.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                    {r.label}
+                                </option>
+                            ))}
                         </select>
                     </label>
-                ) : null}
-            </div>
-            {typedAmount.kind === "bad" ? (
-                <p
-                    id={`${ids}-amount-help`}
-                    role="alert"
-                    className="mt-2 text-[12px] text-destructive-subtle-foreground"
-                >
-                    {typedAmount.error}
-                </p>
-            ) : needsWhy ? (
-                <p
-                    id={`${ids}-why-help`}
-                    className="mt-2 text-[12px] text-destructive-subtle-foreground"
-                >
-                    Say why you&apos;re refunding this amount.
-                </p>
-            ) : null}
-            <p className="mt-2 text-[12px] text-muted-foreground">
-                {how}
-                {goodwill
-                    ? " Only this amount goes back; the items stay sold."
-                    : shipping > 0
-                      ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
-                      : ""}
-                {putBackUnits > 0 && stock === "back"
-                    ? ` ${putBackUnits} go${putBackUnits === 1 ? "es" : ""} back in stock when the refund is confirmed.`
-                    : ""}
-            </p>
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
+                    {reason === "other" ? (
+                        <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
+                            Say why
+                            <input
+                                type="text"
+                                value={other}
+                                maxLength={REFUND_REASON_MAX}
+                                onChange={(e) => setOther(e.target.value)}
+                                placeholder="Optional"
+                                className={cn(FOCUS, FIELD, "w-full")}
+                            />
+                        </label>
+                    ) : null}
+                    <label className="grid gap-1 text-[12px] font-medium">
+                        Or another amount
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={typed}
+                            onChange={(e) => setTyped(e.target.value)}
+                            placeholder="₹"
+                            aria-label="Refund another amount, in rupees"
+                            aria-invalid={
+                                typedAmount.kind === "bad" || undefined
+                            }
+                            aria-describedby={
+                                typedAmount.kind === "bad"
+                                    ? `${ids}-amount-help`
+                                    : undefined
+                            }
+                            className={cn(
+                                FOCUS,
+                                FIELD,
+                                "w-[110px] tabular-nums",
+                            )}
+                        />
+                    </label>
+                    {putBackUnits > 0 ? (
+                        <label className="grid gap-1 text-[12px] font-medium">
+                            Stock
+                            <select
+                                value={stock}
+                                onChange={(e) =>
+                                    setStock(e.target.value as "back" | "off")
+                                }
+                                className={cn(FOCUS, FIELD)}
+                            >
+                                <option value="back">Put back in stock</option>
+                                <option value="off">Write off</option>
+                            </select>
+                        </label>
+                    ) : null}
+                </div>
+            </OrderSheetBody>
+            <OrderSheetFoot
+                note={
+                    <>
+                        {typedAmount.kind === "bad" ? (
+                            <p
+                                id={`${ids}-amount-help`}
+                                role="alert"
+                                className="mb-2 text-[12px] text-destructive-subtle-foreground"
+                            >
+                                {typedAmount.error}
+                            </p>
+                        ) : needsWhy ? (
+                            <p
+                                id={`${ids}-why-help`}
+                                className="mb-2 text-[12px] text-destructive-subtle-foreground"
+                            >
+                                Say why you&apos;re refunding this amount.
+                            </p>
+                        ) : null}
+                        <p className="text-[12px] text-muted-foreground">
+                            {how}
+                            {goodwill
+                                ? " Only this amount goes back; the items stay sold."
+                                : shipping > 0
+                                  ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
+                                  : ""}
+                            {putBackUnits > 0 && stock === "back"
+                                ? ` ${putBackUnits} go${putBackUnits === 1 ? "es" : ""} back in stock when the refund is confirmed.`
+                                : ""}
+                        </p>
+                    </>
+                }
+            >
                 <Button
                     type="button"
                     variant="destructive"
-                    className={actionClass("primary")}
                     disabled={off}
                     onClick={() =>
                         onRefund({
@@ -259,7 +297,7 @@ export function RefundPanel({
                 >
                     Refund {format(amount)}
                 </Button>
-            </div>
-        </WorkPanel>
+            </OrderSheetFoot>
+        </>
     );
 }

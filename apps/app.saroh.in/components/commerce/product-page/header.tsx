@@ -4,6 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ArrowUpRight, Camera, ChevronLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref, productHref } from "@/lib/products/links";
@@ -104,6 +105,22 @@ export function ProductCrumbs({
                         </Link>
                     ))}
                 </div>
+                {shopUrl ? (
+                    // Its page is live, so a code for it has somewhere to go.
+                    <QrButton
+                        compact="always"
+                        variant="ghost"
+                        className="size-7 rounded-[7px]"
+                        link={{
+                            mode: "saved",
+                            kind: "PRODUCT",
+                            ref: product.id,
+                            url: shopUrl,
+                            what: product.name,
+                            from: "Product page",
+                        }}
+                    />
+                ) : null}
                 {shopUrl ? (
                     // Live on the shop (UX-082): open it as customers see it.
                     <Button

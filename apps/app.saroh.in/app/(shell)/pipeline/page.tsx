@@ -1,5 +1,4 @@
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -7,6 +6,7 @@ import Link from "next/link";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { PipelineBoardStart } from "@/components/crm/pipeline-board-start";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { StagesDialog } from "@/components/leads/stages-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
@@ -219,7 +219,7 @@ export default async function PipelinePage() {
     );
 }
 
-/** The board header with a title + list-view link. */
+/** The board header: its title, the Board | List switch and the actions. */
 function Header({
     pipelineName,
     action,
@@ -233,9 +233,7 @@ function Header({
             description={pipelineName}
             actions={
                 <>
-                    <Button asChild variant="outline">
-                        <Link href="/leads">List view</Link>
-                    </Button>
+                    <LeadsViewSwitch current="board" />
                     {action}
                 </>
             }

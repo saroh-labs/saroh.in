@@ -1337,6 +1337,28 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Cancel after a refund by hand (#918, 2026-10-09): "Cancel order…" refunds what is left on the order, not every line in full. Paid online, that amount goes back to the provider, capped as below and split across the payments as another amount is; with nothing left it hands nothing back and just cancels. Paid by hand, the counter gives back what is left. Credit notes cover only what is refunded now. The cancel dialog says how much goes back and how ("₹100 has already been refunded, so the ₹380 left goes back to Razorpay, in 3–5 days."). Part by hand and the rest online makes the order **Refunded** once nothing is left.
 - Consequences: `Order.refundedByHand` keeps what was handed back by hand (migration `20261103100000_order_refunded_by_hand`). Insights' `order.refunded` is still written only for a full refund, since that figure is net of full refunds by design (#867). An online refund, by line or another amount, is capped at what is left on the order with refunds by hand counted, so money handed back by hand is never sent back again online; a cancel works that amount out itself (`onlineRefundableInTx`). `docs/patterns/backend-billing-and-classes.md` → "Orders and the shelf".
 
+## DEC-118 A QR code holds a short link on the Saroh address, and counts scans without a cookie
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: a merchant prints a QR once and it stays on a counter, a card or a bag for years. The page it points at changes, a custom domain can lapse, and the merchant wants to know whether the paper works.
+- Decision: a saved code holds a short link on the business's Saroh address, `<address>.saroh.app/q/<code>`, never the custom domain: the Saroh address forwards after a change (DEC-069) and can't lapse. Where it points can be changed later without reprinting. A retired code forwards to the site's home page, since paper outlives the row; a code with scans is retired, never deleted.
+- Two kinds. A _saved code_ (a row, a short link, a scan count) for pages that stay: the site, the shop, the booking page, a product, a service, any page. An _instant QR_ (drawn in the browser, nothing saved, not counted) for a link that belongs to one record, such as a pay link.
+- Counting: the site's `/q/<code>` handler asks the API to resolve and count, and the API takes that call only with the relay signature. One row per code per day (`QrScanDay`); link-preview fetchers are skipped. No cookie and no stored visitor detail, so DEC-108's "no banner needed" still holds. A failure to count never stops the visitor: they are forwarded anyway.
+- Bookings and orders: the redirect lands with `?src=qr-<code>` and a booking or order made from that page keeps it (`sourceCode`). It rides the URL only, so a visitor who goes to another page first is not counted, and the column says so.
+- Drawing: one renderer in `packages/ui` (`qr-art.ts`) for the workspace and the free tool on saroh.in. Where the design and a code that scans disagree, the code that scans wins: a branded code keeps its alignment pattern as a small eye, a logo needs version 3 or more, and a colour too light to scan is warned about or not offered.
+- Access: `site:read` / `site:update` (DEC-039, no new staff permissions). A plain code is in every plan; branding, print files and scan counts sit behind one catalogue row (`qr-branding`), refused in the usual `MODULE_LOCKED` shape.
+- The free tool (`/tools/qr-code-maker`) saves nothing: it draws in the browser. Its email unlocks the download and is Saroh's own words with a link back; it never attaches a file made from a stranger's link.
+- Consequences: `/q` is a reserved path on every merchant address. The UPI QR on invoices is unchanged. Scans are not yet a dimension in Insights.
+
+## DEC-119 What isn't built yet is listed with a period, not a date
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
+- Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
+- Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
+
 ## DEC-120 A business scheduled for deletion winds down, and an owner can download its data
 
 **Status: Accepted — 2026-10-09** · owner · follows #921 (DEC-021) and #117 (DEC-057)
@@ -1389,3 +1411,26 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - How: every job that deletes reads the hold through `organizations/legal-hold.ts`. `organizations/legal-hold.deletes.spec.ts` scans the source for jobs that delete and fails on one that is neither hold-aware nor declared not a business's data, and on a file a hold-aware job hands its deleting to without saying how the hold reaches it.
 - Consequences: a business deleted before this ships already lost its files on day one; its personal data is erased 180 days after its `deletedRetainedAt` like any other. Lifting a hold on a deleted business past its 180 days lets the next daily run erase it. The console shows "Legal hold" on the directory (with a filter) and at the top of the business page with who, when and why, and "Data kept until ‹date›" on the deletion trail. Not built: backups are outside the eraser (the Privacy Policy's roll-off covers them); a held business's export zip made before the hold is still deleted on its 7th day (a copy; the records stay); a removal attempt on a suspended business is usually refused by the workspace's lifecycle gate before the service, so the recorded refusal comes from the preview the dialog reads.
 - Migration: `20261106100000_legal_hold_retention` (four nullable columns on `Organization`, `Session_expiresAt_idx`, and one-waiting-run indexes for the two chains). New optional env `RETENTION_AFTER_DELETION_DAYS`.
+
+## DEC-123 A location uses the business logo unless it has its own
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: a location's "Description and logo" sheet asked for a "Logo address", a web link to type. The business already uploads its logo in Settings › Business, and the owner asked that a location use it, that a logo be uploaded rather than linked, and that the task finish inside the sheet.
+- Decision: a location with no logo of its own shows the business logo, and says so ("Using your business logo"). It can have its own, uploaded in the same sheet (PNG, JPG or WebP, 1 MB at most, the business logo's rule); "Use your business logo" goes back. The typed web link is gone.
+- Data: `Store.logoMediaId` beside `Store.logo`, the business logo's shape (a library object and the address it is served from, taken when set). Both null is "use the business's". A location that already held a typed address keeps it as its own logo, with no library object, until it is replaced or given up.
+- API: `PUT /stores/:id` takes `logoMediaId` (an image in the location's own business's library, or `null` for the business logo; left out, the logo stays). One route, not a pair like the business logo's, because the sheet saves the description and the logo with one Save. `GET /stores/:id` returns `ownLogo`, `businessLogo` and `effectiveLogo` (own, else the business's, else none). The old `logo` address field is still accepted from an older app, but a new address is refused. The library won't delete an image while a location uses it.
+- Access is unchanged: whoever may edit the location may change its logo.
+- Consequences: nothing reads a location's logo yet beyond its own row and sheet. Invoices, receipts and QR codes keep the business logo (DEC-082). Where a location's logo should appear (the pick-up line of a checkout, a location's page) is still to decide.
+
+## DEC-124 A site's icon: its own, else the business logo, else a plain initial; never Saroh's mark
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: every merchant site served one fixed `favicon.ico` from the renderer (`apps/saroh.app/app/favicon.ico`, the framework's default mark), and there was no setting. A merchant's site never carries Saroh's brand, or anyone else's.
+- Decision: a site shows its own icon when the merchant uploaded one; else the business logo from Settings › Business; else a plain tile with the site's initial in the site's accent colour. The renderer ships no icon file of its own.
+- The site's own icon is set in Website › Settings › Search and sharing, in the row's sheet: PNG, JPG or WebP (no SVG, as the storage allowlist), under 1 MB, as the business logo. "At least 192 × 192; square works best" is guidance, not a refusal. `site:update`; no plan lock.
+- It is part of the draft, like the share image ("Next publish"): saved on the Site (`iconMediaId`, `iconUrl`, the logo's shape), written into the Publication snapshot at publish (`site.icon`, only when there is one) and counted in what waits for the next publish. The logo that stands in is the business's, read live, and applies at once.
+- The public site read resolves the icon (own, else logo, else none) and sends it with the snapshot, so the renderer asks nothing more. Every page's head names it, for the tab and as the phone's touch icon. `/favicon.ico` on a merchant's address forwards to it (302). With neither, the site serves the tile itself at `/site-icon.svg`, and `/favicon.ico` answers with it. A draft preview and a test release show theirs.
+- No image pipeline: an uploaded image is served as it is, from the media address, with its type declared. The tile is an SVG drawn by one function (`@saroh/site-blocks/site-icon`) that the site serves and the workspace previews, so no font or image library is added; a phone gets no touch icon for it and draws its own.
+- Consequences: migration `20261108100000_site_icon`. The library refuses to delete an image while it is a site's icon. Setting or removing the business logo tells the page cache (`site.pages.revalidate`, cause `icon`), since a kept page carries the old one. `docs/patterns/frontend-design-system.md` → "Type and the mark".

@@ -128,6 +128,13 @@ export interface StartCheckout {
     discountCode?: string;
     /** Stable for one checkout, so a double tap starts it once. */
     key: string;
+    /**
+     * The tag the page's address carried when a QR code's scan opened it
+     * (`qr-<code>`, `qr-source.ts`), added by the bag as it starts the
+     * checkout. The API looks the code up on this site and ignores anything
+     * else; it never refuses an order over it.
+     */
+    source?: string;
 }
 
 /**

@@ -45,6 +45,20 @@ describe("which requests the page cache may answer (#863)", () => {
         }
     });
 
+    it("never a QR code's short link, so every scan reaches the server", () => {
+        for (const path of ["/q/h7c", "/q/h7c?utm=x", "/q"]) {
+            expect(reason(req(`https://rye.saroh.app${path}`))).toBe(
+                "private path",
+            );
+            expect(reason(req(`https://www.ryebakery.in${path}`))).toBe(
+                "private path",
+            );
+        }
+        // A page that merely starts with the letter is an ordinary page.
+        expect(reason(req("https://rye.saroh.app/quotes"))).toBe("cacheable");
+        expect(reason(req("https://rye.saroh.app/qr-menu"))).toBe("cacheable");
+    });
+
     it("never a preview, a review link or the renderer's own routes", () => {
         for (const path of [
             "/preview/tok",
@@ -138,6 +152,16 @@ describe("the key a page is kept under (#863)", () => {
         expect(await key(req("https://rye.saroh.app/shop?page=3"))).not.toBe(
             base,
         );
+    });
+
+    it("keeps the page a QR scan opened apart from the page itself", async () => {
+        // `?src=qr-<code>` is read in the browser only, so both are the
+        // same drawing; and being keyed apart, a tagged request could never
+        // answer a visitor who asked for the plain page.
+        const plain = await key(req("https://rye.saroh.app/book"));
+        const scanned = await key(req("https://rye.saroh.app/book?src=qr-h7c"));
+        expect(scanned).not.toBe(plain);
+        expect(new URL(plain).searchParams.has("src")).toBe(false);
     });
 
     it("keeps a client navigation's RSC answer apart from the page", async () => {

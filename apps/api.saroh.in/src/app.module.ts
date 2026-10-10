@@ -57,6 +57,7 @@ import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
+import { ToolsModule } from "./modules/tools/tools.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
 import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
@@ -138,6 +139,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         BillingModule,
         WaitlistModule,
         LinkPreviewModule,
+        ToolsModule,
         BusinessReportsModule,
         SelfTestModule,
     ],

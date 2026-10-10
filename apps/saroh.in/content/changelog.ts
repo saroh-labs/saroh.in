@@ -1,3 +1,5 @@
+import type { ComingGroupKey } from "./coming";
+import { NOT_AVAILABLE_YET } from "./coming";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
 
@@ -132,33 +134,113 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
     },
 ];
 
-/** Planned work, never linked, each marked "Not available yet" (R15, R16). */
+/**
+ * Planned work, never linked, each marked "Not available yet" (R15, R16),
+ * under the group that says roughly when (`./coming`).
+ *
+ * Every row was checked against the code on `development` on 10 Oct 2026
+ * and has its row in the claims ledger (§12, CN1–CN18) before it is here.
+ * A row promises only what isn't built: nothing a merchant can already do
+ * is listed as coming (CSV import; their own Meta Pixel and Google
+ * Analytics in Website › Settings › Tracking). No row names a plan or a
+ * price.
+ */
 export interface ComingNext {
-    when: string;
+    group: ComingGroupKey;
     name: string;
     line: string;
 }
 
 export const COMING_NEXT: readonly ComingNext[] = [
     {
-        when: "Nov–Dec 2026",
-        name: "Google Calendar sync",
-        line: "Bookings show up in your Google Calendar.",
+        group: "next",
+        // A business can already connect WhatsApp in Settings › Providers
+        // and write to an enquiry by hand; nothing is sent on its own. The
+        // design's "…not just email" is dropped: no booking reminder goes
+        // by email either (ledger BK2, CN1).
+        name: "Automatic WhatsApp messages",
+        line: "Booking reminders, order updates and pay links sent to your customers on WhatsApp for you.",
     },
     {
-        when: "Nov–Dec 2026",
+        group: "next",
+        name: "QR codes",
+        line: "A QR for your page, a service or a product, with your logo, ready to print for the counter.",
+    },
+    {
+        group: "next",
+        name: "Google Calendar sync",
+        line: "Bookings show up in your Google Calendar, and busy times there block the slot in Saroh.",
+    },
+    {
+        group: "next",
         name: "Google Meet and Zoom links",
         line: "Online appointments get a meeting link made for them automatically.",
     },
     {
-        when: "Jan–Mar 2027",
+        group: "early-2027",
         name: "Shopify import",
         line: "Move products, customers and past orders over from Shopify in one go.",
     },
     {
-        when: "Apr–Jun 2027",
+        group: "early-2027",
+        name: "PhonePe",
+        line: "Take payments through PhonePe, alongside Razorpay and Cashfree.",
+    },
+    {
+        group: "early-2027",
+        // An order that ships already takes a courier's name and a tracking
+        // number typed by hand, so tracking alone isn't what's coming
+        // (ledger CN7).
+        name: "Shiprocket",
+        line: "Shipping labels and courier pick-up for orders that ship, with tracking filled in for you.",
+    },
+    {
+        group: "early-2027",
+        name: "Google Business Profile",
+        line: "Your booking or shop link on your Google listing.",
+    },
+    {
+        group: "early-2027",
+        name: "Tally and Zoho Books export",
+        line: "Send orders and invoices to your accountant in their format.",
+    },
+    {
+        group: "early-2027",
+        name: "Saroh for Android",
+        line: "Run your day from your phone: bookings, walk-ins, orders and payments, in English, Hindi or Hinglish. Works without internet.",
+    },
+    {
+        group: "early-2027",
+        // Invoices already carry the business's logo and GSTIN (ledger
+        // BI7), so the design's "add your logo, colours, GSTIN…" names only
+        // what is new (ledger CN11).
+        name: "Invoice layouts",
+        line: "Pick an invoice layout, set its colours, terms and a signature, and see it before it goes out.",
+    },
+    {
+        group: "early-2027",
+        name: "Sign in with Google",
+        line: "Your customers sign in to your booking or shop page with Google. GitHub too.",
+    },
+    {
+        group: "later",
+        name: "Bring your own login",
+        line: "Already have an app with Firebase, Clerk or Auth0? Your customers keep one account.",
+    },
+    {
+        group: "later",
+        name: "API keys and webhooks",
+        line: "Connect Saroh to your own tools, n8n and AI assistants, with keys you control.",
+    },
+    {
+        group: "later",
         name: "Social publishing",
         line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
+    },
+    {
+        group: "later",
+        name: "Canva",
+        line: "Open any post in Canva to edit it, or bring in designs you've made there, then schedule them from Saroh.",
     },
 ];
 
@@ -175,7 +257,7 @@ export const CHANGELOG = {
     comingTitle: "Coming next",
     comingSub:
         "None of these is available yet. Times are rough and can move. When one ships, it gets its own entry above.",
-    notYet: "Not available yet",
+    notYet: NOT_AVAILABLE_YET,
     readMore: "Read the full note",
     metaDescription:
         "What's new in Saroh, the one place a small business in India sells, takes bookings, invoices and runs its website. Every release, and what's coming next.",

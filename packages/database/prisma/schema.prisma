@@ -198,6 +198,9 @@ model Organization {
   siteVerifications    SiteVerification[]
   siteTrackers         SiteTracker[]
   siteTrackingSettings SiteTrackingSettings[]
+  // A site's QR codes and their daily scan counts.
+  qrCodes              QrCode[]
+  qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
 
@@ -668,6 +671,10 @@ model Media {
   productPosters ProductImage[]    @relation("ProductImagePoster")
   // The business whose logo it is (at most one: a logo is per business).
   businessLogos  BusinessProfile[] @relation("BusinessLogo")
+  // The locations whose own logo it is.
+  locationLogos  Store[]           @relation("LocationLogo")
+  // The sites whose icon it is (Website › Settings).
+  siteIcons      Site[]            @relation("SiteIcon")
 
   @@index([organizationId])
 }
@@ -721,7 +728,13 @@ model Store {
   // L15 drops the column (a later release).
   slug        String? @unique
   description String?
+  // The location's own logo (DEC-123): the address it is served from, and
+  // the library object it came from, taken when it was set (the business
+  // logo's pattern). Both null: the location uses the business logo. An
+  // address with no object is one typed in before a logo could be uploaded.
   logo        String?
+  logoMediaId String?
+  logoMedia   Media?  @relation("LocationLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
 
   // Ownership
   // ADR-001: Store is an Organization-owned commerce channel. The nullable
@@ -1687,6 +1700,11 @@ model Order {
   // correct it (ADR-008, U5). The order stays the ledger.
   invoices Invoice[]
 
+  // The QR code whose scan opened the page this order was placed from
+  // (`QrCode.id`), when the page's address still carried the scan's tag.
+  // Null for every other order.
+  sourceCode String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1766,6 +1784,8 @@ model Order {
   @@index([organizationId, createdAt])
   // What an account ordered, newest first (A7).
   @@index([customerAccountId, createdAt])
+  // The QR list's Orders count: the few orders that name a code.
+  @@index([sourceCode], map: "Order_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 model OrderItem {
@@ -3040,6 +3060,17 @@ model Site {
   socialImageHeight Int?
   socialImageBytes  Int?
 
+  // The site's icon (the browser tab, a bookmark, a phone's home screen):
+  // a library object, and the address it is served from, taken when it was
+  // set (the business logo's shape, DEC-124). Draft like the share image:
+  // it travels into the Publication snapshot at publish. Null means none of
+  // its own, and the site then shows the business logo, else a plain tile
+  // with its initial. The library refuses to delete it while it is the
+  // icon; the SetNull is only a backstop.
+  iconMediaId String?
+  iconMedia   Media?  @relation("SiteIcon", fields: [iconMediaId], references: [id], onDelete: SetNull)
+  iconUrl     String?
+
   // The footer a merchant writes for themselves (#202): `{ format, value }`,
   // the same shape richText sections carry, so one authoring surface and one
   // sanitizer serve both.
@@ -3099,6 +3130,8 @@ model Site {
   verifications    SiteVerification[]
   trackers         SiteTracker[]
   trackingSettings SiteTrackingSettings?
+  // The site's QR codes: short links at `/q/<code>` on its Saroh address.
+  qrCodes          QrCode[]
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live
@@ -3722,6 +3755,72 @@ model SiteTrackingSettings {
   updatedAt DateTime @updatedAt
 
   @@unique([siteId, organizationId])
+  @@index([organizationId])
+}
+
+/// A QR code a business made for its site. The printed code holds a short
+/// link, `<address>.saroh.app/q/<code>`, never the target itself: the target
+/// is resolved when the code is scanned, so paper keeps working when a page
+/// moves and a code can be pointed somewhere new.
+model QrCode {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The short id in the link: 3 to 6 characters from an alphabet with no
+  // look-alikes, made by the API. Unique per site, so finding one never
+  // reads across businesses.
+  code String
+
+  // SITE | SHOP | BOOK | PRODUCT | PAGE (CHECKed in the migration).
+  targetKind String
+  // PRODUCT: the product's id. PAGE: the page's id. Null for the others.
+  // An id, not an address, so a renamed product or a moved page still opens.
+  targetRef  String?
+
+  // Where the code is placed: COUNTER | MIRROR | CARD | FLYER | OTHER
+  // (CHECKed in the migration), and the owner's own words for it.
+  place     String
+  placeNote String?
+  // The line printed with the code ("Scan to book").
+  label     String?
+
+  // PLAIN | BRANDED (CHECKed in the migration).
+  style String @default("PLAIN")
+  // "#rrggbb", lower case (CHECKed in the migration).
+  color String
+
+  // Retired, never deleted: paper outlives the row, and a retired code
+  // forwards to the site's home page without counting.
+  retiredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scanDays QrScanDay[]
+
+  @@unique([siteId, code])
+  // The target of (qrCodeId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+/// How many times a QR code was scanned on one day. One row per code and
+/// day, added to in place; nothing about a visitor is stored.
+model QrScanDay {
+  qrCodeId String
+  qrCode   QrCode @relation(fields: [qrCodeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  day   DateTime @db.Date // the UTC day bucket, as the analytics rollups
+  count Int      @default(0)
+
+  @@id([qrCodeId, day])
   @@index([organizationId])
 }
 
@@ -4385,6 +4484,11 @@ model Booking {
 
   idempotencyKey String? // dedupe double-submits (like Submission)
 
+  // The QR code whose scan opened the page this booking was made from
+  // (`QrCode.id`), when the page's address still carried the scan's tag.
+  // Null for every other booking.
+  sourceCode String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   cancelledAt DateTime?
@@ -4487,6 +4591,8 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
+  // The QR list's Bookings count: the few bookings that name a code.
+  @@index([sourceCode], map: "Booking_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a

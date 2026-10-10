@@ -1,33 +1,19 @@
-import { PageHeader } from "@saroh/ui/page-header";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-import { PageContainer } from "@/components/shared/page-container";
-import { PostCategoriesManager } from "@/components/sites/post-categories-manager";
-import { listPostCategories } from "@/lib/content/service";
-import { requireSession } from "@/lib/session";
-import { getSite } from "@/lib/sites/service";
-/** The tab's title (UX-081): without one it read the bare "Saroh". */
-export const metadata = { title: "Categories · Website" };
+import { postCategoriesHref } from "@/lib/content/categories-href";
 
+/**
+ * Post categories used to be a page of their own, outside the Website tabs.
+ * They are managed from the Posts tab now, in a sheet over the posts they
+ * group, so this address sends an old link or bookmark there with the sheet
+ * open. Someone who can't change categories lands on the Posts tab, which
+ * doesn't offer them the sheet.
+ */
 export default async function PostCategoriesPage({
     params,
 }: {
     params: Promise<{ siteId: string }>;
 }) {
     const { siteId } = await params;
-    await requireSession();
-    const site = await getSite(siteId);
-    if (!site) notFound();
-
-    const categories = await listPostCategories(siteId);
-
-    return (
-        <PageContainer width="form">
-            <PageHeader
-                title="Post categories"
-                description="Group this site's posts."
-            />
-            <PostCategoriesManager siteId={siteId} categories={categories} />
-        </PageContainer>
-    );
+    redirect(postCategoriesHref(siteId));
 }

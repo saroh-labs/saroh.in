@@ -61,6 +61,7 @@ import { OrganizationRolesService } from "../organizations/organization-roles.se
 import { ProductAccess } from "../products/product-access";
 import { ProductsService } from "../products/products.service";
 import { setPublishNeedsApproval } from "../sites/publish-approval";
+import { QrCodesService } from "../sites/qr-codes.service";
 import { SiteTrackingService } from "../sites/site-tracking.service";
 import { SitesService } from "../sites/sites.service";
 import { StaffService } from "../staff/staff.service";
@@ -90,6 +91,7 @@ const roles = new OrganizationRolesService();
 const comms = new CommunicationsService();
 const sites = new SitesService(new EntitlementService());
 const tracking = new SiteTrackingService();
+const qrCodes = new QrCodesService();
 const storefronts = new StorefrontsService();
 const staff = new StaffService();
 const aggregate = new AnalyticsAggregateHandler();
@@ -809,5 +811,84 @@ describe("a merchant's own trackers (DB, DEC-108)", () => {
         await expect(
             tracking.save(b.owner, site.id, ga4),
         ).resolves.toBeDefined();
+    });
+});
+
+describe("a branded QR code (DB)", () => {
+    const siteOf = (b: Business) =>
+        prisma.site.create({
+            data: { organizationId: b.orgId, name: "Site", slug: uniq("s") },
+        });
+    const plain = { targetKind: "SITE", place: "COUNTER" } as const;
+    const branded = { ...plain, style: "BRANDED", color: "#0b5d3b" } as const;
+
+    it("refuses a branded code where the plan leaves it off; a plain one never", async () => {
+        const free = await business("free");
+        const freeSite = await siteOf(free);
+        expect(
+            (await refused(qrCodes.create(free.owner, freeSite.id, branded)))
+                .details,
+        ).toMatchObject({ code: "MODULE_LOCKED", moduleId: "qr-branding" });
+        const made = await qrCodes.create(free.owner, freeSite.id, plain);
+        expect(made.style).toBe("PLAIN");
+        // Going branded later is refused the same way.
+        expect(
+            (
+                await refused(
+                    qrCodes.update(free.owner, freeSite.id, made.id, {
+                        style: "BRANDED",
+                    }),
+                )
+            ).details,
+        ).toMatchObject({ code: "MODULE_LOCKED", moduleId: "qr-branding" });
+        // The list sends the counts and says the plan leaves them out.
+        expect(await qrCodes.list(free.owner, freeSite.id)).toMatchObject({
+            included: false,
+            codes: [{ id: made.id, scans: { total: 0, last7Days: 0 } }],
+        });
+
+        const grow = await business("grow");
+        const growSite = await siteOf(grow);
+        await expect(
+            qrCodes.create(grow.owner, growSite.id, branded),
+        ).resolves.toMatchObject({ style: "BRANDED", color: "#0b5d3b" });
+        expect((await qrCodes.list(grow.owner, growSite.id)).included).toBe(
+            true,
+        );
+    });
+
+    it("lets a business that moved to Free re-point or retire a branded code it made", async () => {
+        const b = await business("free");
+        const site = await siteOf(b);
+        // Made while on a paid plan.
+        const kept = await prisma.qrCode.create({
+            data: {
+                siteId: site.id,
+                organizationId: b.orgId,
+                code: "h7c",
+                targetKind: "SITE",
+                place: "COUNTER",
+                style: "BRANDED",
+                color: "#0b5d3b",
+            },
+        });
+        await expect(
+            qrCodes.update(b.owner, site.id, kept.id, {
+                place: "MIRROR",
+                style: "BRANDED",
+            }),
+        ).resolves.toMatchObject({ place: "MIRROR", style: "BRANDED" });
+        await expect(
+            qrCodes.retire(b.owner, site.id, kept.id),
+        ).resolves.toMatchObject({ retired: true });
+    });
+
+    it("with the switch off, refuses nothing", async () => {
+        const b = await business("free", false);
+        const site = await siteOf(b);
+        await expect(
+            qrCodes.create(b.owner, site.id, branded),
+        ).resolves.toMatchObject({ style: "BRANDED" });
+        expect((await qrCodes.list(b.owner, site.id)).included).toBe(true);
     });
 });

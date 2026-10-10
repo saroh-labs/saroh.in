@@ -9,6 +9,8 @@ import type { PublicModulePageStates } from "./module-pages";
 import { publicModulePageStates } from "./module-pages";
 import { sanitizeRichHtml } from "./sanitize";
 import { assertSiteInOrg } from "./site-access";
+import type { PublicSiteIcon } from "./site-icon";
+import { publicSiteIcon } from "./site-icon";
 import type { SiteSnapshot } from "./sites.service";
 import { SitesService } from "./sites.service";
 
@@ -80,6 +82,8 @@ export interface PreviewView {
      * preview without them reads as before.
      */
     modules?: PublicModulePageStates;
+    /** The icon publishing would show (DEC-124); null for the plain tile. */
+    icon?: PublicSiteIcon | null;
 }
 
 /**
@@ -317,6 +321,9 @@ export class SitePreviewLinksService {
             siteId: link.siteId,
             expiresAt: link.expiresAt,
             ...(modules ? { modules } : {}),
+            // The icon publishing would show (DEC-124): the draft's own,
+            // else the business logo.
+            icon: await publicSiteIcon(snapshot, link.organizationId),
         };
     }
 

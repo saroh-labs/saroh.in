@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { QrButton } from "@/components/qr/qr-button";
 import { BusinessDate } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
@@ -149,6 +150,16 @@ export function PayLinkBlock({
                     >
                         <Copy aria-hidden className="size-4" />
                     </Button>
+                    <QrButton
+                        compact="always"
+                        link={{
+                            mode: "instant",
+                            url: link.url,
+                            what: "this order's pay link",
+                            opens: "pay",
+                            fileName: "pay-link-qr",
+                        }}
+                    />
                 </div>
                 <p className="mt-1.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                     Shown this once — copy it now. Saroh doesn&apos;t send it;

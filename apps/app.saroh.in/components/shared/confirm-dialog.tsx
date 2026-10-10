@@ -13,6 +13,7 @@ import {
 import { buttonVariants } from "@saroh/ui/button";
 import type { LucideIcon } from "lucide-react";
 import { Trash2 } from "lucide-react";
+import type { RefObject } from "react";
 
 /**
  * A confirmation for an action that cannot be undone, in place of
@@ -43,6 +44,7 @@ export function ConfirmDialog({
     cancelLabel = "Cancel",
     onConfirm,
     icon: Icon = Trash2,
+    returnFocusTo,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -54,10 +56,25 @@ export function ConfirmDialog({
     onConfirm: () => void;
     /** The mark: a bin unless what goes is not deleted (Stop tracking). */
     icon?: LucideIcon;
+    /**
+     * The button that opened it, for a caller with no trigger of its own:
+     * closed, the keyboard goes back there if it is still on the page.
+     */
+    returnFocusTo?: RefObject<HTMLElement | null>;
 }) {
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent className="max-w-[384px] gap-0 overflow-hidden p-0 sm:rounded-xl">
+            <AlertDialogContent
+                className="max-w-[384px] gap-0 overflow-hidden p-0 sm:rounded-xl"
+                {...(returnFocusTo
+                    ? {
+                          onCloseAutoFocus: (e: Event) => {
+                              e.preventDefault();
+                              returnFocusTo.current?.focus();
+                          },
+                      }
+                    : {})}
+            >
                 <AlertDialogHeader className="flex-row items-start gap-[13px] space-y-0 px-[22px] pb-1.5 pt-5 text-left">
                     <span
                         aria-hidden

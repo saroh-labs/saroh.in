@@ -15,6 +15,10 @@ jest.mock("@saroh/database", () => {
             productImage: { count: jest.fn().mockResolvedValue(0) },
             // Businesses using it as their logo; default "none".
             businessProfile: { count: jest.fn().mockResolvedValue(0) },
+            // Locations using it as their own logo; default "none".
+            store: { count: jest.fn().mockResolvedValue(0) },
+            // Sites using it as their own icon (DEC-124); default "none".
+            site: { count: jest.fn().mockResolvedValue(0) },
             // The delete guard counts publications referencing a key. Default
             // to "none", so existing remove tests keep their meaning.
             $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
@@ -48,6 +52,8 @@ const del = prisma.media.delete as jest.Mock;
 const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 const productImageCount = prisma.productImage.count as jest.Mock;
 const logoCount = prisma.businessProfile.count as jest.Mock;
+const locationLogoCount = prisma.store.count as jest.Mock;
+const siteIconCount = prisma.site.count as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -649,6 +655,46 @@ describe("MediaService.remove", () => {
         );
         expect(logoCount).toHaveBeenCalledWith({
             where: { logoMediaId: "media_1" },
+        });
+        expect(deleteObject).not.toHaveBeenCalled();
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it("refuses to delete a location's own logo", async () => {
+        const deleteObject = jest.fn();
+        const service = new MediaService(fakeStorage({ deleteObject }));
+        findUnique.mockResolvedValue({
+            id: "media_1",
+            organizationId: "org_1",
+            key: SIGNED.key,
+        });
+        locationLogoCount.mockResolvedValueOnce(1);
+
+        await expect(service.remove(ctx(), "media_1")).rejects.toThrow(
+            /a location's logo/,
+        );
+        expect(locationLogoCount).toHaveBeenCalledWith({
+            where: { logoMediaId: "media_1", deletedAt: null },
+        });
+        expect(deleteObject).not.toHaveBeenCalled();
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it("refuses to delete a site's icon, published or not", async () => {
+        const deleteObject = jest.fn();
+        const service = new MediaService(fakeStorage({ deleteObject }));
+        findUnique.mockResolvedValue({
+            id: "media_1",
+            organizationId: "org_1",
+            key: SIGNED.key,
+        });
+        siteIconCount.mockResolvedValueOnce(1);
+
+        await expect(service.remove(ctx(), "media_1")).rejects.toThrow(
+            /your site icon/,
+        );
+        expect(siteIconCount).toHaveBeenCalledWith({
+            where: { iconMediaId: "media_1" },
         });
         expect(deleteObject).not.toHaveBeenCalled();
         expect(del).not.toHaveBeenCalled();

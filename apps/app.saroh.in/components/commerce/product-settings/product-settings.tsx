@@ -35,9 +35,10 @@ export function useUnsaved(): Unsaved {
 }
 
 /**
- * Product settings' tabs and the one leave guard. Most changes here take
- * effect at once and offer Undo; the defaults and the SKU pattern are forms
- * with a save bar, and leaving either with changes asks first.
+ * Product settings' tabs and the one leave guard. The lists are read first:
+ * a change is made in a dialog or a side sheet, saved there and offered Undo.
+ * The defaults and the SKU pattern are forms with a save bar, and leaving
+ * either with changes asks first.
  */
 export function ProductSettings({
     tab,
@@ -136,23 +137,31 @@ export function ProductSettings({
     );
 }
 
-/** A tab's heading and the line under it. */
+/**
+ * A tab's heading and the line under it, with the tab's one action (New
+ * category, Add field) beside them when it has one.
+ */
 export function TabIntro({
     title,
+    action,
     children,
 }: {
     title: string;
+    action?: ReactNode;
     children: ReactNode;
 }) {
     return (
-        <>
-            <h2 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                {title}
-            </h2>
-            <p className="mb-4 mt-[5px] max-w-[64ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                {children}
-            </p>
-        </>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0 flex-[1_1_320px]">
+                <h2 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
+                    {title}
+                </h2>
+                <p className="mt-[5px] max-w-[64ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+                    {children}
+                </p>
+            </div>
+            {action}
+        </div>
     );
 }
 

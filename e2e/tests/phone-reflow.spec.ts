@@ -364,7 +364,7 @@ test.describe("phone reflow: Order Detail", () => {
         // A refund by line needs a payment taken through a provider, which
         // a dev stack has none of (as in order-detail.spec.ts): it runs when
         // E2E_REFUND_ORDER_ID names one. The cancel below refunds a
-        // hand-paid order's money in its own panel either way.
+        // hand-paid order's money in its own sheet either way.
         const id = refundOrder.id;
         test.skip(
             !id,
@@ -375,7 +375,9 @@ test.describe("phone reflow: Order Detail", () => {
         await page.setViewportSize(WIDTHS[0]);
         await page.goto(`/commerce/orders/${id}`);
         await page.getByRole("button", { name: "Refund…" }).click();
-        const refund = page.getByRole("region", { name: "Refund" });
+        const refund = page.getByRole("dialog", {
+            name: "What are you refunding?",
+        });
         await fitsAtPhoneWidths(
             page,
             refund,
@@ -386,6 +388,7 @@ test.describe("phone reflow: Order Detail", () => {
             "Refund",
         );
         await refund.getByRole("button", { name: "Cancel" }).click();
+        await expect(refund).toBeHidden();
     });
 
     test("Cancel (with its refund) and Edit fit a phone", async ({
@@ -405,7 +408,7 @@ test.describe("phone reflow: Order Detail", () => {
         await noSidewaysScroll(page, "Order Detail with a long name");
 
         await page.getByRole("button", { name: "Cancel order…" }).click();
-        const cancel = page.getByRole("region", { name: /^Cancel #/ });
+        const cancel = page.getByRole("dialog", { name: /^Cancel #/ });
         await fitsAtPhoneWidths(
             page,
             cancel,
@@ -420,12 +423,14 @@ test.describe("phone reflow: Order Detail", () => {
         await cancel
             .getByRole("button", { name: "Cancel", exact: true })
             .click();
+        // One sheet at a time: the page is out of reach until it is gone.
+        await expect(cancel).toBeHidden();
 
         await page.setViewportSize(WIDTHS[0]);
         await page
             .getByRole("button", { name: "Edit items or address" })
             .click();
-        const edit = page.getByRole("region", { name: "Edit order" });
+        const edit = page.getByRole("dialog", { name: /^Edit #/ });
         await fitsAtPhoneWidths(
             page,
             edit,

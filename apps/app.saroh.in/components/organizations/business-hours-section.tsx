@@ -1,249 +1,98 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@saroh/ui/form";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { Switch } from "@saroh/ui/switch";
-import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useState } from "react";
 
-import type { BusinessRow } from "@/components/organizations/business-section";
+import { BusinessHoursSheet } from "@/components/organizations/business-hours-sheet";
 import {
-    BusinessSection,
+    BusinessRows,
     ComingSoon,
-} from "@/components/organizations/business-section";
+    EditRow,
+} from "@/components/organizations/business-row-parts";
 import type { OfferUndo } from "@/components/organizations/use-settings-undo";
-import type { WeekText } from "@/lib/organizations/opening-hours";
-import {
-    dayProblem,
-    monToThu,
-    sameWeek,
-    WEEK,
-    weekFromText,
-    weekText,
-} from "@/lib/organizations/opening-hours";
-import { undoStorefrontHours } from "@/lib/organizations/settings-actions";
-import { hoursUndo } from "@/lib/organizations/settings-undo";
+import { Absent, Row } from "@/components/sites/settings-rows";
+import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
+import { sameWeek } from "@/lib/organizations/opening-hours";
 import { newStorefrontHref } from "@/lib/stores/links";
-import { updateStorefront } from "@/lib/stores/storefront-actions";
+import { weekSummary } from "@/lib/stores/opening-hours-summary";
 import type {
     StorefrontHours,
     StorefrontHoursRead,
 } from "@/lib/stores/storefronts";
 
+import type { BusinessSheets } from "./use-business-sheets";
+
 export const HOURS_SECTION = {
     title: "Hours",
-    lead: "When you're open — bookings and pickup follow this",
+    lead: "When you're open. Bookings and pick-up follow this.",
 } as const;
-
-const day = z.string().superRefine((value, ctx) => {
-    const problem = dayProblem(value);
-    if (problem) ctx.addIssue({ code: "custom", message: problem });
-});
-
-const hoursSchema = z.object({
-    mon: day,
-    tue: day,
-    wed: day,
-    thu: day,
-    fri: day,
-    sat: day,
-    sun: day,
-});
 
 const NOTE =
     "Applies to every location. Online orders placed while you're closed are ready from the next opening time.";
 
-/** A line under the card's header: why the hours read as they do. */
-function Notice({ children }: { children: React.ReactNode }) {
-    return (
-        <p className="text-pretty border-b border-border/70 px-[18px] py-3 text-[12.5px] leading-normal text-muted-foreground">
-            {children}
-        </p>
-    );
-}
-
 const LINK =
     "font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground";
 
+/** Whether the read has a location whose hours can be changed. */
+export const hasHoursToEdit = (hours: StorefrontHoursRead) =>
+    hours.state === "ok" && hours.storefronts.length > 0;
+
 /**
- * Business → Hours ("Saroh Settings" design): when the business is open,
- * read first and edited like the other cards, one at a time.
+ * Business → Hours, read first (owner, 10 Oct): when the business is open,
+ * as one row saying the week the way a shop writes it on its door, edited
+ * in its side sheet (`business-hours-sheet.tsx`).
  *
- * The week is real, but it is kept per storefront (`openingHours`, Monday
- * first), so this card reads the first storefront's and Save writes every
- * storefront — "Applies to every storefront". When they differ, the card
- * says so before a Save makes them the same. A business with no storefront
- * has nowhere to keep hours, so the card says that and links to making one
- * rather than offering a Save that would go nowhere.
+ * The week is real, but it is kept per location (`openingHours`, Monday
+ * first), so the row reads the first location's and Save writes every
+ * location. When they differ, the tab says so before a Save makes them the
+ * same. A business with no location has nowhere to keep hours, so the tab
+ * says that and links to making one rather than offering an Edit that
+ * would go nowhere.
  *
  * Closed-on dates and the booking-page banner have no home in the API yet:
- * they are drawn, switched off and marked "Coming soon" — never saved.
- *
- * Its own form, beside the Business one: the organization's PATCH never
- * carries hours, and the hours go out as one storefront PATCH each. The
- * Business form still decides which card is open (`editing`) and holds the
- * way off the page while this one has changes (`onDirty`).
+ * they are rows marked "Coming soon", with nothing to edit.
  */
 export function BusinessHoursSection({
     hours,
-    editing,
     canEdit,
-    onEdit,
-    onDone,
-    onDirty,
     hidden,
+    sheets,
     offerUndo,
 }: {
     hours: StorefrontHoursRead;
-    editing: boolean;
-    /** May change the business's settings and its storefronts. */
+    /** May change the business's settings and its locations. */
     canEdit: boolean;
-    onEdit: () => void;
-    /** The card closes: saved, or cancelled. */
-    onDone: () => void;
-    onDirty: (dirty: boolean) => void;
     /**
-     * Another tab is showing. The card stays mounted so an unsaved edit
-     * survives a look at another tab, as the Business form's cards do.
+     * Another tab is showing. The tab stays mounted so what a save
+     * answered is still what it reads when it is looked at again.
      */
     hidden: boolean;
+    sheets: BusinessSheets;
     /** Says the save landed, with Undo while the week can be put back (F12). */
     offerUndo: OfferUndo;
 }) {
     const router = useRouter();
-    // What the API last said, so the card reads a save at once.
+    // What the API last said, so the row reads a save at once.
     const [stores, setStores] = useState<StorefrontHours[]>(
         hours.state === "ok" ? hours.storefronts : [],
     );
     const first = stores.at(0);
-    const saved = weekText(first?.openingHours ?? null);
-    const differ = stores.some(
-        (s) => !sameWeek(s.openingHours, first?.openingHours ?? null),
-    );
-
-    const form = useForm<WeekText>({
-        resolver: zodResolver(hoursSchema),
-        defaultValues: saved,
-        mode: "onChange",
-    });
-    const { isDirty, isSubmitting, errors } = form.formState;
-    useEffect(() => {
-        onDirty(isDirty);
-    }, [isDirty, onDirty]);
-
-    const problems = Object.keys(errors).length;
-    const saveWhy = !isDirty
-        ? "No changes yet"
-        : problems === 1
-          ? "1 thing to fix"
-          : problems > 1
-            ? `${problems} things to fix`
-            : "";
-
-    async function onSubmit(values: WeekText) {
-        const results = await Promise.all(
-            stores.map(async (store) => ({
-                store,
-                result: await updateStorefront(store.id, {
-                    // A closed day keeps each storefront's own times.
-                    openingHours: weekFromText(values, store.openingHours),
-                }),
-            })),
-        );
-        setStores(
-            results.map(({ store, result }) =>
-                result.ok
-                    ? { ...store, openingHours: result.data.openingHours }
-                    : store,
-            ),
-        );
-        const failed = results.flatMap(({ store, result }) =>
-            result.ok ? [] : [{ name: store.name, error: result.error }],
-        );
-        if (failed.length > 0) {
-            // Named, since the others did save: "Rye & Co: A day has to …".
-            showError(
-                `${failed.map((f) => f.name).join(", ")}: ${failed[0]?.error ?? "not saved"}`,
-            );
-            return;
-        }
-        const back = hoursUndo(
-            results.map(({ store, result }) => ({
-                id: store.id,
-                before: store.openingHours,
-                after: result.ok ? result.data.openingHours : null,
-            })),
-        );
-        offerUndo(
-            stores.length === 1
-                ? "Hours saved"
-                : `Hours saved for all ${stores.length} locations`,
-            back &&
-                (async () => {
-                    const undone = await undoStorefrontHours(back);
-                    if (!undone.ok) return undone;
-                    const weeks = new Map(
-                        undone.data.map((s) => [s.id, s.openingHours]),
-                    );
-                    setStores((now) =>
-                        now.map((s) => ({
-                            ...s,
-                            openingHours: weeks.get(s.id) ?? s.openingHours,
-                        })),
-                    );
-                    form.reset(
-                        weekText(undone.data.at(0)?.openingHours ?? null),
-                    );
-                    return { ok: true };
-                }),
-        );
-        // As the fields will read it back: "7:00 - 9:30" is "07:00–09:30".
-        form.reset(weekText(weekFromText(values, null)));
-        onDone();
-    }
-
-    const rows: BusinessRow[] = [
-        { label: "Mon – Thu", value: monToThu(saved) },
-        { label: "Friday", value: saved.fri },
-        { label: "Saturday", value: saved.sat },
-        { label: "Sunday", value: saved.sun },
-        {
-            label: "Closed on",
-            value: "",
-            empty: "No closures planned",
-            soon: true,
-        },
-        {
-            label: "Booking page",
-            value: "Doesn't mention closures",
-            soon: true,
-        },
-    ];
+    const week = first?.openingHours ?? null;
+    const differ = stores.some((s) => !sameWeek(s.openingHours, week));
+    const editing = sheets.editing?.which === "hours" ? sheets.editing : null;
 
     const notice =
         hours.state === "sell-off" ? (
-            <Notice>
+            <>
                 Hours are kept on your locations, and Sell is switched off.{" "}
                 <Link href="/settings/modules" className={LINK}>
                     Turn on Sell
                 </Link>
-            </Notice>
+            </>
         ) : hours.state === "unavailable" ? (
-            <Notice>
+            <>
                 Your locations&apos; hours couldn&apos;t be read, so they
                 can&apos;t be changed here right now.{" "}
                 <button
@@ -256,123 +105,96 @@ export function BusinessHoursSection({
                 >
                     Try again
                 </button>
-            </Notice>
+            </>
         ) : !first ? (
-            <Notice>
+            <>
                 Hours are kept on a location, and this business has none yet.{" "}
                 <Link href={newStorefrontHref} className={LINK}>
                     Create a location
                 </Link>
-            </Notice>
+            </>
         ) : differ ? (
-            <Notice>
-                Your locations have different hours — this shows {first.name}
+            <>
+                Your locations have different hours. This shows {first.name}
                 &apos;s, and saving sets them all to these.
-            </Notice>
+            </>
         ) : undefined;
 
     return (
-        <Form {...form}>
-            <form
-                id="business-hours-panel"
-                role="tabpanel"
-                aria-labelledby="business-tab-hours"
-                onSubmit={form.handleSubmit(onSubmit)}
-                className={cn(
-                    "grid min-w-0 flex-[1_1_460px] gap-4",
-                    hidden && "hidden",
-                )}
+        <div
+            id="business-hours-panel"
+            role="tabpanel"
+            aria-labelledby="business-tab-hours"
+            className={cn(
+                "grid min-w-0 flex-[1_1_460px] gap-4",
+                hidden && "hidden",
+            )}
+        >
+            <BusinessRows
+                title={HOURS_SECTION.title}
+                lead={HOURS_SECTION.lead}
+                notice={notice}
+                note={NOTE}
             >
-                <BusinessSection
-                    title={HOURS_SECTION.title}
-                    lead={HOURS_SECTION.lead}
-                    rows={rows}
-                    note={NOTE}
-                    editing={editing}
-                    canEdit={canEdit && first !== undefined}
-                    onEdit={() => {
-                        form.reset(saved);
-                        onEdit();
-                    }}
-                    onCancel={() => {
-                        form.reset(saved);
-                        onDone();
-                    }}
-                    saveOff={!isDirty || problems > 0}
-                    saving={isSubmitting}
-                    saveWhy={saveWhy}
-                    top={notice}
+                <Row
+                    id={BUSINESS_ROW_ID.hours}
+                    label="Opening hours"
+                    action={
+                        canEdit && first ? (
+                            week ? (
+                                <EditRow
+                                    sheet="hours"
+                                    sheets={sheets}
+                                    name="Edit opening hours"
+                                />
+                            ) : (
+                                <EditRow
+                                    sheet="hours"
+                                    sheets={sheets}
+                                    label="Set hours"
+                                />
+                            )
+                        ) : null
+                    }
                 >
-                    {WEEK.map(({ key, label }) => (
-                        <FormField
-                            key={key}
-                            control={form.control}
-                            name={key}
-                            render={({ field }) => (
-                                <FormItem className="min-w-0 flex-[0_1_150px]">
-                                    <FormLabel>{label}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            maxLength={20}
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            placeholder={
-                                                key === "mon"
-                                                    ? "07:00–19:00 or Closed"
-                                                    : undefined
-                                            }
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    ))}
-                    <div className="min-w-0 basis-full">
-                        <div className="flex items-center gap-2">
-                            <Label htmlFor="business-closed-on">
-                                Closed on
-                            </Label>
-                            <ComingSoon />
-                        </div>
-                        <Input
-                            id="business-closed-on"
-                            disabled
-                            placeholder="1 Nov (Diwali), 25 Dec"
-                            aria-describedby="business-closed-on-hint"
-                            className="mt-1.5"
-                        />
-                        <p
-                            id="business-closed-on-hint"
-                            className="mt-[5px] text-[11.5px] leading-normal text-muted-foreground"
-                        >
-                            Dates you&apos;re closed. Separate them with commas.
-                        </p>
-                    </div>
-                    <div className="min-w-0 basis-full">
-                        <div className="flex items-center gap-3">
-                            <Switch
-                                id="business-closures-banner"
-                                checked={false}
-                                disabled
-                                aria-describedby="business-closures-banner-hint"
-                            />
-                            <Label htmlFor="business-closures-banner">
-                                Show closures on the booking page
-                            </Label>
-                            <ComingSoon />
-                        </div>
-                        <p
-                            id="business-closures-banner-hint"
-                            className="mt-[5px] text-[11.5px] leading-normal text-muted-foreground"
-                        >
-                            Customers see &quot;Closed 1 Nov for Diwali&quot; a
-                            week before.
-                        </p>
-                    </div>
-                </BusinessSection>
-            </form>
-        </Form>
+                    <span
+                        data-testid="business-hours-summary"
+                        className="block tabular-nums"
+                    >
+                        {week ? (
+                            weekSummary(week)
+                        ) : (
+                            <Absent>Not set yet</Absent>
+                        )}
+                    </span>
+                </Row>
+                <Row label="Closed on">
+                    <span className="flex flex-wrap items-baseline gap-2">
+                        <Absent>No closures planned</Absent>
+                        <ComingSoon />
+                    </span>
+                </Row>
+                <Row label="Booking page">
+                    <span className="flex flex-wrap items-baseline gap-2">
+                        <span>Doesn&apos;t mention closures</span>
+                        <ComingSoon />
+                    </span>
+                </Row>
+            </BusinessRows>
+
+            {/* The open sheet, a fresh draft each time it opens. */}
+            {editing && canEdit && first ? (
+                <BusinessHoursSheet
+                    key={editing.opened}
+                    stores={stores}
+                    differ={differ}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onStores={setStores}
+                    onSaved={offerUndo}
+                />
+            ) : null}
+        </div>
     );
 }

@@ -164,9 +164,26 @@ describe("searchSettings", () => {
         // not the business's details, its plan or its providers.
         const hits = searchSettings("", member, { limit: 99 });
         expect(new Set(hits.map((h) => h.where))).toEqual(
-            new Set(["Team", "Modules", "Your profile"]),
+            // And the website's QR codes, which they may see.
+            new Set(["Team", "Modules", "Your profile", "Share"]),
         );
         expect(searchSettings("gstin", member)).toEqual([]);
+    });
+
+    it("finds QR codes by what people call them, while Website is on", () => {
+        for (const typed of ["qr", "scan", "share", "short link"]) {
+            expect(
+                searchSettings(typed, owner).map((h) => h.href),
+                typed,
+            ).toContain("/settings/share");
+        }
+        // The codes open pages of the website: without it, not offered.
+        // ("QR" still finds How to pay us, which holds the UPI QR.)
+        expect(
+            searchSettings("qr", { ...owner, modules: ["COMMERCE"] }).map(
+                (h) => h.href,
+            ),
+        ).toEqual(["/settings/organization?section=pay"]);
     });
 
     it("finds the plan for the owner alone, and alerts for anyone", () => {

@@ -521,22 +521,45 @@ test.describe("availability and services", () => {
             "The first person has no Monday hours",
         );
         const [from = ""] = (await first.innerText()).split("–");
+        // "+ Hours" adds in a small popover over the row, so no day moves.
         await monday.getByRole("button", { name: "+ Hours" }).click();
-        await monday.getByRole("combobox", { name: "From" }).click();
+        const adding = page.getByRole("dialog", {
+            name: "Add hours on Monday",
+        });
+        await adding.getByRole("combobox", { name: "From" }).click();
         await page.getByRole("option", { name: from, exact: true }).click();
-        await expect(monday.getByRole("alert")).toContainText(
+        await expect(adding.getByRole("alert")).toContainText(
             "That overlaps hours already set.",
         );
-        await monday.getByRole("button", { name: "Cancel" }).click();
+        await expect(
+            adding.getByRole("button", { name: "Add hours" }),
+        ).toBeDisabled();
+        await adding.getByRole("button", { name: "Cancel" }).click();
+        await expect(adding).toBeHidden();
+
+        // Time off is read first: the lines, then "Add time off", which
+        // opens a sheet. Its button adds to the page's draft, not saved
+        // until the Save bar's "Save changes".
+        const timeOff = page.getByRole("region", { name: "Time off" });
+        await expect(timeOff.getByRole("textbox")).toHaveCount(0);
+        await timeOff.getByRole("button", { name: "Add time off" }).click();
+        const sheet = page.getByRole("dialog", { name: "Add time off" });
+        await expect(sheet).toBeVisible();
+        await sheet.getByLabel(/^Reason/).fill("E2E day off");
+        await sheet.getByRole("button", { name: "Add day off" }).click();
+        await expect(sheet).toBeHidden();
+        await expect(
+            timeOff.getByText("E2E day off · not saved yet"),
+        ).toBeVisible();
 
         await page
             .getByRole("button", { name: "Copy Monday to weekdays" })
             .click();
-        const bar = page.getByRole("button", { name: "Save hours" });
-        if (await bar.isVisible()) {
-            await page.getByRole("button", { name: "Discard" }).click();
-            await expect(bar).toBeHidden();
-        }
+        const bar = page.getByRole("button", { name: "Save changes" });
+        await expect(bar).toBeVisible();
+        await page.getByRole("button", { name: "Discard" }).click();
+        await expect(bar).toBeHidden();
+        await expect(timeOff.getByText("E2E day off")).toHaveCount(0);
     });
 
     test("a class under two places is refused, and leaving asks first (E2)", async ({

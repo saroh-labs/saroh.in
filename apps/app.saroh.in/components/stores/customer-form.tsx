@@ -37,9 +37,15 @@ type FormValues = z.infer<typeof formSchema>;
 export function CustomerForm({
     storeId,
     customer,
+    onSaved,
+    onCancel,
 }: {
     storeId: string;
     customer?: Customer;
+    /** After an edit is saved: the sheet that holds the form closes. */
+    onSaved?: () => void;
+    /** Draws Cancel beside the button, for a form in a sheet. */
+    onCancel?: () => void;
 }) {
     const router = useRouter();
     const editing = Boolean(customer);
@@ -82,8 +88,10 @@ export function CustomerForm({
         }
         showSuccess(editing ? "Saved" : `${input.email} added`);
         // Editing stays on the customer; adding one opens them.
-        if (editing) router.refresh();
-        else router.push(customerHref(storeId, res.data.id));
+        if (editing) {
+            router.refresh();
+            onSaved?.();
+        } else router.push(customerHref(storeId, res.data.id));
     }
 
     return (
@@ -214,7 +222,7 @@ export function CustomerForm({
                         )}
                     />
                 </div>
-                <div>
+                <div className="flex flex-wrap gap-2">
                     <Button
                         type="submit"
                         className="wk-press"
@@ -226,6 +234,16 @@ export function CustomerForm({
                               ? "Save changes"
                               : "Create customer"}
                     </Button>
+                    {onCancel ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={isSubmitting}
+                            onClick={onCancel}
+                        >
+                            Cancel
+                        </Button>
+                    ) : null}
                 </div>
             </form>
         </Form>

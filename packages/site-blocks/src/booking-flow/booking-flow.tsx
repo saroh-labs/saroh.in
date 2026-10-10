@@ -13,6 +13,7 @@ import type { PublicVisit } from "../blocks/visit-us";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
+import { useQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { TEST_RELEASE_REASON } from "../test-release/words";
@@ -216,6 +217,12 @@ export default function BookingFlow({
         account.customer,
     );
     const [name, setName] = useState("");
+    // The QR code whose scan opened this page, when the address carries
+    // its tag (`qr-source.ts`). The flow never leaves this address (its
+    // steps, the sign-in sheet and the payment window all open on it), so
+    // the tag is here for every step and is sent with the booking. Never
+    // stored anywhere.
+    const source = useQrSource();
     const [sheetOpen, setSheetOpen] = useState(false);
     // A test release (DEC-071, T6): the last step stops here instead of
     // signing in, and nothing is booked or held.
@@ -452,6 +459,7 @@ export default function BookingFlow({
         ...(asks ? { locationType: whereNow } : {}),
         ...(note.trim() ? { intakeNote: note.trim() } : {}),
         ...(phoneNo.trim() ? { bookerPhone: phoneNo.trim() } : {}),
+        ...(source ? { source } : {}),
     };
 
     // A name is asked for only while the account has none (A9).

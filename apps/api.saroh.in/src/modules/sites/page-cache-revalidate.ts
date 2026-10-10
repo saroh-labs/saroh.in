@@ -15,7 +15,9 @@ import { env } from "../../env";
  * Queued:
  *  - **a site's whole look** (`siteIds`): a version going live (publish,
  *    restore, go-live: `putLive`), a change of web address, the merchant's
- *    trackers or codes saved, Saroh switching a site's trackers off or on.
+ *    trackers or codes saved, Saroh switching a site's trackers off or on,
+ *    the business logo set or removed (it is the icon of a site with none
+ *    of its own, DEC-124).
  *  - **products** (`productIds`, `stockLevelIds`): every stock flow and
  *    every change to how a product counts takes the product or shelf locks
  *    (`products/stock-levels.ts`, the lock order), so that is where a stock
@@ -28,7 +30,7 @@ import { env } from "../../env";
 export const SITE_PAGES_REVALIDATE_TYPE = "site.pages.revalidate";
 
 export type PageRevalidateCause =
-    "publish" | "address" | "trackers" | "stock" | "product";
+    "publish" | "address" | "trackers" | "icon" | "stock" | "product";
 
 export interface PageRevalidatePayload {
     cause: PageRevalidateCause;

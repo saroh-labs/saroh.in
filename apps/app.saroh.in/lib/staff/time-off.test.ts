@@ -124,7 +124,7 @@ describe("the form's words", () => {
             tone: "danger",
         });
         expect(offNote({ refusal: null, taken: 3, closed: true })).toEqual({
-            text: "3 bookings fall in this time. They're kept — move or cancel them from the calendar.",
+            text: "3 bookings fall in this time. They're kept. Move or cancel them from the calendar.",
             tone: "warn",
         });
         expect(

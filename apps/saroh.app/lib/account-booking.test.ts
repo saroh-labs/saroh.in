@@ -54,6 +54,16 @@ describe("accountBookingBody", () => {
         ).toEqual({ ...REQUEST, bookerPhone: "+91 98450 12345" });
     });
 
+    it("passes on a QR code's tag, and books without anything else sent as one", () => {
+        expect(accountBookingBody({ ...REQUEST, source: "qr-h7c" })).toEqual({
+            ...REQUEST,
+            source: "qr-h7c",
+        });
+        for (const source of ["newsletter", "qr-", 7, "cuid_of_a_row", null]) {
+            expect(accountBookingBody({ ...REQUEST, source })).toEqual(REQUEST);
+        }
+    });
+
     it("forwards paying a deposit (E8), never an amount", () => {
         expect(
             accountBookingBody({ ...REQUEST, pay: "DEPOSIT", amount: 400 }),

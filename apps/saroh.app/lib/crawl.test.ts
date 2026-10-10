@@ -102,6 +102,10 @@ describe("robotsTxt", () => {
         ]) {
             expect(text).toContain(`Disallow: ${path}\n`);
         }
+        // A QR code's short link, with its slash: "Disallow: /q" would
+        // also keep crawlers out of a page such as /quotes.
+        expect(text).toContain("Disallow: /q/\n");
+        expect(text).not.toContain("Disallow: /q\n");
         expect(text).toContain("Sitemap: https://rye.saroh.app/sitemap.xml");
     });
 });
@@ -131,5 +135,10 @@ describe("isPrivateSitePath", () => {
         expect(isPrivateSitePath("/shop")).toBe(false);
         expect(isPrivateSitePath("/shop/orderly-tea")).toBe(false);
         expect(isPrivateSitePath("/payments-info")).toBe(false);
+        // A QR code's short link, and nothing that only starts like it.
+        expect(isPrivateSitePath("/q")).toBe(true);
+        expect(isPrivateSitePath("/q/h7c")).toBe(true);
+        expect(isPrivateSitePath("/quotes")).toBe(false);
+        expect(isPrivateSitePath("/qr")).toBe(false);
     });
 });

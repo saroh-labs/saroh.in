@@ -262,6 +262,16 @@
   The stroke is never Saffron, and the dot drops below 20px. Every brand app
   ships `favicon.ico`, `icon.svg` and `apple-icon.png` in `app/`, rendered from
   that master.
+- **Current** — **`saroh.app` ships no icon file** (DEC-124). A merchant's
+  site shows its own icon (Website › Settings), else the business logo, else
+  a plain tile with its initial in `--site-accent`
+  (`plainSiteIconSvg`, `@saroh/site-blocks/site-icon`, which the site serves
+  at `/site-icon.svg` and the workspace previews). The public site read
+  resolves which, and `[domain]/layout.tsx` declares it
+  (`lib/site-icon.ts`); `/favicon.ico` on a merchant's address forwards to
+  it. Never add `favicon.ico`, `icon.*` or `apple-icon.*` under
+  `apps/saroh.app/app`: Next would serve it on every merchant's address
+  (`lib/site-icon.test.ts` fails if one appears).
 
 ## Motion
 

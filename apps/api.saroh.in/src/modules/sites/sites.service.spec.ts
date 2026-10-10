@@ -45,6 +45,8 @@ jest.mock("@saroh/database", () => {
         // A template's enquiry sections get their Form (K15): the starter
         // has none.
         form: { create: jest.fn() },
+        // The logo that stands in for a site's icon (DEC-124): none here.
+        businessProfile: { findUnique: jest.fn(async () => null) },
         // The shop's rollout flag, never configured here: off.
         featureFlagOverride: { findUnique: jest.fn(async () => null) },
         featureFlag: { findUnique: jest.fn(async () => null) },

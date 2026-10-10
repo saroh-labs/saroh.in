@@ -47,6 +47,10 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
     "sites/site-tracking.controller.ts": "WEBSITE",
+    // A site's own icon (DEC-124).
+    "sites/site-icon.controller.ts": "WEBSITE",
+    // A site's QR codes (Settings › Share).
+    "sites/qr-codes.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -180,6 +184,10 @@ const NEVER: Record<string, string> = {
     // shop's address and hours stay true whichever modules are on.
     "sites/public-sites.controller.ts":
         "published sites, and the business's place and hours",
+    // A QR code's short link, relayed by the site's server. It forwards
+    // to a page that answers for its own module, so it carries none.
+    "sites/public-qr.controller.ts":
+        "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always
     // on, so it must not vanish with a module switch.
     "site-accounts/sign-in.controller.ts":
@@ -273,6 +281,9 @@ const NEVER: Record<string, string> = {
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":
         "saroh.in's public link preview tool, not a tenant surface",
+    // QR codes plan U9: the free QR code maker's email gate, the same way.
+    "tools/qr-maker.controller.ts":
+        "saroh.in's public QR code maker's email gate, not a tenant surface",
     // Terms rev 46 (9 Oct): a customer reports a business at
     // saroh.in/customers, with no account and whatever it has switched on.
     "business-reports/public-business-reports.controller.ts":

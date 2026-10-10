@@ -1,47 +1,100 @@
 "use client";
 
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
-/** Which row is open for editing; one at a time. */
-export type EditingRow =
-    "postsPrefix" | "title" | "description" | "social" | "menu" | "footer";
+import { SELLS_FROM_ANCHOR } from "@/lib/sites/sells-from";
+import type { SettingsSheet } from "@/lib/sites/settings-edit";
+import {
+    SETTINGS_EDIT_PARAM,
+    settingsSheetFromParam,
+} from "@/lib/sites/settings-edit";
+
+import type { SheetControl } from "./settings-sheet";
 
 /**
- * The settings rows' one save loop (#188): one row open at a time, each
- * save PATCHes only its own field, and the row stays open on a refusal so
- * nothing typed is lost. `saving` names the row whose save is in flight,
- * so only its button says "Saving…".
+ * The settings rows' sheets and their one save loop (#188; read first
+ * since 10 Oct): one sheet open at a time, each save PATCHes only its own
+ * field, and a refusal leaves the sheet open so nothing typed is lost.
+ *
+ * `opened` counts the openings, so each one is a fresh draft; the sheet is
+ * kept while it slides shut. A link opens one with `?edit=`; closing it
+ * takes the query out of the address, so a reload starts from the rows.
  */
-export function useSettingsSave() {
+export function useSettingsSave(
+    /** The sheet a request really opens, or none (no shop to choose for). */
+    resolve: (which: SettingsSheet) => SettingsSheet | null = (which) => which,
+) {
     const router = useRouter();
-    const [editing, setEditing] = useState<EditingRow | null>(null);
-    const [saving, setSaving] = useState<EditingRow | null>(null);
+    const asked = settingsSheetFromParam(
+        useSearchParams().get(SETTINGS_EDIT_PARAM),
+    );
+    const [editing, setEditing] = useState<{
+        which: SettingsSheet;
+        open: boolean;
+        opened: number;
+    } | null>(() => {
+        const which = asked ? resolve(asked) : null;
+        return which ? { which, open: true, opened: 1 } : null;
+    });
     const [pending, startTransition] = useTransition();
 
+    function open(asking: SettingsSheet) {
+        const which = resolve(asking);
+        if (!which) return;
+        setEditing((e) => ({
+            which,
+            open: true,
+            opened: (e?.opened ?? 0) + 1,
+        }));
+    }
+
+    function close() {
+        setEditing((e) => (e ? { ...e, open: false } : e));
+        const url = new URL(window.location.href);
+        const linked =
+            url.searchParams.has(SETTINGS_EDIT_PARAM) ||
+            url.hash === `#${SELLS_FROM_ANCHOR}`;
+        if (!linked) return;
+        url.searchParams.delete(SETTINGS_EDIT_PARAM);
+        url.hash = "";
+        window.history.replaceState(null, "", url);
+    }
+
     function run(
-        row: EditingRow,
         call: () => Promise<{ ok: true } | { ok: false; error: string }>,
         said: string,
+        /** The row shows the new value at once, before the page reads again. */
+        onSaved?: () => void,
     ) {
-        setSaving(row);
         startTransition(async () => {
             const res = await call();
-            setSaving(null);
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            setEditing(null);
-            // Local state already shows the new value; refresh so the server
-            // props (and the publish bar's count) agree with it.
+            onSaved?.();
+            close();
+            // Refresh so the server props (and the publish bar's count)
+            // agree with what the row now says.
             router.refresh();
             showSuccess(said);
         });
     }
 
-    return { editing, setEditing, saving, pending, run };
+    /** One row's sheet: whether it is the open one, and how to open it. */
+    function control(which: SettingsSheet): SheetControl {
+        const mine = editing?.which === which ? editing : null;
+        return {
+            open: mine?.open ?? false,
+            opened: mine?.opened ?? 0,
+            show: () => open(which),
+            close,
+        };
+    }
+
+    return { editing, open, close, pending, run, control };
 }
 
 export type SettingsSave = ReturnType<typeof useSettingsSave>;
