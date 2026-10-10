@@ -96,6 +96,14 @@ export const REVIEWER_EMAIL = "reviewer@saroh.dev";
 export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
 
 /**
+ * Tara, on Northwind's diary with a login: on the team as "Calendar only"
+ * (#868), so she reads and changes her own bookings and nothing else of the
+ * business. The browser spec `role-calendar-only.spec.ts` signs in as her
+ * (`seed/calendar-only-teammate.ts`).
+ */
+export const CALENDAR_ONLY_EMAIL = "tara.calendar@saroh.dev";
+
+/**
  * Someone just starting out (DEC-070, K2). Browser specs about setting up
  * ("What are you setting up?") sign in as them and make businesses of their
  * own, never touching the demo owner's. They also own one business per kind

@@ -48,6 +48,27 @@ export const people = {
      * and nothing on, for reading a first run (`first-run-kind.spec.ts`).
      */
     founder: { email: "founder@saroh.dev", password: demoUser.password },
+    /**
+     * Arun, an Admin on Northwind (and on Pulse Fitness, so a spec opens
+     * Northwind by id first). The role specs sign in as him.
+     */
+    admin: { email: "admin@saroh.dev", password: demoUser.password },
+    /**
+     * Maya, a Member on Northwind (and on Prana Yoga). `member` above is
+     * Rye's, which is only read; what a Member changes is tried here.
+     */
+    northwindMember: {
+        email: "member@saroh.dev",
+        password: demoUser.password,
+    },
+    /**
+     * Tara, Calendar only on Northwind (#868), with one booking of her own
+     * (the seed's `calendar-only-teammate.ts`).
+     */
+    calendarOnly: {
+        email: "tara.calendar@saroh.dev",
+        password: demoUser.password,
+    },
 } as const;
 
 export type Role = keyof typeof people;
