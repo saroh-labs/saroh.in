@@ -1,6 +1,6 @@
-import { Alert, AlertDescription, AlertTitle } from "@saroh/ui/alert";
 import { Badge } from "@saroh/ui/badge";
 import { FailedState } from "@saroh/ui/data-state";
+import { Notice } from "@saroh/ui/notice";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 
@@ -60,31 +60,25 @@ function Board({ view }: { view: DeploymentsView }) {
         <>
             <AutoRefresh active={anyInFlight(view.rows)} everyMs={15_000} />
             {!view.configured && (
-                <Alert>
-                    <AlertTitle>Deploys are off on this instance</AlertTitle>
-                    <AlertDescription>
-                        The API holds no deploy token
-                        (SITE_DEPLOY_GITHUB_TOKEN), so nothing can be deployed
-                        or read from here. Merges still deploy.
-                    </AlertDescription>
-                </Alert>
+                <Notice title="Deploys are off on this instance">
+                    The API holds no deploy token (SITE_DEPLOY_GITHUB_TOKEN), so
+                    nothing can be deployed or read from here. Merges still
+                    deploy.
+                </Notice>
             )}
             {view.readError && (
-                <Alert variant="destructive">
-                    <AlertTitle>The latest runs could not be read</AlertTitle>
-                    <AlertDescription>
-                        {view.readError} The rows below don&apos;t show what is
-                        live.{" "}
-                        <a
-                            href={view.workflowUrl}
-                            className="underline underline-offset-4"
-                            target="_blank"
-                            rel="noreferrer"
-                        >
-                            Open the runs on GitHub
-                        </a>
-                    </AlertDescription>
-                </Alert>
+                <Notice tone="error" title="The latest runs could not be read">
+                    {view.readError} The rows below don&apos;t show what is
+                    live.{" "}
+                    <a
+                        href={view.workflowUrl}
+                        className="underline underline-offset-4"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        Open the runs on GitHub
+                    </a>
+                </Notice>
             )}
             {panel ? (
                 <>
@@ -106,17 +100,10 @@ function Board({ view }: { view: DeploymentsView }) {
                     </p>
                 </>
             ) : (
-                <Alert>
-                    <AlertTitle>
-                        This console doesn&apos;t know which environment it
-                        deploys
-                    </AlertTitle>
-                    <AlertDescription>
-                        The API names no environment (SITE_DEPLOY_ENVIRONMENT),
-                        so nothing can be deployed from here. Merges still
-                        deploy.
-                    </AlertDescription>
-                </Alert>
+                <Notice title="This console doesn't know which environment it deploys">
+                    The API names no environment (SITE_DEPLOY_ENVIRONMENT), so
+                    nothing can be deployed from here. Merges still deploy.
+                </Notice>
             )}
             <p className="text-[13px] text-muted-foreground">
                 <a
