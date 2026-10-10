@@ -166,7 +166,11 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     { label: "Contacts pipeline", page: "/settings/modules", module: "CRM" },
     { label: "Plan and billing", page: "/settings/billing" },
-    { label: "Change plan", page: "/settings/billing" },
+    {
+        label: "Change plan",
+        page: "/settings/billing",
+        action: "billing:manage",
+    },
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
     { label: "Alerts — the bell and email", page: "/settings/profile" },

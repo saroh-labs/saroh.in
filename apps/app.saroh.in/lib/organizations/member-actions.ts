@@ -1,11 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+
+import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+
+import {
+    ACTIVE_ORG_NAME_COOKIE,
+    ACTIVE_ORG_USER_COOKIE,
+} from "./left-business";
 
 import type { InviteMemberInput } from "./members";
 import {
     dismissStorefrontTeamNotice as dismissStorefrontTeamNoticeApi,
     inviteMember as inviteMemberApi,
+    leaveBusiness as leaveBusinessApi,
     removeMember as removeMemberApi,
     revokeInvitation as revokeInvitationApi,
     setMemberExtraActions as setMemberExtraActionsApi,
@@ -56,6 +65,23 @@ export async function setMemberExtraActions(userId: string, actions: string[]) {
 export async function removeMember(userId: string) {
     const res = await removeMemberApi(userId);
     if (res.ok) revalidatePath(TEAM_PATH);
+    return res;
+}
+
+/**
+ * Leave the active business. Once it is done the business is forgotten as
+ * the one that was open: left there, the cookie would name a business the
+ * person is no longer in, and the next screen would tell them someone had
+ * removed them (`left-business.ts`). They left; nobody removed them.
+ */
+export async function leaveBusiness() {
+    const res = await leaveBusinessApi();
+    if (res.ok) {
+        const jar = await cookies();
+        jar.delete(ACTIVE_ORG_COOKIE);
+        jar.delete(ACTIVE_ORG_NAME_COOKIE);
+        jar.delete(ACTIVE_ORG_USER_COOKIE);
+    }
     return res;
 }
 

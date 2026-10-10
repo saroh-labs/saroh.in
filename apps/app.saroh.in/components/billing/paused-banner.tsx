@@ -7,6 +7,7 @@ import type { PausedView } from "@/lib/billing/paused";
 import { PLAN_AND_BILLING_HREF, pausedBanner } from "@/lib/billing/paused";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
+import { PlanWay } from "./plan-way";
 
 /**
  * Above every page while a move to a lower plan has paused something, or
@@ -34,9 +35,11 @@ export function PausedBanner({ view }: { view: PausedView | null }) {
                     </span>{" "}
                     {b.body}
                 </p>
-                <Button asChild size="sm" className="shrink-0">
-                    <Link href={PLAN_AND_BILLING_HREF}>{planLabel()}</Link>
-                </Button>
+                <PlanWay className="text-foreground/80">
+                    <Button asChild size="sm" className="shrink-0">
+                        <Link href={PLAN_AND_BILLING_HREF}>{planLabel()}</Link>
+                    </Button>
+                </PlanWay>
             </div>
         </Notice>
     );
@@ -56,7 +59,9 @@ export function PausedNote({
     return (
         <Notice tone="warning" role="note" className={className}>
             {children}{" "}
-            <TextLink href={PLAN_AND_BILLING_HREF}>{planLabel()}</TextLink>
+            <PlanWay className="text-[length:inherit] text-inherit">
+                <TextLink href={PLAN_AND_BILLING_HREF}>{planLabel()}</TextLink>
+            </PlanWay>
         </Notice>
     );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { toFailure } from "./failure";
 import {
+    isRoleRefusal,
     ROLE_DENIED_FALLBACK,
     roleDeniedMessage,
     roleDeniedOf,
@@ -124,7 +125,7 @@ describe("toFailure, for a refusal by role", () => {
         });
     });
 
-    it("marks nothing else a denial: an endpoint's own sentence is an error", () => {
+    it("marks an endpoint's own sentence a denial too, by what it says", () => {
         const own = toFailure(
             {
                 error: {
@@ -135,10 +136,61 @@ describe("toFailure, for a refusal by role", () => {
             },
             "x",
         );
+        // No code came with it: the sentence is kept and says what it is.
         expect(own).toEqual({
             ok: false,
             error: "Your role changes only your own bookings.",
+            denied: true,
         });
+    });
+
+    it("marks nothing else a denial", () => {
         expect(toFailure(null, "Could not save.").denied).toBeUndefined();
+        expect(
+            toFailure({ error: { message: "That time was just taken." } }, "x")
+                .denied,
+        ).toBeUndefined();
+    });
+});
+
+describe("isRoleRefusal: the sentence says what it is", () => {
+    it("knows every sentence this file writes", () => {
+        for (const action of [
+            "booking:write",
+            "store:create",
+            "member:remove",
+            "org:delete",
+            "something:new",
+            null,
+        ]) {
+            expect(isRoleRefusal(roleDeniedSentence(action))).toBe(true);
+        }
+    });
+
+    it("knows the API's own wordings of a refusal by role", () => {
+        for (const said of [
+            "Your role can't change bookings.",
+            "Your role changes only your own bookings.",
+            "Your role moves only your location's orders.",
+            "Only an owner can download the business's data.",
+            "Only the owner can do this.",
+        ]) {
+            expect(isRoleRefusal(said)).toBe(true);
+        }
+    });
+
+    it("is false for a breakage, a plan, a conflict or nothing", () => {
+        for (const said of [
+            "Couldn't save the service.",
+            "That time was just taken.",
+            "You've reached your 10 products on Plan A",
+            "We couldn't confirm that was saved. Check your connection, see whether it went through, then try again.",
+            "You've been signed out. Sign in again and what you typed stays here.",
+            "",
+            null,
+            undefined,
+        ]) {
+            expect(isRoleRefusal(said)).toBe(false);
+        }
     });
 });

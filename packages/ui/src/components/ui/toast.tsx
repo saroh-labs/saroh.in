@@ -48,6 +48,11 @@ export interface ToastAction {
  * worse than none.
  */
 export function showError(message: string, description?: string) {
+    // A refusal is not a breakage: it is said calmly, never in red.
+    if (refusals.some((is) => is(message))) {
+        showRefusal(message, description);
+        return;
+    }
     const way =
         errorActions.get(message) ?? errorActions.get(description ?? "");
     toast.error(message, {
@@ -99,6 +104,43 @@ export function setErrorAction(
         errorActions.delete(sentence);
     };
 }
+
+/**
+ * "You may not" is not "it broke". A refusal (by the person's role, most
+ * often) is said in the neutral style, with no red and no alert glyph: red
+ * tells someone to try again at a thing that will only be refused again.
+ * It stays ten seconds, long enough to read who can change it, and can be
+ * closed.
+ */
+export function showRefusal(message: string, description?: string) {
+    toast.message(message, {
+        description,
+        duration: UNDO_MS,
+        closeButton: true,
+    });
+}
+
+type RefusalTest = (message: string) => boolean;
+const refusals: RefusalTest[] = [];
+
+/**
+ * Teach `showError` which sentences are refusals, wherever they are shown
+ * from.
+ *
+ * Hundreds of call sites only know `showError(res.error)`, and the sentence
+ * is all that reaches them. An app registers how to tell its refusals (the
+ * merchant app: `isRoleRefusal`) once, on mount, and every one of those
+ * call sites then says a refusal through `showRefusal`. Call the returned
+ * function to take it back.
+ */
+export function setRefusalTest(is: RefusalTest): () => void {
+    refusals.push(is);
+    return () => {
+        const at = refusals.indexOf(is);
+        if (at !== -1) refusals.splice(at, 1);
+    };
+}
+
 /** How long anything can be undone: ten seconds, everywhere. */
 export const UNDO_MS = 10_000;
 

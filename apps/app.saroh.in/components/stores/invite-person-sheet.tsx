@@ -42,6 +42,12 @@ const ROLE_OPTIONS = LOCATION_ROLES.map((r) => ({
  * Location team unless they're on it already (DEC-048, F16), which the
  * sheet says in a line.
  *
+ * The sentence under the title promises only what all four roles get in
+ * this app today: the location's products and orders to read, and its
+ * orders to move along (DEC-074). The API lets an Admin, Manager or Editor
+ * do more at their location than the app offers them yet; until it does,
+ * the invitation doesn't say so.
+ *
  * An invite tells someone, so it waits ten seconds with Undo (`useHold`):
  * the sheet closes, keeping what was typed, and a refusal or an Undo opens
  * it again with that, the refusal under the email when the API names it.
@@ -118,7 +124,7 @@ export function InvitePersonSheet({
                 // Back to the button that opened it.
                 returnFocusTo="invite-someone"
                 title="Invite someone"
-                description={`They can work on ${locationName}'s catalogue, orders and customers once they accept.`}
+                description={`They can see ${locationName}'s products and orders, and move its orders along, once they accept.`}
                 open={open}
                 pending={isSubmitting}
                 saveLabel="Send invite"

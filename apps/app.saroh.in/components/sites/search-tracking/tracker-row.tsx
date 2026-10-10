@@ -1,6 +1,7 @@
 import type { TrackerKind } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { TrackerView } from "@/lib/sites/search-tracking";
 import {
     NOT_RUNNING_LINE,
@@ -114,7 +115,10 @@ function StandingLine({
     if (standing === "locked" && lock) {
         return tracker ? (
             <p className="text-sm" data-kept>
-                {lock.kept} <TextLink href={lock.href}>{lock.cta}</TextLink>
+                {lock.kept}{" "}
+                <PlanWay className="text-[length:inherit]">
+                    <TextLink href={lock.href}>{lock.cta}</TextLink>
+                </PlanWay>
             </p>
         ) : null;
     }

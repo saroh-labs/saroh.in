@@ -1127,6 +1127,29 @@ describe("SiteEditor shell", () => {
         expect(actions.getReviewState).toHaveBeenCalled();
     });
 
+    it("keeps the check open on where the site is, the first time it goes live", async () => {
+        render({
+            neverPublished: true,
+            initialPendingChanges: null,
+            initialPendingSiteChanges: null,
+        });
+        await press(button("Publish"));
+        await press(button("Publish site"));
+        expect(actions.publishSite).toHaveBeenCalledTimes(1);
+        // The finished state says it, with the address as a link: no toast.
+        expect(toast.showSuccess).not.toHaveBeenCalled();
+        expect(document.body.textContent).toContain("Flour & Ferment is live.");
+        const address = document.querySelector<HTMLAnchorElement>(
+            'a[href="https://flour.saroh.app"]',
+        );
+        expect(address?.textContent).toContain("flour.saroh.app");
+        // And it leaves like the check does.
+        await press(button("Back to editing"));
+        expect(document.body.textContent).not.toContain(
+            "Flour & Ferment is live.",
+        );
+    });
+
     it("closes the Undo when the check opens, so Publish never misses a restored block (review G-1)", async () => {
         render();
         click(button("Remove"));

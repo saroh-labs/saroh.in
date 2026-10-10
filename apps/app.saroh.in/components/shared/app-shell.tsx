@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
+import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ClosingBanner } from "@/components/organizations/closing-banner";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -20,6 +21,7 @@ import {
 import { PageContainer } from "@/components/shared/page-container";
 import { TabBar } from "@/components/shared/tab-bar";
 import { accountsUrl } from "@/lib/accounts";
+import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
@@ -216,7 +218,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const roleKey = activeOrg?.roleKey ?? null;
 
     return (
-        <div className="flex min-h-screen flex-col">
+        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -346,6 +348,26 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 storefronts={storefronts?.used ?? null}
                 kind={activeOrg?.kind ?? null}
             />
-        </div>
+        </ShellFrame>
+    );
+}
+
+/**
+ * The shell's outer box, which also says once whether this person may
+ * change the plan (`billing:manage`): every plan prompt under it offers the
+ * way to another plan to someone who may, and says who can to anyone else
+ * (`PlanWay`).
+ */
+function ShellFrame({
+    canChangePlan,
+    children,
+}: {
+    canChangePlan: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <div className="flex min-h-screen flex-col">{children}</div>
+        </PlanAccessProvider>
     );
 }

@@ -24,6 +24,7 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
+import { Refusal } from "@/components/shared/refusal";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
     BusinessDetail,
@@ -41,7 +42,6 @@ import {
     readBusinessDetails,
     saveOrganizationSettings,
 } from "@/lib/organizations/settings-actions";
-import { Notice } from "@saroh/ui/notice";
 
 const FIELDS = [
     "addressLine1",
@@ -277,9 +277,7 @@ function DetailsForm({
                 <FormSheetFoot
                     saveLabel={continueLabel}
                     pending={saving}
-                    note={
-                        refusal ? <Notice tone="error">{refusal}</Notice> : null
-                    }
+                    note={<Refusal>{refusal}</Refusal>}
                     onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
                 />
             </>

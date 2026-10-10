@@ -24,6 +24,8 @@ import {
 import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
+import { PlanWay } from "@/components/billing/plan-way";
+import { Refusal } from "@/components/shared/refusal";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
@@ -281,7 +283,7 @@ function TurnOnBody({
                     </>
                 )}
 
-                {t.failure ? <Notice tone="error">{t.failure}</Notice> : null}
+                <Refusal>{t.failure}</Refusal>
             </FormSheetBody>
             <FormSheetFoot
                 saveLabel="Turn on"
@@ -321,9 +323,11 @@ function ConnectLocked({
     return (
         <div className="grid gap-2 rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
             <p className="text-pretty">{connectLockLine(moduleKey, lock)}</p>
-            <TextLink href={lock.href} className="justify-self-start">
-                {lock.cta}
-            </TextLink>
+            <PlanWay className="text-[length:inherit]">
+                <TextLink href={lock.href} className="justify-self-start">
+                    {lock.cta}
+                </TextLink>
+            </PlanWay>
         </div>
     );
 }

@@ -98,6 +98,6 @@ export function onlyOwnerWords(
             ? `${owners.join("")} owns ${locationName}.`
             : `${owners.slice(0, -1).join(", ")} and ${owners.at(-1)} own ${locationName}.`;
     return people.canInvite
-        ? `${who} Invite someone to work on its catalogue, orders and customers.`
+        ? `${who} Invite someone to see its products and orders, and move its orders along.`
         : who;
 }

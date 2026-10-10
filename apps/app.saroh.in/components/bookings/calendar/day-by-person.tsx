@@ -67,7 +67,7 @@ export function HourRail({ span }: { span: Span }) {
                     className="absolute inset-x-0 h-px"
                     style={{ top: at(m, span[0]) }}
                 >
-                    <span className="absolute -top-[7px] left-0 text-[11px] tabular-nums text-muted-foreground">
+                    <span className="absolute -top-[7px] right-2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
                         {formatClock(m, { short: true })}
                     </span>
                 </div>

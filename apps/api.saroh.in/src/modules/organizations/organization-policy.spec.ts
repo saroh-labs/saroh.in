@@ -240,6 +240,22 @@ describe("organization-policy: authorize()", () => {
     });
 });
 
+describe("Plan and billing (DEC-014)", () => {
+    // The app's Settings tab, its page and every plan prompt ask these two
+    // (`lib/billing/plan-access.ts` in app.saroh.in). Changing who holds
+    // them here changes who is offered the page and the way to a plan.
+    it("is read and changed by Owner and Admin, and by nobody else", () => {
+        for (const role of ["OWNER", "ADMIN"] as const) {
+            expect(can(role, "billing:read")).toBe(true);
+            expect(can(role, "billing:manage")).toBe(true);
+        }
+        for (const role of ["MEMBER", "REVIEWER"] as const) {
+            expect(can(role, "billing:read")).toBe(false);
+            expect(can(role, "billing:manage")).toBe(false);
+        }
+    });
+});
+
 describe("discount codes", () => {
     it.each([
         ["OWNER", true, true],

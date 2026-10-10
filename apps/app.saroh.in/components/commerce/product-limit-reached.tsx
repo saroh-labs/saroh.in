@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
-import { LimitReachedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { LimitReachedCard } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
 
 /**
@@ -11,12 +11,11 @@ import type { PlanMeter } from "@/lib/billing/meter";
  */
 export function ProductLimitReached({ meter }: { meter: PlanMeter }) {
     return (
-        <LimitReachedState
+        <LimitReachedCard
             title={`You're at ${meter.label}`}
             description="Archive or delete one to make room, or move to a plan with more."
             plan={meter.upgradeTo}
             href={meter.href}
-            canChangePlan
             secondary={
                 <Button asChild variant="outline" className="wk-press">
                     <Link href="/commerce/products">Back to Products</Link>

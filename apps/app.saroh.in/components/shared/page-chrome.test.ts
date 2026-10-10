@@ -173,6 +173,8 @@ describe("a page's title is the page header's", () => {
         "components/sites/post-read-view.tsx",
         // A full-screen review over the editor, with its own bar.
         "components/sites/pre-publish-check.tsx",
+        // That review's finished state, in the same bar.
+        "components/sites/went-live.tsx",
     ]);
 
     it("has no hand-written <h1> under the shell or in components", () => {

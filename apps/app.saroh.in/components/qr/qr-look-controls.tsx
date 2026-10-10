@@ -10,6 +10,7 @@ import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import {
     ChoiceGroup,
     Eyebrow,
@@ -115,13 +116,15 @@ export function QrLookControls({
                     >
                         {keptBranded ? `${lock.kept} ` : null}
                         {lock.line}{" "}
-                        <Link
-                            href={lock.href}
-                            aria-label={lock.cta}
-                            className={linkClass}
-                        >
-                            {lock.plan}
-                        </Link>
+                        <PlanWay fallback={lock.plan}>
+                            <Link
+                                href={lock.href}
+                                aria-label={lock.cta}
+                                className={linkClass}
+                            >
+                                {lock.plan}
+                            </Link>
+                        </PlanWay>
                         .
                     </p>
                 ) : null}

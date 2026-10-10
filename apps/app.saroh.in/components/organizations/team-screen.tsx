@@ -36,6 +36,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { LeaveBusiness } from "@/components/organizations/leave-business";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -64,6 +65,7 @@ import {
     teamCounts,
     usesSeat,
 } from "@/lib/organizations/invitations";
+import { isOnlyOwner, onlyOwnerLine } from "@/lib/organizations/leave-business";
 import {
     inviteMember,
     removeMember,
@@ -524,6 +526,8 @@ function PeopleTab({
     // buttons. The Extra permissions column shows only once someone has
     // one (F15, F17): a column that says "—" for everyone says nothing.
     const withExtras = anyoneHasExtras(members);
+    // The only owner can't leave: no button on their row, and why below.
+    const onlyOwner = isOnlyOwner(members) === true;
     const grid = withExtras
         ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
         : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
@@ -566,7 +570,8 @@ function PeopleTab({
                         );
                         // An owner is moved to another role first (Edit), and
                         // no one is removed by someone they outrank, by role
-                        // or by extras. Leaving is not removing yourself.
+                        // or by extras. Leaving is not removing yourself: it
+                        // is on your own row, whatever your role.
                         const canRemove =
                             canManage &&
                             role !== "OWNER" &&
@@ -649,6 +654,17 @@ function PeopleTab({
                                     </div>
                                 ) : null}
                                 <div className="flex flex-wrap justify-end gap-1.5">
+                                    {m.isSelf && !onlyOwner ? (
+                                        <LeaveBusiness
+                                            business={organizationName}
+                                            onlyOwner={false}
+                                            locations={(
+                                                m.storefronts ?? []
+                                            ).map((s) => s.name)}
+                                            size="sm"
+                                            className={rowButton}
+                                        />
+                                    ) : null}
                                     {canRemove ? (
                                         <Button
                                             size="sm"
@@ -690,6 +706,7 @@ function PeopleTab({
                     A person&apos;s role sets what they can reach in{" "}
                     {organizationName}. Leaving this business touches nothing in
                     any other.
+                    {onlyOwner ? ` ${onlyOwnerLine(organizationName)}` : null}
                 </p>
             </div>
         </div>
@@ -975,10 +992,10 @@ function MemberDrawer({
             dirty={changed}
             saveOff={outranks}
             extra={
-                /* Everyone else is removed from their row. An owner and
-                   the viewer have no Remove there, so this is the one way
-                   to remove a second owner, or to leave. */
-                member && !locked && (current === "OWNER" || member.isSelf) ? (
+                /* Everyone else is removed from their row. An owner has no
+                   Remove there, so this is the one way to remove a second
+                   owner. The viewer leaves from their own row. */
+                member && !locked && current === "OWNER" && !member.isSelf ? (
                     <Button
                         type="button"
                         variant="ghost"

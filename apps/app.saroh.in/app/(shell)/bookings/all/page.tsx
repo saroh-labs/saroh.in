@@ -4,12 +4,14 @@ import Link from "next/link";
 import { BookingsView } from "@/components/bookings/bookings-view";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { bookingsListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
@@ -73,6 +75,9 @@ export default async function BookingsPage({
           )
         : every;
 
+    // The business's first booking (wave G), said once.
+    const moment = await bookingsListMoment(every, organization);
+
     // No bookings at all yet: "Share your booking page" while it is live
     // (DEC-069, L8). Only then is the web address read, and a read that
     // fails (or a role it isn't shown to) just leaves the button out.
@@ -123,6 +128,7 @@ export default async function BookingsPage({
                 }
             />
             <div className="mt-6 space-y-4">
+                {moment ? <Moment moment={moment} /> : null}
                 {since ? (
                     <SinceNotice
                         count={upcoming.length}

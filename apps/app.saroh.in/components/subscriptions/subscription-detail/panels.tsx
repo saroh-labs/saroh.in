@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
@@ -112,14 +113,19 @@ export function ChargesCard({
             >
                 Charges
             </h2>
-            {state !== "ok" ? (
+            {state === "failed" ? (
+                <FailedRead
+                    things="the charges"
+                    reassurance="Everything else on this page is up to date."
+                    className="border-t border-border/70 px-4 py-2.5"
+                />
+            ) : state === "denied" ? (
                 <p
-                    role={state === "failed" ? "alert" : "note"}
+                    role="note"
                     className="border-t border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground"
                 >
-                    {state === "denied"
-                        ? "Your role can't see invoices, so the charges aren't shown here."
-                        : "The charges couldn't be loaded. Everything else on this page is up to date."}
+                    Your role can&apos;t see invoices, so the charges
+                    aren&apos;t shown here.
                 </p>
             ) : rows.length === 0 ? (
                 <EmptyState

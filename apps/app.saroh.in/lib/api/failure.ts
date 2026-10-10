@@ -1,4 +1,4 @@
-import { roleDeniedMessage } from "@/lib/api/role-denied";
+import { isRoleRefusal, roleDeniedMessage } from "@/lib/api/role-denied";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import { planRefusalOf } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
@@ -56,14 +56,16 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
     const missing = missingDetailsOf(inner?.details ?? b.details);
     const plan = planRefusalOf(inner?.details ?? b.details, message);
     const denied = roleDeniedMessage(body);
+    const said = typeof message === "string" && message ? message : fallback;
+    // An endpoint that words its own refusal ("Your role can't change
+    // bookings.") sends no code: its sentence says what it is.
+    const refused = denied !== null || isRoleRefusal(said);
     return {
         ok: false,
-        error:
-            denied ??
-            (typeof message === "string" && message ? message : fallback),
+        error: denied ?? said,
         ...(field ? { field } : {}),
         ...(missing ? { missing } : {}),
         ...(plan ? { plan } : {}),
-        ...(denied ? { denied: true as const } : {}),
+        ...(refused ? { denied: true as const } : {}),
     };
 }

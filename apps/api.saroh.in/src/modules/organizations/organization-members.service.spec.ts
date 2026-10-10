@@ -70,7 +70,10 @@ import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
-import { OrganizationMembersService } from "./organization-members.service";
+import {
+    LAST_OWNER_CANT_LEAVE,
+    OrganizationMembersService,
+} from "./organization-members.service";
 import { builtInActions, resolveCapabilities } from "./organization-policy";
 
 const db = prisma as unknown as {
@@ -888,6 +891,205 @@ describe("removing someone", () => {
         await expect(service.remove(ctx(), "stranger")).rejects.toThrow(
             /not in this workspace/,
         );
+    });
+});
+
+/**
+ * Leaving (UX audit, 10 Oct 2026): anyone who is a member may go, whatever
+ * their role, and the business still always has an owner.
+ */
+describe("leaving a business", () => {
+    const leaver = (
+        role: OrgRole,
+        roleKey?: string,
+        actions?: string[],
+    ): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "user_me",
+        role,
+        ...(roleKey ? { roleKey } : {}),
+        ...(actions ? { actions } : {}),
+    });
+
+    beforeEach(() => {
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+        });
+    });
+
+    it("asks no permission: a Member, a Reviewer and a narrow role all leave", async () => {
+        const who: OrganizationContext[] = [
+            leaver("MEMBER"),
+            leaver("REVIEWER"),
+            // A location's team and a diary person: no `member:remove`.
+            leaver("MEMBER", "storefront-team", ["org:read", "store:read"]),
+            leaver("MEMBER", "calendar-only", ["org:read", "booking:read"]),
+            // A role that holds nothing at all.
+            leaver("MEMBER", "nothing", []),
+        ];
+        for (const me of who) {
+            db.membership.findUnique.mockResolvedValue({
+                role: me.roleKey ?? me.role,
+                extraActions: [],
+            });
+            await expect(service.leave(me)).resolves.toEqual({
+                left: true,
+                revokedLinks: 0,
+                storefrontRoles: 0,
+            });
+        }
+        expect(db.membership.delete).toHaveBeenCalledTimes(who.length);
+    });
+
+    it("removes the caller's own membership in this business, and no one else's", async () => {
+        await service.leave(leaver("MEMBER"));
+
+        expect(db.membership.findUnique).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_userId: {
+                        organizationId: "org_1",
+                        userId: "user_me",
+                    },
+                },
+            }),
+        );
+        expect(db.membership.delete).toHaveBeenCalledWith({
+            where: {
+                organizationId_userId: {
+                    organizationId: "org_1",
+                    userId: "user_me",
+                },
+            },
+        });
+        expect(db.$transaction.mock.calls[0][1]).toEqual({
+            isolationLevel: "Serializable",
+        });
+    });
+
+    it("takes with them what a removal takes: sites reviewed, share links, location roles and waiting location invites", async () => {
+        db.sitePreviewLink.updateMany.mockResolvedValue({ count: 3 });
+        db.storeMembers.deleteMany.mockResolvedValue({ count: 2 });
+
+        const result = await service.leave(leaver("MEMBER"));
+
+        expect(db.siteReviewer.deleteMany).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", userId: "user_me" },
+        });
+        expect(db.sitePreviewLink.updateMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            createdByUserId: "user_me",
+            revokedAt: null,
+        });
+        // Scoped to this business's locations, never another's.
+        expect(db.storeMembers.deleteMany).toHaveBeenCalledWith({
+            where: { userId: "user_me", store: { organizationId: "org_1" } },
+        });
+        expect(db.storeInvitation.updateMany.mock.calls[0][0]).toMatchObject({
+            where: {
+                status: "PENDING",
+                store: { organizationId: "org_1" },
+            },
+            data: { status: "REVOKED" },
+        });
+        expect(result).toEqual({
+            left: true,
+            revokedLinks: 3,
+            storefrontRoles: 2,
+        });
+    });
+
+    it("refuses the only owner, saying why and what to do first", async () => {
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
+        db.membership.count.mockResolvedValue(0);
+
+        const refused = service.leave(leaver("OWNER"));
+        await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+        await expect(refused).rejects.toThrow(LAST_OWNER_CANT_LEAVE);
+        expect(LAST_OWNER_CANT_LEAVE).toBe(
+            "You're the only owner of this business, and it always needs one. Make someone else an owner first, then leave.",
+        );
+        expect(db.membership.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                role: "OWNER",
+                userId: { not: "user_me" },
+            },
+        });
+        expect(db.membership.delete).not.toHaveBeenCalled();
+        expect(db.storeMembers.deleteMany).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it("lets an owner leave once there is another", async () => {
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
+        db.membership.count.mockResolvedValue(1);
+
+        await expect(service.leave(leaver("OWNER"))).resolves.toMatchObject({
+            left: true,
+        });
+        expect(db.membership.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it("checks the last owner again inside the transaction", async () => {
+        db.membership.findUnique.mockResolvedValue({
+            role: "OWNER",
+            extraActions: [],
+        });
+        // Another owner before the transaction; none left inside it: two
+        // owners leaving at once must not both pass.
+        db.membership.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+        await expect(service.leave(leaver("OWNER"))).rejects.toThrow(
+            LAST_OWNER_CANT_LEAVE,
+        );
+        expect(db.membership.delete).not.toHaveBeenCalled();
+    });
+
+    it("writes it down as leaving, by the person themselves", async () => {
+        await service.leave(leaver("MEMBER", "calendar-only"));
+
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: "membership.remove",
+                actorUserId: "user_me",
+                actorRoleKey: "calendar-only",
+                organizationId: "org_1",
+                targetType: "membership",
+                targetId: "user_me",
+                metadata: expect.objectContaining({ left: true }),
+            }),
+        );
+    });
+
+    it("is a 404 for someone who is not in the business", async () => {
+        db.membership.findUnique.mockResolvedValue(null);
+
+        await expect(service.leave(leaver("MEMBER"))).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        expect(db.membership.delete).not.toHaveBeenCalled();
+    });
+
+    it("leaves a removal's own record as it was: no `left` on it", async () => {
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+        await service.remove(ctx(), "user_2");
+        const [event] = (audit.record as jest.Mock).mock.calls[0];
+        expect(event.metadata).toEqual({
+            role: "REVIEWER",
+            revokedLinks: 0,
+            storefrontRoles: 0,
+        });
     });
 });
 

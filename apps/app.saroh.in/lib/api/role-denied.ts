@@ -104,6 +104,22 @@ export function roleDeniedSentence(action: string | null | undefined): string {
     return cant ? `${cant} ${WHO}` : ROLE_DENIED_FALLBACK;
 }
 
+/**
+ * Whether a sentence is a refusal by role, however it reached the screen.
+ *
+ * Most call sites only hold `res.error`, a string. The API words every
+ * refusal by role one of two ways ("Your role can't …", "Only an owner can
+ * …", `backend-auth-and-access.md`), and so does this file, so the sentence
+ * itself says what it is. `showError` asks this (registered once in
+ * `app/providers.tsx`) and says a refusal calmly, and `Refusal` asks it for
+ * the line inside an open sheet, dialog or confirm.
+ */
+export function isRoleRefusal(sentence: string | null | undefined): boolean {
+    const said = sentence?.trim();
+    if (!said) return false;
+    return /^(Your role |Only (the|an) owner can )/.test(said);
+}
+
 /** The `details` of any of the shapes the API returns an error in. */
 export function errorDetails(body: unknown): unknown {
     if (typeof body !== "object" || body === null) return undefined;

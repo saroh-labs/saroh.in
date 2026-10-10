@@ -234,9 +234,23 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
     - A write the API refused by role arrives with `details.code`
       `ROLE_DENIED` and the permission. `toFailure` and `readError` say it
       in `lib/api/role-denied.ts`'s words and mark the result `denied`;
-      `reportFailure` shows a denied result with `showInfo`, not the red
-      error. Gap: most screens still call `showError(res.error)` directly,
-      so they show the readable sentence in the error style.
+      `reportFailure` shows a denied result with `showRefusal`, not the
+      red error.
+    - **A refusal by role is never red, from any call site** (10 Oct 2026).
+      Most screens only hold `res.error`, so the sentence says what it is:
+      `isRoleRefusal` (`lib/api/role-denied.ts`) knows the two ways a
+      refusal by role is worded ("Your role …", "Only an owner can …"), and
+      an endpoint's own sentence is marked `denied` too. `app/providers.tsx`
+      registers it once (`setRefusalTest`, `@saroh/ui/toast`), so every
+      `showError(res.error)` says a refusal through `showRefusal`: the
+      neutral toast, ten seconds, closable. Inside a sheet, dialog or
+      confirm that is still open it is `Refusal`
+      (`components/shared/refusal.tsx`): a neutral `Notice` for a refusal
+      by role, the error `Notice` for anything else. `ConfirmDialog` draws
+      its refusal with it. A new refusal by role in the API starts "Your
+      role " or carries `ROLE_DENIED`, or it is shown as an error. Gap:
+      a save's sentence drawn by hand as `<p role="alert">` under a field
+      is still red when the role refused it.
 - **Current** — **Calm, recoverable copy**: "Couldn't load {things}", "Nothing
   has been changed.", and **Try again** reads again (`retry`, a refetch or
   `router.refresh()`), never "reload the page" and never "Retry". A part of
@@ -306,10 +320,18 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   `DataView` draws it. A picker says `noMatchLine(things, q)`.
 - **Current** (10 Oct 2026) — **A plan prompt has one label**, `planLabel`:
   "See {Plan}" when one plan unlocks the thing, "See plans" otherwise.
-  Someone who can't change the plan reads who can, as text. Gap: most
-  prompts don't yet know whether the reader may change the plan and show
-  the link to everyone; the Plan and billing page then turns away anyone
-  but the owner.
+  Someone who can't change the plan reads who can, as text: "The owner
+  can change the plan in Settings › Plan and billing." The shell says once
+  whether the reader may (`mayChangePlan`: `billing:manage`,
+  `lib/billing/plan-access.ts`, through `PlanAccessProvider`), and a prompt
+  never passes it: it wraps its link in `PlanWay`
+  (`components/billing/plan-way.tsx`), or draws `PlanLockedCard` /
+  `LimitReachedCard`. `LimitNoticeBlock` and the plan refusal dialog do it
+  themselves. A link that is only sometimes to the plans passes
+  `when={isPlanHref(href)}`. Plan and billing opens to `billing:read`
+  (`mayOpenPlan`), the same rule as its Settings tab and the API (DEC-128).
+  Gap: the setup checklists' plan rows (Home, Settings › Business, a
+  location) still link for everyone.
 - **Gap** — About 55 lines inside a page still word a partial failure by
   hand ("Reviews couldn't be read just now, so …"). They are true and say
   what is missing. They don't yet read `couldntLoadLine`.

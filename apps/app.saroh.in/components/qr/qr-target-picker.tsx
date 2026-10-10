@@ -17,7 +17,7 @@ import {
     Eyebrow,
     pillClass,
 } from "@/components/shared/choice-group";
-import { Notice } from "@saroh/ui/notice";
+import { Refusal } from "@/components/shared/refusal";
 import { TextLink } from "@saroh/ui/text-link";
 
 /** From this many products and pages, "More…" gets a search box. */
@@ -100,7 +100,7 @@ export function QrTargetPicker({
                 className="flex flex-col gap-2.5"
                 itemClassName={(on) => cardClass(on)}
             />
-            {problem ? <Notice tone="error">{problem}</Notice> : null}
+            <Refusal>{problem}</Refusal>
             {targets.more.length > 0 ? (
                 <div className="flex flex-col gap-2">
                     <TextLink
