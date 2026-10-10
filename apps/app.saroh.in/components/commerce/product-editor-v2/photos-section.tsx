@@ -26,6 +26,7 @@ import {
 import type { ProductDetail } from "@/lib/products/service";
 
 import { Notice } from "@saroh/ui/notice";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
@@ -391,19 +392,13 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 {limit.text}
             </FieldHelp>
             {busy ? (
-                <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress ?? 0}
-                    aria-label="Upload progress"
-                    className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${progress ?? 0}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={progress ?? 0}
+                    max={100}
+                    size="xs"
+                    label="Upload progress"
+                    className="mt-2"
+                />
             ) : null}
             {error ? (
                 <Notice tone="error" className="mt-[9px]">

@@ -9,6 +9,7 @@ import type {
     LocationTab,
     ReadyItem,
 } from "@/lib/stores/location-readiness";
+import { doneOf, ProgressBar } from "@saroh/ui/progress-bar";
 
 /** Opens a tab of the page and puts the keyboard on a field there. */
 type Jump = (tab: LocationTab, focus?: string) => void;
@@ -59,7 +60,6 @@ export function LocationReadinessCard({
         );
     }
 
-    const pct = Math.round((100 * done) / total);
     return (
         <section
             aria-labelledby="location-ready-heading"
@@ -81,20 +81,12 @@ export function LocationReadinessCard({
                         · {note}
                     </span>
                 ) : null}
-                <div
-                    role="progressbar"
-                    aria-label={heading}
-                    aria-valuemin={0}
-                    aria-valuemax={total}
-                    aria-valuenow={done}
-                    aria-valuetext={`${done} of ${total} done`}
-                    className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={done}
+                    max={total}
+                    label={doneOf(done, total)}
+                    className="ml-auto max-w-[200px] flex-[1_1_120px] self-center"
+                />
             </div>
             <ul className="grid gap-2">
                 {items.map((item) => (

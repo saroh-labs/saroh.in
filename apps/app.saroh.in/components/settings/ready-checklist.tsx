@@ -8,6 +8,7 @@ import type {
     ReadyStep,
 } from "@/lib/settings/ready";
 import { checklistHeading } from "@/lib/settings/ready";
+import { doneOf, ProgressBar } from "@saroh/ui/progress-bar";
 
 /**
  * "Get ready to take money" ("Saroh Settings" design): the one "what's
@@ -59,7 +60,6 @@ export function readyHasLeft(list: Checklist): boolean {
 
 /** The counted steps, Home's, with the plan's asides under them. */
 function Steps({ list }: { list: Checklist }) {
-    const pct = Math.round((100 * list.done) / list.total);
     const heading = checklistHeading(list);
     return (
         <div className="grid gap-2">
@@ -68,21 +68,14 @@ function Steps({ list }: { list: Checklist }) {
                     {heading}
                 </h3>
                 <span className="text-[12.5px] text-foreground/80">
-                    {list.done} of {list.total} done
+                    {doneOf(list.done, list.total)}
                 </span>
-                <div
-                    role="progressbar"
-                    aria-label="Setup done"
-                    aria-valuemin={0}
-                    aria-valuemax={list.total}
-                    aria-valuenow={list.done}
-                    className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={list.done}
+                    max={list.total}
+                    label={doneOf(list.done, list.total)}
+                    className="ml-auto max-w-[200px] flex-[1_1_120px] self-center"
+                />
             </div>
             <ul className="grid gap-2">
                 {list.left.map((item) => (

@@ -53,6 +53,7 @@ import {
 } from "@/lib/services/treatment";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 import { TextLink } from "@saroh/ui/text-link";
 import { ClassSeats } from "./class-seats";
 import { Eyebrow, STATE_TONE } from "./parts";
@@ -638,24 +639,12 @@ function ClassLook({
             {!cancelled ? (
                 <Card>
                     <Eyebrow>Places</Eyebrow>
-                    <div
-                        role="progressbar"
-                        aria-label="Places booked"
-                        aria-valuemin={0}
-                        aria-valuemax={s.capacity}
-                        aria-valuenow={live.length}
-                        className="h-2 overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className={cn(
-                                "h-full",
-                                full ? "bg-destructive" : "bg-success",
-                            )}
-                            style={{
-                                width: `${Math.min(100, (live.length / Math.max(1, s.capacity)) * 100)}%`,
-                            }}
-                        />
-                    </div>
+                    <ProgressBar
+                        value={live.length}
+                        max={s.capacity}
+                        tone={full ? "danger" : "success"}
+                        label={`${live.length} of ${s.capacity} places booked`}
+                    />
                     <p className="mt-1.5 text-[12.5px]">
                         {live.length} of {s.capacity} booked
                         {full

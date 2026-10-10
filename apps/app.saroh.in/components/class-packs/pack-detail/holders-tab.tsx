@@ -15,12 +15,13 @@ import { whoCanChange } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 import { Segmented } from "@saroh/ui/segmented";
 
 const BAR = {
-    ok: "bg-success",
-    soon: "bg-foreground",
-    ended: "bg-muted-foreground",
+    ok: "success",
+    soon: "ink",
+    ended: "neutral",
 } as const;
 
 const WHEN = {
@@ -194,15 +195,14 @@ function HolderItem({
                         {row.left}
                     </span>
                 </div>
-                <div
-                    aria-hidden
-                    className="mt-[7px] h-[5px] overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className={cn("h-full rounded-full", BAR[row.bar])}
-                        style={{ width: `${row.pct}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={row.pct}
+                    max={100}
+                    size="xs"
+                    tone={BAR[row.bar]}
+                    label={`${Math.round(row.pct)}% left`}
+                    className="mt-[7px]"
+                />
                 <div
                     className={cn(
                         "mt-1.5 text-[12.5px] font-semibold",

@@ -1,8 +1,7 @@
-import { cn } from "@saroh/ui/lib/utils";
-
 import { chipClass } from "@/components/shared/chip";
 import { FailedRead } from "@/components/shared/failed-read";
 import { EmptyState } from "@saroh/ui/data-state";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 
 /** The design's white card: border-first, 12px corners, 14px by 16px. */
 export const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
@@ -108,18 +107,19 @@ export function Bar({
     tone: "ok" | "accent" | "off";
 }) {
     return (
-        <div className="mt-[7px] h-[5px] overflow-hidden rounded-full bg-muted">
-            <div
-                className={cn(
-                    "h-full rounded-full",
-                    tone === "ok"
-                        ? "bg-success-subtle-foreground"
-                        : tone === "accent"
-                          ? "bg-foreground"
-                          : "bg-neutral-400",
-                )}
-                style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-            />
-        </div>
+        <ProgressBar
+            value={Math.max(0, Math.min(100, pct))}
+            max={100}
+            size="xs"
+            tone={
+                tone === "ok"
+                    ? "success"
+                    : tone === "accent"
+                      ? "ink"
+                      : "neutral"
+            }
+            label={`${Math.round(Math.max(0, Math.min(100, pct)))}% left`}
+            className="mt-[7px]"
+        />
     );
 }

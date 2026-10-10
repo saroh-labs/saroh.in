@@ -105,7 +105,7 @@ export function HoldCard({
             >
                 <div
                     className={cn(
-                        "h-[3px] rounded-full transition-[width] duration-200 ease-linear",
+                        "h-[3px] rounded-full transition-[width] duration-slow ease-out",
                         refund
                             ? "bg-destructive-subtle-foreground"
                             : "bg-foreground",

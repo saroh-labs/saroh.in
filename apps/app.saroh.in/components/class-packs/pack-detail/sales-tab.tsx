@@ -15,6 +15,7 @@ import type {
 } from "@/lib/class-packs/pack-sales";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { Notice } from "@saroh/ui/notice";
+import { ProgressBar } from "@saroh/ui/progress-bar";
 
 const CARD =
     "min-w-0 rounded-[12px] border border-border bg-card px-[18px] py-4";
@@ -90,15 +91,11 @@ export function SalesTab({
                             <span className="text-muted-foreground">
                                 {m.label}
                             </span>
-                            <div
-                                aria-hidden
-                                className="h-2 overflow-hidden rounded-full bg-muted"
-                            >
-                                <div
-                                    className="h-full rounded-full bg-foreground"
-                                    style={{ width: `${m.pct}%` }}
-                                />
-                            </div>
+                            <ProgressBar
+                                value={m.pct}
+                                max={100}
+                                label={`${m.label}: ${m.n}`}
+                            />
                             <span className="text-foreground/80">{m.n}</span>
                             <span className="text-right font-semibold tabular-nums">
                                 {m.amt}

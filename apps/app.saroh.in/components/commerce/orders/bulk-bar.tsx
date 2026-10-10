@@ -321,7 +321,7 @@ function HeldCard({
                 className="mt-2 h-[3px] rounded-full bg-foreground/5"
             >
                 <div
-                    className="h-[3px] rounded-full bg-foreground transition-[width] duration-200 ease-linear"
+                    className="h-[3px] rounded-full bg-foreground transition-[width] duration-slow ease-out"
                     style={{ width: `${(left / HOLD_UNDO_MS) * 100}%` }}
                 />
             </div>
