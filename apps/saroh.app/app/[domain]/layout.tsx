@@ -50,7 +50,12 @@ import {
     requestSignInCode,
     verifySignInCode,
 } from "./account/actions";
-import { checkoutStanding, quoteBag, startCheckout } from "./shop/actions";
+import {
+    checkoutStanding,
+    quoteBag,
+    savedDeliveryAddress,
+    startCheckout,
+} from "./shop/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -279,6 +284,7 @@ export default async function SiteLayout({
                     quote: quoteBag,
                     start: startCheckout,
                     standing: checkoutStanding,
+                    savedAddress: savedDeliveryAddress,
                 }}
                 apiUrl={publicApiUrl()}
                 account={{

@@ -11,7 +11,7 @@ import { SignInSheet } from "../account/sign-in-sheet";
 import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
-import { phoneText } from "../lib/phone";
+import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { useQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
@@ -166,6 +166,16 @@ export interface BookingAccount {
     waitlist?: WaitlistApi;
 }
 
+/**
+ * The phone the business has for a signed-in customer, for the optional
+ * "Phone": only one the booking would take, so a number staff wrote their
+ * own way ("ext 4") never blocks the booking.
+ */
+export function accountPhone(customer: SignedInCustomer | null): string {
+    const phone = customer?.phone?.trim() ?? "";
+    return phone && phoneOk(phone) ? phone : "";
+}
+
 /** What is left while the name isn't typed (UX-083: a next step until they try to book). */
 const NAME_LEFT = "Add your name.";
 export interface BookingFlowProps {
@@ -233,7 +243,10 @@ export default function BookingFlow({
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
     const [note, setNote] = useState("");
     // A phone to reach them on (UX-049), optional; filled into checkout.
-    const [phoneNo, setPhoneNo] = useState("");
+    // A signed-in customer's own is there already, to keep or change.
+    const [phoneNo, setPhoneNo] = useState(() =>
+        accountPhone(account.customer),
+    );
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
@@ -725,6 +738,8 @@ export default function BookingFlow({
     /** Signed in from the sheet: book straight away, on what was chosen. */
     const signedIn = async (who: SignedInCustomer) => {
         setCustomer(who);
+        // Their own phone, unless they typed one for this booking.
+        if (!phoneNo.trim()) setPhoneNo(accountPhone(who));
         // A full class: they came to join its line (A12).
         if (waitMode === "join") {
             await joinWaitlist(who);
@@ -983,7 +998,7 @@ export default function BookingFlow({
         setPayChoice(null);
         setWhere("IN_PERSON");
         setNote("");
-        setPhoneNo("");
+        setPhoneNo(accountPhone(customer));
         setTouched(false);
         setSubmitError(null);
         wanted.current = null;

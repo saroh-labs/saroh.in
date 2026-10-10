@@ -2,6 +2,7 @@ import type {
     CheckoutQuote,
     CheckoutStanding,
     CheckoutStarted,
+    DeliveryAddress,
     ShopProblem,
     ShopResult,
 } from "@saroh/site-blocks";
@@ -187,6 +188,38 @@ export function isStanding(v: unknown): v is CheckoutStanding {
     );
 }
 
+/**
+ * The answer of the last-delivery read: `{ address }`, null when the
+ * customer has had none. Rebuilt field by field, so only an address's own
+ * parts reach the bag.
+ */
+export function savedAddressOf(
+    v: unknown,
+): { address: DeliveryAddress | null } | null {
+    if (!isRecord(v)) return null;
+    if (v.address === null) return { address: null };
+    if (!isRecord(v.address)) return null;
+    const a = v.address;
+    if (
+        !isString(a.line1) ||
+        !isString(a.city) ||
+        !isString(a.state) ||
+        !isString(a.postalCode)
+    ) {
+        return null;
+    }
+    const address: DeliveryAddress = {
+        line1: a.line1,
+        city: a.city,
+        state: a.state,
+        postalCode: a.postalCode,
+    };
+    if (isString(a.name) && a.name) address.name = a.name;
+    if (isString(a.phone) && a.phone) address.phone = a.phone;
+    if (isString(a.line2) && a.line2) address.line2 = a.line2;
+    return { address };
+}
+
 export const SHOP_TROUBLE =
     "Something went wrong on our side. Please try again.";
 
@@ -263,6 +296,11 @@ export function problemOf(
             message?.startsWith("You have orders waiting")
             ? fail("busy", message)
             : fail("busy");
+    }
+    // A delivery with no number to ring: the bag asks for one, so this is
+    // an older page's bag; say what to add.
+    if (status === 400 && field === "address.phone") {
+        return fail("invalid", "Add a phone number for the delivery.");
     }
     if (status === 400) return fail("invalid");
     if (status === 409) return fail("bag-changed");

@@ -264,6 +264,7 @@ describe("Free takes money offline", () => {
             key: "key-12345678", // gitleaks:allow (a checkout's idempotency key)
             payment: "ON_HANDOVER",
             address: {
+                phone: "98450 12345",
                 line1: "12 Hill Road",
                 city: "Mumbai",
                 state: "Maharashtra",

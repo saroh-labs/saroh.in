@@ -19,6 +19,7 @@ import type {
     CheckoutQuote,
     CheckoutStanding,
     CheckoutStarted,
+    DeliveryAddress,
     ShopCheckoutApi,
     ShopResult,
     StartCheckout,
@@ -316,6 +317,8 @@ function setup(
         outcome?: CheckoutOutcome;
         /** Drawn on a test release (DEC-071, T6). */
         testRelease?: boolean;
+        /** The signed-in customer's last delivery; none when left out. */
+        saved?: DeliveryAddress;
     } = {},
 ) {
     const quote = vi.fn(() =>
@@ -338,7 +341,10 @@ function setup(
             },
         ),
     );
-    const api: ShopCheckoutApi = { quote, start, standing };
+    const savedAddress = vi.fn(() =>
+        Promise.resolve({ ok: true as const, data: over.saved ?? null }),
+    );
+    const api: ShopCheckoutApi = { quote, start, standing, savedAddress };
     const signIn: SignInApi = {
         requestCode: vi.fn(() =>
             Promise.resolve({ ok: true as const, resendAfterSeconds: 30 }),
@@ -383,7 +389,7 @@ function setup(
             bag
         ),
     );
-    return { quote, start, standing, openCheckout, signIn };
+    return { quote, start, standing, openCheckout, signIn, savedAddress };
 }
 
 async function openTheBag() {
@@ -620,6 +626,7 @@ describe("the header's bag", () => {
         });
         expect(place).toBeDisabled();
         for (const [label, value] of [
+            ["Phone", "98450 12345"],
             ["Address", "12 Hill Road"],
             ["Town or city", "Mumbai"],
             ["PIN code", "400050"],
@@ -632,6 +639,213 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeEnabled();
+        // State is a choice of India's states and union territories.
+        const state = screen.getByLabelText(/^State/);
+        expect(state.tagName).toBe("SELECT");
+        expect(state.querySelectorAll("option")).toHaveLength(37);
+    });
+
+    it("needs a phone for a delivery, and says so beside the button", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        for (const [label, value] of [
+            ["Address", "12 Hill Road"],
+            ["Town or city", "Mumbai"],
+            ["PIN code", "400050"],
+            ["State", "Maharashtra"],
+        ] as const) {
+            fireEvent.change(
+                await screen.findByLabelText(new RegExp(`^${label}`)),
+                { target: { value } },
+            );
+        }
+        const place = screen.getByRole("button", { name: /^Place order/ });
+        expect(place).toBeDisabled();
+        expect(place).toHaveAccessibleDescription(
+            "Add a phone number for the delivery.",
+        );
+        const phone = screen.getByLabelText(/^Phone/);
+        expect(phone).toBeRequired();
+        fireEvent.change(phone, { target: { value: "call me" } });
+        expect(place).toHaveAccessibleDescription("Check the phone number.");
+        expect(phone).toHaveAttribute("aria-invalid", "true");
+        fireEvent.change(phone, { target: { value: "98450 12345" } });
+        expect(
+            screen.getByRole("button", { name: /^Place order/ }),
+        ).toBeEnabled();
+    });
+
+    it("asks for no phone for a pick-up", async () => {
+        setup({ signedIn: true });
+        await openTheBag();
+        expect(screen.queryByLabelText(/^Phone/)).toBeNull();
+        expect(
+            await screen.findByRole("button", { name: /^Place order/ }),
+        ).toBeEnabled();
+    });
+
+    it("reads out a returning customer's last address, and sends it", async () => {
+        const { start, savedAddress } = setup({
+            signedIn: true,
+            saved: {
+                name: "Asha Rao",
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                line2: "Flat 4",
+                city: "Mumbai",
+                state: "maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        await screen.findByText("12 Hill Road");
+        expect(screen.getByText("Mumbai, Maharashtra 400050")).toBeVisible();
+        expect(screen.getByText("98450 12345")).toBeVisible();
+        expect(savedAddress).toHaveBeenCalledTimes(1);
+        // Nothing to type: no field is drawn.
+        expect(screen.queryByLabelText(/^Address/)).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+        expect(start.mock.calls[0][0].address).toEqual({
+            name: "Asha Rao",
+            phone: "98450 12345",
+            line1: "12 Hill Road",
+            line2: "Flat 4",
+            city: "Mumbai",
+            state: "Maharashtra",
+            postalCode: "400050",
+        });
+    });
+
+    it("empties it on Use a different address, and never fills it in again", async () => {
+        const { savedAddress } = setup({
+            signedIn: true,
+            saved: {
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        fireEvent.click(
+            await screen.findByRole("button", {
+                name: "Use a different address",
+            }),
+        );
+        expect(screen.getByLabelText(/^Address/)).toHaveValue("");
+        expect(screen.getByLabelText(/^Phone/)).toHaveValue("");
+        expect(
+            screen.getByRole("button", { name: /^Place order/ }),
+        ).toBeDisabled();
+        // Closed and opened again: still theirs to type.
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        await openTheBag();
+        expect(await screen.findByLabelText(/^Address/)).toHaveValue("");
+        expect(savedAddress).toHaveBeenCalledTimes(1);
+    });
+
+    it("fills the fields in, to be finished, when the last address has no phone", async () => {
+        setup({
+            signedIn: true,
+            saved: {
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        expect(await screen.findByLabelText(/^Address/)).toHaveValue(
+            "12 Hill Road",
+        );
+        expect(screen.getByLabelText(/^State/)).toHaveValue("Maharashtra");
+        expect(
+            screen.queryByRole("button", { name: "Use a different address" }),
+        ).toBeNull();
+    });
+
+    it("asks nobody's last address while signed out, or for a pick-up", async () => {
+        const { savedAddress } = setup({
+            saved: {
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        await screen.findByLabelText(/^Address/);
+        expect(savedAddress).not.toHaveBeenCalled();
     });
 
     it("fills the payment window with the name and phone typed in the bag", async () => {
@@ -702,6 +916,7 @@ describe("the header's bag", () => {
         await openTheBag();
         fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
         for (const [label, value] of [
+            ["Phone", "98450 12345"],
             ["Address", "12 Hill Road"],
             ["Town or city", "Mumbai"],
             ["PIN code", "400050"],
@@ -1379,5 +1594,24 @@ describe("parseBagDraft", () => {
         expect(draft.code).toBeNull();
         expect(draft.checkout).toBeNull();
         expect(draft).not.toHaveProperty("source");
+        expect(draft.saved).toBeNull();
+    });
+
+    it("keeps whether the address is their last one, and reads a typed state as the list names it", () => {
+        const draft = parseBagDraft(
+            JSON.stringify({
+                saved: "shown",
+                address: { line1: "12 Hill Road", state: " orissa" },
+            }),
+        );
+        expect(draft.saved).toBe("shown");
+        expect(draft.address.state).toBe("Odisha");
+        expect(
+            parseBagDraft(JSON.stringify({ saved: "yes" })).saved,
+        ).toBeNull();
+        expect(
+            parseBagDraft(JSON.stringify({ address: { state: "Atlantis" } }))
+                .address.state,
+        ).toBe("");
     });
 });

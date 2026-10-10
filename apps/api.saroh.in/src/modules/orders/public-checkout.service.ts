@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { isCustomerPhone } from "../../common/customer-phone";
 import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
@@ -403,6 +404,14 @@ export class PublicCheckoutService {
                 throw new BadRequestException({
                     message: "Add the address to deliver to.",
                     field: "address",
+                });
+            }
+            // A delivery needs a number to ring: the rider at the gate, the
+            // courier with a parcel. Pick-up asks for none.
+            if (shipsToAddress(type) && !isCustomerPhone(dto.address?.phone)) {
+                throw new BadRequestException({
+                    message: "Add a phone number for the delivery.",
+                    details: { reason: "phone", field: "address.phone" },
                 });
             }
 

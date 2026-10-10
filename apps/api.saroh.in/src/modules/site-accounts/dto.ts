@@ -10,6 +10,7 @@ import {
     MinLength,
 } from "class-validator";
 
+import { CUSTOMER_PHONE } from "../../common/customer-phone";
 import type { AccountBookPay, BookingLocationType } from "../bookings/dto";
 import {
     ACCOUNT_BOOK_PAY,
@@ -133,7 +134,7 @@ export class AccountBookDto {
     @IsOptional()
     @Transform(trim)
     @IsString()
-    @Matches(/^\+?[\d\s()-]{6,24}$/, {
+    @Matches(CUSTOMER_PHONE, {
         message: "Check the phone number.",
     })
     bookerPhone?: string;

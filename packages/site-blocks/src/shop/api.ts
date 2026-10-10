@@ -198,6 +198,12 @@ export interface ShopCheckoutApi {
     }): Promise<ShopResult<CheckoutQuote>>;
     start(body: StartCheckout): Promise<ShopResult<CheckoutStarted>>;
     standing(orderId: string): Promise<ShopResult<CheckoutStanding>>;
+    /**
+     * Where the signed-in customer's last delivery went, or null when they
+     * have had none: the bag reads it out instead of asking again. Absent:
+     * the bag always asks.
+     */
+    savedAddress?: () => Promise<ShopResult<DeliveryAddress | null>>;
 }
 
 /** The sentence when the server can't be reached at all. */

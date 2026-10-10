@@ -24,6 +24,11 @@ export interface SignedInCustomer {
     email: string;
     /** Null until the customer gives a name. */
     name: string | null;
+    /**
+     * The phone the business has for them, or null. The booking page fills
+     * its optional "Phone" with it. Absent from an older API.
+     */
+    phone?: string | null;
 }
 
 export type CodeRequestResult =

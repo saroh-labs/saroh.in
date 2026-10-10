@@ -66,6 +66,8 @@ import { WebhooksService } from "../webhooks/webhooks.service";
 import { priceBag } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
+import { CheckoutSavedAddressService } from "./checkout-saved-address";
+import { CheckoutSavedAddressController } from "./checkout-saved-address.controller";
 import type { CheckoutStartDto } from "./checkout.dto";
 import { CloseAbandonedCheckoutHandler } from "./close-abandoned-checkout.handler";
 import {
@@ -107,8 +109,9 @@ beforeAll(async () => {
     });
     const moduleRef = await Test.createTestingModule({
         imports: [SiteAccountsModule],
-        controllers: [PublicCheckoutController],
+        controllers: [PublicCheckoutController, CheckoutSavedAddressController],
         providers: [
+            CheckoutSavedAddressService,
             {
                 provide: PublicCheckoutService,
                 // Generous: these tests read and start many times from one
@@ -479,6 +482,7 @@ describe("starting a checkout and paying (G13)", () => {
         const res = await start(s, token, {
             fulfilment: "LOCAL_DELIVERY",
             address: {
+                phone: "98450 12345",
                 line1: "12 Hill Road",
                 city: "Mumbai",
                 state: "Maharashtra",
@@ -822,6 +826,7 @@ describe("starting a checkout and paying (G13)", () => {
             fulfilment: "LOCAL_DELIVERY",
             address: {
                 name,
+                phone: "98450 12345",
                 line1: "14, 2nd Cross",
                 city: "Bengaluru",
                 state: "Karnataka",
@@ -896,6 +901,34 @@ describe("starting a checkout and paying (G13)", () => {
         const gift = await start(s, token, delivery("9800000001"));
         expect(gift.status).toBe(201);
         expect((await contactOf()).phone).toBe("9811122233");
+    });
+
+    it("refuses a delivery with no phone to ring, or one that isn't a number, and makes nothing", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const delivery = (phone?: string) => ({
+            fulfilment: "LOCAL_DELIVERY",
+            address: {
+                ...(phone === undefined ? {} : { phone }),
+                line1: "14, 2nd Cross",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+        for (const phone of [undefined, "ring the bell", "12"]) {
+            const res = await start(s, token, delivery(phone));
+            expect(res.status).toBe(400);
+            expect(errorOf(res.body)).toMatchObject({
+                message: "Add a phone number for the delivery.",
+                details: { reason: "phone", field: "address.phone" },
+            });
+        }
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
+        // A pick-up asks for none.
+        expect((await start(s, token)).status).toBe(201);
     });
 
     it("refuses a session from site A on site B's host, or naming site B", async () => {
@@ -1579,6 +1612,7 @@ describe("a discount code at the site's checkout (DEC-104)", () => {
 
 describe("free delivery over an amount at the site's checkout", () => {
     const ADDRESS = {
+        phone: "98450 12345",
         line1: "12 Hill Road",
         city: "Mumbai",
         state: "Maharashtra",
@@ -1821,5 +1855,115 @@ describe("the QR code an order came from", () => {
             source: "qr-h7c",
         });
         expect(res.status).toBe(400);
+    });
+});
+
+describe("the last delivery's address, for the bag to offer again", () => {
+    const address = (s: Shop, token: string, host = s.host) =>
+        call("GET", `/public/sites/${s.siteId}/checkout/address`, {
+            host,
+            token,
+        });
+    const delivery = (line1: string, over: Record<string, unknown> = {}) => ({
+        fulfilment: "LOCAL_DELIVERY",
+        address: {
+            name: "Kavya Iyer",
+            phone: "98450 12345",
+            line1,
+            line2: "Flat 4",
+            city: "Bengaluru",
+            state: "Karnataka",
+            postalCode: "560038",
+        },
+        ...over,
+    });
+
+    it("is nothing for a customer who has had no delivery, and needs a session", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const none = await address(s, token);
+        expect(none.status).toBe(200);
+        expect(none.body).toEqual({ address: null });
+        // A pick-up leaves nothing to offer.
+        expect((await start(s, token)).status).toBe(201);
+        expect((await address(s, token)).body).toEqual({ address: null });
+        expect(
+            (
+                await call(
+                    "GET",
+                    `/public/sites/${s.siteId}/checkout/address`,
+                    {
+                        host: s.host,
+                    },
+                )
+            ).status,
+        ).toBe(401);
+    });
+
+    it("is the address of the last order placed, never of a checkout left unpaid", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+
+        // Started and never paid: not an order, so not offered.
+        const unpaid = await start(s, token, delivery("1 Unpaid Lane"));
+        expect(unpaid.status).toBe(201);
+        expect((await address(s, token)).body).toEqual({ address: null });
+
+        // Paid: placed, and offered.
+        await paid(s.organizationId, payment(unpaid.body).providerIntentId);
+        expect((await address(s, token)).body).toEqual({
+            address: {
+                name: "Kavya Iyer",
+                phone: "98450 12345",
+                line1: "1 Unpaid Lane",
+                line2: "Flat 4",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+
+        // A later one placed to be paid on delivery is the last now.
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { offerPayOnHandover: true },
+        });
+        const later = await start(
+            s,
+            token,
+            delivery("14, 2nd Cross", { payment: "ON_HANDOVER" }),
+        );
+        expect(later.status).toBe(201);
+        expect((await address(s, token)).body).toMatchObject({
+            address: { line1: "14, 2nd Cross" },
+        });
+    });
+
+    it("is never another customer's, another site's, or one whose lines were cleared", async () => {
+        const s = await shop();
+        const other = await shop();
+        const asha = await signIn(s.host);
+        const ravi = await signIn(s.host);
+        const first = await start(s, asha.token, delivery("12 Hill Road"));
+        await paid(s.organizationId, payment(first.body).providerIntentId);
+
+        expect((await address(s, ravi.token)).body).toEqual({ address: null });
+        // Asha's session is for her own site alone.
+        expect((await address(other, asha.token, other.host)).status).toBe(401);
+        expect((await address(other, asha.token)).status).not.toBe(200);
+
+        // A privacy removal clears an order's delivery lines: nothing left.
+        await prisma.order.update({
+            where: { id: first.body.orderId as string },
+            data: {
+                deliveryName: null,
+                deliveryPhone: null,
+                deliveryLine1: null,
+                deliveryLine2: null,
+                deliveryCity: null,
+                deliveryPostalCode: null,
+            },
+        });
+        expect((await address(s, asha.token)).body).toEqual({ address: null });
     });
 });

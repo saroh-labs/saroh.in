@@ -9,6 +9,7 @@ import {
     problemOf,
     quoteBody,
     resultOf,
+    savedAddressOf,
     startBody,
 } from "./shop-checkout-shape";
 
@@ -234,6 +235,63 @@ describe("the API's answers", () => {
                 error: { message: "Stored provider credentials are malformed" },
             }).message,
         ).not.toMatch(/credentials/);
+    });
+});
+
+describe("a returning customer's last delivery", () => {
+    it("is rebuilt field by field, and null when they have had none", () => {
+        expect(savedAddressOf({ address: null })).toEqual({ address: null });
+        expect(
+            savedAddressOf({
+                address: {
+                    name: "Asha Rao",
+                    phone: "98450 12345",
+                    line1: "12 Hill Road",
+                    line2: null,
+                    city: "Mumbai",
+                    state: "Maharashtra",
+                    postalCode: "400050",
+                    orderId: "o_1",
+                },
+                contactId: "c_1",
+            }),
+        ).toEqual({
+            address: {
+                name: "Asha Rao",
+                phone: "98450 12345",
+                line1: "12 Hill Road",
+                city: "Mumbai",
+                state: "Maharashtra",
+                postalCode: "400050",
+            },
+        });
+    });
+
+    it("refuses an answer that isn't one", () => {
+        expect(savedAddressOf(null)).toBeNull();
+        expect(savedAddressOf({})).toBeNull();
+        expect(savedAddressOf({ address: "12 Hill Road" })).toBeNull();
+        expect(
+            savedAddressOf({ address: { line1: "12 Hill Road", city: 7 } }),
+        ).toBeNull();
+    });
+
+    it("says a delivery refused for its phone in the page's words", () => {
+        expect(
+            problemOf(400, {
+                error: {
+                    message: "Add a phone number for the delivery.",
+                    details: { reason: "phone", field: "address.phone" },
+                },
+            }),
+        ).toEqual({
+            ok: false,
+            reason: "invalid",
+            message: "Add a phone number for the delivery.",
+        });
+        expect(problemOf(400, {}).message).toBe(
+            "Check the details and try again.",
+        );
     });
 });
 

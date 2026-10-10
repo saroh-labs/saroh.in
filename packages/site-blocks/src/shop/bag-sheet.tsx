@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
-import { focusRing, inputFill, optionClasses } from "../booking-flow/styles";
+import { focusRing, optionClasses } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type {
@@ -17,6 +17,15 @@ import type {
     StartCheckout,
 } from "./api";
 import { checkoutKey, SHOP_OFFLINE } from "./api";
+import {
+    addressBlank,
+    AddressFields,
+    addressLeft,
+    EMPTY_ADDRESS,
+    needsAddress,
+    SavedAddress,
+    trimmed,
+} from "./bag-address";
 import type { BagItem } from "./bag-store";
 import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
 import { cleanCode, CodeField, codeSettled } from "./code-field";
@@ -46,41 +55,6 @@ type Load =
     | { kind: "loading" }
     | { kind: "ready"; quote: CheckoutQuote }
     | { kind: "error"; message: string };
-
-const needsAddress = (way: ShopWay | null) =>
-    way === "LOCAL_DELIVERY" || way === "SHIPPING";
-
-const EMPTY_ADDRESS: DeliveryAddress = {
-    name: "",
-    phone: "",
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-};
-
-function addressReady(a: DeliveryAddress): boolean {
-    return (
-        a.line1.trim() !== "" &&
-        a.city.trim() !== "" &&
-        a.state.trim() !== "" &&
-        a.postalCode.trim() !== ""
-    );
-}
-
-function trimmed(a: DeliveryAddress): DeliveryAddress {
-    const out: DeliveryAddress = {
-        line1: a.line1.trim(),
-        city: a.city.trim(),
-        state: a.state.trim(),
-        postalCode: a.postalCode.trim(),
-    };
-    if (a.name?.trim()) out.name = a.name.trim();
-    if (a.phone?.trim()) out.phone = a.phone.trim();
-    if (a.line2?.trim()) out.line2 = a.line2.trim();
-    return out;
-}
 
 /** What a line says under its name when it can't be sold as asked. */
 export function lineNote(line: QuoteLine): string | null {
@@ -169,6 +143,8 @@ export function holdReason(input: {
     quote: CheckoutQuote | null;
     way: ShopWay | null;
     addressOk: boolean;
+    /** What the address still lacks, when it is the phone and not a line. */
+    addressNote?: string | null;
     payable: boolean;
 }): string | null {
     const { quote, way } = input;
@@ -186,18 +162,13 @@ export function holdReason(input: {
     if (!way || quote.fulfilment !== way) {
         return "Choose how your order reaches you.";
     }
-    if (!input.addressOk) return "Add the address to deliver to.";
+    if (!input.addressOk) {
+        return input.addressNote ?? "Add the address to deliver to.";
+    }
     if (!input.payable)
         return "This can't be paid for this way. Choose another.";
     return null;
 }
-
-// 16px: under it, iOS Safari zooms the page when a field takes focus.
-const field = cn(
-    "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-base",
-    inputFill,
-    focusRing,
-);
 
 const stepper = cn(
     "border-site-border bg-site-bg text-site-fg size-[30px] cursor-pointer rounded-lg border text-base leading-none hover:opacity-80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
@@ -217,6 +188,13 @@ export interface BagDraft {
     pay: ShopPayment | null;
     address: DeliveryAddress;
     /**
+     * Where `address` came from, for a signed-in customer: `shown` while it
+     * is their last delivery's, read out rather than typed; `typing` once
+     * they have none, or chose another ("Use a different address"), which
+     * is never filled in again; null until the bag has asked.
+     */
+    saved: "shown" | "typing" | null;
+    /**
      * The discount code applied in the bag (DEC-104), as typed and tidied;
      * null for none. The quote judges it every time it prices the bag.
      */
@@ -235,6 +213,7 @@ export const EMPTY_DRAFT: BagDraft = {
     way: null,
     pay: null,
     address: EMPTY_ADDRESS,
+    saved: null,
     code: null,
     checkout: null,
 };
@@ -344,6 +323,44 @@ export function BagSheet({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- the bag's contents, by value
     }, [bagPrint, way, api, round, problem, draft.code]);
 
+    // A signed-in customer's last delivery, asked for once a delivery is
+    // chosen: read out instead of typed again. Never over something typed.
+    const askSaved =
+        signedIn &&
+        needsAddress(way) &&
+        draft.saved === null &&
+        addressBlank(address)
+            ? api.savedAddress
+            : undefined;
+    const asksSaved = askSaved !== undefined;
+    useEffect(() => {
+        if (!askSaved) return;
+        let live = true;
+        void askSaved()
+            .catch(() => null)
+            .then((result) => {
+                if (!live) return;
+                const found = result?.ok ? result.data : null;
+                onDraft((d) => {
+                    if (d.saved !== null) return d;
+                    if (!found || !addressBlank(d.address)) {
+                        return { ...d, saved: "typing" };
+                    }
+                    const last = { ...EMPTY_ADDRESS, ...found };
+                    // One the checkout would now send back (an older
+                    // order with no phone) is filled in to be finished.
+                    return {
+                        ...d,
+                        address: last,
+                        saved: addressLeft(last) === null ? "shown" : "typing",
+                    };
+                });
+            });
+        return () => {
+            live = false;
+        };
+    }, [askSaved, onDraft]);
+
     if (items.length === 0) {
         return (
             <SheetFrame title="Your bag" onClose={onClose}>
@@ -365,7 +382,8 @@ export function BagSheet({
     const applied =
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
-    const addressOk = !needsAddress(way) || addressReady(address);
+    const addressNote = needsAddress(way) ? addressLeft(address) : null;
+    const addressOk = addressNote === null;
     const pays = paysOf(quote);
     const pay = payChosen(pays, draft.pay);
     const payNote = payWords(pay);
@@ -381,7 +399,13 @@ export function BagSheet({
     const freeNote = quote ? freeDeliveryNote(quote, way) : null;
     const held = busy
         ? null
-        : holdReason({ quote, way, addressOk, payable: pay !== null });
+        : holdReason({
+              quote,
+              way,
+              addressOk,
+              addressNote,
+              payable: pay !== null,
+          });
     const pickup = way === "PICKUP" ? (quote?.pickup ?? null) : null;
 
     function place() {
@@ -703,10 +727,31 @@ export function BagSheet({
                             <legend className="text-site-muted mb-1 text-xs font-bold uppercase tracking-[0.08em]">
                                 Deliver to
                             </legend>
-                            <AddressFields
-                                address={address}
-                                onChange={setField}
-                            />
+                            {asksSaved ? (
+                                <p
+                                    role="status"
+                                    className="text-site-body text-sm"
+                                >
+                                    Looking for your last address…
+                                </p>
+                            ) : draft.saved === "shown" ? (
+                                <SavedAddress
+                                    address={address}
+                                    onDifferent={() =>
+                                        onDraft((d) => ({
+                                            ...d,
+                                            address: EMPTY_ADDRESS,
+                                            saved: "typing",
+                                        }))
+                                    }
+                                />
+                            ) : (
+                                <AddressFields
+                                    site={site}
+                                    address={address}
+                                    onChange={setField}
+                                />
+                            )}
                         </fieldset>
                     ) : null}
                 </div>
@@ -809,55 +854,4 @@ export function payWords(
             : "You'll pay when you collect your order. Your order is placed now.";
     }
     return "You pay online in a secure window. Your order is placed once the payment goes through.";
-}
-
-function AddressFields({
-    address,
-    onChange,
-}: {
-    address: DeliveryAddress;
-    onChange: (name: keyof DeliveryAddress) => (value: string) => void;
-}) {
-    const input = (
-        name: keyof DeliveryAddress,
-        label: string,
-        auto: string,
-        required = false,
-    ) => (
-        <label className="block text-[13.5px] font-medium">
-            {label}
-            {required ? <span aria-hidden="true"> *</span> : null}
-            <input
-                type={name === "phone" ? "tel" : "text"}
-                // The keyboard each needs: digits for a PIN code (six of
-                // them), the phone pad for a phone.
-                inputMode={
-                    name === "postalCode"
-                        ? "numeric"
-                        : name === "phone"
-                          ? "tel"
-                          : undefined
-                }
-                maxLength={name === "postalCode" ? 6 : undefined}
-                autoComplete={auto}
-                required={required}
-                value={address[name] ?? ""}
-                onChange={(e) => onChange(name)(e.target.value)}
-                className={field}
-            />
-        </label>
-    );
-    return (
-        <div className="grid gap-2.5">
-            {input("name", "Name", "name")}
-            {input("phone", "Phone", "tel")}
-            {input("line1", "Address", "address-line1", true)}
-            {input("line2", "Flat, floor or landmark", "address-line2")}
-            <div className="grid grid-cols-2 gap-2.5">
-                {input("city", "Town or city", "address-level2", true)}
-                {input("postalCode", "PIN code", "postal-code", true)}
-            </div>
-            {input("state", "State", "address-level1", true)}
-        </div>
-    );
 }
