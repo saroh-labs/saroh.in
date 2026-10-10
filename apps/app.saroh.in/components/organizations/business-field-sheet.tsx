@@ -5,7 +5,7 @@ import { Form } from "@saroh/ui/form";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { useEffect } from "react";
-import type { FieldErrors, Resolver } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 
 import type { FormValues } from "@/components/organizations/business-form";
@@ -16,7 +16,6 @@ import {
     NUMBER_FIELDS,
     onSheet,
     printOf,
-    rowTitleOf,
     settingsPatch,
     valuesOf,
 } from "@/components/organizations/business-form";
@@ -48,10 +47,17 @@ import { browserZone } from "@/lib/organizations/time-zones";
 
 /**
  * One row of Settings › Business, edited in its side sheet (owner, 10 Oct):
- * the row's fields over a draft of the whole business, so the rules that
- * span rows still hold. Save sends only what changed; a refusal keeps the
- * sheet open with what was typed, on its field when the field is here and
- * in a toast (naming its row) when it is another row's.
+ * the row's fields over a draft of the whole business, so a rule that
+ * spans rows is checked with everything it needs. Save sends only what
+ * changed; a refusal keeps the sheet open with what was typed, on its
+ * field when the API names one that is here and in a toast otherwise.
+ *
+ * Only the fields in the sheet can hold its Save: something amiss in
+ * another row (an address saved under older rules) is that row's to fix,
+ * and never stops a name or a phone being saved. What a sheet's own change
+ * needs from another row is asked for here instead: turning GST on, or
+ * giving a registered business its GSTIN, brings the registered address in
+ * when the saved one is short.
  *
  * The row gives each opening its own `key`, so the draft starts from what
  * is saved every time.
@@ -79,21 +85,33 @@ export function BusinessFieldSheet({
 }) {
     const saved = valuesOf(settings);
     const zoneSaved = Boolean(settings.profile?.timezone);
-    // An Indian address isn't whole without its state (UX-018): asked only
-    // by the address's own sheet, so a saved address without one never
-    // holds up another row's save. In the resolver, so the form's own
-    // checks keep it (a manual error would be cleared by the next one).
+    // A registered business needs its registered address. When the saved
+    // one is short, its fields join the sheet that registers it or sets
+    // its GSTIN, so one Save covers both.
+    const addressShort =
+        (sheet === "gst" || sheet === "taxId") &&
+        addressProblems({ ...saved, gstRegistered: true }).length > 0;
     const resolver: Resolver<FormValues> = async (values, context, options) => {
         const result = await zodResolver(formSchema)(values, context, options);
+        // An Indian address isn't whole without its state (UX-018): asked
+        // only by the address's own sheet. In the resolver, so the form's
+        // own checks keep it (a manual error would be cleared by the next).
         const noState = sheet === "address" ? stateProblem(values) : null;
-        if (!noState) return result;
-        return {
-            values: {},
-            errors: {
-                ...result.errors,
-                gstState: { type: "custom", message: noState },
-            },
+        const all = {
+            ...result.errors,
+            ...(noState
+                ? { gstState: { type: "custom", message: noState } }
+                : {}),
         };
+        // Only what is in this sheet holds its Save.
+        const mine = Object.fromEntries(
+            Object.entries(all).filter(([field]) =>
+                onSheet(sheet, field, addressShort && values.gstRegistered),
+            ),
+        );
+        return Object.keys(mine).length > 0
+            ? { values: {}, errors: mine }
+            : { values, errors: {} };
     };
     const form = useForm<FormValues>({ resolver, defaultValues: saved });
     const { isSubmitting, dirtyFields, isDirty, errors } = form.formState;
@@ -125,12 +143,7 @@ export function BusinessFieldSheet({
     // format saved under older rules does not hold up a GSTIN save (DEC-028).
     const numberProblem =
         sheet === "numbers" ? numberFormatProblemOnSave(v, dirtyFields) : null;
-    // Turning GST on needs a registered address. When the saved one is
-    // short, its fields join the sheet, so one Save covers both.
-    const withAddress =
-        sheet === "gst" &&
-        v.gstRegistered &&
-        addressProblems({ ...saved, gstRegistered: true }).length > 0;
+    const withAddress = addressShort && v.gstRegistered;
     const here = (field: string) => onSheet(sheet, field, withAddress);
 
     /**
@@ -145,16 +158,6 @@ export function BusinessFieldSheet({
             form.setValue(key, fields[key], { shouldDirty: false });
         }
     };
-
-    /** A refusal on another row's field is said, since it is not here. */
-    function onInvalid(problems: FieldErrors<FormValues>) {
-        const first = Object.entries(problems).find(([field]) => !here(field));
-        if (first) {
-            showError(
-                `${rowTitleOf(first[0])}: ${first[1].message ?? "needs attention"}`,
-            );
-        }
-    }
 
     async function onSubmit(values: FormValues) {
         // The number format's rules, said on its field before the API would.
@@ -204,7 +207,7 @@ export function BusinessFieldSheet({
                         onClose();
                         return;
                     }
-                    void form.handleSubmit(onSubmit, onInvalid)(e);
+                    void form.handleSubmit(onSubmit)(e);
                 }}
             >
                 <div

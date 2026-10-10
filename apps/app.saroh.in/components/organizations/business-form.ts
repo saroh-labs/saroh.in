@@ -34,10 +34,10 @@ import type {
 
 /**
  * What Settings › Business's sheets hold and send: the one schema every
- * sheet checks its draft against (a rule that spans two rows, such as a
- * GST-registered business needing its registered address, holds whichever
- * sheet is open), the saved settings as a draft, and the patch a save
- * sends. Pure, so a sheet only draws fields.
+ * sheet checks its draft against (so a rule that spans two rows, such as a
+ * GST-registered business needing its registered address, is checked with
+ * both), which fields each sheet shows, the saved settings as a draft, and
+ * the patch a save sends. Pure, so a sheet only draws fields.
  */
 
 /** Allow an empty string (field left blank / cleared) or a valid value. */
@@ -148,9 +148,9 @@ export const NUMBER_FIELDS = [
 const ADDRESS_FIELDS = [...ADDRESS_KEYS, "gstState", "country"] as const;
 
 /**
- * The fields each sheet shows, which is where a refusal can be said on its
- * field; one on a field of another row is said in a toast instead. How to
- * pay us, Hours and the logo keep forms of their own.
+ * The fields each sheet shows: the ones whose problems hold its Save, and
+ * where the API's refusal can be said on its field. How to pay us, Hours
+ * and the logo keep forms of their own.
  */
 const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
     kind: ["kind"],
@@ -169,8 +169,8 @@ const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
 };
 
 /**
- * Whether `field` is on `sheet`. `withAddress`: the registration's sheet
- * has taken the address fields in, because turning GST on needs them.
+ * Whether `field` is on `sheet`. `withAddress`: the sheet has taken the
+ * address fields in, because a registered business needs them.
  */
 export function onSheet(
     sheet: BusinessSheet,
@@ -178,24 +178,7 @@ export function onSheet(
     withAddress: boolean,
 ): boolean {
     if ((SHEET_FIELDS[sheet] ?? []).some((f) => f === field)) return true;
-    return (
-        sheet === "gst" &&
-        withAddress &&
-        ADDRESS_FIELDS.some((f) => f === field)
-    );
-}
-
-/** The row a field is edited from, named when its refusal is off screen. */
-export function rowTitleOf(field: string): string {
-    if (ADDRESS_FIELDS.some((f) => f === field)) return "Registered address";
-    if (field === "taxId" || field === "gstRegistered") return "GST";
-    if (["invoicePrefix", ...NUMBER_FIELDS].includes(field)) {
-        return "Invoice numbers";
-    }
-    if (field === "deliveryRate" || field === "deliverySac") {
-        return "GST on delivery";
-    }
-    return "Business details";
+    return withAddress && ADDRESS_FIELDS.some((f) => f === field);
 }
 
 /** The format a business numbers by: its own, else its standing's default. */

@@ -62,7 +62,7 @@ export function BusinessSheetFields({
     next: string;
     /** Why the number format is refused, from what is on screen. */
     numberProblem: string | null;
-    /** GST is being turned on and the saved address is short: ask for it. */
+    /** The business is registered and its saved address is short: ask for it. */
     withAddress: boolean;
     /** The GST switch moved: an untouched number format follows it. */
     onRegistered: (on: boolean) => void;

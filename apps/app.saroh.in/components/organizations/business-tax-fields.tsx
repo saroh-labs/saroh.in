@@ -55,7 +55,7 @@ export function BusinessTaxFields({
     next: string;
     /** Why the number format is refused, from what is on screen. */
     numberProblem: string | null;
-    /** GST is being turned on and the saved address is short: ask for it. */
+    /** The business is registered and its saved address is short: ask for it. */
     withAddress: boolean;
     /** The GST switch moved: an untouched number format follows it. */
     onRegistered: (on: boolean) => void;
@@ -111,6 +111,22 @@ export function BusinessTaxFields({
         />
     );
 
+    // A registered business needs a registered address, which is another
+    // tab's row. When the saved one is short its fields join the sheet
+    // that registers the business or sets its GSTIN, so one Save covers
+    // both and nobody is sent to another tab halfway.
+    const addressNeeded = withAddress ? (
+        <>
+            <p className="mt-2 basis-full border-t border-border pt-3 text-[13px] font-medium">
+                Registered address
+                <span className="ml-2 font-normal text-muted-foreground">
+                    A tax invoice prints it
+                </span>
+            </p>
+            {address}
+        </>
+    ) : null;
+
     switch (sheet) {
         case "gst":
             return (
@@ -145,24 +161,16 @@ export function BusinessTaxFields({
                         )}
                     />
                     {registered ? taxId : null}
-                    {/* Turning GST on needs a registered address, which is
-                        another tab's row. When the saved one is short its
-                        fields join this sheet, so one Save covers both. */}
-                    {withAddress ? (
-                        <>
-                            <p className="mt-2 basis-full border-t border-border pt-3 text-[13px] font-medium">
-                                Registered address
-                                <span className="ml-2 font-normal text-muted-foreground">
-                                    A tax invoice prints it
-                                </span>
-                            </p>
-                            {address}
-                        </>
-                    ) : null}
+                    {addressNeeded}
                 </>
             );
         case "taxId":
-            return taxId;
+            return (
+                <>
+                    {taxId}
+                    {addressNeeded}
+                </>
+            );
         case "numbers":
             return (
                 <>
