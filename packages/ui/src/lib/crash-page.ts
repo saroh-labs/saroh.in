@@ -207,13 +207,27 @@ type Fetch<Env, Ctx> = (
     ctx: Ctx,
 ) => Response | Promise<Response>;
 
-export interface WithCrashPageOptions extends CrashPageHtmlOptions {
+export interface WithCrashPageOptions<
+    Env = unknown,
+    Ctx = unknown,
+> extends CrashPageHtmlOptions {
     /** One line for Workers Logs; the visitor never sees the error. */
     log?: (detail: {
         event: "worker_crashed";
         path: string;
         error: string;
     }) => void;
+    /**
+     * Send the error to the error tracker (DEC-125). Handed the error and
+     * the request as they are: what leaves is the reporter's to scrub
+     * (`@saroh/error-tracking/server`). The crash page never waits for it:
+     * a promise it returns is given to `ctx.waitUntil`, and whatever it
+     * throws is dropped.
+     */
+    report?: (
+        error: unknown,
+        at: { request: Request; env: Env; ctx: Ctx },
+    ) => void | Promise<void>;
 }
 
 /**
@@ -228,7 +242,7 @@ export interface WithCrashPageOptions extends CrashPageHtmlOptions {
  */
 export function withCrashPage<Env, Ctx>(
     fetch: Fetch<Env, Ctx>,
-    options: WithCrashPageOptions,
+    options: WithCrashPageOptions<Env, Ctx>,
 ): (request: Request, env: Env, ctx: Ctx) => Promise<Response> {
     const html = crashPageHtml(options);
     return async (request, env, ctx) => {
@@ -246,6 +260,23 @@ export function withCrashPage<Env, Ctx>(
             };
             if (options.log) options.log(detail);
             else console.error(JSON.stringify(detail));
+            if (options.report) {
+                try {
+                    const sending = options.report(error, {
+                        request,
+                        env,
+                        ctx,
+                    });
+                    if (sending instanceof Promise) {
+                        const quiet = sending.catch(() => undefined);
+                        (
+                            ctx as { waitUntil?: (p: Promise<unknown>) => void }
+                        ).waitUntil?.(quiet);
+                    }
+                } catch {
+                    // The tracker failing is never the visitor's problem.
+                }
+            }
             return new Response(request.method === "HEAD" ? null : html, {
                 status: 500,
                 headers: {

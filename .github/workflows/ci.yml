@@ -188,6 +188,12 @@ jobs:
       - name: Site blocks gate
         run: pnpm run check:blocks
 
+      # Merchant sites never load a tracker of Saroh's: no PostHog SDK,
+      # address or public key under apps/saroh.app or packages/site-blocks
+      # (DEC-125). Their own server's errors are reported server-side only.
+      - name: No Saroh tracker on merchant sites
+        run: pnpm run check:merchant-site-tracking
+
       # Each migration folder has its own timestamp, so replay order is chosen.
       - name: Migration ids
         run: pnpm run check:migration-ids

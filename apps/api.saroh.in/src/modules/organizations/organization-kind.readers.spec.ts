@@ -39,6 +39,8 @@ const ALLOWED: Record<string, string> = {
         "the Turn on sheet's prefill follows it (K8)",
     "modules/sites/site-create.ts":
         "a new site starts from the kind's template (K15)",
+    "modules/analytics/product-milestones.ts":
+        "a milestone says what kind of business reached it (DEC-125); nothing is decided from it",
 };
 
 /**

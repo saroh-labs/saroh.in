@@ -39,6 +39,19 @@ export const env = createEnv({
         // A name kept from Vercel (DEC-107); the template renders refuse
         // `production` whatever their switch says.
         VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
+        /**
+         * PostHog (DEC-125), SERVER ONLY, and on purpose not `NEXT_PUBLIC_`:
+         * a merchant site's visitors are the merchant's customers, and
+         * nothing of PostHog's may reach their browsers. With a key, an
+         * error thrown while this server renders a page is reported with
+         * the site's host and the route's template, and nothing about the
+         * visitor. Unset, nothing is sent. `lib/error-tracking.ts`.
+         */
+        POSTHOG_KEY: z
+            .string()
+            .regex(/^phc_[A-Za-z0-9]+$/)
+            .optional(),
+        POSTHOG_HOST: z.string().url().optional(),
     },
     client: {
         NEXT_PUBLIC_API_URL: z.string().url().optional(),
@@ -57,6 +70,8 @@ export const env = createEnv({
         SITE_ACCOUNT_AREA: process.env.SITE_ACCOUNT_AREA,
         TEMPLATE_RENDERS: process.env.TEMPLATE_RENDERS,
         VERCEL_ENV: process.env.VERCEL_ENV,
+        POSTHOG_KEY: process.env.POSTHOG_KEY,
+        POSTHOG_HOST: process.env.POSTHOG_HOST,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

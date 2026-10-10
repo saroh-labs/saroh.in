@@ -122,4 +122,51 @@ describe("withCrashPage", () => {
         expect(res.status).toBe(500);
         expect(await res.text()).toBe("");
     });
+
+    it("hands the error to the tracker without waiting for it (DEC-125)", async () => {
+        const error = new Error("boom");
+        const waitUntil = vi.fn();
+        const env = { KEY: "k" };
+        const report = vi.fn(() => new Promise<void>(() => undefined));
+        const fetch = withCrashPage(
+            () => {
+                throw error;
+            },
+            { brand: "neutral", log: () => undefined, report },
+        );
+        const request = new Request("https://rye.saroh.app/menu");
+
+        // Resolves although the report never does.
+        const res = await fetch(request, env, { waitUntil });
+
+        expect(res.status).toBe(500);
+        expect(report).toHaveBeenCalledWith(error, {
+            request,
+            env,
+            ctx: { waitUntil },
+        });
+        expect(waitUntil).toHaveBeenCalledOnce();
+    });
+
+    it("still draws the page when the tracker throws or rejects", async () => {
+        for (const report of [
+            () => {
+                throw new Error("tracker down");
+            },
+            () => Promise.reject(new Error("tracker down")),
+        ]) {
+            const fetch = withCrashPage(
+                () => {
+                    throw new Error("boom");
+                },
+                { brand: "saroh", log: () => undefined, report },
+            );
+            const res = await fetch(
+                new Request("https://app.saroh.in/"),
+                {},
+                ctx,
+            );
+            expect(res.status).toBe(500);
+        }
+    });
 });

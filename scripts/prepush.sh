@@ -824,6 +824,7 @@ bg_step deploy-env pnpm run check:deploy-env
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
+bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step words pnpm run check:words

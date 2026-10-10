@@ -17,11 +17,13 @@
     "portless": "admin.saroh",
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/error-tracking": "workspace:*",
         "@saroh/pricing-catalog": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "lucide-react": "catalog:",
         "next": "catalog:next16",
+        "posthog-js": "1.435.9",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "zod": "catalog:"

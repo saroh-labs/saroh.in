@@ -4,6 +4,7 @@ import type { Job } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 
+import { reportJobError } from "../../common/observability/report-error";
 import { env } from "../../env";
 import { JobHandlerRegistry } from "./job-handler.registry";
 import type { JobQueue } from "./job-queue.port";
@@ -103,12 +104,25 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
+            // Counted before the queue records the failure: a queue may
+            // update the row it handed out.
+            const attempt = job.attempts + 1;
             this.logger.warn(
                 `Job ${job.id} (${job.type}) failed attempt ` +
-                    `${job.attempts + 1}/${job.maxAttempts}: ${message}`,
+                    `${attempt}/${job.maxAttempts}: ${message}`,
             );
             if (!(await this.queue.fail(job.id, this.workerId, message))) {
                 this.lostLease(job, "failed");
+            } else if (attempt >= job.maxAttempts) {
+                // That was the last attempt: the job is FAILED for good.
+                // Logged at ERROR and sent to the error tracker (DEC-125)
+                // with its type and ids, never its payload.
+                reportJobError(err, {
+                    jobId: job.id,
+                    jobType: job.type,
+                    organizationId: job.organizationId,
+                    attempts: attempt,
+                });
             }
         }
     }
