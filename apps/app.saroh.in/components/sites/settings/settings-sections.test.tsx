@@ -31,6 +31,10 @@ vi.mock("@/lib/qr/actions", () => ({
     openQrPanel: vi.fn(),
     makeQrPanelCode: vi.fn(),
 }));
+// The business's own sheets open from Contact and social (DEC-125).
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));

@@ -6,7 +6,7 @@ import type { SiteDetail, SitePage } from "@/lib/sites/service";
 
 /**
  * The words and rules of a site's Settings tab (Website › Settings audit,
- * 9 Oct 2026): its six groups, the "Before you share your site" checklist,
+ * 9 Oct 2026): its seven groups, the "Before you share your site" checklist,
  * the values the live site actually uses when nothing is written, and the
  * one bar that says what waits for the next publish. Pure, so the editable
  * view and the read-only one say the same thing.
@@ -17,6 +17,7 @@ export const SETTINGS_GROUPS = [
     { id: "address", label: "Address" },
     { id: "search-and-sharing", label: "Search and sharing" },
     { id: "menu-and-footer", label: "Menu and footer" },
+    { id: "contact", label: "Contact and social" },
     { id: "shop", label: "Shop" },
     { id: "tracking", label: "Tracking" },
     { id: "advanced", label: "Advanced" },

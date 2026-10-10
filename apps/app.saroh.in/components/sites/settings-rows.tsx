@@ -4,7 +4,7 @@ import { Card, CardContent } from "@saroh/ui/card";
 /**
  * The site settings screen's building blocks (Website › Settings audit):
  *
- * - `Group` — one of the six groups, the content of its tab (its h2 is
+ * - `Group` — one of the seven groups, the content of its tab (its h2 is
  *   for a screen reader: the tab already says it on screen).
  * - `Section` — a titled card of rows inside a group (h3), shared with the
  *   rows that live in their own files (`sells-from-row.tsx`,
