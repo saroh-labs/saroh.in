@@ -453,7 +453,7 @@ describe("QrMaker — branded", () => {
             Array.from(host.querySelectorAll("a"))
                 .find((a) => a.textContent === "Add your logo")
                 ?.getAttribute("href"),
-        ).toBe("/settings/organization?section=identity");
+        ).toBe("/settings/organization?section=identity&edit=logo");
     });
 
     it("draws the logo, and puts it inside the downloaded file", async () => {

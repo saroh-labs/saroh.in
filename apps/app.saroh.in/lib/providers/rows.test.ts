@@ -484,7 +484,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
         expect(b.replyTo).toBeNull();
         expect(b.noReply).toMatch(/Add a contact email/);
         expect(CONTACT_EMAIL_HREF).toBe(
-            "/settings/organization?section=contact",
+            "/settings/organization?section=contact&edit=contactEmail",
         );
     });
 

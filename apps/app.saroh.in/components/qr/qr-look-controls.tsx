@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useState } from "react";
 
+import { businessEditHref } from "@/lib/organizations/business-rows";
 import { QR_INK } from "@/lib/qr/colours";
 import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
@@ -13,8 +14,8 @@ import { QR_LABELS } from "@/lib/qr/words";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 import type { QrStyleLock } from "./qr-style-lock";
 
-/** Where the business logo is set. */
-export const LOGO_HREF = "/settings/organization?section=identity";
+/** Where the business logo is set: Business → Identity, its sheet open. */
+export const LOGO_HREF = businessEditHref("logo");
 
 const CUSTOM = "__custom__";
 
