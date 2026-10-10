@@ -6,8 +6,8 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import {
     addressDraftOf,
     addressPatch,
@@ -38,7 +38,7 @@ const PROBLEM =
 
 /**
  * The frame every Edit sheet in The place shares: the settings rows' own
- * (`components/shared/settings-sheet-frame.tsx`, which says how it saves,
+ * (`components/shared/form-sheet.tsx`, which says how it saves,
  * closes and hands the keyboard back), named by the row it edits.
  */
 export function PlaceSheetFrame({
@@ -57,7 +57,7 @@ export function PlaceSheetFrame({
     children: ReactNode;
 }) {
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${PLACE_ROW_ID[sheet]}-panel`}
             returnFocusTo={placeEditId(sheet)}
             {...frame}

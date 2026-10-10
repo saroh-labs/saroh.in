@@ -1,11 +1,12 @@
 "use client";
 
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
 import { Archive } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { retireQrCode } from "@/lib/qr/actions";
 import type { QrScreen } from "@/lib/qr/screen";
@@ -87,17 +88,22 @@ export function QrShare({
         maker.current?.focus({ preventScroll: true });
     };
 
-    async function retire(code: QrCodeView) {
+    async function retire(code: QrCodeView): Promise<ConfirmResult> {
         const res = await retireQrCode(site.id, code.id);
         if (!res.ok) {
-            showError(
-                res.error.trim() || "We couldn't retire that code. Try again.",
-            );
-            return;
+            return {
+                ok: false,
+                error:
+                    res.error.trim() ||
+                    "We couldn't retire that code. Try again.",
+            };
         }
         if (changing?.id === code.id) setChanging(null);
         took(res.data);
-        showSuccess("Code retired", "A printed copy now opens your home page.");
+        showSuccess(
+            "Code retired.",
+            "A printed copy now opens your home page.",
+        );
     }
 
     return (
@@ -218,12 +224,9 @@ export function QrShare({
                         : ""
                 }
                 confirmLabel="Retire code"
-                cancelLabel="Keep it"
-                onConfirm={() => {
-                    const code = retiring;
-                    setRetiring(null);
-                    if (code) void retire(code);
-                }}
+                busyLabel="Retiring…"
+                keepLabel="Keep code"
+                onConfirm={() => (retiring ? retire(retiring) : undefined)}
             />
         </section>
     );

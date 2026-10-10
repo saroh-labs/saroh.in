@@ -51,6 +51,8 @@ import {
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
+import { useHold } from "@/components/shared/use-hold";
+
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
@@ -62,7 +64,6 @@ import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
 import { BookingsTopBar } from "./parts";
 import type { QuickLookActions } from "./quick-look-types";
-import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
@@ -162,7 +163,7 @@ export function CalendarScreen({
     serviceHours?: ServiceHours | null;
 }) {
     const router = useRouter();
-    const { hold, undo, pending } = useHeld();
+    const { hold, undo, pending } = useHold();
     const [overrides, setOverrides] = useState<Record<string, Override>>({});
     const [peek, setPeek] = useState<string | null>(null);
     const [gap, setGap] = useState<GapTarget | null>(null);

@@ -7,7 +7,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -30,6 +30,7 @@ import type { CrmResult } from "@/lib/api/http";
 export function DeleteMenu<T>({
     name,
     verb,
+    keep,
     title,
     description,
     onDelete,
@@ -41,6 +42,8 @@ export function DeleteMenu<T>({
     name: string;
     /** Verb plus noun, on the menu item and the button: "Delete lead". */
     verb: string;
+    /** The way out, saying what is kept: "Keep lead". */
+    keep: string;
     title: string;
     /** What goes, what stays, and "This cannot be undone." */
     description: string;
@@ -59,16 +62,17 @@ export function DeleteMenu<T>({
     const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
 
+    /** From the confirm, which waits and says a refusal itself. */
     async function commit() {
         setBusy(true);
         const res = await onDelete();
         if (!res.ok) {
             setBusy(false);
-            showError(res.error);
-            return;
+            return { ok: false, error: res.error };
         }
         showSuccess(done(res.data));
         router.push(then);
+        return { ok: true };
     }
 
     return (
@@ -111,11 +115,8 @@ export function DeleteMenu<T>({
                 title={title}
                 description={description}
                 confirmLabel={verb}
-                cancelLabel="Keep it"
-                onConfirm={() => {
-                    setAsking(false);
-                    void commit();
-                }}
+                keepLabel={keep}
+                onConfirm={commit}
             />
         </>
     );

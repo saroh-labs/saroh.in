@@ -5,9 +5,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { CatalogueView, CategoryRemoval } from "@/lib/products/settings";
 import {
@@ -19,7 +18,6 @@ import {
 } from "@/lib/products/settings-actions";
 
 import { CategoryMergeSheet } from "./category-merge-sheet";
-import { NameDialog } from "./name-dialog";
 import { bigBtn, rowBtn, TabIntro } from "./product-settings";
 
 const NAME_MAX = 40;
@@ -29,22 +27,15 @@ type Category = CatalogueView["categories"][number];
 
 /**
  * What each product is — one category per product. The list is read first:
- * New category and Rename open a one-field dialog, Merge a side sheet that
- * says what moves where, and Delete asks first. A change takes effect when
- * its button is pressed, and every one can be undone: a rename, a merge (its
- * products move and it goes), a delete (its products go to Uncategorized).
+ * New category and Rename open a one-field dialog, and Merge a side sheet
+ * that says what moves where. A change takes effect when its button is
+ * pressed, and every one can be undone: a rename, a merge (its products
+ * move and it goes), a delete (its products go to Uncategorized). So
+ * Delete asks nothing: it goes at once, with Undo for ten seconds.
  */
 export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { categories, uncategorizedCount, canWrite } = catalogue;
-    const [, start] = useTransition();
-    // The category Delete was pressed on. It stays while the confirm closes,
-    // so its words don't change on the way out.
-    const [deleting, setDeleting] = useState<Category | null>(null);
-    const [confirming, setConfirming] = useState(false);
-    // The Delete that was pressed: the confirm hands the keyboard back.
-    const deleteFrom = useRef<HTMLButtonElement | null>(null);
-
     const exists = (name: string, except?: string) =>
         name.trim().toLowerCase() === "uncategorized" ||
         categories.some(
@@ -53,19 +44,15 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 c.name.toLowerCase() === name.trim().toLowerCase(),
         );
 
-    /** An Undo, or a delete: the call, then the list as it now is. */
-    function run(work: () => Promise<void>) {
-        start(async () => {
-            await work();
-            router.refresh();
-        });
+    /** An Undo: the call, then the list as it now is. `showUndo` says how it went. */
+    async function undone(work: Promise<{ ok: boolean; error?: string }>) {
+        const res = await work;
+        router.refresh();
+        return res;
     }
 
     const undoRemoval = (removal: CategoryRemoval) =>
-        run(async () => {
-            const undo = await restoreCategory(removal);
-            if (!undo.ok) showError(undo.error);
-        });
+        undone(restoreCategory(removal));
 
     async function add(name: string) {
         const res = await addCategory(name);
@@ -74,12 +61,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             return false;
         }
         router.refresh();
-        showUndo(`${name} added.`, () =>
-            run(async () => {
-                const undo = await removeCategory(res.data.id);
-                if (!undo.ok) showError(undo.error);
-            }),
-        );
+        showUndo(`${name} added.`, () => undone(removeCategory(res.data.id)));
         return true;
     }
 
@@ -91,10 +73,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
         }
         router.refresh();
         showUndo(`${c.name} is now ${name}.`, () =>
-            run(async () => {
-                const undo = await renameCategory(c.id, c.name);
-                if (!undo.ok) showError(undo.error);
-            }),
+            undone(renameCategory(c.id, c.name)),
         );
         return true;
     }
@@ -110,12 +89,20 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
         return true;
     }
 
-    function remove(c: Category) {
-        run(async () => {
-            const res = await removeCategory(c.id);
-            if (!res.ok) return showError(res.error);
-            showUndo(`${c.name} deleted.`, () => undoRemoval(res.data));
-        });
+    /** Reversible, so it asks nothing: gone at once, with Undo. */
+    async function remove(c: Category) {
+        const res = await removeCategory(c.id);
+        if (!res.ok) return showError(res.error);
+        router.refresh();
+        showUndo(
+            `${c.name} deleted.`,
+            () => undoRemoval(res.data),
+            c.productCount
+                ? {
+                      description: `Its ${plural(c.productCount)} ${c.productCount === 1 ? "is" : "are"} now Uncategorized.`,
+                  }
+                : {},
+        );
     }
 
     const newCategory = canWrite ? (
@@ -209,7 +196,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                             : name.length > NAME_MAX
                                               ? `Keep it under ${NAME_MAX} characters.`
                                               : exists(name, c.id)
-                                                ? "That name is taken — use Merge to combine them."
+                                                ? "That name is taken. Use Merge to combine them."
                                                 : ""
                                     }
                                     onSubmit={(name) => rename(c, name)}
@@ -236,11 +223,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                     type="button"
                                     className={cn(rowBtn, "text-destructive")}
                                     aria-label={`Delete ${c.name}`}
-                                    onClick={(e) => {
-                                        deleteFrom.current = e.currentTarget;
-                                        setDeleting(c);
-                                        setConfirming(true);
-                                    }}
+                                    onClick={() => void remove(c)}
                                 >
                                     Delete
                                 </button>
@@ -263,23 +246,6 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                     </span>
                 </li>
             </ul>
-
-            {deleting ? (
-                <ConfirmDialog
-                    open={confirming}
-                    onOpenChange={setConfirming}
-                    title={`Delete ${deleting.name}?`}
-                    description={
-                        deleting.productCount
-                            ? `Its ${plural(deleting.productCount)} ${deleting.productCount === 1 ? "moves" : "move"} to Uncategorized. The products themselves are not touched. You can undo it.`
-                            : "No products use it. You can undo it."
-                    }
-                    confirmLabel="Delete category"
-                    cancelLabel="Keep it"
-                    returnFocusTo={deleteFrom}
-                    onConfirm={() => remove(deleting)}
-                />
-            ) : null}
         </section>
     );
 }

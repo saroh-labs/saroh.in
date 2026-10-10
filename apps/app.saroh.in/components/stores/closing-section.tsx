@@ -108,18 +108,15 @@ export function ClosingSection({
                     orders > 0
                         ? `Its ${kept} on the business's record, and the catalogue is untouched: it belongs to the business, not to this location.`
                         : "Nothing has been sold here, so there is nothing to keep."
-                } This can't be undone.`}
-                confirmLabel="Close permanently"
-                onConfirm={() => {
-                    startClosing(async () => {
-                        const res = await closeStorefront(store.id);
-                        if (!res.ok) {
-                            showError(res.error);
-                            return;
-                        }
-                        showSuccess(`${store.name} is closed`);
-                        router.replace(LOCATIONS_HREF);
-                    });
+                } This cannot be undone.`}
+                confirmLabel="Close location"
+                busyLabel="Closing…"
+                keepLabel="Keep location"
+                onConfirm={async () => {
+                    const res = await closeStorefront(store.id);
+                    if (!res.ok) return { ok: false, error: res.error };
+                    showSuccess("Location closed.");
+                    router.replace(LOCATIONS_HREF);
                 }}
             />
         </Section>

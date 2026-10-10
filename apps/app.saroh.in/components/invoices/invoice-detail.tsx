@@ -3,12 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
+import { Copy, Link2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId, useReducer, useState } from "react";
 
-import { reportFailure } from "@/components/billing/plan-refusal";
+import { refusedResult } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
@@ -27,7 +27,8 @@ import {
 } from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { QrButton } from "@/components/qr/qr-button";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog, sayRefusal } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { EmailNote } from "@/lib/communications/email-setup";
@@ -196,7 +197,8 @@ export function InvoiceDetail({
     const nextReminderAt = send?.nextReminderAt ?? null;
     const dialog = (d: Dialog) => (v: boolean) => setOpen(v ? d : null);
 
-    async function makeLink() {
+    /** The refusal comes back, for the confirm that asked or a toast. */
+    async function makeLink(): Promise<ConfirmResult> {
         setBusy(true);
         const res = await details.run(() =>
             newPayLink(invoice.id, invoice.updatedAt),
@@ -204,7 +206,7 @@ export function InvoiceDetail({
         setBusy(false);
         if (!res) return;
         // A plan without online payments: its notice and the way up.
-        if (!res.ok) return reportFailure(res);
+        if (!res.ok) return refusedResult(res);
         setViewUrl(null);
         redraw();
         showSuccess(
@@ -215,13 +217,13 @@ export function InvoiceDetail({
     }
 
     /** No pay link can be made (#833): a link to view it and how to pay. */
-    async function makeViewLink() {
+    async function makeViewLink(): Promise<ConfirmResult> {
         setBusy(true);
         // It replaces the pay link this tab made, which is forgotten.
         const res = await details.run(() => newViewLink(invoice.id));
         setBusy(false);
         if (!res) return;
-        if (!res.ok) return reportFailure(res);
+        if (!res.ok) return refusedResult(res);
         setViewUrl(res.data.url);
         showSuccess(
             (await copy(res.data.url))
@@ -248,13 +250,13 @@ export function InvoiceDetail({
         // The address of a link already out was shown once; a new one
         // retires it, so that is asked first.
         if (online?.payLinkActive) setOpen("newLink");
-        else void makeLink();
+        else void makeLink().then(sayRefusal);
     }
 
     function copyViewLink() {
         if (viewUrl) return copyShown();
         if (online?.payLinkActive) setOpen("newViewLink");
-        else void makeViewLink();
+        else void makeViewLink().then(sayRefusal);
     }
 
     const print = () => window.print();
@@ -545,16 +547,18 @@ export function InvoiceDetail({
                 open={open === "newLink"}
                 onOpenChange={dialog("newLink")}
                 who={invoice.who}
-                onConfirm={() => void makeLink()}
+                onConfirm={makeLink}
             />
             <ConfirmDialog
                 open={open === "newViewLink"}
                 onOpenChange={dialog("newViewLink")}
+                tone="neutral"
+                icon={Link2}
                 title="Make a new link?"
-                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one.`}
+                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one. This cannot be undone.`}
                 confirmLabel="Make a new link"
-                cancelLabel="Keep the old one"
-                onConfirm={() => void makeViewLink()}
+                keepLabel="Keep the old link"
+                onConfirm={makeViewLink}
             />
         </div>
     );

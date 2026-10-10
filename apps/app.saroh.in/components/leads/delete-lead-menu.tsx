@@ -18,6 +18,7 @@ export function DeleteLeadMenu({
         <DeleteMenu
             name={title}
             verb="Delete lead"
+            keep="Keep lead"
             title={`Delete “${title}”?`}
             description={`Its notes and follow-ups go with it. ${contactName ? `${contactName} stays in your contacts` : "The person stays in your contacts"}, and any form entry it came from stays on record. This cannot be undone.`}
             onDelete={() => deleteLead(leadId)}

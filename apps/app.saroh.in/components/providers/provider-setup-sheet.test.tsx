@@ -18,7 +18,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
-import { ProviderSetupDialog } from "./provider-setup-dialog";
+import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 const connectPaymentProvider = vi.fn();
 vi.mock("@/lib/providers/actions", () => ({
@@ -113,7 +113,7 @@ function open(
 ) {
     act(() => {
         root.render(
-            <ProviderSetupDialog
+            <ProviderSetupSheet
                 kind="payments"
                 label={provider === "RAZORPAY" ? "Razorpay" : "Cashfree"}
                 trigger="Connect"

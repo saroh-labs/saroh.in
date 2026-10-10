@@ -6,8 +6,8 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { OptionSelect } from "@/components/shared/option-select";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import type { NewOff } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
 import { previewOff } from "@/lib/staff/actions";
@@ -38,7 +38,7 @@ function fromPicker(date: Date): LocalDate {
  * Its button adds to the screen's draft and closes; nothing is written
  * until the page's "Save changes", and the sheet says so. A time that can't
  * be added keeps it open with what was chosen. It is drawn in the app's one
- * sheet frame (`components/shared/settings-sheet-frame.tsx`): Cancel,
+ * sheet frame (`components/shared/form-sheet.tsx`): Cancel,
  * Escape and the close button drop it, a press outside does nothing once
  * something is chosen, and the keyboard goes back to "Add time off". The
  * card gives each opening its own `key`, so a sheet starts fresh every time.
@@ -127,7 +127,7 @@ export function AddTimeOffSheet({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             returnFocusTo={ADD_TIME_OFF_ID}
             title="Add time off"
             description={`Days ${me.name} can't be booked, or days the business is closed. Bookings already made are kept.`}
@@ -260,6 +260,6 @@ export function AddTimeOffSheet({
             >
                 {note.text}
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

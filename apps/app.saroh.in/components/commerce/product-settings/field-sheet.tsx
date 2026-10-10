@@ -19,7 +19,7 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { chipBtn, PROBLEM } from "./product-settings";
 
 export const FIELD_TYPES: { type: FieldType; label: string }[] = [
@@ -155,7 +155,7 @@ export function FieldSheet({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -321,6 +321,6 @@ export function FieldSheet({
                     </p>
                 ) : null}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

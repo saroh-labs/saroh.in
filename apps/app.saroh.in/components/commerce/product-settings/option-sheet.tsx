@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
     addOption,
@@ -183,7 +183,7 @@ export function OptionSheet({
     }
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -330,7 +330,7 @@ export function OptionSheet({
                             : "Type a value and press Enter, or add them later.")}
                 </p>
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 

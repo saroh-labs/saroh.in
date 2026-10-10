@@ -3,7 +3,7 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 
 import { chipBtn } from "./product-settings";
@@ -42,7 +42,7 @@ export function CategoryMergeSheet({
         to === null ? null : (targets.find((t) => t.id === to)?.name ?? "");
 
     return (
-        <SettingsSheetFrame
+        <FormSheet
             trigger={trigger}
             open={open}
             onOpen={() => {
@@ -99,6 +99,6 @@ export function CategoryMergeSheet({
                     ? "Pick where its products should go."
                     : `The ${plural(category.productCount)} in ${category.name} move to ${into}, and ${category.name} goes away.`}
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

@@ -63,14 +63,13 @@ export function PhotosSheet({
         const previous = baseline.map((p) =>
             p.id && survivors.has(p.id) ? p : { ...p, id: undefined },
         );
-        showUndo("Photos and videos saved.", () => {
-            void replaceProductImages(product.id, photosInput(previous)).then(
-                (undo) => {
-                    if (!undo.ok)
-                        showError("Couldn't undo. The saved photos stay.");
-                    router.refresh();
-                },
+        showUndo("Photos and videos saved.", async () => {
+            const undo = await replaceProductImages(
+                product.id,
+                photosInput(previous),
             );
+            router.refresh();
+            return undo;
         });
     }
 
@@ -86,8 +85,7 @@ export function PhotosSheet({
             fullEditorHref={productEditHref(storeId, product.id, "photos")}
             dirty={dirty}
             saving={saving}
-            note={dirty ? undefined : "No changes yet"}
-            onSave={() => void save()}
+            onSave={save}
         >
             <PhotosField value={draft} onChange={setDraft} disabled={saving} />
         </QuickSheet>

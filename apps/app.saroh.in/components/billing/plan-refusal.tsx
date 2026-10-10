@@ -59,6 +59,27 @@ export function reportFailure(
     else showError(said);
 }
 
+/**
+ * The same failure, for a confirm or an overlay that stays open on a
+ * refusal: the reason to show inside it. A plan's refusal is its own
+ * notice, which takes over, so the confirm closes (`true`).
+ */
+export function refusedResult(
+    res: { error: string; plan?: PlanRefusal },
+    fallback?: string,
+): true | { ok: false; error: string } {
+    if (res.plan) {
+        showPlanRefusal(res.plan);
+        return true;
+    }
+    return {
+        ok: false,
+        error: res.error.trim()
+            ? res.error
+            : (fallback ?? "That didn't work. Try again."),
+    };
+}
+
 export function PlanRefusalHost() {
     const [refusal, setRefusal] = useState<PlanRefusal | null>(null);
     useEffect(() => {
@@ -76,11 +97,9 @@ export function PlanRefusalHost() {
                 if (!open) setRefusal(null);
             }}
         >
-            <DialogContent className="max-w-[440px]">
-                <DialogHeader className="text-left">
-                    <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        {refusal?.title}
-                    </DialogTitle>
+            <DialogContent size="md">
+                <DialogHeader>
+                    <DialogTitle>{refusal?.title}</DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
                         {refusal?.body}
                     </DialogDescription>
@@ -93,7 +112,7 @@ export function PlanRefusalHost() {
                         <div className="h-full w-full rounded-full bg-destructive" />
                     </div>
                 ) : null}
-                <DialogFooter className="gap-2 sm:space-x-0">
+                <DialogFooter>
                     <Button
                         type="button"
                         variant="outline"

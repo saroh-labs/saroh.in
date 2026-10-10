@@ -16,8 +16,31 @@ import { toast } from "sonner";
  * the console and the error tracker, and a user shown a stack fragment learns
  * nothing they can act on. Map failures to your own strings.
  */
-export function showSuccess(message: string, description?: string) {
-    toast.success(message, { description });
+export function showSuccess(
+    message: string,
+    description?: string,
+    action?: ToastAction,
+) {
+    toast.success(message, {
+        description,
+        ...(action
+            ? {
+                  // Long enough to read the line and reach the button.
+                  duration: UNDO_MS,
+                  action: { label: action.label, onClick: action.onClick },
+              }
+            : {}),
+    });
+}
+
+/**
+ * One button on a success toast: the way to the thing just made ("Open
+ * lead"), for a sheet or dialog that keeps the merchant where they were.
+ * Never the only way there.
+ */
+export interface ToastAction {
+    label: string;
+    onClick: () => void;
 }
 
 /**
@@ -32,27 +55,71 @@ export function showError(message: string, description?: string) {
     });
 }
 
+/** How long anything can be undone: ten seconds, everywhere. */
+export const UNDO_MS = 10_000;
+
+/** What an Undo said: nothing or `true` when done, else refused. */
+export type UndoResult = void | boolean | { ok: boolean; error?: string };
+
+export const UNDONE = "Undone.";
+export const NOT_UNDONE = "Couldn't undo. It stays as saved.";
+
 /**
  * Something reversible just happened, with the way back beside it. Undo is the
- * default for reversible actions; only the irreversible get a confirm. Eight
- * seconds rather than five, because it carries an action.
+ * default for reversible actions; only the irreversible get a confirm. Ten
+ * seconds, everywhere: no screen has a window of its own.
  *
- * `duration` is for a screen whose Undo window is a rule of its own — Order
- * Detail holds a kitchen step or a refund for ten seconds (ADR-008), and the
- * toast offering its Undo must last exactly that long, not the default.
+ * `undo` takes it back and says how that went; this says the rest, in one
+ * wording: "Undone." when it worked, "Couldn't undo. It stays as saved."
+ * when it was refused or threw (with the refusal's own sentence under it).
+ * So no caller words an Undo's outcome, and none fails silently. `quiet`
+ * is for a caller that draws the outcome on the page itself (a hold card
+ * with its own state).
  *
  * Returns the toast's id, for `dismissToast` when the window closes early.
  */
 export function showUndo(
     message: string,
-    onUndo: () => void,
-    options: { duration?: number; description?: string } = {},
+    undo: () => UndoResult | Promise<UndoResult>,
+    options: { duration?: number; description?: string; quiet?: boolean } = {},
 ): ToastId {
     return toast(message, {
         description: options.description,
-        duration: options.duration ?? 8000,
-        action: { label: "Undo", onClick: onUndo },
+        duration: options.duration ?? UNDO_MS,
+        action: {
+            label: "Undo",
+            onClick: () => {
+                void settleUndo(undo, options.quiet ?? false);
+            },
+        },
     });
+}
+
+/** Run an Undo and say how it went. Exported for a second Undo button. */
+export async function settleUndo(
+    undo: () => UndoResult | Promise<UndoResult>,
+    quiet = false,
+): Promise<boolean> {
+    let result: UndoResult;
+    try {
+        result = await undo();
+    } catch {
+        result = false;
+    }
+    const ok =
+        result === undefined ||
+        result === true ||
+        (typeof result === "object" && result.ok);
+    if (quiet) return ok;
+    if (ok) {
+        showSuccess(UNDONE);
+    } else {
+        showError(
+            NOT_UNDONE,
+            typeof result === "object" ? result.error : undefined,
+        );
+    }
+    return ok;
 }
 
 /**

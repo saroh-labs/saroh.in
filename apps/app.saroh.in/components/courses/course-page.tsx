@@ -4,14 +4,6 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { EmptyState } from "@saroh/ui/data-state";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -37,6 +29,10 @@ import type { CourseDetail, Enrollment } from "@/lib/courses/service";
 import { formatTimeRange } from "@/lib/format/datetime";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { invoiceMoney } from "@/lib/invoices/money";
+
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useHold } from "@/components/shared/use-hold";
 
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
@@ -234,7 +230,12 @@ function Sessions({
     const [adding, setAdding] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const refocus = useRef(false);
-    const count = course.sessions.length;
+    // A session removed here: gone from the list at once, and removed for
+    // real when its ten seconds are up (`useHold`).
+    const { hold } = useHold();
+    const [removed, setRemoved] = useState<readonly string[]>([]);
+    const sessions = course.sessions.filter((s) => !removed.includes(s.id));
+    const count = sessions.length;
     useEffect(() => {
         if (!refocus.current) return;
         refocus.current = false;
@@ -260,11 +261,34 @@ function Sessions({
             weekday: "long",
         }).format(new Date(iso));
 
-    async function remove(sessionId: string) {
-        const res = await removeSession(course.id, sessionId);
-        if (!res.ok) return showError(res.error);
-        showSuccess("Session removed");
-        router.refresh();
+    /**
+     * Removing a session cancels the bookings on it, and the API can't put
+     * those back. So it is held: gone at once with Undo, and removed when
+     * the ten seconds are up.
+     */
+    function remove(sessionId: string) {
+        const back = () =>
+            setRemoved((ids) => ids.filter((id) => id !== sessionId));
+        setRemoved((ids) => [...ids, sessionId]);
+        hold(
+            `session:${sessionId}`,
+            "Session removed.",
+            async () => {
+                const res = await removeSession(course.id, sessionId);
+                if (!res.ok) {
+                    showError("The session wasn't removed.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
+            course.enrolled > 0
+                ? {
+                      description:
+                          "Everyone booked on it is taken off when the ten seconds are up.",
+                  }
+                : {},
+        );
     }
 
     // One "Add session" button: in the empty line while there are none, by
@@ -272,13 +296,18 @@ function Sessions({
     // and takes the keyboard back when it closes, including when the first
     // session moves the button from one place to the other.
     const canAdd = canWrite && course.status !== "ARCHIVED";
-    const empty = course.sessions.length === 0;
+    const empty = sessions.length === 0;
     const addButton = (
         <Button
             ref={trigger}
             variant="outline"
             size={empty ? "default" : "sm"}
-            onClick={() => setAdding(true)}
+            onClick={() => {
+                // The first session moves the button to the heading: the
+                // keyboard follows it there.
+                refocus.current = empty;
+                setAdding(true);
+            }}
         >
             Add session
         </Button>
@@ -304,7 +333,7 @@ function Sessions({
                 />
             ) : (
                 <ol className="divide-y overflow-hidden rounded-[11px] border border-border bg-card">
-                    {course.sessions.map((s) => {
+                    {sessions.map((s) => {
                         const past = Date.parse(s.startAt) <= now;
                         return (
                             <li
@@ -353,7 +382,7 @@ function Sessions({
                                         size="sm"
                                         className="coarse:size-11"
                                         aria-label="Remove this session"
-                                        onClick={() => void remove(s.id)}
+                                        onClick={() => remove(s.id)}
                                     >
                                         <X className="size-4" aria-hidden />
                                     </Button>
@@ -373,12 +402,6 @@ function Sessions({
                     open={adding}
                     onOpenChange={setAdding}
                     course={course}
-                    onCloseAutoFocus={(e) => {
-                        e.preventDefault();
-                        trigger.current?.focus();
-                        // The first session moves the button to the heading.
-                        refocus.current = empty;
-                    }}
                 />
             ) : null}
         </section>
@@ -547,7 +570,6 @@ function CancelEnrolmentDialog({
     const router = useRouter();
     const voidId = useId();
     const [voidToo, setVoidToo] = useState(false);
-    const [busy, setBusy] = useState(false);
     const open =
         enrollment.invoice &&
         (enrollment.invoice.standing === "ISSUED" ||
@@ -556,69 +578,54 @@ function CancelEnrolmentDialog({
             : null;
     const n = enrollment.upcoming;
 
-    async function confirm() {
-        setBusy(true);
+    async function confirm(): Promise<ConfirmResult> {
         const res = await cancelEnrollment(
             course.id,
             enrollment.id,
             voidToo && open ? open.id : undefined,
         );
-        setBusy(false);
         if (!res.ok) {
-            showError(res.error);
             router.refresh();
-            return;
+            return { ok: false, error: res.error };
         }
         showSuccess(
-            `${enrollment.contact.name} is off the course${n > 0 ? ` — ${n} ${n === 1 ? "session" : "sessions"} cancelled` : ""}`,
+            "Enrolment cancelled.",
+            `${enrollment.contact.name} is off the course${n > 0 ? `, and ${n} ${n === 1 ? "session is" : "sessions are"} cancelled` : ""}.`,
         );
-        onClose();
         router.refresh();
     }
 
     return (
-        <Dialog open onOpenChange={(o) => (o ? null : onClose())}>
-            <DialogContent className="sm:max-w-[440px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Take {enrollment.contact.name} off {course.name}?
-                    </DialogTitle>
-                    <DialogDescription>
-                        {n > 0
-                            ? `Their ${n} ${n === 1 ? "session" : "sessions"} still to come ${n === 1 ? "is" : "are"} cancelled, which cannot be undone, and their seat frees at once. Sessions already run stay as they were.`
-                            : "Their seat frees at once. Sessions already run stay as they were."}
-                    </DialogDescription>
-                </DialogHeader>
-                {open ? (
-                    <div className="flex items-start gap-2.5 rounded-[10px] border border-border px-3.5 py-3">
-                        <Checkbox
-                            id={voidId}
-                            checked={voidToo}
-                            onCheckedChange={(v) => setVoidToo(v === true)}
-                            className="mt-0.5"
-                        />
-                        <Label
-                            htmlFor={voidId}
-                            className="text-[13px] font-normal leading-[1.5]"
-                        >
-                            Void their open invoice {open.number} too. Leave it
-                            if they owe for sessions they had.
-                        </Label>
-                    </div>
-                ) : null}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        Keep enrolment
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => void confirm()}
+        <ConfirmDialog
+            open
+            onOpenChange={(o) => (o ? null : onClose())}
+            title={`Take ${enrollment.contact.name} off ${course.name}?`}
+            description={
+                n > 0
+                    ? `Their ${n} ${n === 1 ? "session" : "sessions"} still to come ${n === 1 ? "is" : "are"} cancelled, and their seat frees at once. Sessions already run stay as they were. This cannot be undone.`
+                    : "Their seat frees at once. Sessions already run stay as they were. This cannot be undone."
+            }
+            confirmLabel="Cancel enrolment"
+            keepLabel="Keep enrolment"
+            onConfirm={confirm}
+        >
+            {open ? (
+                <div className="flex items-start gap-2.5 rounded-[10px] border border-border px-3.5 py-3">
+                    <Checkbox
+                        id={voidId}
+                        checked={voidToo}
+                        onCheckedChange={(v) => setVoidToo(v === true)}
+                        className="mt-0.5"
+                    />
+                    <Label
+                        htmlFor={voidId}
+                        className="text-[13px] font-normal leading-[1.5]"
                     >
-                        {busy ? "Cancelling…" : "Cancel enrolment"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                        Void their open invoice {open.number} too. Leave it if
+                        they owe for sessions they had.
+                    </Label>
+                </div>
+            ) : null}
+        </ConfirmDialog>
     );
 }

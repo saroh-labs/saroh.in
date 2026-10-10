@@ -285,14 +285,14 @@ test.describe("bookings calendar", () => {
         await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
         await page.keyboard.press("Escape");
 
-        // Past the hold (use-held.ts, HOLD_MS 8s), the booking is still
+        // Past the hold (use-hold.ts, ten seconds), the booking is still
         // booked and nothing was sent. Running the page's clock on fires
         // whatever timer is still held, at once.
         const sent: string[] = [];
         page.on("request", (r) => {
             if (r.method() !== "GET") sent.push(r.url());
         });
-        await page.clock.runFor(9_000);
+        await page.clock.runFor(11_000);
         expect(sent).toEqual([]);
         const after = (await diaries(page.request, from, to))
             .flatMap((d) => d.bookings)

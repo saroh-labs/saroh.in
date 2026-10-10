@@ -60,6 +60,7 @@ describe("stopTrackingConfirm", () => {
         expect(c.description).not.toMatch(/always available/);
         expect(c.description).toMatch(/unless you mark it sold out/);
         expect(c.confirmLabel).toBe("Stop tracking");
+        expect(c.keepLabel).toBe("Keep tracking");
     });
 });
 

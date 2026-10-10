@@ -18,12 +18,6 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
         "an order, from its page",
         "components/commerce/order-detail/cancel-panel.tsx",
         'variant="destructive"',
-        'dismiss="Keep order"',
-    ],
-    [
-        "an order, from the Orders list",
-        "components/commerce/orders/order-row-menu.tsx",
-        'confirmLabel="Cancel order"',
         'cancelLabel="Keep order"',
     ],
     [
@@ -71,10 +65,11 @@ describe("the way out of a confirm that cancels", () => {
         expect(src).toContain(keep);
     });
 
-    it("the three ways to cancel an order say the same thing", () => {
+    it("the ways to cancel an order that ask say the same thing", () => {
+        // From the Orders list a cancel asks nothing: it is held ten
+        // seconds with Undo.
         for (const file of [
             "components/commerce/order-detail/cancel-panel.tsx",
-            "components/commerce/orders/order-row-menu.tsx",
             "components/commerce/order-actions.tsx",
         ]) {
             const src = read(file);
@@ -104,7 +99,7 @@ describe("the way out of a confirm that cancels", () => {
             )) {
                 const block = m[0];
                 if (!/confirmLabel="Cancel\b/.test(block)) continue;
-                const keep = /cancelLabel="([^"]+)"/.exec(block)?.[1];
+                const keep = /keepLabel="([^"]+)"/.exec(block)?.[1];
                 if (!keep?.startsWith("Keep ")) {
                     wrong.push(
                         `${path.relative(APP, file)}: ${keep ?? "Cancel"}`,

@@ -370,7 +370,7 @@ export function NewBookingDialog({
                 // A stray press outside must not drop a booking half
                 // made: once someone or a time is chosen, only Close,
                 // Escape and the close button leave. As every sheet does
-                // (`components/shared/settings-sheet-frame.tsx`).
+                // (`components/shared/form-sheet.tsx`).
                 onInteractOutside={(e) => {
                     if (
                         saving ||
