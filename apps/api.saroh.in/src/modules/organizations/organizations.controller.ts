@@ -55,7 +55,7 @@ export class OrganizationsController {
         @CurrentUser() user: AuthUser,
         @Body() dto: OnboardOrganizationDto,
     ) {
-        return this.onboarding.onboard(user.id, dto);
+        return this.onboarding.onboard(user.id, dto, { email: user.email });
     }
 
     @Get()

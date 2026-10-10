@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { prisma, startOnFreePlan } from "@saroh/database";
 
+import { appBase } from "../../common/app-url";
+import { sendWelcomeEmail } from "../../common/email";
 import { ActivationEvents } from "../analytics/activation-events";
 import {
     AuditAction,
@@ -66,6 +68,11 @@ export class OrganizationOnboardingService {
     async onboard(
         userId: string,
         dto: OnboardOrganizationDto,
+        /**
+         * Who is setting it up, for the welcome email: the signed-in
+         * caller, never a value from the body. Absent, none is sent.
+         */
+        owner?: { email: string },
     ): Promise<OnboardedOrganization> {
         /*
          * The address the business reserves: the one the merchant chose, or
@@ -176,6 +183,27 @@ export class OrganizationOnboardingService {
         // as the audit write above: after the commit, and it swallows its own
         // errors so instrumentation can never undo a committed onboarding.
         await this.activation?.organizationCreated(onboarded.id);
+
+        // The welcome email (UX audit, 10 Oct): once, here, to whoever set
+        // the business up. Not awaited: a mail server's pause is not the
+        // setup screen's, and a welcome that didn't leave undoes nothing.
+        if (owner?.email) {
+            void sendWelcomeEmail(owner.email, {
+                businessName: dto.name,
+                goal: dto.goal ?? null,
+                openUrl: `${appBase()}/open/${onboarded.id}`,
+                address: onboarded.slug,
+            }).then(
+                (outcome) => {
+                    if (outcome === "failed") {
+                        this.logger.warn(
+                            `Welcome email for organization ${onboarded.id} did not send`,
+                        );
+                    }
+                },
+                () => undefined,
+            );
+        }
 
         return onboarded;
     }

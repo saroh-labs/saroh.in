@@ -6,6 +6,8 @@ import {
     codeSenderName,
     codeSubject,
 } from "../modules/site-accounts/sender-name";
+import type { WelcomeMail } from "./email-welcome";
+import { welcomeEmail } from "./email-welcome";
 import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
 
 const FROM =
@@ -168,6 +170,29 @@ function codeEmail(
   <p style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:8px;padding:16px 0">${otp}</p>
   <p style="color:#666;font-size:12px">This code expires in ${minutes} minutes. If you didn't request it, you can ignore this email.</p>
 </div>`;
+}
+
+/**
+ * "‹Business› is set up on Saroh" to whoever created it (`email-welcome.ts`
+ * has the words and the rules). Awaited and it says how it went, though the
+ * caller only logs: a welcome that didn't leave never undoes a business.
+ * With no SMTP the log names the subject and never the address.
+ */
+export async function sendWelcomeEmail(
+    to: string,
+    mail: WelcomeMail,
+): Promise<EmailOutcome> {
+    const { subject, html } = welcomeEmail(mail);
+    if (!transporter) {
+        console.info(`[Welcome] (no SMTP) not sent: ${subject}`);
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({ from: FROM, to, subject, html });
+        return "sent";
+    } catch {
+        return "failed";
+    }
 }
 
 export const SIGN_IN_CODE_SUBJECT = "Your Saroh sign-in code";
