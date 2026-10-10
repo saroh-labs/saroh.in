@@ -1,12 +1,8 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
-import { ShareCards, webImageUrl } from "@saroh/ui/share-cards";
-import { Textarea } from "@saroh/ui/textarea";
-import { ImageIcon } from "lucide-react";
+import { ShareCards } from "@saroh/ui/share-cards";
 import { useState } from "react";
 
-import { MediaPicker } from "@/components/sites/media-picker";
 import {
     Absent,
     Group,
@@ -19,25 +15,25 @@ import type { SiteDetail } from "@/lib/sites/service";
 import { ROW_ANCHORS, siteNameOf } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
-import { EditActions } from "./edit-actions";
+import { EditAction } from "./edit-actions";
+import type { SearchSharingSaved } from "./search-sharing-sheets";
+import {
+    DescriptionSheet,
+    ShareImageSheet,
+    TitleSheet,
+} from "./search-sharing-sheets";
+import { ShareImageThumb } from "./share-image-thumb";
 import type { SettingsSave } from "./use-settings-save";
-import { useShareImage } from "./use-share-image";
-
-/** Search engines truncate around here. Guidance, never enforcement. */
-const TITLE_GUIDE = 60;
-const DESCRIPTION_GUIDE = 155;
-
-/** "12 of about 60 characters", or the aim once past it. */
-function lengthLine(length: number, guide: number): string {
-    return length > guide
-        ? `Aim for ${guide} characters or fewer. Currently ${length}.`
-        : `${length} of about ${guide} characters.`;
-}
+import { shareImageOf } from "./use-share-image";
 
 /**
  * Search and sharing: the search title, the description and the share
  * image, then how the link looks where it is shared. All three are part of
  * the draft ("Next publish").
+ *
+ * Each row says what is saved and its Edit opens the row's sheet, where
+ * the length is counted and the link's card drawn as it is typed. A save
+ * shows in the row at once (`saved`), before the page reads again.
  *
  * Each row shows what the live site uses. The title falls back to the
  * site's name, as the renderer's `<title>` does, so it reads "Rye · your
@@ -55,24 +51,35 @@ export function SearchSharingGroup({
     live: boolean;
     state: SettingsSave;
 }) {
-    const [seoTitle, setSeoTitle] = useState(site.seoTitle ?? "");
-    const [seoDescription, setSeoDescription] = useState(
-        site.seoDescription ?? "",
-    );
-    const image = useShareImage(site);
-    const { editing, run } = state;
+    // What the rows say: the site's own, then each save as it lands.
+    const [saved, setSaved] = useState<SearchSharingSaved>({
+        seoTitle: site.seoTitle ?? "",
+        seoDescription: site.seoDescription ?? "",
+        image: shareImageOf(site),
+    });
+    const { editing, run, pending, close } = state;
     const name = siteNameOf(site);
 
     const save = (
-        row: "title" | "description" | "social",
         input: Parameters<typeof updateSiteSettings>[1],
         label: string,
+        next: Partial<SearchSharingSaved>,
     ) =>
         run(
-            row,
             () => updateSiteSettings(site.id, input),
             `${label} saved. Publish to make it public.`,
+            () => setSaved((s) => ({ ...s, ...next })),
         );
+
+    const { seoTitle, seoDescription, image } = saved;
+    const sheet = {
+        saved,
+        siteName: site.name,
+        domain: address?.host ?? null,
+        open: editing?.open ?? false,
+        pending,
+        onClose: close,
+    };
 
     return (
         <Group id="search-and-sharing" title="Search and sharing">
@@ -82,36 +89,14 @@ export function SearchSharingGroup({
                     label="Title"
                     draft
                     action={
-                        <EditActions
+                        <EditAction
                             row="title"
                             state={state}
-                            onSave={() =>
-                                save(
-                                    "title",
-                                    { seoTitle: seoTitle || null },
-                                    "Title",
-                                )
-                            }
-                            onCancel={() => setSeoTitle(site.seoTitle ?? "")}
+                            name="Edit title"
                         />
                     }
                 >
-                    {editing === "title" ? (
-                        <div className="space-y-1">
-                            <Input
-                                value={seoTitle}
-                                autoFocus
-                                placeholder={name}
-                                onChange={(e) => setSeoTitle(e.target.value)}
-                                aria-label="Search title"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {seoTitle
-                                    ? lengthLine(seoTitle.length, TITLE_GUIDE)
-                                    : `Left empty, your site's name is used: ${name}.`}
-                            </p>
-                        </div>
-                    ) : seoTitle ? (
+                    {seoTitle ? (
                         <span className="[overflow-wrap:anywhere]">
                             {seoTitle}
                         </span>
@@ -125,42 +110,19 @@ export function SearchSharingGroup({
                     label="Description"
                     draft
                     action={
-                        <EditActions
+                        <EditAction
                             row="description"
                             state={state}
-                            editLabel={seoDescription ? "Edit" : "Write"}
-                            onSave={() =>
-                                save(
-                                    "description",
-                                    { seoDescription: seoDescription || null },
-                                    "Description",
-                                )
-                            }
-                            onCancel={() =>
-                                setSeoDescription(site.seoDescription ?? "")
+                            label={seoDescription ? "Edit" : "Write"}
+                            name={
+                                seoDescription
+                                    ? "Edit description"
+                                    : "Write description"
                             }
                         />
                     }
                 >
-                    {editing === "description" ? (
-                        <div className="space-y-1">
-                            <Textarea
-                                value={seoDescription}
-                                rows={3}
-                                autoFocus
-                                onChange={(e) =>
-                                    setSeoDescription(e.target.value)
-                                }
-                                aria-label="Search description"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {lengthLine(
-                                    seoDescription.length,
-                                    DESCRIPTION_GUIDE,
-                                )}
-                            </p>
-                        </div>
-                    ) : seoDescription ? (
+                    {seoDescription ? (
                         <span className="[overflow-wrap:anywhere]">
                             {seoDescription}
                         </span>
@@ -174,70 +136,40 @@ export function SearchSharingGroup({
                     label="Share image"
                     draft
                     action={
-                        <EditActions
-                            row="social"
+                        <EditAction
+                            row="image"
                             state={state}
-                            editLabel={image.url ? "Replace" : "Add"}
-                            onSave={() =>
-                                save("social", image.input, "Share image")
+                            label={image.url ? "Replace" : "Add"}
+                            name={
+                                image.url
+                                    ? "Replace share image"
+                                    : "Add share image"
                             }
-                            onCancel={image.reset}
                         />
                     }
                 >
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-14 w-24 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted text-muted-foreground">
-                                {webImageUrl(image.url) ? (
-                                    // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL, not a project asset
-                                    <img
-                                        src={webImageUrl(image.url) ?? ""}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                    />
-                                ) : (
-                                    <ImageIcon
-                                        aria-hidden
-                                        className="h-4 w-4"
-                                    />
-                                )}
-                            </div>
-                            <div className="min-w-0 text-xs">
-                                {image.url ? (
-                                    <span className="break-all text-muted-foreground">
-                                        {image.url}
-                                    </span>
-                                ) : (
-                                    <>
-                                        <Absent>None</Absent>
-                                        <p className="text-muted-foreground">
-                                            1200×630 works everywhere.
-                                        </p>
-                                    </>
-                                )}
-                            </div>
+                    <div className="flex items-center gap-3">
+                        <ShareImageThumb url={image.url} />
+                        <div className="min-w-0 text-xs">
+                            {image.url ? (
+                                <span className="break-all text-muted-foreground">
+                                    {image.url}
+                                </span>
+                            ) : (
+                                <>
+                                    <Absent>None</Absent>
+                                    <p className="text-muted-foreground">
+                                        1200×630 works everywhere.
+                                    </p>
+                                </>
+                            )}
                         </div>
-                        {editing === "social" ? (
-                            <div className="grid gap-1.5">
-                                <MediaPicker
-                                    onPick={(img) => image.choose(img.src, img)}
-                                />
-                                <Input
-                                    value={image.url}
-                                    placeholder="or paste an image address"
-                                    onChange={(e) =>
-                                        image.choose(e.target.value)
-                                    }
-                                    aria-label="Share image address"
-                                />
-                            </div>
-                        ) : null}
                     </div>
                 </Row>
 
                 {/* What the link looks like when it is posted (#220), drawn
-                    from the rows above as they are typed. WhatsApp first;
-                    the other apps fold. */}
+                    from what the rows above have saved. WhatsApp first; the
+                    other apps fold. */}
                 <Row label="When shared">
                     <ShareCards
                         fold
@@ -254,6 +186,40 @@ export function SearchSharingGroup({
                     />
                 </Row>
             </Section>
+
+            {/* The open sheet, a fresh draft each time it opens. */}
+            {editing?.which === "title" ? (
+                <TitleSheet
+                    key={editing.opened}
+                    {...sheet}
+                    name={name}
+                    onSave={(next) =>
+                        save({ seoTitle: next || null }, "Title", {
+                            seoTitle: next,
+                        })
+                    }
+                />
+            ) : null}
+            {editing?.which === "description" ? (
+                <DescriptionSheet
+                    key={editing.opened}
+                    {...sheet}
+                    onSave={(next) =>
+                        save({ seoDescription: next || null }, "Description", {
+                            seoDescription: next,
+                        })
+                    }
+                />
+            ) : null}
+            {editing?.which === "image" ? (
+                <ShareImageSheet
+                    key={editing.opened}
+                    {...sheet}
+                    onSave={(input, next) =>
+                        save(input, "Share image", { image: next })
+                    }
+                />
+            ) : null}
         </Group>
     );
 }

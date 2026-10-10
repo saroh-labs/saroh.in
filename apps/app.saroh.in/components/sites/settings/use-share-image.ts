@@ -10,20 +10,29 @@ interface Facts {
     bytes: number | null;
 }
 
-const factsOf = (site: SiteDetail): Facts => ({
-    width: site.socialImageWidth,
-    height: site.socialImageHeight,
-    bytes: site.socialImageBytes,
+/** A share image as it is saved: its address, and what is known of it. */
+export interface ShareImage {
+    url: string;
+    facts: Facts;
+}
+
+export const shareImageOf = (site: SiteDetail): ShareImage => ({
+    url: site.socialImageUrl ?? "",
+    facts: {
+        width: site.socialImageWidth,
+        height: site.socialImageHeight,
+        bytes: site.socialImageBytes,
+    },
 });
 
 /**
- * The share image being chosen, with facts about it kept beside its
- * address (#220). A pick from the library brings them along; a pasted
+ * The share image being chosen in its sheet, starting from the one saved,
+ * with facts about it kept beside its address (#220). A pick from the library brings them along; a pasted
  * address is measured in the browser, and its size on disk stays unknown.
  */
-export function useShareImage(site: SiteDetail) {
-    const [url, setUrl] = useState(site.socialImageUrl ?? "");
-    const [facts, setFacts] = useState<Facts>(factsOf(site));
+export function useShareImage(saved: ShareImage) {
+    const [url, setUrl] = useState(saved.url);
+    const [facts, setFacts] = useState<Facts>(saved.facts);
     // The address whose measurement is still in flight, so a slow picture
     // that finishes after the merchant has moved on cannot stamp its size on
     // the next one. Touched only from event handlers, never during render.
@@ -60,12 +69,6 @@ export function useShareImage(site: SiteDetail) {
         img.src = src;
     }
 
-    function reset() {
-        setUrl(site.socialImageUrl ?? "");
-        measuring.current = null;
-        setFacts(factsOf(site));
-    }
-
     /** What Save sends: the image and its facts, or all four cleared. */
     const input = url
         ? {
@@ -81,5 +84,5 @@ export function useShareImage(site: SiteDetail) {
               socialImageBytes: null,
           };
 
-    return { url, facts, choose, reset, input };
+    return { url, facts, choose, input };
 }
