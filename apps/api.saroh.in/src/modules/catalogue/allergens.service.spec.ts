@@ -100,7 +100,7 @@ describe("Allergens (DB)", () => {
         const list = await allergens.views(orgId);
         const gluten = list.find((a) => a.name === "Gluten")?.id ?? "";
         await expect(allergens.remove(orgId, gluten)).rejects.toThrow(
-            "Gluten is on 1 product — take it off them first.",
+            "Gluten is on 1 product. Take it off them first.",
         );
         const soy = list.find((a) => a.name === "Soy")?.id ?? "";
         await expect(allergens.remove(orgId, soy)).resolves.toEqual({

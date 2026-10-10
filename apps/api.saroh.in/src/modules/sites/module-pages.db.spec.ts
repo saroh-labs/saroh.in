@@ -724,6 +724,8 @@ describe("module pages on the public site read (G15, real database)", () => {
         // `icon` is always there (DEC-124): null here, with no icon or logo.
         expect(Object.keys(view).sort()).toEqual([
             "icon",
+            // Where the site answers (its own domain, else its Saroh address).
+            "primaryHost",
             "publishedAt",
             "siteId",
             "snapshot",

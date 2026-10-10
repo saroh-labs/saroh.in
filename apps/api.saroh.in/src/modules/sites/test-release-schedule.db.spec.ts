@@ -581,7 +581,7 @@ describe("the site.go_live job (T10)", () => {
         expect(row.wentLiveAt).toBeNull();
         expect(row.lastGoLiveOutcome).toBe("NOT_LIVE");
         expect(row.lastGoLiveReason).toMatch(
-            /^The site was published at \d{1,2}:\d{2}[ap]m, after this was scheduled\. Go live now, or schedule it again\.$/,
+            /^The site was published at \d{1,2}:\d{2} [ap]m, after this was scheduled\. Go live now, or schedule it again\.$/,
         );
         // Cleared, so the merchant can schedule again.
         expect(row).toMatchObject({

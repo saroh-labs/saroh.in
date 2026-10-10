@@ -464,7 +464,7 @@ describe("Collections (DB)", () => {
         expect((refused as BadRequestException).getResponse()).toMatchObject({
             field: "productIds",
             message:
-                "A collection holds up to 500 products; this one has room for 1 more.",
+                "A collection holds up to 500 products. This one has room for 1 more.",
         });
         // One more fits; naming one it has already adds nothing.
         await collections.addProducts(orgId, made.id, [p499, many[0].id]);

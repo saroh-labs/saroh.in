@@ -214,7 +214,7 @@ describe("module turn-off impact (F13)", () => {
         );
         expect(bookings?.count).toBe(3);
         expect(bookings?.message).toBe(
-            "3 upcoming bookings stay booked; the booking page stops taking new ones.",
+            "3 upcoming bookings stay booked. The booking page stops taking new ones.",
         );
         expect(view.blockers).toEqual([]);
     });
