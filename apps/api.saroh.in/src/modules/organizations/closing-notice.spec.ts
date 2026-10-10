@@ -1,5 +1,9 @@
 jest.mock("@saroh/database", () => ({
-    prisma: { organization: { findUnique: jest.fn() } },
+    prisma: {
+        organization: { findUnique: jest.fn() },
+        merchantPaymentProvider: { findFirst: jest.fn() },
+        paymentIntent: { findFirst: jest.fn() },
+    },
 }));
 jest.mock("../payments/refunds-outstanding", () => ({
     refundsOutstanding: jest.fn(),
@@ -82,7 +86,14 @@ describe("visibleRefunds (#921)", () => {
 });
 
 describe("closingNotice (#921)", () => {
-    beforeEach(() => jest.clearAllMocks());
+    const provider = prisma.merchantPaymentProvider.findFirst as jest.Mock;
+    const paidOnline = prisma.paymentIntent.findFirst as jest.Mock;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        provider.mockResolvedValue({ id: "mpp_1" });
+        paidOnline.mockResolvedValue(null);
+    });
 
     it("says nothing for a business that isn't closing", async () => {
         (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
@@ -120,6 +131,30 @@ describe("closingNotice (#921)", () => {
         expect(view.closing?.memberships?.rows[0]).toMatchObject({
             href: "/billing/subscriptions/sub_1",
         });
+        // DEC-117: keys connected, so refunds still go online; and an
+        // owner is offered their data.
+        expect(view.closing).toMatchObject({
+            refundsOnline: true,
+            canDownloadData: true,
+        });
+    });
+
+    it("says online refunds are off once the keys are gone, only where customers paid online (DEC-117)", async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+            lifecycleStatus: "PENDING_DELETION",
+            deletionScheduledAt: SINCE,
+        });
+        provider.mockResolvedValue(null);
+        paidOnline.mockResolvedValue({ id: "pi_1" });
+        expect((await closingNotice(ctx("MEMBER"))).closing).toMatchObject({
+            refundsOnline: false,
+            canDownloadData: false,
+        });
+        // Nobody ever paid online: nothing to refund that way.
+        paidOnline.mockResolvedValue(null);
+        expect((await closingNotice(ctx("ADMIN"))).closing?.refundsOnline).toBe(
+            true,
+        );
     });
 
     it("gives a member, who sees no money, the date alone", async () => {
@@ -132,6 +167,8 @@ describe("closingNotice (#921)", () => {
             deletesOn: SINCE.toISOString(),
             refunds: null,
             memberships: null,
+            refundsOnline: true,
+            canDownloadData: false,
         });
         expect(refundsOutstanding).not.toHaveBeenCalled();
         expect(activeMemberships).not.toHaveBeenCalled();

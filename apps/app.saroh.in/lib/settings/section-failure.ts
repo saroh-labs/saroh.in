@@ -12,7 +12,8 @@ export type SettingsSection =
     | "providers"
     | "activity"
     | "billing"
-    | "profile";
+    | "profile"
+    | "data";
 
 export const SECTION_FAILURE: Record<
     SettingsSection,
@@ -52,5 +53,10 @@ export const SECTION_FAILURE: Record<
         heading: "Your profile",
         title: "Your profile could not be loaded",
         body: "Nothing has changed — this screen could not read your details or alerts. Try again in a moment.",
+    },
+    data: {
+        heading: "Your data",
+        title: "Your downloads could not be loaded",
+        body: "Nothing has changed — this screen could not read them. A download already being prepared carries on, and its link is still emailed to you.",
     },
 };

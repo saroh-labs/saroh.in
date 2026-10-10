@@ -13,6 +13,7 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { storeLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { authorize } from "../organizations/organization-policy";
@@ -62,7 +63,9 @@ export class StoresController {
         return this.storesService.getForUser(id, user.id);
     }
 
+    /** A setting: refused while the business is closing or suspended (DEC-117). */
     @Put(":id")
+    @UseGuards(BetterAuthGuard, storeLifecycleGuard("id"))
     update(
         @CurrentUser() user: AuthUser,
         @Param("id") id: string,

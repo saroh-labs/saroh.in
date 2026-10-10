@@ -9,6 +9,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -76,6 +77,7 @@ export class PaymentsController {
     }
 
     @Post("orders/:orderId/payment-intent")
+    @LifecycleWrite("wind-down")
     @HttpCode(201)
     createIntent(
         @OrgContext() ctx: OrganizationContext,
@@ -97,6 +99,7 @@ export class PaymentsController {
     }
 
     @Post("orders/:orderId/refund")
+    @LifecycleWrite("wind-down")
     @HttpCode(201)
     refund(
         @OrgContext() ctx: OrganizationContext,
@@ -121,6 +124,7 @@ export class PaymentsController {
      * refundable.
      */
     @Post("payment-attempts/:attemptId/refund")
+    @LifecycleWrite("wind-down")
     @HttpCode(201)
     refundMismatch(
         @OrgContext() ctx: OrganizationContext,
@@ -131,6 +135,7 @@ export class PaymentsController {
 
     /** Try again a refund whose provider answer was lost — it looks first (#508). */
     @Post("orders/:orderId/refunds/:refundId/retry")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     retryRefund(
         @OrgContext() ctx: OrganizationContext,

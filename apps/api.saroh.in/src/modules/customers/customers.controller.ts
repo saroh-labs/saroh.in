@@ -12,6 +12,7 @@ import {
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
@@ -25,7 +26,7 @@ import { CreateCustomerDto, UpdateCustomerDto } from "./dto";
  * `MODULE_ROLLOUT.md`). The service still asks `order:read` of every read.
  */
 @Controller("stores/:storeId/customers")
-@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@UseGuards(BetterAuthGuard, StoreLifecycleGuard, ModuleEnforcementGuard)
 export class CustomersController {
     constructor(private readonly customers: CustomersService) {}
 

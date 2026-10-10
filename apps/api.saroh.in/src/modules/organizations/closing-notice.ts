@@ -10,6 +10,11 @@ import { refundsOutstanding } from "../payments/refunds-outstanding";
 import { OrganizationLifecycleStatus } from "./organization-lifecycle.policy";
 import { allows } from "./organization-policy";
 
+/** The owner, by role key (as `sites/publish-approval.ts` reads it). */
+function isOwner(ctx: Pick<OrganizationContext, "role" | "roleKey">): boolean {
+    return (ctx.roleKey ?? ctx.role) === "OWNER";
+}
+
 /** A refund not yet back with its customer, as the workspace lists it. */
 export interface ClosingRefundRow {
     key: string;
@@ -59,7 +64,37 @@ export interface ClosingNoticeView {
             byProvider: { provider: string; active: number }[];
             rows: ClosingMembershipRow[];
         } | null;
+        /**
+         * Whether Saroh can still send a refund online (DEC-117): a payment
+         * provider is connected. `false` only when customers have paid
+         * online and no provider is connected now — Refund isn't offered,
+         * and the banner says to refund in the provider's dashboard and
+         * record it. Absent from an API before it.
+         */
+        refundsOnline: boolean;
+        /** The reader is an owner: the banner offers "Download your data". */
+        canDownloadData: boolean;
     };
+}
+
+/**
+ * False when customers have paid this business online and no provider is
+ * connected to send a refund through. A business nobody paid online has
+ * nothing to refund that way, so it reads true.
+ */
+export async function refundsOnlineFor(
+    organizationId: string,
+): Promise<boolean> {
+    const connected = await prisma.merchantPaymentProvider.findFirst({
+        where: { organizationId, status: "CONNECTED" },
+        select: { id: true },
+    });
+    if (connected) return true;
+    const paid = await prisma.paymentIntent.findFirst({
+        where: { organizationId, status: "SUCCEEDED" },
+        select: { id: true },
+    });
+    return !paid;
 }
 
 /** Build the notice for this reader. Reads only. */
@@ -81,11 +116,12 @@ export async function closingNotice(
     const readsInvoices = allows(ctx, "invoice:read");
     const readsMemberships = allows(ctx, "subscription:read");
 
-    const [owed, memberships] = await Promise.all([
+    const [owed, memberships, refundsOnline] = await Promise.all([
         readsOrders || readsInvoices
             ? refundsOutstanding(prisma, ctx.organizationId)
             : null,
         readsMemberships ? activeMemberships(prisma, ctx.organizationId) : null,
+        refundsOnlineFor(ctx.organizationId),
     ]);
 
     return {
@@ -103,6 +139,8 @@ export async function closingNotice(
                       })),
                   }
                 : null,
+            refundsOnline,
+            canDownloadData: isOwner(ctx),
         },
     };
 }

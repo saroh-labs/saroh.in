@@ -10,14 +10,14 @@
 Every provider sits behind a port, with adapters under the module's
 `providers/` directory and a fake for tests.
 
-| Port               | Where                     | For                                                             |
-| ------------------ | ------------------------- | --------------------------------------------------------------- |
-| `MerchantProvider` | `modules/payments`        | An Organization's own customer payments — Razorpay and Cashfree |
-| `BillingProvider`  | `modules/billing`         | Saroh charging the Organization                                 |
-| `WebhookProvider`  | `modules/webhooks`        | Signed inbound events                                           |
-| `CommsProvider`    | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel    |
-| `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter              |
-| `DomainHosting`    | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS      |
+| Port               | Where                     | For                                                                                                                                                    |
+| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MerchantProvider` | `modules/payments`        | An Organization's own customer payments — Razorpay and Cashfree                                                                                        |
+| `BillingProvider`  | `modules/billing`         | Saroh charging the Organization                                                                                                                        |
+| `WebhookProvider`  | `modules/webhooks`        | Signed inbound events                                                                                                                                  |
+| `CommsProvider`    | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel                                                                                           |
+| `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter; `putObject` and `readObject` for what the server writes and copies itself (a data export, DEC-117) |
+| `DomainHosting`    | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS                                                                                             |
 
 `DomainHosting` (#859) registers a domain's hostname as a custom hostname on
 the merchant-sites zone once its TXT check passes, and deletes it there

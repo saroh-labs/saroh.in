@@ -80,6 +80,19 @@ export interface HeadObjectResult {
     etag?: string;
 }
 
+/** Options for a server-side {@link ObjectStorage.putObject}. */
+export interface PutObjectOptions {
+    contentType: string;
+    /** Exact byte length of `body`; required for a stream. */
+    contentLength: number;
+}
+
+/**
+ * A body the server writes itself: bytes, or a Node readable stream (a file
+ * on disk) whose length is known.
+ */
+export type PutObjectBody = Uint8Array | NodeJS.ReadableStream;
+
 /**
  * The storage boundary every adapter implements. Adapters are constructed by a
  * factory that receives typed config from the app (no `process.env` reads
@@ -129,4 +142,23 @@ export interface ObjectStorage {
      * is let through rather than block local work (#478, #873).
      */
     readonly seesUploads: boolean;
+
+    /**
+     * Write an object the SERVER made (never a client upload, which goes
+     * through {@link createSignedUploadUrl}): a business's data export
+     * (DEC-117). The caller derives the key, tenant-scoped like every other
+     * (`org/<organizationId>/…`); this never accepts one from a request.
+     */
+    putObject(
+        key: string,
+        body: PutObjectBody,
+        opts: PutObjectOptions,
+    ): Promise<void>;
+
+    /**
+     * Read a whole object as a stream of chunks, without holding it in
+     * memory: the media files a data export copies into its zip. Resolves
+     * `null` when the key does not exist or has no bytes to read.
+     */
+    readObject(key: string): Promise<AsyncIterable<Uint8Array> | null>;
 }

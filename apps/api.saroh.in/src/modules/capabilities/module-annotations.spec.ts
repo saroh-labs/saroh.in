@@ -279,6 +279,10 @@ const NEVER: Record<string, string> = {
         "saroh.in's report-a-business form, not a tenant surface",
     "admin/admin-business-reports.controller.ts":
         "staff control plane (customers' reports), not a tenant surface",
+    // DEC-117: an owner takes the business's data whatever it has switched
+    // off, and while it is closing or suspended.
+    "data-export/data-export.controller.ts":
+        "the owner's download of the business's own data — no module holds it",
 };
 
 /** Controllers with a test of their own below, not a row above. */

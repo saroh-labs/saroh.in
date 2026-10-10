@@ -93,6 +93,11 @@ export const AuditAction = {
     // the publication. Metadata: how it went live (`source`), and the test
     // release when it was one. The target is the new publication.
     SitePublishOverride: "site.publish_approval.override",
+    // "Download your data" (DEC-117): an owner asked for the business's
+    // zip, and each time one made a link to download it. The target is the
+    // export; metadata is counts and sizes, never a link or a key.
+    DataExportRequested: "organization.data_export.requested",
+    DataExportDownloaded: "organization.data_export.downloaded",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

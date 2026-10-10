@@ -1,8 +1,10 @@
 import type { Prisma } from "@saroh/database";
+import { prisma } from "@saroh/database";
 
 import { keptByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
 import { pausedByPlan } from "../billing/paused-errors";
+import { activityOpen } from "../organizations/organization-lifecycle.policy";
 
 /**
  * What a move to a lower plan does to a site's checkout (#800,
@@ -11,6 +13,11 @@ import { pausedByPlan } from "../billing/paused-errors";
  * as no longer sold here. Everything goes on as before when nothing is
  * paused (`PLAN_ENFORCEMENT` off, off the catalogue, or under the limits).
  * Orders already placed are never touched.
+ *
+ * A business that isn't taking new activity — suspended, or closing
+ * (`PENDING_DELETION`, DEC-117) — reads exactly as a paused one: its
+ * site stays up and says it isn't taking orders or bookings right now,
+ * never why (`organization-lifecycle.policy.ts`).
  */
 export interface ShopPause {
     /** The products still on the site; spread into product reads. */
@@ -19,11 +26,28 @@ export interface ShopPause {
     takingOrders: boolean;
 }
 
+/**
+ * Whether the business takes new orders and bookings at all, for its
+ * lifecycle (DEC-117). A missing business is the caller's own 404.
+ */
+export async function takingNewActivity(
+    organizationId: string,
+): Promise<boolean> {
+    const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { lifecycleStatus: true },
+    });
+    return !organization || activityOpen(organization.lifecycleStatus);
+}
+
 export async function shopPause(
     organizationId: string,
     siteId: string,
     storeId: string | null,
 ): Promise<ShopPause> {
+    if (!(await takingNewActivity(organizationId))) {
+        return { kept: {}, takingOrders: false };
+    }
     const paused = await overLimit.pausedNow(organizationId);
     if (!paused) return { kept: {}, takingOrders: true };
     return {
@@ -47,11 +71,15 @@ export async function assertLocationTakingOrders(
     if (paused?.storeIds.has(storeId)) throw pausedByPlan("location");
 }
 
-/** Whether a website stopped taking bookings (#800): only a paused site. */
+/**
+ * Whether a website stopped taking bookings (#800): a paused site, or a
+ * business suspended or closing (DEC-117).
+ */
 export async function siteTakingBookings(
     organizationId: string,
     siteId: string,
 ): Promise<boolean> {
+    if (!(await takingNewActivity(organizationId))) return false;
     const paused = await overLimit.pausedNow(organizationId);
     return !paused?.siteIds.has(siteId);
 }

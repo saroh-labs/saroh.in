@@ -10,6 +10,8 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { notTakingOrders } from "../billing/paused-errors";
+import { takingNewActivity } from "../orders/checkout-paused";
 import { AccountAreaGuard } from "./account-area";
 import type {
     AccountBookingRow,
@@ -74,11 +76,12 @@ export class AccountBookingsTabController {
     @Post("bookings/:ref/move")
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
-    move(
+    async move(
         @CurrentCustomer() customer: CustomerContext,
         @Param("ref") ref: string,
         @Body() dto: AccountBookingTimeDto,
     ): Promise<AccountBookingRow> {
+        await assertTakingBookings(customer);
         return this.bookings.move(customer, ref, dto.startAt);
     }
 
@@ -106,11 +109,23 @@ export class AccountBookingsTabController {
     @Post("treatments/:orderRef/visits")
     @HttpCode(HttpStatus.CREATED)
     @Header("Cache-Control", "no-store")
-    bookVisit(
+    async bookVisit(
         @CurrentCustomer() customer: CustomerContext,
         @Param("orderRef") orderRef: string,
         @Body() dto: AccountBookingTimeDto,
     ): Promise<AccountTreatment> {
+        await assertTakingBookings(customer);
         return this.bookings.bookVisit(customer, orderRef, dto.startAt);
+    }
+}
+
+/**
+ * Moving a booking or booking a treatment's next visit takes a new time: a
+ * business suspended or closing takes none (DEC-117), and the customer
+ * hears what a paused site says, never why. Cancelling stays open.
+ */
+async function assertTakingBookings(customer: CustomerContext): Promise<void> {
+    if (!(await takingNewActivity(customer.organizationId))) {
+        throw notTakingOrders("bookings");
     }
 }

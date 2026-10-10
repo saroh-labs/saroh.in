@@ -303,8 +303,11 @@ export class PublicCheckoutService {
             if (scope.organizationId !== customer.organizationId) {
                 throw signedOut();
             }
-            await assertOrganizationOpen(scope.organizationId);
+            // Not taking orders — a paused site (#800), or a business
+            // suspended or closing (DEC-117) — answers in the paused words
+            // first; the lifecycle gate stays behind it.
             if (scope.takingOrders === false) throw notTakingOrders();
+            await assertOrganizationOpen(scope.organizationId);
             const ready = await checkoutReadiness(
                 prisma,
                 scope.organizationId,
