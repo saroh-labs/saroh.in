@@ -26,7 +26,10 @@ import { usePathname } from "next/navigation";
 import { useRef } from "react";
 
 import { mayAddWebsite } from "@/lib/business-limits";
+import type { PostCategory } from "@/lib/content/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
+
+import { PostCategoriesSheet } from "./post-categories-sheet";
 
 export interface WebsiteHeaderSite {
     id: string;
@@ -64,6 +67,7 @@ export function WebsiteHeader({
     pageCount,
     postCount,
     formEntries,
+    postCategories,
 }: {
     site: WebsiteHeaderSite;
     sites: WebsiteHeaderSite[];
@@ -87,6 +91,12 @@ export function WebsiteHeader({
      * in there, so it follows its own permission, not the site's.
      */
     formEntries?: number | null;
+    /**
+     * The site's post categories, for the Posts tab's "Categories" sheet:
+     * `null` when they could not be read (the sheet says so), `undefined`
+     * for someone who can't change them, who isn't offered the button.
+     */
+    postCategories?: PostCategory[] | null;
 }) {
     const pathname = usePathname();
     const base = `/sites/${site.id}`;
@@ -200,8 +210,10 @@ export function WebsiteHeader({
                         ) : null}
                         <TabActions
                             tab={active}
+                            siteId={site.id}
                             base={base}
                             canEdit={canEdit}
+                            postCategories={postCategories}
                         />
                     </>
                 }
@@ -338,20 +350,28 @@ export function StateBadge({
 /** The one thing each tab is for, in the header's action slot. */
 function TabActions({
     tab,
+    siteId,
     base,
     canEdit,
+    postCategories,
 }: {
     tab: TabId;
+    siteId: string;
     base: string;
     canEdit: boolean;
+    postCategories: PostCategory[] | null | undefined;
 }) {
     if (!canEdit) return null;
     if (tab === "posts") {
         return (
             <>
-                <Button variant="outline" asChild>
-                    <Link href={`${base}/posts/categories`}>Categories</Link>
-                </Button>
+                {/* Managed here, in a sheet over the posts they group. */}
+                {postCategories === undefined ? null : (
+                    <PostCategoriesSheet
+                        siteId={siteId}
+                        categories={postCategories}
+                    />
+                )}
                 <Button asChild>
                     <Link href={`${base}/posts/new`}>
                         <Plus className="mr-1.5 size-4" />
