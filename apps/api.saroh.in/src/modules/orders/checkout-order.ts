@@ -72,6 +72,12 @@ export async function createCheckoutOrder(
          * the order, counted with the counter's.
          */
         discount?: AppliedDiscount | null;
+        /**
+         * The QR code whose scan opened the page it was ordered from
+         * (`Order.sourceCode`), already resolved on the customer's own
+         * site (`sites/qr-source.ts`).
+         */
+        sourceCode?: string | null;
     },
 ): Promise<string> {
     const { lines, type, shippingCents, dto } = input;
@@ -261,6 +267,7 @@ export async function createCheckoutOrder(
                             checkoutKey: dto.key,
                             // The account's Orders find it by this (A7).
                             customerAccountId: account.accountId,
+                            sourceCode: input.sourceCode ?? null,
                             ...(address
                                 ? {
                                       deliveryName: address.name ?? null,

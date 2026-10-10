@@ -63,6 +63,13 @@ export interface BookInput {
      * its snapshot, its job payload or a log.
      */
     intakeNote?: string;
+    /**
+     * The tag the booking page's address carried when a QR code's scan
+     * opened it (`qr-<code>`), as the page sent it. Only ever read by
+     * `qrSourceFor`, which turns it into {@link ReserveBy.sourceCode} or
+     * nothing; never stored as it is.
+     */
+    sourceTag?: string;
 }
 
 /** The pack or the membership a class credit comes out of (A10). */
@@ -100,6 +107,12 @@ export interface ReserveBy {
      * its contact) can't hold the same session twice.
      */
     account?: SignedInBooker;
+    /**
+     * The QR code whose scan opened the page it was booked from
+     * (`Booking.sourceCode`), already resolved on the customer's own site
+     * (`sites/qr-source.ts`). Absent for every booking the team makes.
+     */
+    sourceCode?: string | null;
 }
 
 /** A signed-in customer booking for themselves (A9). */
@@ -538,6 +551,7 @@ export async function reserveInTx(
             intakeNote: intakeNoteOf(input.intakeNote),
             customerAccountId: by.account?.accountId ?? null,
             bookedOnline,
+            sourceCode: by.sourceCode ?? null,
             freeCancelUntil,
             ...(person
                 ? {

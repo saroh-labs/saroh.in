@@ -1,6 +1,7 @@
 import { prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
+import { realOrderWhere } from "../orders/open-orders";
 import type { QrPlace, QrStyle, QrTargetKind, QrTargetSite } from "./qr-target";
 import { QR_BRANDING_ROW, qrSourceCode, qrTargetLook } from "./qr-target";
 import { platformOrigin } from "./site-origin";
@@ -43,7 +44,12 @@ export interface QrCodeView {
     createdAt: string;
     updatedAt: string;
     scans: { total: number; last7Days: number };
-    /** Made from a page this code opened. */
+    /**
+     * Made from a page this code opened, while its address still carried
+     * the scan's tag (`qr-source.ts`). Bookings that stand (confirmed: not
+     * cancelled, not an unpaid hold), and real orders (never a checkout
+     * started and left unpaid).
+     */
     bookings: number;
     orders: number;
 }
@@ -164,14 +170,27 @@ export async function qrCodesView(
                 ? []
                 : prisma.booking.groupBy({
                       by: ["sourceCode"],
-                      where: { organizationId, sourceCode: { in: sources } },
+                      where: {
+                          organizationId,
+                          sourceCode: { in: sources },
+                          // Standing bookings, as Home counts them: a
+                          // cancelled one isn't coming, and an unpaid hold
+                          // isn't a booking yet.
+                          status: "CONFIRMED",
+                      },
                       _count: { _all: true },
                   }),
             none
                 ? []
                 : prisma.order.groupBy({
                       by: ["sourceCode"],
-                      where: { organizationId, sourceCode: { in: sources } },
+                      where: {
+                          organizationId,
+                          sourceCode: { in: sources },
+                          // Real orders only, as the Orders list counts
+                          // them: never a checkout started and left unpaid.
+                          ...realOrderWhere(),
+                      },
                       _count: { _all: true },
                   }),
             Promise.all(rows.map((r) => qrTargetLook(prisma, site, r))),

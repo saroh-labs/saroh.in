@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { useQrSource, withQrSource } from "../qr-source";
 import { ctaClasses } from "./cta";
 
 /**
@@ -158,6 +159,9 @@ export default function BookingSection({
      */
     slots?: Slot[];
 }) {
+    // On a page a QR code's scan opened, the link to the booking page
+    // carries the scan's tag on (`qr-source.ts`).
+    const source = useQrSource();
     const [slotsState, setSlotsState] = useState<SlotsState>(
         givenSlots ? { kind: "ready", slots: givenSlots } : { kind: "loading" },
     );
@@ -231,7 +235,10 @@ export default function BookingSection({
     const groups =
         slotsState.kind === "ready" ? groupByDay(slotsState.slots) : [];
     const bookUrl = bookHref
-        ? `${bookHref}?service=${encodeURIComponent(serviceId)}`
+        ? withQrSource(
+              `${bookHref}?service=${encodeURIComponent(serviceId)}`,
+              source,
+          )
         : undefined;
 
     return (

@@ -57,6 +57,7 @@ import { CUSTOMER_SESSION_HEADER } from "../site-accounts/customer-session.guard
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { signSiteRelay, SITE_RELAY_HEADER } from "../site-accounts/site-relay";
 import { siteRelaySecret } from "../site-accounts/site-secrets";
+import { QrCodesService } from "../sites/qr-codes.service";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -1700,5 +1701,125 @@ describe("free delivery over an amount at the site's checkout", () => {
         });
         expect(order.shipping.toString()).toBe("60");
         expect(order.discount.toString()).toBe("100");
+    });
+});
+
+describe("the QR code an order came from", () => {
+    /** A code of the shop's site, as the workspace would have made it. */
+    function qr(s: Shop, code: string, retired = false) {
+        return prisma.qrCode.create({
+            data: {
+                siteId: s.siteId,
+                organizationId: s.organizationId,
+                code,
+                targetKind: "SHOP",
+                place: "COUNTER",
+                color: "#1c1c1a",
+                retiredAt: retired ? new Date() : null,
+            },
+        });
+    }
+
+    const sourceOf = async (res: { body: Record<string, unknown> }) =>
+        (
+            await prisma.order.findUniqueOrThrow({
+                where: { id: res.body.orderId as string },
+            })
+        ).sourceCode;
+
+    const listed = async (s: Shop) =>
+        (
+            await new QrCodesService().list(
+                {
+                    organizationId: s.organizationId,
+                    userId: "u_owner",
+                    role: "OWNER",
+                },
+                s.siteId,
+            )
+        ).codes;
+
+    it("stores the code's row on a checkout started with its tag, and counts it once it is a real order", async () => {
+        const s = await shop();
+        const code = await qr(s, "h7c");
+        const { token } = await signIn(s.host);
+
+        const res = await start(s, token, { source: "qr-h7c" });
+
+        expect(res.status).toBe(201);
+        expect(JSON.stringify(res.body)).not.toContain(code.id);
+        expect(await sourceOf(res)).toBe(code.id);
+        // Started and not paid yet: a checkout, not an order.
+        expect(await listed(s)).toEqual([
+            expect.objectContaining({ id: code.id, orders: 0, bookings: 0 }),
+        ]);
+
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+        expect(await listed(s)).toEqual([
+            expect.objectContaining({ id: code.id, orders: 1 }),
+        ]);
+    });
+
+    it("places the order without a source for another business's code, even one with the same short id elsewhere", async () => {
+        const rye = await shop();
+        const other = await shop();
+        await qr(other, "k9d");
+        const otherShared = await qr(other, "h7c");
+        const ryeShared = await qr(rye, "h7c");
+
+        const first = await signIn(rye.host);
+        const theirs = await start(rye, first.token, { source: "qr-k9d" });
+        expect(theirs.status).toBe(201);
+        expect(await sourceOf(theirs)).toBeNull();
+
+        const second = await signIn(rye.host);
+        const shared = await start(rye, second.token, { source: "qr-h7c" });
+        expect(shared.status).toBe(201);
+        expect(await sourceOf(shared)).toBe(ryeShared.id);
+        expect(
+            await prisma.order.count({ where: { sourceCode: otherShared.id } }),
+        ).toBe(0);
+    });
+
+    it("places the order without a source for a tag that isn't one, and never refuses over it", async () => {
+        const s = await shop({ onHand: 50 });
+        const code = await qr(s, "h7c");
+        for (const source of [
+            "newsletter",
+            "qr-",
+            // The row's own id: the browser never names a row.
+            code.id,
+            7,
+            null,
+        ] as unknown[]) {
+            const { token } = await signIn(s.host);
+            const res = await start(s, token, { source });
+            expect([String(source), res.status]).toEqual([String(source), 201]);
+            expect(await sourceOf(res)).toBeNull();
+        }
+    });
+
+    it("still stores a retired code, and no source without a tag", async () => {
+        const s = await shop();
+        const code = await qr(s, "h7c", true);
+
+        const first = await signIn(s.host);
+        const tagged = await start(s, first.token, { source: "qr-h7c" });
+        expect(tagged.status).toBe(201);
+        expect(await sourceOf(tagged)).toBe(code.id);
+
+        const second = await signIn(s.host);
+        const plain = await start(s, second.token);
+        expect(plain.status).toBe(201);
+        expect(await sourceOf(plain)).toBeNull();
+    });
+
+    it("refuses a quote that carries a source: only a start names one", async () => {
+        const s = await shop();
+        const res = await quote(s, {
+            lines: [{ listingId: s.listingId, quantity: 1 }],
+            source: "qr-h7c",
+        });
+        expect(res.status).toBe(400);
     });
 });

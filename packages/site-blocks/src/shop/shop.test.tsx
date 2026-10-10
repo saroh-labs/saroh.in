@@ -1053,3 +1053,90 @@ describe("a discount code in the bag (DEC-104)", () => {
         );
     });
 });
+
+describe("the QR code an order came from", () => {
+    const PLACED: CheckoutStarted = {
+        ...STARTED,
+        payBy: "ON_HANDOVER",
+        payment: null,
+    };
+    const collect = {
+        signedIn: true,
+        quote: {
+            ok: true as const,
+            data: quoteOf({
+                payments: [
+                    {
+                        type: "ON_HANDOVER" as const,
+                        label: "Pay when you collect",
+                    },
+                ],
+            }),
+        },
+        start: { ok: true as const, data: PLACED },
+    };
+
+    afterEach(() => {
+        window.sessionStorage.clear();
+        window.history.replaceState({}, "", "/");
+    });
+
+    async function placeIt() {
+        await openTheBag();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Place order · / }),
+        );
+        await screen.findByRole("heading", { name: "Order placed" });
+    }
+
+    it("sends the tag the page loaded with when a checkout starts", async () => {
+        window.history.replaceState({}, "", "/shop/sourdough?src=qr-h7c");
+        const { start } = setup(collect);
+        await placeIt();
+        expect(start.mock.calls[0][0]).toMatchObject({
+            fulfilment: "PICKUP",
+            source: "qr-h7c",
+        });
+    });
+
+    it("keeps it while the visitor moves around the shop without a reload", async () => {
+        window.history.replaceState({}, "", "/shop?src=qr-h7c");
+        const { start } = setup(collect);
+        // Another product, opened by a link inside the site: the same page
+        // load, on an address that no longer carries the tag.
+        window.history.pushState({}, "", "/shop/focaccia");
+        await placeIt();
+        expect(start.mock.calls[0][0].source).toBe("qr-h7c");
+    });
+
+    it("never puts the tag in the stored bag, a cookie or any storage", () => {
+        window.history.replaceState({}, "", "/shop?src=qr-h7c");
+        const { start } = setup(collect);
+        addToBag(SITE, { listingId: "l-rolls", variantId: null, quantity: 1 });
+        const kept = [
+            document.cookie,
+            JSON.stringify({ ...window.localStorage }),
+            JSON.stringify({ ...window.sessionStorage }),
+        ].join("\n");
+        expect(kept).toContain("l-rolls");
+        expect(kept).not.toContain("qr-");
+        expect(kept).not.toContain("h7c");
+        for (const item of readBag(SITE)) {
+            expect(Object.keys(item)).toEqual([
+                "listingId",
+                "variantId",
+                "quantity",
+            ]);
+        }
+        expect(start).not.toHaveBeenCalled();
+    });
+
+    it("sends no source on a page load that had no tag", async () => {
+        window.history.replaceState({}, "", "/shop");
+        const { start } = setup(collect);
+        // A tag that turns up on the address later is not this page load's.
+        window.history.pushState({}, "", "/shop?src=qr-h7c");
+        await placeIt();
+        expect(start.mock.calls[0][0]).not.toHaveProperty("source");
+    });
+});

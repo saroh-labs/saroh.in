@@ -169,6 +169,12 @@ export interface SignedInBookRequest {
      * the payment window.
      */
     bookerPhone?: string;
+    /**
+     * The tag this page's address carried when a QR code's scan opened it
+     * (`qr-<code>`, `qr-source.ts`). The API looks the code up on this site
+     * and ignores anything else; it never refuses a booking over it.
+     */
+    source?: string;
 }
 
 /** Book it, signed in: the site's server action that does. */

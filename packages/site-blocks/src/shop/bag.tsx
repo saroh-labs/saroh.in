@@ -11,6 +11,7 @@ import { SignInSheet } from "../account/sign-in-sheet";
 import type { OpenCheckout } from "../booking-flow/checkout";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { readQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { itemsText } from "../test-release/words";
@@ -101,6 +102,14 @@ export function ShopBag({
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
     const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
+    // The QR code whose scan opened this page load, when the address it
+    // loaded on carried the tag (`qr-source.ts`). The bag's sheet has no
+    // address of its own, so the tag is held here, in memory, for as long
+    // as the page stays loaded, and sent when a checkout starts. It is
+    // never put in the stored bag (`bag-store.ts`) or anywhere else that
+    // outlives the page. Never drawn, so the server's null and the
+    // browser's tag can differ.
+    const [source] = useState(readQrSource);
     // One left from an earlier page is asked about again. It is never
     // drawn, so the server's null and the browser's id can differ.
     const [pending, setPending] = useState<string | null>(() =>
@@ -178,7 +187,8 @@ export function ShopBag({
     async function start(request: StartCheckout, who: SignedInCustomer) {
         setBusy(true);
         setProblem(null);
-        const result = await api.start(request).catch(() => ({
+        const asked = source ? { ...request, source } : request;
+        const result = await api.start(asked).catch(() => ({
             ok: false as const,
             reason: "error" as const,
             message: SHOP_OFFLINE,

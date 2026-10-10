@@ -18,6 +18,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import { qrSourceFor } from "../sites/qr-source";
 import {
     commerceOpen,
     effectiveStorefront,
@@ -402,6 +403,13 @@ export class PublicCheckoutService {
                 });
             }
 
+            // The QR code whose scan opened the page, if its address
+            // still carried the tag: this site's own code or nothing, and
+            // never a reason to refuse the order.
+            const sourceCode = await qrSourceFor(
+                { siteId, organizationId: scope.organizationId },
+                dto.source,
+            );
             const orderId = await createCheckoutOrder(scope, account, {
                 lines,
                 type,
@@ -412,6 +420,7 @@ export class PublicCheckoutService {
                 dto,
                 payOnHandover: payBy === "ON_HANDOVER",
                 discount: applied,
+                sourceCode,
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)
