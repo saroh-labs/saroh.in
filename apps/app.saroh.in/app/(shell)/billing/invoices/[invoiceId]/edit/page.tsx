@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { PageContainer } from "@/components/shared/page-container";
+import { requireCan } from "@/lib/access/require-can";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { getInvoice } from "@/lib/invoices/service";
@@ -21,6 +22,17 @@ export default async function EditInvoicePage({
 }) {
     await requireSession();
     const { invoiceId } = await params;
+    // Asked before the form is drawn: `invoice:write` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("invoice:write", {
+        thing: "Edit invoice",
+        back: {
+            href: `/billing/invoices/${invoiceId}`,
+            label: "Back to the invoice",
+            needs: "invoice:read",
+        },
+    });
+    if (access.denied) return access.denied;
     const [invoice, contacts, settings, provider, organization] =
         await Promise.all([
             getInvoice(invoiceId),
