@@ -38,3 +38,17 @@ if (
         }
     };
 }
+
+/*
+ * jsdom lays nothing out, so it has no `scrollIntoView`. Putting the
+ * keyboard on the first field in error brings it into view too
+ * (`focusFirstError`), and here there is nowhere to scroll.
+ */
+if (
+    typeof Element !== "undefined" &&
+    typeof Element.prototype.scrollIntoView !== "function"
+) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+        return undefined;
+    };
+}

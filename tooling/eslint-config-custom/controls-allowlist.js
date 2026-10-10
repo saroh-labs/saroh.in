@@ -34,8 +34,6 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/day-by-person.tsx": ["button"],
     // button: a row or card that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
-    // label: a label that wraps its control
-    "components/bookings/new-booking-dialog.tsx": ["label"],
     // button: a choice in a list
     "components/bookings/reschedule-booking.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip
@@ -50,8 +48,6 @@ export const RAW_ALLOWED = {
     "components/calendar/week-hour-grid.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/class-packs/pack-detail/overview.tsx": ["button"],
-    // label: a label that wraps its control
-    "components/commerce/new-order/pay-step.tsx": ["label"],
     // button: a row or card that is one button
     "components/commerce/order-detail/stepper.tsx": ["button"],
     // button: a row or card that is one button
@@ -107,14 +103,6 @@ export const RAW_ALLOWED = {
     "components/qr/qr-add-logo.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip
     "components/qr/qr-target-picker.tsx": ["button"],
-    // label: a label that wraps its control
-    "components/services/service-editor/editor-sections.tsx": ["label"],
-    // label: a label that wraps its control
-    "components/services/service-editor/fields.tsx": ["label"],
-    // label: a label that wraps its control
-    "components/services/service-editor/more-settings.tsx": ["label"],
-    // label: a label that wraps its control
-    "components/services/service-editor/where-field.tsx": ["label"],
     // button: a row or card that is one button
     "components/settings/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself

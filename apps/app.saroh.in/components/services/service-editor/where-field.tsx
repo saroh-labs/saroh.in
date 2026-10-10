@@ -7,7 +7,8 @@ import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { LocationType } from "@/lib/services/service";
 import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
-import { FIELD, HELP, LABEL } from "./fields";
+import { Field } from "@saroh/ui/field";
+import { HELP } from "./fields";
 
 const WHERE: [LocationType, string][] = [
     ["IN_PERSON", "In person"],
@@ -25,12 +26,17 @@ export function WhereField({
     where,
     meetingUrl,
     onChange,
+    error,
+    onLeave,
 }: {
     where: LocationType;
     meetingUrl: string;
     onChange: (patch: { where?: LocationType; meetingUrl?: string }) => void;
+    /** What is wrong with the link, once it should be said. */
+    error?: string | null;
+    onLeave?: () => void;
 }) {
-    const ids = { label: useId(), link: useId(), linkHelp: useId() };
+    const ids = { label: useId() };
     return (
         <>
             <Eyebrow id={ids.label} className="mt-3">
@@ -53,30 +59,24 @@ export function WhereField({
             </div>
             <p className={HELP}>{whereNote(where)}</p>
             {needsMeetingLink(where) ? (
-                <div className="mt-3">
-                    <label htmlFor={ids.link} className={LABEL}>
-                        Link to join
-                    </label>
+                <Field
+                    label="Link to join"
+                    className="mt-3"
+                    error={error}
+                    onBlur={onLeave}
+                    hint="Everyone who books online gets this same link, on their confirmation and on the booking. For a paid session, set a passcode or a waiting room. A new link reaches bookings made after you save."
+                >
                     <Input
-                        id={ids.link}
                         type="url"
                         inputMode="url"
                         placeholder="https://meet.google.com/abc-defg-hij"
                         maxLength={500}
                         value={meetingUrl}
-                        aria-describedby={ids.linkHelp}
                         onChange={(e) =>
                             onChange({ meetingUrl: e.target.value })
                         }
-                        className={FIELD}
                     />
-                    <p id={ids.linkHelp} className={HELP}>
-                        Everyone who books online gets this same link, on their
-                        confirmation and on the booking. For a paid session, set
-                        a passcode or a waiting room. A new link reaches
-                        bookings made after you save.
-                    </p>
-                </div>
+                </Field>
             ) : null}
         </>
     );

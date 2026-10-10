@@ -142,14 +142,8 @@ export function PayStep({
                 </CheckRow>
             ) : null}
             {discounting ? (
-                <div className="mt-2.5">
-                    <label
-                        htmlFor={discountId}
-                        className="text-[12px] font-medium"
-                    >
-                        Discount
-                    </label>
-                    <div className="mt-[5px] flex gap-2">
+                <Field label="Discount" htmlFor={discountId} className="mt-2.5">
+                    <div className="flex gap-2">
                         <Input
                             id={discountId}
                             value={discount}
@@ -171,7 +165,7 @@ export function PayStep({
                             Remove
                         </Button>
                     </div>
-                </div>
+                </Field>
             ) : (
                 <Button
                     variant="link"

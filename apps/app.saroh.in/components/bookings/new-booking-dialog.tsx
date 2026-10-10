@@ -2,7 +2,6 @@
 
 import { formatDate, formatDateTime, formatTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -17,6 +16,7 @@ import {
     PayLinkPanel,
 } from "@/components/bookings/pay-link-panel";
 import { CustomerPicker } from "@/components/customers/customer-picker";
+import { CheckRow } from "@/components/shared/check-row";
 import { Chip } from "@/components/shared/chip";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import {
@@ -449,7 +449,7 @@ export function NewBookingDialog({
                                     className="grid max-h-[220px] gap-3 overflow-y-auto pr-1"
                                     value={picked}
                                     onChange={setPicked}
-                                    choices={(slots ?? []).map((slot) => ({
+                                    choices={slots.map((slot) => ({
                                         value: slot.startAt,
                                         label: formatTime(
                                             slot.startAt,
@@ -498,14 +498,12 @@ export function NewBookingDialog({
                                         : "border-border",
                                 )}
                             >
-                                <label className="flex cursor-pointer items-start gap-2.5">
-                                    <Checkbox
-                                        checked={usePack}
-                                        onCheckedChange={(c) =>
-                                            setUsePack(c === true)
-                                        }
-                                        className="mt-0.5"
-                                    />
+                                <CheckRow
+                                    checked={usePack}
+                                    onChange={setUsePack}
+                                    className="items-start gap-2.5"
+                                    boxClassName="mt-0.5"
+                                >
                                     <span className="grid gap-0.5">
                                         <span className="text-[13.5px] font-medium">
                                             Use their class pack
@@ -516,7 +514,7 @@ export function NewBookingDialog({
                                                 : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
                                         </span>
                                     </span>
-                                </label>
+                                </CheckRow>
                                 {usePack && usable.length > 1 ? (
                                     <OptionSelect
                                         id={ids.pack}

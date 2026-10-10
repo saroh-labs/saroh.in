@@ -149,7 +149,7 @@ export function QrMaker({
                                 >
                                     {primary === "make"
                                         ? "Make this code"
-                                        : "Save changes"}
+                                        : "Save"}
                                 </Button>
                             ) : null}
                             <Button

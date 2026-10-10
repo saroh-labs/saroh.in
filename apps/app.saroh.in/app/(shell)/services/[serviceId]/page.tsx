@@ -68,6 +68,7 @@ export default async function ServiceEditorPage({
             usage={usage?.[service.id] ?? null}
             currency={service.currency ?? currency}
             timezone={timezone}
+            openingHours={staff?.openingHours ?? null}
             canEdit={canEdit}
             hasPage={hasPage}
             hasStorefront={hasStorefront}

@@ -552,7 +552,7 @@ test.describe("availability and services", () => {
 
         // Time off is read first: the lines, then "Add time off", which
         // opens a sheet. Its button adds to the page's draft, not saved
-        // until the Save bar's "Save changes".
+        // until the Save bar's "Save".
         const timeOff = page.getByRole("region", { name: "Time off" });
         await expect(timeOff.getByRole("textbox")).toHaveCount(0);
         await timeOff.getByRole("button", { name: "Add time off" }).click();
@@ -568,7 +568,7 @@ test.describe("availability and services", () => {
         await page
             .getByRole("button", { name: "Copy Monday to weekdays" })
             .click();
-        const bar = page.getByRole("button", { name: "Save changes" });
+        const bar = page.getByRole("button", { name: "Save", exact: true });
         await expect(bar).toBeVisible();
         await page.getByRole("button", { name: "Discard" }).click();
         await expect(bar).toBeHidden();
@@ -602,13 +602,16 @@ test.describe("availability and services", () => {
                 await first.click();
             }
         }
+        // A field says what is wrong once it is left, and the button stays
+        // on: pressing it says the rest and goes to the first field.
         await page.getByLabel("Places").fill("1");
+        await page.getByLabel("Places").blur();
         await expect(page.getByRole("alert").first()).toHaveText(
             "A class needs at least 2 places.",
         );
         await expect(
             page.getByRole("button", { name: "Add service" }),
-        ).toBeDisabled();
+        ).toBeEnabled();
 
         // The app's one leave question, as every create and edit flow asks
         // it: Stay keeps what was typed, Leave goes where the link pointed.

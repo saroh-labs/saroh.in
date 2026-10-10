@@ -36,7 +36,7 @@ function fromPicker(date: Date): LocalDate {
  * and says so; they are kept.
  *
  * Its button adds to the screen's draft and closes; nothing is written
- * until the page's "Save changes", and the sheet says so. A time that can't
+ * until the page's "Save", and the sheet says so. A time that can't
  * be added keeps it open with what was chosen. It is drawn in the app's one
  * sheet frame (`components/shared/form-sheet.tsx`): Cancel,
  * Escape and the close button drop it, a press outside does nothing once
@@ -140,7 +140,7 @@ export function AddTimeOffSheet({
                 <p className="text-pretty text-[12.5px] text-muted-foreground">
                     Adding it here isn&apos;t saving it. It joins this
                     screen&apos;s changes, marked &ldquo;not saved yet&rdquo;,
-                    until you press Save changes.
+                    until you press Save.
                 </p>
             }
             onClose={onClose}

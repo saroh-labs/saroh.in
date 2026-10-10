@@ -119,7 +119,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 /**
  * Bookings › Availability (U16, the design's `?view=avail`): when each person
  * can be booked. Weekly hours, time off, one-off extra hours and the
- * business's booking rules are a draft until "Save changes"; saving writes
+ * business's booking rules are a draft until "Save"; saving writes
  * what changed, and Undo puts it all back. Hours never move a booking — the
  * ones left outside are listed and kept. The booking rules show with nobody
  * on the diary too (UX-022): a solo owner sets how people pay and cancel.
@@ -307,7 +307,7 @@ export function AvailabilityEditor({
         }
     }
 
-    // Hours, time off and rules wait for "Save changes": a way off the
+    // Hours, time off and rules wait for "Save": a way off the
     // page asks first.
     const guard = useLeaveGuard({
         dirty: canEdit && dirty && !saving,
@@ -334,7 +334,7 @@ export function AvailabilityEditor({
                 busy={saving}
                 busyLabel="Saving…"
             >
-                Save changes
+                Save
             </Button>
         </div>
     ) : null;

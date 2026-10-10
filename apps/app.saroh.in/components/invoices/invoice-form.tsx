@@ -31,6 +31,7 @@ import {
 } from "@/components/shared/use-leave-guard";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import {
     createInvoice,
     issueInvoice,
@@ -49,6 +50,7 @@ import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 import { copyText } from "@saroh/ui/copy-button";
 import { OptionSelect } from "@saroh/ui/option-select";
+import type { BaseSyntheticEvent } from "react";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -197,6 +199,7 @@ export function InvoiceForm({
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             contactId: draft?.contact?.id ?? initialContactId ?? "",
             due: draft?.dueAt ? "kept" : 14,
@@ -365,8 +368,13 @@ export function InvoiceForm({
         router.push(to);
     }
 
-    function onInvalid(errs: FieldErrors<FormValues>) {
+    function onInvalid(
+        errs: FieldErrors<FormValues>,
+        event?: BaseSyntheticEvent,
+    ) {
         if (errs.billToGstin || errs.billToState) setBuyerOpen(true);
+        // The buyer's fields open first, so the keyboard can land on one.
+        toFirstError(errs, event);
         if (errs.lines?.root?.message ?? errs.lines?.message) {
             showError(String(errs.lines.root?.message ?? errs.lines.message));
         }
