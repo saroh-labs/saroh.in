@@ -11,7 +11,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
-import { FilterChips } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/list-toolbar";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
@@ -130,7 +130,7 @@ export function HoldersTab({
     }
 
     const list = which === "live" ? rows.live : rows.done;
-    // Which of one list: its chip row, each count a quiet number.
+    // Which of one list: a dropdown, each count a quiet number.
     const segments = [
         { key: "live", label: "Can still use", count: rows.live.length },
         { key: "done", label: "Used up or expired", count: rows.done.length },
@@ -139,17 +139,18 @@ export function HoldersTab({
     return (
         <>
             {head}
-            <FilterChips
-                label="Who has it"
-                className="mt-2.5"
-                value={which}
-                onValueChange={setWhich}
-                chips={segments.map((s) => ({
-                    value: s.key,
-                    label: s.label,
-                    count: s.count,
-                }))}
-            />
+            <div className="mt-2.5">
+                <ListFilter
+                    label="Who has it"
+                    value={which}
+                    onValueChange={setWhich}
+                    options={segments.map((s) => ({
+                        value: s.key,
+                        label: s.label,
+                        count: s.count,
+                    }))}
+                />
+            </div>
             <div id={panelId}>
                 {list.length === 0 ? (
                     <EmptyState

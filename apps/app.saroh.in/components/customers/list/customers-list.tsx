@@ -17,6 +17,7 @@ import {
     pageText,
 } from "@/lib/customers/list";
 
+import { ListPaging } from "@/components/shared/list-toolbar";
 import { Filters } from "./filters";
 import { NoMatch, Rows } from "./rows";
 import { ListFirstRun, ListHeading, ListNote } from "./states";
@@ -113,7 +114,13 @@ export function CustomersList({
     return (
         <div>
             {heading}
-            <Filters query={query} page={page} go={go} searching={navigating} />
+            <Filters
+                query={query}
+                page={page}
+                go={go}
+                searching={navigating}
+                count={page.total > page.pageSize ? pageText(page) : null}
+            />
             {notice}
             <div aria-busy={navigating}>
                 <Rows
@@ -130,32 +137,19 @@ export function CustomersList({
                 />
             </div>
             {page.total > page.pageSize ? (
-                <nav
-                    aria-label="Pages"
-                    className="mt-3 flex items-center gap-2 text-[12.5px] text-muted-foreground"
-                >
-                    <span className="flex-1 tabular-nums">
-                        {pageText(page)}
-                    </span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page <= 1}
-                        onClick={() => go({ page: page.page - 1 })}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page >= pages}
-                        onClick={() => go({ page: page.page + 1 })}
-                    >
-                        Next
-                    </Button>
-                </nav>
+                <ListPaging
+                    label="Pages of customers"
+                    previous={
+                        page.page > 1
+                            ? { onClick: () => go({ page: page.page - 1 }) }
+                            : null
+                    }
+                    next={
+                        page.page < pages
+                            ? { onClick: () => go({ page: page.page + 1 }) }
+                            : null
+                    }
+                />
             ) : null}
             <ListNote />
         </div>

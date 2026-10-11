@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 
-import { FilterChips, ListToolbar } from "@/components/shared/list-toolbar";
+import {
+    AttentionToggle,
+    ListFilter,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
 
 import { productHref } from "@/lib/products/links";
 import { untrackedLine } from "@/lib/stock/screen";
@@ -20,9 +24,9 @@ import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
 
 /**
- * Levels (#527): the one list toolbar (search, then the chips All, Needs
- * you and a location), the table a page at a time, and the footer naming
- * what isn't tracked. The
+ * Levels (#527): the one list toolbar (search, the location dropdown and
+ * the Needs you toggle, in one row), the table a page at a time, and the
+ * footer naming what isn't tracked. The
  * chip and the search are in the address; the next page comes on "Show
  * more".
  */
@@ -85,19 +89,17 @@ export function LevelsPanel({
           )
         : loaded.rows;
 
-    const chips = [
-        { value: "all", label: "All" },
-        // The count follows the label as a quiet number; none is a fact.
-        { value: "needs", label: "Needs you", count: needsYou },
-        // A location chip only where there is more than one (ADR-010).
-        ...(allStorefronts.length > 1
-            ? allStorefronts.map((s) => ({
-                  value: s.id,
-                  label: s.name,
-                  holdsData: true,
-              }))
-            : []),
+    // Two ideas, so two controls: which location (a dropdown, as on the
+    // Log), and the one attention toggle, "Needs you". Both write `?show=`
+    // as they always have, so choosing one clears the other.
+    const locations = [
+        { value: "all", label: "All locations" },
+        ...allStorefronts.map((s) => ({ value: s.id, label: s.name })),
     ];
+    const show_ = (id: string) =>
+        router.push(href({ show: id === "all" ? undefined : id }), {
+            scroll: false,
+        });
 
     const soldOutWords = (ids: string[] | undefined) => {
         if (!ids?.length) return null;
@@ -142,23 +144,43 @@ export function LevelsPanel({
                 className="mb-3.5"
                 search={
                     <ListSearch
-                        placeholder="Search stock by product or SKU"
+                        placeholder="Search stock"
+                        describe="By product or SKU"
                         defaultValue={q}
                         searching={searching}
                         onSearch={search}
                     />
                 }
-                chips={
-                    <FilterChips
-                        label="Which products"
-                        value={show}
-                        onValueChange={(id) =>
-                            router.push(
-                                href({ show: id === "all" ? undefined : id }),
-                                { scroll: false },
-                            )
+                filters={
+                    // A location filter only where there is more than
+                    // one (ADR-010).
+                    allStorefronts.length > 1 ? (
+                        <ListFilter
+                            holdsData
+                            label="Location"
+                            value={storefrontView ? show : "all"}
+                            onValueChange={show_}
+                            options={locations}
+                        />
+                    ) : null
+                }
+                onClear={
+                    q || show !== "all"
+                        ? () =>
+                              router.push(
+                                  href({ q: undefined, show: undefined }),
+                                  { scroll: false },
+                              )
+                        : undefined
+                }
+                attention={
+                    <AttentionToggle
+                        label="Needs you"
+                        count={needsYou}
+                        on={show === "needs"}
+                        onToggle={() =>
+                            show_(show === "needs" ? "all" : "needs")
                         }
-                        chips={chips}
                     />
                 }
             />

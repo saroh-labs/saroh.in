@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { OrderStatusChips } from "@/components/commerce/orders/order-tabs";
+import { OrderStatusFilter } from "@/components/commerce/orders/order-tabs";
 import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { Chip, chipClass } from "@/components/shared/chip";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
@@ -142,24 +142,20 @@ describe("StatusBadge", () => {
 });
 
 describe("the call sites moved onto the shared pieces", () => {
-    it("a list's status filter: the chip row, never tabs, each count a quiet number", () => {
+    it("a list's status filter: one dropdown in the toolbar's row, never tabs or chips", () => {
         const out = html(
-            <OrderStatusChips
+            <OrderStatusFilter
                 query={readOrdersQuery({ tab: "open" })}
                 counts={{ all: 12, open: 3, refunded: 0 }}
                 go={() => undefined}
             />,
         );
-        expect(out).toMatch(/role="radiogroup"[^>]*aria-label="Order status"/);
-        expect(out).toMatch(
-            /aria-checked="true"[^>]*>Open <span data-chip-count=""[^>]*>3</,
-        );
-        // Zero is a fact, and is said.
-        expect(out).toMatch(/>Refunded <span data-chip-count=""[^>]*>0</);
-        expect(out).toContain("data-filter-chips");
-        // Not a tab strip, not a link, no badge, no joined dot.
+        expect(out).toMatch(/role="combobox"[^>]*aria-label="Order status"/);
+        expect(out).toContain("data-list-filter");
+        // The box says the chosen status and how many it holds.
+        expect(out).toMatch(/>Open <span data-value-count=""[^>]*>3</);
         expect(out).not.toMatch(
-            /data-tab-strip|role="tab|data-count-badge|aria-current| · /,
+            /data-tab-strip|role="tab|role="radio"|data-count-badge|aria-current| · /,
         );
         expect(out).not.toMatch(/--brand|highlight/);
     });

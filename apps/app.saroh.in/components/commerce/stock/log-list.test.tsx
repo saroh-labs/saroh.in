@@ -120,8 +120,7 @@ describe("LogList on a phone", () => {
     });
 
     it("scrolls no day sideways under 760px", () => {
-        // The log's card scrolls only at the desk. (The chip row above it
-        // is the one sideways scroller a phone has, inside ScrollX.)
+        // The log's card scrolls only at the desk.
         const card = /<div data-list-table=""[^>]*class="([^"]*)"/.exec(html);
         expect(card?.[1].split(" ")).toContain("min-[760px]:overflow-x-auto");
         expect(card?.[1].split(" ")).not.toContain("overflow-x-auto");
@@ -139,20 +138,20 @@ describe("LogList on a phone", () => {
         expect(html).toMatch(/class="whitespace-nowrap tabular-nums[^"]*">/);
     });
 
-    it("follows the one toolbar: dropdown filters, the count, then the kind as chips", () => {
+    it("follows the one toolbar: the kind, the location and the product as dropdowns in one row, then the count", () => {
         const at = (needle: string) => html.indexOf(needle);
-        expect(at('data-slot="list-filters"')).toBeGreaterThan(-1);
-        expect(at('data-slot="list-filters"')).toBeLessThan(
-            at('data-slot="list-end"'),
-        );
-        expect(at('data-slot="list-end"')).toBeLessThan(
-            at('data-slot="list-chips"'),
-        );
-        expect(html).toMatch(
-            /role="radiogroup"[^>]*aria-label="Kind of change"/,
-        );
-        expect(html).toContain('aria-label="Product"');
-        // No chip is a link or a tab any more.
-        expect(html).not.toMatch(/role="tab"/);
+        const order = [
+            'aria-label="Kind of change"',
+            'aria-label="Location"',
+            'aria-label="Product"',
+            'data-slot="list-count"',
+        ].map(at);
+        expect(order.every((i) => i >= 0)).toBe(true);
+        expect(order).toEqual([...order].sort((a, b) => a - b));
+        // The unnarrowed kind says what it filters.
+        expect(html).toMatch(/>All changes</);
+        expect(html).not.toContain(">Everything<");
+        // One row: no chips under it, no tabs.
+        expect(html).not.toMatch(/role="(?:tab|radio)"|data-slot="list-chips"/);
     });
 });

@@ -78,10 +78,9 @@ describe("the Packs tab", () => {
         expect(html).toContain("7 of 10");
         expect(html).toContain("Use by 20 Oct");
         expect(html).toContain("Bought 1 Sep · ₹3,000 · Cash");
-        // The chip's count follows its label: no dot joins them.
-        expect(html).toMatch(
-            /aria-checked="true"[^>]*>Can still use <span[^>]*>1<\/span>/,
-        );
+        // Which packs is a dropdown, open on the ones they can still use.
+        expect(html).toMatch(/role="combobox"[^>]*aria-label="Which packs"/);
+        expect(html).toContain(">Can still use<");
         expect(html).not.toContain("Can still use · 1");
         expect(html).toContain("Classes booked · 1");
         expect(html).toContain('aria-expanded="false"');
@@ -114,8 +113,9 @@ describe("the Packs tab", () => {
             }),
         ]);
         expect(html).toContain("Ran out 20 Sep with 2 unused");
+        // The box says the narrowed choice and how many it holds.
         expect(html).toMatch(
-            /aria-checked="true"[^>]*>Used up or expired <span[^>]*>1<\/span>/,
+            />Used up or expired <span data-value-count=""[^>]*>1</,
         );
     });
 });

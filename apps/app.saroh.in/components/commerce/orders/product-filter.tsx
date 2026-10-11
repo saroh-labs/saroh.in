@@ -23,7 +23,7 @@ import { findOrderProducts } from "@/lib/orders/list-actions";
  * than the design's plain menu, since a catalogue runs to hundreds of
  * products. It searches the business's products that are on its orders —
  * the API's, not the page's — a beat after typing stops, and the last
- * answer wins. "Any product" clears it.
+ * answer wins. "All products" clears it.
  */
 export function ProductFilter({
     value,
@@ -70,7 +70,7 @@ export function ProductFilter({
         if (productId !== value) onChange(productId);
     }
 
-    const label = value ? (name ?? "One product") : "Any product";
+    const label = value ? (name ?? "One product") : "All products";
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -80,7 +80,7 @@ export function ProductFilter({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    aria-label={`Product: ${value ? label : "any product"}. Change it.`}
+                    aria-label={`Product: ${value ? label : "all products"}. Change it.`}
                     className={cn(listPickerClass, className)}
                 >
                     <span className="min-w-0 truncate">{label}</span>
@@ -135,7 +135,7 @@ export function ProductFilter({
                                 onSelect={() => pick(null)}
                                 className="min-h-10 coarse:min-h-11"
                             >
-                                <span className="ml-6">Any product</span>
+                                <span className="ml-6">All products</span>
                             </CommandItem>
                         ) : null}
                         {(found ?? []).map((p) => (

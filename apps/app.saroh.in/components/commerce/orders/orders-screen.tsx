@@ -2,11 +2,14 @@
 
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
-import { ListToolbar } from "@/components/shared/list-toolbar";
+import {
+    ListPaging,
+    ListToolbar,
+    MoreFilters,
+} from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { useArrivals } from "@/components/shared/use-arrivals";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
@@ -16,6 +19,7 @@ import type {
     OrderFilterOptions,
     OrderListPage,
 } from "@/lib/orders/business-service";
+import { filtersActive, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import {
     nextPageHref,
@@ -31,13 +35,18 @@ import type { OrderPlace } from "@/lib/stores/abilities";
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
-import { OrderFilters, OrderToggles } from "./order-filters";
+import {
+    moreFiltersOn,
+    OrderAttention,
+    OrderDateFilter,
+    OrderMoreFilters,
+} from "./order-filters";
 import { OrderFiltersSheet } from "./order-filters-sheet";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
 import { SearchField } from "./order-search";
-import { OrderStatusChips } from "./order-tabs";
+import { OrderStatusFilter } from "./order-tabs";
 import {
     OrdersAttentionPartial,
     OrdersEmpty,
@@ -71,12 +80,15 @@ export function OrdersScreen({
     stores,
     openByStore,
     businessName,
+    notices,
     kitchen = false,
     filterOptions = null,
     share = null,
     can = NO_ABILITIES,
     newOrder = null,
 }: {
+    /** The page's notices, drawn under its header. */
+    notices?: React.ReactNode;
     query: OrdersQuery;
     /** The page on screen, read on the server. */
     page: OrderListPage;
@@ -193,6 +205,13 @@ export function OrdersScreen({
         !!page.nextCursor,
     );
     const firstStore = stores.length === 1 ? stores[0] : undefined;
+    // Anything narrowed, a search with words in it included: the toolbar
+    // then offers the way back to every order.
+    const narrowed =
+        filtersActive(query) ||
+        query.q.trim() !== "" ||
+        query.tab !== "all" ||
+        query.storefront !== null;
     // Needs attention couldn't be read for this page (B15): the API sends
     // null rather than an empty list, and the page says so.
     const attentionUnread = rows.some((r) => r.attention === null);
@@ -249,21 +268,29 @@ export function OrdersScreen({
                 }
             />
 
-            {/* The one list toolbar: search, then the dropdown filters
-                (behind one Filters button on a phone, B5), the range on
-                the right, and the status chips under it. */}
+            {/* A notice about the page sits under its header, never above
+                the title. */}
+            {notices}
+
+            {/* The one list toolbar, in one row: search, the three most
+                used filters, one Filters button for the rest, the one
+                attention toggle, Clear filters, and the range. */}
             <ListToolbar
                 search={
                     <SearchField query={query} go={go} searching={navigating} />
                 }
+                // The three most used: the status, the date, the location.
                 filters={
                     <>
-                        <OrderFiltersSheet
+                        <OrderStatusFilter
                             query={query}
-                            options={filterOptions}
+                            counts={page.counts}
                             go={go}
-                            className="min-[760px]:hidden"
                         />
+                        {/* The desk's; a phone has the date in the sheet. */}
+                        <div className="max-[759px]:hidden min-[760px]:contents">
+                            <OrderDateFilter query={query} go={go} />
+                        </div>
                         {many ? (
                             <StorefrontFilter
                                 stores={stores}
@@ -285,26 +312,56 @@ export function OrdersScreen({
                                 note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
                             />
                         ) : null}
-                        {/* The desk: the filter menus, on the page. */}
-                        <div className="min-w-0 max-w-full max-[759px]:hidden">
-                            <OrderFilters
-                                query={query}
-                                options={filterOptions}
-                                go={go}
-                            />
-                        </div>
                     </>
                 }
-                count={range ? `Showing ${range}` : null}
-                chips={
-                    <OrderStatusChips
-                        query={query}
-                        counts={page.counts}
-                        go={go}
-                    >
-                        <OrderToggles query={query} go={go} />
-                    </OrderStatusChips>
+                // Every other filter is behind one Filters button: a
+                // popover at the desk, the sheet on a phone.
+                more={
+                    <>
+                        <OrderFiltersSheet
+                            query={query}
+                            options={filterOptions}
+                            go={go}
+                            className="min-[760px]:hidden"
+                        />
+                        <MoreFilters
+                            title="Filter orders"
+                            count={moreFiltersOn(query)}
+                            className="max-[759px]:hidden"
+                        >
+                            <div
+                                role="group"
+                                aria-label="Filter orders"
+                                className="grid gap-2.5"
+                            >
+                                <OrderMoreFilters
+                                    query={query}
+                                    options={filterOptions}
+                                    go={go}
+                                />
+                            </div>
+                        </MoreFilters>
+                    </>
                 }
+                attention={
+                    <OrderAttention
+                        query={query}
+                        go={go}
+                        className="max-[759px]:hidden"
+                    />
+                }
+                onClear={
+                    narrowed
+                        ? () =>
+                              go({
+                                  ...NO_FILTERS,
+                                  q: "",
+                                  tab: "all",
+                                  storefront: null,
+                              })
+                        : undefined
+                }
+                count={range ? `Showing ${range}` : null}
             />
 
             {/* From Home's "Last 24 hours" (F6): the list is narrowed, and
@@ -438,34 +495,12 @@ export function OrdersScreen({
                 />
             ) : null}
 
-            {previous || next ? (
-                <nav
-                    aria-label="Pages of orders"
-                    className="flex flex-wrap items-center justify-end gap-2 pt-3.5"
-                >
-                    <PageLink href={previous} label="Previous" />
-                    <PageLink href={next} label="Next" />
-                </nav>
-            ) : null}
+            <ListPaging
+                label="Pages of orders"
+                previous={previous ? { href: previous } : null}
+                next={next ? { href: next } : null}
+            />
         </div>
-    );
-}
-
-/** Previous or Next: a link while there is a page there, else off. */
-function PageLink({ href, label }: { href: string | null; label: string }) {
-    if (!href) {
-        return (
-            <Button variant="outline" disabled>
-                {label}
-            </Button>
-        );
-    }
-    return (
-        <Button variant="outline" asChild>
-            <Link href={href} scroll={false}>
-                {label}
-            </Link>
-        </Button>
     );
 }
 

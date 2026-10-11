@@ -5,9 +5,8 @@ import { TextLink } from "@saroh/ui/text-link";
 /**
  * What the Invoices list is narrowed to by what each paper was for (D18):
  * every kind, then each source the business has (Orders, Bookings,
- * Subscriptions, Packs, Courses, By hand). It is a kind, not a status, so
- * it is one of the list toolbar's dropdown filters; the status is the chip
- * row under it.
+ * Subscriptions, Packs, Courses, By hand): one of the list toolbar's
+ * dropdown filters, beside the invoice's status.
  */
 export function SourceFilter({
     chips,
@@ -26,7 +25,7 @@ export function SourceFilter({
             onValueChange={onPick}
             options={chips.map((c) => ({
                 value: c.id,
-                label: c.id === "all" ? "For anything" : c.label,
+                label: c.id === "all" ? "All sources" : c.label,
             }))}
         />
     );

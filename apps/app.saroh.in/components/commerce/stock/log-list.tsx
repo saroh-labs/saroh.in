@@ -26,7 +26,6 @@ import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import {
-    FilterChips,
     ListFilter,
     listTable,
     ListTableHead,
@@ -52,8 +51,8 @@ const PHONE_ENTRY =
  * for one that reads orders; the API leaves them out otherwise.
  *
  * It follows the one list toolbar and the one table look: the location
- * and the product are dropdown filters, the kind of entry is the chip row,
- * and the days are groups inside one card under one head band.
+ * the product and the kind of change are dropdown filters in one row, and
+ * the days are groups inside one card under one head band.
  *
  * On a phone (under 760px, T3) each entry is two wrapping lines, by CSS
  * alone (no hydration flash, nothing rendered twice): the time, the product
@@ -92,14 +91,28 @@ export function LogList({
         });
     }
 
-    // The one list toolbar: which location and which product are its
-    // dropdown filters, how many entries are loaded is the count on the
-    // right, and the kind of entry is the chip row.
+    // The one list toolbar, in one row: the kind of change, the location
+    // and the product are its dropdown filters, and how many entries are
+    // loaded is the count on the right.
     const filters = (
         <ListToolbar
             className="mb-3.5"
             filters={
                 <>
+                    <ListFilter<LogKindId>
+                        label="Kind of change"
+                        value={filter.kind}
+                        onValueChange={(id) =>
+                            router.push(
+                                href({ kind: id === "all" ? undefined : id }),
+                                { scroll: false },
+                            )
+                        }
+                        options={LOG_KINDS.map((k) => ({
+                            value: k.id,
+                            label: k.id === "all" ? "All changes" : k.label,
+                        }))}
+                    />
                     {storefronts.length > 1 ? (
                         <ListFilter
                             holdsData
@@ -147,26 +160,25 @@ export function LogList({
                     />
                 </>
             }
+            onClear={
+                filter.kind !== "all" ||
+                filter.store !== "all" ||
+                filter.product
+                    ? () =>
+                          router.push(
+                              href({
+                                  kind: undefined,
+                                  store: undefined,
+                                  product: undefined,
+                              }),
+                              { scroll: false },
+                          )
+                    : undefined
+            }
             count={
                 log !== "failed"
                     ? logCountWords(loaded.entries.length, !!loaded.next)
                     : null
-            }
-            chips={
-                <FilterChips<LogKindId>
-                    label="Kind of change"
-                    value={filter.kind}
-                    onValueChange={(id) =>
-                        router.push(
-                            href({ kind: id === "all" ? undefined : id }),
-                            { scroll: false },
-                        )
-                    }
-                    chips={LOG_KINDS.map((k) => ({
-                        value: k.id,
-                        label: k.label,
-                    }))}
-                />
             }
         />
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import { FailedRead } from "@/components/shared/failed-read";
-import { FilterChips, ListFilter } from "@/components/shared/list-toolbar";
+import { ListFilter, MoreFilters } from "@/components/shared/list-toolbar";
 import { ListSearch } from "@saroh/ui/list-search";
 
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
@@ -11,8 +11,8 @@ import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
 const ANY = "";
 
-const STATUS_CHIPS: { value: ProductStatus | typeof ANY; label: string }[] = [
-    { value: ANY, label: "All" },
+const STATUSES: { value: ProductStatus | typeof ANY; label: string }[] = [
+    { value: ANY, label: "All statuses" },
     { value: "PUBLISHED", label: "Live" },
     { value: "DRAFT", label: "Draft" },
     { value: "ARCHIVED", label: "Archived" },
@@ -25,9 +25,10 @@ interface ToolbarProps {
 }
 
 /**
- * The Products list's toolbar (#519), in the one list toolbar's order:
- * search, then the dropdown filters (the location, only with more than
- * one, a category and a collection), then the status chips. DataView adds
+ * The Products list's toolbar (#519), in the one list toolbar's row:
+ * search, then its three most used filters as dropdowns (the status, a
+ * category, and the location where there is more than one), then one
+ * Filters button for the rest (a collection). DataView adds
  * how many are in this view. Everything goes into the address, and the
  * server reads the first page again: search covers the whole catalogue,
  * not the page on screen.
@@ -52,7 +53,7 @@ export function CatalogueSearch({
     );
 }
 
-/** Location, category and collection: each the toolbar's one dropdown. */
+/** The row's three most used: the status, the category and the location. */
 export function CatalogueFilters({
     query,
     go,
@@ -65,6 +66,21 @@ export function CatalogueFilters({
     const many = storefronts.byStorefront.length > 1;
     return (
         <>
+            <ListFilter<ProductStatus | typeof ANY>
+                label="Status"
+                value={query.status ?? ANY}
+                onValueChange={(status) => go({ status: status || null })}
+                options={STATUSES}
+            />
+            <ChoiceFilter
+                label="Category"
+                any="All categories"
+                things="categories"
+                empty="No categories yet"
+                choices={choices.categories}
+                value={query.category}
+                onPick={(category) => go({ category })}
+            />
             {many ? (
                 <StorefrontFilter
                     stores={storefronts.byStorefront}
@@ -79,39 +95,44 @@ export function CatalogueFilters({
                     note="A filter, not a scope. The catalogue belongs to the business, and a location decides what it sells from it."
                 />
             ) : null}
+        </>
+    );
+}
+
+/**
+ * The filter past the row's three (status, category, location): which
+ * collection, behind the one Filters button.
+ */
+export function CatalogueMoreFilters({
+    query,
+    go,
+    choices,
+}: ToolbarProps & { choices: FilterChoices }) {
+    return (
+        <MoreFilters title="Filter products" count={query.collection ? 1 : 0}>
             <ChoiceFilter
-                label="Category"
-                any="Any category"
-                things="categories"
-                empty="No categories yet"
-                choices={choices.categories}
-                value={query.category}
-                onPick={(category) => go({ category })}
-            />
-            <ChoiceFilter
+                wide
                 label="Collection"
-                any="Any collection"
+                any="All collections"
                 things="collections"
                 empty="No collections yet"
                 choices={choices.collections}
                 value={query.collection}
                 onPick={(collection) => go({ collection })}
             />
-        </>
+        </MoreFilters>
     );
 }
 
-/** All, Live, Draft, Archived: the list's status, as the chip row. */
-export function CatalogueStatusChips({ query, go }: ToolbarProps) {
-    return (
-        <FilterChips
-            label="Status"
-            value={query.status ?? ANY}
-            onValueChange={(status) => go({ status: status || null })}
-            chips={STATUS_CHIPS}
-        />
-    );
-}
+/** Whether the toolbar has narrowed the catalogue, a search included. */
+export const catalogueNarrowed = (query: ListQuery) =>
+    [
+        query.q,
+        query.status,
+        query.category,
+        query.collection,
+        query.storefront,
+    ].some(Boolean);
 
 function ChoiceFilter({
     label,
@@ -121,7 +142,10 @@ function ChoiceFilter({
     choices,
     value,
     onPick,
+    wide = false,
 }: {
+    /** The width of what holds it (the Filters popover). */
+    wide?: boolean;
     label: string;
     any: string;
     things: string;
@@ -143,6 +167,7 @@ function ChoiceFilter({
                 ...choices.map((c) => ({ value: c.id, label: c.name })),
             ]}
             footer={choices.length === 0 ? empty : undefined}
+            className={wide ? "w-full" : undefined}
         />
     );
 }

@@ -1,5 +1,5 @@
 import { FailedRead } from "@/components/shared/failed-read";
-import { FilterChips } from "@/components/shared/list-toolbar";
+import { ListFilter } from "@/components/shared/list-toolbar";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 
@@ -84,17 +84,18 @@ export function Chips<K extends string>({
     onChange: (key: K) => void;
 }) {
     return (
-        <FilterChips<K>
-            label={label}
-            className="mb-2.5"
-            value={value}
-            onValueChange={onChange}
-            chips={chips.map((c) => ({
-                value: c.key,
-                label: c.label,
-                count: c.count,
-            }))}
-        />
+        <div className="mb-2.5">
+            <ListFilter<K>
+                label={label}
+                value={value}
+                onValueChange={onChange}
+                options={chips.map((c) => ({
+                    value: c.key,
+                    label: c.label,
+                    count: c.count,
+                }))}
+            />
+        </div>
     );
 }
 

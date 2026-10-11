@@ -11,7 +11,8 @@ import type { ProductOverview } from "@/lib/products/overview";
 import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
-import { FilterChips, listTable } from "@/components/shared/list-toolbar";
+import { LinkFilter } from "@/components/shared/link-filter";
+import { listTable } from "@/components/shared/list-toolbar";
 import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
@@ -73,10 +74,10 @@ export function ProductOrdersTab({
     return (
         <div>
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-                <FilterChips
+                <LinkFilter
                     label="Which orders"
                     value={filter}
-                    chips={[
+                    options={[
                         {
                             value: "open",
                             label: "Open",
