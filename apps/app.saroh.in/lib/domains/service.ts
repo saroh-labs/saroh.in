@@ -30,6 +30,40 @@ export interface SiteDomain {
      * into what the screen shows (#861).
      */
     hosting?: DomainHostingRead;
+    /**
+     * What the hostname is (DEC-140): a bare domain (`yourshop.in`), `www`
+     * on one, or any other subdomain. Absent from an api before it.
+     */
+    hostnameKind?: "bare" | "www" | "subdomain" | (string & {});
+    /**
+     * For a `www` connection, its bare domain and where it stands. Null for
+     * any other hostname. `lib/domains/bare-view.ts` turns it into words.
+     */
+    bare?: BareDomainRead | null;
+}
+
+/**
+ * - FORWARDS: the bare domain sends visitors on to `www`.
+ * - FORWARDS_HTTP_ONLY: it does, but `https://` on it fails.
+ * - POINTS_HERE: its DNS reaches our hosting directly (an ALIAS or a
+ *   flattened CNAME), so it can be added as a domain of its own.
+ * - NOT_FORWARDING: none of these.
+ *
+ * Null until the api has looked. Free-form on the wire: an unknown value
+ * reads as not looked at.
+ */
+export type BareState =
+    "FORWARDS" | "FORWARDS_HTTP_ONLY" | "POINTS_HERE" | "NOT_FORWARDING";
+
+export interface BareDomainRead {
+    /** The bare domain: `yourshop.in` for `www.yourshop.in`. */
+    hostname: string;
+    /** Where it should forward: `https://www.yourshop.in`. */
+    forwardTo: string;
+    state: BareState | (string & {}) | null;
+    checkedAt: string | null;
+    /** The business has added the bare domain as a domain of its own. */
+    added: boolean;
 }
 
 /**

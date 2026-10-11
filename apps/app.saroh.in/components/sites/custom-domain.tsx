@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
 import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
+import { BareDomainPart } from "@/components/sites/bare-domain-step";
 import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
@@ -20,6 +21,7 @@ import {
     removeDomain,
     verifyDomain,
 } from "@/lib/domains/actions";
+import { bareView } from "@/lib/domains/bare-view";
 import {
     checkLine,
     checkToast,
@@ -135,6 +137,34 @@ export function CustomDomain({
         return { ok: true as const };
     }
 
+    /**
+     * A bare domain that already points at Saroh, added as a domain of its
+     * own from its `www` domain's row (DEC-140). Its card then shows its
+     * record, in place.
+     */
+    async function addBare(from: SiteDomain, hostname: string) {
+        const res = await runAction(() => claimDomain(siteId, hostname), {
+            setBusy: (on) => setBusy(on ? `bare:${from.id}` : null),
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        // The `www` row now knows its bare domain was added too.
+        setDomains((prev) => [
+            res.data,
+            ...(prev ?? []).map((d) =>
+                d.id === from.id && d.bare
+                    ? { ...d, bare: { ...d.bare, added: true } }
+                    : d,
+            ),
+        ]);
+        showSuccess(
+            `${res.data.hostname} added. Now add its record at your registrar.`,
+        );
+    }
+
     async function check(domain: SiteDomain) {
         const res = await runAction(() => verifyDomain(domain.id), {
             setBusy: (on) => setBusy(on ? domain.id : null),
@@ -181,13 +211,18 @@ export function CustomDomain({
         added?.opened === adding.opened
             ? domains.find((d) => d.id === added.id)
             : undefined;
-    const addedNow = addedDomain
-        ? {
-              domain: addedDomain,
-              view: domainView(addedDomain, CNAME_TARGET),
-              line: checkLine(addedDomain, zone),
-          }
+    const addedView = addedDomain
+        ? domainView(addedDomain, CNAME_TARGET)
         : null;
+    const addedNow =
+        addedDomain && addedView
+            ? {
+                  domain: addedDomain,
+                  view: addedView,
+                  line: checkLine(addedDomain, zone),
+                  bare: bareView(addedDomain, addedView, zone),
+              }
+            : null;
 
     return (
         <>
@@ -206,6 +241,11 @@ export function CustomDomain({
             {domains.map((domain) => {
                 const view = domainView(domain, CNAME_TARGET);
                 const line = checkLine(domain, zone);
+                // DEC-140: the bare domain of a `www` one, beside its state.
+                const bare = bareView(domain, view, zone);
+                const checkLabel =
+                    view.checkLabel ??
+                    (bare?.offerCheck ? "Check again" : null);
                 const lineAt =
                     view.scene === "waiting"
                         ? domain.lastCheckedAt
@@ -233,7 +273,7 @@ export function CustomDomain({
                                 </Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                                {view.checkLabel ? (
+                                {checkLabel ? (
                                     <Button
                                         type="button"
                                         size="sm"
@@ -242,7 +282,7 @@ export function CustomDomain({
                                         busy={busy === domain.id}
                                         busyLabel="Checking…"
                                     >
-                                        {view.checkLabel}
+                                        {checkLabel}
                                     </Button>
                                 ) : null}
                                 {confirmRemove === domain.id ? null : (
@@ -281,6 +321,14 @@ export function CustomDomain({
                         ) : null}
 
                         <DomainRecords domain={domain} view={view} />
+
+                        <BareDomainPart
+                            domain={domain}
+                            view={view}
+                            bare={bare}
+                            adding={busy === `bare:${domain.id}`}
+                            onAdd={(hostname) => void addBare(domain, hostname)}
+                        />
 
                         {line ? (
                             <p

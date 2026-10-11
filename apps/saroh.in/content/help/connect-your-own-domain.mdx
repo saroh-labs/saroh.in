@@ -9,10 +9,12 @@
 #         one keeps working."; "Your own domain": "Point a domain you own at
 #         this site. You prove you own it with one DNS record; nothing
 #         changes for visitors until it is verified.")
-#   ADD   apps/app.saroh.in/components/sites/custom-domain.tsx (placeholder
-#         "shop.example.com", "A domain you already own, without https://.",
-#         "Add domain"; "Add this record at your registrar to prove you own
-#         the domain. Copy each part exactly."; Type TXT, Name
+#   ADD   apps/app.saroh.in/components/sites/custom-domain.tsx and
+#         add-domain-dialog.tsx (placeholder "shop.example.com", "A domain
+#         you already own, like www.yourshop.in. Leave out www and Saroh
+#         adds it, then shows how to forward the rest.", "Add domain"; "Add
+#         these two records at your registrar. Copy each part exactly.";
+#         Type TXT, Name
 #         _saroh-verification.‹domain›, Value; "Copy"; "Waiting for DNS",
 #         "Check now", "Remove", "Verified"; the check results "Not checked
 #         yet. Add the record, then check.", "… no record found yet. A new
@@ -35,6 +37,20 @@
 # attention" with what is wrong in words. Where it isn't, it says Verified,
 # as in shot 5. Step 5 names the states in words and doesn't re-take the
 # shot, which shows the Verified screen.
+# BARE (DEC-140, 12 Oct) apps/app.saroh.in/lib/domains/bare-view.ts,
+# components/sites/bare-domain-step.tsx; the API's
+# domains/bare-domain-sync.ts and bare-forwarding.ts: a domain typed
+# without www is added as www.‹domain› ("Your site will live at
+# www.‹domain›. ‹domain› will forward to it, which is the last step
+# below."), with the step "Forward ‹domain› to www.‹domain›" ("look for
+# Forwarding, Redirect or URL redirect"; Domain and Forward to, each with
+# Copy). Each check, the daily one included, looks at the bare domain and
+# the row says "‹domain› forwards to www.‹domain›.", "… but not over
+# https. Someone who types https://‹domain› will see a browser warning.",
+# "… doesn't forward to www.‹domain› yet." or "… points straight at
+# Saroh, so it needs no forwarding." with "Add ‹domain›". The shots were
+# taken before this and show a domain with www already typed, so none is
+# re-taken; the forwarding step has no picture of its own.
 # Shot 1 re-taken on 6 Oct: the web address on the Website screen comes
 # from the API's renderer host, so it was captured with the API's
 # RENDERER_URL set to https://saroh.app and reads northwind.saroh.app, as
@@ -47,10 +63,10 @@ slug: connect-your-own-domain
 area: Website
 group: Your website
 order: 10
-intro: "Your site already has an address on Saroh. If you own a domain, like yourshop.in, you can point it at your site as well. You add two DNS records at the place you bought the domain. This takes about ten minutes, plus the time DNS takes to spread."
+intro: "Your site already has an address on Saroh. If you own a domain, like yourshop.in, you can point it at your site as well. You add two DNS records at the place you bought the domain, and set the domain without www to forward to www. This takes about ten minutes, plus the time DNS takes to spread."
 description: "Point a domain you own at your Saroh site: add it, prove it's yours with a DNS record, then send visitors with a second record."
 readMinutes: 3
-updated: "2026-10-08"
+updated: "2026-10-12"
 publishOn: "2026-10-17"
 steps:
     # NAV.
@@ -61,7 +77,7 @@ steps:
       marker: Settings
     # ADD.
     - title: Add the domain
-      body: "Type the domain you own, without https://, and press Add domain. Use the exact address you want people to type, like www.yourshop.in."
+      body: "Type the domain you own, without https://, and press Add domain. If you leave out www and type yourshop.in, Saroh adds www.yourshop.in: your site will live there, and yourshop.in will forward to it. A name like shop.yourshop.in is added as it is."
       shot: help-own-domain-2
       caption: "Your own domain at Northwind Supply (demo store), with a second domain typed in."
       marker: Add domain
@@ -80,10 +96,12 @@ steps:
       marker: Check now
     # ADD (verified), CAP1.
     - title: Send visitors to your site
-      body: "Once it's found, the domain is verified, and Saroh shows a second record: Type CNAME, your domain as the Name, and the Value Saroh shows. Add it at your registrar the same way. That's what sends visitors to your site. Until it does, the domain says Not live yet; press Check again later. Once it works, Saroh says Live at your domain, with a link, and tucks the records away under DNS records. If something's wrong, it says Needs attention and what to fix."
+      body: "Once it's found, the domain is verified, and Saroh shows a second record: Type CNAME, your domain as the Name, and the Value Saroh shows. Add it at your registrar the same way. That's what sends visitors to your site. Until it does, the domain says Not live yet; press Check again later. Once it works, Saroh says Live at your domain, with a link, and tucks the records away under DNS records. If something's wrong, it says Needs attention and what to fix. For a domain with www, there is one more thing to set at your registrar: find Forwarding, Redirect or URL redirect, and forward yourshop.in to https://www.yourshop.in. Saroh shows both parts with Copy, looks each day, and says under the domain if yourshop.in doesn't forward."
       shot: help-own-domain-5
       caption: "A verified domain at Northwind Supply (demo store), and the CNAME record that sends visitors to the site."
       tip: "Your site not opening on your domain a day after adding the CNAME? Write to contact@saroh.in with the domain, and we'll look."
       marker: CNAME
 next: [make-your-link-look-right-when-shared, verify-your-site-and-add-analytics]
 ---
+
+Many registrars can't point a domain without www, like yourshop.in, straight at a website. So your site lives at www.yourshop.in and yourshop.in forwards to it. Some registrars forward only http://, so someone who types https://yourshop.in sees a browser warning until they use www. If yours has a setting for HTTPS or SSL on forwarding, turn it on. If your registrar offers an ALIAS, ANAME or flattened CNAME record, you can point yourshop.in at Saroh with it and add yourshop.in as a domain too.

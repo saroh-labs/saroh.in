@@ -33,6 +33,15 @@ With `CLOUDFLARE_HOSTNAMES_TOKEN` or `CLOUDFLARE_HOSTNAMES_ZONE_ID` unset the
 port is null, a WARN says so at boot, and the read says `hosting.state: "OFF"`
 (`domain-hosting-sync.ts`).
 
+A bare domain (`example.com`) is connected through `www` (DEC-140): the
+claim turns it into `www.<domain>` unless its DNS already reaches the
+hosting, and every check of a verified `www` domain also looks at its bare
+domain and stores where it stands (`bare-domain.ts`, `bare-domain-sync.ts`,
+`bare-forwarding.ts`). "Is it bare" is the Public Suffix List's answer
+(`tldts`), never a list of suffixes kept here. The look is a notice: it never
+changes the `www` domain's verification or hosting. Its requests go to a host
+a merchant typed, so they use the link-preview guard and read no body.
+
 DEC-011 describes separate `EmailProvider` and `WhatsAppProvider` ports; the
 code has one `CommsProvider` port with per-channel adapters. DECISIONS.md carries
 a note saying so.
@@ -82,7 +91,10 @@ a note saying so.
   Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
   visitor typed: use `dns.promises.Resolver` with a short timeout and one
   try, cap how many such fetches run at once, and answer a typed "busy"
-  past it (`link-preview/ssrf-guard.ts`).
+  past it (`link-preview/ssrf-guard.ts`). Any other fetch of a host a
+  merchant or visitor named goes through the same guard (`checkUrl`,
+  `resolveTarget`, `pinnedLookup`), each redirect included: the bare-domain
+  check does (`domains/bare-forwarding.ts`).
 - **Current** — **Merchant payments and Saroh billing never share** records,
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real

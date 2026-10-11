@@ -351,6 +351,17 @@ the Privacy Policy states both.
   or the test-only domain fakes on: the chain is never started, a stray
   run logs `domains_recheck_off` and ends, and domains move only on
   "Check now".
+- **A `www` domain's bare domain is looked at in the same check**
+  (DEC-140, `domains/bare-domain-sync.ts`): whether `example.com` forwards
+  to `www.example.com`, over https too, or points straight here. It is
+  written on the row (`bareStatus`) as a notice. It is never a host
+  failure, never counts toward the back-off, and never tells the team:
+  the `www` site is not affected by it. A look waits on a stranger's
+  host (three seconds at most for each of `http://` and `https://`), so
+  the background's looks share 60 seconds in any five minutes
+  (`BareLookBudget`): past that they are skipped, the row keeps its last
+  standing, and the run stays inside its job lease. "Check now" always
+  looks.
 - **A live domain that goes down tells the team, once per incident**
   (#917, `notifications/domain-alerts.ts`). The check's write that moves a
   domain out of live (ACTIVE), or back into it, queues `team.alert`

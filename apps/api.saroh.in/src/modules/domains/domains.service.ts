@@ -20,6 +20,16 @@ import {
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
+import {
+    bareCandidates,
+    BareLookBudget,
+    bareRead,
+    hostnameToConnect,
+    ownHostnamesAmong,
+    syncBareDomain,
+} from "./bare-domain-sync";
+import type { BareDomainCheck } from "./bare-forwarding";
+import { BARE_DOMAIN_CHECK } from "./bare-forwarding";
 import type { DomainHosting } from "./domain-hosting";
 import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
 import type { OnLiveChange } from "./domain-hosting-sync";
@@ -64,7 +74,18 @@ export class DomainsService {
         // #859: null when hosting isn't set up on this instance (off).
         @Inject(DOMAIN_HOSTING)
         private readonly hosting: DomainHosting | null = null,
+        // DEC-140: null where the bare-domain check is off (tests, fakes).
+        @Inject(BARE_DOMAIN_CHECK)
+        private readonly bareCheck: BareDomainCheck | null = null,
     ) {}
+
+    /** The time the background re-check may spend on bare domains. */
+    private readonly bareBudget = new BareLookBudget();
+
+    /** A check nobody pressed (the re-check job) looks within the budget. */
+    private bareBudgetFor(actorUserId: string | null) {
+        return actorUserId === null ? this.bareBudget : undefined;
+    }
 
     /**
      * Claim a hostname for the org. Authorizes `domain:manage`, rejects an
@@ -86,12 +107,16 @@ export class DomainsService {
             );
         }
 
-        const hostname = input.hostname.trim().toLowerCase();
+        const typed = input.hostname.trim().toLowerCase();
         // DEC-071: `test.<H>` and `test--*` are test-release hosts. The DTO
         // refuses them at the edge; this keeps any other caller honest.
-        if (isTestReservedHostname(hostname)) {
+        if (isTestReservedHostname(typed)) {
             throw new BadRequestException(TEST_RESERVED_HOSTNAME_MSG);
         }
+        // DEC-140: a bare domain (`example.com`) is connected as its `www`,
+        // unless its DNS already reaches the hosting. The answer carries the
+        // hostname that was claimed, so the screen says which it was.
+        const hostname = await hostnameToConnect(typed, this.bareCheck);
 
         // Globally-unique guard: a hostname claimed by ANY org (this one or
         // another) blocks a new claim. Pre-check for a clear 409; the unique
@@ -134,7 +159,7 @@ export class DomainsService {
         }
 
         return {
-            domain: this.withHosting(domain),
+            domain: await this.withBare(this.withHosting(domain)),
             dnsRecord: this.instructionsFor(domain),
         };
     }
@@ -156,13 +181,10 @@ export class DomainsService {
 
         const domain = await this.requireOwned(ctx, domainId);
         const result = await this.check(domain, ctx.userId);
+        const read = await this.withBare(this.withHosting(result.domain));
         return result.verified
-            ? { domain: this.withHosting(result.domain), verified: true }
-            : {
-                  domain: this.withHosting(result.domain),
-                  verified: false,
-                  reason: result.reason,
-              };
+            ? { domain: read, verified: true }
+            : { domain: read, verified: false, reason: result.reason };
     }
 
     /**
@@ -192,7 +214,15 @@ export class DomainsService {
                 domain,
                 tellTeam(actorUserId),
             );
-            return { domain: synced, verified: true };
+            // DEC-140: and where the bare domain of a `www` one stands.
+            return {
+                domain: await syncBareDomain(
+                    this.bareCheck,
+                    synced,
+                    this.bareBudgetFor(actorUserId),
+                ),
+                verified: true,
+            };
         }
 
         const checkedAt = new Date();
@@ -243,7 +273,14 @@ export class DomainsService {
             verified,
             tellTeam(actorUserId),
         );
-        return { domain: hosted, verified: true };
+        return {
+            domain: await syncBareDomain(
+                this.bareCheck,
+                hosted,
+                this.bareBudgetFor(actorUserId),
+            ),
+            verified: true,
+        };
     }
 
     /**
@@ -258,8 +295,10 @@ export class DomainsService {
             where: { organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
         });
+        const own = new Set(domains.map((d) => d.hostname));
         return domains.map((domain) => ({
             ...this.withHosting(domain),
+            ...bareRead(domain, own),
             dnsRecord: this.instructionsFor(domain),
         }));
     }
@@ -406,6 +445,24 @@ export class DomainsService {
             ...domain,
             hosting: hostingView(domain, this.hosting !== null),
         };
+    }
+
+    /**
+     * A domain's read with its bare-domain part (DEC-140): the hostname's
+     * kind and, for a `www` connection, where the bare domain stands and
+     * whether this business added it too.
+     */
+    private async withBare<
+        T extends Pick<
+            Domain,
+            "organizationId" | "hostname" | "bareStatus" | "bareCheckedAt"
+        >,
+    >(domain: T) {
+        const own = await ownHostnamesAmong(
+            domain.organizationId,
+            bareCandidates(domain.hostname),
+        );
+        return { ...domain, ...bareRead(domain, own) };
     }
 
     /** The DNS TXT record the org must publish for a domain. */
