@@ -193,7 +193,11 @@ export function SplitPanel({
     return (
         <>
             {eyebrow ? (
-                <p className="label mb-[15px] opacity-70">{eyebrow}</p>
+                // The panel's own colour: `.label` is muted Ink, which on
+                // the dark panel is dark on dark.
+                <p className="label mb-[15px] text-inherit opacity-70">
+                    {eyebrow}
+                </p>
             ) : null}
             <p className="mb-3.5 text-pretty font-display text-[25px] font-semibold leading-[1.25] tracking-[-0.025em]">
                 {heading}

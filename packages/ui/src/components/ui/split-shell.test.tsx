@@ -169,6 +169,11 @@ describe("SplitPanel", () => {
         );
 
         expect(screen.getByText("Welcome back")).toBeVisible();
+        // The panel's own colour, not `.label`'s muted Ink: on the Ink
+        // panel that was dark on dark (contrast 2.1).
+        expect(screen.getByText("Welcome back").className).toContain(
+            "text-inherit",
+        );
         expect(screen.getAllByRole("listitem")).toHaveLength(2);
     });
 
