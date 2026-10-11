@@ -87,8 +87,18 @@ export function Tip({
 const showing = new Set<() => void>();
 let listening = false;
 
-/** How long the layers under a hint take to learn it has gone. */
-const HAND_ON_MS = 30;
+/**
+ * Wait until the layers under a hint have drawn again without it. Two
+ * frames, not a fixed time: on a busy machine a fixed 30ms ran out before
+ * the sheet had redrawn, and the handed-on key was let go like the first.
+ */
+function afterRedraw(then: () => void) {
+    if (typeof requestAnimationFrame !== "function") {
+        window.setTimeout(then, 30);
+        return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => then()));
+}
 
 /**
  * One listener for every hint, on the window, ahead of Radix's own.
@@ -113,7 +123,7 @@ function listen() {
             event.stopImmediatePropagation();
             for (const drop of hints) drop();
             const target = event.target;
-            window.setTimeout(() => {
+            afterRedraw(() => {
                 // Only to the control the key was pressed in, and only if
                 // it is still on the page. A sheet or dialog holds the
                 // keyboard inside itself, so a press on the page's body
@@ -136,7 +146,7 @@ function listen() {
                         composed: true,
                     }),
                 );
-            }, HAND_ON_MS);
+            });
         },
         true,
     );

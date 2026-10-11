@@ -150,7 +150,39 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
             expect(inside).toBe(true);
         }
 
+        // TEMPORARY (11 Oct): this fails only in the gate's built app, on the
+        // phone project. Say what the page held when Escape was pressed.
+        await page.evaluate(() => {
+            const w = window as unknown as { __esc: string[] };
+            w.__esc = [];
+            const say = (where: string) => (e: KeyboardEvent) => {
+                if (e.key !== "Escape") return;
+                const a = document.activeElement;
+                w.__esc.push(
+                    `${where} trusted=${e.isTrusted} prevented=${e.defaultPrevented} active=${a?.tagName}/${a?.getAttribute("aria-label") ?? a?.getAttribute("placeholder") ?? ""} tips=${document.querySelectorAll("[role=tooltip]").length} dialogs=${document.querySelectorAll("[role=dialog]").length} layers=${document.querySelectorAll("[data-radix-popper-content-wrapper],[data-sonner-toast]").length}`,
+                );
+            };
+            window.addEventListener("keydown", say("window-capture"), true);
+            document.addEventListener("keydown", say("document-bubble"));
+        });
         await page.keyboard.press("Escape");
+        await page.waitForTimeout(1500);
+        console.log(
+            "ESCAPE-DIAG",
+            test.info().project.name,
+            JSON.stringify(
+                await page.evaluate(() => ({
+                    log: (window as unknown as { __esc: string[] }).__esc,
+                    dialogs: document.querySelectorAll("[role=dialog]").length,
+                    hover: Array.from(document.querySelectorAll(":hover"))
+                        .slice(-2)
+                        .map(
+                            (e) =>
+                                `${e.tagName}/${e.getAttribute("aria-label") ?? ""}/${e.getAttribute("aria-description") ?? ""}`,
+                        ),
+                })),
+            ),
+        );
         await expect(sheet).toHaveCount(0);
         await expect(heroChip(page)).toBeFocused();
     });
