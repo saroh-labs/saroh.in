@@ -51,7 +51,7 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * the page failing — a diary with nothing in it would be a lie.
  *
  * The register this page used to be lives on at /bookings/all, the List
- * side of the header's Calendar | List switch.
+ * view of the header's one view switch.
  */
 export const metadata = { title: "Bookings" };
 
@@ -139,7 +139,7 @@ export default async function BookingsPage({
                 <PageHeader
                     breadcrumb={["Bookings", "Calendar"]}
                     title="Calendar"
-                    meta={<BookingsViewSwitch current="calendar" />}
+                    meta={<BookingsViewSwitch current={layout} date={date} />}
                 />
                 <div>
                     <FailedState
@@ -177,6 +177,9 @@ export default async function BookingsPage({
                 notices={notices}
                 limitNotice={<PlanLimitNotice moduleId="bookings" />}
                 serviceHours={serviceHours}
+                // Cancelled bookings stay off the diary unless the address
+                // asks for them, so a reload keeps the choice.
+                showCancelled={params.cancelled === "1"}
                 people={people}
                 can={{
                     book: may("booking:write"),

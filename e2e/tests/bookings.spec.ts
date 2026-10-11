@@ -147,28 +147,48 @@ test.describe("bookings calendar", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: /· today$/ }),
         ).toBeVisible();
-        await expect(page.getByRole("radio", { name: /Day/ })).toHaveAttribute(
-            "aria-checked",
-            "true",
+        // One switch for every view of the bookings: the layouts and the
+        // list. Each is a link, and the open one says so.
+        const views = page.getByRole("navigation", { name: "Bookings view" });
+        await expect(views.getByRole("link", { name: /Day/ })).toHaveAttribute(
+            "aria-current",
+            "page",
         );
+        await expect(views.getByRole("link", { name: "List" })).toBeVisible();
         await page.goto("/bookings?layout=agenda");
         await expect(
             page.getByRole("group", { name: "Pick a day" }),
         ).toBeVisible();
         await expect(
-            page.getByText(/Customers can book/).first(),
-        ).toBeVisible();
+            views.getByRole("link", { name: "Agenda" }),
+        ).toHaveAttribute("aria-current", "page");
+        // The standing sentence under the diary is gone.
+        await expect(page.getByText(/Customers can book/)).toHaveCount(0);
     });
 
-    test("the legend follows the business: a gym that runs classes shows Class", async ({
+    test("the legend names only what is drawn: free time is the plain page", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto("/bookings");
-        const legend = page.getByRole("listitem");
-        await expect(legend.filter({ hasText: /^One-to-one$/ })).toBeVisible();
-        await expect(legend.filter({ hasText: /^Class$/ })).toBeVisible();
-        await expect(legend.filter({ hasText: /^Free$/ })).toBeVisible();
+        await expect(
+            page.getByRole("navigation", { name: "Bookings view" }),
+        ).toBeVisible();
+        // What it names depends on the day (`legendOf`, unit-tested): never
+        // free time, and nothing the diary does not draw.
+        const key = page.getByRole("list", { name: "Key" });
+        await expect(
+            key.getByRole("listitem").filter({ hasText: /^Free$/ }),
+        ).toHaveCount(0);
+        for (const item of await key.getByRole("listitem").allInnerTexts()) {
+            expect([
+                "One-to-one",
+                "Class",
+                "Closed",
+                "Time off",
+                "Cancelled",
+            ]).toContain(item.trim());
+        }
         await page.goto("/bookings?layout=week");
         await expect(page.getByText(/bookings? this week/)).toBeVisible();
     });
