@@ -245,7 +245,8 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
     - **A refusal by role is never red, from any call site** (10 Oct 2026).
       Most screens only hold `res.error`, so the sentence says what it is:
       `isRoleRefusal` (`lib/api/role-denied.ts`) knows the two ways a
-      refusal by role is worded ("Your role …", "Only an owner can …"), and
+      refusal by role is worded ("Your role …", "Only the owner can …" or
+      "Only an owner can …"), and
       an endpoint's own sentence is marked `denied` too. `app/providers.tsx`
       registers it once (`setRefusalTest`, `@saroh/ui/toast`), so every
       `showError(res.error)` says a refusal through `showRefusal`: the
@@ -254,7 +255,10 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
       (`components/shared/refusal.tsx`): a neutral `Notice` for a refusal
       by role, the error `Notice` for anything else. `ConfirmDialog` draws
       its refusal with it. A new refusal by role in the API starts "Your
-      role " or carries `ROLE_DENIED`, or it is shown as an error. A
+      role " or "Only the owner can ", or carries `ROLE_DENIED`, or it is
+      shown as an error. What only the owner holds has its own line
+      (`OWNERS`): "Only the owner can do this.", and for the plan "Only
+      the owner can change the plan." (`billing:manage`, 2026-10-11). A
       save's sentence under a form is `Refusal` too, never a red line drawn
       by hand: a hand-written `role="alert"` line is for a field's own
       problem (validation, or an API sentence that names the field) only.
@@ -342,15 +346,24 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
 - **Current** (10 Oct 2026) — **A plan prompt has one label**, `planLabel`:
   "See {Plan}" when one plan unlocks the thing, "See plans" otherwise.
   Someone who can't change the plan reads who can, as text: "The owner
-  can change the plan in Settings › Plan and billing." The shell says once
-  whether the reader may (`mayChangePlan`: `billing:manage`,
-  `lib/billing/plan-access.ts`, through `PlanAccessProvider`), and a prompt
+  can change the plan in Settings › Plan and billing." That is everyone
+  but an Owner (DEC-131, amended 2026-10-11): `billing:manage` is the
+  owner's alone, so an Admin reads the line on every plan prompt. The
+  shell says once whether the reader may (`mayChangePlan`: `billing:manage`,
+  `lib/billing/plan-access.ts`, through `PlanAccessProvider`; with no
+  permissions to read, only the Owner), and a prompt
   never passes it: it wraps its link in `PlanWay`
   (`components/billing/plan-way.tsx`), or draws `PlanLockedCard` /
   `LimitReachedCard`. `LimitNoticeBlock` and the plan refusal dialog do it
   themselves. A link that is only sometimes to the plans passes
   `when={isPlanHref(href)}`. Plan and billing opens to `billing:read`
   (`mayOpenPlan`), the same rule as its Settings tab and the API (DEC-131).
+  Opened without `billing:manage` (an Admin) it is read: `ReadOnlyNote
+ownerOnly` on top ("Your role can read the plan but not change it. Only
+  the owner can change this."), and no plan button, coupon, payment
+  method, payment to carry on or live add-on control
+  (`plan-billing/plan-owner-only.test.tsx`). Settings search offers
+  "Change plan" to the Owner only.
   A setup checklist's plan row is row data: `planRow`
   (`components/settings/ready-rows.tsx`) leaves the button out and puts
   who can after the row's line, and `PlanAsides` wraps its button in
