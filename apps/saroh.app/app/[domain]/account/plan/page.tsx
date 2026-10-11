@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import { AccountCard, PlanTab } from "@saroh/site-blocks";
 
 import { getAccount, getPacksOnSale, getPlanTab } from "@/lib/account-area";
+import { accountTitle, getAccountSite } from "@/lib/account-site";
+import { ACCOUNT_PAGE_TITLES } from "@/lib/account-title";
 import { publicApiUrl } from "@/lib/api-url";
 import { pricesPageHref } from "@/lib/module-pages";
-import { getSiteForHost } from "@/lib/publication";
 
 import {
     buyPack,
@@ -26,7 +27,9 @@ import {
  * the switch and the session. A business that shows no Plan tab has no
  * page here either.
  */
-export const metadata: Metadata = { title: "Plan" };
+export function generateMetadata(): Promise<Metadata> {
+    return accountTitle(ACCOUNT_PAGE_TITLES.plan);
+}
 
 export default async function AccountPlanPage({
     params,
@@ -38,7 +41,7 @@ export default async function AccountPlanPage({
         getAccount(),
         getPlanTab(),
         getPacksOnSale(),
-        getSiteForHost(domain),
+        getAccountSite(domain),
     ]);
     if (!lookup.ok) return null; // The layout drew the signed-out state.
     if (!lookup.account.tabs.some((t) => t.key === "plan")) notFound();
@@ -46,8 +49,12 @@ export default async function AccountPlanPage({
         return (
             <AccountCard
                 labelledBy="account-plan-unavailable"
-                title="Plan"
-                lead="Your plan couldn't be loaded. Refresh the page to try again."
+                title="Couldn't load your plan"
+                lead={
+                    <span role="status">
+                        Refresh the page to try again. Nothing has changed.
+                    </span>
+                }
             />
         );
     }

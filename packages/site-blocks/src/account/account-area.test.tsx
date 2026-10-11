@@ -52,7 +52,7 @@ const ACCOUNT: AccountView = {
     businessName: "Kavi Dental",
     tabs: [
         { key: "home", label: "Home" },
-        { key: "me", label: "Me" },
+        { key: "me", label: "Your details" },
     ],
     offers: { appointments: true, orders: false, plans: false },
     bookingsLabel: "Appointments",
@@ -228,7 +228,7 @@ describe("Home", () => {
         ).toBeInTheDocument();
     });
 
-    it("nothing booked and no orders are said as such", () => {
+    it("with nothing at all, one welcome block says what they can do here: never a column of empty cards", () => {
         render(
             <AccountHome
                 account={ACCOUNT}
@@ -240,9 +240,29 @@ describe("Home", () => {
                 }}
             />,
         );
-        expect(screen.getByText("Nothing booked")).toBeInTheDocument();
-        expect(screen.getByText("No orders yet.")).toBeInTheDocument();
+        // What they don't have is not the first thing they read (DEC-142).
+        expect(screen.queryByText("Nothing booked")).toBeNull();
+        expect(screen.queryByText("No orders yet.")).toBeNull();
         expect(screen.queryByText("Membership")).toBeNull();
+        expect(
+            screen.queryByRole("heading", { name: "Next booking" }),
+        ).toBeNull();
+        expect(screen.getAllByRole("region")).toHaveLength(1);
+        expect(
+            screen.getByRole("heading", { name: "Nothing here yet" }),
+        ).toBeInTheDocument();
+        // Only what this business offers: a clinic's customer books.
+        expect(
+            screen.getByText(
+                "Once you book with Kavi Dental, you'll find it here: what you've booked and your receipts.",
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("link", { name: "Book a time" }),
+        ).toHaveAttribute("href", "/book");
+        expect(
+            screen.queryByRole("link", { name: "Go to the shop" }),
+        ).toBeNull();
     });
 });
 
@@ -282,6 +302,14 @@ function meApi(overrides: Partial<MeApi> = {}): MeApi {
         signOutEverywhere: vi
             .fn<MeApi["signOutEverywhere"]>()
             .mockResolvedValue({ ok: true }),
+        payInvoice: vi.fn<MeApi["payInvoice"]>().mockResolvedValue({
+            ok: true,
+            url: "https://kavi.saroh.app/pay/tok",
+        }),
+        saveNotices: vi.fn<MeApi["saveNotices"]>().mockResolvedValue({
+            ok: true,
+            notices: { email: false },
+        }),
         ...overrides,
     };
 }
@@ -498,7 +526,7 @@ describe("Me", () => {
         ).toBeInTheDocument();
     });
 
-    it("signs out here, or everywhere", async () => {
+    it('"Sign out" is the button; "Sign out everywhere" waits behind More (DEC-142)', async () => {
         const api = meApi();
         render(
             <Me
@@ -509,10 +537,39 @@ describe("Me", () => {
                 api={api}
             />,
         );
+        // The rare one is not beside the common one.
+        expect(
+            screen.getByRole("button", { name: "Sign out" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Sign out everywhere" }),
+        ).toBeNull();
+        const more = screen.getByRole("button", { name: /^More/ });
+        expect(more).toHaveAttribute("aria-expanded", "false");
+        await click(more);
+        expect(more).toHaveAttribute("aria-expanded", "true");
         await click(
             screen.getByRole("button", { name: "Sign out everywhere" }),
         );
         expect(api.signOutEverywhere).toHaveBeenCalled();
+        expect(api.signOut).not.toHaveBeenCalled();
+        expect(router.push).toHaveBeenCalledWith("/");
+    });
+
+    it("signs out here with one press", async () => {
+        const api = meApi();
+        render(
+            <Me
+                account={ACCOUNT}
+                receipts={{ ok: true, value: [] }}
+                notes={null}
+                options={OPTIONS}
+                api={api}
+            />,
+        );
+        await click(screen.getByRole("button", { name: "Sign out" }));
+        expect(api.signOut).toHaveBeenCalled();
+        expect(api.signOutEverywhere).not.toHaveBeenCalled();
         expect(router.push).toHaveBeenCalledWith("/");
     });
 });

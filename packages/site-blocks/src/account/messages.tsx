@@ -106,7 +106,9 @@ export function AccountMessages({
               : businessName;
 
     return (
-        <div className="grid gap-3.5">
+        // A thread reads best in a column: on a wide screen it keeps a
+        // phone's measure rather than stretching a line across the page.
+        <div className="grid gap-3.5 md:max-w-[640px]">
             <section
                 aria-labelledby={`${id}-title`}
                 className="bg-site-surface border-site-border grid gap-2 rounded-[calc(var(--site-radius)+14px)] border p-3.5"

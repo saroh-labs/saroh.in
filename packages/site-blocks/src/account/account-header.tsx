@@ -7,9 +7,9 @@ import type { ReactNode } from "react";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { trimTrailingSlashes } from "../url-path";
+import { currentTab } from "./hrefs";
 import type { AccountTab } from "./model";
 import { firstName } from "./model";
-import { currentTab } from "./tab-bar";
 
 /**
  * The account area's compact header (DEC-073 #10; Saroh Customer Site
@@ -33,6 +33,9 @@ export function accountTitle(
 ): string {
     const path = trimTrailingSlashes(pathname ?? "");
     if (path.startsWith("/account/receipts/")) return "Receipt";
+    // A thing's own page (DEC-142) is named for the thing, not its list.
+    if (path.startsWith("/account/orders/")) return "Your order";
+    if (path.startsWith("/account/bookings/")) return "Your booking";
     const tab = currentTab(path === "" ? null : path, tabs);
     if (tab === "home") {
         const first = firstName(name);
@@ -69,14 +72,16 @@ export function AccountHeader({
     const pathname = usePathname();
     const heading = title ?? accountTitle(pathname, tabs, name);
     return (
-        <header className="bg-site-bg border-site-border font-site-body sticky top-0 z-30 border-b">
-            <div className="mx-auto flex max-w-[640px] items-center gap-2.5 px-[18px] py-3">
+        // Stays at the top on a phone. From tablet width up the tabs do
+        // (`tab-bar.tsx`), and the header scrolls away with the page.
+        <header className="bg-site-bg border-site-border font-site-body sticky top-0 z-30 border-b md:static md:border-b-0">
+            <div className="mx-auto flex max-w-[640px] items-center gap-2.5 px-[18px] py-3 md:max-w-[960px] md:gap-3.5 md:px-6 md:pb-4 md:pt-6">
                 <Link
                     href={homeHref}
                     aria-label={`Back to the site: ${businessName}`}
                     title="Back to the site"
                     className={cn(
-                        "bg-site-accent text-site-accent-fg font-site-heading grid h-[34px] w-[34px] shrink-0 cursor-pointer place-items-center rounded-[calc(var(--site-radius)+8px)] text-base font-bold transition-[opacity,transform] duration-100 hover:opacity-90 active:scale-[0.96]",
+                        "bg-site-accent text-site-accent-fg font-site-heading grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[calc(var(--site-radius)+8px)] text-lg font-bold transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:opacity-90 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
                         focusRing,
                     )}
                 >
@@ -90,13 +95,13 @@ export function AccountHeader({
                     <Link
                         href={homeHref}
                         className={cn(
-                            "text-site-muted hover:text-site-fg block truncate text-xs font-medium",
+                            "text-site-body hover:text-site-fg block truncate text-[13px] font-medium underline-offset-2 hover:underline",
                             focusRing,
                         )}
                     >
                         {businessName}
                     </Link>
-                    <h1 className="font-site-heading text-site-fg m-0 truncate text-xl font-semibold tracking-[-0.02em]">
+                    <h1 className="font-site-heading text-site-fg m-0 truncate text-[calc(1.3125rem*var(--site-heading-scale,1))] font-semibold leading-tight tracking-[-0.02em] md:text-[calc(1.75rem*var(--site-heading-scale,1))]">
                         {heading}
                     </h1>
                 </div>

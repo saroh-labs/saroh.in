@@ -5,7 +5,8 @@ import type { TrackLookup } from "@saroh/site-blocks";
 import { ACCOUNT_TAB_HREF, AccountOrders } from "@saroh/site-blocks";
 
 import { getAccount, getOrder, getOrders } from "@/lib/account-area";
-import { getSiteForHost } from "@/lib/publication";
+import { accountTitle, getAccountSite } from "@/lib/account-site";
+import { ACCOUNT_PAGE_TITLES } from "@/lib/account-title";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 
 /**
@@ -13,9 +14,12 @@ import { getCheckoutOptions } from "@/lib/shop-checkout";
  * newest first, and — at `?order=‹ref›` — that order's Track, drawn from
  * the steps the API sends. The layout has already checked the switch and
  * the session. A business that doesn't sell has no Orders tab, and this
- * page is a 404 for it.
+ * page is a 404 for it. Each order also has a page of its own
+ * (`[orderRef]/page.tsx`, DEC-142).
  */
-export const metadata: Metadata = { title: "Orders" };
+export function generateMetadata(): Promise<Metadata> {
+    return accountTitle(ACCOUNT_PAGE_TITLES.orders);
+}
 
 export default async function AccountOrdersPage({
     params,
@@ -37,7 +41,7 @@ export default async function AccountOrdersPage({
     const [orders, track, site] = await Promise.all([
         getOrders(),
         ref ? getOrder(ref) : Promise.resolve<TrackLookup | null>(null),
-        getSiteForHost(domain),
+        getAccountSite(domain),
     ]);
     // "Go to the shop" only while the shop takes orders (G13).
     const options = site?.siteId

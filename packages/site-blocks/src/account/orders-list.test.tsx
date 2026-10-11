@@ -105,14 +105,36 @@ describe("the words", () => {
             "●",
             "○",
         ]);
+        const visit = {
+            number: 2,
+            startAt: "2026-10-05T04:30:00.000Z",
+            timezone: "Asia/Kolkata",
+            state: "booked" as const,
+        };
+        // Still to come: booked.
+        expect(visitLine(visit, new Date("2026-10-01T00:00:00Z"))).toEqual({
+            title: "Visit 2 · Mon 5 Oct, 10:00 am",
+            state: "Booked",
+        });
+        // Over, and nobody has said how it went: its date alone, never
+        // "Booked" (DEC-142).
+        expect(visitLine(visit, new Date("2026-10-06T00:00:00Z"))).toEqual({
+            title: "Visit 2 · Mon 5 Oct, 10:00 am",
+            state: "",
+        });
+        // Marked by the business: said, whenever it is read.
         expect(
-            visitLine({
-                number: 2,
-                startAt: "2026-10-05T04:30:00.000Z",
-                timezone: "Asia/Kolkata",
-                state: "booked",
-            }),
-        ).toEqual({ title: "Visit 2 · Mon 5 Oct, 10:00 am", state: "Booked" });
+            visitLine(
+                { ...visit, state: "done" },
+                new Date("2026-10-06T00:00:00Z"),
+            ).state,
+        ).toBe("Done");
+        expect(
+            visitLine(
+                { ...visit, state: "missed" },
+                new Date("2026-10-06T00:00:00Z"),
+            ).state,
+        ).toBe("Missed");
         expect(
             visitLine({
                 number: 3,
@@ -330,7 +352,7 @@ describe("Home's orders", () => {
             tabs: [
                 { key: "home", label: "Home" },
                 { key: "orders", label: "Orders" },
-                { key: "me", label: "Me" },
+                { key: "me", label: "Your details" },
             ],
             offers: { appointments: false, orders: true, plans: false },
             bookingsLabel: "Appointments",

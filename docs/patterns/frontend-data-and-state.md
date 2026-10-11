@@ -85,7 +85,20 @@ add or change there may be served to the next visitor without rendering.
   read. The Worker already passes by private paths
   (`lib/private-paths.ts`), previews, review links, test hosts and any
   request with a session cookie (`lib/page-cache/request-rules.ts`); a new
-  private path goes in `private-paths.ts`.
+  private path goes in `private-paths.ts`. That one list also decides what
+  `robots.txt` disallows and which responses carry
+  `X-Robots-Tag: noindex, nofollow` (`privatePathHeaders`, set by the
+  middleware; DEC-142), so a new private path needs nothing else.
+- **The customer's account streams a held layout; a public page does not.**
+  Every page under `[domain]/account` has a `loading.tsx` (DEC-142). They
+  are private and never indexed, so the 200 a streamed "not found" answers
+  with costs nothing there. A public page still renders before its first
+  byte so `notFound()` answers 404 (DEV_LEARNINGS, UX-071): no `loading.tsx`
+  above one.
+- **A constant a server page reads lives in a plain module.** An export of
+  a `"use client"` file reaches a server component as a reference, not its
+  value: the account's addresses are in `site-blocks/account/hrefs.ts` for
+  that reason, not in the tab bar.
 - **A live read outside the publication shortens the page's life.** The
   head (trackers, codes; DEC-108) keeps it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five

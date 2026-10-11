@@ -5,6 +5,7 @@ import type {
     AccountMoveAnswer,
     AccountTimesAnswer,
     AccountVisitAnswer,
+    LeaveResult,
 } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
@@ -172,4 +173,38 @@ export async function bookVisit(
         (body) => (isTreatment(body) ? body : null),
     );
     return got.ok ? { ok: true, treatment: got.value } : got;
+}
+
+/**
+ * Leave a class's line from the account (DEC-142): the booking page's own
+ * route (`POST public/site-accounts/waitlist/leave`), for the class and
+ * start named. The API finds the place by the signed-in customer, so only
+ * ever their own; a place held for them then goes to the next in line.
+ */
+export async function leaveLine(
+    serviceRef: string,
+    startAt: string,
+): Promise<LeaveResult> {
+    if (!(await siteOrigin()) || !accountAreaOn()) {
+        return { ok: false, message: OFFLINE };
+    }
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
+    const serviceId = typeof serviceRef === "string" ? serviceRef.trim() : "";
+    const at = cleanInstant(startAt);
+    if (!serviceId || serviceId.length > MAX_REF || !at) {
+        return { ok: false, message: OFFLINE };
+    }
+    const call = await accountFetch("waitlist/leave", {
+        method: "POST",
+        body: { serviceId, startAt: at },
+    });
+    if (!call?.ok) return { ok: false, message: OFFLINE };
+    if (call.res.ok) return { ok: true };
+    return {
+        ok: false,
+        message: refusal(
+            call.res.status,
+            await call.res.json().catch(() => null),
+        ),
+    };
 }

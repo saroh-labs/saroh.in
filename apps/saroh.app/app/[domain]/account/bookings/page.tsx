@@ -4,12 +4,20 @@ import { notFound } from "next/navigation";
 import type { SignInOptions } from "@saroh/site-blocks";
 import { AccountBookingsTab } from "@saroh/site-blocks";
 
-import { getAccount, getBookings } from "@/lib/account-area";
+import {
+    getAccount,
+    getBookings,
+    getCourses,
+    getWaitlist,
+} from "@/lib/account-area";
+import { accountTitle } from "@/lib/account-site";
+import { ACCOUNT_PAGE_TITLES } from "@/lib/account-title";
 import { getSignInOptions } from "@/lib/sign-in";
 
 import {
     bookVisit,
     cancelBooking,
+    leaveLine,
     moveBooking,
     moveTimes,
     visitTimes,
@@ -21,8 +29,12 @@ import {
  * `?move=‹ref›` or `?cancel=‹ref›` (Home's next booking) opens that sheet.
  * The layout has already checked the switch and the session. A business
  * that takes no bookings has no Bookings tab, and this page is a 404 for it.
+ * Their places in a class's line and their courses sit here too, and each
+ * booking has a page of its own (`[bookingRef]/page.tsx`, DEC-142).
  */
-export const metadata: Metadata = { title: "Bookings" };
+export function generateMetadata(): Promise<Metadata> {
+    return accountTitle(ACCOUNT_PAGE_TITLES.bookings);
+}
 
 function one(value: string | string[] | undefined): string | null {
     const text = typeof value === "string" ? value.trim() : "";
@@ -43,8 +55,11 @@ export default async function AccountBookingsPage({
     const tab = account.tabs.find((t) => t.key === "bookings");
     if (!tab) notFound();
 
-    const [bookings, options] = await Promise.all([
+    const [bookings, waitlist, courses, options] = await Promise.all([
         getBookings(),
+        // Their places in a class's line, and their courses (DEC-142).
+        getWaitlist(),
+        getCourses(),
         // The business's public phone, for "Call"; never blocks the page.
         getSignInOptions().catch((): SignInOptions | null => null),
     ]);
@@ -70,6 +85,10 @@ export default async function AccountBookingsPage({
                       ? { kind: "cancel", ref: cancel }
                       : null
             }
+            waitlist={waitlist}
+            courses={courses}
+            leaveLine={leaveLine}
+            now={new Date().toISOString()}
         />
     );
 }

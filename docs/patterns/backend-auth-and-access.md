@@ -648,6 +648,18 @@ orgId)` (`organizations/organization-kind.ts`).
   through `lib/customer-session.ts` (`siteAccountsFetch`, `accountFetch`),
   and every state-changing action calls `siteOrigin()` (`lib/origin.ts`)
   first — `lib/origin.test.ts` fails when one doesn't.
+- **Current** (ADR-011; DEC-142) — **What a customer sees leaves through
+  the allow-list, and someone else's row is a 404.** Every answer of an
+  account route is built by a named-field serializer in
+  `site-accounts/customer-view.ts` or one of the three files it re-exports
+  (`account-bookings-view.ts`, `account-packs-view.ts`,
+  `account-details-view.ts`), never by spreading a row;
+  `customer-view.spec.ts` feeds each one a row carrying staff notes,
+  another attendee and internal ids and checks none comes out. Every read
+  is scoped to the session's business **and** contact, so another
+  customer's order, booking or invoice is a 404, never "not yours". A new
+  thing a customer may see is a new serializer there, with its case in the
+  spec.
 - **Adopted** (2026-09-26, DEC-039) — **New staff permissions wait for the
   matrix review** (`docs/plans/2026-09-26-permission-matrix.md`). Until then,
   build against today's actions.

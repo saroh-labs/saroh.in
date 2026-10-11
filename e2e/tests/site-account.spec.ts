@@ -12,7 +12,7 @@ import {
 /**
  * The customer account area on a merchant's site (round-2 plan A, A5),
  * against the running stack: the header's Sign in lands on the account's
- * Home, Me shows the customer's details and receipts, a name change sticks,
+ * Home, Your details shows the customer's details and receipts, a name change sticks,
  * and signing out leaves the header's Sign in again.
  *
  * The area ships dark (`SITE_ACCOUNT_AREA`, off until A6–A8 and A13 land),
@@ -49,7 +49,7 @@ test.describe("the account area (A5)", () => {
     test.skip(!areaOn, "SITE_ACCOUNT_AREA is off on this stack");
     test.beforeEach(({ page }) => asNewVisitor(page));
 
-    test("Sign in in the header lands on Home, and Me keeps a name change", async ({
+    test("Sign in in the header lands on Home, and Your details keeps a name change", async ({
         page,
     }) => {
         const email = `a5-${Date.now()}@example.in`;
@@ -70,7 +70,8 @@ test.describe("the account area (A5)", () => {
             "page",
         );
 
-        await tabs.getByRole("link", { name: "Me" }).click();
+        // The tab is "Your details" (DEC-142); its address is unchanged.
+        await tabs.getByRole("link", { name: "Your details" }).click();
         await expect(page).toHaveURL(/\/account\/me$/);
         await expect(page.getByText(email)).toBeVisible();
         await expect(page.getByText("No receipts yet.")).toBeVisible();
@@ -85,7 +86,9 @@ test.describe("the account area (A5)", () => {
 
         // The account's compact header (DEC-073 #10): the tab's title and
         // the business's letter back to the site, no site header or footer.
-        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Me");
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+            "Your details",
+        );
         await expect(page.getByRole("contentinfo")).toHaveCount(0);
         await page
             .getByRole("banner")
