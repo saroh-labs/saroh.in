@@ -9,6 +9,8 @@ import { useCallback, useRef, useState } from "react";
 
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { countSaved } from "@/lib/stock/levels";
+import type { StockHref, StockPages } from "@/lib/stock/list-query";
+import { stockHref } from "@/lib/stock/list-query";
 import type { LogKindId } from "@/lib/stock/log";
 import {
     countDraft,
@@ -34,8 +36,10 @@ type Tab = "levels" | "log" | "checks";
 
 /**
  * Sell › Stock (#527, #521), after "Saroh Stock": the header with Move stock
- * and Count stock, the three tabs, and the count in progress. The tabs and
- * filters are addresses; the count is this screen's own state until saved.
+ * and Count stock, the three tabs, and the count in progress. The tabs,
+ * filters and pages are addresses; the count is this screen's own state
+ * until saved, so what was typed on one page of Levels is still there on
+ * the next.
  */
 export function StockScreen({
     business,
@@ -50,7 +54,7 @@ export function StockScreen({
     logFilter,
     products,
     canWrite,
-    pageSizes,
+    pages,
 }: {
     business: string | null;
     tab: Tab;
@@ -64,7 +68,8 @@ export function StockScreen({
     logFilter: { kind: LogKindId; store: string; product: string };
     products: { id: string; name: string }[];
     canWrite: boolean;
-    pageSizes: { levels: number; log: number; checks: number };
+    /** Each list's page and rows per page, as the address has them. */
+    pages: StockPages;
 }) {
     const router = useRouter();
     const [saving, setSaving] = useState(false);
@@ -74,25 +79,10 @@ export function StockScreen({
 
     /** This screen's address with some of its parts changed. */
     const { kind, store, product } = logFilter;
-    const href = useCallback(
-        (change: Record<string, string | undefined>) => {
-            const parts: Record<string, string | undefined> = {
-                tab: tab === "levels" ? undefined : tab,
-                show: show === "all" ? undefined : show,
-                q: q || undefined,
-                kind: kind === "all" ? undefined : kind,
-                store: store === "all" ? undefined : store,
-                product: product || undefined,
-                ...change,
-            };
-            const params = new URLSearchParams();
-            for (const [k, v] of Object.entries(parts)) {
-                if (v) params.set(k, v);
-            }
-            const s = params.toString();
-            return s ? `/commerce/stock?${s}` : "/commerce/stock";
-        },
-        [tab, show, q, kind, store, product],
+    const href = useCallback<StockHref>(
+        (change) =>
+            stockHref({ tab, show, q, kind, store, product, pages }, change),
+        [tab, show, q, kind, store, product, pages],
     );
 
     // Cancel offers Undo, which puts the typed numbers back (`useCountMode`).
@@ -287,7 +277,7 @@ export function StockScreen({
                             counting={counting}
                             values={values}
                             onValue={onValue}
-                            pageSize={pageSizes.levels}
+                            paging={pages.levels}
                         />
                     </>
                 ) : null}
@@ -298,11 +288,15 @@ export function StockScreen({
                         storefronts={storefronts}
                         products={products}
                         href={href}
-                        pageSize={pageSizes.log}
+                        paging={pages.log}
                     />
                 ) : null}
                 {tab === "checks" ? (
-                    <ChecksList checks={checks} pageSize={pageSizes.checks} />
+                    <ChecksList
+                        checks={checks}
+                        href={href}
+                        paging={pages.checks}
+                    />
                 ) : null}
             </div>
 

@@ -11,35 +11,7 @@ import {
     logCountWords,
     logKindId,
     logKinds,
-    moreChecks,
 } from "./log";
-
-describe("moreChecks", () => {
-    const c = (key: string) => ({ key });
-
-    it("adds the next page to what is shown", () => {
-        expect(moreChecks([c("a"), c("b")], { checks: [c("c")] })).toEqual([
-            c("a"),
-            c("b"),
-            c("c"),
-        ]);
-    });
-
-    it("never shows a check twice", () => {
-        expect(
-            moreChecks([c("a"), c("b")], { checks: [c("b"), c("c")] }),
-        ).toEqual([c("a"), c("b"), c("c")]);
-    });
-
-    it("puts the first page in place when the API started again", () => {
-        expect(
-            moreChecks([c("a"), c("b")], {
-                checks: [c("a"), c("c")],
-                restarted: true,
-            }),
-        ).toEqual([c("a"), c("c")]);
-    });
-});
 
 const TZ = "Asia/Kolkata";
 const NOW = new Date("2026-09-26T06:30:00Z");
@@ -152,8 +124,8 @@ describe("days", () => {
             ["Yesterday", ["c"]],
             ["18 Sep", ["d"]],
         ]);
-        expect(logCountWords(1, false)).toBe("1 entry");
-        expect(logCountWords(50, true)).toBe("50 entries so far");
+        expect(logCountWords(1)).toBe("1 entry");
+        expect(logCountWords(120)).toBe("120 entries");
     });
 });
 

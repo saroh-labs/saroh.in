@@ -9,6 +9,7 @@ import { PRODUCT_LINES } from "../orders/order-line";
 import type { ResolveCheckDto, StockChecksQueryDto } from "./dto";
 import type { StockReader } from "./stock-access";
 import { stockReader, stockWriter } from "./stock-access";
+import { stockWindow } from "./stock-paging";
 import { COUNT_DIDNT_MATCH, shortBy } from "./stock-words";
 import { COUNTING_ROWS } from "./tracking";
 
@@ -64,6 +65,10 @@ export interface StockChecksView {
     counts: Record<StockCheckKind, number>;
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
+    /** Every open check, across every page. */
+    total: number;
+    /** Checks a page, as asked; null when every one was sent. */
+    pageSize: number | null;
     /**
      * The cursor's check had closed, so this is the first page again: the
      * caller replaces the list it holds instead of adding to it.
@@ -85,14 +90,16 @@ export class StockChecksService {
     constructor(private readonly idempotency: IdempotencyService) {}
 
     /**
-     * The open checks, a page at a time when `limit` is given (`cursor` is
-     * the last key of the page before). Without it, every one, as before.
+     * The open checks, a page at a time: by its number (`page`, at `size`
+     * checks), or `limit` checks after `cursor`, the last key of the page
+     * before (`stock-paging.ts`). Without any of them, every one, as before.
      */
     async list(
         ctx: OrganizationContext,
         query: StockChecksQueryDto = {},
     ): Promise<StockChecksView> {
         const reader = stockReader(ctx);
+        const { take, skip } = stockWindow(query);
         const open = await this.open(reader);
         const counts: Record<StockCheckKind, number> = {
             SHORT: 0,
@@ -112,13 +119,16 @@ export class StockChecksService {
             restarted = at < 0;
             rest = restarted ? open : open.slice(at + 1);
         }
-        const more = query.limit !== undefined && rest.length > query.limit;
-        const page = more ? rest.slice(0, query.limit) : rest;
+        const end = take === undefined ? rest.length : skip + take;
+        const more = rest.length > end;
+        const page = rest.slice(skip, end);
         return {
             checks: page.map(({ fingerprint: _f, ...check }) => check),
             counts,
             canResolve: reader.canWrite,
             nextCursor: more ? page[page.length - 1].key : null,
+            total: open.length,
+            pageSize: take ?? null,
             restarted,
         };
     }

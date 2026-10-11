@@ -6,10 +6,6 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/",
     useSearchParams: () => new URLSearchParams(""),
 }));
-vi.mock("@/lib/stock/screen-actions", () => ({
-    loadLevelsPage: vi.fn(),
-    loadLogPage: vi.fn(),
-}));
 vi.mock("@/lib/orders/list-actions", () => ({ findOrderProducts: vi.fn() }));
 
 import { ClassPacksTabs } from "@/components/class-packs/class-packs-tabs";
@@ -330,7 +326,7 @@ describe("a list read a page at a time, with views above it: Stock › Levels", 
                 counting={false}
                 values={{}}
                 onValue={noop}
-                pageSize={50}
+                paging={{ page: 1, size: 50 }}
             />,
         );
     const out = draw("needs");
