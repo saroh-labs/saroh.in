@@ -4,7 +4,7 @@ import { PartialRead } from "@/components/shared/failed-read";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -115,7 +115,6 @@ export function CollectionsPanel({
                         onClick={() => setSheet({ id: null })}
                         className="gap-[5px]"
                     >
-                        <Plus className="size-3" aria-hidden />
                         New collection
                     </Button>
                 ) : null}

@@ -4,7 +4,6 @@ import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -45,7 +44,6 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
         <OptionSheet
             trigger={
                 <Button type="button" className="shrink-0">
-                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     New option
                 </Button>
             }

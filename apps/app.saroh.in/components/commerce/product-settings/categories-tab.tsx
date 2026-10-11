@@ -4,7 +4,6 @@ import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { NameDialog } from "@/components/shared/name-dialog";
@@ -108,7 +107,6 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
         <NameDialog
             trigger={
                 <Button type="button" className="shrink-0">
-                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     New category
                 </Button>
             }

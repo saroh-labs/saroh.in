@@ -9,7 +9,7 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Globe, MoreHorizontal, Plus } from "lucide-react";
+import { Globe, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -170,13 +170,7 @@ export function Header({
 
                                 asChild
                             >
-                                <Link href={s.href}>
-                                    <Plus
-                                        aria-hidden
-                                        className="mr-1 size-3.5"
-                                    />
-                                    {s.label}
-                                </Link>
+                                <Link href={s.href}>{s.label}</Link>
                             </Button>
                         ))}
                         <Tip label={canEdit ? undefined : EDIT_OFF}>
