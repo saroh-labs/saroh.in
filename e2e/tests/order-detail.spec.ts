@@ -360,10 +360,9 @@ test.describe("order detail", () => {
         await expect(panel.getByText("· added")).toBeVisible();
         await panel.getByRole("button", { name: /^Save/ }).click();
         await expect(panel).toBeHidden();
-        // Unpaid, so the added item is owed: the toast says how much.
-        await expect(
-            shown(page, /^Order saved\. ₹[\d,.]+ more is due\.$/),
-        ).toBeVisible();
+        // Nothing was paid, so no money moves and none is "more" due: the
+        // toast says the order was saved, and Money shows the new total.
+        await expect(shown(page, /^Order saved\.$/)).toBeVisible();
         await expect(
             page
                 .getByRole("region", { name: "What happened" })
