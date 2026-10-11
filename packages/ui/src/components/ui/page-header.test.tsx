@@ -140,6 +140,42 @@ describe("PageHeader", () => {
         ).toHaveTextContent("PR");
         expect(screen.getByRole("heading")).toHaveTextContent(/^Priya Raman$/);
     });
+
+    it("holds the picture to its own size, so a large photo leaves the title its room", () => {
+        // An inline link around a 1600px photo, in a block box, was as wide
+        // as the photo and squeezed the title to nothing.
+        const { container } = render(
+            <PageHeader
+                title="Rosehip Face Oil"
+                lead={
+                    <a href="/photos">
+                        <img src="/cover.jpg" alt="" />
+                    </a>
+                }
+            />,
+        );
+        const lead = container.querySelector('[data-slot="page-lead"]');
+        expect(lead?.className.split(" ")).toEqual(
+            expect.arrayContaining(["flex", "shrink-0"]),
+        );
+    });
+
+    it("lets the actions wrap on a phone, and holds their width only from sm up", () => {
+        const { container } = render(
+            <PageHeader
+                title="Priya Raman"
+                actions={<button type="button">Edit details</button>}
+            />,
+        );
+        const classes =
+            container
+                .querySelector('[data-slot="page-actions"]')
+                ?.className.split(" ") ?? [];
+        expect(classes).toEqual(
+            expect.arrayContaining(["flex-wrap", "min-w-0", "sm:shrink-0"]),
+        );
+        expect(classes).not.toContain("shrink-0");
+    });
 });
 
 describe("countLabel", () => {

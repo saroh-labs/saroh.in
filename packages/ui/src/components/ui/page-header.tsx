@@ -153,7 +153,10 @@ export function PageHeader({
                     )}
                 >
                     {lead ? (
-                        <div data-slot="page-lead" className="shrink-0">
+                        // A flex box, so whatever stands here keeps its
+                        // own size: an inline link around a photo took the
+                        // photo's full width and left the title none.
+                        <div data-slot="page-lead" className="flex shrink-0">
                             {lead}
                         </div>
                     ) : null}
@@ -217,7 +220,10 @@ export function PageHeader({
                         {actions ? (
                             <div
                                 data-slot="page-actions"
-                                className="flex shrink-0 flex-wrap items-center gap-2"
+                                // On a phone the group is as wide as the
+                                // page and its buttons wrap. Held to their
+                                // own width there, they ran off the side.
+                                className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0"
                             >
                                 {actions}
                             </div>

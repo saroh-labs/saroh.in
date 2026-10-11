@@ -239,7 +239,7 @@ export function ProductHeader({
                             aria-label="Cover photo, open Photos"
                             className={cn(
                                 FOCUS,
-                                "size-14 shrink-0 overflow-hidden rounded-xl bg-muted",
+                                "block size-14 shrink-0 overflow-hidden rounded-xl bg-muted",
                             )}
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
