@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as ModulePages from "@/lib/module-pages";
+
 import { generateMetadata } from "./page";
 
 interface Lookup {
@@ -22,9 +24,9 @@ vi.mock("@/lib/publication", () => ({
     findPageByPath: vi.fn(() => null),
     postsPrefix: vi.fn(() => "blog"),
 }));
-vi.mock("@/lib/module-pages", async (original) => ({
+vi.mock("@/lib/module-pages", async (importOriginal) => ({
     // The rule that keeps an empty page out of search is the real one.
-    ...(await original<typeof import("@/lib/module-pages")>()),
+    ...(await importOriginal<typeof ModulePages>()),
     findModulePage: vi.fn(() => null),
     isFreePage: vi.fn(() => false),
     moduleLabel: vi.fn(() => "Shop"),

@@ -340,3 +340,81 @@ describe("the Product grid's read", () => {
         expect(cardLine(null)).toBeNull();
     });
 });
+
+describe("a product with no photo, in the Product grid (starter audit)", () => {
+    const NO_PHOTOS = BREADS.map((p) => ({ ...p, image: null }));
+    const looks: RenderedProductGrid[] = [
+        { ...content },
+        { ...content, cardStyle: "bare" },
+        { ...content, variant: "lead" },
+        { ...content, layout: "list" },
+    ];
+
+    it.each(looks)(
+        "draws cards of words, with no empty box, when no product shown has one (%o)",
+        (look) => {
+            const { container } = render(
+                <ProductGridSection
+                    content={look}
+                    feed={{ products: NO_PHOTOS, basePath: "/shop" }}
+                />,
+            );
+            expect(container.querySelector("img")).toBeNull();
+            expect(container.querySelector("[data-name-plate]")).toBeNull();
+            expect(container.querySelector(".h-\\[130px\\]")).toBeNull();
+            expect(container.querySelector(".aspect-\\[4\\/5\\]")).toBeNull();
+            // Every product is still there, by name, with its price.
+            expect(screen.getAllByRole("listitem")).toHaveLength(4);
+            expect(
+                screen.getByRole("link", { name: /Sourdough/ }),
+            ).toHaveTextContent("From ₹250");
+            expect(container).not.toHaveTextContent("No photo yet");
+        },
+    );
+
+    it("says Sold out beside the name when there is no photo to carry it", () => {
+        render(
+            <ProductGridSection
+                content={{ ...content, cardStyle: "bare" }}
+                feed={{ products: NO_PHOTOS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getByRole("link", { name: /Brioche/ })).toHaveTextContent(
+            "Sold out",
+        );
+    });
+
+    it.each(looks.slice(0, 3))(
+        "gives it a name panel in the photo's own box where its neighbours have photos (%o)",
+        (look) => {
+            const { container } = render(
+                <ProductGridSection
+                    content={look}
+                    feed={{ products: BREADS, basePath: "/shop" }}
+                />,
+            );
+            // Focaccia has a photo; the three others shown take a panel.
+            expect(container.querySelectorAll("img")).toHaveLength(1);
+            const plates = container.querySelectorAll("[data-name-plate]");
+            expect(plates).toHaveLength(3);
+            for (const plate of Array.from(plates)) {
+                // Decoration: the card's own words name the product.
+                expect(plate).toHaveAttribute("aria-hidden", "true");
+            }
+            expect(
+                screen.getByRole("link", { name: /Rye loaf/ }),
+            ).toBeVisible();
+        },
+    );
+
+    it("keeps the merchant's own switch: photos off draws none, whatever the products have", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={{ ...content, showPhotos: false }}
+                feed={{ products: BREADS, basePath: "/shop" }}
+            />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector("[data-name-plate]")).toBeNull();
+    });
+});

@@ -461,7 +461,7 @@ export default function ProductPage({
                                 onClick={() => pick(v)}
                                 aria-pressed={v.id === variantId}
                                 className={cn(
-                                    "min-h-11 min-w-11 cursor-pointer rounded-[calc(var(--site-radius,2px)+6px)] border px-3.5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-100 ease-out [overflow-wrap:anywhere] active:scale-[0.97]",
+                                    "min-h-11 min-w-11 max-w-full cursor-pointer rounded-[calc(var(--site-radius,2px)+6px)] border px-3.5 py-1.5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-100 ease-out [overflow-wrap:anywhere] active:scale-[0.97]",
                                     focusRing,
                                     v.id === variantId
                                         ? "border-site-fg bg-site-fg text-site-bg"
@@ -544,7 +544,15 @@ export default function ProductPage({
     // the photos, or in a column of its own when there are none.
     const about =
         hasAbout || details.length > 0 ? (
-            <div className="min-w-0">
+            <div
+                className={cn(
+                    "min-w-0",
+                    // With no photo this is a column of its own at a desk;
+                    // on a phone it follows the button, under a rule.
+                    !hasPhotos &&
+                        "max-md:border-site-border max-md:border-t max-md:pt-6",
+                )}
+            >
                 {/* 4 — description and details */}
                 {hasAbout ? (
                     <section
