@@ -4139,3 +4139,26 @@ one. A wrapper that can sit under `asChild` passes on what it is given. An
 overlay's `dirty` is "differs from what is saved", not "would send
 something".
 **Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## A customer picked "13:00" on the page and was emailed "1:00 pm"
+
+**Symptom**: on a merchant's site the booking page offered "09:00 … 13:00 …
+16:30" and the account area wrote "Mon 5 Oct, 14:00", while the email the
+same customer got said "1:00 pm" and the merchant app "1:00 pm" (seen in a
+browser, 11 Oct 2026).
+**Cause**: the 12-hour decision (10 Oct) gave the merchant app and the API
+one formatter each, with a check on each. The site (`packages/site-blocks`)
+had neither: `timeIn`, `bookingWhen` and a message's time each asked `Intl`
+for `hour12: false`, and the timetable and On today drew the API's "HH:MM"
+as it came.
+**Fix**: `packages/site-blocks/src/lib/clock.ts` (`timeWords`, `clockWords`,
+`timeRangeWords`), the twin of the API's `timeWords`, drawn everywhere a
+customer reads a time. `timeIn` and `clockValue` stay the 24-hour value for
+an address and a comparison.
+**Check**: `lib/clock.test.ts` runs the API spec's cases, and fails any
+other file in the package that formats an hour.
+**Rule**: a format decided for "everywhere" has three homes: the merchant
+app, the API's sentences and the merchant's site. Change all three, and give
+each its own check.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates

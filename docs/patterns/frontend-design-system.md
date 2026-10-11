@@ -636,6 +636,17 @@ zone)` is "9:30 am", lowercase, no leading zero. `formatClock` does
     - A test whose words carry a date and no `now` calls `pinClock()`
       (`lib/format/test-clock.ts`), or it passes this year and fails the
       next.
+- **Current** (11 Oct 2026) — **A merchant's site writes a time the same
+  way**, from its own one formatter, `packages/site-blocks/src/lib/clock.ts`
+  (the site imports nothing from the merchant app or the API): `timeWords(at,
+zone)` is "9:00 am", `clockWords("09:30")` the same for a wall-clock value,
+  `timeRangeWords` "9:00 to 9:30 am". Its twin is the API's `timeWords`
+  (`common/words-format.ts`), which writes the emails the same customer gets;
+  `clock.test.ts` runs the API spec's cases and fails any other file in the
+  package that formats an hour. `clockValue` and the booking flow's `timeIn`
+  are the 24-hour "HH:MM" for a machine (a `?start=`, a comparison), never
+  drawn. Opening hours keep their compact form ("9am–7pm",
+  `lib/opening-hours.ts`).
 - **Current** (10 Oct 2026) — `tabular-nums` on columns of figures, and a
   word where zero is a state rather than a measurement: "Not set", "None",
   "Not known", "Not yet", never a lone "—" and never 0 (`saroh-product.md`
