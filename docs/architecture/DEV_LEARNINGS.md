@@ -4201,3 +4201,20 @@ requests were right and only the largest ones were wrong.
 match). A skipped job on a pull request that touches `apps/` or `packages/`
 is a finding: read the "skipping" rows, not only the red ones.
 **Category**: ci · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A row of four buttons ran past a phone's edge, on CI's fonts only
+
+**Symptom**: once CI ran its browser shards on the batch, four own-domain
+specs failed on the phone project: the page had zoomed out to 414px at a
+412px screen. The same specs passed on a Mac.
+**Cause**: a site setting's row (`Row` in `components/sites/settings-rows.tsx`)
+held its actions in a `shrink-0` box. Web address has four (Copy, QR code,
+View, Change), wider than the card on a phone, so the box ran out of the card.
+On a Mac it stopped 9px short of the screen's edge. On CI's Linux fonts it
+went 2px past, and the browser zoomed out to fit.
+**Fix**: the actions' box may shrink on a phone (`min-w-0 max-w-full
+sm:shrink-0`), so the buttons wrap inside the card.
+**Check**: the specs' own `expectNothingHiddenSideways`. A row that reaches
+the screen's edge on a Mac is past it somewhere else: nothing inside a card
+may be wider than the card.
+**Category**: frontend · `docs/patterns/frontend-verification.md`

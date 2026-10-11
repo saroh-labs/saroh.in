@@ -125,7 +125,15 @@ export function Row({
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
                     <div className="min-w-0">{children}</div>
-                    {action ? <div className="shrink-0">{action}</div> : null}
+                    {/* On a phone the actions may be narrower than they
+                        would like, so a row of four wraps inside the card:
+                        held to their own width they ran out of it, and past
+                        the screen's edge on a wider font. */}
+                    {action ? (
+                        <div className="min-w-0 max-w-full sm:shrink-0">
+                            {action}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );
