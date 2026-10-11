@@ -6,10 +6,9 @@ import { useMemo, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Checkbox } from "../checkbox";
 import { EmptyState } from "../data-state";
-import { FilterChips } from "../filter-chips";
 import { ListSearch } from "../list-search";
 import { listTable } from "../list-table";
-import { ListToolbar } from "../list-toolbar";
+import { ListFilter, ListToolbar } from "../list-toolbar";
 import { ScrollX } from "../scroll-x";
 import { Segmented } from "../segmented";
 import { Skeleton } from "../skeleton";
@@ -56,6 +55,7 @@ export function DataView<TRow>({
     empty,
     searchableColumnIds,
     filters,
+    filterLabel = "Show",
     initialFilterId,
     isLoading = false,
     error = null,
@@ -65,7 +65,9 @@ export function DataView<TRow>({
     toolbarSearch,
     toolbarExtra,
     toolbarEnd,
-    toolbarChips,
+    toolbarAttention,
+    toolbarMore,
+    onClearFilters,
     countLabel,
     hideModeToggle = false,
     onRowClick,
@@ -226,7 +228,9 @@ export function DataView<TRow>({
         Boolean(toolbarSearch) ||
         showModes ||
         Boolean(toolbarExtra) ||
-        Boolean(toolbarEnd);
+        Boolean(toolbarAttention) ||
+        Boolean(toolbarEnd) ||
+        hasFilters;
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
@@ -644,14 +648,14 @@ export function DataView<TRow>({
         // 14px between toolbar and table, as the applied screens space them.
         <div className="space-y-[14px]">
             {/*
-             * The one list toolbar: search first, then the screen's
-             * dropdown filters, then (to the right) the density switch and
-             * how many rows are showing. Under it, the chip row.
+             * The one list toolbar, in ONE row: search first, then every
+             * filter as a dropdown, then (to the right) the density switch
+             * and how many rows are showing.
              *
-             * Named subsets of the same rows (All, Live, Ended) are chips,
-             * never tabs: tabs are a screen's views. Each chip shows its
-             * count, so nobody presses into an empty one; `?view=` keeps
-             * the choice in the address.
+             * Named subsets of the same rows (All, Live, Ended) are a
+             * dropdown, never tabs (tabs are a screen's views) and never a
+             * row of chips. Each option shows its count, so nobody picks
+             * an empty one.
              */}
             <ListToolbar
                 search={
@@ -666,7 +670,49 @@ export function DataView<TRow>({
                         />
                     ) : null)
                 }
-                filters={toolbarExtra}
+                filters={
+                    hasFilters || toolbarExtra ? (
+                        <>
+                            {/* The named subsets of the rows (All, Live,
+                                Ended) are one more dropdown in the row,
+                                each with its count. `?view=` keeps the
+                                choice in the address. */}
+                            {hasFilters ? (
+                                <ListFilter
+                                    label={filterLabel}
+                                    value={filterId ?? ""}
+                                    onValueChange={chooseFilter}
+                                    options={(filters ?? []).map((f, i) => ({
+                                        value: f.id,
+                                        // The unnarrowed choice says what
+                                        // the list holds: "All codes".
+                                        label:
+                                            i === 0 && f.label === "All"
+                                                ? `All ${noun.other}`
+                                                : f.label,
+                                        count: countOf(f),
+                                    }))}
+                                />
+                            ) : null}
+                            {toolbarExtra}
+                        </>
+                    ) : null
+                }
+                attention={toolbarAttention}
+                more={toolbarMore}
+                onClear={
+                    // The list's own search and subset, and whatever the
+                    // screen says it has narrowed itself.
+                    search.trim() ||
+                    (hasFilters && filterId !== firstFilter?.id) ||
+                    onClearFilters
+                        ? () => {
+                              clearSearch();
+                              if (firstFilter) chooseFilter(firstFilter.id);
+                              onClearFilters?.();
+                          }
+                        : undefined
+                }
                 end={
                     toolbarEnd || showModes ? (
                         <>
@@ -695,22 +741,6 @@ export function DataView<TRow>({
                     ) : null
                 }
                 count={toolbarCount}
-                chips={
-                    hasFilters ? (
-                        <FilterChips
-                            label="Show"
-                            value={filterId ?? ""}
-                            onValueChange={chooseFilter}
-                            chips={(filters ?? []).map((f) => ({
-                                value: f.id,
-                                label: f.label,
-                                count: countOf(f),
-                            }))}
-                        />
-                    ) : (
-                        toolbarChips
-                    )
-                }
             />
 
             {error ? (

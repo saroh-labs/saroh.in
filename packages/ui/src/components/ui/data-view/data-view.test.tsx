@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -194,9 +194,9 @@ describe("DataView — how many", () => {
 });
 
 /**
- * A list's own toolbar and table (the one list anatomy): search first, the
- * count on the right, the named subsets as chips under them, never tabs,
- * then the table with its tinted head band.
+ * A list's own toolbar and table (the one list anatomy): ONE row of search,
+ * the named subsets as a dropdown and the count on the right, never tabs
+ * and never a row of chips, then the table with its tinted head band.
  */
 describe("DataView — the one toolbar and the one table", () => {
     beforeEach(() => window.localStorage.clear());
@@ -237,32 +237,44 @@ describe("DataView — the one toolbar and the one table", () => {
         />
     );
 
-    it("draws the named subsets as chips with their counts, never as tabs", () => {
+    it("draws the named subsets as one dropdown, never as tabs or chips", () => {
         setWidth(true);
         const { container } = render(filtered());
-        const group = screen.getByRole("radiogroup", { name: "Show" });
-        expect(group).toBeInTheDocument();
-        expect(screen.getByRole("radio", { name: "All 3" })).toBeChecked();
-        expect(screen.getByRole("radio", { name: "Owes 2" })).not.toBeChecked();
-        // Zero is a fact, so it is said.
-        expect(screen.getByRole("radio", { name: "Lapsed 0" })).toBeVisible();
+        const box = screen.getByRole("combobox", { name: "Show" });
+        // The unnarrowed choice says what the list holds, not a bare "All".
+        expect(box).toHaveTextContent(/^All customers$/);
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(
+            screen
+                .getAllByRole("option")
+                .map((o) => o.textContent.replace(/\s+/g, " ")),
+            // Zero is a fact, so it is said.
+        ).toEqual(["All customers 3", "Owes 2", "Lapsed 0"]);
         expect(screen.queryByRole("tab")).toBeNull();
-        expect(screen.queryByRole("tablist")).toBeNull();
+        expect(screen.queryByRole("radio")).toBeNull();
         expect(container.querySelector("[data-tab-strip]")).toBeNull();
         expect(container.querySelector("[data-count-badge]")).toBeNull();
     });
 
-    it("narrows the rows when a chip is pressed, and says how many are showing", () => {
+    it("narrows the rows when an option is chosen, and says how many are showing", async () => {
         setWidth(true);
         render(filtered());
-        screen.getByRole("radio", { name: "Owes 2" }).click();
-        return screen.findByText("2 of 3 customers").then(() => {
-            expect(screen.queryByText("Asha Rao")).toBeNull();
-            expect(screen.getByText("Bela Shah")).toBeInTheDocument();
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "Show" }), {
+            key: "ArrowDown",
         });
+        fireEvent.keyDown(screen.getByRole("option", { name: /^Owes/ }), {
+            key: "Enter",
+        });
+        await screen.findByText("2 of 3 customers");
+        expect(screen.queryByText("Asha Rao")).toBeNull();
+        expect(screen.getByText("Bela Shah")).toBeInTheDocument();
+        // The box now says the narrowed choice and its count.
+        expect(
+            screen.getByRole("combobox", { name: "Show" }),
+        ).toHaveTextContent(/^Owes 2$/);
     });
 
-    it("orders the toolbar: search, then the count on the right, then the chips, then the table", () => {
+    it("is one row: search, the dropdown, the count on the right, then the table", () => {
         setWidth(true);
         const { container } = render(filtered());
         const at = (selector: string) => {
@@ -272,8 +284,8 @@ describe("DataView — the one toolbar and the one table", () => {
         };
         const order = [
             at('[data-slot="list-search"]'),
-            at('[data-slot="list-end"]'),
-            at('[data-slot="list-chips"]'),
+            at('[role="combobox"][aria-label="Show"]'),
+            at('[data-slot="list-count"]'),
             at("table"),
         ];
         for (let i = 0; i < order.length - 1; i++) {
@@ -282,13 +294,18 @@ describe("DataView — the one toolbar and the one table", () => {
                     Node.DOCUMENT_POSITION_FOLLOWING,
             ).toBeTruthy();
         }
+        // No second row of controls under the toolbar's one.
+        expect(container.querySelector('[data-slot="list-chips"]')).toBeNull();
+        expect(at('[data-slot="list-row"]').nextElementSibling).toBe(
+            at('[data-slot="list-count"]'),
+        );
         expect(at('[data-slot="list-count"]')).toHaveTextContent("3 customers");
         expect(
             screen.getByRole("searchbox", { name: "Search customers" }),
         ).toBeInTheDocument();
     });
 
-    it("takes a screen's own search, dropdown filters, sort and chips in the same slots", () => {
+    it("takes a screen's own search, dropdown filters, attention toggle and sort in the same slots", () => {
         setWidth(true);
         const { container } = render(
             <DataView
@@ -300,7 +317,7 @@ describe("DataView — the one toolbar and the one table", () => {
                 toolbarSearch={<input aria-label="Search products" />}
                 toolbarExtra={<button type="button">Category</button>}
                 toolbarEnd={<button type="button">Sort</button>}
-                toolbarChips={<div data-testid="own-chips">Live</div>}
+                toolbarAttention={<button type="button">Needs you</button>}
             />,
         );
         const inSlot = (slot: string) =>
@@ -312,7 +329,7 @@ describe("DataView — the one toolbar and the one table", () => {
         ).toHaveAccessibleName("Search products");
         expect(inSlot("list-filters")).toBe("Category");
         expect(inSlot("list-end")).toContain("Sort");
-        expect(inSlot("list-chips")).toBe("Live");
+        expect(inSlot("list-attention")).toBe("Needs you");
     });
 
     it("draws the table's head as a tinted band of small uppercase labels, rows ruled edge to edge", () => {

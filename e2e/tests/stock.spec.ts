@@ -189,11 +189,7 @@ test.describe("Stock screen", () => {
         await signIn(page, rye.member);
         await page.goto(`/open/${rye.org}`);
 
-        /**
-         * What scrolls or clips sideways inside `main`, bar the tab strip
-         * and the chip row (one line inside ScrollX, `data-scroll-x`, the
-         * scroller `fixtures/hidden-sideways.ts` allows everywhere).
-         */
+        /** What scrolls or clips sideways inside `main`, bar the tab strip. */
         const hidden = () =>
             page
                 .locator("main")
@@ -202,7 +198,6 @@ test.describe("Stock screen", () => {
                         .filter(
                             (el) =>
                                 !el.closest("nav") &&
-                                !el.closest("[data-scroll-x]") &&
                                 getComputedStyle(el).overflowX !== "visible" &&
                                 el.scrollWidth > el.clientWidth + 1,
                         )
