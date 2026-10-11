@@ -4307,3 +4307,24 @@ a tag pattern replaced with nothing in one pass, anywhere in `apps`,
 **Rule**: to read markup's words, loop the replace until the string stops
 changing, or put a space where the tag was. Never one pass with `""`.
 **Category**: security · CodeQL on PRs · `scripts/check-tag-strip.mjs`
+
+## A notice's button sat against its words, on twenty screens
+
+**Symptom**: on Orders, the late-rule notice drew "Change it" and the
+dismiss cross straight after its sentence, with the rest of the bar empty,
+and its glyph a few pixels above the words (owner, 11 Oct 2026). Invoices'
+overdue notice, Subscriptions' unpaid one and about twenty others did the
+same.
+**Cause**: each caller laid out its own row inside `Notice` (words with
+`flex-1`, then a button) and expected the row to span the bar. `Notice`'s
+text column had no `flex-1`, so the row was only as wide as its content
+and the button had nothing to be pushed across. The glyph is set on the
+first line of text, and a row with a button in it is taller than a line.
+**Fix**: the text column in `Notice` takes the row's width, so every such
+row reaches the right edge; `align="center"` sets the glyph level with a
+row the caller's button made taller, and the callers with such a row pass
+it. The late-rule notice uses the `action` slot.
+**Rule**: a button that belongs to a notice goes in `action`. Where the
+caller needs its own row, it passes `align="center"`.
+**Check**: `packages/ui/src/components/ui/notice.test.tsx`.
+**Category**: design system · `packages/ui/src/components/ui/notice.tsx`

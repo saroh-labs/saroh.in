@@ -203,7 +203,7 @@ export function OrderQuickView({
             }
         >
             {read.state === "failed" ? (
-                <Notice tone="error">
+                <Notice tone="error" align="center">
                     <div className="flex flex-wrap items-center gap-2.5">
                         <span className="min-w-0 flex-1">{read.error}</span>
                         <Button

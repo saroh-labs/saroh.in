@@ -213,7 +213,7 @@ export function MergeDialog({
                     }
                 />
             ) : readFailed ? (
-                <Notice role="alert" className="mt-3.5">
+                <Notice role="alert" className="mt-3.5" align="center">
                     <div className="flex flex-wrap items-center gap-2.5">
                         <span className="flex-[1_1_220px] text-[13px] text-foreground/75">
                             {readFailed} Nothing has changed.

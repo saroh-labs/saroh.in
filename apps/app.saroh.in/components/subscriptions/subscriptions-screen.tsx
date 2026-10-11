@@ -308,7 +308,11 @@ export function SubscriptionsScreen({
                 ) : (
                     <>
                         {failed > 0 && tab !== "failed" ? (
-                            <Notice tone="error" className="mb-3.5">
+                            <Notice
+                                tone="error"
+                                className="mb-3.5"
+                                align="center"
+                            >
                                 <div className="flex flex-wrap items-center gap-3">
                                     <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
                                         {failed}{" "}

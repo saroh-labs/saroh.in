@@ -283,7 +283,7 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
-                    <Notice tone="error" className="mb-3.5">
+                    <Notice tone="error" className="mb-3.5" align="center">
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
                                 {overdueCount} overdue · {sums(overdue)}, worked

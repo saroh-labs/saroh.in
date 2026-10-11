@@ -205,7 +205,7 @@ export function PaymentBanner({
         : null;
     if (handover && !failed && waited) {
         return (
-            <Notice tone="error">
+            <Notice tone="error" align="center">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-[1_1_260px]">
                         <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
@@ -251,7 +251,7 @@ export function PaymentBanner({
     }
     if (handover && !failed) {
         return (
-            <Notice role="status">
+            <Notice role="status" align="center">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-[1_1_260px]">
                         <div className="text-[13.5px] font-bold">

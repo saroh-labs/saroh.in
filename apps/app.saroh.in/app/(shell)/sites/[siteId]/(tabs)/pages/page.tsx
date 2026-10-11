@@ -75,7 +75,7 @@ export default async function SitePagesPage({
     return (
         <div className="flex flex-col gap-4">
             {waiting > 0 ? (
-                <Notice role="status">
+                <Notice role="status" align="center">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <span className="min-w-0 flex-1 text-pretty">
                             Waiting to be published:{" "}
