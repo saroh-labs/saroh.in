@@ -1,4 +1,6 @@
 import { apiFetch, getActiveOrgId, getList } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planRefusalOf } from "@/lib/billing/refusal";
 
 /**
  * A merchant's own domain, as the api reports it (#200).
@@ -40,6 +42,12 @@ export interface SiteDomain {
      * any other hostname. `lib/domains/bare-view.ts` turns it into words.
      */
     bare?: BareDomainRead | null;
+    /**
+     * Where the domain stands against the business's plan (DEC-139).
+     * Absent from an api before it, and on a domain just added; both read
+     * as `included`. `lib/domains/domain-plan.ts` words it.
+     */
+    plan?: DomainPlanRead;
 }
 
 /**
@@ -67,6 +75,26 @@ export interface BareDomainRead {
 }
 
 /**
+ * - included: the plan includes the business's own domain, or no plan rule
+ *   is enforced. Nothing to say.
+ * - ending: the plan still includes it, and is known to end; the domain
+ *   stops showing the site at `stopsAt`, 3 days after that end.
+ * - grace: the plan no longer includes it; the domain shows the site until
+ *   `stopsAt`.
+ * - paused: the domain sends visitors to `sendsTo` since `stopsAt`. It is
+ *   still connected, and shows the site again on a plan with a domain.
+ *
+ * Free-form on the wire: an unknown state says nothing.
+ */
+export interface DomainPlanRead {
+    state: "included" | "ending" | "grace" | "paused" | (string & {});
+    /** ISO; null while the plan includes the domain. */
+    stopsAt: string | null;
+    /** The site's Saroh address as a host ("yourshop.saroh.app"), or null. */
+    sendsTo: string | null;
+}
+
+/**
  * - OFF: hosting isn't set up on this instance; the domain can still verify.
  * - WAITING_VERIFICATION: the TXT check hasn't passed yet.
  * - NOT_POINTED: verified, waiting for the CNAME and the certificate.
@@ -89,7 +117,14 @@ export interface DomainHostingRead {
 }
 
 export type DomainsResult<T> =
-    { ok: true; data: T } | { ok: false; error: string; status?: number };
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          status?: number;
+          /** The plan's refusal, when that is what stopped it (DEC-139). */
+          plan?: PlanRefusal;
+      };
 
 async function domainsBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
@@ -106,7 +141,7 @@ async function domainsBase(): Promise<string | null> {
 function readError(
     body: unknown,
     fallback: string,
-): { error: string; status?: number } {
+): { error: string; status?: number; plan?: PlanRefusal } {
     const err = (
         body as {
             error?: {
@@ -120,10 +155,14 @@ function readError(
         ? err.details.find((d): d is string => typeof d === "string")
         : undefined;
     const message = typeof err?.message === "string" ? err.message : undefined;
+    // A plan without its own domain refuses the way every plan refusal does
+    // (DEC-139). Null while plans aren't shown (DEC-136): the sentence alone.
+    const plan = planRefusalOf(err?.details, message);
     return {
         error: detail ?? message ?? fallback,
         status:
             typeof err?.statusCode === "number" ? err.statusCode : undefined,
+        ...(plan ? { plan } : {}),
     };
 }
 
