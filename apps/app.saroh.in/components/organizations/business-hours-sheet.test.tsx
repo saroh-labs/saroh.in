@@ -37,7 +37,7 @@ const store = (
     id: string,
     name: string,
     openingHours: OpeningHoursDay[] | null,
-) => ({ id, name, openingHours }) as StorefrontHours;
+): StorefrontHours => ({ id, name, openingHours });
 
 let host: HTMLDivElement;
 let root: Root;
@@ -85,12 +85,11 @@ function draw(stores: StorefrontHours[], differ = false) {
 }
 const named = (role: string, name: RegExp) =>
     Array.from(document.querySelectorAll<HTMLElement>(`[role="${role}"]`)).find(
-        (el) =>
-            name.test(el.getAttribute("aria-label") ?? el.textContent ?? ""),
+        (el) => name.test(el.getAttribute("aria-label") ?? el.textContent),
     );
 const button = (name: RegExp) =>
     Array.from(document.querySelectorAll("button")).find((b) =>
-        name.test(b.textContent ?? ""),
+        name.test(b.textContent),
     );
 async function press(el: HTMLElement | undefined) {
     if (!el) throw new Error("nothing to press");
@@ -122,7 +121,7 @@ describe("Business › Hours sheet", () => {
         expect(update).toHaveBeenCalledTimes(2);
         const [first, second] = sent();
         expect(first).toEqual(second);
-        expect(first?.filter((d) => d.closed).map((d) => d.day)).toEqual([
+        expect(first.filter((d) => d.closed).map((d) => d.day)).toEqual([
             "SAT",
             "SUN",
         ]);
