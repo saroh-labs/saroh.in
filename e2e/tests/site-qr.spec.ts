@@ -123,12 +123,14 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         expect(head.headers().location).toBe(location);
         expect((await mine(made.id))?.scans.total).toBe(2);
 
-        // A code the site doesn't have is its 404, not a redirect.
+        // A code the site doesn't have still reaches the business: its
+        // home page, untagged, never a bare "Not found".
         const unknown = await request.get(`${LIVE}/q/zzzzzz`, {
             maxRedirects: 0,
             headers,
         });
-        expect(unknown.status()).toBe(404);
+        expect(unknown.status()).toBe(302);
+        expect(unknown.headers().location).toBe(`${LIVE}/`);
 
         // In a browser, the visitor lands on the booking page with the tag
         // on the address.

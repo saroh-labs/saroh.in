@@ -214,7 +214,8 @@ test.describe("pay links on the business's own address (L6)", () => {
         // Either the window couldn't open (its script was blocked), or the
         // business's provider couldn't start the payment on this stack.
         // Both are said in the customer's words, with a way to go again.
-        const said = page.getByRole("alert");
+        // The page's own alert: Next's route announcer is one too.
+        const said = page.getByRole("main").getByRole("alert");
         await expect(said).toBeVisible({ timeout: 15_000 });
         await expect(said).toHaveText(
             /We couldn't open the payment window\. Check your connection and try again\.|can't take payment online right now|We couldn't start the payment/,

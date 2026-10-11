@@ -84,7 +84,8 @@ test.describe("site sign-in: the API side", () => {
     test("a workspace session doesn't sign anyone in on the site", async ({
         page,
     }) => {
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
+        // The password form: /login alone asks for an email code.
+        await page.goto(`${urls.ACCOUNTS_URL}/login?with=password`);
         await page.getByLabel("Email").fill(demoUser.email);
         await page
             .getByLabel("Password", { exact: true })
@@ -116,7 +117,8 @@ test.describe("site sign-in: in the browser", () => {
     test.beforeEach(({ page }) => asNewVisitor(page));
 
     async function signInStaff(page: Page) {
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
+        // The password form: /login alone asks for an email code.
+        await page.goto(`${urls.ACCOUNTS_URL}/login?with=password`);
         await page.getByLabel("Email").fill(demoUser.email);
         await page
             .getByLabel("Password", { exact: true })
