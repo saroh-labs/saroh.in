@@ -8,7 +8,7 @@ import { escapeHtml } from "./html";
 /**
  * `starter` — the template a new site starts from.
  *
- * Two versions are registered, and both keep resolving (`registry.ts`): the
+ * Every version stays registered and keeps resolving (`registry.ts`): the
  * registry keys templates by `id@version`, and a shipped version is never
  * edited.
  *
@@ -22,13 +22,18 @@ import { escapeHtml } from "./html";
  *   image at all: both heroes are the centred look, and v1's gallery gives way
  *   to words and a call to action. A photo is the merchant's to add. Every
  *   link it makes goes somewhere: an email, or its own About page.
- * - v3 ({@link starterTemplate}, UX-070, #353) starts with a real menu (Home,
+ * - v3 ({@link starterTemplateV3}, UX-070, #353) starts with a real menu (Home,
  *   About), so Settings › Menu, the pre-publish check and the live header
  *   agree. With nothing said about the business, the hero prompts the owner
  *   ("Say what you do and where, in one line.") rather than speaking for
- *   them, and without an email there is one About button, not two.
+ *   them, and without an email there is one About button, not two. That
+ *   prompt reached visitors on every site published before it was replaced,
+ *   so the pre-publish check now refuses it (`placeholders.ts`).
+ * - v4 (`starter-v4.ts`, DEC-141) is the one new sites start from: a look
+ *   of its own, sections for what the business has switched on, and no
+ *   line that is not true of the business.
  *
- * All copy is derived from the business profile via content builders, so an
+ * In these three, all copy is derived from the business profile via content builders, so an
  * org that has only supplied its name still gets a complete, contract-valid
  * site.
  */
@@ -283,7 +288,7 @@ const [v2Home, v2About] = starterTemplateV2.pages as [
     TemplatePage,
 ];
 
-export const starterTemplate: TemplateManifest = {
+export const starterTemplateV3: TemplateManifest = {
     ...starterTemplateV2,
     version: 3,
     pages: [

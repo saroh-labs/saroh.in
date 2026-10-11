@@ -46,7 +46,12 @@ export interface TemplateContext {
     legalName?: string;
     /** Short marketing tagline, e.g. used as a hero subheading. */
     tagline?: string;
-    /** Longer one-line description of what the business does. */
+    /**
+     * One line on what the business does. Until it has a field of its own
+     * the API composes it from what the business already told Saroh (its
+     * services or what it sells, and its town: `composeBusinessLine`), and
+     * leaves it out when nothing true can be said.
+     */
     description?: string;
     /** Public contact email, used to build "Contact us" CTAs. */
     contactEmail?: string;
@@ -63,6 +68,24 @@ export interface TemplateContext {
      * cannot invent an id, so a services list is laid down only from these.
      */
     serviceIds?: string[];
+    /**
+     * The shop can be shown for the business (the Shop page's own gate:
+     * Commerce rolled out and on, and the shop open for it). Absent means
+     * not known: lay down nothing that sells.
+     */
+    sells?: boolean;
+    /** At least one of its services is a class (more than one place). */
+    hasClasses?: boolean;
+    /**
+     * Where the business is, as it would say it in a sentence: its town
+     * ("Bengaluru"). Never a street or a postcode. Absent when it has
+     * said nothing.
+     */
+    area?: string;
+    /** It has a place with an address, so a Visit us block has one to show. */
+    hasPlace?: boolean;
+    /** It has a week of opening hours saved. */
+    hasHours?: boolean;
 }
 
 /**
@@ -254,6 +277,43 @@ export interface TemplateManifest {
      * ends in its name (and "Made with Saroh" on Free, DEC-102).
      */
     footer?: TemplateFooter;
+    /**
+     * The module pages a site made from the template starts with, each only
+     * where its condition holds (starter v4, DEC-141): Shop, Book, Prices,
+     * Contact. They are not laid down from `pages`: the API makes each one
+     * through the path that adds a module page by hand or when a module is
+     * switched on (`addModulePageIfMissing`), so a site made today and a
+     * site whose business turns the module on next month hold the same
+     * page. Absent: none, as every template before v4.
+     */
+    modulePages?: readonly TemplateModulePage[];
+}
+
+/** The module page kinds a template may start a site with, in menu order. */
+export const TEMPLATE_MODULE_PAGE_KINDS = [
+    "SHOP",
+    "BOOK",
+    "PRICES",
+    "CONTACT",
+] as const;
+export type TemplateModulePageKind =
+    (typeof TEMPLATE_MODULE_PAGE_KINDS)[number];
+
+/** One module page a template asks for. See `TemplateManifest.modulePages`. */
+export interface TemplateModulePage {
+    kind: TemplateModulePageKind;
+    /** Whether this business gets it. Absent means always. */
+    when?: (ctx: TemplateContext) => boolean;
+}
+
+/** The module page kinds a template asks for, for this business. */
+export function templateModulePageKinds(
+    template: Pick<TemplateManifest, "modulePages">,
+    ctx: TemplateContext,
+): TemplateModulePageKind[] {
+    return (template.modulePages ?? [])
+        .filter((page) => !page.when || page.when(ctx))
+        .map((page) => page.kind);
 }
 
 /** A template's starting footer. See {@link TemplateManifest.footer}. */
@@ -269,6 +329,24 @@ export interface TemplateFooter {
      * them is the template's words, not the owner's.
      */
     formerLines?: readonly string[];
+    /**
+     * A line worked out from the business itself (starter v4): what it does
+     * and where, in its own names. Used when `line` is absent. It is the
+     * business's own facts, not the template's words, so the pre-publish
+     * check does not name it; nothing is written when it returns none.
+     */
+    lineFrom?: (ctx: TemplateContext) => string | undefined;
+}
+
+/** The footer line a site made from the template starts with, if any. */
+export function templateFooterLineFor(
+    template: Pick<TemplateManifest, "footer">,
+    ctx: TemplateContext,
+): string | undefined {
+    const footer = template.footer;
+    if (!footer) return undefined;
+    const line = (footer.line ?? footer.lineFrom?.(ctx) ?? "").trim();
+    return line === "" ? undefined : line;
 }
 
 /**

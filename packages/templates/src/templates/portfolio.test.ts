@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 import { instantiateTemplate } from "../instantiate";
 import type { TemplateContext } from "../manifest";
 import { getTemplate } from "../registry";
-import { PORTFOLIO_TEMPLATE_ID, portfolioTemplate } from "./portfolio";
+import {
+    PORTFOLIO_TEMPLATE_ID,
+    portfolioTemplate,
+    portfolioTemplateV1,
+} from "./portfolio";
 
 /** Every string anywhere in a section's content, however deeply nested. */
 function strings(value: unknown): string[] {
@@ -59,10 +63,12 @@ function projectsBlocks(ctx: TemplateContext) {
 }
 
 describe("portfolio@1 (DEC-070, K12)", () => {
-    it("is the first version of the portfolio template", () => {
+    it("is the portfolio template, whose pages are version 1's", () => {
         expect(portfolioTemplate.id).toBe(PORTFOLIO_TEMPLATE_ID);
         expect(PORTFOLIO_TEMPLATE_ID).toBe("portfolio");
-        expect(portfolioTemplate.version).toBe(1);
+        expect(portfolioTemplate.version).toBe(2);
+        expect(portfolioTemplate.pages).toBe(portfolioTemplateV1.pages);
+        expect(getTemplate(PORTFOLIO_TEMPLATE_ID, 1)).toBe(portfolioTemplateV1);
     });
 
     it("is registered as the latest portfolio (K15)", () => {
