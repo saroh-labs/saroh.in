@@ -4,7 +4,6 @@ import { Fragment } from "react";
 
 import { CoursesCard } from "./courses-card";
 import type { LeaveLine, PayInvoice } from "./details-api";
-import { DETAILS_OFFLINE } from "./details-api";
 import { NextBooking } from "./home-next-booking";
 import type { HomeBlock } from "./home-order";
 import { homeLayout } from "./home-order";
@@ -45,9 +44,6 @@ import { WaitlistPlaces } from "./waitlist-places";
  * (A6); an order on its way has Track (A7).
  */
 
-const OFFLINE_ACTION = () =>
-    Promise.resolve({ ok: false as const, message: DETAILS_OFFLINE });
-
 /** Blocks that take the page's whole width from tablet width up. */
 const FULL_WIDTH: ReadonlySet<HomeBlock> = new Set<HomeBlock>([
     "changes",
@@ -70,8 +66,12 @@ export function AccountHome({
      * business offers and the shop isn't offered.
      */
     doors?: { bookHref: string | null; shopHref: string | null };
-    /** The site's server actions; left out, the buttons say they can't. */
-    api?: { payInvoice: PayInvoice; leaveLine: LeaveLine };
+    /**
+     * The site's server actions. Required: this is drawn on the server,
+     * and only a server action may be handed on to the buttons that call
+     * it.
+     */
+    api: { payInvoice: PayInvoice; leaveLine: LeaveLine };
     /** When the page was drawn (ISO); now, when left out. */
     now?: string;
 }) {
@@ -91,8 +91,7 @@ export function AccountHome({
         canShop: shopHref !== null,
     });
     const messagesHref = has("messages") ? ACCOUNT_TAB_HREF.messages : null;
-    const payInvoice = api?.payInvoice ?? OFFLINE_ACTION;
-    const leaveLine = api?.leaveLine ?? OFFLINE_ACTION;
+    const { payInvoice, leaveLine } = api;
 
     // With an odd number of half-width cards, the first takes the whole
     // row: the thing that matters most gets the room, and no card is left
@@ -112,6 +111,7 @@ export function AccountHome({
                 return (
                     <SinceLastHere
                         changes={layout.changes}
+                        since={home.since}
                         failed={home.changes?.ok === false}
                         businessName={business}
                         messagesHref={messagesHref}

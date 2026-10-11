@@ -364,7 +364,13 @@ describe("Home's orders", () => {
             orders: { ok: true, value: [READY, COLLECTED] },
             plan: { ok: true, value: null },
         };
-        render(<AccountHome account={account} home={home} />);
+        render(
+            <AccountHome
+                account={account}
+                home={home}
+                api={{ payInvoice: vi.fn(), leaveLine: vi.fn() }}
+            />,
+        );
         expect(
             screen.getByRole("link", { name: "Track order #1019" }),
         ).toHaveAttribute("href", "/account/orders?order=ord_1");

@@ -227,3 +227,20 @@ export function changeWhen(iso: string, now: Date, timeZone = "UTC"): string {
         ? full.slice(0, -5)
         : full;
 }
+
+/**
+ * When they were last here, beside the card's title: "Since yesterday",
+ * "Since 9 Oct", "Since earlier today". Empty when it isn't known.
+ */
+export function sinceWords(
+    since: string | null | undefined,
+    now: Date,
+    timeZone = "UTC",
+): string {
+    if (!since) return "";
+    const when = changeWhen(since, now, timeZone);
+    if (when === "") return "";
+    if (when === "Today") return "Since earlier today";
+    if (when === "Yesterday") return "Since yesterday";
+    return `Since ${when}`;
+}

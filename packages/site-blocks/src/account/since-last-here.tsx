@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import type { AccountChange } from "./details-model";
-import { changeWhen, changeWords } from "./details-model";
+import { changeWhen, changeWords, sinceWords } from "./details-model";
 import { AccountCard, textLink } from "./parts";
 
 /**
@@ -31,6 +31,7 @@ function useVisitorZone(): string | null {
 
 export function SinceLastHere({
     changes,
+    since = null,
     failed = false,
     businessName,
     messagesHref,
@@ -38,6 +39,8 @@ export function SinceLastHere({
     className,
 }: {
     changes: AccountChange[];
+    /** The visit the changes count from, said beside the title. */
+    since?: string | null;
     /** The read failed: said, never shown as "nothing changed". */
     failed?: boolean;
     businessName: string;
@@ -65,6 +68,7 @@ export function SinceLastHere({
         <AccountCard
             labelledBy="account-changes"
             title="Since you were last here"
+            sub={zone ? sinceWords(since, at, zone) || undefined : undefined}
             className={className}
         >
             <ul className="m-0 list-none p-0">

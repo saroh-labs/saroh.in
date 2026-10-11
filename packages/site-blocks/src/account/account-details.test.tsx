@@ -162,12 +162,19 @@ function home(over: Partial<HomeData> = {}): HomeData {
 const headings = () =>
     screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
 
+/** Home's server actions; none is called by these tests. */
+const HOME_API = {
+    payInvoice: vi.fn().mockResolvedValue({ ok: false, message: "" }),
+    leaveLine: vi.fn().mockResolvedValue({ ok: false, message: "" }),
+};
+
 describe("Home, in the order that matters to this customer (DEC-142)", () => {
     const DOORS = { bookHref: "/book", shopHref: "/shop" };
 
     it("a customer with one order reads the order first, and Book a time last", () => {
         render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home({ orders: { ok: true, value: [ORDER_OPEN] } })}
                 doors={DOORS}
@@ -205,6 +212,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
         ];
         render(
             <AccountHome
+                api={HOME_API}
                 account={{ ...ACCOUNT, unreadMessages: 2 }}
                 home={home({
                     changes: { ok: true, value: changes },
@@ -247,6 +255,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
         // A shop that takes no bookings, with a finished order.
         render(
             <AccountHome
+                api={HOME_API}
                 account={{
                     ...ACCOUNT,
                     offers: { appointments: false, orders: true, plans: false },
@@ -278,6 +287,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
     it("with nothing at all, one welcome block; and it says what is true when staff haven't linked the account", () => {
         const { unmount } = render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home()}
                 doors={DOORS}
@@ -298,6 +308,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
 
         render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home({ linkPending: true })}
                 doors={DOORS}
@@ -314,6 +325,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
     it("the linking note is only for an empty Home: with something to show, it isn't said", () => {
         render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home({
                     linkPending: true,
@@ -329,6 +341,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
     it("a failed read says so in its own block, and never reads as nothing", () => {
         render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home({
                     changes: { ok: false },
@@ -361,6 +374,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
     it("the blocks are one grid, two columns from tablet width up, in the page's own order", () => {
         const { container } = render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={home({
                     nextBooking: { ok: true, value: BOOKING },

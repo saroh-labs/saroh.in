@@ -21,6 +21,7 @@ import {
     placeHref,
     placeLine,
     placeTitle,
+    sinceWords,
     TO_PAY_HREF,
 } from "./details-model";
 
@@ -302,6 +303,29 @@ describe("what changed since they were last here", () => {
             "30 Dec 2025",
         );
         expect(changeWhen("not a date", now, zone)).toBe("");
+    });
+});
+
+describe("when they were last here", () => {
+    const now = new Date("2026-10-12T06:00:00Z");
+    const zone = "Asia/Kolkata";
+
+    it("is said beside the title, in the visitor's own days", () => {
+        expect(sinceWords("2026-10-12T01:00:00Z", now, zone)).toBe(
+            "Since earlier today",
+        );
+        expect(sinceWords("2026-10-11T06:00:00Z", now, zone)).toBe(
+            "Since yesterday",
+        );
+        expect(sinceWords("2026-10-03T06:00:00Z", now, zone)).toBe(
+            "Since 3 Oct",
+        );
+    });
+
+    it("says nothing when it isn't known", () => {
+        expect(sinceWords(null, now, zone)).toBe("");
+        expect(sinceWords(undefined, now, zone)).toBe("");
+        expect(sinceWords("whenever", now, zone)).toBe("");
     });
 });
 

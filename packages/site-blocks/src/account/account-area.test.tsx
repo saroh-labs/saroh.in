@@ -148,6 +148,12 @@ describe("the account's words", () => {
     });
 });
 
+/** Home's server actions; none is called by these tests. */
+const HOME_API = {
+    payInvoice: vi.fn().mockResolvedValue({ ok: false, message: "" }),
+    leaveLine: vi.fn().mockResolvedValue({ ok: false, message: "" }),
+};
+
 describe("Home", () => {
     const home: HomeData = {
         nextBooking: {
@@ -168,7 +174,7 @@ describe("Home", () => {
     };
 
     it("shows the next booking and the plan, under the header's greeting", () => {
-        render(<AccountHome account={ACCOUNT} home={home} />);
+        render(<AccountHome account={ACCOUNT} home={home} api={HOME_API} />);
         // "Hi, Farah" is the account header's title now (DEC-073 #10).
         expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
         expect(
@@ -200,6 +206,7 @@ describe("Home", () => {
     it("a failed read says so and never reads as none", () => {
         render(
             <AccountHome
+                api={HOME_API}
                 account={{ ...ACCOUNT, bookingsLabel: "Bookings" }}
                 home={{
                     nextBooking: { ok: false },
@@ -231,6 +238,7 @@ describe("Home", () => {
     it("with nothing at all, one welcome block says what they can do here: never a column of empty cards", () => {
         render(
             <AccountHome
+                api={HOME_API}
                 account={ACCOUNT}
                 home={{
                     nextBooking: { ok: true, value: null },
