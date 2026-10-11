@@ -150,27 +150,26 @@
   draws its own; the scan in `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts`
   fails when one does, and its allowlists are the record of what is left.
 
-    | Piece                                     | Where                                                                | The rule                                                                                                                                                                                                                                                                                                               |
-    | ----------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | `TabStrip`                                | `@saroh/ui/tabs`                                                     | The one tab look, for a screen's VIEWS only (never a status filter: that is `FilterChips`): Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move).                                                    |
-    | `SectionList`                             | `components/shared/section-list.tsx`                                 | The one vertical list of sections (Settings, Website › Settings).                                                                                                                                                                                                                                                      |
-    | `Segmented`                               | `@saroh/ui/segmented`                                                | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                                                                                                                                                      |
-    | `Chip`, `chipClass`                       | `@saroh/ui/chip` (also `components/shared/chip.tsx`)                 | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
-    | `FilterChips`                             | `@saroh/ui/filter-chips` (also `components/shared/list-toolbar.tsx`) | A list's status or kind filter: a radio group of chips (links where each choice is an address). `count` follows the label as a quiet tabular number. One line inside `ScrollX` on a phone.                                                                                                                             |
-    | `ListToolbar`, `ListFilter`               | `@saroh/ui/list-toolbar` (also `components/shared/list-toolbar.tsx`) | The one toolbar of a list (slots `tabs`, `search`, `filters`, `end`, `count`, `chips`) and its one dropdown filter and sort.                                                                                                                                                                                           |
-    | `listTable`, `ListTable`, `ListTableHead` | `@saroh/ui/list-table` (also `components/shared/list-toolbar.tsx`)   | The one table look for a list a screen draws itself: the card, the tinted head band, rows ruled edge to edge, figures, a time that never wraps. `DataView` draws the same.                                                                                                                                             |
-    | `ChipGroup`, `RadioCards`, `ChoiceGroup`  | `components/shared/choice-group.tsx`                                 | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
-    | `CheckRow`, `SwitchRow`                   | `components/shared/check-row.tsx`                                    | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
-    | `ListSearch`                              | `@saroh/ui/list-search`                                              | "Search {things}" (required), icon, 38px, ONE width (320px, full width on a phone: a call site never sets one), 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. First in `ListToolbar`'s row. DataView draws it.                                                                               |
-    | `StatusBadge`, `Badge`                    | `components/shared/status-badge.tsx`, `@saroh/ui/badge`              | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
-    | `CountBadge`                              | `@saroh/ui/count-badge`                                              | Unread and tab counts. `neutral` is a plain tally. `strong` (Ink) and `danger` only when the number means "needs you now", with `says` ("need you") so its name says so. `null` is "—", never 0. A count in a chip is not this piece.                                                                                  |
-    | `AbsentValue`, `AbsentOr`, `absentText`   | `@saroh/ui/absent-value`, `@saroh/ui/lib/absent`                     | A value that isn't there, in a cell, a stat tile, a row's meta or a quick look: a muted dash, `aria-hidden`, with `says` ("None", "Not set", "Not known") as the visually hidden word. `absentText()` is the dash for a plain string. Never typed by hand (`check:copy`). A Settings read row says "Not set" in words. |
-    | `Notice`                                  | `@saroh/ui/notice`                                                   | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                                                                                                                                                         |
-    | `TextLink`, `textLinkClass`               | `@saroh/ui/text-link`                                                | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                                                                                                                                                        |
-    | `IconButton`, `Tip`                       | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`                         | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                                                                                                                                                        |
-    | `CopyButton`, `ShareLink`, `copyText`     | `@saroh/ui/copy-button`                                              | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.                                                                                                                                    |
-    | `ProgressBar`, `doneOf`                   | `@saroh/ui/progress-bar`                                             | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
-    | `.label`                                  | `packages/ui/src/globals.css`                                        | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
+    | Piece                                                                       | Where                                                                | The rule                                                                                                                                                                                                                                                                                                               |
+    | --------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `TabStrip`                                                                  | `@saroh/ui/tabs`                                                     | The one tab look, for a screen's VIEWS only (never a status filter: that is a `ListFilter`): Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move).                                                   |
+    | `SectionList`                                                               | `components/shared/section-list.tsx`                                 | The one vertical list of sections (Settings, Website › Settings).                                                                                                                                                                                                                                                      |
+    | `Segmented`                                                                 | `@saroh/ui/segmented`                                                | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                                                                                                                                                      |
+    | `Chip`, `chipClass`                                                         | `@saroh/ui/chip` (also `components/shared/chip.tsx`)                 | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
+    | `ListToolbar`, `ListFilter`, `MoreFilters`, `AttentionToggle`, `ListPaging` | `@saroh/ui/list-toolbar` (also `components/shared/list-toolbar.tsx`) | The one toolbar of a list, in one row (slots `tabs`, `search`, `filters`, `more`, `attention`, `onClear`, `end`, `count`). Every filter is a `ListFilter` dropdown, at most three in the row and the rest behind `MoreFilters`. One `AttentionToggle` at most. `ListPaging` is how a paged list ends.                  |
+    | `listTable`, `ListTable`, `ListTableHead`                                   | `@saroh/ui/list-table` (also `components/shared/list-toolbar.tsx`)   | The one table look for a list a screen draws itself: the card, the tinted head band, rows ruled edge to edge, figures, a time that never wraps. `DataView` draws the same.                                                                                                                                             |
+    | `ChipGroup`, `RadioCards`, `ChoiceGroup`                                    | `components/shared/choice-group.tsx`                                 | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
+    | `CheckRow`, `SwitchRow`                                                     | `components/shared/check-row.tsx`                                    | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
+    | `ListSearch`                                                                | `@saroh/ui/list-search`                                              | "Search {things}" (required), icon, 38px, ONE width (320px, full width on a phone: a call site never sets one), `describe` for what it looks through, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. First in `ListToolbar`'s row. DataView draws it.                                         |
+    | `StatusBadge`, `Badge`                                                      | `components/shared/status-badge.tsx`, `@saroh/ui/badge`              | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
+    | `CountBadge`                                                                | `@saroh/ui/count-badge`                                              | Unread and tab counts. `neutral` is a plain tally. `strong` (Ink) and `danger` only when the number means "needs you now", with `says` ("need you") so its name says so. `null` is "—", never 0. A count in a dropdown filter is not this piece.                                                                       |
+    | `AbsentValue`, `AbsentOr`, `absentText`                                     | `@saroh/ui/absent-value`, `@saroh/ui/lib/absent`                     | A value that isn't there, in a cell, a stat tile, a row's meta or a quick look: a muted dash, `aria-hidden`, with `says` ("None", "Not set", "Not known") as the visually hidden word. `absentText()` is the dash for a plain string. Never typed by hand (`check:copy`). A Settings read row says "Not set" in words. |
+    | `Notice`                                                                    | `@saroh/ui/notice`                                                   | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                                                                                                                                                         |
+    | `TextLink`, `textLinkClass`                                                 | `@saroh/ui/text-link`                                                | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                                                                                                                                                        |
+    | `IconButton`, `Tip`                                                         | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`                         | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                                                                                                                                                        |
+    | `CopyButton`, `ShareLink`, `copyText`                                       | `@saroh/ui/copy-button`                                              | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.                                                                                                                                    |
+    | `ProgressBar`, `doneOf`                                                     | `@saroh/ui/progress-bar`                                             | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
+    | `.label`                                                                    | `packages/ui/src/globals.css`                                        | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,
@@ -286,52 +285,84 @@
   screen that draws its own (its allow-lists need a reason each):
 
     ```
-    PageHeader          title, count, actions level with the title
-    [view tabs]         TabStrip, only if the screen has views
-    search · filters ················ sort · view switch · "Showing 1 to 50 of 532"
-    [status chips]      FilterChips
-    the table           DataView, or ListTable with listTable's classes
+    PageHeader      title, count, actions level with the title
+    [notices]       under the header, never above the title
+    [view tabs]     TabStrip, only if the screen has views
+    search · up to 3 dropdowns · [Filters] · [one attention toggle] · [Clear filters] ······ sort · view switch · count
+    the table       DataView, or ListTable with listTable's classes
+    Previous Next   ListPaging, at the foot on the right
     ```
 
-    - **One toolbar: `ListToolbar`.** Slots, in this order: `tabs`,
-      then ONE row of `search` (the one `ListSearch`), `filters`
-      (dropdowns) and, pushed to the right, `end` (the sort, then the
-      table/list/grid switch) and `count` (how many are showing, in
-      words), then `chips`. A slot left out takes no room. `DataView`
+    - **One toolbar, ONE row: `ListToolbar`.** Slots: `tabs`, then one
+      row of `search` (the one `ListSearch`), `filters`, `more`,
+      `attention` and `onClear`, and on the right `end` (the sort, then
+      the table/list/grid switch) and `count`. There is NO second row of
+      chips under it (the owner's second look, 11 Oct): what was a chip
+      row is one more dropdown. A slot left out takes no room. `DataView`
       draws its own through it and takes a screen's own pieces in the
-      same slots (`toolbarSearch`, `toolbarExtra`, `toolbarEnd`,
-      `toolbarChips`).
-    - **On a phone the row wraps**, search full width first, and
-      NOTHING in it is `shrink-0`: a row of four buttons held to its own
-      width ran 2px past a 412px screen on CI's fonts (DEV_LEARNINGS).
-      The chips are one line that scrolls sideways inside `ScrollX`
-      (`data-scroll-x`, the scroller `e2e/fixtures/hidden-sideways.ts`
-      allows). Where a screen has many dropdowns (Orders), a phone gets
-      one Filters button that opens them in a sheet.
-    - **A dropdown filter is `ListFilter`**, and so is the sort: an
-      `OptionSelect` as wide as its words, the search field's height,
-      with one gap before its chevron. Never `size="sm"`, a `min-w-[…]`
-      or a height of a screen's own: that is how two filters on one row
-      got two chevron gaps. An option may carry a `hint` (a count) and
-      the list a `footer` (a note). A picker that is not a flat list (a
-      product search) takes `listPickerClass` on its trigger.
-    - **Tabs are views. A status filter is chips.** `TabStrip` is only
-      for different views or sub-pages of a screen: Stock's Levels, Log
-      and Checks, Subscribers and Plans, a record's sections, two pages
-      with different columns (Class packs). Narrowing ONE list by status
-      or kind (All, Open, Refunded. All, Live, Scheduled, Ended) is
-      ALWAYS `FilterChips`, a radio group, whatever the address calls it:
-      a filter that was a tab keeps its query parameter (`?tab=`,
-      `?view=`, `?show=`) and its counts. `DataView`'s `filters` are
-      chips, and it has no other way to draw them. An on/off filter
-      (`Chip as="toggle"`) follows the choice in the same row. A
+      same slots (`toolbarSearch`, `toolbarExtra`, `toolbarMore`,
+      `toolbarAttention`, `toolbarEnd`, `onClearFilters`).
+    - **Every filter is a dropdown: `ListFilter`**, and so is the sort
+      (`narrowed={false}`): an `OptionSelect` as wide as its words, the
+      search field's height, with one gap before its chevron. Never
+      `size="sm"`, a `min-w-[…]` or a height of a screen's own. Its
+      accessible name is what it filters ("Order status", "Kind of
+      change"). An option's `count` is a quiet tabular number at its
+      right, and after the label in the box once a narrowed option is
+      chosen ("Open 3"): leave it out when it isn't known, pass 0 when
+      zero is a fact. An option may also carry a `hint` and the list a
+      `footer`. A server component hands addresses to `LinkFilter`
+      (`components/shared/link-filter.tsx`).
+    - **An unnarrowed filter reads "All {plural}"**, in the thing's own
+      noun, so the box says what it filters: "All orders", "All
+      locations", "All categories", "All statuses", "All dates", "All
+      changes". Never a bare "All" beside "All locations", and never
+      "Any …". `DataView` turns a first filter labelled "All" into "All
+      {noun}" itself.
+    - **At most THREE dropdowns in the row: the list's most used. The
+      rest sit behind one `MoreFilters` button** ("Filters", and "Filters
+      2" while two of them are narrowed), which opens them in a popover,
+      one to a line. On a phone a list that has a filters sheet draws
+      that from the same button (Orders). Orders' three are status, date
+      and location. Products' are status, category and location.
+    - **A narrowed filter shows at a glance and is one press to undo.**
+      Its box says the chosen value and takes the selected look (an Ink
+      edge, `NARROWED`), and while anything is narrowed, a search with
+      words in it included, a quiet "Clear filters" ends the row
+      (`onClear`).
+    - **At most ONE chip: `AttentionToggle`.** An on/off filter for what
+      needs the merchant now ("Needs you 4", "Needs attention") may sit
+      in the row after the dropdowns, its count in the attention tone
+      while it is above zero. It is a one-press shortcut: one per list,
+      never on a row of its own. A filter that mixes two ideas splits:
+      Stock › Levels is a Location dropdown and the Needs you toggle.
+      Any other on/off filter is a two-option dropdown (Orders' Late).
+    - **The count is said once.** "Showing 1 to 50 of 532" is on the
+      right of the row's first line from `lg`. Where the row has no room
+      for it, it is one quiet line under the toolbar, on the left: never
+      floating right on a line of its own. If the row wraps, the search
+      keeps its width, the dropdowns flow after it, and the right-hand
+      group stays on the first line.
+    - **On a phone the row stacks and wraps**, search full width first,
+      and NOTHING in it is `shrink-0`: a row of four buttons held to its
+      own width ran 2px past a 412px screen on CI's fonts
+      (DEV_LEARNINGS).
+    - **The placeholder fits the field.** "Search {things}", and what it
+      looks through is `describe` ("By name, phone or email", the
+      field's accessible description). At the one width about 30
+      characters fit beside the "/" hint: "…phone or ema" was cut off.
+    - **Tabs are views.** `TabStrip` is only for different views or
+      sub-pages of a screen: Stock's Levels, Log and Checks, Subscribers
+      and Plans, Products' All, Collections, Stock and Reviews, a
+      record's sections, two pages with different columns (Class
+      packs). Narrowing ONE list by status or kind is a `ListFilter`,
+      whatever the address calls it: a filter that was a tab keeps its
+      query parameter (`?tab=`, `?view=`, `?show=`) and its counts. A
       segmented switch is for two drawings of the same records (table
       and board, calendar and list), in `PageHeader`'s `meta`.
-    - **One count style.** In a chip the count follows the label as a
-      quiet tabular number ("Returning 9"): pass `count`, leave it out
-      when it isn't known, pass 0 when zero is a fact. In a tab the
-      count is `CountBadge` in its neutral tone. A badge is dark or red
-      ONLY when the number means "needs you now", and then it says so
+    - **One count style.** In a dropdown, the quiet number above. In a
+      tab, `CountBadge` in its neutral tone. A badge is dark or red ONLY
+      when the number means "needs you now", and then it says so
       (`countSays="need you"`, read as "4 need you"). Never a count
       joined to a label by a dot ("Needs you · 4").
     - **One table.** A tinted head band (`bg-muted`) of `.label` column
@@ -345,8 +376,23 @@
       cannot drift. **The gutter is the head's and each row's own, never
       a wrapper's**: a padded box round the rows is what stopped Stock's
       rules short of its card.
-    - **Page actions are level with the title**, whatever is under it
-      (see `PageHeader` above).
+    - **Rows keep one height.** At most two lines in a cell. Orders'
+      status cell is the pill with its step dashes on one line where the
+      column has room, then how long it has waited and what is owed on
+      the next.
+    - **A mark in a row says what it means.** The ring on an order's
+      initials is a returning customer: it is named so ("Returning
+      customer", to a screen reader and on hover), and the plain initials
+      are decoration.
+    - **A paged list ends with `ListPaging`**: Previous and Next
+      together at the foot, on the right, each off when there is nowhere
+      to go, the same words on every list.
+    - **Page actions are level with the title**, whatever is under it,
+      and each keeps its own width (see `PageHeader` above). A button
+      reserves its `busyLabel`'s width at rest, so a busy label is the
+      verb alone ("Exporting…"), with any progress beside the button.
+    - **A notice about the page sits under its header**, above the
+      toolbar, never above the title.
     - **A time never wraps** (see Numbers and dates).
 
     Hand-built before this, and on the shared classes now: Stock (Levels
@@ -358,7 +404,8 @@
     grid already matched and keeps its own row. Not tables, and left as
     they are: card grids (Services, Class packs, Collections, plan cards,
     the Pipeline board), Stock's Checks (a card per check, with its
-    actions) and a settings matrix (Your profile's alerts).
+    actions) and a settings matrix (Your profile's alerts). Lists that
+    load more instead of paging (Stock, Products) keep "Show more".
 
 - **Current** — **One width per kind of screen, through `PageContainer`**
   (04 §1): lists, boards and dashboards `full`; create and edit forms
