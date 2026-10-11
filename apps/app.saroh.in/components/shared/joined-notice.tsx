@@ -58,6 +58,8 @@ export function JoinedNotice() {
             tone="success"
             data-joined-notice=""
             layout="banner"
+            // One line of words and a button: level with each other.
+            align="center"
             action={
                 <Button
                     type="button"

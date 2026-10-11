@@ -35,6 +35,27 @@ describe("Notice", () => {
         expect(classes(column())).toContain("sm:items-center");
     });
 
+    it("sets the words level with the action when asked: a button is taller than a line", () => {
+        const { container, rerender } = render(
+            <Notice tone="info" action={<button type="button">Got it</button>}>
+                Words
+            </Notice>,
+        );
+        const row = () => container.querySelector("[data-notice]");
+        expect(classes(row())).toContain("sm:items-start");
+        expect(classes(row())).not.toContain("sm:items-center");
+        rerender(
+            <Notice
+                tone="info"
+                align="center"
+                action={<button type="button">Got it</button>}
+            >
+                Words
+            </Notice>,
+        );
+        expect(classes(row())).toContain("sm:items-center");
+    });
+
     it("puts an action in its own group, after the words", () => {
         render(
             <Notice tone="info" action={<button type="button">Review</button>}>

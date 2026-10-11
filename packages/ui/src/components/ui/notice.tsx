@@ -63,10 +63,12 @@ export interface NoticeProps extends Omit<
     /** `false` for no glyph, or a glyph of the caller's own. */
     icon?: React.ReactNode | false;
     /**
-     * `"center"` when the words share one row with a button of the
-     * caller's own: from `sm` the glyph then sits level with that row's
-     * middle, not with a first line that the button made taller. Left out,
-     * the glyph sits on the first line of text.
+     * `"center"` when the words share one row with a button, the caller's
+     * own or the `action`: from `sm` the glyph, the words and the button
+     * then sit level with each other, where a button taller than a line of
+     * words would otherwise leave them above its middle. For a notice of
+     * one or two lines. Left out, the glyph sits on the first line of text
+     * and the action at the top, which is right for a long notice.
      */
     align?: "start" | "center";
 }
@@ -105,6 +107,9 @@ export const Notice = React.forwardRef<HTMLDivElement, NoticeProps>(
                 data-notice={tone}
                 className={cn(
                     "flex flex-col gap-2.5 text-sm leading-[1.5] sm:flex-row sm:items-start sm:justify-between sm:gap-4",
+                    // Level with the action too: a button is taller than a
+                    // line of words, and the words sat above its middle.
+                    align === "center" && "sm:items-center",
                     layout === "card"
                         ? "rounded-lg border px-3.5 py-3"
                         : "border-b px-4 py-2.5 sm:px-[22px]",

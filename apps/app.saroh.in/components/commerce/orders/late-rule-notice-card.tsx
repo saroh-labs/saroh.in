@@ -54,7 +54,8 @@ export function LateRuleNoticeCard({
         <Notice
             tone="info"
             role="note"
-            className="mb-4 sm:items-center"
+            className="mb-4"
+            align="center"
             action={
                 <>
                     {canChange ? (
