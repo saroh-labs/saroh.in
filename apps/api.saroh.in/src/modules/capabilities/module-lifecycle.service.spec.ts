@@ -33,6 +33,11 @@ function makeDb() {
         auditEvent: {
             create: jest.fn().mockResolvedValue({}),
         },
+        // The website that follows the business's modules (DEC-141): this
+        // business has none, so switching a module on writes no page.
+        site: {
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
         $transaction: jest.fn((cb: (tx: unknown) => unknown): unknown =>
             cb(db),
         ),
