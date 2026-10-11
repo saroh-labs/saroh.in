@@ -318,7 +318,12 @@ describe("DomainsService.verify", () => {
             siteId: null,
         });
         domainUpdate.mockImplementation(({ data }) =>
-            Promise.resolve({ id: "dom_1", status: "PENDING", ...data }),
+            Promise.resolve({
+                id: "dom_1",
+                hostname: "shop.acme.com",
+                status: "PENDING",
+                ...data,
+            }),
         );
 
         verifier.setFailure("WRONG_VALUE");

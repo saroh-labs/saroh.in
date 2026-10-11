@@ -8,6 +8,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { bareDomainCheckProvider } from "./bare-forwarding";
 import { domainHostingProvider } from "./domain-hosting.provider";
 import {
     DOMAIN_RECHECK_TYPE,
@@ -47,6 +48,7 @@ const CHAIN_CHECK_MS = 60 * 60 * 1000;
         DomainRecheckHandler,
         domainVerifierProvider,
         domainHostingProvider,
+        bareDomainCheckProvider,
         OrganizationGuard,
     ],
     exports: [DomainsService],
