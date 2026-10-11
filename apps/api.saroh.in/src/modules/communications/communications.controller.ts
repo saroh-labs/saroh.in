@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     Param,
+    Patch,
     Post,
     Query,
     UseGuards,
@@ -17,7 +18,12 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { CommunicationsService } from "./communications.service";
-import { ConnectCommsProviderDto, SendMessageDto, SetConsentDto } from "./dto";
+import {
+    ConnectCommsProviderDto,
+    SendMessageDto,
+    SetAccountUpdatesDto,
+    SetConsentDto,
+} from "./dto";
 
 /**
  * Org communications endpoints (S6-001), scoped to
@@ -150,5 +156,26 @@ export class CommunicationsController {
     ) {
         const id = contactId?.trim() ?? "";
         return this.comms.noticeReach(ctx, id === "" ? null : id);
+    }
+
+    /**
+     * "Updates in your customers' Messages" (12 Oct 2026): whether Saroh
+     * posts order, booking and invoice updates into a customer's account
+     * thread for this business, whether that choice can have an effect
+     * yet, and whether the business emails its customers itself.
+     * `comms:manage`. Not module-gated: the thread is not Communications',
+     * and turning it off must work with that module off.
+     */
+    @Get("customer-notices/account-updates")
+    accountUpdates(@OrgContext() ctx: OrganizationContext) {
+        return this.comms.accountUpdates(ctx);
+    }
+
+    @Patch("customer-notices/account-updates")
+    setAccountUpdates(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetAccountUpdatesDto,
+    ) {
+        return this.comms.setAccountUpdates(ctx, dto.on);
     }
 }

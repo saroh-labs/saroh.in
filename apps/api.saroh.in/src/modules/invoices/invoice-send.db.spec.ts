@@ -16,6 +16,8 @@ jest.mock("../../env", () => ({
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         NODE_ENV: "test",
         RENDERER_URL: "https://saroh.app",
+        // The thread's rule asks the account area too (`accountThreadOn`).
+        SITE_ACCOUNT_AREA: "on",
     },
 }));
 
