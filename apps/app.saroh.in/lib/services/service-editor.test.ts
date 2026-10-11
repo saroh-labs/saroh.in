@@ -451,7 +451,7 @@ describe("glance", () => {
         expect(rows[2]).toEqual(["Booked this week", "Couldn't count"]);
         expect(glance(draft({ price: "" }), null, "INR")[0]).toEqual([
             "Price",
-            "Not set",
+            "—",
         ]);
     });
 });

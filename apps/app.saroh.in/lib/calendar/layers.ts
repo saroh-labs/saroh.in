@@ -1,5 +1,6 @@
 import { formatMonth, formatTime } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import { fromMajor, toMajor } from "./money";
 import { dayProblems, problemChip } from "./problems";
 import type {
@@ -372,7 +373,7 @@ export function monthSummary({
     if (off[lead.key]) {
         const on = layers
             .filter((l) => !off[l.key])
-            .map((l) => `${l.label} ${month.totals[l.key] ?? "not known"}`);
+            .map((l) => `${l.label} ${month.totals[l.key] ?? absentText()}`);
         return on.length ? on.join(" · ") : "Every layer is off";
     }
     const soFar = month.days

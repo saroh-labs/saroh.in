@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -77,7 +78,7 @@ export function SubscriptionRow({
                         : "text-muted-foreground",
                 )}
             >
-                {when.text}
+                <AbsentOr says="None">{when.text}</AbsentOr>
             </span>
             <span className="shrink-0 font-display text-[14px] font-semibold tabular-nums text-foreground">
                 {shortPrice(sub.price, sub.currency, sub.interval)}

@@ -348,7 +348,7 @@ describe("a pause with an end date (D8)", () => {
     it("says the day it resumes on its own, in its zone", () => {
         expect(headline(paused, null, NOW)).toEqual({
             pill: { tone: "accent", label: "Paused" },
-            big: "None",
+            big: "—",
             when: "",
             line: "Paused until 16 Oct · resumes on its own. Nothing is charged while paused.",
         });
@@ -442,7 +442,7 @@ describe("headline", () => {
             null,
             NOW,
         );
-        expect(h.big).toBe("None");
+        expect(h.big).toBe("—");
         expect(h.pill).toEqual({ tone: "accent", label: "Ends 1 Oct" });
     });
 });

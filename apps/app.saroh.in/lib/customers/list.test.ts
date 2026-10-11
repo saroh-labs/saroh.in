@@ -417,7 +417,7 @@ describe("a row", () => {
     });
 
     it("shows Spent in each currency, and a dash for nothing paid", () => {
-        expect(spentText([])).toBe("None");
+        expect(spentText([])).toBe("—");
         expect(spentText([{ currency: "INR", amount: "5000.00" }])).toBe(
             "₹5,000",
         );
@@ -436,7 +436,7 @@ describe("a row", () => {
 describe("noOrderText (DEC-056, C14)", () => {
     it("says someone added on the list was added by hand, and nothing of anyone else", () => {
         expect(noOrderText(row({ addedByHand: true }))).toBe("Added by hand");
-        expect(noOrderText(row({ addedByHand: false }))).toBe("None");
-        expect(noOrderText(row())).toBe("None");
+        expect(noOrderText(row({ addedByHand: false }))).toBe("—");
+        expect(noOrderText(row())).toBe("—");
     });
 });

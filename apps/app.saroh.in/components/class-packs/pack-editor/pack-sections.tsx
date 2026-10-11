@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -260,7 +261,15 @@ export function PackGlance({
                                 {k}
                             </dt>
                             <dd className="m-0 text-right font-semibold tabular-nums">
-                                {v}
+                                <AbsentOr
+                                    says={
+                                        k === "Sold so far"
+                                            ? "Not known"
+                                            : "Not set"
+                                    }
+                                >
+                                    {v}
+                                </AbsentOr>
                             </dd>
                         </div>
                     ))}

@@ -1,5 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
 import type { ClassPack } from "./service";
@@ -164,7 +165,7 @@ export function packCard(p: PackListItem, canWrite: boolean): PackCardView {
         terms,
         sold: String(p.sold),
         takings,
-        stillToUse: left === undefined ? "Not known" : String(left),
+        stillToUse: left === undefined ? absentText() : String(left),
         stillToUseNote:
             people > 0
                 ? `across ${count(people, "person", "people")}`

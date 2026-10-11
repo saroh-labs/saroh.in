@@ -1,3 +1,4 @@
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
@@ -80,7 +81,15 @@ export function PlanOverview({
                                     {g.label}
                                 </dt>
                                 <dd className="font-semibold tabular-nums">
-                                    {g.value}
+                                    <AbsentOr
+                                        says={
+                                            g.label === "Price changes"
+                                                ? "Not known"
+                                                : "None"
+                                        }
+                                    >
+                                        {g.value}
+                                    </AbsentOr>
                                 </dd>
                             </div>
                         ))}

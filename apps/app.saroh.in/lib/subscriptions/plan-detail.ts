@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import type {
     Interval,
     Plan,
@@ -299,7 +300,7 @@ export function historyRows(
  * with more pages says "at least".
  */
 export function priceChangesText(page: PlanEventsPage | null): string {
-    if (!page) return "Not known";
+    if (!page) return absentText();
     const n = page.events.filter(
         (e) => e.kind !== "CREATED" && touchesPrice(e.changes),
     ).length;
@@ -320,7 +321,9 @@ export function glanceRows(
         {
             label: "Coming in a month",
             value:
-                monthly > 0 ? formatMoneyMajor(monthly, plan.currency) : "None",
+                monthly > 0
+                    ? formatMoneyMajor(monthly, plan.currency)
+                    : absentText(),
         },
         { label: "Price changes", value: priceChangesText(events) },
     ];

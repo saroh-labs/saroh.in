@@ -1,4 +1,5 @@
 import { formatDay } from "@/lib/format/datetime";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -263,7 +264,7 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                                 />
                             </span>
                             <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground [overflow-wrap:anywhere] min-[380px]:text-[22px]">
-                                {t.value}
+                                <AbsentOr says="None">{t.value}</AbsentOr>
                             </span>
                             <span className="mt-[3px] text-xs leading-[1.45] text-muted-foreground">
                                 {t.note}

@@ -1,3 +1,4 @@
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Section } from "./fields";
 
 /**
@@ -18,7 +19,7 @@ export function AtAGlance({ rows }: { rows: [string, string][] }) {
                             {label}
                         </dt>
                         <dd className="text-right font-semibold tabular-nums">
-                            {value}
+                            <AbsentOr says="Not set">{value}</AbsentOr>
                         </dd>
                     </div>
                 ))}

@@ -3,6 +3,7 @@
 import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -148,7 +149,7 @@ function Body({
                     sub.failedCharge?.total ?? sub.price,
                     sub.currency,
                 )
-              : "None";
+              : null;
     const nextLine =
         tab === "active"
             ? sub.endsAt
@@ -188,7 +189,7 @@ function Body({
                 </div>
                 <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
                 <div className="mt-0.5 font-display text-[24px] font-semibold tabular-nums tracking-[-0.02em]">
-                    {nextBig}
+                    {nextBig ?? <AbsentValue says="None" />}
                 </div>
                 <p className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
                     {nextLine}

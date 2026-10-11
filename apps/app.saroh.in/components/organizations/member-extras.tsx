@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
@@ -105,10 +106,7 @@ export function useMemberExtras({
 export function ExtrasCell({ labels }: { labels: string[] }) {
     if (labels.length === 0) {
         return (
-            <span className="text-[13px] text-muted-foreground">
-                <span aria-hidden>None</span>
-                <span className="sr-only">No extra permissions</span>
-            </span>
+            <AbsentValue says="No extra permissions" className="text-[13px]" />
         );
     }
     return (

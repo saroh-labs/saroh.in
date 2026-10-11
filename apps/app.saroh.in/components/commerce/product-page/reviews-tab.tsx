@@ -1,4 +1,5 @@
 import { plural } from "@/lib/format/plural";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Card } from "@saroh/ui/card";
 import { Star } from "lucide-react";
 
@@ -49,7 +50,9 @@ export function ProductReviewsTab({
             <Card className="flex-[1_1_250px] rounded-[12px] px-[18px] py-4">
                 <p className="flex items-baseline gap-2">
                     <span className="font-display text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {summary.average?.toFixed(1) ?? "None"}
+                        {summary.average?.toFixed(1) ?? (
+                            <AbsentValue says="None" />
+                        )}
                     </span>
                     {summary.average ? (
                         <span

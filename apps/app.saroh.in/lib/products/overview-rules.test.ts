@@ -162,7 +162,7 @@ describe("Linked to this product", () => {
         });
         expect(collectionsSummary(placement({ collections: [] }))).toEqual({
             count: "In no collection",
-            names: "None",
+            names: "—",
         });
     });
     it("says the website can't show products yet, rather than none", () => {

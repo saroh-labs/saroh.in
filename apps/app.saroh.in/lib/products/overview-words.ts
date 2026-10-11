@@ -1,6 +1,7 @@
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 import { formatMonth, viewerTimeZone } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 /**
  * The product page's Overview in words (#522), after "Saroh Product Detail":
  * the availability card, the "Linked to this product" cards, the Details
@@ -146,7 +147,7 @@ export function collectionsSummary(placement: ProductPlacement): {
             shown.length === 0
                 ? "In no collection"
                 : `In ${count(shown.length, "collection")}`,
-        names: shown.map((c) => c.name).join(", ") || "None",
+        names: shown.map((c) => c.name).join(", ") || absentText(),
     };
 }
 

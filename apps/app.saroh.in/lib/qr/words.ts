@@ -1,4 +1,5 @@
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import type {
     QrCodeView,
     QrPlace,
@@ -70,7 +71,7 @@ export function madeWords(code: Pick<QrCodeView, "bookings" | "orders">): {
     orders: string | null;
 } {
     return {
-        bookings: code.bookings > 0 ? String(code.bookings) : "None",
+        bookings: code.bookings > 0 ? String(code.bookings) : absentText(),
         orders: code.orders > 0 ? count(code.orders, "order") : null,
     };
 }

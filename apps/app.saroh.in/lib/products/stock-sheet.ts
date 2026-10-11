@@ -8,6 +8,7 @@
  * trying again sends only what didn't land.
  */
 
+import { absentText } from "@saroh/ui/lib/absent";
 import type { ProductStock } from "../stock/product-stock";
 import { isCount, isMoney, paise, trimMoney } from "./editor-sections";
 import type { ProductDetail } from "./service";
@@ -367,7 +368,7 @@ export function foldSaved(
 
 /** "16 can sell" under a size, from the edited counts; "—" while one is wrong. */
 export function canSellNote(size: SheetSize): string {
-    if (size.shelves.some((x) => !isCount(x.onHand))) return "Not known";
+    if (size.shelves.some((x) => !isCount(x.onHand))) return absentText();
     return String(
         size.shelves.reduce(
             (n, x) => n + Math.max(0, Number(x.onHand) - x.promised),

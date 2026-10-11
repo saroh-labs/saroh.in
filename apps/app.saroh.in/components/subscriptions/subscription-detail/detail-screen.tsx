@@ -2,6 +2,7 @@
 
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -297,7 +298,7 @@ export function SubscriptionDetail({
                     <div className="min-w-0 flex-[1_1_300px]">
                         <div className="label">Next charge</div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
-                            {head.big}
+                            <AbsentOr says="None">{head.big}</AbsentOr>
                         </div>
                         <div className="text-[12.5px] text-muted-foreground">
                             {head.when}

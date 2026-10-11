@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -162,7 +163,9 @@ export function QrCodesList({
                                                     data-qr-bookings=""
                                                     className="font-mono tabular-nums"
                                                 >
-                                                    {made.bookings}
+                                                    <AbsentOr says="None">
+                                                        {made.bookings}
+                                                    </AbsentOr>
                                                 </span>
                                                 {made.orders ? (
                                                     <span className="text-[11.5px] text-muted-foreground">

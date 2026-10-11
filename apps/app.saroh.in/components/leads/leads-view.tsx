@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -47,7 +48,7 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground">Not set</span>;
+const Missing = () => <AbsentValue says="Not set" />;
 
 export function LeadsView({
     leads,
@@ -135,7 +136,9 @@ export function LeadsView({
                 // which is not, hence `ViewerDate`.
                 l.status === "OPEN" ? (
                     <span className="whitespace-nowrap text-muted-foreground">
-                        {formatWaiting(l.createdAt, now) ?? "Not known"}
+                        {formatWaiting(l.createdAt, now) ?? (
+                            <AbsentValue says="Not known" />
+                        )}
                     </span>
                 ) : (
                     <ViewerDate

@@ -1,3 +1,4 @@
+import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -90,7 +91,7 @@ export function ProductOverviewTab({
                     ) : (
                         <ProductStat
                             label="Can be sold now"
-                            value="Not set"
+                            value={<AbsentValue says="Not set" />}
                             hint="No stock count yet"
                         />
                     )
@@ -172,7 +173,9 @@ export function ProductOverviewTab({
                                 {collectionsSummary(placement.data).count}
                             </LinkedHeadline>
                             <p className="text-[12px] leading-[1.45] text-muted-foreground">
-                                {collectionsSummary(placement.data).names}
+                                <AbsentOr says="None">
+                                    {collectionsSummary(placement.data).names}
+                                </AbsentOr>
                             </p>
                         </>
                     ) : (
@@ -208,8 +211,9 @@ export function ProductOverviewTab({
                     {reviews.status === "ok" ? (
                         <>
                             <span className="text-[14px] font-semibold">
-                                {ratingLabel(reviews.data.summary) ??
-                                    "No reviews yet"}
+                                <AbsentOr says="None">
+                                    {ratingLabel(reviews.data.summary)}
+                                </AbsentOr>
                             </span>
                             <span
                                 className={cn(

@@ -1,6 +1,7 @@
 "use client";
 
 import { FailedRead } from "@/components/shared/failed-read";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -227,7 +228,7 @@ export function SkuTab({
                                 {r.variant ? ` · ${r.variant}` : ""}
                             </span>
                             <span className="min-w-0 break-all font-mono text-[12px] text-muted-foreground">
-                                {r.now || "None"}
+                                {r.now || <AbsentValue says="None" />}
                             </span>
                             <span
                                 className={cn(
@@ -239,7 +240,7 @@ export function SkuTab({
                                           : "text-foreground",
                                 )}
                             >
-                                {r.next || "None"}
+                                {r.next || <AbsentValue says="None" />}
                             </span>
                         </div>
                     ))

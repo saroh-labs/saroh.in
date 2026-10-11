@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
 import Link from "next/link";
@@ -34,7 +35,7 @@ import { Users } from "lucide-react";
  */
 
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
-const Missing = () => <span className="text-muted-foreground">Not set</span>;
+const Missing = () => <AbsentValue says="Not set" />;
 
 const FILTERS: DataFilter<ContactListItem>[] = [
     { id: "all", label: "All" },

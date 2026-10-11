@@ -1,5 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackKind, PackServiceOption, PackValues } from "./pack-editor";
 import {
@@ -144,7 +145,7 @@ export function glance(
 ): [string, string][] {
     const each = perCredit(values);
     const drops = dropIns(values, services);
-    let saving = "Not set";
+    let saving = absentText();
     if (each !== null && drops.length) {
         const mid = (Math.min(...drops) + Math.max(...drops)) / 2;
         if (mid > 0) {
@@ -155,11 +156,11 @@ export function glance(
         [
             `Per ${unitOf(values.kind)}`,
             each === null
-                ? "Not set"
+                ? absentText()
                 : formatMoneyMajor(Math.round(each), values.currency),
         ],
         ["Saving vs drop-in", saving],
-        ["Sold so far", sold === null ? "Not known" : String(sold)],
+        ["Sold so far", sold === null ? absentText() : String(sold)],
     ];
 }
 

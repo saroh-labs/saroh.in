@@ -13,6 +13,7 @@ import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     CreateServiceInput,
@@ -656,7 +657,7 @@ export function glance(
     const gap = wholeNumber(draft.gap);
     const priceText =
         price === null || Number.isNaN(price)
-            ? "Not set"
+            ? absentText()
             : price === 0
               ? "Free"
               : formatMoney(price, currency);

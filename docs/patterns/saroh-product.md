@@ -597,18 +597,37 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
 (`apps/app.saroh.in`: JSX text, labels, placeholders, aria-labels, toasts,
 empty states, and every sentence a `lib/` function returns):
 
-- **No em dash and no semicolon.** Two sentences, a comma, a colon or
+- **No em dash and no semicolon in a sentence.** Two sentences, a comma, a colon or
   "and", whichever reads naturally ("Voided. Nothing is owed.", "A place
   you sell from: a shop counter, a studio, a market stall."). A name and
   its note are joined by a colon or " · ", never a dash.
 - **A range says "to"**: "31 Aug to 27 Sep", "14 to 20 Sep 2026", "₹499 to
   ₹899", "Showing 1 to 50 of 120", "Mon to Sat". The one exception is the
   typed format of a day's hours, "07:00–19:00", which the field reads back.
-- **An absent value is a word, never a lone "—"**: "Not set" (nobody has
-  filled it in), "None" (there are none), "Not known" (it couldn't be read
-  or worked out), "Not yet" (a month still to come), "Not recorded".
-  `CountBadge` (`@saroh/ui`) still draws "—" for a count that couldn't be
-  read.
+- **An absent value in a cell is a dash, drawn by the one shared piece**
+  (owner, 11 Oct 2026; the words of 10 Oct read heavier, most of all in a
+  big stat tile and a mono SKU cell). A table cell, a stat tile, a row's
+  meta line, a code cell, a quick look and a summary draw
+  `<AbsentValue says="…" />` (`@saroh/ui/absent-value`): a muted "—" the
+  eye sees, hidden from a screen reader, and the word it hears instead.
+  The word is still chosen with care: "Not set" (nobody has filled it in),
+  "None" (there are none), "Not known" (it couldn't be read or worked
+  out), "Not yet" (a month still to come), "Not recorded", "None sold".
+  `<AbsentOr says="…">{text}</AbsentOr>` draws a `lib/` function's words,
+  or the dash when they are nothing. A place that can only hold a plain
+  string (a `title`, a joined meta line, a sort value) takes
+  `absentText()` from `@saroh/ui/lib/absent`, the only file the dash is
+  written in. `CountBadge` draws the same mark for a count that couldn't
+  be read.
+    - **A Settings read row keeps its words.** Label on the left, value
+      on the right, the row's Edit button beside it: "Not set" there is the
+      invitation to set it (`Absent` in `components/sites/settings-rows.tsx`,
+      `empty` on a Business row, Your profile, the pay-instructions and
+      verification rows, an Activity change).
+    - **A sentence is not a cell.** A line that reads as words keeps them
+      ("GSTIN not set" on the print preview, "use within no limit → 30
+      days" in a pack's changes, "changed billing from every unknown
+      period").
 - **business**, never organization or workspace; **location**, never store
   or storefront; **module**, never capability; **Stock**, never inventory;
   **Sign in** and the noun **sign-in**, never log in or login; a **time**,
@@ -618,7 +637,10 @@ empty states, and every sentence a `lib/` function returns):
   name.", "That didn't go through. Try again.").
 - `pnpm check:copy` (`scripts/check-app-copy.mjs`, in `pnpm prepush` and
   CI) reads the app with TypeScript's parser and fails each of these. Its
-  allow-list takes a file, a rule and a reason.
+  allow-list takes a file, a rule and a reason. The absent mark is its one
+  dash: it reads `packages/ui/src/lib/absent.ts` too, which is on the
+  allow-list, so a "—" (or `&mdash;`, or `\u2014`) typed anywhere else in
+  the app still fails.
 - **Open** (owner): the menu's last group is still headed "Workspace", on
   the allow-list until it is renamed. The docs still call the app itself
   "the workspace".

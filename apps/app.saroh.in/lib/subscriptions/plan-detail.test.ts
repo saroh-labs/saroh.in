@@ -374,7 +374,7 @@ describe("priceChangesText and glanceRows", () => {
     });
 
     it("never claims an exact count it can't know", () => {
-        expect(priceChangesText(null)).toBe("Not known");
+        expect(priceChangesText(null)).toBe("—");
         expect(priceChangesText(page({ nextCursor: "e1" }))).toBe("1+");
         expect(priceChangesText(page({ earlierUnrecorded: true }))).toBe(
             "1 recorded",
@@ -392,7 +392,7 @@ describe("priceChangesText and glanceRows", () => {
         ]);
         expect(
             glanceRows(plan({ monthlyFromMembers: "0.00" }), null)[1].value,
-        ).toBe("None");
+        ).toBe("—");
     });
 });
 

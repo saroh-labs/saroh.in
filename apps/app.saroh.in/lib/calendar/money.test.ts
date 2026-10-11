@@ -127,9 +127,9 @@ describe("monthStrip", () => {
 
     it("a month still to come has nothing in or out yet, only Due", () => {
         expect(word(monthStrip(september, at("future")))).toEqual([
-            ["In", "Not yet"],
-            ["Out", "Not yet"],
-            ["Net", "Not yet"],
+            ["In", "—"],
+            ["Out", "—"],
+            ["Net", "—"],
             ["Due", "₹1,200"],
         ]);
     });

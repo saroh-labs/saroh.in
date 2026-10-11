@@ -1,3 +1,4 @@
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -211,9 +212,11 @@ export function InvoicePaper({
                     <div className="min-w-0 flex-[0_1_200px]">
                         <p className="label">Place of supply</p>
                         <p className="mt-1 text-[13px]">
-                            {taxed.placeOfSupply
-                                ? `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
-                                : "Not set"}
+                            {taxed.placeOfSupply ? (
+                                `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
+                            ) : (
+                                <AbsentValue says="Not set" />
+                            )}
                             {taxed.taxType === "INTER"
                                 ? " · IGST"
                                 : " · CGST + SGST"}

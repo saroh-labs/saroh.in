@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ABSENT_MARK } from "../../lib/absent";
 import { cn } from "../../lib/utils";
 
 export type CountTone = "neutral" | "strong" | "danger";
@@ -19,7 +20,8 @@ export interface CountBadgeProps extends Omit<
 > {
     /**
      * A number, or a few words ("2 need you"). `null` is a count that could
-     * not be read: it draws "—" and is named "count unknown", never 0.
+     * not be read: it draws the absent mark (`lib/absent.ts`) and is named
+     * "count unknown", never 0.
      */
     count: number | string | null;
     tone?: CountTone;
@@ -55,7 +57,7 @@ export function CountBadge({
             )}
             {...props}
         >
-            {count === null ? "—" : over ? `${max}+` : count}
+            {count === null ? ABSENT_MARK : over ? `${max}+` : count}
         </span>
     );
 }
