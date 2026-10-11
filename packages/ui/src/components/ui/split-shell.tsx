@@ -112,9 +112,17 @@ export function SplitShell({
                        which takes it away from assistive technology too;
                        `sr-only` or an opacity treatment would leave it being
                        read out to exactly the people who cannot see it. */
-                    className="hidden w-[38%] min-w-[320px] max-w-[560px] flex-col justify-center bg-primary px-10 py-12 text-primary-foreground dark:bg-background dark:text-foreground min-[760px]:flex"
+                    className="hidden w-[38%] min-w-[320px] max-w-[560px] bg-primary px-10 text-primary-foreground dark:bg-background dark:text-foreground min-[760px]:block"
                 >
-                    <div className="mx-auto w-full max-w-[392px]">{panel}</div>
+                    {/* Centred in the window, not in the page: beside a
+                        form longer than the screen (setup) it sat half way
+                        down the page, below the fold. It stays put while
+                        the form scrolls. */}
+                    <div className="sticky top-0 flex min-h-screen flex-col justify-center py-12">
+                        <div className="mx-auto w-full max-w-[392px]">
+                            {panel}
+                        </div>
+                    </div>
                 </aside>
             ) : null}
         </div>
