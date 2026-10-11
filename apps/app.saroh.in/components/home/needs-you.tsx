@@ -5,7 +5,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
-import { arrivalProps, useArrivals } from "@/components/shared/use-arrivals";
+import { arrivalProps } from "@/components/shared/arrival-props";
+import { useArrivals } from "@/components/shared/use-arrivals";
 import { openTotal } from "@/lib/home/inline-actions";
 import { EmptyState } from "@saroh/ui/data-state";
 

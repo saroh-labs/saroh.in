@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * A list that reads again by itself (`useLiveRefresh`) may come back with
  * a row that wasn't there: a new order, a new thing that needs you. That
  * row enters with the list's entrance motion and wears a quiet edge until
- * it is touched (`arrivalProps`), so someone looking up from the counter
+ * it is touched (`arrivalProps` in `arrival-props.ts`), so someone looking up from the counter
  * sees what is new without the page shouting.
  *
  * - What is on screen when the list first draws is never new.
@@ -55,26 +55,3 @@ export function useArrivals(
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
-
-/**
- * What a row that just arrived carries: the entrance and the edge
- * (`wk-item wk-arrived` in `workspace.css`, still under reduced motion),
- * and the two ways of touching it.
- */
-export function arrivalProps(
-    arrived: boolean,
-    onTouch: () => void,
-): {
-    className?: string;
-    "data-arrived"?: "";
-    onPointerDown?: () => void;
-    onFocusCapture?: () => void;
-} {
-    if (!arrived) return {};
-    return {
-        className: "wk-item wk-arrived",
-        "data-arrived": "",
-        onPointerDown: onTouch,
-        onFocusCapture: onTouch,
-    };
-}

@@ -3,8 +3,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { arrivalProps } from "@/components/shared/arrival-props";
 import { BusinessDate } from "@/components/shared/business-zone";
-import { arrivalProps } from "@/components/shared/use-arrivals";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";

@@ -4,12 +4,16 @@
  * enters with an edge, until it is touched. What the list first drew, and
  * anything a change of tab or filter brought, is never new.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { arrivalProps, useArrivals } from "./use-arrivals";
+import { arrivalProps } from "./arrival-props";
+import { useArrivals } from "./use-arrivals";
 
 function List({ ids, scope }: { ids: string[]; scope?: string }) {
     const arrivals = useArrivals(ids, scope);
@@ -121,5 +125,18 @@ describe("useArrivals", () => {
 describe("arrivalProps", () => {
     it("is nothing at all for a row that was already there", () => {
         expect(arrivalProps(false, () => undefined)).toEqual({});
+    });
+
+    it("can be called by a row drawn on the server", () => {
+        // A product's orders tab is a server component and draws the same
+        // row: exported from a "use client" file, this threw there and the
+        // tab came back as the error page.
+        for (const file of [
+            "arrival-props.ts",
+            "../commerce/orders/order-row.tsx",
+        ]) {
+            const source = readFileSync(join(__dirname, file), "utf8");
+            expect(source, file).not.toMatch(/^\s*["']use client["']/);
+        }
     });
 });
