@@ -81,6 +81,16 @@ test.describe("Products list", () => {
             await expect(look.getByText("Live", { exact: true })).toBeVisible();
             await page.keyboard.press("Escape");
 
+            // On a phone the toasts sit over the foot of the list, where this
+            // one row is, and take the press meant for its menu. The pointer
+            // is still resting where Undo was pressed, inside the toast, and
+            // a toast under the pointer waits: move off it, then wait for the
+            // toasts to go, as someone would.
+            await page.mouse.move(1, 1);
+            await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, {
+                timeout: 20_000,
+            });
+
             // Duplicate opens a draft copy in the Editor.
             await page
                 .getByRole("button", { name: `More actions for ${name}` })
