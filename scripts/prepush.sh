@@ -834,6 +834,7 @@ bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step tag-strip pnpm run check:tag-strip
+bg_step titles pnpm run check:titles
 bg_step words pnpm run check:words
 bg_step formats pnpm run check:formats
 bg_step copy pnpm run check:copy
