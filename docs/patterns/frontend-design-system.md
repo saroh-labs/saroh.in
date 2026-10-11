@@ -404,8 +404,11 @@
     grid already matched and keeps its own row. Not tables, and left as
     they are: card grids (Services, Class packs, Collections, plan cards,
     the Pipeline board), Stock's Checks (a card per check, with its
-    actions) and a settings matrix (Your profile's alerts). Lists that
-    load more instead of paging (Stock, Products) keep "Show more".
+    actions) and a settings matrix (Your profile's alerts). Stock's
+    three lists (Levels, Log, Checks) end with `ListPaging`, each with its
+    own page and size in the address (`lib/stock/list-query.ts`); Levels
+    pages by product, so its footer counts products, not rows. A list
+    that loads more instead of paging (Products) keeps "Show more".
 
 - **Current** — **One width per kind of screen, through `PageContainer`**
   (04 §1): lists, boards and dashboards `full`; create and edit forms

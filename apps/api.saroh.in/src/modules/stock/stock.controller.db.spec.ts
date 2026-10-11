@@ -337,6 +337,66 @@ describe("Stock API (DB)", () => {
             ).rejects.toThrow(NotFoundException);
         });
 
+        it("reads any page of products by its number, at the size asked", async () => {
+            // Enough products for a full second page at the smallest size.
+            for (let i = 0; i < 20; i += 1) {
+                await product(`Paged ${String(i).padStart(2, "0")} ${tag}`, 5);
+            }
+            const all = await api.levels(owner(), {});
+            const products = Array.from(
+                new Set(all.rows.map((r) => r.productId)),
+            );
+            expect(products.length).toBeGreaterThan(20);
+            // Asked for nothing, every row comes back, as before.
+            expect(all.pageSize).toBeNull();
+            expect(all.total).toBe(products.length);
+
+            const of = (view: typeof all) =>
+                Array.from(new Set(view.rows.map((r) => r.productId)));
+            const second = await api.levels(owner(), { page: 2, size: 10 });
+            expect(of(second)).toEqual(products.slice(10, 20));
+            expect(second.pageSize).toBe(10);
+            expect(second.total).toBe(products.length);
+            expect(second.untracked).toEqual(all.untracked);
+            expect(second.needsYou).toBe(all.needsYou);
+            expect(of(await api.levels(owner(), { size: 10 }))).toEqual(
+                products.slice(0, 10),
+            );
+            // Past the end is an empty page, not an error.
+            const past = await api.levels(owner(), { page: 99, size: 10 });
+            expect(past.rows).toEqual([]);
+            expect(past.total).toBe(products.length);
+
+            // The total is the filters' own: the search, and Needs you.
+            const found = await api.levels(owner(), {
+                q: `paged 0`,
+                page: 1,
+                size: 10,
+            });
+            expect(found.total).toBe(10);
+            expect(of(found)).toHaveLength(10);
+            const needs = await api.levels(owner(), { needs: true, size: 100 });
+            expect(needs.total).toBe(of(needs).length);
+
+            await expect(
+                api.levels(owner(), { cursor: products[0], page: 2 }),
+            ).rejects.toThrow("Page by a cursor or a page number, not both.");
+        });
+
+        it("one storefront's view leaves out what it neither sells nor holds, and counts what is left", async () => {
+            const all = await api.levels(owner(), {});
+            const atOnline = await api.levels(owner(), { storefront: online });
+            expect(atOnline.rows.length).toBeLessThan(all.rows.length);
+            expect(
+                atOnline.rows.every((r) =>
+                    r.cells.some((c) => c.soldHere || c.onHand > 0),
+                ),
+            ).toBe(true);
+            expect(atOnline.total).toBe(
+                new Set(atOnline.rows.map((r) => r.productId)).size,
+            );
+        });
+
         it("searches names and SKUs, and keeps only what needs someone", async () => {
             const low = await product(`Rye ${tag}`, 1);
             await prisma.stockLevel.update({
@@ -872,6 +932,63 @@ describe("Stock API (DB)", () => {
             });
             expect(next.entries.map((e) => e.quantity)).toEqual([1, 1]);
             expect(next.nextCursor).toBeNull();
+        });
+
+        it("reads any page of the log by its number, at the size asked", async () => {
+            const id = await product("Crumpet", 1);
+            // The first count is an entry too: 24 more make 25.
+            for (let units = 1; units <= 24; units += 1) {
+                await api.adjust(owner(), {
+                    storeId: hill,
+                    productId: id,
+                    units,
+                });
+            }
+            const all = await api.log(owner(), { product: id, size: 100 });
+            expect(all.entries).toHaveLength(25);
+            expect(all.total).toBe(25);
+            expect(all.pageSize).toBe(100);
+            expect(all.nextCursor).toBeNull();
+
+            const second = await api.log(owner(), {
+                product: id,
+                page: 2,
+                size: 10,
+            });
+            expect(second.entries.map((e) => e.id)).toEqual(
+                all.entries.slice(10, 20).map((e) => e.id),
+            );
+            expect(second.pageSize).toBe(10);
+            // The total is the filters', not the page's.
+            expect(second.total).toBe(25);
+            const third = await api.log(owner(), {
+                product: id,
+                page: 3,
+                size: 10,
+            });
+            expect(third.entries.map((e) => e.id)).toEqual(
+                all.entries.slice(20).map((e) => e.id),
+            );
+            // Past the end is an empty page, not an error.
+            const past = await api.log(owner(), {
+                product: id,
+                page: 9,
+                size: 10,
+            });
+            expect(past.entries).toEqual([]);
+            expect(past.total).toBe(25);
+            // The default is still 50.
+            const plain = await api.log(owner(), { product: id });
+            expect(plain.pageSize).toBe(50);
+            expect(plain.entries).toHaveLength(25);
+
+            await expect(
+                api.log(owner(), {
+                    product: id,
+                    cursor: all.entries[0].id,
+                    page: 2,
+                }),
+            ).rejects.toThrow("Page by a cursor or a page number, not both.");
         });
 
         it("names people only for audit:read, and orders only for order:read", async () => {

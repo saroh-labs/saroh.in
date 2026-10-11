@@ -8,7 +8,6 @@ import { LogList } from "./log-list";
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock("@/lib/stock/screen-actions", () => ({ loadLogPage: vi.fn() }));
 
 /**
  * The stock log on a phone (T3): each entry is two wrapping lines by CSS
@@ -45,10 +44,14 @@ function entry(over: Partial<StockLogEntry> = {}): StockLogEntry {
     };
 }
 
-function render(entries: StockLogEntry[]) {
+function render(
+    entries: StockLogEntry[],
+    { total, page = 1 }: { total?: number; page?: number } = {},
+) {
     const log: StockLog = {
         entries,
         nextCursor: null,
+        total,
         seesPeople: true,
         seesOrders: true,
         timezone: "Asia/Kolkata",
@@ -62,11 +65,42 @@ function render(entries: StockLogEntry[]) {
                 { id: "s2", name: "Online" },
             ]}
             products={[{ id: "p1", name: "Sourdough loaf" }]}
-            href={() => "/commerce/stock?tab=log"}
-            pageSize={50}
+            href={(change) =>
+                change.page
+                    ? `/commerce/stock?tab=log&logPage=${change.page}`
+                    : "/commerce/stock?tab=log"
+            }
+            paging={{ page, size: 50 }}
         />,
     );
 }
+
+describe("LogList's footer", () => {
+    it("pages by number under the table, and counts every entry the filters keep", () => {
+        const html = render([entry(), entry({ id: "e2" })], {
+            total: 120,
+            page: 2,
+        });
+        expect(html).toContain("120 entries");
+        expect(html).toContain('aria-label="Rows per page"');
+        expect(html).toContain('aria-label="Pages of stock changes"');
+        expect(html).toMatch(/data-list-range=""[^>]*>51 to 100 of 120</);
+        // Previous, Next and each number are addresses of this screen.
+        expect(html).toContain('href="/commerce/stock?tab=log&amp;logPage=1"');
+        expect(html).toContain('href="/commerce/stock?tab=log&amp;logPage=3"');
+        expect(html).not.toContain("Show older");
+        // The footer follows the table.
+        expect(html.indexOf("data-list-paging")).toBeGreaterThan(
+            html.indexOf("data-list-table"),
+        );
+    });
+
+    it("draws no footer for a list that fits the smallest page", () => {
+        const html = render([entry()], { total: 1 });
+        expect(html).toContain("1 entry");
+        expect(html).not.toContain("data-list-paging");
+    });
+});
 
 describe("LogList on a phone", () => {
     const html = render([

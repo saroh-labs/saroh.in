@@ -2,18 +2,18 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
+import { ListPaging } from "@/components/shared/list-toolbar";
 import { productHref } from "@/lib/products/links";
-import { CHECK_LABELS, checkWords, moreChecks } from "@/lib/stock/log";
-import {
-    loadChecksPage,
-    resolveStockCheck,
-    undoStock,
-} from "@/lib/stock/screen-actions";
+import type { StockHref, StockListPage } from "@/lib/stock/list-query";
+import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
+import { CHECK_LABELS, checkWords } from "@/lib/stock/log";
+import { resolveStockCheck, undoStock } from "@/lib/stock/screen-actions";
 import type { StockCheck, StockChecks } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
@@ -27,32 +27,23 @@ const newKey = () => crypto.randomUUID();
  * Stock checks (#521): what doesn't add up — a shelf short for its orders,
  * a count made against a number that had moved, a sale that took nothing
  * from the shelf, promised that isn't what open orders hold — each with
- * what can be done about it. Resolving records that someone looked; a
- * check opens again when its numbers move on.
+ * what can be done about it, a page at a time under the one list footer.
+ * Resolving records that someone looked; a check opens again when its
+ * numbers move on.
  */
 export function ChecksList({
     checks,
-    pageSize,
+    href,
+    paging,
 }: {
     checks: StockChecks | "failed";
-    pageSize: number;
+    /** The screen's address with these changed. */
+    href: StockHref;
+    /** The page on screen and its rows per page. */
+    paging: StockListPage;
 }) {
     const router = useRouter();
-    const [loaded, setLoaded] = useState(() => ({
-        from: checks,
-        list: checks === "failed" ? [] : checks.checks,
-        next: checks === "failed" ? null : (checks.nextCursor ?? null),
-    }));
     const [busy, setBusy] = useState<string | null>(null);
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [pending, start] = useTransition();
-    if (loaded.from !== checks) {
-        setLoaded({
-            from: checks,
-            list: checks === "failed" ? [] : checks.checks,
-            next: checks === "failed" ? null : (checks.nextCursor ?? null),
-        });
-    }
 
     const intro = (
         <p className="mb-3.5 max-w-[72ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
@@ -118,32 +109,11 @@ export function ChecksList({
         router.refresh();
     };
 
-    const more = () =>
-        start(async () => {
-            const cursor = loaded.next;
-            setLoadError(null);
-            if (!cursor) return;
-            const res = await runAction(
-                () => loadChecksPage({ cursor, limit: pageSize }),
-                { quiet: true, onUnreached: setLoadError },
-            );
-            if (!res) return;
-            if (!res.ok) {
-                setLoadError(res.error);
-                return;
-            }
-            setLoaded((l) => ({
-                ...l,
-                list: moreChecks(l.list, res.data),
-                next: res.data.nextCursor ?? null,
-            }));
-        });
-
     return (
         <div>
             {intro}
             <div className="grid gap-2.5">
-                {loaded.list.map((c) => {
+                {checks.checks.map((c) => {
                     const { label, tone } = CHECK_LABELS[c.kind];
                     const { title, body } = checkWords(c);
                     const off = busy === c.key;
@@ -175,7 +145,7 @@ export function ChecksList({
                         </article>
                     );
                 })}
-                {loaded.list.length === 0 ? (
+                {checks.checks.length === 0 ? (
                     <EmptyState
                         size="panel"
                         title="Everything adds up"
@@ -183,28 +153,17 @@ export function ChecksList({
                     />
                 ) : null}
             </div>
-            {loaded.next ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={more}
-                        busy={pending}
-                        busyLabel="Loading…"
-                    >
-                        Show more
-                    </Button>
-                    {loadError ? (
-                        <span
-                            role="alert"
-                            className="text-[12px] text-destructive"
-                        >
-                            {loadError}
-                        </span>
-                    ) : null}
-                </div>
-            ) : null}
+            <ListPaging
+                label={STOCK_PAGES_LABEL.checks}
+                page={paging.page}
+                total={checks.total ?? checks.checks.length}
+                size={paging.size}
+                to={(n) => ({ href: href({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize(STOCK_LISTS.checks, size);
+                    router.push(href({ size }), { scroll: false });
+                }}
+            />
         </div>
     );
 }

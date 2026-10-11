@@ -219,10 +219,12 @@ with why it stops there:
   category tree. The product page's reads (`forProduct`, `setForProduct`)
   could move to their own service, as the controller's product routes
   already are.
-- `stock/levels-read.ts` (423) and `stock/stock-checks.service.ts`
-  (448) — the Stock screen's levels, and its four checks. Each is one
-  reader, now paged (#527). The levels left `stock-reads.service.ts` (217
-  now, the log) when paging grew them, and how a product's lines and
+- `stock/levels-read.ts` (458) and `stock/stock-checks.service.ts`
+  (515) — the Stock screen's levels, and its four checks. Each is one
+  reader, now paged (#527) by a page number or a cursor; which rows a page
+  holds is `stock/stock-paging.ts`, shared with the log. The levels left
+  `stock-reads.service.ts` (232 now, the log) when paging grew them, and
+  how a product's lines and
   cells are drawn and judged went to `stock/product-lines.ts` (#534), which
   the Products list's Needs you shares; a little over, and cutting either
   further splits a query from the words it builds.

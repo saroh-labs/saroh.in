@@ -10,6 +10,7 @@ import { stockLine } from "../products/product-overview";
 import type { StockLevelsQueryDto } from "./dto";
 import { productLines } from "./product-lines";
 import type { StockReader } from "./stock-access";
+import { stockWindow } from "./stock-paging";
 import type { ShelfNeed } from "./stock-words";
 import { shortBy } from "./stock-words";
 import { businessTracksStock } from "./tracking";
@@ -18,11 +19,12 @@ import { businessTracksStock } from "./tracking";
  * The Stock screen's levels (#514, paged for #527): a row per product (or
  * per variant) with a cell per open storefront.
  *
- * Paged by product, a page at a time (`limit` products after `cursor`, the
- * last product id of the page before), the way the log pages. The rows are
- * worked out for every product the filters keep — "Needs you" is a word the
- * shelves make, not a column — and only the page's are sent, with the page's
- * last changes read. Without `limit` every row comes back, as before.
+ * Paged by product, a page at a time: by its number (`page`, at `size`
+ * products), or `limit` products after `cursor`, the last product id of the
+ * page before (`stock-paging.ts`). The rows are worked out for every product
+ * the filters keep — "Needs you" is a word the shelves make, not a column —
+ * and only the page's are sent, with the page's last changes read. Without
+ * `page`, `size` or `limit` every row comes back, as before.
  */
 
 export interface LastChange {
@@ -89,6 +91,13 @@ export interface StockLevelsView {
     canWrite: boolean;
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
+    /**
+     * Products the filters keep (the search, Needs you, the storefront
+     * shown), across every page: what the pages are counted in.
+     */
+    total: number;
+    /** Products a page, as asked; null when every row was sent. */
+    pageSize: number | null;
     /**
      * Rows that need someone, across every page and every open storefront
      * (not the search, nor the storefront shown): short, sold out or at
@@ -217,6 +226,7 @@ export async function readLevels(
     query: StockLevelsQueryDto,
 ): Promise<StockLevelsView> {
     const { organizationId } = reader;
+    const { take, skip } = stockWindow(query);
     // Every open storefront judges "Needs you"; the view shows the one asked.
     const everyStorefront = await openStorefronts(organizationId);
     const storefronts = query.storefront
@@ -394,12 +404,20 @@ export async function readLevels(
     // Filter, then page by product.
     let kept = groups
         .filter((g) => !matching || matching.has(g.productId))
-        .map((g) =>
-            query.needs
-                ? { ...g, rows: g.rows.filter((r) => rowNeedsYou(r.cells)) }
-                : g,
-        )
+        .map((g) => {
+            let rows = g.rows;
+            if (query.needs) rows = rows.filter((r) => rowNeedsYou(r.cells));
+            // One storefront's view: what it sells or still holds. Left
+            // out here, not by the screen, so `total` counts what is drawn.
+            if (query.storefront) {
+                rows = rows.filter((r) =>
+                    r.cells.some((c) => c.soldHere || c.onHand > 0),
+                );
+            }
+            return rows === g.rows ? g : { ...g, rows };
+        })
         .filter((g) => g.rows.length > 0);
+    const total = kept.length;
     if (query.cursor) {
         // After the cursor in name order — whether or not the filters
         // still keep the cursor's own product.
@@ -407,8 +425,9 @@ export async function readLevels(
         const after = order.get(query.cursor) ?? -1;
         kept = kept.filter((g) => (order.get(g.productId) ?? -1) > after);
     }
-    const more = query.limit !== undefined && kept.length > query.limit;
-    const page = more ? kept.slice(0, query.limit) : kept;
+    const end = take === undefined ? kept.length : skip + take;
+    const more = kept.length > end;
+    const page = kept.slice(skip, end);
     const rows = page.flatMap((g) => g.rows);
 
     const changes = await lastChanges(
@@ -431,6 +450,8 @@ export async function readLevels(
         tracking,
         canWrite: reader.canWrite,
         nextCursor: more ? page[page.length - 1].productId : null,
+        total,
+        pageSize: take ?? null,
         needsYou,
         timezone,
     };

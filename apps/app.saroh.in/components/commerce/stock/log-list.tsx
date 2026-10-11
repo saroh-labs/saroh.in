@@ -1,14 +1,15 @@
 "use client";
 
 import { formatTime } from "@/lib/format/datetime";
-import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
 import { productHref } from "@/lib/products/links";
+import type { StockHref, StockListPage } from "@/lib/stock/list-query";
+import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
 import type { LogKindId } from "@/lib/stock/log";
 import {
     allStorefrontsWords,
@@ -19,20 +20,18 @@ import {
     groupByDay,
     LOG_KINDS,
     logCountWords,
-    logKinds,
 } from "@/lib/stock/log";
-import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import {
     ListFilter,
+    ListPaging,
     listTable,
     ListTableHead,
     ListToolbar,
 } from "@/components/shared/list-toolbar";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import { PILL_TONE, TEXT_TONE } from "./tones";
 
@@ -47,7 +46,8 @@ const PHONE_ENTRY =
 /**
  * The stock log (#521): every change to every shelf, newest first, grouped
  * by the business's day — by kind, storefront and product, a page at a
- * time. Names only for a role that reads the audit trail, order links only
+ * time under the one list footer (rows per page, the page numbers,
+ * Previous and Next). Names only for a role that reads the audit trail, order links only
  * for one that reads orders; the API leaves them out otherwise.
  *
  * It follows the one list toolbar and the one table look: the location
@@ -66,34 +66,22 @@ export function LogList({
     storefronts,
     products,
     href,
-    pageSize,
+    paging,
 }: {
     log: StockLog | "failed";
     filter: { kind: LogKindId; store: string; product: string };
     storefronts: { id: string; name: string }[];
     products: { id: string; name: string }[];
-    href: (change: Record<string, string | undefined>) => string;
-    pageSize: number;
+    /** The screen's address with these changed. */
+    href: StockHref;
+    /** The page on screen and its rows per page. */
+    paging: StockListPage;
 }) {
     const router = useRouter();
-    const [loaded, setLoaded] = useState(() => ({
-        from: log,
-        entries: log === "failed" ? [] : log.entries,
-        next: log === "failed" ? null : log.nextCursor,
-    }));
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [pending, start] = useTransition();
-    if (loaded.from !== log) {
-        setLoaded({
-            from: log,
-            entries: log === "failed" ? [] : log.entries,
-            next: log === "failed" ? null : log.nextCursor,
-        });
-    }
 
     // The one list toolbar, in one row: the kind of change, the location
-    // and the product are its dropdown filters, and how many entries are
-    // loaded is the count on the right.
+    // and the product are its dropdown filters, and how many entries the
+    // filters keep, across every page, is the count on the right.
     const filters = (
         <ListToolbar
             className="mb-3.5"
@@ -177,7 +165,7 @@ export function LogList({
             }
             count={
                 log !== "failed"
-                    ? logCountWords(loaded.entries.length, !!loaded.next)
+                    ? logCountWords(log.total ?? log.entries.length)
                     : null
             }
         />
@@ -200,45 +188,16 @@ export function LogList({
     }
 
     const timezone = log.timezone ?? "Asia/Kolkata";
-    const days = groupByDay(loaded.entries, timezone);
-    const byId = new Map(loaded.entries.map((e) => [e.id, e]));
+    const days = groupByDay(log.entries, timezone);
+    const byId = new Map(log.entries.map((e) => [e.id, e]));
     const pairOf = (e: StockLogEntry) =>
         e.pairId
-            ? (loaded.entries.find(
+            ? (log.entries.find(
                   (o) => o.pairId === e.pairId && o.id !== e.id,
               ) ??
               byId.get(e.pairId) ??
               null)
             : null;
-
-    const more = () =>
-        start(async () => {
-            const cursor = loaded.next;
-            setLoadError(null);
-            if (!cursor) return;
-            const res = await runAction(
-                () =>
-                    loadLogPage({
-                        kind: logKinds(filter.kind),
-                        storefront:
-                            filter.store === "all" ? undefined : filter.store,
-                        product: filter.product || undefined,
-                        cursor,
-                        limit: pageSize,
-                    }),
-                { quiet: true, onUnreached: setLoadError },
-            );
-            if (!res) return;
-            if (!res.ok) {
-                setLoadError(res.error);
-                return;
-            }
-            setLoaded((l) => ({
-                ...l,
-                entries: [...l.entries, ...res.data.entries],
-                next: res.data.nextCursor,
-            }));
-        });
 
     // The design's columns; the two number columns grow for a business
     // that counts in thousands, and every row of a day shares them. Desk
@@ -434,28 +393,17 @@ export function LogList({
                     )
                 ) : null}
             </div>
-            {loaded.next ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={more}
-                        busy={pending}
-                        busyLabel="Loading…"
-                    >
-                        Show older
-                    </Button>
-                    {loadError ? (
-                        <span
-                            role="alert"
-                            className="text-[12px] text-destructive"
-                        >
-                            {loadError}
-                        </span>
-                    ) : null}
-                </div>
-            ) : null}
+            <ListPaging
+                label={STOCK_PAGES_LABEL.log}
+                page={paging.page}
+                total={log.total ?? log.entries.length}
+                size={paging.size}
+                to={(n) => ({ href: href({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize(STOCK_LISTS.log, size);
+                    router.push(href({ size }), { scroll: false });
+                }}
+            />
             <p className="mt-3.5 max-w-[72ch] text-pretty text-[12px] leading-normal text-muted-foreground">
                 Sold and Returned come from orders, so nobody can type them.
                 Entries can&apos;t be deleted. A mistake is fixed with a new

@@ -368,6 +368,46 @@ describe("Stock checks (DB)", () => {
         expect(first.restarted).toBe(false);
     });
 
+    it("reads any page of the open checks by its number, at the size asked", async () => {
+        // Enough open checks for a full second page at the smallest size:
+        // each shelf promises units no open order holds.
+        for (let i = 0; i < 20; i += 1) {
+            const stockLevelId = await track(
+                await product(`Paged ${String(i).padStart(2, "0")}`, null),
+                5,
+            );
+            await prisma.stockLevel.update({
+                where: { id: stockLevelId },
+                data: { promised: 2 },
+            });
+        }
+        const all = await checks.list(owner());
+        expect(all.checks.length).toBeGreaterThanOrEqual(20);
+        // Asked for nothing, every open check comes back, as before.
+        expect(all.pageSize).toBeNull();
+        expect(all.total).toBe(all.checks.length);
+
+        const second = await checks.list(owner(), { page: 2, size: 10 });
+        expect(second.checks.map((c) => c.key)).toEqual(
+            all.checks.slice(10, 20).map((c) => c.key),
+        );
+        expect(second.pageSize).toBe(10);
+        expect(second.total).toBe(all.total);
+        expect(second.counts).toEqual(all.counts);
+        expect(second.restarted).toBe(false);
+        expect(
+            (await checks.list(owner(), { size: 10 })).checks.map((c) => c.key),
+        ).toEqual(all.checks.slice(0, 10).map((c) => c.key));
+        // Past the end is an empty page, not an error.
+        const past = await checks.list(owner(), { page: 99, size: 10 });
+        expect(past.checks).toEqual([]);
+        expect(past.total).toBe(all.total);
+
+        await expect(
+            checks.list(owner(), { cursor: all.checks[0].key, page: 2 }),
+        ).rejects.toThrow("Page by a cursor or a page number, not both.");
+    });
+
     it("says it started again when the check a page ended on has closed", async () => {
         const first = await checks.list(owner(), { limit: 1 });
         const ended = first.nextCursor;
