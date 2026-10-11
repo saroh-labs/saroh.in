@@ -39,13 +39,59 @@ describe("the site header's main button (G17)", () => {
     it("is Book, to /book, when the business takes bookings here", () => {
         expect(
             headerAction({ booking: booking({}), shopServes: false }),
-        ).toEqual({ label: "Book", href: "/book" });
+        ).toEqual({ kind: "book", label: "Book", href: "/book" });
     });
 
     it("is Book even when a shop also serves: booking comes first", () => {
         expect(
             headerAction({ booking: booking({}), shopServes: true }),
-        ).toEqual({ label: "Book", href: "/book" });
+        ).toEqual({ kind: "book", label: "Book", href: "/book" });
+    });
+
+    it("is Contact us for a site that neither books nor sells, when it has a contact page", () => {
+        const none = {
+            booking: booking({ open: false, services: [] }),
+            shopServes: false,
+        };
+        // The Contact module page, wherever the merchant put it.
+        expect(
+            headerAction({
+                ...none,
+                pages: [
+                    { path: "/", kind: null },
+                    { path: "/say-hello", kind: "CONTACT" },
+                ],
+                modules: { CONTACT: "on" },
+            }),
+        ).toEqual({ kind: "contact", label: "Contact us", href: "/say-hello" });
+        // A page of the merchant's own at /contact.
+        expect(
+            headerAction({ ...none, pages: [{ path: "/contact" }] }),
+        ).toEqual({ kind: "contact", label: "Contact us", href: "/contact" });
+        // The Contact page's module is off: it shows "not available", so
+        // the header doesn't send anyone there.
+        expect(
+            headerAction({
+                ...none,
+                pages: [{ path: "/say-hello", kind: "CONTACT" }],
+                modules: { CONTACT: "off" },
+            }),
+        ).toBeNull();
+    });
+
+    it("never offers Contact us ahead of Book or Order", () => {
+        const pages = [{ path: "/contact", kind: "CONTACT" }];
+        expect(
+            headerAction({ booking: booking({}), shopServes: false, pages })
+                ?.kind,
+        ).toBe("book");
+        expect(
+            headerAction({
+                booking: booking({ open: false }),
+                shopServes: true,
+                pages,
+            })?.kind,
+        ).toBe("shop");
     });
 
     it("is none for a site with no modules", () => {
@@ -90,7 +136,7 @@ describe("the site header's main button (G17)", () => {
                 booking: booking({ open: false, services: [] }),
                 shopServes: true,
             }),
-        ).toEqual({ label: "Order", href: "/shop" });
+        ).toEqual({ kind: "shop", label: "Order", href: "/shop" });
     });
 
     it("follows the modules as they change, with no republish (G19)", () => {
@@ -100,6 +146,7 @@ describe("the site header's main button (G17)", () => {
         // Appointments off: the booking page closes, and Order takes over.
         const noBooking = { ...both, booking: booking({ open: false }) };
         expect(headerAction(noBooking)).toEqual({
+            kind: "shop",
             label: "Order",
             href: "/shop",
         });

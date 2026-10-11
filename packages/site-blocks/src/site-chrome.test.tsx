@@ -539,12 +539,8 @@ describe("the menu follows the modules (G19)", () => {
             />,
         );
         const row = () => screen.getByRole("navigation", { name: "Site" });
-        expect(linkTexts(row())).toEqual([
-            "Home",
-            "Our story",
-            "Shop",
-            "Contact",
-        ]);
+        // Order opens the shop, so the menu beside it doesn't say Shop too.
+        expect(linkTexts(row())).toEqual(["Home", "Our story", "Contact"]);
         expect(screen.getAllByRole("link", { name: "Order" })).toHaveLength(1);
 
         // Commerce off: the same snapshot, the live read says SHOP is off,

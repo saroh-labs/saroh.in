@@ -45,6 +45,17 @@ const ALL: SiteContact = {
     ],
 };
 
+/** A place's week as the footer lists it: each line's days and its hours. */
+function weekOf(place: Element | null | undefined): (string | null)[][] {
+    return Array.from(
+        place?.querySelectorAll("[data-site-hours] dl > div") ?? [],
+    ).map((row) => [
+        // The days, less the word a screen reader hears on today's line.
+        (row.querySelector("dt")?.firstChild?.textContent ?? "").trim(),
+        row.querySelector("dd")?.textContent ?? null,
+    ]);
+}
+
 const footer = (contact: SiteContact | null, layout?: "left") =>
     render(
         <SiteFooter
@@ -65,12 +76,27 @@ describe("the footer's contact group (DEC-128)", () => {
             screen.getByRole("link", { name: "hello@rye.example.com" }),
         ).toHaveAttribute("href", "mailto:hello@rye.example.com");
 
-        // One place: its address on a line, unnamed, with its week.
+        // One place: "Find us", its address line by line in an <address>,
+        // unnamed, with its week by day.
+        const place = screen.getByRole("heading", { name: "Find us" });
+        expect(place.tagName).toBe("H2");
+        const address = place.parentElement?.querySelector("address");
+        expect(address?.textContent).toBe("12th Main\nIndiranagar, Bengaluru");
+        expect(address).toHaveClass("whitespace-pre-line", "not-italic");
         expect(
-            screen.getByText("12th Main, Indiranagar, Bengaluru"),
-        ).toBeInTheDocument();
-        expect(screen.queryByText(/Indiranagar:/)).toBeNull();
-        expect(screen.getByText("Mon to Tue 6am to 9pm")).toBeInTheDocument();
+            screen.queryByRole("heading", { name: "Indiranagar" }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("heading", { name: "Opening hours" }).tagName,
+        ).toBe("H3");
+        expect(weekOf(place.parentElement)).toEqual([
+            ["Monday and Tuesday", "6am to 9pm"],
+            ["Wednesday to Sunday", "Closed"],
+        ]);
+        // WhatsApp is said in words, a link to the business's own wa.me.
+        expect(
+            screen.getByRole("link", { name: "Message on WhatsApp" }),
+        ).toHaveAttribute("href", "https://wa.me/919845012345");
         const directions = screen.getByRole("link", { name: "Get directions" });
         expect(directions).toHaveAttribute(
             "href",
@@ -80,16 +106,15 @@ describe("the footer's contact group (DEC-128)", () => {
             "https://www.google.com/maps/search/?api=1&query=12th%20Main%2C%20Indiranagar%2C%20Bengaluru",
         );
 
+        // The icons, less WhatsApp: it is already said in words above.
         const social = screen.getByRole("list", { name: "Find us on" });
         const links = within(social).getAllByRole("link");
         expect(links.map((a) => a.getAttribute("aria-label"))).toEqual([
             "Instagram",
-            "WhatsApp",
             "X",
         ]);
         expect(links.map((a) => a.getAttribute("href"))).toEqual([
             "https://www.instagram.com/rye",
-            "https://wa.me/919845012345",
             "https://x.com/rye",
         ]);
         for (const link of links) {
@@ -147,8 +172,13 @@ describe("the footer's contact group (DEC-128)", () => {
                 { name: "Koramangala", address: "80 Feet Road" },
             ],
         });
-        expect(screen.getByText("Indiranagar:")).toBeInTheDocument();
-        expect(screen.getByText("Koramangala:")).toBeInTheDocument();
+        // Each place is a column under its own name; none is "Find us".
+        expect(
+            screen
+                .getAllByRole("heading", { level: 2 })
+                .map((h) => h.textContent),
+        ).toEqual(["Indiranagar", "Koramangala", "Get in touch"]);
+        expect(screen.queryByRole("heading", { name: "Find us" })).toBeNull();
         expect(
             screen
                 .getAllByRole("link", { name: "Get directions" })
@@ -203,11 +233,12 @@ describe("the footer's contact group (DEC-128)", () => {
             ],
         });
         expect(screen.queryByRole("link", { name: "Google Maps" })).toBeNull();
+        // Instagram and X; WhatsApp is the link in words.
         expect(
             within(
                 screen.getByRole("list", { name: "Find us on" }),
             ).getAllByRole("link"),
-        ).toHaveLength(3);
+        ).toHaveLength(2);
     });
 
     it("never draws a link that isn't a network's own address", () => {

@@ -100,6 +100,11 @@ export default async function PreviewLayout({
             <SiteFooter
                 footer={snapshot.site.footer}
                 name={snapshot.site.name}
+                // The header's menu again at the foot, as the live site
+                // lists it, every link kept inside the preview.
+                navigation={navigation}
+                modules={modules}
+                basePath={base}
             />
             <KeepLinksInside base={base} />
         </div>

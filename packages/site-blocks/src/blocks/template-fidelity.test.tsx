@@ -93,9 +93,10 @@ describe("blocks read the type scale, with today's sizes as fallbacks", () => {
     it("sets the hero's display line from --site-display-size", () => {
         render(<HeroSection content={BLOCK_META.hero.fixtures.centered} />);
         const h1 = screen.getByRole("heading", { level: 1 });
-        expect(h1.className).toContain("var(--site-display-size,2.25rem)");
+        // One size that runs with the screen: never under 36px, up to the
+        // template's display size (60px without one), times the scale.
         expect(h1.className).toContain(
-            "md:text-[calc(var(--site-display-size,3.75rem)",
+            "text-[calc(clamp(2.25rem,6vw_+_0.75rem,var(--site-display-size,3.75rem))*var(--site-heading-scale))]",
         );
         expect(h1.className).toContain("font-site-heading");
     });

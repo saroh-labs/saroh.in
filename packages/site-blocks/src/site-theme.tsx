@@ -13,6 +13,7 @@
 import type { SiteFontPair } from "@saroh/block-contract";
 import { findFontPair, fontStack } from "@saroh/block-contract";
 
+import { craftRules } from "./site-craft";
 import { SITE_FONT_STACK } from "./tailwind-preset";
 
 /**
@@ -98,6 +99,11 @@ export function fontPairStacks(
  *
  * Deliberately NOT Saroh's brand tokens: this subtree is the merchant's
  * website, not a Saroh surface.
+ *
+ * After the tokens come the rules every site shares, each drawn from those
+ * tokens: a section's bands and frame (`sectionRules`), and the craft layer
+ * (`site-craft.ts`: base type, the reading column, the rhythm between
+ * sections, focus and selection, and the little motion a site has).
  */
 export function SiteTheme({
     variables,
@@ -212,7 +218,7 @@ ${
                 }
             }`
         : `            ${at} {\n${custom}\n            }`
-}${labels}${column}${sectionRules(at)}
+}${labels}${column}${sectionRules(at)}${craftRules(at, variables)}
         `}</style>
     );
 }

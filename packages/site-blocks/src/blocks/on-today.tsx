@@ -14,6 +14,8 @@ import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton } from "./cta";
+import { HeroHeading } from "./hero-heading";
+import type { HeroLevel } from "./hero-level";
 import PlainHero from "./hero-plain";
 
 /**
@@ -162,7 +164,10 @@ export default function OnTodayHero({
     bookHref,
     today: given,
     now,
+    level = 1,
 }: {
+    /** `1` for the page's first hero, `2` for any later one (`hero.tsx`). */
+    level?: HeroLevel;
     content: RenderedHero;
     /**
      * The live site's id — the read resolves the business from it. `null`:
@@ -212,7 +217,7 @@ export default function OnTodayHero({
     // Where no site is live (the editor's canvas): say what goes here.
     if (!given && siteId === undefined) {
         return (
-            <SplitHero content={content} line={null}>
+            <SplitHero content={content} level={level} line={null}>
                 <Panel title="On today" sub={null}>
                     <p className="border-site-border text-site-muted border-t px-1 py-3 text-[13.5px]">
                         Today&apos;s classes and free times show here on your
@@ -224,12 +229,14 @@ export default function OnTodayHero({
     }
     // A live render that could not tell which site, or a failed read: the
     // hero without the panel — never an empty "nothing on".
-    if (!given && siteId === null) return <PlainHero content={content} />;
-    if (state.kind === "error") return <PlainHero content={content} />;
+    if (!given && siteId === null)
+        return <PlainHero content={content} level={level} />;
+    if (state.kind === "error")
+        return <PlainHero content={content} level={level} />;
 
     if (state.kind === "loading") {
         return (
-            <SplitHero content={content} line={null}>
+            <SplitHero content={content} level={level} line={null}>
                 <Panel title="On today" sub={null}>
                     <p className="border-site-border text-site-muted border-t px-1 py-3 text-[13.5px]">
                         Loading today&apos;s times…
@@ -252,11 +259,11 @@ export default function OnTodayHero({
 
     // No Appointments, or nothing on the booking page: no panel (default 138).
     if (!today.appointments) {
-        return <PlainHero content={content} below={line} />;
+        return <PlainHero content={content} level={level} below={line} />;
     }
 
     return (
-        <SplitHero content={content} line={line}>
+        <SplitHero content={content} level={level} line={line}>
             <Panel
                 title={today.classes ? "On today" : "Free today"}
                 sub={dateText(today.date, true)}
@@ -309,19 +316,29 @@ function OpenLine({ text, open }: { text: string; open: boolean }) {
 function SplitHero({
     content,
     line,
+    level = 1,
     children,
 }: {
+    level?: HeroLevel;
     content: RenderedHero;
     line: React.ReactNode;
     children: React.ReactNode;
 }) {
+    // Only the page's first hero is its h1 (`hero.tsx`).
     return (
-        <section className="bg-site-hero-bg text-site-hero-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            // It paints its own ground (`site-craft.ts`).
+            data-site-ground="hero"
+            className="bg-site-hero-bg text-site-hero-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+        >
             <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))]">
                 <div className="pt-2">
-                    <h1 className="font-site-heading text-balance text-[clamp(calc(38px*var(--site-heading-scale)),9vw,calc(64px*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]">
+                    <HeroHeading
+                        level={level}
+                        className="font-site-heading text-balance text-[clamp(calc(38px*var(--site-heading-scale)),9vw,calc(64px*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
+                    >
                         {content.heading}
-                    </h1>
+                    </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-3.5 max-w-[44ch] text-pretty text-base leading-[1.55] opacity-75">
                             {content.subheading}
