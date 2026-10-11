@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { Type } from "class-transformer";
@@ -31,6 +31,9 @@ import type { CatalogueItemDto } from "./serialize";
  * returns this: a page of rows after `cursor`, how many match, the counts
  * the list's chips show, and what needs someone — all worked out here, so
  * a screen that holds one page never counts from it.
+ *
+ * A list with numbered pages asks by `page` (from 1) and `size` instead of
+ * a cursor, as the Orders list does.
  */
 
 /** The list's chips: everything, what's in a collection, what counts stock. */
@@ -43,6 +46,9 @@ export const CATALOGUE_VIEWS = [
 export type CatalogueView = (typeof CATALOGUE_VIEWS)[number];
 
 const DEFAULT_PAGE = 50;
+
+/** The sizes a list with numbered pages offers; any other is refused. */
+export const CATALOGUE_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 export class CatalogueQueryDto {
     @IsOptional()
@@ -86,6 +92,24 @@ export class CatalogueQueryDto {
     @Min(1)
     @Max(200)
     limit?: number;
+
+    /**
+     * Or the page by its number, from 1: what a list with numbered pages
+     * asks. Read by offset, so a product added while someone pages can move
+     * one down a page; the cursor stays for a caller that must not skip.
+     */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt({ message: "page must be a whole number" })
+    @Min(1)
+    @Max(100_000)
+    page?: number;
+
+    /** Rows per page, for a list with numbered pages: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn(CATALOGUE_PAGE_SIZES, { message: "size is 10, 25, 50 or 100" })
+    size?: number;
 }
 
 export interface CataloguePageDto {
@@ -94,6 +118,8 @@ export interface CataloguePageDto {
     nextCursor: string | null;
     /** Products matching every filter, search and view. */
     total: number;
+    /** How many rows a page holds: `size`, else `limit`, else the default. */
+    pageSize: number;
     /** Each chip's count, within the storefront and status asked for. */
     counts: { all: number; collections: number; inventory: number };
     /**
@@ -114,11 +140,16 @@ export interface CataloguePageDto {
 const ARCHIVED = "ARCHIVED";
 
 /**
- * Whether `query` asks for a page (it names a `limit`) rather than the
- * whole catalogue, which every older caller reads as an array.
+ * Whether `query` asks for a page (it names a `limit`, a `page` or a
+ * `size`) rather than the whole catalogue, which every older caller reads
+ * as an array.
  */
 export function wantsPage(query: CatalogueQueryDto): boolean {
-    return query.limit !== undefined;
+    return (
+        query.limit !== undefined ||
+        query.page !== undefined ||
+        query.size !== undefined
+    );
 }
 
 /**
@@ -158,6 +189,12 @@ export async function cataloguePage(
     query: CatalogueQueryDto,
 ): Promise<CataloguePageDto> {
     const { status, storefront } = query;
+    if (query.cursor && query.page) {
+        throw new BadRequestException({
+            message: "Page by a cursor or a page number, not both.",
+            details: { field: "page" },
+        });
+    }
     const stores = await openStores(organizationId, storefront);
     const base: Prisma.ProductWhereInput = {
         organizationId,
@@ -242,7 +279,8 @@ export async function cataloguePage(
     }
     const where: Prisma.ProductWhereInput = { AND: narrow };
 
-    const take = query.limit ?? DEFAULT_PAGE;
+    const take = query.size ?? query.limit ?? DEFAULT_PAGE;
+    const skip = query.page ? (query.page - 1) * take : 0;
     const [page, total, all, inColl, inv, everywhere, listed] =
         await Promise.all([
             products.catalogue(
@@ -251,6 +289,7 @@ export async function cataloguePage(
                 {
                     where: after ? { AND: [where, after] } : where,
                     take: take + 1,
+                    ...(skip > 0 ? { skip } : {}),
                 },
             ),
             prisma.product.count({ where: { AND: [base, where] } }),
@@ -277,6 +316,7 @@ export async function cataloguePage(
         items,
         nextCursor: more ? (items[items.length - 1]?.id ?? null) : null,
         total,
+        pageSize: take,
         counts: { all, collections: inColl, inventory: inv },
         storefronts: {
             everywhere,

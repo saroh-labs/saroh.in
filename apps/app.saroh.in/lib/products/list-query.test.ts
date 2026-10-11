@@ -6,6 +6,7 @@ import {
     isNarrowed,
     listHref,
     newCollectionHref,
+    pageHref,
     readListQuery,
 } from "./list-query";
 
@@ -25,8 +26,61 @@ describe("the Products list's address (#519)", () => {
             status: "DRAFT",
             category: null,
             collection: "c1",
+            page: 1,
+            size: 50,
         });
         expect(isNarrowed(query)).toBe(true);
+    });
+
+    it("reads the page and the rows a page, and opens at the size last chosen", () => {
+        expect(readListQuery({ page: "3", size: "25" })).toMatchObject({
+            page: 3,
+            size: 25,
+        });
+        // No size in the address: what this browser last chose.
+        expect(readListQuery({}, 100).size).toBe(100);
+        expect(readListQuery({ size: "10" }, 100).size).toBe(10);
+        // Anything else is the first page, at the size it would have had.
+        for (const page of ["0", "-2", "1.5", "two"]) {
+            expect(readListQuery({ page }).page).toBe(1);
+        }
+        expect(readListQuery({ size: "37" }).size).toBe(50);
+        expect(readListQuery({ size: "37" }, 25).size).toBe(25);
+    });
+
+    it("keeps the page and the size in the address, leaving the defaults out", () => {
+        const query = readListQuery({ q: "rye", page: "3", size: "25" });
+        expect(listHref(query)).toBe("/commerce/products?q=rye&page=3&size=25");
+        expect(pageHref(query, 4)).toBe(
+            "/commerce/products?q=rye&page=4&size=25",
+        );
+        expect(pageHref(query, 1)).toBe("/commerce/products?q=rye&size=25");
+        expect(pageHref(readListQuery({ page: "2" }), 1)).toBe(
+            "/commerce/products",
+        );
+    });
+
+    it("starts again at the first page when what is listed, or the size, changes", () => {
+        const query = readListQuery({ page: "3", size: "25" });
+        expect(listHref(query, { view: "inventory" })).toBe(
+            "/commerce/products?tab=inventory&size=25",
+        );
+        expect(listHref(query, { view: "needs" })).toBe(
+            "/commerce/products?view=needs&size=25",
+        );
+        expect(listHref(query, { q: "rye" })).toBe(
+            "/commerce/products?q=rye&size=25",
+        );
+        expect(listHref(query, { status: "DRAFT" })).toBe(
+            "/commerce/products?status=DRAFT&size=25",
+        );
+        expect(listHref(query, { collection: "c1" })).toBe(
+            "/commerce/products?collection=c1&size=25",
+        );
+        expect(listHref(query, { size: 100 })).toBe(
+            "/commerce/products?size=100",
+        );
+        expect(listHref(query, { size: 50 })).toBe("/commerce/products");
     });
 
     it("falls back to All for an unknown chip and ignores an unknown status", () => {
@@ -102,6 +156,18 @@ describe("the Products list's address (#519)", () => {
             status: undefined,
             category: undefined,
             collection: undefined,
+            page: undefined,
+            size: 50,
+        });
+    });
+
+    it("asks the API for the page by its number, at the size on screen", () => {
+        expect(
+            catalogueFilter(readListQuery({ page: "3", size: "25" })),
+        ).toMatchObject({ page: 3, size: 25 });
+        expect(catalogueFilter(readListQuery({}, 10))).toMatchObject({
+            page: undefined,
+            size: 10,
         });
     });
 });

@@ -180,6 +180,9 @@ module.exports = {
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
+        // The Products list's query: a page by number and its sizes, with a
+        // mocked Prisma.
+        "<rootDir>/src/modules/products/catalogue-page.dto.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         // #517 photos and videos: limits, kind/type match, posters from the
         // library, with a jest-mocked Prisma.

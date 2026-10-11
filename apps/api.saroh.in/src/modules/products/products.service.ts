@@ -233,11 +233,13 @@ export class ProductsService {
         /**
          * A page of it (#519): narrowed further by `where` (which carries
          * the keyset after the page before, `afterInList`), `take` rows in
-         * the same order. Left out, all of it.
+         * the same order, after `skip` of them for a page asked by its
+         * number. Left out, all of it.
          */
         page: {
             where?: Prisma.ProductWhereInput;
             take?: number;
+            skip?: number;
         } = {},
     ): Promise<CatalogueItemDto[]> {
         const { status, storefront } = filter;
@@ -252,6 +254,7 @@ export class ProductsService {
             },
             orderBy: [{ createdAt: "desc" }, { id: "asc" }],
             ...(page.take !== undefined ? { take: page.take } : {}),
+            ...(page.skip ? { skip: page.skip } : {}),
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { variants: true } },
