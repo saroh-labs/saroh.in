@@ -835,7 +835,6 @@ export default function BookingFlow({
         startAtChosen,
         where,
         payChoice,
-        phoneNo,
         hadNote,
     ]);
 

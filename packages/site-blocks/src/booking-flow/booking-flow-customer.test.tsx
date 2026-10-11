@@ -541,7 +541,12 @@ describe("the booking through a reload", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: /^Book/ }));
         await screen.findByRole("heading", { name: "You're booked, Asha." });
-        expect(window.sessionStorage.getItem("saroh.booking-draft")).toBe(null);
+        // Forgotten in an effect, just after the heading is drawn.
+        await waitFor(() =>
+            expect(window.sessionStorage.getItem("saroh.booking-draft")).toBe(
+                null,
+            ),
+        );
     });
 
     it("keeps only what it knows, for two hours, under the address without its tags", () => {
