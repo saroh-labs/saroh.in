@@ -11,6 +11,10 @@ import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
  * The bag's lines: each with its photo, what one costs, − and + and its
  * amount, and "Remove". − stops at one: a line leaves the bag only when the
  * customer says so, and the bag then offers to put it back.
+ *
+ * A bag with no photos at all draws no photo column: lines of empty squares
+ * said only that nothing was there. Where some lines have a photo, the
+ * others keep a quiet square, so the names line up.
  */
 
 /** A bag line's key: its listing and variant. */
@@ -58,6 +62,7 @@ export function BagLines({
     /** A line was taken out: the bag offers to put it back. */
     onRemoved: (line: RemovedLine) => void;
 }) {
+    const anyPhoto = quote.lines.some((line) => line.image);
     return (
         <ul className="m-0 list-none p-0">
             {quote.lines.map((line) => {
@@ -82,18 +87,19 @@ export function BagLines({
                                 {...siteImage()}
                                 className="border-site-border size-14 shrink-0 rounded-[calc(var(--site-radius)+4px)] border object-cover"
                             />
-                        ) : (
+                        ) : anyPhoto ? (
                             <span
                                 aria-hidden="true"
+                                data-line-blank=""
                                 className={cn(
                                     "size-14 shrink-0 rounded-[calc(var(--site-radius)+4px)]",
                                     quietFill,
                                 )}
                             />
-                        )}
+                        ) : null}
                         <div className="min-w-0 flex-1">
                             <div className="flex gap-2.5">
-                                <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
+                                <span className="min-w-0 flex-1 font-semibold leading-snug [overflow-wrap:anywhere]">
                                     {name}
                                 </span>
                                 <span className="font-semibold tabular-nums">

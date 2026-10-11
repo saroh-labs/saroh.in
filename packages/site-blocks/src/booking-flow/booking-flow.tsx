@@ -1315,6 +1315,14 @@ export default function BookingFlow({
                                     </>
                                 )}
                             </p>
+                            {/* With no phone in the sentence, the ways the
+                                site does show: a message, at least. */}
+                            {facts.phone ? null : (
+                                <ReachLinks
+                                    reach={callReach}
+                                    className="mt-1"
+                                />
+                            )}
                         </div>
                     ) : !page.open || services.length === 0 ? (
                         <div className={card}>

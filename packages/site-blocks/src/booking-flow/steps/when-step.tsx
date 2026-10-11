@@ -9,7 +9,7 @@ import type {
     BookingStart,
 } from "../model";
 import { visitsOf } from "../model";
-import { card, focusRing, quietFill } from "../styles";
+import { card, quietFill, textAction } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { OneToOne } from "./one-to-one";
 import { Sessions } from "./sessions";
@@ -82,18 +82,49 @@ export function WhenStep({
                 }
             />
             {daysState.kind === "loading" ? (
+                // The shape of what is coming: the label, two weeks of
+                // days, a row of times. The card holds its height while
+                // the times are read, so nothing under it jumps.
                 <div
                     role="status"
                     aria-label="Loading times"
+                    data-times-loading=""
                     className="grid gap-2.5"
                 >
                     <div className={cn("h-3.5 w-2/5 rounded-md", quietFill)} />
-                    <div
-                        className={cn(
-                            "h-[66px] rounded-[calc(var(--site-radius)+12px)]",
-                            quietFill,
-                        )}
-                    />
+                    {isClass ? (
+                        <div className="grid gap-2">
+                            {[0, 1, 2].map((i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "h-[60px] rounded-[calc(var(--site-radius)+10px)]",
+                                        quietFill,
+                                    )}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <>
+                            <div className="coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))] grid grid-cols-7 gap-1.5">
+                                {Array.from({ length: 14 }, (_, i) => (
+                                    <div
+                                        key={i}
+                                        className={cn(
+                                            "h-[62px] rounded-[calc(var(--site-radius)+10px)]",
+                                            quietFill,
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                            <div
+                                className={cn(
+                                    "mt-2 h-[45px] rounded-[calc(var(--site-radius)+7px)]",
+                                    quietFill,
+                                )}
+                            />
+                        </>
+                    )}
                 </div>
             ) : daysState.kind === "error" ? (
                 <div>
@@ -106,10 +137,7 @@ export function WhenStep({
                         <button
                             type="button"
                             onClick={onRetry}
-                            className={cn(
-                                "text-site-fg mt-3 text-sm font-semibold underline",
-                                focusRing,
-                            )}
+                            className={cn(textAction, "mt-3")}
                         >
                             Try again
                         </button>
