@@ -240,6 +240,12 @@ export function DataView<TRow>({
         });
     const clearSelection = () => setSelected(new Set());
     const firstFilter = filters?.at(0);
+    /**
+     * Where "Show all" goes from an empty view: the view that hides nothing.
+     * A list whose first view is itself a subset (Bookings opens on
+     * "Upcoming") would otherwise be sent back to the view it is already in.
+     */
+    const wholeFilter = filters?.find((f) => !f.predicate) ?? firstFilter;
 
     /** Normalised once so the guards below are plain length checks. */
     const searchable = searchableColumnIds ?? [];
@@ -815,8 +821,8 @@ export function DataView<TRow>({
                         title={`No ${noun.other} in “${activeFilter.label}”`}
                         description={`${count(rows.length)} in total.`}
                         onClear={
-                            firstFilter
-                                ? () => chooseFilter(firstFilter.id)
+                            wholeFilter && wholeFilter.id !== filterId
+                                ? () => chooseFilter(wholeFilter.id)
                                 : undefined
                         }
                     />
