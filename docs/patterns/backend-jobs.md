@@ -270,6 +270,14 @@ the Privacy Policy states both.
   trails are records. A business on legal hold keeps its rows, and its
   members their sign-in sessions. It logs counts per table.
 - **`analytics.retention`** (below) leaves a held business's events too.
+- **`waitlist.retention`** (`waitlist/waitlist-retention.handler.ts`) is
+  the one daily chain for what saroh.in's visitors leave with Saroh: a
+  waitlist entry 12 months after its invite, a link-preview report and a QR
+  code maker email 12 months after last use, and a message from
+  saroh.in/contact 12 months after it arrived (DEC-137,
+  `contact-messages/contact-retention.ts`). A new kind of visitor data
+  joins this sweep as a function it calls, counted and caught on its own,
+  rather than starting a chain (and a partial unique index) of its own.
 
 ## Data export — **Current** (DEC-120)
 

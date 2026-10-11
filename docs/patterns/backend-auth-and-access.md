@@ -547,6 +547,12 @@ orgId)` (`organizations/organization-kind.ts`).
   `organization:pii:read`) and marked done with `reports:resolve`, which
   Platform Owners and Support hold. Closing a report changes nothing for
   the business, so it never asks for `organization:lifecycle:write`.
+- **Current** (DEC-137) — **Messages from saroh.in/contact** belong to no
+  business and every row is personal data (a name, an email, the writer's
+  words), so the whole list (`GET /admin/contact-messages`) needs
+  `organization:pii:read`. It is read-only and adds no permission. The
+  public write (`POST /public/contact-messages`) is guardless, rate-limited
+  per visitor and answers nothing back; rows go after 12 months.
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator
