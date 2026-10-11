@@ -72,6 +72,39 @@
   intro as one large heading-face line; `productGrid.columns` (3–5) fixes
   the bare cards' count across at the desk.
 
+- **Current** — **The craft layer and the site's chrome** (starter site
+  work, 12 Oct). `SiteTheme` writes, after the tokens, the rules every site
+  shares (`site-craft.ts`): headings in the heading face, balanced, with
+  tracking and leading by level; a text block's column held to a 62ch
+  measure when the site sets none; its lists, quotes and links from the
+  site's tokens; the rhythm between sections (a banded section takes 1.2×
+  the merchant's Section padding, two plain sections in a row sit half a
+  padding apart); a focus outline in the ground's own text colour for any
+  link or button without a designed ring; the accent as the selection
+  colour; and a section's entrance on scroll (`animation-timeline: view()`
+  behind `@supports`, screens and no-preference only, never on a scoped
+  theme). Base rules are `:where(<scope>) h2`, so **a block's utility class
+  always wins**; a new base rule is written the same way. The scope is the
+  marks `data-site-section`, `data-site-header`, `data-site-footer` and
+  `data-site-page`; a block that paints its own full-width ground (hero,
+  closing band) marks its root `data-site-ground`, and its colour runs edge
+  to edge with the column and margins on an inner element.
+  **One primary action a site** (`sitePrimaryAction` in
+  `site-primary-action.ts`: Book, else Order, else Contact us): the header
+  shows it once and its menu leaves that page out
+  (`withoutPrimaryAction`); a template's hero and closing band follow the
+  same function. The footer (`site-footer.tsx`) lists the facts in columns
+  (each place with its address, directions and its week by day, how to get
+  in touch, the site's pages) over the closing line, and draws no column or
+  heading for what isn't set; today is marked in the browser, on the
+  business's clock. Footer text is the footer's own colour at full
+  strength; only hairlines are tinted. A closing band always has a heading
+  and a line: its own (`heading`, `text`) or composed by `ctaBandWords`
+  from what its button does and the site's name, never a promise. Only a
+  page's first hero is its `h1` (`heroLevels`, `HeroHeading`). Shared
+  buttons (`ctaClasses`) take a surface (`page`, `hero`, `band`, `photo`)
+  and carry hover, focus-visible, pressed and disabled states on each.
+
 ## Saroh tokens — Ink & Saffron
 
 - **Current** — **The brand is the "Saroh Brand System" page in the Claude
