@@ -440,7 +440,7 @@ describe("choosing on the booking page", () => {
 describe("the booking through a reload", () => {
     const signedOut = () => account({ customer: null });
 
-    it("brings back the service, the time and the phone, says so, and never keeps the note", async () => {
+    it("brings back the service and the time, says so, and never keeps the note or the phone number", async () => {
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
         await chooseOneToOne();
@@ -459,6 +459,10 @@ describe("the booking through a reload", () => {
         const stored = JSON.stringify({ ...window.sessionStorage });
         expect(stored).toContain("svc_pt");
         expect(stored).not.toContain("blood thinners");
+        // Nor the phone number: what is about the person is not written
+        // to the browser's storage. A signed-in customer's comes back
+        // from their account.
+        expect(stored).not.toContain("98450");
         expect(document.cookie).toBe("");
         expect(JSON.stringify({ ...window.localStorage })).not.toContain(
             "svc_pt",
@@ -477,9 +481,7 @@ describe("the booking through a reload", () => {
         expect(
             screen.getByRole("radio", { name: /Personal training/ }),
         ).toHaveAttribute("aria-checked", "true");
-        expect(screen.getByLabelText("Phone (optional)")).toHaveValue(
-            "98450 12345",
-        );
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         expect(screen.getByLabelText("Anything we should know?")).toHaveValue(
             "",
         );

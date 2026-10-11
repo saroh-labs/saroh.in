@@ -298,7 +298,7 @@ describe("New post and a post, for someone who reads the site", () => {
         expect(said).toContain("See you & yours.");
         // The body is text. A draft's markup is never drawn, least of all
         // a script.
-        expect(said).not.toMatch(/<strong>|<script|alert\(1\)/);
+        expect(said).not.toMatch(/<strong>|<script|alert\(1\)/i);
         expect(said).not.toMatch(/<input|<textarea|<form|post-editor/);
         expect(said).not.toMatch(/>Save<|>Publish<|Save draft/);
     });

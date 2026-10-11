@@ -731,7 +731,6 @@ export default function BookingFlow({
             setStart(null);
             if (kept.where) setWhere(kept.where);
             if (kept.pay) setPayChoice(kept.pay);
-            if (kept.phone) setPhoneNo((typed) => typed || kept.phone);
             setDaysState({ kind: "loading", serviceId: kept.serviceId });
             loadDays(kept.serviceId, {
                 skip: kept.skip,
@@ -826,7 +825,6 @@ export default function BookingFlow({
             startAt: startAtChosen,
             where,
             pay: payChoice,
-            phone: phoneNo.trim(),
             hadNote,
         });
     }, [

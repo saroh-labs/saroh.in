@@ -111,8 +111,10 @@ loads the page again on the way back. So what the customer typed before
 that step is kept in `sessionStorage` and restored on mount: the bag's way,
 address, discount code and checkout key (`site-blocks/src/shop/bag-draft-store.ts`),
 the sign-in sheet's email and step (`account/sign-in-draft.ts`), and the
-booking page's service, weeks, person, time, where, way to pay and phone
-(`booking-flow/booking-draft.ts`).
+booking page's service, weeks, person, time, where and way to pay
+(`booking-flow/booking-draft.ts`). The booking page keeps no phone number
+and no note: what is about the person is not written to the browser's
+storage, and a signed-in customer's phone comes back from their account.
 
 - **`sessionStorage` only**: no cookie, never `localStorage` for anything
   typed. Every read is narrowed field by field and every call is wrapped;

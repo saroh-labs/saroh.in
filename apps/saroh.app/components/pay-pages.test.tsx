@@ -75,8 +75,9 @@ const NOT_FOR_CUSTOMERS =
 const text = (html: string) =>
     html
         .replace(/<[^>]+>/g, " ")
-        .replace(/&amp;/g, "&")
         .replace(/&#x27;/g, "'")
+        // Last, so "&amp;#x27;" stays "&#x27;" and is never read twice.
+        .replace(/&amp;/g, "&")
         .replace(/\s+/g, " ");
 
 describe("an invoice's pay link", () => {

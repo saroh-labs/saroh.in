@@ -19,12 +19,23 @@ const ENTITIES: Readonly<Record<string, string>> = {
     "&apos;": "'",
 };
 
+/**
+ * Every tag gone, and a script's or a style's contents with it. Done again
+ * until nothing changes: taking one tag out can leave another behind
+ * ("<scr<script>ipt>"), and what is left must hold none at all.
+ */
+function withoutTags(html: string): string {
+    let text = html;
+    for (;;) {
+        const next = text.replace(HIDDEN, "").replace(/<[^>]*>/g, "");
+        if (next === text) return text.replace(/[<>]/g, "");
+        text = next;
+    }
+}
+
 export function postParagraphs(html: string | null | undefined): string[] {
     if (!html) return [];
-    const text = html
-        .replace(HIDDEN, "")
-        .replace(BLOCK_END, "\n")
-        .replace(/<[^>]*>/g, "")
+    const text = withoutTags(html.replace(BLOCK_END, "\n"))
         .replace(/&(nbsp|lt|gt|quot|#39|apos);/g, (e) => ENTITIES[e] ?? e)
         // Last, so "&amp;lt;" reads "&lt;" and never becomes a bracket.
         .replace(/&amp;/g, "&");

@@ -36,7 +36,6 @@ const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 const WHERE: readonly BookingWhere[] = ["IN_PERSON", "ONLINE"];
 const PAYS: readonly BookPay[] = ["NOW", "DEPOSIT", "DESK", "CREDIT"];
-const MAX_PHONE = 32;
 const MAX_SEARCH = 512;
 
 export interface BookingDraft {
@@ -51,8 +50,12 @@ export interface BookingDraft {
     startAt: string | null;
     where: BookingWhere | null;
     pay: BookPay | null;
-    phone: string;
-    /** A note had been typed. The note itself is never kept. */
+    /**
+     * A note had been typed. The note itself is never kept, and neither is
+     * a phone number: what is about the person is not written to the
+     * browser's storage, and a signed-in customer's phone comes back from
+     * their account.
+     */
     hadNote: boolean;
     /** When it was kept, by this browser's clock. */
     savedAt: number;
@@ -118,7 +121,6 @@ export function parseBookingDraft(
                 : null,
         where: WHERE.find((w) => w === s.where) ?? null,
         pay: PAYS.find((p) => p === s.pay) ?? null,
-        phone: typeof s.phone === "string" ? s.phone.slice(0, MAX_PHONE) : "",
         hadNote: s.hadNote === true,
         savedAt,
     };
@@ -150,7 +152,6 @@ export function writeBookingDraft(draft: Omit<BookingDraft, "savedAt">): void {
             startAt: draft.startAt,
             where: draft.where,
             pay: draft.pay,
-            phone: draft.phone.slice(0, MAX_PHONE),
             hadNote: draft.hadNote,
             savedAt: Date.now(),
         };
