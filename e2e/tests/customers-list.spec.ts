@@ -65,20 +65,19 @@ test.describe("customers list", () => {
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";
         await page
-            .getByRole("searchbox", { name: /Search customers by name/ })
+            .getByRole("searchbox", { name: "Search customers" })
             .fill(name);
         await expect(page).toHaveURL(/[?&]q=/);
         await expect(
             page.getByRole("link", { name: new RegExp(escape(name)) }).first(),
         ).toBeVisible();
 
-        // The chips are the list's status filter: a radio group.
-        const chips = page.getByRole("radiogroup", { name: "Show" });
-        await chips.getByRole("radio", { name: /^Returning/ }).click();
+        // Who to show is one of the toolbar's dropdowns.
+        const show = page.getByRole("combobox", { name: "Show" });
+        await show.click();
+        await page.getByRole("option", { name: /^Returning/ }).click();
         await expect(page).toHaveURL(/chip=returning/);
-        await expect(
-            chips.getByRole("radio", { name: /^Returning/ }),
-        ).toHaveAttribute("aria-checked", "true");
+        await expect(show).toContainText("Returning");
 
         await page.getByRole("combobox", { name: "Sort" }).click();
         await page.getByRole("option", { name: "Spent, highest" }).click();
