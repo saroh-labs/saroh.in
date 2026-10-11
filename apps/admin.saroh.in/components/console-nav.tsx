@@ -7,6 +7,7 @@ import {
     Cog,
     Flag,
     HardDrive,
+    Mail,
     Rocket,
     ScrollText,
     ShieldCheck,
@@ -58,6 +59,12 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Reports",
                 icon: Flag,
                 permission: "organization:read",
+            },
+            {
+                href: "/messages",
+                label: "Messages",
+                icon: Mail,
+                permission: "organization:pii:read",
             },
             {
                 href: "/usage",
