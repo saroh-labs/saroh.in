@@ -1,7 +1,9 @@
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import Link from "next/link";
+
 import { PlanWay } from "./plan-way";
 
 /**
@@ -14,7 +16,8 @@ import { PlanWay } from "./plan-way";
  * someone who may change the plan (`PlanWay`); anyone else reads who can.
  *
  * Presentational: server pages pass it the notice (`PlanLimitNotice`), the
- * refusal dialog a 403's (`PlanRefusalHost`).
+ * refusal dialog a 403's (`PlanRefusalHost`). Nothing while plans aren't
+ * shown (DEC-136).
  */
 export function LimitNoticeBlock({
     full,
@@ -37,6 +40,7 @@ export function LimitNoticeBlock({
     href: string;
     className?: string;
 }) {
+    if (!plansShown()) return null;
     const refused = full && !soft;
     return (
         <Notice

@@ -1,4 +1,5 @@
 import { personHref } from "@/lib/contacts/person-href";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /**
  * Where a notification opens (10 Oct 2026). Every row in the inbox is a
@@ -70,7 +71,8 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
         id ? `/sites/${encodeURIComponent(id)}/settings` : "/sites",
     providers: () => "/settings/providers",
     team: () => "/settings/people",
-    plan: () => "/settings/billing#change-plan",
+    // Home while plans aren't shown (DEC-136): the page isn't there.
+    plan: () => (plansShown() ? "/settings/billing#change-plan" : "/"),
     products: () => "/commerce/products",
 };
 

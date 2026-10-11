@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Notice } from "@saroh/ui/notice";
 import { PlanWay } from "./plan-way";
 
@@ -24,7 +25,8 @@ export function daysLeft(endsAt: string, now: Date): number {
  * gave for a while, that moves the business to a cheaper one. Shown above
  * every page in its last 30 days (the API decides, `planEnding`), with the
  * way to stay on it; the same end is emailed 30, 7 and 1 days ahead.
- * Nothing when there is none, or the role can't read billing.
+ * Nothing when there is none, the role can't read billing, or plans
+ * aren't shown (DEC-136).
  */
 export function PlanEndingBanner({
     ending,
@@ -33,7 +35,7 @@ export function PlanEndingBanner({
     ending: BillingAccessView["planEnding"] | undefined;
     now?: Date;
 }) {
-    if (!ending) return null;
+    if (!ending || !plansShown()) return null;
     const days = daysLeft(ending.endsAt, now);
     return (
         <Notice

@@ -38,6 +38,10 @@
         "NEXT_PUBLIC_POSTHOG_HOST",
         "NEXT_PUBLIC_POSTHOG_REPLAY",
         "NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE",
+        // The workspace: whether Saroh's own plans are shown (DEC-136).
+        // Compiled into the bundle, so a build with it differs from one
+        // without.
+        "NEXT_PUBLIC_PLANS",
         // saroh.in: shows Resources pages before their publish date on a
         // preview deployment; ignored on production (plan KTD-2). Hashed, not
         // passed through: a build without it pre-renders /help as a 404, and
@@ -107,6 +111,9 @@
         // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
         // plan sections appear once it is "open"; read at build.
         "NEXT_PUBLIC_LAUNCH_MODE",
+        // Templates' switch (DEC-135): saroh.in's gallery and the merchant
+        // app's template picker show only when it is "on"; read at build.
+        "NEXT_PUBLIC_TEMPLATES",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",

@@ -311,6 +311,9 @@ e2e_stack() {
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
     export NEXT_PUBLIC_ROOT_DOMAIN=localhost
+    # Saroh's own plans are shown on this stack (DEC-136), as CI: the plan
+    # specs need Settings › Plan and billing and its prompts.
+    export NEXT_PUBLIC_PLANS=on
     export EMAIL_FROM="Saroh <noreply@saroh.in>"
     export E2E_APP_URL=http://localhost:3003
     export E2E_ACCOUNTS_URL=http://localhost:3000
@@ -325,6 +328,9 @@ e2e_stack() {
     # Resources pages before their publish date, as CI: without it the Help
     # and Privacy specs skip themselves and test nothing.
     export RESOURCES_PREVIEW=1
+    # Templates on, as CI (DEC-135): the gallery on saroh.in and the template
+    # picker in the app, which the templates specs open. Unset is off.
+    export NEXT_PUBLIC_TEMPLATES=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,

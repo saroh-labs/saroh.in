@@ -553,6 +553,10 @@ jobs:
       # reads `localhost` as a tenant subdomain and rewrites every request —
       # `/preview/<token>` included — into a tenant lookup that finds nothing.
       NEXT_PUBLIC_ROOT_DOMAIN: localhost
+      # Saroh's own plans are shown on this stack (DEC-136): the plan specs
+      # need Settings › Plan and billing and its prompts. Production leaves
+      # it out.
+      NEXT_PUBLIC_PLANS: "on"
       EMAIL_FROM: Saroh <noreply@saroh.in>
       E2E_APP_URL: http://localhost:3003
       E2E_ACCOUNTS_URL: http://localhost:3000
@@ -569,6 +573,9 @@ jobs:
       # specs run instead of skipping. Never production: the site ignores it
       # there (plan KTD-2).
       RESOURCES_PREVIEW: "1"
+      # Templates on (DEC-135): saroh.in's gallery and the app's template
+      # picker, which the templates specs open. Unset, as production, is off.
+      NEXT_PUBLIC_TEMPLATES: "on"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.

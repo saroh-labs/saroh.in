@@ -124,7 +124,10 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
                 // drawn only while the gallery is shown (`linkShown`). "Made
                 // for your kind of business" is still not claimed: not every
                 // kind has one yet (no salon). Ledger CL8.
-                body: "Start from a template, connect your own domain, and set how each page looks when it's shared on WhatsApp or Facebook.",
+                // Templates are held back for now (DEC-135; owner, 11 Oct),
+                // so the sentence no longer opens with "Start from a
+                // template". Put it back when the gallery returns.
+                body: "Connect your own domain, and set how each page looks when it's shared on WhatsApp or Facebook.",
                 link: { label: "See templates", href: "/templates" },
             },
         ],

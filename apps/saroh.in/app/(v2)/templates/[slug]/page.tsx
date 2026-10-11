@@ -31,7 +31,8 @@ import { templatesLive } from "@/lib/templates-live";
  *
  * No plan or price row: the repo is public and the design's "Plan" fact is
  * cut. Every template is built at build time; any other slug, or any while
- * the gallery isn't published (17 Oct, KTD-2), is a 404.
+ * the gallery isn't published (17 Oct, KTD-2) or is switched off
+ * (DEC-135), is a 404.
  */
 export const dynamicParams = false;
 

@@ -20,7 +20,8 @@ vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: () => resolveActiveOrganization() as unknown,
 }));
 vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
-vi.mock("@/env", () => ({ env: {} }));
+// Plans shown, as the runner has it everywhere else (DEC-136).
+vi.mock("@/env", () => ({ env: { NEXT_PUBLIC_PLANS: "on" } }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
     usePathname: () => "/settings/billing",

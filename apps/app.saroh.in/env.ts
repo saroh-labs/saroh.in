@@ -53,6 +53,14 @@ export const env = createEnv({
          * the share of allowed sessions recorded, from 0 to 1; unset, every
          * one (`REPLAY_SAMPLE_RATE`).
          */
+        /**
+         * Whether a new website may be started from a chosen template
+         * (DEC-135): `on` shows the template picker on `/sites/new` and in
+         * the Turn on sheet; anything else, unset included, hides it and the
+         * site starts from the one for what is being set up
+         * (`lib/sites/templates-switch.ts`).
+         */
+        NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
@@ -63,6 +71,13 @@ export const env = createEnv({
             .string()
             .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
             .optional(),
+        /**
+         * Saroh's own plans in the workspace (DEC-136): Settings › Plan and
+         * billing and every plan prompt. Shown only when "on"; unset or
+         * "off", the page is a 404 and nothing names a plan. Read through
+         * `lib/saroh-billing/plans-shown.ts`, nowhere else.
+         */
+        NEXT_PUBLIC_PLANS: z.enum(["on", "off"]).optional(),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
@@ -75,11 +90,13 @@ export const env = createEnv({
         NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET:
             process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+        NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
             process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
+        NEXT_PUBLIC_PLANS: process.env.NEXT_PUBLIC_PLANS,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

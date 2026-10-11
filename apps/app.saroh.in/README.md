@@ -73,6 +73,7 @@ NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.saroh.localhost
 NEXT_PUBLIC_BETTER_AUTH_URL=https://api.saroh.localhost
 NEXT_PUBLIC_ROOT_DOMAIN=saroh.app.localhost        # where merchant subdomains live (saroh.app in prod)
 # NGROK_URL=                                       # dev-only tunnel origin
+NEXT_PUBLIC_PLANS=on                               # Saroh's own plans (DEC-136); unset or off hides them
 ```
 
 `NEXT_PUBLIC_ROOT_DOMAIN` is `saroh.app`, **not** `saroh.in`. It is the same

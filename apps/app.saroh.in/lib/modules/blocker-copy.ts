@@ -11,14 +11,18 @@
  * here, and scans the app for a code rendered directly.
  */
 import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /** Said when a role doesn't reach a module, or may not change one. */
 export const ROLE_REFUSAL = `Your role doesn't include this. ${WHO_CAN_CHANGE}`;
 
+/** Said of a module Saroh hasn't offered this business. */
+const NOT_OFFERED = "This isn't available for your business yet.";
+
 export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     // The gates, in the API's order.
     UNAUTHORIZED: ROLE_REFUSAL,
-    ROLLOUT_DISABLED: "This isn't available for your business yet.",
+    ROLLOUT_DISABLED: NOT_OFFERED,
     ORG_MODULE_DISABLED:
         "This is turned off for your business. Nothing it holds has been deleted.",
     PROJECT_MODULE_UNSELECTED: "This isn't turned on for this project.",
@@ -87,11 +91,17 @@ export const BLOCKER_FALLBACK = "This needs attention before it can go ahead.";
 /**
  * The words for one blocker: the API's own sentence, else this app's line
  * for its code, else the plain fallback. Never the code.
+ *
+ * While plans aren't shown (DEC-136) a plan's blocker reads as one not
+ * offered yet: there is no plan to name and no page to change it on.
  */
 export function blockerSentence(blocker: {
     code: string;
     message?: string | null;
 }): string {
+    if (blocker.code === "ENTITLEMENT_REQUIRED" && !plansShown()) {
+        return NOT_OFFERED;
+    }
     const said = blocker.message?.trim();
     if (said) return said;
     return BLOCKER_COPY[blocker.code] ?? BLOCKER_FALLBACK;

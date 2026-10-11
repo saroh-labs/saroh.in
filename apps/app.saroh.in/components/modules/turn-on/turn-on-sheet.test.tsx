@@ -30,6 +30,12 @@ vi.mock("@/lib/modules/turn-on-actions", () => ({
         enableModuleAction(key, setup),
 }));
 
+/** The template choice's switch (DEC-135); on, as local dev, by default. */
+let templateChoice = true;
+vi.mock("@/lib/sites/templates-switch", () => ({
+    templateChoiceOn: () => templateChoice,
+}));
+
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -151,6 +157,7 @@ beforeEach(() => {
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
+    templateChoice = true;
     websiteTemplate = null;
     locks = { payments: null, messaging: null };
     websiteTemplates = [];
@@ -499,6 +506,32 @@ describe("Website", () => {
             siteName: "Northwind",
             address: "northwind",
             templateId: "bakery",
+        });
+    });
+
+    it("with the template choice switched off, names and offers no template and sends none (DEC-135)", async () => {
+        templateChoice = false;
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            {
+                id: "bakery",
+                name: "Bakery",
+                kinds: ["food"],
+                uses: ["COMMERCE"],
+            },
+        ];
+        await open(["COMMERCE", "WEBSITE"]);
+        expect(text()).not.toContain("Starts from");
+        expect(text()).not.toMatch(/template/i);
+        expect(text()).not.toContain("Bakery");
+
+        await press(button(/^Turn on/));
+        // The API starts the site from the one for what is being set up.
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
         });
     });
 

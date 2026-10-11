@@ -38,6 +38,7 @@ import {
     moduleStatesWith,
     suggestedTemplates,
 } from "@/lib/sites/template-picker";
+import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
 /**
  * The sheet's state: what it starts from (read from `setup-defaults` when it
@@ -248,8 +249,12 @@ export function useTurnOn({
     };
 
     // The template a new website starts from (DEC-070, K15), when said.
+    // With the template choice switched off (DEC-135) none is named or
+    // offered, none is sent, and the API starts the site from the kind's.
     const website = (loaded ?? []).find((d) => d.key === "WEBSITE");
-    const websiteTemplate = website?.template ?? null;
+    const websiteTemplate = templateChoiceOn()
+        ? (website?.template ?? null)
+        : null;
     // The web address was chosen when the business was set up, so it is
     // said, not asked again (UX audit, 10 Oct). It turns back into a field
     // only when the API refuses it, so it can be fixed.

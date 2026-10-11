@@ -66,6 +66,13 @@ import { z } from "zod";
  * deployment (`VERCEL_ENV=production`), whatever it is set to
  * (`lib/resources-context.ts`).
  *
+ * `NEXT_PUBLIC_TEMPLATES` is the Templates gallery's switch (DEC-135): `on`
+ * lets `/templates` and its pages be shown, from their `publishOn` day as
+ * any Resources page; anything else, unset included, keeps them a 404 and
+ * linked nowhere, whatever the date or `RESOURCES_PREVIEW` says. Read at
+ * build. Unset counts as `on` only under `next dev`
+ * (`lib/resources-context.ts`).
+ *
  * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
  * build's page routes into it (`routes.config.js`), so the Resources list links
  * only pages this build has.
@@ -74,6 +81,7 @@ export const env = createEnv({
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
+        NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_GA_MEASUREMENT_ID: z
             .string()
             .regex(/^G-[A-Z0-9]+$/)
@@ -144,6 +152,7 @@ export const env = createEnv({
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
+        NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
         NEXT_PUBLIC_GOOGLE_ADS_ID: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,

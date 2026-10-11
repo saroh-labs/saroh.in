@@ -4,8 +4,8 @@
     "private": true,
     "scripts": {
         "build": "next build",
-        "dev": "portless app.saroh next dev",
-        "dev:app": "next dev",
+        "dev": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} portless app.saroh next dev",
+        "dev:app": "NEXT_PUBLIC_PLANS=${NEXT_PUBLIC_PLANS:-on} next dev",
         "lint": "eslint .",
         "start": "next start",
         "test": "vitest run",

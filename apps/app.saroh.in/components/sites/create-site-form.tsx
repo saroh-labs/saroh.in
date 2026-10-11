@@ -85,9 +85,14 @@ type FormValues = z.infer<typeof formSchema>;
  * link). The picker (U12) shows the templates suggested for the business
  * first and every one under "All"; any can be picked, with one of its
  * colourways, and the choice is always sent.
+ *
+ * With the template choice switched off (`choice` false, DEC-135) there is
+ * no picker and no template is sent: the API starts the site from the one
+ * for what is being set up.
  */
 export function CreateSiteForm({
     templates,
+    choice = true,
     defaults = null,
     defaultTemplateId = null,
     startTemplateId = null,
@@ -96,6 +101,8 @@ export function CreateSiteForm({
 }: {
     /** The catalogue; null when it could not be read (said, not hidden). */
     templates: Template[] | null;
+    /** Whether a template may be chosen (`templateChoiceOn`); else none is. */
+    choice?: boolean;
     /** What the API offers a new site; null starts the form empty. */
     defaults?: NewSiteDefaults | null;
     /** The kind's template (`kindDefaults(kind).starterTemplate`). */
@@ -108,7 +115,7 @@ export function CreateSiteForm({
     modules?: ModuleStates | null;
 }) {
     const router = useRouter();
-    const listed = templates ?? [];
+    const listed = choice ? (templates ?? []) : [];
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         ...PAGE_FORM,
@@ -265,11 +272,16 @@ export function CreateSiteForm({
                             </FormItem>
                         )}
                     />
-                ) : (
+                ) : choice ? (
                     <NoTemplates
                         failed={templates === null}
                         onRetry={() => router.refresh()}
                     />
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        Your site starts with pages for what you&apos;re setting
+                        up. Every one can be changed or removed.
+                    </p>
                 )}
                 <Button
                     type="submit"

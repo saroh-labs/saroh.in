@@ -55,6 +55,9 @@
         // Session replay in the signed-in workspace: off unless "on",
         // and then only for people who have not opted out.
         "NEXT_PUBLIC_POSTHOG_REPLAY": "off",
+        // Saroh's own plans in the workspace (DEC-136): Settings › Plan and
+        // billing and every plan prompt, shown only when "on".
+        "NEXT_PUBLIC_PLANS": "on",
         "NEXT_PUBLIC_VERCEL_ENV": "preview",
         "VERCEL_GIT_COMMIT_REF": "development",
         "AUTH_COOKIE_PREFIX": "saroh-dev",
@@ -68,6 +71,9 @@
         "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET": "sites.saroh.io",
         "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
+        // Choosing a template for a new website (DEC-135): "on" here.
+        // Production leaves it out, which is off: no template picker.
+        "NEXT_PUBLIC_TEMPLATES": "on",
     },
     "env": {
         "production": {
@@ -89,6 +95,9 @@
                 // (owner, 10 Oct), and then only for people who have not opted
                 // out and have been shown the notice.
                 "NEXT_PUBLIC_POSTHOG_REPLAY": "on",
+                // NEXT_PUBLIC_PLANS is left out (DEC-136): no Plan and
+                // billing and no plan prompt until pricing opens. Add
+                // "NEXT_PUBLIC_PLANS": "on" here that day, and deploy.
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
@@ -97,6 +106,8 @@
                 "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET": "saroh.app",
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",
+                // The template picker is off while this is left out
+                // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
             },
             "services": [
                 {

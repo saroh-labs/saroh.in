@@ -19,6 +19,7 @@ import {
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
 
 /*
@@ -75,10 +76,13 @@ export default async function WaitlistPage() {
         ...WAITLIST,
         offer: offer ? launchOfferLines(offer) : WAITLIST.offer,
     };
-    const integrations = linkShown(
-        WAITLIST_MONEY.link.href,
-        resourcesContext(),
-    );
+    const ctx = resourcesContext();
+    const integrations = linkShown(WAITLIST_MONEY.link.href, ctx);
+    // A template is saved only while the gallery that offers it is shown
+    // (DEC-135): hidden, `?template=` is ignored.
+    const templates = templatesLive(ctx)
+        ? galleryTemplates().map((t) => ({ slug: t.slug, name: t.name }))
+        : [];
     const opening = content.openingDate
         ? `Opens ${openingShort(content.openingDate)}`
         : "Opening soon";
@@ -154,13 +158,7 @@ export default async function WaitlistPage() {
                 </div>
 
                 <div className="flex flex-col gap-5 rounded-mk-card border border-border bg-white p-[clamp(20px,3vw,32px)] shadow-[0_4px_12px_rgba(28,28,26,0.10)]">
-                    <WaitlistForm
-                        content={content}
-                        templates={galleryTemplates().map((t) => ({
-                            slug: t.slug,
-                            name: t.name,
-                        }))}
-                    />
+                    <WaitlistForm content={content} templates={templates} />
                 </div>
             </main>
 

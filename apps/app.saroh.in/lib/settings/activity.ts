@@ -2,6 +2,7 @@ import { formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { storefrontHref } from "@/lib/stores/links";
 
 import type { BusinessTab } from "./activity-changes";
@@ -294,6 +295,9 @@ export function activityLine(
                 MODULES,
             );
         case "organization.plan.changed": {
+            // Plans aren't shown (DEC-136): no plan is named, and the page
+            // the line opens isn't there.
+            if (!plansShown()) return null;
             const from = text(meta.from);
             const to = text(meta.to);
             if (from && to)
