@@ -9,19 +9,17 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load customers"
-            description="Something went wrong on our side, so this may not be the whole picture. Nothing has been changed."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Customers"
+            things="customers"
         />
     );
 }

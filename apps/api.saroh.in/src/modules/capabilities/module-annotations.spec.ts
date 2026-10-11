@@ -36,7 +36,6 @@ const CLASS_LEVEL: Record<string, string> = {
     "leads/leads.controller.ts": "CRM",
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
-    "bookings/bookings.controller.ts": "APPOINTMENTS",
     // A12: a class's waitlist, for the team.
     "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
@@ -48,6 +47,10 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
     "sites/site-tracking.controller.ts": "WEBSITE",
+    // A site's own icon (DEC-124).
+    "sites/site-icon.controller.ts": "WEBSITE",
+    // A site's QR codes (Settings › Share).
+    "sites/qr-codes.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -58,13 +61,10 @@ const CLASS_LEVEL: Record<string, string> = {
     // addresses kept for one release.
     "catalogue/catalogue.controller.ts": "COMMERCE",
     "catalogue/store-catalogue.controller.ts": "COMMERCE",
-    // The business's orders across its storefronts, and the storefronts.
-    "orders/organization-orders.controller.ts": "COMMERCE",
+    // The storefronts.
     "stores/storefronts.controller.ts": "COMMERCE",
-    "customers/customers.controller.ts": "COMMERCE",
     "discounts/discounts.controller.ts": "COMMERCE",
     "product-reviews/product-reviews.controller.ts": "COMMERCE",
-    "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
     // #531: the business's products and where each is sold.
@@ -75,10 +75,6 @@ const CLASS_LEVEL: Record<string, string> = {
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
-    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
-    // Both of its controllers: the packs, and using one on a booking (E12).
-    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
-    "courses/courses.controller.ts": "COURSES",
 };
 
 /**
@@ -90,6 +86,27 @@ const METHOD_LEVEL: Record<string, string> = {
     // DEC-070: invoicing needs no module; only the pay link is Payments'.
     "invoices/invoices.controller.ts": "PAYMENTS",
     "communications/communications.controller.ts": "COMMUNICATIONS",
+    // #117: history reads stay open when the module is off; every write and
+    // operational route is gated. `history-reads.gate.spec.ts` pins which.
+    "orders/orders.controller.ts": "COMMERCE",
+    "orders/organization-orders.controller.ts": "COMMERCE",
+    "customers/customers.controller.ts": "COMMERCE",
+    "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // #117 (owner, 9 Oct): plans, subscriptions, packs and courses keep their
+    // history readable too, and cancelling a subscription or an enrolment is
+    // wind-down, allowed with the module off.
+    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
+    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
+    "courses/courses.controller.ts": "COURSES",
+};
+
+/**
+ * A METHOD_LEVEL file may hold a second controller that is wholly a write and
+ * gated at the class: named here, so no other one is.
+ */
+const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
+    // Using a pack on a booking, or taking it off (E12).
+    "class-packs/class-packs.controller.ts": ["BookingClassPackController"],
 };
 
 /**
@@ -119,11 +136,17 @@ const NEVER: Record<string, string> = {
     // F14: a person's own alert choices; the rows follow their role and
     // the modules on, read by the service.
     "notifications/notification-preferences.controller.ts": "cross-cutting",
+    // DEC-125: a person's own "Help improve Saroh" choice, kept on their
+    // user row; it belongs to no module.
+    "notifications/usage-sharing.controller.ts":
+        "the person's own choice, not a capability",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
     // DEC-069 (L2): the web address is the business's whichever modules
     // are on, and share buttons across modules read its links.
     "organizations/web-address.controller.ts": "tenancy, not a capability",
+    // Wave G: which moments a business has seen, whichever modules are on.
+    "organizations/moments.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":
         "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
@@ -146,6 +169,8 @@ const NEVER: Record<string, string> = {
         "staff control plane, not a tenant surface",
     "admin/admin-deployments.controller.ts":
         "staff control plane, not a tenant surface",
+    "admin/admin-usage.controller.ts":
+        "staff control plane, not a tenant surface",
     "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
     "self-test/self-test.controller.ts": "diagnostics",
@@ -165,6 +190,10 @@ const NEVER: Record<string, string> = {
     // shop's address and hours stay true whichever modules are on.
     "sites/public-sites.controller.ts":
         "published sites, and the business's place and hours",
+    // A QR code's short link, relayed by the site's server. It forwards
+    // to a page that answers for its own module, so it carries none.
+    "sites/public-qr.controller.ts":
+        "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always
     // on, so it must not vanish with a module switch.
     "site-accounts/sign-in.controller.ts":
@@ -231,6 +260,10 @@ const NEVER: Record<string, string> = {
     // already paid is shown to whoever placed it, Commerce on or off.
     "orders/checkout-confirmation.controller.ts":
         "a placed site order's confirmation — shown to its customer only",
+    // The bag's "deliver to your last address". Never module-gated: it
+    // reads the signed-in customer's own last order and writes nothing.
+    "orders/checkout-saved-address.controller.ts":
+        "a customer's own last delivery address, for the site's bag",
     // G9: a site's Plans block. Payments being off is checked by the
     // service (`paymentsOffered`), which answers 404, as a site with no plans.
     "subscriptions/public-plans.controller.ts":
@@ -258,6 +291,19 @@ const NEVER: Record<string, string> = {
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":
         "saroh.in's public link preview tool, not a tenant surface",
+    // QR codes plan U9: the free QR code maker's email gate, the same way.
+    "tools/qr-maker.controller.ts":
+        "saroh.in's public QR code maker's email gate, not a tenant surface",
+    // Terms rev 46 (9 Oct): a customer reports a business at
+    // saroh.in/customers, with no account and whatever it has switched on.
+    "business-reports/public-business-reports.controller.ts":
+        "saroh.in's report-a-business form, not a tenant surface",
+    "admin/admin-business-reports.controller.ts":
+        "staff control plane (customers' reports), not a tenant surface",
+    // DEC-120: an owner takes the business's data whatever it has switched
+    // off, and while it is closing or suspended.
+    "data-export/data-export.controller.ts":
+        "the owner's download of the business's own data — no module holds it",
 };
 
 /** Controllers with a test of their own below, not a row above. */
@@ -303,9 +349,14 @@ describe("module enforcement rollout (#117)", () => {
             // If it ever moves to the class, the exempt handlers below it stop
             // being exempt — which is the mistake this file exists to catch.
             const classLevel = new RegExp(
-                `@RequireModule\\("${moduleKey}"\\)\\s*\\nexport class`,
+                `@RequireModule\\("${moduleKey}"\\)\\s*\\n(?:@IgnoreModuleReadiness\\(\\)\\s*\\n)?export class (\\w+)`,
+                "g",
             );
-            expect(text).not.toMatch(classLevel);
+            const gatedWhole = Array.from(
+                text.matchAll(classLevel),
+                (m) => m[1],
+            );
+            expect(gatedWhole).toEqual(CLASS_LEVEL_WITHIN[file] ?? []);
         },
     );
 
@@ -403,9 +454,9 @@ describe("module enforcement rollout (#117)", () => {
         }
     });
 
-    it("gates both Class packs controllers on CLASS_PACKS, not Appointments (E12)", () => {
+    it("gates Class packs on CLASS_PACKS, not Appointments (E12)", () => {
         const text = source("class-packs/class-packs.controller.ts");
-        expect(text.match(/@RequireModule\("CLASS_PACKS"\)/g)).toHaveLength(2);
+        expect(text).toContain('@RequireModule("CLASS_PACKS")');
         expect(text).not.toContain('@RequireModule("APPOINTMENTS")');
     });
 

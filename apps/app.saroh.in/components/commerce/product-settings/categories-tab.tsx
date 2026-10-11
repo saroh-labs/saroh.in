@@ -1,12 +1,14 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { count, plural } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
+import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import type { CatalogueView } from "@/lib/products/settings";
+import type { CatalogueView, CategoryRemoval } from "@/lib/products/settings";
 import {
     addCategory,
     mergeCategory,
@@ -15,39 +17,25 @@ import {
     restoreCategory,
 } from "@/lib/products/settings-actions";
 
-import {
-    bigBtn,
-    chipBtn,
-    primaryBtn,
-    rowBtn,
-    smallBtn,
-    TabIntro,
-    textBox,
-} from "./product-settings";
+import { listTable } from "@/components/shared/list-toolbar";
+import { cn } from "@saroh/ui/lib/utils";
+import { CategoryMergeSheet } from "./category-merge-sheet";
+import { TabIntro } from "./product-settings";
 
 const NAME_MAX = 40;
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
-
-type Mode =
-    | { id: string; kind: "rename" }
-    | { id: string; kind: "merge" }
-    | { id: string; kind: "delete" };
+type Category = CatalogueView["categories"][number];
 
 /**
- * What each product is — one category per product. A change here takes
- * effect at once, and every one can be undone: a rename, a merge (its
- * products move and it goes), a delete (its products go to Uncategorized).
+ * What each product is — one category per product. The list is read first:
+ * New category and Rename open a one-field dialog, and Merge a side sheet
+ * that says what moves where. A change takes effect when its button is
+ * pressed, and every one can be undone: a rename, a merge (its products
+ * move and it goes), a delete (its products go to Uncategorized). So
+ * Delete asks nothing: it goes at once, with Undo for ten seconds.
  */
 export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { categories, uncategorizedCount, canWrite } = catalogue;
-    const [pending, start] = useTransition();
-    const [newName, setNewName] = useState("");
-    const [mode, setMode] = useState<Mode | null>(null);
-    const [draft, setDraft] = useState("");
-    // "" is Uncategorized; null is nothing picked yet.
-    const [mergeTo, setMergeTo] = useState<string | null>(null);
-
     const exists = (name: string, except?: string) =>
         name.trim().toLowerCase() === "uncategorized" ||
         categories.some(
@@ -55,405 +43,212 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 c.id !== except &&
                 c.name.toLowerCase() === name.trim().toLowerCase(),
         );
-    const nn = newName.trim();
-    const newErr =
-        nn && exists(nn)
-            ? `There is already a category called ${nn}.`
-            : nn.length > NAME_MAX
-              ? `Keep it under ${NAME_MAX} characters.`
-              : "";
 
-    function run(work: () => Promise<void>) {
-        start(async () => {
-            await work();
-            router.refresh();
-        });
+    /** An Undo: the call, then the list as it now is. `showUndo` says how it went. */
+    async function undone(work: Promise<{ ok: boolean; error?: string }>) {
+        const res = await work;
+        router.refresh();
+        return res;
     }
 
-    function add() {
-        if (!nn || newErr) return;
-        run(async () => {
-            const res = await addCategory(nn);
-            if (!res.ok) return showError(res.error);
-            setNewName("");
-            showUndo(`${nn} added.`, () =>
-                run(async () => {
-                    const undo = await removeCategory(res.data.id);
-                    if (!undo.ok) showError(undo.error);
-                }),
-            );
-        });
+    const undoRemoval = (removal: CategoryRemoval) =>
+        undone(restoreCategory(removal));
+
+    async function add(name: string) {
+        const res = await addCategory(name);
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        router.refresh();
+        showUndo(`${name} added.`, () => undone(removeCategory(res.data.id)));
+        return true;
     }
 
-    const cancel = () => {
-        setMode(null);
-        setMergeTo(null);
-        setDraft("");
-    };
+    async function rename(c: Category, name: string) {
+        const res = await renameCategory(c.id, name);
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        router.refresh();
+        showUndo(`${c.name} is now ${name}.`, () =>
+            undone(renameCategory(c.id, c.name)),
+        );
+        return true;
+    }
+
+    async function merge(c: Category, intoId: string | null, into: string) {
+        const res = await mergeCategory(c.id, intoId);
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        router.refresh();
+        showUndo(`${c.name} merged into ${into}.`, () => undoRemoval(res.data));
+        return true;
+    }
+
+    /** Reversible, so it asks nothing: gone at once, with Undo. */
+    async function remove(c: Category) {
+        const res = await removeCategory(c.id);
+        if (!res.ok) return showError(res.error);
+        router.refresh();
+        showUndo(
+            `${c.name} deleted.`,
+            () => undoRemoval(res.data),
+            c.productCount
+                ? {
+                      description: `Its ${count(c.productCount, "product")} ${plural(c.productCount, "is", "are")} now Uncategorized.`,
+                  }
+                : {},
+        );
+    }
+
+    const newCategory = canWrite ? (
+        <NameDialog
+            trigger={
+                <Button type="button" className="shrink-0">
+                    New category
+                </Button>
+            }
+            title="New category"
+            note="Products can be put in it as soon as it is added."
+            label="Category name"
+            placeholder="Lip care"
+            submitLabel="Add category"
+            busyLabel="Adding…"
+            problem={(name) =>
+                !name
+                    ? "A category needs a name."
+                    : exists(name)
+                      ? `There is already a category called ${name}.`
+                      : name.length > NAME_MAX
+                        ? `Keep it under ${NAME_MAX} characters.`
+                        : ""
+            }
+            onSubmit={add}
+        />
+    ) : null;
 
     return (
         <section aria-labelledby="tab-categories">
-            <TabIntro title="Categories">
-                What each product is — one per product. They drive the
+            <TabIntro
+                title="Categories"
+                // With none yet, the empty state carries the button.
+                action={categories.length > 0 ? newCategory : null}
+            >
+                What each product is, one per product. They drive the
                 shop&apos;s filters and your reports. To group products for the
                 website, use collections.
             </TabIntro>
 
-            {canWrite ? (
-                <>
-                    <div className="mb-3.5 flex flex-wrap gap-2">
-                        <input
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    add();
-                                }
-                            }}
-                            aria-label="New category name"
-                            aria-invalid={!!newErr}
-                            placeholder="New category, e.g. Lip care"
-                            className={cn(
-                                textBox,
-                                "flex-[1_1_220px]",
-                                newErr ? "border-destructive" : "border-border",
-                            )}
-                        />
-                        <button
-                            type="button"
-                            disabled={!nn || !!newErr || pending}
-                            onClick={add}
-                            className={bigBtn}
-                        >
-                            Add category
-                        </button>
-                    </div>
-                    {newErr ? (
-                        <p
-                            role="alert"
-                            className="-mt-2 mb-3 text-[12px] text-destructive"
-                        >
-                            {newErr}
-                        </p>
-                    ) : null}
-                </>
-            ) : (
-                <ReadOnlyNote />
-            )}
+            {canWrite ? null : <ReadOnlyNote />}
 
-            <ul className="rounded-[12px] border border-border bg-card">
-                {categories.map((c) => {
-                    const me = mode?.id === c.id ? mode.kind : null;
-                    const dn = draft.trim();
-                    const renameErr = !dn
-                        ? "A category needs a name."
-                        : dn.length > NAME_MAX
-                          ? `Keep it under ${NAME_MAX} characters.`
-                          : exists(dn, c.id)
-                            ? "That name is taken — use Merge to combine them."
-                            : "";
-                    const into =
-                        mergeTo === null
-                            ? null
-                            : mergeTo === ""
-                              ? "Uncategorized"
-                              : (categories.find((x) => x.id === mergeTo)
-                                    ?.name ?? "");
-                    return (
-                        <li
-                            key={c.id}
-                            className={cn(
-                                "border-b border-border/70 px-4 py-3 last:border-b-0",
-                                me && "bg-muted/50",
-                            )}
-                        >
-                            {me === null ? (
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                    <div className="min-w-0 flex-[1_1_200px]">
-                                        <p className="text-[13.5px] font-semibold">
-                                            {c.name}
-                                        </p>
-                                        <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                            {plural(c.productCount)}
-                                        </p>
-                                    </div>
-                                    {canWrite ? (
-                                        <div className="flex gap-1.5">
-                                            <button
-                                                type="button"
-                                                className={rowBtn}
-                                                onClick={() => {
-                                                    setMode({
-                                                        id: c.id,
-                                                        kind: "rename",
-                                                    });
-                                                    setDraft(c.name);
-                                                }}
-                                            >
-                                                Rename
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={rowBtn}
-                                                onClick={() => {
-                                                    setMode({
-                                                        id: c.id,
-                                                        kind: "merge",
-                                                    });
-                                                    setMergeTo(null);
-                                                }}
-                                            >
-                                                Merge
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={cn(
-                                                    rowBtn,
-                                                    "text-destructive",
-                                                )}
-                                                onClick={() =>
-                                                    setMode({
-                                                        id: c.id,
-                                                        kind: "delete",
-                                                    })
-                                                }
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
+            {categories.length === 0 ? (
+                <EmptyState
+                    className="mb-3"
+                    size="panel"
+                    title="No categories yet"
+                    description={
+                        canWrite
+                            ? "Add one to say what a product is, such as Lip care. Until then every product is Uncategorized."
+                            : "Every product is Uncategorized until someone adds one."
+                    }
+                    action={newCategory}
+                />
+            ) : null}
 
-                            {me === "rename" ? (
-                                <form
-                                    className="flex flex-wrap items-center gap-2"
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        if (renameErr) return;
-                                        if (dn === c.name) return cancel();
-                                        run(async () => {
-                                            const res = await renameCategory(
-                                                c.id,
-                                                dn,
-                                            );
-                                            if (!res.ok)
-                                                return showError(res.error);
-                                            cancel();
-                                            showUndo(
-                                                `${c.name} is now ${dn}.`,
-                                                () =>
-                                                    run(async () => {
-                                                        const undo =
-                                                            await renameCategory(
-                                                                c.id,
-                                                                c.name,
-                                                            );
-                                                        if (!undo.ok)
-                                                            showError(
-                                                                undo.error,
-                                                            );
-                                                    }),
-                                            );
-                                        });
-                                    }}
-                                >
-                                    <input
-                                        value={draft}
-                                        autoFocus
-                                        onChange={(e) =>
-                                            setDraft(e.target.value)
-                                        }
-                                        aria-label={`New name for ${c.name}`}
-                                        className={cn(
-                                            textBox,
-                                            "h-8 flex-[1_1_200px] rounded-[7px] px-[9px]",
-                                            renameErr && dn
-                                                ? "border-destructive"
-                                                : "border-border",
-                                        )}
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!!renameErr || pending}
-                                        className={primaryBtn}
-                                    >
-                                        Save
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={cancel}
-                                        className={smallBtn}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <span
-                                        className={cn(
-                                            "basis-full text-[11.5px]",
-                                            renameErr
-                                                ? "text-destructive"
-                                                : "text-muted-foreground",
-                                        )}
-                                    >
-                                        {renameErr ||
-                                            "Products in it change with it. Nothing else to do."}
-                                    </span>
-                                </form>
-                            ) : null}
-
-                            {me === "merge" ? (
-                                <div>
-                                    <p className="mb-2 text-[13px] font-semibold">
-                                        Merge {c.name} into…
-                                    </p>
-                                    <div
-                                        role="radiogroup"
-                                        aria-label={`Merge ${c.name} into`}
-                                        className="flex flex-wrap gap-1.5"
-                                    >
-                                        {[
-                                            ...categories
-                                                .filter((x) => x.id !== c.id)
-                                                .map((x) => ({
-                                                    id: x.id,
-                                                    name: x.name,
-                                                })),
-                                            { id: "", name: "Uncategorized" },
-                                        ].map((t) => (
-                                            <button
-                                                key={t.id || "none"}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={mergeTo === t.id}
-                                                onClick={() => setMergeTo(t.id)}
-                                                className={chipBtn(
-                                                    mergeTo === t.id,
-                                                )}
-                                            >
-                                                {t.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                        <span className="flex-[1_1_220px] text-[12px] text-foreground/75">
-                                            {into === null
-                                                ? "Pick where its products should go."
-                                                : `The ${plural(c.productCount)} in ${c.name} move to ${into}, and ${c.name} goes away.`}
-                                        </span>
-                                        <button
+            <ul data-list-table="" className={listTable.card}>
+                {categories.map((c) => (
+                    <li
+                        key={c.id}
+                        className={cn(
+                            "flex flex-wrap items-center gap-2.5",
+                            listTable.rowStill,
+                        )}
+                    >
+                        <div className="min-w-0 flex-[1_1_200px]">
+                            <p className="text-[13.5px] font-semibold [overflow-wrap:anywhere]">
+                                {c.name}
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                {count(c.productCount, "product")}
+                            </p>
+                        </div>
+                        {canWrite ? (
+                            <div className="flex shrink-0 gap-1.5">
+                                <NameDialog
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
                                             type="button"
-                                            disabled={
-                                                mergeTo === null || pending
-                                            }
-                                            className={primaryBtn}
-                                            onClick={() =>
-                                                run(async () => {
-                                                    const res =
-                                                        await mergeCategory(
-                                                            c.id,
-                                                            mergeTo === ""
-                                                                ? null
-                                                                : mergeTo,
-                                                        );
-                                                    if (!res.ok)
-                                                        return showError(
-                                                            res.error,
-                                                        );
-                                                    cancel();
-                                                    showUndo(
-                                                        `${c.name} merged into ${into ?? ""}.`,
-                                                        () =>
-                                                            run(async () => {
-                                                                const undo =
-                                                                    await restoreCategory(
-                                                                        res.data,
-                                                                    );
-                                                                if (!undo.ok)
-                                                                    showError(
-                                                                        undo.error,
-                                                                    );
-                                                            }),
-                                                    );
-                                                })
-                                            }
+                                            aria-label={`Rename ${c.name}`}
+                                        >
+                                            Rename
+                                        </Button>
+                                    }
+                                    title="Rename category"
+                                    note="Products in it change with it. Nothing else to do."
+                                    label="Name"
+                                    initial={c.name}
+                                    submitLabel="Save"
+                                    problem={(name) =>
+                                        !name
+                                            ? "A category needs a name."
+                                            : name.length > NAME_MAX
+                                              ? `Keep it under ${NAME_MAX} characters.`
+                                              : exists(name, c.id)
+                                                ? "That name is taken. Use Merge to combine them."
+                                                : ""
+                                    }
+                                    onSubmit={(name) => rename(c, name)}
+                                />
+                                <CategoryMergeSheet
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
+                                            type="button"
+                                            aria-label={`Merge ${c.name}`}
                                         >
                                             Merge
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={cancel}
-                                            className={smallBtn}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            {me === "delete" ? (
-                                <div
-                                    role="alert"
-                                    className="flex flex-wrap items-center gap-2 rounded-[9px] bg-destructive-subtle px-3 py-2.5"
+                                        </Button>
+                                    }
+                                    category={c}
+                                    others={categories.filter(
+                                        (x) => x.id !== c.id,
+                                    )}
+                                    onMerge={(intoId, into) =>
+                                        merge(c, intoId, into)
+                                    }
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="xs"
+                                    type="button"
+                                    className="text-destructive hover:text-destructive"
+                                    aria-label={`Delete ${c.name}`}
+                                    onClick={() => void remove(c)}
                                 >
-                                    <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.5] text-destructive">
-                                        {c.productCount
-                                            ? `Its ${plural(c.productCount)} ${c.productCount === 1 ? "moves" : "move"} to Uncategorized. The products themselves are not touched.`
-                                            : "No products use it."}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        disabled={pending}
-                                        className="inline-flex h-[30px] items-center rounded-[7px] bg-destructive px-[11px] text-[12px] font-semibold text-destructive-foreground hover:bg-destructive/90 coarse:h-11"
-                                        onClick={() =>
-                                            run(async () => {
-                                                const res =
-                                                    await removeCategory(c.id);
-                                                if (!res.ok)
-                                                    return showError(res.error);
-                                                cancel();
-                                                showUndo(
-                                                    `${c.name} deleted.`,
-                                                    () =>
-                                                        run(async () => {
-                                                            const undo =
-                                                                await restoreCategory(
-                                                                    res.data,
-                                                                );
-                                                            if (!undo.ok)
-                                                                showError(
-                                                                    undo.error,
-                                                                );
-                                                        }),
-                                                );
-                                            })
-                                        }
-                                    >
-                                        Delete {c.name}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={cancel}
-                                        className={smallBtn}
-                                    >
-                                        Keep it
-                                    </button>
-                                </div>
-                            ) : null}
-                        </li>
-                    );
-                })}
+                                    Delete
+                                </Button>
+                            </div>
+                        ) : null}
+                    </li>
+                ))}
                 <li className="flex flex-wrap items-center gap-2.5 px-4 py-3">
                     <div className="min-w-0 flex-[1_1_200px]">
                         <p className="text-[13.5px] font-semibold">
                             Uncategorized
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {plural(uncategorizedCount)}
+                            {count(uncategorizedCount, "product")}
                         </p>
                     </div>
                     <span className="text-[12px] text-muted-foreground">
-                        Always there — where products go when their category is
+                        Always there. Where products go when their category is
                         removed
                     </span>
                 </li>

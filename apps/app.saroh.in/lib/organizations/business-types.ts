@@ -28,12 +28,6 @@ export const BUSINESS_TYPE_VALUES = BUSINESS_TYPE_OPTIONS.map(
     (o) => o.value,
 ) as [BusinessTypeValue, ...BusinessTypeValue[]];
 
-/**
- * Where the type is set on Settings › Business, for the go-live checklist
- * to land on (`nudges.ts`).
- */
-export const BUSINESS_TYPE_ANCHOR = "business-type";
-
 /** The old spelling of `pvt`, read until Z4 (see above). */
 const LEGACY_PRIVATE_LIMITED = "company";
 

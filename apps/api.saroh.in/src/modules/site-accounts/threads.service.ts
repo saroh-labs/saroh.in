@@ -158,7 +158,7 @@ export class ThreadsService {
                     {
                         message:
                             lastHour >= POSTS_PER_HOUR
-                                ? "You've sent a lot of messages this hour. The team will read them — try again later."
+                                ? "You've sent a lot of messages this hour. The team will read them. Try again later."
                                 : "You're sending messages quickly. Wait a minute, then try again.",
                         details: { reason: "too-many" },
                     },

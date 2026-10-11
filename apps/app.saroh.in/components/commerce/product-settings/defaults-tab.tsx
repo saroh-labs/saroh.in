@@ -1,5 +1,8 @@
 "use client";
 
+import { count, plural } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -19,16 +22,13 @@ import {
     toEntry,
 } from "@/lib/products/settings-rules";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
-import {
-    chipBtn,
-    primaryBtn,
-    smallBtn,
-    TabIntro,
-    textBox,
-    useUnsaved,
-} from "./product-settings";
+import { Field } from "@saroh/ui/field";
+import { TabIntro, useUnsaved } from "./product-settings";
 
 /**
  * What a new product starts with — how to use it, when to warn about stock,
@@ -76,10 +76,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     function save() {
         if (problem || !dirty) return;
         start(async () => {
-            const res = await saveDefaults(
-                rows.map(toEntry),
-                applyExisting && hit.count > 0,
+            const res = await runAction(() =>
+                saveDefaults(rows.map(toEntry), applyExisting && hit.count > 0),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -90,11 +90,14 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             const n = res.data.updatedCount;
             showUndo(
                 n
-                    ? `Defaults saved, and ${n} ${n === 1 ? "product" : "products"} updated.`
+                    ? `Defaults saved, and ${count(n, "product")} updated.`
                     : "Defaults saved. Existing products keep their values.",
                 () =>
                     start(async () => {
-                        const undo = await undoDefaults(res.data);
+                        const undo = await runAction(() =>
+                            undoDefaults(res.data),
+                        );
+                        if (!undo) return;
                         if (!undo.ok) showError(undo.error);
                         router.refresh();
                     }),
@@ -106,7 +109,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
         <section>
             <TabIntro title="Defaults">
                 What a new product starts with. A category&apos;s own value
-                wins; leave it empty and the All products value is used. Saved
+                wins. Leave it empty and the All products value is used. Saved
                 products keep their values unless you choose to update them.
             </TabIntro>
             {catalogue.canWrite ? null : <ReadOnlyNote />}
@@ -168,8 +171,8 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 </span>
                                 <span className="flex-[1_1_200px] text-[12px] text-muted-foreground">
                                     {isAll
-                                        ? `Used by every category that leaves a field empty · ${n} ${n === 1 ? "product" : "products"}`
-                                        : `${n} ${n === 1 ? "product" : "products"} · ${
+                                        ? `Used by every category that leaves a field empty · ${count(n, "product")}`
+                                        : `${count(n, "product")} · ${
                                               own
                                                   ? `${own} of 3 fields set here, the rest from All products`
                                                   : "everything from All products"
@@ -177,9 +180,12 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-3">
-                                <label className="min-w-0 flex-[2_1_260px] text-[12px] font-medium">
-                                    How to use or care for it
-                                    <input
+                                <Field
+                                    label="How to use or care for it"
+                                    className="flex-[2_1_260px] space-y-[5px]"
+                                >
+                                    <Input
+                                        dense
                                         value={r.howToUse}
                                         disabled={!catalogue.canWrite}
                                         onChange={(e) =>
@@ -189,18 +195,18 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         }
                                         placeholder={
                                             isAll || !all?.howToUse
-                                                ? "Nothing — each product says"
+                                                ? "Nothing. Each product says"
                                                 : `All products: ${all.howToUse}`
                                         }
-                                        className={cn(
-                                            textBox,
-                                            "mt-[5px] block h-[34px] w-full rounded-[7px] border-border px-[9px] font-normal",
-                                        )}
+                                        className="w-full min-w-0"
                                     />
-                                </label>
-                                <label className="min-w-0 flex-[1_1_110px] text-[12px] font-medium">
-                                    Warn at
-                                    <input
+                                </Field>
+                                <Field
+                                    label="Warn at"
+                                    className="flex-[1_1_110px] space-y-[5px]"
+                                >
+                                    <Input
+                                        dense
                                         type="number"
                                         min={0}
                                         inputMode="numeric"
@@ -215,63 +221,39 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 : `All products: ${all?.low ?? ""}`
                                         }
                                         aria-invalid={!lowOk}
-                                        className={cn(
-                                            textBox,
-                                            "mt-[5px] block h-[34px] w-full rounded-[7px] px-[9px] font-normal",
-                                            lowOk
-                                                ? "border-border"
-                                                : "border-destructive",
-                                        )}
+                                        className="w-full min-w-0"
                                     />
-                                </label>
+                                </Field>
                                 <div className="min-w-0 flex-[1_1_100%]">
                                     <p className="mb-1.5 text-[12px] font-medium">
                                         Returns
                                     </p>
-                                    <div
-                                        role="radiogroup"
-                                        aria-label={`${r.name} returns`}
-                                        className="flex flex-wrap gap-1.5"
-                                    >
-                                        {choices.map((o) => (
-                                            <button
-                                                key={o.choice || "same"}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={
-                                                    r.returns === o.choice
-                                                }
-                                                disabled={!catalogue.canWrite}
-                                                onClick={() =>
-                                                    set(r.key, {
-                                                        returns: o.choice,
-                                                    })
-                                                }
-                                                className={chipBtn(
-                                                    r.returns === o.choice,
-                                                )}
-                                            >
-                                                {o.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <ChipGroup
+                                        label={`${r.name} returns`}
+                                        value={r.returns}
+                                        onChange={(returns) =>
+                                            set(r.key, { returns })
+                                        }
+                                        disabled={!catalogue.canWrite}
+                                        choices={choices.map((o) => ({
+                                            value: o.choice,
+                                            label: o.label,
+                                        }))}
+                                    />
                                 </div>
                             </div>
                             {catalogue.canWrite
                                 ? suggestions.map((s) => (
                                       <div
                                           key={`${s.key}:${s.field}`}
-                                          className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-brand-subtle px-[11px] py-[9px]"
+                                          className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-muted px-[11px] py-[9px]"
                                       >
-                                          <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-brand-subtle-foreground">
+                                          <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-foreground">
                                               {suggestionText(s, r.name)}
                                           </span>
-                                          <button
+                                          <Button
+                                              size="sm"
                                               type="button"
-                                              className={cn(
-                                                  primaryBtn,
-                                                  "h-7 px-2.5",
-                                              )}
                                               onClick={() =>
                                                   set(r.key, {
                                                       [s.field === "howToUse"
@@ -283,13 +265,11 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                               }
                                           >
                                               Use it
-                                          </button>
-                                          <button
+                                          </Button>
+                                          <Button
+                                              variant="outline"
+                                              size="sm"
                                               type="button"
-                                              className={cn(
-                                                  smallBtn,
-                                                  "h-7 px-2.5",
-                                              )}
                                               onClick={() =>
                                                   setDismissed({
                                                       ...dismissed,
@@ -298,7 +278,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                               }
                                           >
                                               Not now
-                                          </button>
+                                          </Button>
                                       </div>
                                   ))
                                 : null}
@@ -310,7 +290,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             {dirty && catalogue.canWrite ? (
                 <div
                     ref={saveBar}
-                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-border-strong bg-muted px-3.5 py-2.5"
                 >
                     <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -323,51 +303,45 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             )}
                         >
                             {problem ||
-                                `New products start with this. ${changed.length} ${changed.length === 1 ? "value" : "values"} changed.`}
+                                `New products start with this. ${count(changed.length, "value")} changed.`}
                         </span>
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             disabled={pending}
                             onClick={() => {
                                 setRows(base);
                                 setApplyExisting(false);
                             }}
-                            className={smallBtn}
                         >
                             Discard
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            size="sm"
                             type="button"
-                            disabled={!!problem || pending}
+                            disabled={!!problem}
                             onClick={save}
-                            className={primaryBtn}
+                            busy={pending}
+                            busyLabel="Saving…"
                         >
-                            {pending ? "Saving…" : "Save defaults"}
-                        </button>
+                            Save defaults
+                        </Button>
                     </div>
                     {hit.count > 0 ? (
-                        <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={applyExisting}
-                            onClick={() => setApplyExisting((v) => !v)}
-                            className="mt-[9px] flex items-center gap-[9px] text-left text-[12.5px] text-foreground/75 coarse:min-h-11"
+                        <CheckRow
+                            checked={applyExisting}
+                            onChange={setApplyExisting}
+                            className="mt-[9px] gap-[9px] text-[12.5px] text-foreground/75"
                         >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "size-4 shrink-0 rounded-[4px]",
-                                    applyExisting
-                                        ? "bg-foreground"
-                                        : "border-[1.5px] border-border-strong bg-card",
-                                )}
-                            />
-                            Also update the {hit.count} saved{" "}
-                            {hit.count === 1 ? "product" : "products"} still
-                            using an old value
-                            {hit.where ? ` (${hit.where})` : ""}. Products with
-                            their own value are left alone.
-                        </button>
+                            <span>
+                                Also update the {hit.count} saved{" "}
+                                {plural(hit.count, "product")} still using an
+                                old value
+                                {hit.where ? ` (${hit.where})` : ""}. Products
+                                with their own value are left alone.
+                            </span>
+                        </CheckRow>
                     ) : null}
                 </div>
             ) : null}

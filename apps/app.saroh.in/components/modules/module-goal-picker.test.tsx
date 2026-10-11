@@ -120,40 +120,40 @@ function suggested(): string[] {
 describe("ModuleGoalPicker by kind (DEC-070)", () => {
     it("a business: Sell leads, suggested and ticked (today's behaviour)", () => {
         render("BUSINESS");
-        expect(titles()[0]).toBe("Sell products");
-        expect(ticked()).toEqual(["Sell products"]);
-        expect(suggested()).toEqual(["Sell products"]);
-        expect(document.body.textContent).toContain("Manage customers & leads");
+        expect(titles()[0]).toBe("Sell things");
+        expect(ticked()).toEqual(["Sell things"]);
+        expect(suggested()).toEqual(["Sell things"]);
+        expect(document.body.textContent).toContain("Keep track of people");
     });
 
     it("no kind (an older API) is a business", () => {
         render(undefined);
-        expect(ticked()).toEqual(["Sell products"]);
+        expect(ticked()).toEqual(["Sell things"]);
     });
 
     it("just me: nothing ticked, nothing suggested, and clients", () => {
         render("SOLO");
         expect(ticked()).toEqual([]);
         expect(suggested()).toEqual([]);
-        expect(titles()).toContain("Sell products");
-        expect(titles()).toContain("Manage clients & leads");
+        expect(titles()).toContain("Sell things");
+        expect(titles()).toContain("Keep track of clients");
         expect(titles()).toContain("Message clients");
         expect(document.body.textContent).toContain(
-            "let clients book time with you",
+            "Everyone you work for, in one list.",
         );
         expect(document.body.textContent).toContain(
-            "Nothing selected — you can add capabilities later.",
+            "Nothing selected. You can add modules later.",
         );
     });
 
     it("a site for my work: the website leads, suggested and ticked", () => {
         render("WORK");
-        expect(titles()[0]).toBe("Show up online");
-        expect(ticked()).toEqual(["Show up online"]);
-        expect(suggested()).toEqual(["Show up online"]);
-        expect(titles()).toContain("Manage readers & leads");
+        expect(titles()[0]).toBe("Put up a website");
+        expect(ticked()).toEqual(["Put up a website"]);
+        expect(suggested()).toEqual(["Put up a website"]);
+        expect(titles()).toContain("Hear from readers");
         // Sell is still on offer, just not first.
-        expect(titles()).toContain("Sell products");
+        expect(titles()).toContain("Sell things");
     });
 
     it("never ticks a suggestion that is already on, dark, or not theirs to turn on", () => {
@@ -173,7 +173,7 @@ describe("ModuleGoalPicker by kind (DEC-070)", () => {
                     : m,
             ),
         );
-        expect(titles()).not.toContain("Show up online");
+        expect(titles()).not.toContain("Put up a website");
         expect(ticked()).toEqual([]);
 
         render(
@@ -194,7 +194,7 @@ describe("ModuleGoalPicker by kind (DEC-070)", () => {
         );
         act(() => (bookings as HTMLElement).click());
         const go = Array.from(document.querySelectorAll("button")).find((b) =>
-            b.textContent.includes("Set up my workspace"),
+            b.textContent.includes("Set up my business"),
         );
         act(() => go?.click());
         expect(

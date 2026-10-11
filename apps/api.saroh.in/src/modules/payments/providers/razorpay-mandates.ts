@@ -482,6 +482,12 @@ export class RazorpayMandates implements MandateCapability {
         return {
             status: chargeStatus(hit.status),
             providerPaymentRef: text(hit.id) ?? null,
+            // Paise already, as Razorpay reports a payment (PAY-06).
+            amountCents:
+                typeof hit.amount === "number" && Number.isInteger(hit.amount)
+                    ? hit.amount
+                    : null,
+            currency: text(hit.currency) ?? null,
         };
     }
 

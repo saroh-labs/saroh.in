@@ -1,5 +1,6 @@
 "use client";
 
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -77,10 +78,17 @@ export function SessionsList({ currentToken }: { currentToken?: string }) {
         // literal type and makes the guard look statically dead.
         const controller = new AbortController();
         void (async () => {
-            const { data, error: err } = await authClient.listSessions();
+            const { data, error: err } = await settle(() =>
+                authClient.listSessions(),
+            );
             if (controller.signal.aborted) return;
             if (err) {
-                setError(err.message ?? "Could not load your sessions.");
+                setError(
+                    authFailureCopy(
+                        err,
+                        "Couldn't load where you are signed in. Try again.",
+                    ),
+                );
                 return;
             }
             setError(null);
@@ -93,10 +101,17 @@ export function SessionsList({ currentToken }: { currentToken?: string }) {
 
     async function revoke(token: string) {
         setRevoking(token);
-        const { error: err } = await authClient.revokeSession({ token });
+        const { error: err } = await settle(() =>
+            authClient.revokeSession({ token }),
+        );
         setRevoking(null);
         if (err) {
-            setError(err.message ?? "Could not revoke that session.");
+            setError(
+                authFailureCopy(
+                    err,
+                    "Couldn't sign that device out. Try again.",
+                ),
+            );
             return;
         }
         setReloadKey((key) => key + 1);

@@ -31,17 +31,17 @@ const KOLKATA = "Asia/Kolkata";
 describe("formatFullMoment", () => {
     it("says the day, the date and the minute in the business's zone", () => {
         expect(formatFullMoment("2026-09-25T08:17:00.000Z", KOLKATA)).toBe(
-            "Friday 25 September 2026, 13:47 IST",
+            "Friday 25 September 2026, 1:47 pm IST",
         );
     });
 
     it("names the zone as a person knows it, else by its offset", () => {
         expect(
             formatFullMoment("2026-09-25T08:17:00.000Z", "Europe/London"),
-        ).toBe("Friday 25 September 2026, 09:17 BST");
+        ).toBe("Friday 25 September 2026, 9:17 am BST");
         expect(
             formatFullMoment("2026-09-25T08:17:00.000Z", "Australia/Sydney"),
-        ).toBe("Friday 25 September 2026, 18:17 GMT+10");
+        ).toBe("Friday 25 September 2026, 6:17 pm GMT+10");
     });
 });
 
@@ -299,8 +299,8 @@ describe("activityDetail — what changed", () => {
                     changes: [
                         {
                             field: "openingHours",
-                            before: "Mon–Sun 09:00–18:00",
-                            after: "Mon–Sat 09:00–18:00, Sun closed",
+                            before: "Mon to Sun 9:00 am to 6:00 pm",
+                            after: "Mon to Sat 9:00 am to 6:00 pm, Sun closed",
                         },
                     ],
                 },
@@ -308,8 +308,8 @@ describe("activityDetail — what changed", () => {
         ).toEqual([
             {
                 label: "Opening hours, High Street",
-                before: "Mon–Sun 09:00–18:00",
-                after: "Mon–Sat 09:00–18:00, Sun closed",
+                before: "Mon to Sun 9:00 am to 6:00 pm",
+                after: "Mon to Sat 9:00 am to 6:00 pm, Sun closed",
             },
         ]);
         expect(

@@ -7,23 +7,31 @@ import {
     BookingUnavailable,
     initialDateOf,
     initialTimeOf,
+    modulePageTopOf,
     ModulePageUnavailable,
     MoveClass,
+    reachOf,
 } from "@saroh/site-blocks";
 
 import { PublishedPage } from "@/components/published-page";
 import { accountAreaOn, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
+import { getCatalogue } from "@/lib/catalogue";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import {
+    findModulePage,
     isBookingDeepLink,
     moduleLabel,
     moduleRoute,
 } from "@/lib/module-pages";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
-import { getSiteForHost } from "@/lib/publication";
+import { getSiteForHost, siteOriginFor } from "@/lib/publication";
+import { serviceJsonLdScript } from "@/lib/service-json-ld";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getSiteContact } from "@/lib/site-contact";
+import { getFooterFacts, soldByFor } from "@/lib/site-footer";
+import { bookDescription, canonical } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 import {
@@ -90,14 +98,30 @@ export async function generateMetadata({
     const name = resolved.snapshot.site.name;
     // The Book page's own title (G15), which is also its menu name.
     const label = moduleLabel(resolved.snapshot.pages, "BOOK", "Book");
+    // What can be booked, for search: the Book page's own lead, else the
+    // services the page offers (its own cached read). Nothing when neither.
+    const booking = resolved.siteId
+        ? await getBookingPage(resolved.siteId)
+        : null;
+    const description = bookDescription({
+        lead: modulePageTopOf(
+            findModulePage(resolved.snapshot.pages, "BOOK") ?? {},
+        )?.lead,
+        business: name,
+        services: booking?.ok ? booking.page.services.map((s) => s.name) : [],
+    });
     return shareable(resolved, {
         title: `${label} · ${name}`,
+        description,
         openGraph: {
             title: `${label} · ${name}`,
+            description,
             siteName: name,
             url: "/book",
         },
-        metadataBase: new URL(`https://${domain}`),
+        // One address for the page, however it was opened (a service, a
+        // day and a time are choices on it, not pages of their own).
+        ...canonical(resolved, domain, "/book"),
     });
 }
 
@@ -157,48 +181,80 @@ export default async function BookPage({
         );
     }
 
-    const [lookup, visit, customer, options] = await Promise.all([
-        getBookingPage(resolved.siteId),
-        // The header's place, hours and phone (E6); null never blocks booking.
-        getBookingVisit(resolved.siteId),
-        getSignedInCustomer().catch((): SignedInCustomer | null => null),
-        getSignInOptions().catch((): SignInOptions | null => null),
-    ]);
+    const [lookup, visit, customer, options, facts, catalogue, contact] =
+        await Promise.all([
+            getBookingPage(resolved.siteId),
+            // The header's place, hours and phone (E6); null never blocks booking.
+            getBookingVisit(resolved.siteId),
+            getSignedInCustomer().catch((): SignedInCustomer | null => null),
+            getSignInOptions().catch((): SignInOptions | null => null),
+            // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-121):
+            // the layout's own reads, shared through `cache`.
+            getFooterFacts(resolved.siteId),
+            getCatalogue(resolved.siteId),
+            // A call and a WhatsApp message, where the page can't find a
+            // time: the layout's own read, shared through `cache`.
+            getSiteContact(resolved.siteId),
+        ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         // A failed read is not kept by the page cache (#863).
         dontCachePage("booking unavailable");
         return <BookingUnavailable business={resolved.snapshot.site.name} />;
     }
+    // What can be booked here, for search engines: only what the page
+    // shows. Not on a test release, which is never indexed.
+    const jsonLd =
+        resolved.mode === "live" && lookup.page.open
+            ? serviceJsonLdScript({
+                  business: resolved.snapshot.site.name,
+                  origin: siteOriginFor(resolved, domain),
+                  services: lookup.page.services,
+              })
+            : null;
     return (
-        <BookingFlow
-            page={lookup.page}
-            visit={visit}
-            account={{
-                customer,
-                options: options ?? {
-                    businessName: lookup.page.businessName,
-                    phone: null,
-                    challenge: { required: false, siteKey: null },
-                },
-                signIn: {
-                    requestCode: requestSignInCode,
-                    verifyCode: verifySignInCode,
-                },
-                book: bookSignedIn,
-                credit: creditFor,
-                signOut,
-                // A full class's waitlist (A12).
-                waitlist: {
-                    mine: waitlistFor,
-                    join: joinWaitlist,
-                    leave: leaveWaitlist,
-                },
-            }}
-            apiUrl={publicApiUrl()}
-            initialServiceId={typeof service === "string" ? service : null}
-            initialDate={initialDateOf(date)}
-            initialStart={initialTimeOf(start)}
-        />
+        <>
+            {jsonLd ? (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: jsonLd }}
+                />
+            ) : null}
+            <BookingFlow
+                page={lookup.page}
+                visit={visit}
+                account={{
+                    customer,
+                    options: options ?? {
+                        businessName: lookup.page.businessName,
+                        phone: null,
+                        challenge: { required: false, siteKey: null },
+                    },
+                    signIn: {
+                        requestCode: requestSignInCode,
+                        verifyCode: verifySignInCode,
+                    },
+                    book: bookSignedIn,
+                    credit: creditFor,
+                    signOut,
+                    // A full class's waitlist (A12).
+                    waitlist: {
+                        mine: waitlistFor,
+                        join: joinWaitlist,
+                        leave: leaveWaitlist,
+                    },
+                }}
+                apiUrl={publicApiUrl()}
+                soldBy={soldByFor(
+                    facts,
+                    resolved.snapshot.site.name,
+                    catalogue.ok,
+                )}
+                reach={reachOf(contact)}
+                initialServiceId={typeof service === "string" ? service : null}
+                initialDate={initialDateOf(date)}
+                initialStart={initialTimeOf(start)}
+            />
+        </>
     );
 }

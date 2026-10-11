@@ -1,15 +1,19 @@
-import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FollowUpsList } from "@/components/leads/follow-ups-list";
 import { LeadsTabs } from "@/components/leads/leads-tabs";
 import { LeadsView } from "@/components/leads/leads-view";
+import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { PageContainer } from "@/components/shared/page-container";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { readOnlyLine } from "@/components/shared/who-can-change";
+import { canOrUnknown } from "@/lib/access/require-can";
 import { contactName } from "@/lib/crm/format";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { listLeads, listOpenTasks } from "@/lib/leads/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { viewParam } from "@/lib/views/search-params";
 
@@ -31,29 +35,44 @@ export default async function LeadsPage({
 }) {
     await requireSession();
 
-    const [leads, params, addLead, tasks] = await Promise.all([
+    const organization = await resolveActiveOrganization();
+    // `lead:write` adds a lead and `activity:write` marks a follow-up done
+    // (`leads.service.ts`). Someone who reads leads without them gets the
+    // list as it is, with no button that would only be refused.
+    const canWrite = canOrUnknown(organization, "lead:write");
+    const canLog = canOrUnknown(organization, "activity:write");
+
+    const [leads, params, addLead, tasks, currency] = await Promise.all([
         listLeads(),
         searchParams,
-        loadAddLead(),
+        canWrite ? loadAddLead() : Promise.resolve(null),
         listOpenTasks().catch(() => null),
+        // A lead's Worth is in the business's currency (owner, 11 Oct).
+        readBusinessCurrency(),
     ]);
     const tab = params.tab === "follow-ups" ? "follow-ups" : "leads";
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Leads"]}
                 title="Leads"
-                description="Opportunities in your pipeline — what they're worth, and how long they've waited."
+                count={countLabel(leads.length, {
+                    one: "lead",
+                    other: "leads",
+                })}
+                description="Opportunities in your pipeline: what they're worth, and how long they've waited."
+                meta={<LeadsViewSwitch current="list" />}
                 actions={
-                    <>
-                        <Button asChild variant="outline">
-                            <Link href="/pipeline">Pipeline board</Link>
-                        </Button>
-                        <AddLeadDialog {...addLead} />
-                    </>
+                    addLead ? <AddLeadDialog {...addLead} header /> : undefined
                 }
             />
             <div className="mt-6 flex flex-col gap-5">
+                {canWrite ? null : (
+                    <ReadOnlyNote className="mb-0">
+                        {readOnlyLine("leads", true)}
+                    </ReadOnlyNote>
+                )}
                 <LeadsTabs
                     active={tab}
                     leadCount={leads.length}
@@ -61,6 +80,7 @@ export default async function LeadsPage({
                 />
                 {tab === "follow-ups" ? (
                     <FollowUpsList
+                        canWrite={canLog}
                         tasks={tasks}
                         leads={Object.fromEntries(
                             leads.map((l) => [
@@ -75,7 +95,11 @@ export default async function LeadsPage({
                         )}
                     />
                 ) : (
-                    <LeadsView leads={leads} initialView={viewParam(params)} />
+                    <LeadsView
+                        leads={leads}
+                        currency={currency}
+                        initialView={viewParam(params)}
+                    />
                 )}
             </div>
         </PageContainer>

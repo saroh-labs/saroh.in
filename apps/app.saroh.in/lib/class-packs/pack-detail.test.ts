@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     BUILT_TABS,
     archiveToast,
@@ -23,6 +24,8 @@ import {
     linkedCards,
     overviewTiles,
 } from "./pack-overview";
+
+pinClock();
 
 const ZONE = "Asia/Kolkata";
 const NOW = new Date("2026-10-01T06:30:00.000Z");
@@ -147,7 +150,7 @@ describe("detailHeader", () => {
         expect(head).toMatchObject({
             thumbN: "10",
             thumbUnit: "classes",
-            status: { label: "On sale", tone: "ok" },
+            status: { label: "Live", tone: "ok" },
             kindLabel: "Classes",
             firstOnly: true,
             meta: "₹1,500 · ₹150 a class · use within 60 days · HIIT, Yoga",
@@ -317,7 +320,7 @@ describe("overview", () => {
             timeZone: ZONE,
         });
         expect(first.map((r) => r.v)).toEqual([
-            "Classes only — never one-to-one sessions",
+            "Classes only, never one-to-one sessions",
             "10 classes",
             "₹1,500 · ₹150 a class",
             "60 days from the sale",
@@ -410,7 +413,7 @@ describe("Who has it", () => {
             ZONE,
         );
         expect(row.bar).toBe("soon");
-        expect(row.when).toBe("Use by 6 Oct — 5 days left");
+        expect(row.when).toBe("Use by 6 Oct, 5 days left");
         expect(row.whenTone).toBe("soon");
     });
 
@@ -491,7 +494,7 @@ describe("Extend", () => {
             ),
         ).toBe("With 7 more days it would still have run out. Add more days.");
         expect(extendFailure({ error: "boom", status: 500 }, "Asha Rao")).toBe(
-            "Couldn't extend Asha's pack. Nothing has changed — try again.",
+            "Couldn't extend Asha's pack. Nothing has changed. Try again.",
         );
     });
 });

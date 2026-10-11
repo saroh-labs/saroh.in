@@ -5,22 +5,25 @@ import { SectionError } from "@/components/shared/section-error";
 /**
  * Segment error boundary. Keeps the app chrome intact so a failure here costs
  * the merchant this panel, not their ability to navigate — see SectionError.
+ *
+ * Only the app's read failed (#370, #908): the public site is served from
+ * its last publication, so the sentence can promise that much and no more.
+ * Try again is `retry`, which reads the site again.
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load your website"
-            description="Your published site is unaffected — this is the editor failing to load."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Website"
+            things="your website"
+            reassurance="Your published site is unaffected."
         />
     );
 }

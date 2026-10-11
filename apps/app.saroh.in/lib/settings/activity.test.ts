@@ -401,7 +401,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { product: film, unitsZeroed: 38, storefronts: 2 },
             }),
         ).toBe(
-            `Sanjay turned Track stock off for ${film} — 38 set to 0 → ${film}`,
+            `Sanjay turned Track stock off for ${film}, 38 set to 0 → ${film}`,
         );
         // Nothing on the shelves: nothing to say about units.
         expect(
@@ -426,7 +426,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { product: "Rye loaf", soldOutCleared: 2 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf — cleared Sold out at 2 locations → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf, cleared Sold out at 2 locations → Rye loaf",
         );
         // A first count started it.
         expect(
@@ -440,7 +440,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf with its first count — cleared Sold out at 1 location → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf with its first count, cleared Sold out at 1 location → Rye loaf",
         );
         // It opens the product.
         expect(
@@ -594,7 +594,7 @@ describe("activityLine — the team", () => {
     it("opens the Team page on its people", () => {
         expect(
             activityLine(event({ action: "membership.remove" }))?.where.href,
-        ).toBe("/settings/people?view=people");
+        ).toBe("/settings/people?tab=people");
     });
 
     it("says so when the person is no longer there", () => {
@@ -629,7 +629,7 @@ describe("formatRecent", () => {
 
     it("gives today's hour, then yesterday, then the date", () => {
         expect(formatRecent("2026-09-25T03:44:00.000Z", zone, now)).toBe(
-            "Today 09:14",
+            "Today, 9:14 am",
         );
         expect(formatRecent("2026-09-24T10:00:00.000Z", zone, now)).toBe(
             "Yesterday",
@@ -645,7 +645,7 @@ describe("formatRecent", () => {
     it("reads the day in the zone given, not the server's", () => {
         // 20:00 UTC on the 24th is already the 25th in Kolkata.
         expect(formatRecent("2026-09-24T20:00:00.000Z", zone, now)).toBe(
-            "Today 01:30",
+            "Today, 1:30 am",
         );
     });
 });

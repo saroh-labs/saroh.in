@@ -135,7 +135,7 @@ describe("the integration pages", () => {
                 pages: broken,
                 planned: [
                     ...plannedIntegrations,
-                    { name: "Fax", line: "", when: "", href: "/fax" },
+                    { name: "Fax", line: "", group: "later", href: "/fax" },
                 ],
             }),
         ).toEqual(["integration email: links to itself", "planned Fax: links"]);
@@ -143,7 +143,7 @@ describe("the integration pages", () => {
 
     it("never gives a planned row a link", () => {
         for (const row of plannedIntegrations) {
-            expect(Object.keys(row).sort()).toEqual(["line", "name", "when"]);
+            expect(Object.keys(row).sort()).toEqual(["group", "line", "name"]);
         }
     });
 

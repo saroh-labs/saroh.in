@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -15,6 +14,9 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { ChoiceGroup } from "@/components/shared/choice-group";
+import { UNREACHED } from "@/lib/api/unreached";
 import {
     confirmAttentionAction,
     removeAttentionAction,
@@ -43,6 +45,7 @@ import {
 } from "@/lib/customer-workspace/attention";
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { Notice } from "@saroh/ui/notice";
 
 interface Choice {
     id: string;
@@ -50,7 +53,7 @@ interface Choice {
 }
 
 const CHOICE =
-    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11";
+    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:h-11";
 
 /**
  * Notes from the customer (C12, "Saroh Customer Detail" › patient notes):
@@ -122,7 +125,7 @@ export function AttentionSuggestions({
                 if (state.status === "failed") {
                     back();
                     showError(
-                        refused ?? "Could not set that note aside.",
+                        refused ?? "Couldn't set that note aside.",
                         "It is still waiting above their record.",
                     );
                 }
@@ -136,10 +139,10 @@ export function AttentionSuggestions({
     return (
         <section
             aria-label={suggestionsTitle(shown)}
-            className="mb-3.5 grid gap-3 rounded-xl border border-highlight bg-brand-subtle px-4 py-3.5"
+            className="mb-3.5 grid gap-3 rounded-xl border border-border-strong bg-muted px-4 py-3.5"
         >
             <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-[13.5px] font-semibold text-brand-subtle-foreground">
+                <span className="text-[13.5px] font-semibold text-foreground">
                     {suggestionsTitle(shown)}
                 </span>
                 <span className="text-pretty text-[12px] text-muted-foreground">
@@ -217,7 +220,7 @@ function SuggestionCard({
             toSuggestionInput(draft, choices),
         ).catch(() => ({
             ok: false as const,
-            error: "The connection dropped before it was added.",
+            error: UNREACHED,
             field: undefined,
         }));
         setSaving(false);
@@ -248,43 +251,32 @@ function SuggestionCard({
                         >
                             What they&apos;re allergic to
                         </span>
-                        <div
-                            role="radiogroup"
-                            aria-labelledby={`${id}-allergen`}
-                            aria-describedby={
+                        <ChoiceGroup
+                            labelledBy={`${id}-allergen`}
+                            describedBy={
                                 allergenError
                                     ? `${id}-allergen-error`
                                     : undefined
                             }
                             className="flex flex-wrap gap-1.5"
-                        >
-                            {choices.map((a) => {
-                                const on = draft.allergenId === a.id;
-                                return (
-                                    <button
-                                        key={a.id}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={on}
-                                        disabled={saving}
-                                        onClick={() =>
-                                            change({
-                                                ...draft,
-                                                allergenId: a.id,
-                                            })
-                                        }
-                                        className={cn(
-                                            "h-7 cursor-pointer rounded-full border px-2.5 text-[12px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed coarse:h-11",
-                                            on
-                                                ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
-                                                : "border-border bg-card text-foreground/75 hover:bg-muted",
-                                        )}
-                                    >
-                                        {a.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                            value={draft.allergenId ?? null}
+                            onChange={(allergenId) =>
+                                change({ ...draft, allergenId })
+                            }
+                            disabled={saving}
+                            choices={choices.map((a) => ({
+                                value: a.id,
+                                label: a.name,
+                            }))}
+                            itemClassName={(on) =>
+                                cn(
+                                    "h-7 rounded-full border px-2.5 text-[12px] active:bg-muted coarse:h-11",
+                                    on
+                                        ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
+                                        : "border-border bg-card text-foreground/75 hover:bg-muted",
+                                )
+                            }
+                        />
                     </div>
                 ) : (
                     <div className="grid min-w-0 gap-[5px]">
@@ -295,6 +287,7 @@ function SuggestionCard({
                             Short label for the team
                         </Label>
                         <Input
+                            dense
                             id={`${id}-label`}
                             value={draft.label}
                             maxLength={SUGGESTION_LABEL_MAX}
@@ -306,39 +299,29 @@ function SuggestionCard({
                             onChange={(e) =>
                                 change({ ...draft, label: e.target.value })
                             }
-                            className="h-[34px] min-w-0 rounded-[8px] px-2.5 text-[13px]"
+                            className="min-w-0 px-2.5"
                         />
                     </div>
                 )}
-                <div
-                    role="radiogroup"
-                    aria-label="Kind"
+                <ChoiceGroup
+                    label="Kind"
                     className="flex flex-wrap gap-1"
-                >
-                    {SUGGESTION_KINDS.map((k) => {
-                        const on = draft.kind === k;
-                        return (
-                            <button
-                                key={k}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                disabled={saving}
-                                onClick={() =>
-                                    change(pickKind(draft, k, canSensitive))
-                                }
-                                className={cn(
-                                    CHOICE,
-                                    on
-                                        ? "border-foreground bg-muted font-semibold"
-                                        : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
-                                )}
-                            >
-                                {KIND_WORD[k]}
-                            </button>
-                        );
-                    })}
-                </div>
+                    value={draft.kind}
+                    onChange={(k) => change(pickKind(draft, k, canSensitive))}
+                    disabled={saving}
+                    choices={SUGGESTION_KINDS.map((k) => ({
+                        value: k,
+                        label: KIND_WORD[k],
+                    }))}
+                    itemClassName={(on) =>
+                        cn(
+                            CHOICE,
+                            on
+                                ? "border-foreground bg-muted font-semibold"
+                                : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
+                        )
+                    }
+                />
             </div>
             {labelError || allergenError ? (
                 <span
@@ -354,49 +337,45 @@ function SuggestionCard({
                 </span>
             ) : null}
             {canSensitive ? (
-                <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-foreground/75 coarse:min-h-11">
-                    <Checkbox
-                        checked={draft.sensitive}
-                        disabled={saving}
-                        onCheckedChange={(v) =>
-                            change({
-                                ...draft,
-                                sensitive: v === true,
-                                sensitiveSet: true,
-                            })
-                        }
-                    />
+                <CheckRow
+                    checked={draft.sensitive}
+                    disabled={saving}
+                    onChange={(sensitive) =>
+                        change({ ...draft, sensitive, sensitiveSet: true })
+                    }
+                    className="text-[12.5px] text-foreground/75"
+                >
                     {sensitiveTickText(sensitiveRoles)}
-                </label>
+                </CheckRow>
             ) : (
                 <p className="text-[12.5px] text-muted-foreground">
                     {NO_SENSITIVE_NOTE}
                 </p>
             )}
             {unplaced ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    {failed.message} Nothing was added; your choices are still
-                    here.
-                </p>
+                <Notice tone="error">
+                    {failed.message} Nothing was added, and your choices are
+                    still here.
+                </Notice>
             ) : null}
             <div className="flex flex-wrap gap-2">
                 <Button
+                    size="sm"
                     type="button"
                     onClick={() => void add()}
-                    disabled={saving || problem !== null}
-                    className="h-[34px] rounded-[8px] px-3.5 text-[12.5px] font-semibold coarse:h-11"
+                    disabled={problem !== null}
+                    busy={saving}
+                    busyLabel="Adding…"
                 >
-                    {saving ? "Adding…" : "Add to Needs attention"}
+                    Add to Needs attention
                 </Button>
                 <Button
+                    size="sm"
                     type="button"
                     variant="outline"
                     onClick={onSetAside}
                     disabled={saving}
-                    className="h-[34px] rounded-[8px] px-3 text-[12.5px] font-semibold text-foreground/75 coarse:h-11"
+                    className="text-foreground/75"
                 >
                     Nothing to add
                 </Button>

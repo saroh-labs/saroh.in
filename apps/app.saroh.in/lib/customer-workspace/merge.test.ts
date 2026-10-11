@@ -296,8 +296,8 @@ describe("offers per channel (default 24)", () => {
                 names,
             ),
         ).toEqual([
-            "Offers by email: No — from this record",
-            "Offers on WhatsApp: not asked — they'll need to say yes again",
+            "Offers by email: No, from this record",
+            "Offers on WhatsApp: not asked. They'll need to say yes again",
         ]);
         expect(
             consentLines(
@@ -307,8 +307,8 @@ describe("offers per channel (default 24)", () => {
                 names,
             ),
         ).toEqual([
-            "Offers by email: Yes — from Priya R.'s record",
-            "Offers on WhatsApp: Yes — from Priya R.'s record",
+            "Offers by email: Yes, from Priya R.'s record",
+            "Offers on WhatsApp: Yes, from Priya R.'s record",
         ]);
     });
 

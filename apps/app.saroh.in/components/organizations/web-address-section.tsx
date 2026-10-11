@@ -15,6 +15,8 @@ import {
     suffixOf,
 } from "@/lib/organizations/web-address";
 
+import { QrButton } from "@/components/qr/qr-button";
+import { FailedRead } from "@/components/shared/failed-read";
 import { WebAddressDialog } from "./web-address-dialog";
 
 /**
@@ -45,21 +47,19 @@ export function WebAddressSection({
     if (!read.ok && read.missing) return null;
     return (
         <section
+            id="web-address"
             aria-label="Web address"
-            className="overflow-hidden rounded-xl border border-border bg-card"
+            className="scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
         >
             {read.ok ? (
                 <Loaded view={read.data} zone={zone} />
             ) : (
                 <>
                     <Header />
-                    <p
-                        role="status"
-                        className="px-[18px] py-[11px] text-[13px] text-muted-foreground"
-                    >
-                        Couldn&apos;t load your web address. Reload the page to
-                        try again.
-                    </p>
+                    <FailedRead
+                        things="your web address"
+                        className="px-[18px] py-[11px]"
+                    />
                 </>
             )}
         </section>
@@ -114,7 +114,7 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                     <span className="font-mono">
                                         {view.customDomain}
                                     </span>
-                                    ;{" "}
+                                    , and{" "}
                                     <span className="font-mono">
                                         {hostOf(view.platformOrigin)}
                                     </span>{" "}
@@ -148,6 +148,17 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                             your website (opens in a new tab)
                                         </span>
                                     </a>
+                                    <QrButton
+                                        compact="always"
+                                        variant="ghost"
+                                        link={{
+                                            mode: "saved",
+                                            kind: "SITE",
+                                            url: view.links.site,
+                                            what: "your website",
+                                            from: "Business settings",
+                                        }}
+                                    />
                                 </>
                             ) : null}
                         </span>

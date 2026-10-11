@@ -20,6 +20,13 @@ export const SENSITIVE_HEADERS = new Set<string>([
     "x-customer-session",
     // A test release link's secret, sent by the renderer (DEC-071, KTD-6).
     "x-saroh-test-token",
+    // The visitor's own address, as the proxies in front pass it on: a
+    // person's, so never in an error line.
+    "x-forwarded-for",
+    "x-real-ip",
+    "forwarded",
+    "cf-connecting-ip",
+    "true-client-ip",
 ]);
 
 /** Body/field names (normalised) whose values must never be logged. */

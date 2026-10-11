@@ -7,7 +7,6 @@ import {
     capGoodwill,
     goodwillRequest,
     linePaidCents,
-    moneyWords,
     planLineRefund,
     planRemainingLines,
     refundStanding,
@@ -198,17 +197,6 @@ describe("refundStanding — derived, never stored", () => {
         expect(refundStanding("PAID", 4250, 1000)).toBe("PARTLY_REFUNDED");
         expect(refundStanding("PAID", 4250, 4250)).toBe("REFUNDED");
         expect(refundStanding("REFUNDED", 4250, 4250)).toBe("REFUNDED");
-    });
-});
-
-describe("moneyWords — an amount as a refusal says it", () => {
-    it("drops paise when there are none, and keeps them when there are", () => {
-        expect(moneyWords(125000, "INR")).toBe("₹1,250");
-        expect(moneyWords(4950, "INR")).toBe("₹49.50");
-    });
-
-    it("falls back to the code for a currency Intl doesn't know", () => {
-        expect(moneyWords(500, "ZZZ1")).toBe("ZZZ1 5");
     });
 });
 

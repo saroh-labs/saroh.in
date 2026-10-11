@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
 import {
@@ -15,6 +16,7 @@ import {
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import { keptPostsOnSite } from "../content/post-paused";
@@ -23,6 +25,7 @@ import {
     checkoutReadiness,
     readinessMessage,
 } from "../orders/checkout-readiness";
+import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -43,6 +46,7 @@ import {
 } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
+import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
@@ -51,6 +55,7 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import { primaryHostOf } from "./primary-host";
 import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
@@ -110,6 +115,13 @@ import {
     siteHostMode,
     siteRootDomain,
 } from "./site-host-mode";
+import type { PublicSiteIcon, SiteIconView } from "./site-icon";
+import {
+    DRAFT_ICON_SELECT,
+    draftIcon,
+    publicSiteIcon,
+    siteIconView,
+} from "./site-icon";
 import type { SiteNavigation } from "./site-navigation";
 import {
     parseSiteNavigation,
@@ -132,6 +144,7 @@ import {
     publicationTemplate,
     siteTemplate,
     templateFooterLine,
+    templateFormerFooterLines,
 } from "./site-template-record";
 
 /**
@@ -316,6 +329,22 @@ export interface PublicSiteView {
      * before.
      */
     modules?: PublicModulePageStates;
+    /**
+     * The icon the site shows (DEC-124): its own from the snapshot, else the
+     * business logo read live, else null, and the renderer draws a plain
+     * tile with the site's initial. Resolved here so the renderer makes no
+     * extra request.
+     */
+    icon?: PublicSiteIcon | null;
+    /**
+     * The host this site is primarily served at: its verified custom
+     * domain when it has one, else its Saroh address
+     * (`rye.saroh.app`). The same site answers on both; this is the one
+     * the renderer names as canonical to search engines, and the one a QR
+     * code's short link lands on, so a customer signed in there stays
+     * signed in. Null when it has neither.
+     */
+    primaryHost?: string | null;
 }
 
 /**
@@ -418,6 +447,11 @@ export interface SiteDetailView {
     socialImageWidth: number | null;
     socialImageHeight: number | null;
     socialImageBytes: number | null;
+    /**
+     * The site's own icon as saved, and the business logo that stands in
+     * without one (DEC-124). Draft, like the share image.
+     */
+    icon: SiteIconView;
     /** Where this site's posts live (#232); null means the default. */
     postsPrefix: string | null;
     createdAt: Date;
@@ -434,6 +468,11 @@ export interface SiteDetailView {
         kind: PageKind;
         /** "Show in menu" (G14). */
         inMenu: boolean;
+        /**
+         * When the page was last changed — renamed, moved, hidden or its
+         * sections saved (#908, `pageUpdatedAt`).
+         */
+        updatedAt: Date;
     }[];
     /**
      * The module pages this caller could add to the site now (G14): kinds
@@ -586,6 +625,8 @@ const draftSiteSelect = {
     socialImageWidth: true,
     socialImageHeight: true,
     socialImageBytes: true,
+    // The site's own icon and its media type (DEC-124).
+    ...DRAFT_ICON_SELECT,
     footer: true,
     navigation: true,
     // Not part of the snapshot: what a Publication is stamped with (KTD-7).
@@ -696,7 +737,11 @@ function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
 
 @Injectable()
 export class SitesService {
-    constructor(private readonly entitlements: EntitlementService) {}
+    constructor(
+        private readonly entitlements: EntitlementService,
+        /** The activation ledger, for the first publish (DEC-125). */
+        @Optional() private readonly activation?: ActivationEvents,
+    ) {}
 
     /**
      * Create a draft Site (pages + DRAFT versions + sections) from a template.
@@ -897,6 +942,8 @@ export class SitesService {
                 socialImageWidth: true,
                 socialImageHeight: true,
                 socialImageBytes: true,
+                iconUrl: true,
+                iconMediaId: true,
                 postsPrefix: true,
                 footer: true,
                 navigation: true,
@@ -923,6 +970,8 @@ export class SitesService {
                         hidden: true,
                         kind: true,
                         inMenu: true,
+                        // The Pages tab's Updated column (#908).
+                        ...pageUpdatedSelect,
                     },
                 },
             },
@@ -943,6 +992,9 @@ export class SitesService {
             templateId,
             templateVersion,
             templateStyleId,
+            pages,
+            iconUrl,
+            iconMediaId,
             ...rest
         } = site;
         const pending = await this.pendingSectionChanges([site.id]);
@@ -954,6 +1006,13 @@ export class SitesService {
             : null;
         return {
             ...rest,
+            pages: pages.map(({ versions, ...page }) => ({
+                ...page,
+                updatedAt: pageUpdatedAt({
+                    updatedAt: page.updatedAt,
+                    versions,
+                }),
+            })),
             // As it applies now (DEC-103): switched on under a plan without
             // the approval row, it reads as off, as publishing treats it.
             publishNeedsApproval: await approvalApplies(
@@ -981,6 +1040,10 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            icon: await siteIconView(ctx.organizationId, {
+                iconUrl,
+                iconMediaId,
+            }),
             template: siteTemplate({
                 templateId,
                 templateVersion,
@@ -1868,6 +1931,7 @@ export class SitesService {
          * the safety of a permanent write depend on a string the client sent.
          */
         const publishedFooter = sanitizedFooter(draftFooter);
+        const icon = draftIcon(site);
         const snapshot: SiteSnapshot = {
             site: {
                 name: site.name,
@@ -1896,6 +1960,12 @@ export class SitesService {
                           height: site.socialImageHeight,
                       }
                     : null,
+                // The site's own icon (DEC-124), only when it has one: a
+                // site without keeps a snapshot byte for byte what it was,
+                // so an approval given before icons still covers its draft.
+                // The logo that stands in is the business's and is read
+                // live, never copied here.
+                ...(icon ? { icon } : {}),
                 /*
                  * The look travels with the content (#189). Normalized here so
                  * a snapshot is always complete, never half-styled by whatever
@@ -1994,7 +2064,7 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(snapshot);
 
-        return prisma.$transaction(async (tx) => {
+        const published = await prisma.$transaction(async (tx) => {
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
              * flag that blocks (`checkAddress`). Asked here, beside the
@@ -2039,6 +2109,11 @@ export class SitesService {
                 route: live.route,
             };
         });
+        // The first time one of the business's websites went live
+        // (DEC-125). After the commit; stored once by the ledger, and it
+        // swallows its own errors.
+        await this.activation?.firstSitePublished(ctx.organizationId, site.id);
+        return published;
     }
 
     // -----------------------------------------------------------------------
@@ -2111,7 +2186,11 @@ export class SitesService {
             where: {
                 siteId,
                 currentPublicationId: { not: null },
-                site: { deletedAt: null },
+                // Offline with its business (#921).
+                site: {
+                    deletedAt: null,
+                    organization: SITE_ONLINE_ORGANIZATION,
+                },
                 AND: [kept],
             },
             orderBy: { publishedAt: "desc" },
@@ -2135,7 +2214,11 @@ export class SitesService {
                 siteId,
                 slug,
                 currentPublicationId: { not: null },
-                site: { deletedAt: null },
+                // Offline with its business (#921).
+                site: {
+                    deletedAt: null,
+                    organization: SITE_ONLINE_ORGANIZATION,
+                },
                 AND: [kept],
             },
             select: {
@@ -2178,10 +2261,19 @@ export class SitesService {
         const site = await prisma.site.findFirst({
             // A second lock (DEC-071, KTD-2): the live pointer only ever names
             // a LIVE row, and a real host is never served anything else.
-            where: { AND: [where, { currentPublication: { kind: "LIVE" } }] },
+            // A deleted business's site is offline (#921): it reads as never
+            // published, from every address.
+            where: {
+                AND: [
+                    where,
+                    { currentPublication: { kind: "LIVE" } },
+                    { organization: SITE_ONLINE_ORGANIZATION },
+                ],
+            },
             select: {
                 id: true,
                 organizationId: true,
+                subdomain: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
@@ -2202,6 +2294,8 @@ export class SitesService {
             publishedAt,
             siteId: site.id,
             ...(modules ? { modules } : {}),
+            icon: await publicSiteIcon(snapshot, site.organizationId),
+            primaryHost: await primaryHostOf(site),
         };
     }
 
@@ -2962,6 +3056,7 @@ export class SitesService {
             // The footer still in its template's words (round 2).
             footer: parseSiteFooter(site.footer),
             templateFooterLine: templateFooterLine(site),
+            formerTemplateFooterLines: templateFormerFooterLines(site),
             pages: site.pages.map((page) => ({
                 id: page.id,
                 path: page.path,
@@ -3202,7 +3297,7 @@ export class SitesService {
         }
         if (page.isHome) {
             throw new BadRequestException(
-                "The home page cannot be deleted — it is what this site's address serves.",
+                "The home page can't be deleted. It is what this site's address serves.",
             );
         }
 

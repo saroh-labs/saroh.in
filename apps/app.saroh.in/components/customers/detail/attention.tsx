@@ -1,5 +1,9 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
+import { plural } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
@@ -25,6 +29,7 @@ import {
 import type { HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { AttentionSheet } from "./attention-sheet";
 import { CARD, LABEL } from "./parts";
 
@@ -81,7 +86,7 @@ export function useAttention({
                 if (state.status === "failed") {
                     back();
                     showError(
-                        refused ?? "Could not take that off Needs attention.",
+                        refused ?? "Couldn't take that off Needs attention.",
                         `${tagText(entry)} is still on their list.`,
                     );
                 }
@@ -123,10 +128,6 @@ export function HeaderAttention({ state }: { state: AttentionState }) {
         />
     );
 }
-
-const TEXT_BTN =
-    "text-[12px] text-muted-foreground transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11";
-
 /**
  * Overview's Needs attention card: each entry with its detail and who added
  * it, Edit and Remove for a role that may, and what this role can't see.
@@ -150,20 +151,20 @@ export function AttentionCard({
             <div className="flex items-baseline gap-2">
                 <span className={cn(LABEL, "flex-1")}>Needs attention</span>
                 {canWrite && state.read ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={state.add}
-                        className="text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Add
-                    </button>
+                    </TextLink>
                 ) : null}
             </div>
             {!state.read ? (
-                <p className="mt-1.5 text-[13px] text-muted-foreground">
-                    Needs attention couldn&apos;t be read just now. Nothing on
-                    it has changed.
-                </p>
+                <FailedRead
+                    className="mt-1.5"
+                    things="what needs attention"
+                    reassurance="Nothing on it has changed."
+                />
             ) : (
                 <>
                     {state.entries.map((e) => (
@@ -185,25 +186,26 @@ export function AttentionCard({
                                 <span className="flex-1" />
                                 {canWrite ? (
                                     <span className="flex gap-3">
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => state.edit(e)}
                                             aria-label={`Edit ${tagText(e)}`}
-                                            className={TEXT_BTN}
+                                            className="text-muted-foreground"
                                         >
                                             Edit
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => state.remove(e)}
                                             aria-label={`Remove ${tagText(e)}`}
-                                            className={cn(
-                                                TEXT_BTN,
-                                                "hover:text-destructive-subtle-foreground active:bg-destructive-subtle",
-                                            )}
+                                            className="text-muted-foreground"
                                         >
                                             Remove
-                                        </button>
+                                        </Button>
                                     </span>
                                 ) : null}
                             </div>
@@ -218,11 +220,12 @@ export function AttentionCard({
                         </div>
                     ))}
                     {!state.entries.length && !hidden ? (
-                        <p className="mt-1.5 text-pretty text-[13px] leading-[1.5] text-muted-foreground">
-                            Nothing yet. An allergy, a medical note or an access
-                            need goes here, and the team sees it by their name
-                            and on their bookings.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="mt-1.5"
+                            title="Nothing yet"
+                            description="An allergy, a medical note or an access need goes here, and the team sees it by their name and on their bookings."
+                        />
                     ) : null}
                     {hidden ? (
                         <p
@@ -238,7 +241,7 @@ export function AttentionCard({
                                 className="size-[13px] shrink-0"
                             />
                             {hidden}. Only people who can edit customers can
-                            read {state.hiddenCount === 1 ? "it" : "them"}.
+                            read {plural(state.hiddenCount, "it", "them")}.
                         </p>
                     ) : null}
                     {!canWrite ? (

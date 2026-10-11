@@ -127,6 +127,16 @@ const orderPaidV1: EventValidator = (props) => ({
     amountCents: requireNumber(props, "amountCents"),
 });
 
+/**
+ * The `order.refunded` contract (v1, #867): an order that `order.paid`
+ * counted has had all of its money back, so Insights' orders figure takes
+ * it off again, net as Sales is. `amountCents` is the counted sale's.
+ */
+const orderRefundedV1: EventValidator = (props) => ({
+    orderId: requireString(props, "orderId", 128),
+    amountCents: requireNumber(props, "amountCents"),
+});
+
 /* ------------------------------------------------------------------------- *
  * Activation events (#176 / #119)
  *
@@ -185,6 +195,25 @@ const firstBookingV1: EventValidator = (props) => ({
 });
 
 /**
+ * The milestones added for the product funnel (DEC-125), v1. Each is stored
+ * once per Organization, as the `first.*` contracts are, and carries an id
+ * or a key only: the service or site that was first, which provider (its
+ * name, never a key), which plan (its key, never a price).
+ */
+const firstServiceV1: EventValidator = (props) => ({
+    serviceId: requireString(props, "serviceId", MAX_ID_LEN),
+});
+const firstSitePublishedV1: EventValidator = (props) => ({
+    siteId: requireString(props, "siteId", MAX_ID_LEN),
+});
+const firstPaymentProviderV1: EventValidator = (props) => ({
+    provider: requireString(props, "provider", MAX_ID_LEN),
+});
+const firstPlanUpgradeV1: EventValidator = (props) => ({
+    planKey: requireString(props, "planKey", MAX_ID_LEN),
+});
+
+/**
  * `import.completed` (v1): counts only. Deliberately no file name and no row
  * contents — an import file is full of customer data and none of it belongs in
  * an analytics ledger.
@@ -220,6 +249,18 @@ export const FIRST_ORDER_CREATED_TYPE = "first.order.created";
  */
 export const FIRST_BOOKING_CREATED_TYPE = "first.booking.created";
 export const IMPORT_COMPLETED_TYPE = "import.completed";
+/**
+ * The product funnel's other firsts (DEC-125): the first bookable service,
+ * the first time any of the business's websites went live, the first payment
+ * provider connected and the first move onto a paid plan. "First" is the
+ * first since these were recorded (10 Oct 2026): a business that had
+ * already published or connected before then records it the next time.
+ */
+export const FIRST_SERVICE_CREATED_TYPE = "first.service.created";
+export const FIRST_SITE_PUBLISHED_TYPE = "first.site.published";
+export const FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE =
+    "first.payment-provider.connected";
+export const FIRST_PLAN_UPGRADED_TYPE = "first.plan.upgraded";
 
 /**
  * Every activation type, for tests and for the producer helper. Kept beside the
@@ -234,17 +275,22 @@ export const ACTIVATION_TYPES: readonly string[] = [
     FIRST_ORDER_CREATED_TYPE,
     FIRST_BOOKING_CREATED_TYPE,
     IMPORT_COMPLETED_TYPE,
+    FIRST_SERVICE_CREATED_TYPE,
+    FIRST_SITE_PUBLISHED_TYPE,
+    FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE,
+    FIRST_PLAN_UPGRADED_TYPE,
 ];
 
 /** The event types accepted from the PUBLIC, unauthenticated intake endpoint. */
 export const SITE_VIEW_TYPE = "site.view";
 export const ENQUIRY_SUBMITTED_TYPE = "enquiry.submitted";
 export const ORDER_PAID_TYPE = "order.paid";
+export const ORDER_REFUNDED_TYPE = "order.refunded";
 
 /**
  * The set of event types a public visitor may ingest. Only `site.view` is
- * publicly ingestable — org-internal types (`enquiry.submitted`, `order.paid`)
- * are produced server-side and MUST be rejected on the public endpoint.
+ * publicly ingestable — org-internal types (`enquiry.submitted`, `order.paid`,
+ * `order.refunded`) are produced server-side and MUST be rejected on the public endpoint.
  */
 export const PUBLIC_INGESTABLE_TYPES: ReadonlySet<string> = new Set([
     SITE_VIEW_TYPE,
@@ -255,6 +301,7 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(SITE_VIEW_TYPE, 1), siteViewV1],
     [key(ENQUIRY_SUBMITTED_TYPE, 1), enquirySubmittedV1],
     [key(ORDER_PAID_TYPE, 1), orderPaidV1],
+    [key(ORDER_REFUNDED_TYPE, 1), orderRefundedV1],
     // Activation (#176) — server-produced only; absent from
     // PUBLIC_INGESTABLE_TYPES on purpose.
     [key(ORGANIZATION_CREATED_TYPE, 1), organizationCreatedV1],
@@ -265,6 +312,10 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(FIRST_ORDER_CREATED_TYPE, 1), firstOrderV1],
     [key(FIRST_BOOKING_CREATED_TYPE, 1), firstBookingV1],
     [key(IMPORT_COMPLETED_TYPE, 1), importCompletedV1],
+    [key(FIRST_SERVICE_CREATED_TYPE, 1), firstServiceV1],
+    [key(FIRST_SITE_PUBLISHED_TYPE, 1), firstSitePublishedV1],
+    [key(FIRST_PAYMENT_PROVIDER_CONNECTED_TYPE, 1), firstPaymentProviderV1],
+    [key(FIRST_PLAN_UPGRADED_TYPE, 1), firstPlanUpgradeV1],
 ]);
 
 /**

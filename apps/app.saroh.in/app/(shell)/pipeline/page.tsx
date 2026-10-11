@@ -1,5 +1,6 @@
+import { formatMoney } from "@/lib/format/money";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -7,9 +8,13 @@ import Link from "next/link";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { PipelineBoardStart } from "@/components/crm/pipeline-board-start";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { StagesDialog } from "@/components/leads/stages-dialog";
 import { PageContainer } from "@/components/shared/page-container";
-import { contactName, formatValue } from "@/lib/crm/format";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { readOnlyLine } from "@/components/shared/who-can-change";
+import { canOrUnknown } from "@/lib/access/require-can";
+import { contactName } from "@/lib/crm/format";
 import { firstStageWithLeads, stageAnchor } from "@/lib/crm/pipeline-board";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
@@ -17,6 +22,7 @@ import { listLeads } from "@/lib/leads/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listPipelines } from "@/lib/pipelines/service";
 import { requireSession } from "@/lib/session";
+import { Inbox } from "lucide-react";
 
 /**
  * Pipeline board for the active organization (S3-005) — the acceptance
@@ -38,15 +44,33 @@ export const metadata = { title: "Pipeline" };
 export default async function PipelinePage() {
     await requireSession();
 
-    const pipelines = await listPipelines();
+    const [pipelines, viewer] = await Promise.all([
+        listPipelines(),
+        resolveActiveOrganization(),
+    ]);
+    // `lead:write` adds a lead and moves its stage (`leads.service.ts`).
+    // Without it the board reads, with no control that would be refused.
+    const canWrite = canOrUnknown(viewer, "lead:write");
 
     if (pipelines.length === 0) {
+        // Adding a lead makes the pipeline (the API's `ensureDefault`), so
+        // the empty board offers that rather than a pipeline to create —
+        // Home's CRM step ("Add your first lead") lands here (#352).
+        const addLead = canWrite ? await loadAddLead(pipelines) : null;
         return (
-            <PageContainer width="wide">
+            <PageContainer width="full">
                 <Header />
                 <EmptyState
-                    title="No pipeline yet"
-                    description="One is created automatically with your first enquiry or hand-created lead."
+                    icon={<Inbox />}
+                    title="No leads yet"
+                    description={
+                        addLead
+                            ? "Add your first lead and your pipeline starts with it. Enquiries from your site arrive here too."
+                            : "Enquiries from your site arrive here, and so do the leads your team adds."
+                    }
+                    action={
+                        addLead ? <AddLeadDialog {...addLead} /> : undefined
+                    }
                 />
             </PageContainer>
         );
@@ -56,11 +80,13 @@ export default async function PipelinePage() {
     const pipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
 
     // Leads for this pipeline only; bucket them by stage id for the columns.
-    const [leads, addLead, organization] = await Promise.all([
+    const [leads, addLead, currency] = await Promise.all([
         listLeads({ pipelineId: pipeline.id }),
-        loadAddLead(pipelines),
-        resolveActiveOrganization(),
+        canWrite ? loadAddLead(pipelines) : Promise.resolve(null),
+        // A lead's Worth is in the business's currency (owner, 11 Oct).
+        readBusinessCurrency(),
     ]);
+    const organization = viewer;
     // From what the API resolved this person may do; the role's name only as
     // the fallback for a response that predates permissions.
     const mayManage = organization?.actions
@@ -80,7 +106,7 @@ export default async function PipelinePage() {
     }));
 
     return (
-        <PageContainer width="wide" className="max-w-full">
+        <PageContainer width="full">
             <Header
                 pipelineName={pipeline.name}
                 action={
@@ -96,10 +122,15 @@ export default async function PipelinePage() {
                                 }))}
                             />
                         ) : null}
-                        <AddLeadDialog {...addLead} />
+                        {addLead ? <AddLeadDialog {...addLead} header /> : null}
                     </>
                 }
             />
+            {canWrite ? null : (
+                <ReadOnlyNote className="mb-0 mt-4">
+                    {readOnlyLine("leads", true)}
+                </ReadOnlyNote>
+            )}
 
             {/* On a phone the board shows one column at a time (UX-077):
                 every stage and its count, to jump to, and the board opens
@@ -151,25 +182,33 @@ export default async function PipelinePage() {
                                     <Badge variant="outline">
                                         {stageLeads.length}
                                     </Badge>
-                                    <AddLeadDialog
-                                        {...addLead}
-                                        stageId={stage.id}
-                                        label="Add"
-                                        ariaLabel={`Add a lead to ${stage.name}`}
-                                        variant="ghost"
-                                        size="sm"
-                                    />
+                                    {addLead ? (
+                                        <AddLeadDialog
+                                            {...addLead}
+                                            stageId={stage.id}
+                                            label="Add"
+                                            ariaLabel={`Add a lead to ${stage.name}`}
+                                            variant="ghost"
+                                            size="sm"
+                                        />
+                                    ) : null}
                                 </span>
                             </div>
 
                             <div className="flex flex-col gap-3">
                                 {stageLeads.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground">
-                                        No leads
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        className="text-xs"
+                                        title="No leads at this stage"
+                                    />
                                 ) : (
                                     stageLeads.map((lead) => {
-                                        const amount = formatValue(lead.value);
+                                        const amount = formatMoney(
+                                            lead.value,
+                                            currency,
+                                            { decimals: "always" },
+                                        );
                                         return (
                                             <article
                                                 key={lead.id}
@@ -191,16 +230,18 @@ export default async function PipelinePage() {
                                                         ? ` · ${amount}`
                                                         : ""}
                                                 </p>
-                                                <div className="mt-2">
-                                                    <MoveStageControl
-                                                        leadId={lead.id}
-                                                        currentStageId={
-                                                            lead.stageId
-                                                        }
-                                                        stages={stages}
-                                                        compact
-                                                    />
-                                                </div>
+                                                {canWrite ? (
+                                                    <div className="mt-2">
+                                                        <MoveStageControl
+                                                            leadId={lead.id}
+                                                            currentStageId={
+                                                                lead.stageId
+                                                            }
+                                                            stages={stages}
+                                                            compact
+                                                        />
+                                                    </div>
+                                                ) : null}
                                             </article>
                                         );
                                     })
@@ -214,7 +255,7 @@ export default async function PipelinePage() {
     );
 }
 
-/** The board header with a title + list-view link. */
+/** The board header: its title, the Board | List switch and the actions. */
 function Header({
     pipelineName,
     action,
@@ -224,16 +265,12 @@ function Header({
 }) {
     return (
         <PageHeader
+            breadcrumb={["Pipeline"]}
+            holdsData="description"
             title="Pipeline"
             description={pipelineName}
-            actions={
-                <>
-                    <Button asChild variant="outline">
-                        <Link href="/leads">List view</Link>
-                    </Button>
-                    {action}
-                </>
-            }
+            meta={<LeadsViewSwitch current="board" />}
+            actions={action}
         />
     );
 }

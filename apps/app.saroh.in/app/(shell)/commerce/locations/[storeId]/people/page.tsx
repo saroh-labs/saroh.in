@@ -1,25 +1,10 @@
-import { PageHeader } from "@saroh/ui/page-header";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-import { sellCrumbs } from "@/components/commerce/sell-crumbs";
-import { PageContainer } from "@/components/shared/page-container";
-import { MembersManager } from "@/components/stores/members-manager";
-import { listInvitations, listMembers } from "@/lib/members/service";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { requireSession } from "@/lib/session";
-import { storefrontHref } from "@/lib/stores/links";
-import { locationsWord } from "@/lib/stores/pick";
-import { getStore } from "@/lib/stores/service";
-import { listStorefronts } from "@/lib/stores/storefronts";
-
-export const metadata = { title: "Location people" };
+import { storefrontPeopleHref } from "@/lib/stores/links";
 
 /**
- * Who may work on one storefront — its catalogue, orders and customers — and
- * the invitations out to it. One roster underneath (DEC-048, F16): everyone
- * here is also on the business's Team, and someone invited here joins it as
- * Storefront team unless they're on it already. Their storefront role is a
- * narrower grant on top, and is what the catalogue's write rules check.
+ * A location's people are a tab of its own page now (`?section=people`);
+ * this address, and every old link to it, still lands there.
  */
 export default async function StorefrontPeoplePage({
     params,
@@ -27,54 +12,5 @@ export default async function StorefrontPeoplePage({
     params: Promise<{ storeId: string }>;
 }) {
     const { storeId } = await params;
-    const session = await requireSession();
-    const [store, count] = await Promise.all([
-        getStore(storeId),
-        // The crumb is named by the count, as the rail is (UX-078).
-        listStorefronts()
-            .then((all) => all.length)
-            .catch(() => null),
-    ]);
-    if (!store) notFound();
-
-    const [members, invitations, organization] = await Promise.all([
-        listMembers(storeId),
-        listInvitations(storeId),
-        resolveActiveOrganization(),
-    ]);
-    const canManage = members.some(
-        (m) => m.kind === "owner" && m.userId === session.user.id,
-    );
-    // Inviting here also adds someone to the team, so it needs the team's
-    // invite too; the API refuses it without. From what the API resolved,
-    // falling back to the role's name for a response without permissions.
-    const canInvite =
-        canManage &&
-        (organization?.actions
-            ? organization.actions.includes("member:invite")
-            : organization?.role === "OWNER" || organization?.role === "ADMIN");
-
-    return (
-        <PageContainer width="form">
-            <PageHeader
-                breadcrumb={sellCrumbs(
-                    {
-                        label: locationsWord(count),
-                        href: "/commerce/locations",
-                    },
-                    { label: store.name, href: storefrontHref(store.id) },
-                    "People",
-                )}
-                title="People"
-                description={`Who can work on ${store.name}'s catalogue, orders and customers. Everyone here is also on your team, under Team.`}
-            />
-            <MembersManager
-                storeId={storeId}
-                members={members}
-                invitations={invitations}
-                canManage={canManage}
-                canInvite={canInvite}
-            />
-        </PageContainer>
-    );
+    redirect(storefrontPeopleHref(storeId));
 }

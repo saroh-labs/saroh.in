@@ -16,7 +16,7 @@ jest.mock("./site-host", () => ({
     businessPublicPhone: jest.fn(),
 }));
 jest.mock("../organizations/organization-lifecycle.gate", () => ({
-    assertOrganizationOpen: jest.fn(() => Promise.resolve()),
+    assertOrganizationWindingDown: jest.fn(() => Promise.resolve()),
 }));
 
 import { HttpException, HttpStatus } from "@nestjs/common";

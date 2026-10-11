@@ -36,9 +36,13 @@ export async function businessDetailsGap(
     return {
         code: BUSINESS_DETAILS_CODE,
         title: address
-            ? "Add the address your invoices print — they go out without it"
-            : "Add your GSTIN — invoices go out without it",
-        href: `/settings/organization?tab=${address ? "address" : "tax"}`,
+            ? "Add the address your invoices print. They go out without it"
+            : "Add your GSTIN. Invoices go out without it",
+        // The tab its row is on, with the row's sheet open
+        // (`business-rows.ts` in the app).
+        href: address
+            ? "/settings/organization?section=address&edit=address"
+            : "/settings/organization?section=tax&edit=taxId",
         severity: "ATTENTION",
         moduleKey: "PAYMENTS",
         tag: "Missing",

@@ -156,6 +156,13 @@ describe("CheckoutConfirmationService (P4)", () => {
             },
             refunded: false,
         });
+        // What happens next: no email provider here, so none is promised;
+        // the address is the account's own.
+        const account = await prisma.customerAccount.findUniqueOrThrow({
+            where: { id: me.accountId },
+        });
+        expect(view.reach).toBe("NONE");
+        expect(view.email).toBe(account.email);
     });
 
     it("is a 404 for another customer's order, even in the same business", async () => {

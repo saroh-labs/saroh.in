@@ -16,6 +16,7 @@ import type {
     CheckoutsView,
     SarohInvoice,
 } from "./plan-view";
+import { plansShown } from "./plans-shown";
 
 /**
  * What Saroh charges this business, read from api.saroh.in (S7-005, plans
@@ -68,8 +69,12 @@ export const getBillingAccess = cache(
  * The same, for a notice or a lock that is an aid, never the page: null when
  * it can't be read or the role may not read it (the API still refuses the
  * write, and says why). Never a stand-in for the page's own reads.
+ *
+ * Null, unasked, while plans aren't shown (DEC-136): every notice, lock and
+ * meter built on it then says nothing, as for a plan that couldn't be read.
  */
 export async function billingAccessOrNull(): Promise<BillingAccessView | null> {
+    if (!plansShown()) return null;
     try {
         const read = await getBillingAccess();
         return read.status === "ok" ? read.data : null;
@@ -85,8 +90,10 @@ export async function billingAccessOrNull(): Promise<BillingAccessView | null> {
  * the business may read it. An aid, like {@link billingAccessOrNull}: null
  * when it can't be read, and the API still refuses a paused write and
  * says why. Request-cached: the shell and a page read it in one render.
+ * Null, unasked, while plans aren't shown (DEC-136).
  */
 export const pausedOrNull = cache(async (): Promise<PausedView | null> => {
+    if (!plansShown()) return null;
     try {
         const read = await orgRead<PausedView | null>("/billing/paused", null);
         return read.status === "ok" ? read.data : null;

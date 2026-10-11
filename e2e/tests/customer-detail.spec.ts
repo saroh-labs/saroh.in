@@ -160,11 +160,12 @@ test.describe("customer detail", () => {
 
         await page.getByRole("button", { name: "See all bookings" }).click();
         await expect(page).toHaveURL(/tab=bk/);
-        await expect(
-            page.getByRole("button", { name: /^Upcoming · \d+/ }),
-        ).toHaveAttribute("aria-pressed", "true");
+        // Which bookings is a dropdown, open on the upcoming ones.
+        const which = page.getByRole("combobox", { name: "Which bookings" });
+        await expect(which).toContainText("Upcoming");
+        await which.click();
         await page
-            .getByRole("button", { name: /^No-shows and late cancels/ })
+            .getByRole("option", { name: /^No-shows and late cancels/ })
             .click();
         await expect(
             page.getByText(/Late cancel|No-show/).first(),
@@ -176,7 +177,7 @@ test.describe("customer detail", () => {
         await page.goto("/customers/not_a_contact");
         await expect(page).toHaveURL(/\/contacts\/not_a_contact$/);
         await expect(
-            page.getByRole("heading", { name: "This person isn't here" }),
+            page.getByRole("heading", { name: "Contact not found" }),
         ).toBeVisible();
     });
 
@@ -193,12 +194,16 @@ test.describe("customer detail", () => {
         });
         await page.goto(`/customers/${who.id}?tab=notes`);
         const text = `E2E note ${s}`;
-        await page.getByLabel("New note").fill(text);
+        // The tab is the list; the field opens in a side sheet.
+        await page.getByRole("button", { name: "Add note" }).click();
+        const sheet = page.getByRole("dialog", { name: "New note" });
+        await sheet.getByLabel("Note", { exact: true }).fill(text);
         // Allergies live on Needs attention, not on a note (Z2a).
         await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(
             0,
         );
-        await page.getByRole("button", { name: "Add note" }).click();
+        await sheet.getByRole("button", { name: "Add note" }).click();
+        await expect(sheet).toBeHidden();
         const note = page.getByRole("article").filter({ hasText: text });
         await expect(note).toBeVisible();
         await expect(note).not.toContainText("Allergy:");
@@ -266,13 +271,17 @@ test.describe("customer detail", () => {
         });
 
         await page.goto(`/customers/${who.id}`);
-        await expect(page.getByText("Possible match — link?")).toBeVisible();
+        await expect(
+            page.getByText("Possible match. Link them?"),
+        ).toBeVisible();
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
             name: "Link a commerce customer",
         });
         await dialog.getByRole("button", { name: "Link" }).first().click();
-        await expect(page.getByText("Possible match — link?")).toHaveCount(0);
+        await expect(page.getByText("Possible match. Link them?")).toHaveCount(
+            0,
+        );
         await tab(page, /^Orders/).click();
         await expect(
             page
@@ -450,7 +459,7 @@ test.describe("needs attention", () => {
             /Rahul \S+ wrote this when booking online/,
         );
         await expect(notes).toContainText(
-            /only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
+            /Only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
         );
     });
 });
@@ -492,7 +501,10 @@ test.describe("customer detail on a 375px phone", () => {
             );
         expect(new Set(tops).size).toBe(1);
         expect(
-            await list.evaluate((el) => el.scrollWidth > el.clientWidth),
+            // The shared strip scrolls in the box around the tabs.
+            await list
+                .locator("xpath=..")
+                .evaluate((el) => el.scrollWidth > el.clientWidth),
         ).toBe(true);
         // Opened from the address, the chosen tab was scrolled into view.
         await expect.poll(() => whole(notes)).toBe(true);

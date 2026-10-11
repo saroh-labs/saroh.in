@@ -35,6 +35,28 @@ describe("reserved page addresses", () => {
         }
     });
 
+    it("reserves /q, where a QR code's short link opens", () => {
+        expect(RESERVED_PAGE_PATHS).toContainEqual({
+            root: "/q",
+            kind: null,
+            purpose: "where your QR codes open",
+        });
+        for (const path of ["/q", "/Q", "/q/", "/q/h7c", "/q/h7c/more"]) {
+            expect(reservedPathFor(path)?.root).toBe("/q");
+        }
+        for (const kind of ["FREE", "SHOP", "BOOK", "CONTACT"] as const) {
+            expect(reservedAgainst("/q", kind)).toBe(true);
+            expect(reservedAgainst("/q/h7c", kind)).toBe(true);
+        }
+    });
+
+    it.each(["/qr", "/quotes", "/q-and-a", "/about/q"])(
+        "leaves %s free beside /q",
+        (path) => {
+            expect(reservedPathFor(path)).toBeNull();
+        },
+    );
+
     it("still lets the Book page sit at /book", () => {
         expect(reservedAgainst("/book", "BOOK")).toBe(false);
         expect(reservedAgainst("/book", "FREE")).toBe(true);

@@ -8,7 +8,8 @@ import { settingsChecklist } from "./nudges";
 import type { ReadyStep } from "./ready";
 import {
     SETUP_HIDDEN_KEY,
-    checklistHeading,
+    checklistSubject,
+    checklistWords,
     emailAttention,
     handlesMoney,
     providersTabNote,
@@ -202,9 +203,13 @@ describe("readyChecklist", () => {
             [
                 "address",
                 "Add your registered address",
-                "/settings/organization?section=address",
+                "/settings/organization?section=address&edit=address",
             ],
-            ["tax", "Add your GSTIN", "/settings/organization?section=tax"],
+            [
+                "tax",
+                "Add your GSTIN",
+                "/settings/organization?section=tax&edit=taxId",
+            ],
             ["catalogue", "Add your first product", "/commerce/products/new"],
             ["site", "Publish your site", "/sites"],
         ]);
@@ -317,7 +322,7 @@ describe("readyChecklist", () => {
         });
         expect(r.outside[0]?.why).toMatch(/How to pay us/);
         // The heading stays about money.
-        expect(checklistHeading(r)).toBe("Get ready to take money");
+        expect(checklistSubject(r)).toBe("money");
 
         // The catalogue names the plan that has it: said, and linked to.
         const named = readyChecklist({
@@ -394,7 +399,7 @@ describe("readyChecklist", () => {
         expect(r.total).toBeGreaterThan(0);
         expect(r.done).toBe(r.total);
         expect(r.left).toEqual([]);
-        expect(takeMoneyPlace(r, false)).toBeNull();
+        expect(takeMoneyPlace(r, false)).toBe("done");
         expect(r.outside.map((a) => a.key)).toEqual(["payments"]);
         // Settings' card carries the same aside, and the same count.
         const settings = settingsChecklist({
@@ -783,7 +788,7 @@ describe("the real business type, for a business that said Registered (prelaunch
             done: false,
             label: "Choose your business type",
             cta: "Choose type",
-            href: "/settings/organization?section=identity#business-type",
+            href: "/settings/organization?section=identity&edit=type",
         });
         expect(step?.why).toMatch(/You said your business is registered/);
         expect(step?.why).toMatch(/private limited, LLP, partnership/);
@@ -846,29 +851,43 @@ describe("the real business type, for a business that said Registered (prelaunch
     });
 });
 
-describe("checklistHeading (DEC-070, UX-019)", () => {
+describe("checklistWords: one name, and what its steps are for (DEC-070, UX-019)", () => {
     const steps = (...keys: string[]) => ({
         steps: keys.map((key) => ({ key }) as ReadyStep),
     });
 
-    it("says money while a money step is in the list, done or not — one title on Home and Settings", () => {
-        expect(checklistHeading(steps("address", "site"))).toBe(
-            "Get ready to take money",
-        );
-        expect(checklistHeading(steps("payments"))).toBe(
-            "Get ready to take money",
-        );
-        expect(checklistHeading(steps("howToPay"))).toBe(
-            "Get ready to take money",
-        );
+    it("is named Finish setup whatever it is about", () => {
+        for (const list of [steps("payments"), steps("site"), steps()]) {
+            expect(checklistWords(list).title).toBe("Finish setup");
+        }
     });
 
-    it("says the site when publishing it is all there is", () => {
-        expect(checklistHeading(steps("site"))).toBe("Get your site live");
+    it("is about money while a money step is in the list, done or not", () => {
+        for (const list of [
+            steps("address", "site"),
+            steps("payments"),
+            steps("howToPay"),
+        ]) {
+            expect(checklistSubject(list)).toBe("money");
+            expect(checklistWords(list)).toEqual({
+                title: "Finish setup",
+                lead: "What is left before you take money.",
+                doneTitle: "You're ready to take money.",
+            });
+        }
     });
 
-    it("says setting up for anything else", () => {
-        expect(checklistHeading(steps())).toBe("Finish setting up");
+    it("is about the site when publishing it is all there is", () => {
+        expect(checklistSubject(steps("site"))).toBe("site");
+        expect(checklistWords(steps("site"))).toMatchObject({
+            lead: "What is left before your site is live.",
+            doneTitle: "Your site is live.",
+        });
+    });
+
+    it("is about setting up for anything else", () => {
+        expect(checklistSubject(steps())).toBe("setup");
+        expect(checklistWords(steps()).doneTitle).toBe("Setup is finished.");
     });
 });
 
@@ -886,10 +905,9 @@ describe("takeMoneyPlace", () => {
     it("is only a Show link while hidden", () => {
         expect(takeMoneyPlace({ done: 1, total: 5 }, true)).toBe("hidden");
     });
-
-    it("is gone when every step is done, hidden or not", () => {
-        expect(takeMoneyPlace({ done: 5, total: 5 }, false)).toBeNull();
-        expect(takeMoneyPlace({ done: 5, total: 5 }, true)).toBeNull();
+    it("is back at the top to say so when every step is done, hidden or not", () => {
+        expect(takeMoneyPlace({ done: 5, total: 5 }, false)).toBe("done");
+        expect(takeMoneyPlace({ done: 5, total: 5 }, true)).toBe("done");
     });
 
     it("is gone when no step could be checked", () => {
@@ -980,7 +998,7 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
         const step = r.left.find((i) => i.key === "howToPay");
         expect(step).toMatchObject({
             label: "Tell customers how to pay you",
-            href: "/settings/organization?section=pay",
+            href: "/settings/organization?section=pay&edit=pay",
         });
         expect(r.steps[0]?.key).toBe("howToPay");
     });

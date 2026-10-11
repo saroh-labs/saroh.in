@@ -1,10 +1,12 @@
 "use client";
 
+import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setMembersCanPause } from "@/lib/subscriptions/actions";
 
 /**
@@ -29,7 +31,8 @@ export function MembersPauseRow({
     function change(next: boolean) {
         setOn(next);
         start(async () => {
-            const res = await setMembersCanPause(next);
+            const res = await runAction(() => setMembersCanPause(next));
+            if (!res) return setOn(!next);
             if (!res.ok) {
                 setOn(!next);
                 showError(res.error);
@@ -47,12 +50,12 @@ export function MembersPauseRow({
     return (
         <div className="mb-3 flex items-start gap-3 rounded-[12px] border border-border bg-card px-4 py-3">
             <div className="min-w-0 flex-1">
-                <label
+                <Label
                     htmlFor={id}
                     className="block text-[14px] font-semibold text-foreground"
                 >
                     Members can pause from their account
-                </label>
+                </Label>
                 <p
                     id={`${id}-hint`}
                     className="mt-0.5 text-pretty text-[12.5px] text-muted-foreground"

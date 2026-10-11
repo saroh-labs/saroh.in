@@ -1,15 +1,18 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useEffect } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import type { WentLive as WentLiveFacts } from "@/components/sites/editor/use-publish";
 import {
     APPROVAL_LINE,
     goesLive,
     TYPE_LABEL,
 } from "@/components/sites/pre-publish-words";
+import { WentLive } from "@/components/sites/went-live";
 import type {
     Flag,
     FlagType,
@@ -17,6 +20,9 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Notice } from "@saroh/ui/notice";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -55,6 +61,7 @@ export function PrePublishCheck({
     needsApproval = false,
     canOverride = false,
     scheduledWarning = null,
+    wentLive = null,
     onPublish,
     onClose,
     onJump,
@@ -92,6 +99,11 @@ export function PrePublishCheck({
      * won't (KTD-14): said before, not discovered after.
      */
     scheduledWarning?: string | null;
+    /**
+     * The site just went live for the first time (wave G): the check shows
+     * its finished state, the address and how to pass it on.
+     */
+    wentLive?: WentLiveFacts | null;
     onPublish: () => void;
     onClose: () => void;
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
@@ -123,6 +135,12 @@ export function PrePublishCheck({
         }))
         .filter((g) => g.flags.length > 0);
 
+    if (wentLive) {
+        return (
+            <WentLive siteName={siteName} live={wentLive} onClose={onClose} />
+        );
+    }
+
     const total = flags.length;
     // What the API will refuse to publish past (L5): the button waits.
     const blocked = flags.some((f) => f.blocking);
@@ -146,42 +164,42 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
+                        size="xs"
                         onClick={onClose}
                     >
                         Back to editing
                     </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        // An owner's override is the destructive kind of
-                        // publish: it goes past a rule the business set.
-                        variant={needsApproval ? "destructive" : "default"}
-                        disabled={
-                            publishing ||
-                            unsaved ||
-                            blocked ||
-                            (needsApproval && !canOverride)
-                        }
-                        title={
+                    <Tip
+                        label={
                             blocked
                                 ? "Choose a web address first"
                                 : unsaved
-                                  ? "Saving your changes — publish is available in a moment"
+                                  ? "Saving your changes. Publish is available in a moment"
                                   : undefined
                         }
-                        onClick={onPublish}
-                        className="h-8 px-3"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : needsApproval || review.outstanding
-                              ? "Publish without approval"
-                              : neverPublished
-                                ? "Publish site"
-                                : "Publish changes"}
-                    </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            // An owner's override is the destructive kind of
+                            // publish: it goes past a rule the business set.
+                            variant={needsApproval ? "destructive" : "default"}
+                            disabled={
+                                unsaved ||
+                                blocked ||
+                                (needsApproval && !canOverride)
+                            }
+                            onClick={onPublish}
+                            busy={publishing}
+                            busyLabel="Publishing…"
+                        >
+                            {needsApproval || review.outstanding
+                                ? "Publish without approval"
+                                : neverPublished
+                                  ? "Publish site"
+                                  : "Publish changes"}
+                        </Button>
+                    </Tip>
                 </div>
             </header>
 
@@ -199,22 +217,14 @@ export function PrePublishCheck({
                      * Publish here leaves behind, named before it happens.
                      */}
                     {needsApproval ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground"
-                        >
+                        <Notice tone="error" role="note" className="mb-6">
                             {canOverride
                                 ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
                                 : "This site goes live only from an approved test release. Make a test release and ask for a review."}
-                        </p>
+                        </Notice>
                     ) : null}
                     {scheduledWarning ? (
-                        <p
-                            role="note"
-                            className="mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
-                        >
-                            {scheduledWarning}
-                        </p>
+                        <Notice className="mb-6">{scheduledWarning}</Notice>
                     ) : null}
                     {/*
                      * The approval, where the spec puts it: this is the last
@@ -227,7 +237,7 @@ export function PrePublishCheck({
                             className={
                                 APPROVAL_LINE[review.latestApproval.outcome]
                                     .approved
-                                    ? "mb-6 rounded-md bg-brand-subtle px-3 py-2 text-sm text-brand-subtle-foreground"
+                                    ? "mb-6 rounded-md bg-muted px-3 py-2 text-sm text-foreground"
                                     : "mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
                             }
                         >
@@ -236,7 +246,7 @@ export function PrePublishCheck({
                                 zone,
                             )}
                             {review.openNotes > 0
-                                ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`
+                                ? `, with ${count(review.openNotes, "note")} still open.`
                                 : "."}
                             {/*
                              * Which of the two things publishing is about to
@@ -249,7 +259,7 @@ export function PrePublishCheck({
                                 <span className="mt-1 block">
                                     A reviewer&apos;s request for changes is
                                     still open. Publishing now goes ahead
-                                    without approval, and records that it did —
+                                    without approval, and records that it did,
                                     here and in version history.
                                 </span>
                             ) : null}
@@ -257,9 +267,11 @@ export function PrePublishCheck({
                     )}
 
                     {total === 0 ? (
-                        <p className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                            Everything checks out. Publish when you are ready.
-                        </p>
+                        <EmptyState
+                            size="panel"
+                            title="Everything checks out"
+                            description="Publish when you are ready."
+                        />
                     ) : (
                         <div className="space-y-8">
                             {siteWide.length > 0 ? (
@@ -317,7 +329,7 @@ export function PrePublishCheck({
                      */}
                     {awaitingNavigation.length > 0 ? (
                         <p className="mt-10 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
-                            Two checks are not running yet — whether a hidden
+                            Two checks are not running yet: whether a hidden
                             section is still linked from your navigation, and
                             whether a page is missing from it. Saroh does not
                             manage your navigation yet.
@@ -340,7 +352,7 @@ function Group({
 }) {
     return (
         <section>
-            <h2 className="flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="label flex items-baseline gap-2">
                 {title}
                 {note === undefined ? null : (
                     <span className="font-mono text-[11px] normal-case tracking-normal opacity-70">
@@ -369,7 +381,7 @@ function Row({
             <li>
                 <Link
                     href={WEB_ADDRESS_SETTINGS_HREF}
-                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
                 >
                     <span
                         aria-hidden="true"
@@ -391,12 +403,12 @@ function Row({
             <button
                 type="button"
                 onClick={() => onJump(flag.pageId, flag.sectionIndex)}
-                className="flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-muted"
+                className="flex w-full items-start gap-3 p-3 text-left transition-colors duration-fast hover:bg-muted"
             >
                 {/* The design's flag dot: 4px, amber #c99f6f (spec §7). */}
                 <span
                     aria-hidden="true"
-                    className="mt-1.5 size-1 shrink-0 rounded-full bg-highlight"
+                    className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
                 />
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm">{flag.message}</span>

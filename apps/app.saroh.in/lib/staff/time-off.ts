@@ -1,8 +1,8 @@
+import { formatClockRange, formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import type { LocalDate } from "@/lib/services/diary";
 import {
     addDays,
-    clock,
-    dayLabel,
     localDateOf,
     localMinuteOf,
     minuteOnDay,
@@ -101,7 +101,7 @@ export function offLines(
 
 /** "2 Nov" — the day without its weekday. */
 function shortDate(date: LocalDate): string {
-    return dayLabel(date).split(" ").slice(1).join(" ");
+    return formatDay(date, { year: "never" });
 }
 
 /** What a line says: when, how long, what part of the day, and whose. */
@@ -113,12 +113,12 @@ export function offLineLabel(
 ): string {
     const when =
         line.days > 1
-            ? `${shortDate(line.fromDate)} – ${shortDate(line.toDate)} · ${line.days} days`
-            : dayLabel(line.fromDate);
+            ? `${shortDate(line.fromDate)} to ${shortDate(line.toDate)} · ${line.days} days`
+            : formatDay(line.fromDate, { weekday: "short", year: "never" });
     const part =
         line.startMinute === null || line.endMinute === null
             ? "all day"
-            : `${clock(line.startMinute)}–${clock(line.endMinute)}`;
+            : formatClockRange(line.startMinute, line.endMinute);
     return `${when} · ${part}${line.closed ? " · business closed" : ""}`;
 }
 
@@ -166,7 +166,7 @@ export function offNote(input: {
     }
     if (input.taken > 0) {
         return {
-            text: `${input.taken} ${input.taken === 1 ? "booking falls" : "bookings fall"} in this time. They're kept — move or cancel them from the calendar.`,
+            text: `${count(input.taken, "booking falls", "bookings fall")} in this time. They're kept. Move or cancel them from the calendar.`,
             tone: "warn",
         };
     }

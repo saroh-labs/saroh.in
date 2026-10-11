@@ -7,6 +7,7 @@ import { useId, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { Row, Section } from "@/components/sites/settings-rows";
+import { runAction } from "@/lib/api/run-action";
 import { setPublishNeedsApproval } from "@/lib/sites/actions";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
 import {
@@ -38,7 +39,10 @@ export function PublishApprovalSection({
     function change(next: boolean) {
         setOn(next);
         startTransition(async () => {
-            const res = await setPublishNeedsApproval(siteId, next);
+            const res = await runAction(() =>
+                setPublishNeedsApproval(siteId, next),
+            );
+            if (!res) return setOn(!next);
             if (!res.ok) {
                 setOn(!next);
                 // Review isn't in the plan (U13): the way up, not a toast.
@@ -58,7 +62,7 @@ export function PublishApprovalSection({
     return (
         <Section
             title="Publishing"
-            description="Whether a change needs someone else's approval before it goes live. Changes here apply at once; there's nothing to publish."
+            description="Whether a change needs someone else's approval before it goes live."
         >
             <Row
                 label="Needs approval"

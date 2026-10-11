@@ -9,6 +9,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
+import { BusinessReportsModule } from "./modules/business-reports/business-reports.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CatalogueModule } from "./modules/catalogue/catalogue.module";
@@ -21,6 +22,7 @@ import { ContentModule } from "./modules/content/content.module";
 import { CoursesModule } from "./modules/courses/courses.module";
 import { CustomerWorkspaceModule } from "./modules/customer-workspace/customer-workspace.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { DataExportModule } from "./modules/data-export/data-export.module";
 import { DiscountsModule } from "./modules/discounts/discounts.module";
 import { DomainsModule } from "./modules/domains/domains.module";
 import { EnquiryModule } from "./modules/enquiry/enquiry.module";
@@ -55,6 +57,7 @@ import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 import { StoresModule } from "./modules/stores/stores.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
+import { ToolsModule } from "./modules/tools/tools.module";
 import { WaitlistModule } from "./modules/waitlist/waitlist.module";
 import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
@@ -93,6 +96,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ProviderHealthModule,
         SavedViewsModule,
         OrganizationsModule,
+        DataExportModule,
         ProjectsModule,
         AuditModule,
         StoresModule,
@@ -135,6 +139,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         BillingModule,
         WaitlistModule,
         LinkPreviewModule,
+        ToolsModule,
+        BusinessReportsModule,
         SelfTestModule,
     ],
 })

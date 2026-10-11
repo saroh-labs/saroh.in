@@ -239,7 +239,7 @@ export function openStateText(state: OpenState | null): string {
 }
 
 /**
- * The week in one line — "Mon–Fri 6am–9pm · Sat 7am–1pm" — with neighbouring
+ * The week in one line — "Mon to Fri 6am to 9pm · Sat 7am to 1pm" — with neighbouring
  * days that keep the same hours said once and closed days left out, as the
  * design's Visit us card writes it. `null` when no day opens.
  */
@@ -255,7 +255,7 @@ export function weekSummary(
             previous = null;
             continue;
         }
-        const hours = `${clockText(d.open)}–${clockText(d.close)}`;
+        const hours = `${clockText(d.open)} to ${clockText(d.close)}`;
         const last = runs.at(-1);
         if (last && previous !== null && last.hours === hours) {
             last.to = day;
@@ -269,7 +269,7 @@ export function weekSummary(
         .map((run) =>
             run.from === run.to
                 ? `${SHORT[run.from]} ${run.hours}`
-                : `${SHORT[run.from]}–${SHORT[run.to]} ${run.hours}`,
+                : `${SHORT[run.from]} to ${SHORT[run.to]} ${run.hours}`,
         )
         .join(" · ");
 }

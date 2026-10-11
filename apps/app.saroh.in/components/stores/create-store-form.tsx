@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -16,12 +17,14 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { trimmedOr } from "@/lib/forms/values";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
+    name: z.string().trim().min(1, { message: "Add a name." }),
     description: z.string().optional(),
 });
 
@@ -31,13 +34,14 @@ export function CreateStoreForm() {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             name: "",
             description: "",
         },
     });
-    const { isSubmitting } = form.formState;
-    const name = form.watch("name");
+    const { isSubmitting, isDirty } = form.formState;
+    const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("location") });
 
     async function onSubmit(values: FormValues) {
         const res = await createStore({
@@ -58,7 +62,8 @@ export function CreateStoreForm() {
     return (
         <Form {...form}>
             <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid max-w-md gap-4"
             >
                 <FormField
@@ -78,27 +83,16 @@ export function CreateStoreForm() {
                         </FormItem>
                     )}
                 />
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Description (optional)</FormLabel>
-                            <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
                 <Button
                     type="submit"
                     className="wk-press justify-self-start"
-                    disabled={isSubmitting || !name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create location"}
+                    Create location
                 </Button>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

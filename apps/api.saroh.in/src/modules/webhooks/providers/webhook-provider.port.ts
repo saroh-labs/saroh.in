@@ -43,7 +43,10 @@ export type WebhookMandateChange = ReportedMandateChange;
  * reconciliation is driven off this shape, never off raw provider JSON.
  */
 export interface NormalizedWebhookEvent {
-    /** Stable per-event idempotency id — the inbox `(provider, providerEventId)`. */
+    /**
+     * Stable per-event idempotency id — unique in the inbox per business:
+     * `(organizationId, provider, providerEventId)` (PAY-05).
+     */
     providerEventId: string;
     /** The raw provider event/type string, for audit (e.g. "payment.captured"). */
     eventType: string;
@@ -61,6 +64,13 @@ export interface NormalizedWebhookEvent {
      * Absent when it reports none — Saroh never estimates one.
      */
     feeCents?: number;
+    /**
+     * On a successful payment: what the provider captured, in minor units
+     * (paise), and its currency — compared with the intent before anything
+     * is marked paid (PAY-06). Absent when the payload doesn't report it.
+     */
+    capturedAmountCents?: number;
+    capturedCurrency?: string;
     /** Present on refund events — the provider refund id to settle. */
     providerRefundId?: string;
     /**

@@ -2,7 +2,7 @@ import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { LOGIN_PANEL } from "@/components/auth/panel-copy";
-import { safeReturnTo } from "@/lib/return-to";
+import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 
 /**
@@ -19,14 +19,17 @@ export default async function LoginPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect, email } = await searchParams;
+    const { redirect, email, with: way } = await searchParams;
     const providers = await signInProviders();
     return (
         <SplitShell panel={<SplitPanel {...LOGIN_PANEL} />}>
             <LoginForm
-                returnTo={safeReturnTo(redirect)}
+                returnTo={safeDestination(redirect)}
                 invitedEmail={typeof email === "string" ? email : undefined}
                 providers={providers}
+                // A code is the main way. `?with=password` opens the
+                // password form, for a link that knows it is wanted.
+                way={way === "password" ? "password" : "code"}
             />
         </SplitShell>
     );

@@ -1,4 +1,5 @@
 import {
+    Body,
     Controller,
     Get,
     HttpCode,
@@ -12,6 +13,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { UndoReadAllDto } from "./notifications.dto";
 import { NotificationsService } from "./notifications.service";
 
 /**
@@ -46,6 +48,16 @@ export class NotificationsController {
     @HttpCode(200)
     markAllRead(@OrgContext() ctx: OrganizationContext) {
         return this.notifications.markAllRead(ctx);
+    }
+
+    /** Undo that press: what it marked read is unread again. */
+    @Post("read-all/undo")
+    @HttpCode(200)
+    undoMarkAllRead(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: UndoReadAllDto,
+    ) {
+        return this.notifications.undoMarkAllRead(ctx, dto.readAt);
     }
 
     @Post(":id/read")

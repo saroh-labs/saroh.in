@@ -5,6 +5,7 @@ import {
     limitWordsFor,
     MODULE_MAP,
 } from "@saroh/pricing-catalog";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * What the business's plan gives it, as `GET organizations/:org/billing/access`
@@ -311,7 +312,7 @@ export function onlinePaymentsLock(
     if (!lock) return null;
     const up = lock.upgradeTo;
     const on = lock.plan ? `You're on ${lock.plan}. ` : "";
-    const cta = up ? `See ${up.name}` : "See plans";
+    const cta = planLabel(up?.name);
     if (what === "payments") {
         return {
             title: up
@@ -356,7 +357,7 @@ export function depositLock(
         body: kept
             ? `${on}This service keeps its deposit, paused: it books "pay at the desk"${until}.`
             : `${on}Services book "pay at the desk"${until}.`,
-        cta: up ? `See ${up.name}` : "See plans",
+        cta: planLabel(up?.name),
         href: lock.href,
     };
 }
@@ -383,7 +384,7 @@ export function membershipPlansLock(
             ? `Memberships come with ${up.name}`
             : `Memberships aren't in your ${lock.plan || "current"} plan`,
         body: `${on}Members you already have keep renewing. Your plans stay here to edit or archive, but they're off your site, and new plans can't go on sale${up ? ` until you move to ${up.name}` : ""}.`,
-        cta: up ? `See ${up.name}` : "See plans",
+        cta: planLabel(up?.name),
         href: lock.href,
     };
 }

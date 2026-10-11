@@ -328,7 +328,7 @@ describe("Home for a staff member (F11)", () => {
                         {
                             code: "CRM_NO_PIPELINE",
                             message:
-                                "Create a pipeline to start tracking leads.",
+                                "Add your first lead to start your pipeline.",
                         },
                     ],
                 },

@@ -5,6 +5,7 @@ import {
     liftToLatest,
     resolveVariant,
 } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import {
     Select,
     SelectContent,
@@ -14,8 +15,6 @@ import {
 } from "@saroh/ui/select";
 
 import type { Section } from "@/lib/sites/service";
-
-import { Field } from "./field";
 
 /**
  * Which look this block wears (#254).

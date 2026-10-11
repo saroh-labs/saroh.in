@@ -9,6 +9,7 @@
  * `react-dom/client` + `act` directly, as the other component tests do. The
  * dialog's parts are drawn in place: a portal is not what is tested here.
  */
+import { formatDate } from "@/lib/format/datetime";
 import type { ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -19,11 +20,7 @@ import type {
     WebAddressAvailability,
     WebAddressView,
 } from "@/lib/organizations/web-address";
-import {
-    consequences,
-    holdDate,
-    previousLine,
-} from "@/lib/organizations/web-address";
+import { consequences, previousLine } from "@/lib/organizations/web-address";
 
 import { WebAddressSection } from "./web-address-section";
 
@@ -37,6 +34,11 @@ vi.mock("@/lib/organizations/web-address-actions", () => ({
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
+}));
+// The web address's QR button: its panel reads only when opened.
+vi.mock("@/lib/qr/actions", () => ({
+    openQrPanel: vi.fn(),
+    makeQrPanelCode: vi.fn(),
 }));
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -187,7 +189,7 @@ describe("the web address row", () => {
             }),
         );
         expect(text()).toContain(
-            "Customers see shop.rye.in; rye.saroh.app still works",
+            "Customers see shop.rye.in, and rye.saroh.app still works",
         );
     });
 
@@ -223,7 +225,8 @@ describe("the Change dialog", () => {
             "Customers signed in on your site will need to sign in again",
         );
         expect(said.indexOf("sign in again")).toBeLessThan(
-            said.indexOf("Change web address"),
+            // The title says it too: the button is the last of them.
+            said.lastIndexOf("Change web address"),
         );
     });
 
@@ -313,7 +316,8 @@ describe("the Change dialog", () => {
         await settle(10);
         expect(saveWebAddress).toHaveBeenLastCalledWith("rye-bakery-2");
         expect(showSuccess).toHaveBeenCalledWith(
-            "Your web address is now rye-bakery-2.saroh.app",
+            "Web address changed.",
+            "It is now rye-bakery-2.saroh.app.",
         );
         expect(refresh).toHaveBeenCalled();
         expect(host.querySelector('[role="dialog"]')).toBe(null);
@@ -325,12 +329,12 @@ describe("dates are days in the business's time zone", () => {
     const now = new Date("2026-09-30T06:00:00.000Z");
 
     it("is the 28th in Kolkata and the 27th in London", () => {
-        expect(holdDate(at, "Asia/Kolkata", now)).toBe("28 Dec");
-        expect(holdDate(at, "Europe/London", now)).toBe("27 Dec");
+        expect(formatDate(at, "Asia/Kolkata", { now })).toBe("28 Dec");
+        expect(formatDate(at, "Europe/London", { now })).toBe("27 Dec");
     });
 
     it("names the year when it isn't this one there", () => {
-        expect(holdDate("2027-01-05T10:00:00.000Z", ZONE, now)).toBe(
+        expect(formatDate("2027-01-05T10:00:00.000Z", ZONE, { now })).toBe(
             "5 Jan 2027",
         );
     });

@@ -7,6 +7,7 @@ import { mediaCounter } from "@/lib/products/editor-sections";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { onTheShop } from "@/lib/products/overview-rules";
 import { detailTag } from "@/lib/products/overview-words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { CardHead, DetailRow, ShownTag } from "./overview-parts";
 import { SheetButton } from "./sheet-button";
@@ -45,7 +46,7 @@ export function OverviewPhotos({
                 <Link
                     href={photosHref}
                     scroll={false}
-                    className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-brand hover:text-foreground coarse:min-h-11`}
+                    className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11`}
                 >
                     {media.length ? `See all ${media.length}` : "Add"}
                 </Link>
@@ -63,7 +64,7 @@ export function OverviewPhotos({
                                     aria-label={
                                         more
                                             ? `See all ${media.length}`
-                                            : `${m.alt || (m.kind === "video" ? "Video" : "Photo")}${i === 0 ? ", the cover" : ""} — open Photos`
+                                            : `${m.alt || (m.kind === "video" ? "Video" : "Photo")}${i === 0 ? ", the cover" : ""}, open Photos`
                                     }
                                     className={`${FOCUS} relative block aspect-square overflow-hidden rounded-lg bg-muted`}
                                 >
@@ -83,10 +84,11 @@ export function OverviewPhotos({
                         })}
                     </div>
                 ) : (
-                    <p className="rounded-[10px] border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        No photos yet. The shop shows a plain tile until you add
-                        one.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No photos yet"
+                        description="The shop shows a plain tile until you add one."
+                    />
                 )}
                 <p className="text-[12px] text-muted-foreground">
                     {mediaCounter(media)}
@@ -134,9 +136,7 @@ export function OverviewDescription({
                             }}
                         />
                     ) : (
-                        <p className="text-muted-foreground">
-                            No description yet.
-                        </p>
+                        <EmptyState size="inline" title="No description yet" />
                     )}
                     {product.keyPoints.length > 0 ? (
                         <ul className="mt-2.5 list-disc pl-5 text-neutral-700 dark:text-muted-foreground">
@@ -166,11 +166,7 @@ export function OverviewDescription({
                                 {contains.length > 0 ? (
                                     <span className="flex flex-wrap gap-1.5">
                                         {contains.map((a) => (
-                                            <Badge
-                                                key={a.id}
-                                                variant="draft"
-                                                className="rounded-full px-[9px] py-0.5 text-[12px] font-semibold"
-                                            >
+                                            <Badge key={a.id} variant="draft">
                                                 {a.name}
                                             </Badge>
                                         ))}
@@ -182,7 +178,7 @@ export function OverviewDescription({
                                         {mayContain
                                             .map((a) => a.name.toLowerCase())
                                             .join(", ")}{" "}
-                                        — same kitchen.
+                                        (same kitchen).
                                     </span>
                                 ) : null}
                             </dd>

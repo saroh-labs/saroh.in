@@ -1,6 +1,5 @@
-import Link from "next/link";
-
 import type { EmailNote } from "@/lib/communications/email-setup";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Why a send can't go for want of the business's own email (DEC-011), and
@@ -15,12 +14,9 @@ export function EmailNoteText({ note }: { note: EmailNote }) {
             {note.action ? (
                 <>
                     {" "}
-                    <Link
-                        href={note.action.href}
-                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                    >
+                    <TextLink href={note.action.href}>
                         {note.action.label}
-                    </Link>
+                    </TextLink>
                 </>
             ) : null}
         </span>

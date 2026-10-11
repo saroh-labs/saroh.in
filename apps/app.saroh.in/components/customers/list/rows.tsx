@@ -1,11 +1,18 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import {
+    ListTable,
+    ListTableHead,
+    listTable,
+} from "@/components/shared/list-toolbar";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { Pill } from "@/components/subscriptions/pill";
 import { personHref } from "@/lib/contacts/person-href";
 import type { CustomerRow, CustomersPage } from "@/lib/customers/list";
 import {
@@ -16,6 +23,8 @@ import {
     rowTags,
     spentText,
 } from "@/lib/customers/list";
+import { EmptyState } from "@saroh/ui/data-state";
+import { clearLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * The design's columns: Customer · Last order · Orders · Spent. A part the
@@ -49,15 +58,10 @@ export function Rows({
           : COLS.person;
     const many = (page.storefronts?.length ?? 0) > 1;
     return (
-        <div className="overflow-hidden rounded-[12px] border border-border bg-card">
+        <ListTable>
             <div className="sm:overflow-x-auto">
                 <div className="sm:min-w-[520px]">
-                    <div
-                        className={cn(
-                            "hidden gap-3 border-b border-border bg-neutral-50 px-4 py-[9px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground dark:bg-muted sm:grid",
-                            cols,
-                        )}
-                    >
+                    <ListTableHead className={cn("hidden gap-3 sm:grid", cols)}>
                         <span>Customer</span>
                         {page.sees.orders ? (
                             <>
@@ -68,22 +72,21 @@ export function Rows({
                         {page.sees.spent ? (
                             <span className="text-right">Spent</span>
                         ) : null}
-                    </div>
+                    </ListTableHead>
                     {page.rows.length === 0
                         ? empty
-                        : page.rows.map((row, i) => (
+                        : page.rows.map((row) => (
                               <Row
                                   key={row.contactId}
                                   row={row}
                                   cols={cols}
                                   sees={page.sees}
                                   many={many}
-                                  first={i === 0}
                               />
                           ))}
                 </div>
             </div>
-        </div>
+        </ListTable>
     );
 }
 
@@ -92,13 +95,11 @@ function Row({
     cols,
     sees,
     many,
-    first,
 }: {
     row: CustomerRow;
     cols: string;
     sees: CustomersPage["sees"];
     many: boolean;
-    first: boolean;
 }) {
     const tags = rowTags(row);
     const sub = lastSub(row, many);
@@ -107,8 +108,9 @@ function Row({
         <Link
             href={personHref(row.contactId)}
             className={cn(
-                "grid grid-cols-1 items-center gap-x-3 gap-y-1 px-4 py-[11px] text-[13px] text-foreground transition-colors duration-fast hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:hover:bg-muted",
-                !first && "border-t border-foreground/10",
+                "grid grid-cols-1 items-center gap-x-3 gap-y-1 text-[13px] text-foreground",
+                listTable.row,
+                listTable.pressable,
                 cols,
             )}
         >
@@ -118,13 +120,9 @@ function Row({
                         {rowName(row)}
                     </span>
                     {tags.map((t) => (
-                        <Pill
-                            key={t.label}
-                            tone={t.tone}
-                            className="px-[7px] py-px"
-                        >
+                        <StatusBadge key={t.label} tone={t.tone}>
                             {t.label}
-                        </Pill>
+                        </StatusBadge>
                     ))}
                 </span>
                 <span className="truncate text-[12px] text-muted-foreground">
@@ -141,14 +139,12 @@ function Row({
                         ) : (
                             "No orders yet"
                         )}
-                        {orders
-                            ? ` · ${orders.count === 1 ? "1 order" : `${orders.count} orders`}`
-                            : null}
+                        {orders ? ` · ${count(orders.count, "order")}` : null}
                         {sees.spent && row.spent && row.spent.length > 0
                             ? ` · ${spentText(row.spent)}`
                             : null}
                         {sub?.open ? (
-                            <span className="text-brand-subtle-foreground">
+                            <span className="text-foreground">
                                 {` · ${sub.text}`}
                             </span>
                         ) : null}
@@ -165,7 +161,9 @@ function Row({
                                     variant="recent"
                                 />
                             ) : (
-                                noOrderText(row)
+                                <AbsentOr says="None">
+                                    {noOrderText(row)}
+                                </AbsentOr>
                             )}
                         </span>
                         {sub ? (
@@ -173,7 +171,7 @@ function Row({
                                 className={cn(
                                     "truncate text-[12px]",
                                     sub.open
-                                        ? "text-brand-subtle-foreground"
+                                        ? "text-foreground"
                                         : "text-muted-foreground",
                                 )}
                             >
@@ -188,7 +186,9 @@ function Row({
             ) : null}
             {sees.spent ? (
                 <span className="hidden text-right font-medium tabular-nums sm:block">
-                    {spentText(row.spent ?? [])}
+                    <AbsentOr says="None">
+                        {spentText(row.spent ?? [])}
+                    </AbsentOr>
                 </span>
             ) : null}
         </Link>
@@ -198,23 +198,38 @@ function Row({
 /** No row matches the search or filters: say which, and the way out. */
 export function NoMatch({
     title,
+    searched,
     onClear,
 }: {
     title: string;
+    /** A search term narrowed it (else only filters did). */
+    searched: boolean;
     onClear: () => void;
 }) {
     return (
-        <div className="px-5 py-[34px] text-center">
-            <p className="text-[14px] font-semibold">{title}</p>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClear}
-                className="mt-2.5 h-[30px] rounded-[8px] px-3 text-[12.5px]"
-            >
-                Clear search and filters
-            </Button>
+        <div className="p-4">
+            <EmptyState
+                data-ph-mask=""
+                kind="no-results"
+                things="customers"
+                cause="filters"
+                title={title}
+                className="border-0"
+                action={
+                    <Button
+                        data-ph-unmask=""
+                        type="button"
+                        variant="outline"
+                        className="wk-press"
+                        onClick={onClear}
+                    >
+                        {clearLabel(
+                            searched ? "search" : "filters",
+                            "customers",
+                        )}
+                    </Button>
+                }
+            />
         </div>
     );
 }

@@ -39,7 +39,7 @@ describe("parseLegal", () => {
 describe("the Privacy Policy", () => {
     const blocks = parseLegal(PRIVACY.body);
 
-    it("has the owner's twelve sections, in order", () => {
+    it("has the owner's thirteen sections, in order", () => {
         expect(
             blocks.flatMap((b) => (b.kind === "heading" ? [b.text] : [])),
         ).toEqual([
@@ -51,6 +51,7 @@ describe("the Privacy Policy", () => {
             "Where it's stored",
             "How long we keep it",
             "Your rights",
+            "If there's a breach",
             "Cookies",
             "How we protect it",
             "Age",
@@ -97,8 +98,10 @@ describe("the Terms and the Refund and Cancellation Policy", () => {
             "Cancelling and refunds",
             "Early access",
             "Money you take",
+            "Your customers and your business",
             "Your data and content",
             "What you can't do",
+            "Fair use",
             "Your website and domain",
             "The source code",
             "Availability and changes",

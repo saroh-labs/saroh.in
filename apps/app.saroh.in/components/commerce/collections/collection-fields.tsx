@@ -1,11 +1,9 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { CategoryNode } from "@/lib/collections/rules";
 import {
     categoryChoices,
@@ -13,29 +11,15 @@ import {
     ruleNote,
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
+import { Notice } from "@saroh/ui/notice";
+import { OptionSelect } from "@saroh/ui/option-select";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The collection sheet's fields (#524), at the product page sheets' scale:
  * 12.5px labels, 11.5px help, 36px controls. Each says its own refusal —
  * the sheet's check or the API's — under it.
  */
-
-const LABEL = "block text-[12.5px] font-medium";
-
-export function FieldError({
-    id,
-    children,
-}: {
-    id?: string;
-    children?: string;
-}) {
-    if (!children) return null;
-    return (
-        <p id={id} role="alert" className="text-[12px] text-destructive">
-            {children}
-        </p>
-    );
-}
 
 export function NameField({
     value,
@@ -49,10 +33,7 @@ export function NameField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-name" className={LABEL}>
-                Name
-            </label>
+        <Field label="Name" error={error}>
             <Input
                 id="collection-name"
                 value={value}
@@ -60,12 +41,8 @@ export function NameField({
                 maxLength={COLLECTION_NAME_MAX + 20}
                 placeholder="Weekend bakes"
                 disabled={disabled}
-                aria-invalid={!!error}
-                aria-describedby={error ? "collection-name-error" : undefined}
-                className="h-9 rounded-[8px] text-[13px]"
             />
-            <FieldError id="collection-name-error">{error}</FieldError>
-        </div>
+        </Field>
     );
 }
 
@@ -81,13 +58,7 @@ export function DescriptionField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-description" className={LABEL}>
-                Description{" "}
-                <span className="font-normal text-muted-foreground">
-                    (optional)
-                </span>
-            </label>
+        <Field label="Description" optional error={error}>
             <Textarea
                 id="collection-description"
                 value={value}
@@ -95,11 +66,9 @@ export function DescriptionField({
                 rows={2}
                 disabled={disabled}
                 placeholder="What's in it, in a line."
-                aria-invalid={!!error}
-                className="rounded-[8px] text-[13px] leading-[1.55]"
+                className="leading-[1.55]"
             />
-            <FieldError>{error}</FieldError>
-        </div>
+        </Field>
     );
 }
 
@@ -121,37 +90,34 @@ export function CategoryField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-category" className={LABEL}>
-                Category
-            </label>
-            {categories.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    There are no categories yet.{" "}
-                    <Link
-                        href={productSettingsHref("categories")}
-                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
-                        Manage categories
-                    </Link>
+        <Field label="Category" htmlFor="collection-category" error={error}>
+            <>
+                {categories.length === 0 ? (
+                    <p className="text-[12.5px] text-muted-foreground">
+                        There are no categories yet.{" "}
+                        <TextLink href={productSettingsHref("categories")}>
+                            Manage categories
+                        </TextLink>
+                    </p>
+                ) : (
+                    <OptionSelect
+                        id="collection-category"
+                        value={value}
+                        onValueChange={onChange}
+                        options={categoryChoices(categories)}
+                        placeholder="Pick a category"
+                        disabled={disabled}
+                        aria-invalid={!!error}
+                        aria-describedby={
+                            error ? "collection-category-note" : undefined
+                        }
+                    />
+                )}
+                <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
+                    {ruleNote(categories, value)}
                 </p>
-            ) : (
-                <OptionSelect
-                    id="collection-category"
-                    value={value}
-                    onValueChange={onChange}
-                    options={categoryChoices(categories)}
-                    placeholder="Pick a category"
-                    disabled={disabled}
-                    aria-invalid={!!error}
-                    className="h-9 rounded-[8px] text-[13px]"
-                />
-            )}
-            <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
-                {ruleNote(categories, value)}
-            </p>
-            <FieldError>{error}</FieldError>
-        </div>
+            </>
+        </Field>
     );
 }
 
@@ -176,14 +142,7 @@ export function SheetNotices({
                     or admin can.
                 </p>
             ) : null}
-            {loadError ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] border border-destructive/40 px-3 py-2.5 text-[12.5px] text-destructive"
-                >
-                    {loadError}
-                </p>
-            ) : null}
+            {loadError ? <Notice tone="error">{loadError}</Notice> : null}
             {loading ? (
                 <p
                     role="status"
@@ -194,40 +153,5 @@ export function SheetNotices({
                 </p>
             ) : null}
         </>
-    );
-}
-
-/** "You have changes that are not saved", with Discard and Keep editing. */
-export function DiscardBar({
-    onDiscard,
-    onKeep,
-}: {
-    onDiscard: () => void;
-    onKeep: () => void;
-}) {
-    return (
-        <div
-            role="alert"
-            className="flex flex-wrap items-center gap-2 border-t border-border bg-brand-subtle px-[18px] py-2.5 text-[12.5px] text-brand-subtle-foreground"
-        >
-            <span className="flex-[1_1_180px]">
-                You have changes that are not saved.
-            </span>
-            <Button
-                type="button"
-                variant="outline"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
-                onClick={onDiscard}
-            >
-                Discard
-            </Button>
-            <Button
-                type="button"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                onClick={onKeep}
-            >
-                Keep editing
-            </Button>
-        </div>
     );
 }

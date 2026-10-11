@@ -1,11 +1,19 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { Block, LocalDate } from "@/lib/services/diary";
-import { blockLine, blockTitle, clock, monthDays } from "@/lib/services/diary";
+import {
+    blockLine,
+    blockTitle,
+    monthDays,
+    STATE_LABEL,
+} from "@/lib/services/diary";
+import { EmptyState } from "@saroh/ui/data-state";
 
-import { StatePill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { STATE_TONE } from "./parts";
 
 export interface FreeRow {
     key: string;
@@ -28,11 +36,7 @@ export function AgendaList({
     empty: string;
 }) {
     if (blocks.length === 0) {
-        return (
-            <p className="rounded-[11px] border border-dashed border-border px-3.5 py-5 text-[13px] text-muted-foreground">
-                {empty}
-            </p>
-        );
+        return <EmptyState size="inline" title={empty} />;
     }
     return (
         <ul className="flex flex-col gap-2">
@@ -49,12 +53,14 @@ export function AgendaList({
                             b.state === "cancelled" && "text-muted-foreground",
                         )}
                     >
-                        <div className="w-16 shrink-0 tabular-nums">
+                        {/* Wide enough for "12:30 pm" in bold at 14px:
+                            at 64px the "pm" dropped under the time. */}
+                        <div className="w-[76px] shrink-0 whitespace-nowrap tabular-nums">
                             <div className="text-[14px] font-bold">
-                                {clock(b.start)}
+                                {formatClock(b.start)}
                             </div>
                             <div className="text-[11.5px] text-muted-foreground">
-                                {clock(b.end)}
+                                {formatClock(b.end)}
                             </div>
                         </div>
                         <span
@@ -81,7 +87,9 @@ export function AgendaList({
                                 {blockLine(b)}
                             </div>
                         </div>
-                        <StatePill state={b.state} />
+                        <StatusBadge tone={STATE_TONE[b.state]}>
+                            {STATE_LABEL[b.state]}
+                        </StatusBadge>
                     </button>
                 </li>
             ))}
@@ -146,7 +154,7 @@ export function AgendaMonth({
                                     on
                                         ? "bg-primary font-bold text-primary-foreground"
                                         : d === today
-                                          ? "bg-brand-subtle font-medium"
+                                          ? "bg-muted font-medium"
                                           : "font-medium hover:bg-muted",
                                 )}
                             >
@@ -156,7 +164,7 @@ export function AgendaMonth({
                                     className={cn(
                                         "mx-auto mt-px block size-1 rounded-full",
                                         busy
-                                            ? "bg-highlight"
+                                            ? "bg-foreground"
                                             : "bg-transparent",
                                     )}
                                 />
@@ -166,7 +174,7 @@ export function AgendaMonth({
                 </div>
                 {free ? (
                     <div className="mt-2.5 border-t border-border/60 pt-2.5">
-                        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <div className="label mb-1.5">
                             {date === today ? "Free today" : "Free this day"}
                         </div>
                         {free.length === 0 ? (
@@ -179,12 +187,12 @@ export function AgendaMonth({
                                     key={f.key}
                                     type="button"
                                     onClick={f.book}
-                                    aria-label={`Book ${f.who} at ${clock(f.from)}`}
+                                    aria-label={`Book ${f.who} at ${formatClock(f.from)}`}
                                     className="flex w-full gap-2 rounded-[7px] px-2 py-[7px] text-left text-[12.5px] hover:bg-success-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-95"
                                 >
                                     <span className="flex-1">{f.who}</span>
                                     <span className="font-semibold tabular-nums text-success-subtle-foreground">
-                                        {clock(f.from)}–{clock(f.to)}
+                                        {formatClockRange(f.from, f.to)}
                                     </span>
                                 </button>
                             ))

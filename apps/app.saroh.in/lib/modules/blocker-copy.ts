@@ -10,14 +10,19 @@
  * API's capabilities module and fails when a code it can send has no line
  * here, and scans the app for a code rendered directly.
  */
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+
 /** Said when a role doesn't reach a module, or may not change one. */
-export const ROLE_REFUSAL =
-    "Your role doesn't include this. An owner or admin can change what you can reach.";
+export const ROLE_REFUSAL = `Your role doesn't include this. ${WHO_CAN_CHANGE}`;
+
+/** Said of a module Saroh hasn't offered this business. */
+const NOT_OFFERED = "This isn't available for your business yet.";
 
 export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     // The gates, in the API's order.
     UNAUTHORIZED: ROLE_REFUSAL,
-    ROLLOUT_DISABLED: "This isn't available for your business yet.",
+    ROLLOUT_DISABLED: NOT_OFFERED,
     ORG_MODULE_DISABLED:
         "This is turned off for your business. Nothing it holds has been deleted.",
     PROJECT_MODULE_UNSELECTED: "This isn't turned on for this project.",
@@ -29,7 +34,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     WEBSITE_NO_PUBLICATION: "Publish your site to go live.",
     WEBSITE_SHOP_NOT_CHOSEN:
         "Choose which location your online shop sells from. Until then your shop page isn't live.",
-    CRM_NO_PIPELINE: "Create a pipeline to start tracking leads.",
+    CRM_NO_PIPELINE: "Add your first lead to start your pipeline.",
     APPOINTMENTS_NO_SERVICE: "Add a bookable service.",
     APPOINTMENTS_NO_AVAILABILITY:
         "Set your availability so customers can book.",
@@ -60,7 +65,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
 
     // What turning a module off changes (F13).
     APPOINTMENTS_UPCOMING_BOOKINGS:
-        "Upcoming bookings stay booked; the booking page stops taking new ones.",
+        "Upcoming bookings stay booked. The booking page stops taking new ones.",
     APPOINTMENTS_SITE_BOOK_PAGE:
         "Your site's booking page stops taking bookings.",
     APPOINTMENTS_ACCOUNT_TAB:
@@ -73,7 +78,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     PAYMENTS_SITE_PLANS: "Your site stops selling plans.",
     COMMERCE_STOREFRONTS: "Your locations stop taking orders.",
     COMMERCE_PUBLISHED_PRODUCTS:
-        "Products leave your site; they are kept here.",
+        "Products leave your site. They are kept here.",
     COMMERCE_SITE_SHOP: "Your site's shop closes.",
     COMMERCE_SITE_SHOP_PAGE: "Your site's shop page stops selling.",
     COMMERCE_ACCOUNT_TAB: "Orders leave your customers' accounts on your site.",
@@ -86,11 +91,17 @@ export const BLOCKER_FALLBACK = "This needs attention before it can go ahead.";
 /**
  * The words for one blocker: the API's own sentence, else this app's line
  * for its code, else the plain fallback. Never the code.
+ *
+ * While plans aren't shown (DEC-136) a plan's blocker reads as one not
+ * offered yet: there is no plan to name and no page to change it on.
  */
 export function blockerSentence(blocker: {
     code: string;
     message?: string | null;
 }): string {
+    if (blocker.code === "ENTITLEMENT_REQUIRED" && !plansShown()) {
+        return NOT_OFFERED;
+    }
     const said = blocker.message?.trim();
     if (said) return said;
     return BLOCKER_COPY[blocker.code] ?? BLOCKER_FALLBACK;
@@ -100,17 +111,25 @@ export function blockerSentence(blocker: {
 const BARE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
 
 /**
- * Words the API means for a developer: a role and a permission key
- * (`Role "MEMBER" may not perform "module:manage"`), a registry key, a
- * request's path and status.
+ * Words the API means for a developer: a registry key, a permission key in
+ * quotes, a request's path and status. A refusal by role is no longer among
+ * them: the API sends it as a sentence (`ROLE_DENIED`, `role-denied.ts`),
+ * which reads as it is.
  */
 const FOR_DEVELOPERS =
-    /may not perform|unknown module|\bfailed:\s*\d{3}\b|"[a-z_]+:[a-z_]+"|internal server error/i;
+    /unknown module|\bfailed:\s*\d{3}\b|"[a-z_]+:[a-z_]+"|internal server error/i;
+
+/**
+ * A refusal by role from an API older than `ROLE_DENIED`
+ * (`Role "MEMBER" may not perform "module:manage"`). Kept so a deploy where
+ * the app is ahead of the API never shows it.
+ */
+const OLD_ROLE_REFUSAL = /\bmay not perform\b/i;
 
 /**
  * The words for a refused module write's message (DEC-057): the API's
- * sentence when it is one a merchant can read, the words for a bare code,
- * the role line for a permission key, and otherwise the plain fallback.
+ * sentence when it is one a merchant can read (a refusal by role included),
+ * the words for a bare code, and otherwise the plain fallback.
  * Never a code, a key or a status.
  */
 export function moduleErrorSentence(
@@ -120,7 +139,7 @@ export function moduleErrorSentence(
     const said = message?.trim();
     if (!said) return fallback;
     if (BARE_CODE.test(said)) return BLOCKER_COPY[said] ?? fallback;
-    if (/may not perform/i.test(said)) return ROLE_REFUSAL;
+    if (OLD_ROLE_REFUSAL.test(said)) return ROLE_REFUSAL;
     if (FOR_DEVELOPERS.test(said)) return fallback;
     return said;
 }

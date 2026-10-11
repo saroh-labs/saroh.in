@@ -4,11 +4,14 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useState } from "react";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";
+import { cn } from "@saroh/ui/lib/utils";
+import { TextLink } from "@saroh/ui/text-link";
 
 export interface ActivityEntry {
     line: ActivityLine;
@@ -39,20 +42,26 @@ export function ActivityList({
 
     return (
         <>
-            <section
-                aria-label="Activity"
-                className="max-w-[760px] overflow-hidden rounded-xl border border-border bg-card"
-            >
+            <section aria-label="Activity" className={listTable.card}>
                 <ol>
                     {entries.map(({ line }) => (
                         <li
                             key={line.id}
-                            className="relative grid grid-cols-[96px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 border-t border-border/70 px-[18px] py-[11px] text-[13px] transition-colors duration-fast first:border-t-0 hover:bg-muted min-[480px]:grid-cols-[96px_minmax(0,1fr)_auto]"
+                            // The first column fits "Today, 12:30 pm"
+                            // on one line: at 96px the 12-hour clock
+                            // broke it after the comma.
+                            className={cn(
+                                "relative grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 text-[13px] min-[480px]:grid-cols-[112px_minmax(0,1fr)_auto]",
+                                listTable.row,
+                            )}
                         >
                             <ViewerDate
                                 iso={line.at}
                                 variant="recent"
-                                className="tabular-nums text-muted-foreground"
+                                className={cn(
+                                    listTable.time,
+                                    "text-muted-foreground",
+                                )}
                             />
                             <button
                                 type="button"
@@ -68,12 +77,12 @@ export function ActivityList({
                                     . Show the details
                                 </span>
                             </button>
-                            <Link
+                            <TextLink
                                 href={line.where.href}
-                                className="relative z-[1] col-start-2 justify-self-start rounded-sm text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[480px]:col-start-auto"
+                                className="relative z-[1] col-start-2 justify-self-start text-[12.5px] min-[480px]:col-start-auto"
                             >
                                 {line.where.label}
-                            </Link>
+                            </TextLink>
                         </li>
                     ))}
                 </ol>
@@ -122,10 +131,7 @@ function ActivitySheet({
             titleClassName="text-clip whitespace-normal text-pretty font-display text-[16px] font-semibold tracking-[-0.015em]"
             description={`${sentence}, ${detail.when}.`}
             footer={
-                <Button
-                    asChild
-                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                >
+                <Button asChild className="min-w-[160px] flex-1">
                     <Link href={line.where.href}>Open {line.where.label}</Link>
                 </Button>
             }

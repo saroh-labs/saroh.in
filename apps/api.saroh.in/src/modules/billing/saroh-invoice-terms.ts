@@ -155,6 +155,9 @@ export function sarohInvoiceNumber(series: string, n: number): string {
     return `${series}/${String(n).padStart(5, "0")}`;
 }
 
+/** The charge key of a nominal first month (DEC-093), before its checkout. */
+export const FIRST_MONTH_KEY = "first-month:";
+
 /** Paise as the paper's rupees string: 12345 → "123.45". */
 export function paiseToRupees(paise: number): string {
     const sign = paise < 0 ? "-" : "";

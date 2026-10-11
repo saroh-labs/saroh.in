@@ -19,7 +19,7 @@ const NAMES: Record<AutopayMethod, { label: string; sub: string }> = {
     },
     EMANDATE: {
         label: "Bank account (eMandate)",
-        sub: "Approve it with your bank; nothing is taken to set it up",
+        sub: "Approve it with your bank, and nothing is taken to set it up",
     },
 };
 
@@ -69,7 +69,7 @@ export function autopayStateLine(
  */
 export function autopayCheckBefore(check: AutopayCheck): string {
     const m = accountMoney(check.amount, check.currency);
-    return `To switch on autopay, your bank needs a ${m} check. We refund the ${m} straight away — it's back in your account in 5–7 working days.`;
+    return `To switch on autopay, your bank needs a ${m} check. We refund the ${m} straight away. It's back in your account in 5 to 7 working days.`;
 }
 
 /** The check afterwards, as a sentence: where its refund is. */
@@ -85,9 +85,9 @@ export function autopayCheckAfter(
                 ? `The ${m} check was refunded on ${accountDate(check.refundedAt, timezone)}.`
                 : `The ${m} check was refunded.`;
         case "REFUNDING":
-            return `The ${m} check is being refunded — it reaches you in 5–7 working days.`;
+            return `The ${m} check is being refunded. It reaches you in 5 to 7 working days.`;
         case "NOT_REFUNDED":
-            return `The ${m} check hasn't been refunded yet. ${business} will return it — ask them if it doesn't arrive.`;
+            return `The ${m} check hasn't been refunded yet. ${business} will return it. Ask them if it doesn't arrive.`;
     }
 }
 

@@ -11,6 +11,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -30,10 +31,16 @@ import {
  * Courses (ADR-007): its own module, which needs Appointments because its
  * sessions are bookings on a service. Enrolling invoices when Payments is
  * on, which the service decides. Authorization is in the service.
+ *
+ * Courses is required per handler, not on the class (#117): making or
+ * changing a course, its sessions, and enrolling carry
+ * `@RequireModule("COURSES")`. The courses, one course with its sessions and
+ * enrolments, are history and stay readable with Courses off; cancelling an
+ * enrolment already made is winding down, and stays open too
+ * (`MODULE_ROLLOUT.md`). `course:*` still applies.
  */
 @Controller("organizations/:organizationId/courses")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("COURSES")
 export class CoursesController {
     constructor(private readonly courses: CoursesService) {}
 
@@ -51,6 +58,7 @@ export class CoursesController {
     }
 
     @Post()
+    @RequireModule("COURSES")
     @HttpCode(201)
     create(
         @OrgContext() ctx: OrganizationContext,
@@ -60,6 +68,7 @@ export class CoursesController {
     }
 
     @Patch(":courseId")
+    @RequireModule("COURSES")
     update(
         @OrgContext() ctx: OrganizationContext,
         @Param("courseId") id: string,
@@ -69,6 +78,7 @@ export class CoursesController {
     }
 
     @Post(":courseId/sessions")
+    @RequireModule("COURSES")
     @HttpCode(201)
     addSession(
         @OrgContext() ctx: OrganizationContext,
@@ -79,6 +89,7 @@ export class CoursesController {
     }
 
     @Delete(":courseId/sessions/:sessionId")
+    @RequireModule("COURSES")
     @HttpCode(200)
     removeSession(
         @OrgContext() ctx: OrganizationContext,
@@ -89,6 +100,7 @@ export class CoursesController {
     }
 
     @Post(":courseId/enrollments")
+    @RequireModule("COURSES")
     @HttpCode(201)
     enrol(
         @OrgContext() ctx: OrganizationContext,
@@ -99,6 +111,7 @@ export class CoursesController {
     }
 
     @Post(":courseId/enrollments/:enrollmentId/cancel")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     cancelEnrollment(
         @OrgContext() ctx: OrganizationContext,
@@ -109,10 +122,12 @@ export class CoursesController {
     }
 }
 
-/** A person's enrolments across courses, for their contact page (ADR-007). */
+/**
+ * A person's enrolments across courses, for their contact page (ADR-007).
+ * History: readable with Courses off (#117), so no module gate.
+ */
 @Controller("organizations/:organizationId/course-enrollments")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("COURSES")
 export class CourseEnrollmentsController {
     constructor(private readonly courses: CoursesService) {}
 

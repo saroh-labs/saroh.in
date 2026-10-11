@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -17,6 +18,7 @@ import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import type { LeadListItem, LeadStatus } from "@/lib/leads/service";
+import { Inbox } from "lucide-react";
 
 /**
  * The pipeline as a register.
@@ -46,13 +48,16 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground">—</span>;
+const Missing = () => <AbsentValue says="Not set" />;
 
 export function LeadsView({
     leads,
+    currency,
     initialView,
 }: {
     leads: LeadListItem[];
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
     initialView?: string;
 }) {
     const now = new Date();
@@ -88,14 +93,17 @@ export function LeadsView({
         },
         {
             id: "value",
-            header: "Value",
+            header: "Worth",
             priority: "secondary",
             numeric: true,
             money: true,
             sortValue: (l) => l.value ?? 0,
-            // No currency is recorded against a Lead anywhere in the schema, so
-            // none is drawn — see `lib/format/money.ts`.
-            cell: (l) => formatMoney(l.value, null) ?? <Missing />,
+            // A lead records an amount and no currency: it is in the
+            // business's (owner, 11 Oct). Empty is the absent mark.
+            cell: (l) =>
+                formatMoney(l.value, currency) ?? (
+                    <AbsentValue says="Not set" />
+                ),
         },
         {
             id: "stage",
@@ -104,9 +112,7 @@ export function LeadsView({
             sortValue: (l) => l.stage?.order ?? Number.MAX_SAFE_INTEGER,
             cell: (l) =>
                 l.stage ? (
-                    <Badge variant="secondary" className="font-normal">
-                        {l.stage.name}
-                    </Badge>
+                    <Badge variant="secondary">{l.stage.name}</Badge>
                 ) : (
                     <Missing />
                 ),
@@ -136,7 +142,9 @@ export function LeadsView({
                 // which is not, hence `ViewerDate`.
                 l.status === "OPEN" ? (
                     <span className="whitespace-nowrap text-muted-foreground">
-                        {formatWaiting(l.createdAt, now) ?? "—"}
+                        {formatWaiting(l.createdAt, now) ?? (
+                            <AbsentValue says="Not known" />
+                        )}
                     </span>
                 ) : (
                     <ViewerDate
@@ -156,12 +164,18 @@ export function LeadsView({
             rowHref={(l) => `/leads/${l.id}`}
             modes={["table", "list"]}
             defaultMode="table"
+            noun={{ one: "lead", other: "leads" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView}
-            // Leads | Follow-ups is the page's tab row; status narrows the list.
-            filterStyle="segmented"
+            // Leads | Follow-ups is the page's tab row; status narrows the
+            // list, as the chip row.
             searchableColumnIds={["title", "contact", "stage"]}
-            empty="Leads appear here as enquiries come in, or when you add one."
+            emptyState={{
+                icon: <Inbox />,
+                title: "No leads yet",
+                note: "They show here as enquiries come in, or when you add one.",
+            }}
             renderCard={(l) => (
                 <Link href={`/leads/${l.id}`} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a
@@ -176,6 +190,11 @@ export function LeadsView({
                                     ? contactName(l.contact)
                                     : "Unknown contact"}
                             </p>
+                            {l.value === null ? null : (
+                                <p className="text-sm tabular-nums">
+                                    {formatMoney(l.value, currency)}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </Link>

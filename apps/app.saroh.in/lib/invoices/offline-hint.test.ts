@@ -26,7 +26,7 @@ describe("offlinePayHint (#835)", () => {
         ).toBe("/settings/providers");
         // An API older than the blocker: read from what it sends.
         expect(offlinePayHint(base).text).toBe(
-            "Connect a payment provider to take payment online.",
+            "No payment provider is connected, so customers can't pay online.",
         );
     });
 

@@ -7,7 +7,7 @@ import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
 import { stampConfirmedEmail } from "./confirmation-stamp";
-import { flagCommsProvider } from "./provider-keys";
+import { commsProviderWorks, flagCommsProvider } from "./provider-keys";
 import type {
     CommsAttachment,
     CommsCredentials,
@@ -270,6 +270,9 @@ export class MessageSendHandler {
             throw err;
         }
 
+        // Accepted on a connection flagged as refused: it works again, and
+        // the team hears so once (#555). Never throws.
+        if (providerRow.attentionAt) await commsProviderWorks(providerRow);
         await this.stamp(message);
     };
 

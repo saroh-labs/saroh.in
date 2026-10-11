@@ -1,6 +1,7 @@
 import type { RenderedProjects } from "@saroh/block-contract";
 import { isSafeHref, resolveVariant } from "@saroh/block-contract";
 
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { listCard, listPhoto } from "./list-layout";
 import { RhythmGallery } from "./projects-rhythm";
@@ -157,7 +158,7 @@ function ProjectCard({ item, over }: { item: Project; over: boolean }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    loading="lazy"
+                    {...siteImage()}
                     className="mb-1.5 aspect-[4/3] w-full object-cover"
                 />
             ) : null}
@@ -175,7 +176,7 @@ function ProjectRow({ item }: { item: Project }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    loading="lazy"
+                    {...siteImage()}
                     className={listPhoto}
                 />
             ) : null}
@@ -202,7 +203,7 @@ function ProjectPlate({ item, src }: { item: Project; src: string }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    loading="lazy"
+                    {...siteImage()}
                     className="aspect-[4/3] w-full object-cover"
                 />
                 <div

@@ -1,4 +1,6 @@
-import { PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { rememberedPageSize } from "@/lib/paging/remembered";
+import { redirect } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -42,8 +44,9 @@ import { isSince, sinceParam } from "@/lib/views/since";
  * (#519, #520).
  *
  * The address says what the list shows (`?view=`, `?q=`, `?storefront=`,
- * `?status=`, `?category=`, `?collection=`, or `?tab=reviews`); this reads
- * the first page for it. The catalogue read failing fails the page (its
+ * `?status=`, `?category=`, `?collection=`, `?page=`, `?size=`, or
+ * `?tab=reviews`); this reads the page it asks for. With no size in the
+ * address the page is as long as this browser last chose. The catalogue read failing fails the page (its
  * error boundary) — never an empty catalogue. Reviews failing leaves the
  * list and says their count is unknown.
  */
@@ -53,6 +56,7 @@ const NO_PAGE: CataloguePage = {
     items: [],
     nextCursor: null,
     total: 0,
+    pageSize: 50,
     counts: { all: 0, collections: 0, inventory: 0 },
     storefronts: { everywhere: 0, byStorefront: [] },
     needs: [],
@@ -90,7 +94,7 @@ export default async function CataloguePage({
     const canWriteReviews = may("product-review:write") && may("order:read");
     const onReviews = params.tab === "reviews" && canReadReviews;
 
-    const query = readListQuery(params);
+    const query = readListQuery(params, await rememberedPageSize("catalogue"));
     // A storefront that isn't this business's (or closed) is no filter.
     if (query.storefront && !stores.some((s) => s.id === query.storefront)) {
         query.storefront = null;
@@ -118,6 +122,12 @@ export default async function CataloguePage({
             // What a lower plan paused (#800): the rows' tags and why.
             pausedOrNull(),
         ]);
+    // A page past the end (the list has since got shorter, or the address
+    // was typed): start again at the first page rather than show an empty
+    // one.
+    if (!onReviews && query.page > 1 && page.items.length === 0) {
+        redirect(listHref(query, { page: 1 }));
+    }
     const choices = choicesFrom(categories, collections);
 
     const active: ProductsTab = onReviews
@@ -146,11 +156,10 @@ export default async function CataloguePage({
     );
     const notice =
         reviews === null ? (
-            <PartialNotice>
-                Reviews couldn&apos;t be read just now, so their count shows as
-                “—”. It is not zero. Everything else on this page arrived
-                normally.
-            </PartialNotice>
+            <PartialRead
+                things="reviews"
+                so="Their count can't be shown. It is not zero."
+            />
         ) : null;
 
     if (onReviews) {

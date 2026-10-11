@@ -6,6 +6,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
 import type { MerchantPaymentProvider } from "@saroh/database";
@@ -17,6 +18,7 @@ import {
     NO_ATTENTION,
 } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import {
     assertPlanTakesOnlinePayment,
@@ -25,7 +27,13 @@ import {
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
-import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
+import { queueProviderBack } from "../notifications/provider-alerts";
+import { assertWithinOrderLeftInTx } from "../orders/hand-refund";
+import {
+    finishCancelInTx,
+    isCancelRefundKey,
+    onlineRefundableInTx,
+} from "../orders/order-cancel";
 import type {
     LineRefundRequest,
     PlannedLineRefund,
@@ -40,12 +48,25 @@ import {
     planRemainingLines,
 } from "../orders/order-refunds";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
+import {
+    MISMATCH_ATTEMPT_WHERE,
+    MISMATCH_REFUND_REASON,
+    mismatchRefundKey,
+    owedOf,
+    refundsOfAttemptInTx,
+} from "./mismatch-refund";
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
-import { assertKeysAccepted, providerOrderFailed } from "./provider-keys";
+import {
+    assertKeysAccepted,
+    credentialsUnreadable,
+    paymentProviderWorks,
+    providerOrderFailed,
+} from "./provider-keys";
+import { activeMandatesByProvider } from "./provider-memberships";
 import type {
     CreateOrderIntentResult,
     MerchantProvider,
@@ -450,6 +471,8 @@ export class PaymentsService {
 
     constructor(
         @Inject(PROVIDER_FACTORY) private readonly factory: ProviderFactory,
+        /** The activation ledger, for the first provider connected (DEC-125). */
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     /**
@@ -521,8 +544,17 @@ export class PaymentsService {
         const row = await planMeter.withRoom(
             ctx.organizationId,
             "integrations",
-            (tx) =>
-                tx.merchantPaymentProvider.upsert({
+            async (tx) => {
+                const before = await tx.merchantPaymentProvider.findUnique({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                        },
+                    },
+                    select: { attentionAt: true },
+                });
+                const saved = await tx.merchantPaymentProvider.upsert({
                     where: {
                         organizationId_provider: {
                             organizationId: ctx.organizationId,
@@ -547,7 +579,20 @@ export class PaymentsService {
                         // Keys that just passed the check need no attention.
                         ...NO_ATTENTION,
                     },
-                }),
+                });
+                // They end a refusal the team was told of (#555); whoever
+                // entered them sees it here, so isn't emailed.
+                if (before?.attentionAt) {
+                    await queueProviderBack(
+                        tx,
+                        saved,
+                        "PAYMENTS",
+                        new Date(),
+                        ctx.userId,
+                    );
+                }
+                return saved;
+            },
             {
                 addingIn: async (tx) =>
                     (await tx.merchantPaymentProvider.count({
@@ -562,17 +607,37 @@ export class PaymentsService {
             },
         );
 
+        // The business's first payment provider (DEC-125): the provider's
+        // name, never a key. Stored once by the ledger, after the write;
+        // it swallows its own errors.
+        await this.activation?.firstPaymentProviderConnected(
+            ctx.organizationId,
+            provider,
+        );
+
         return redact(row);
     }
 
-    /** List the org's connected providers, redacted. `payment:read`. */
-    async listProviders(ctx: OrganizationContext): Promise<RedactedProvider[]> {
+    /**
+     * List the org's connected providers, redacted. `payment:read`. Each
+     * says how many customers' autopay memberships are active at it
+     * (#921): disconnecting cancels none of them, and the confirm says so.
+     */
+    async listProviders(
+        ctx: OrganizationContext,
+    ): Promise<(RedactedProvider & { activeMemberships: number })[]> {
         authorize(ctx, "payment:read");
-        const rows = await prisma.merchantPaymentProvider.findMany({
-            where: { organizationId: ctx.organizationId },
-            orderBy: { createdAt: "desc" },
-        });
-        return rows.map(redact);
+        const [rows, memberships] = await Promise.all([
+            prisma.merchantPaymentProvider.findMany({
+                where: { organizationId: ctx.organizationId },
+                orderBy: { createdAt: "desc" },
+            }),
+            activeMandatesByProvider(prisma, ctx.organizationId),
+        ]);
+        return rows.map((row) => ({
+            ...redact(row),
+            activeMemberships: memberships.get(row.provider) ?? 0,
+        }));
     }
 
     /** Get one of the org's providers, redacted. `payment:read`. 404 if absent. */
@@ -789,6 +854,13 @@ export class PaymentsService {
      * over, cancelled already) are read where no stage move can slip in.
      * The refund rows carry the cancel's key (`order-cancel.ts`); the order
      * is marked cancelled as the provider answers for them.
+     *
+     * After part of the order was refunded by hand (#865, #918, DEC-116)
+     * what goes back is what is left on the order, not the payments' whole
+     * balance: that amount, split across the payments newest first as
+     * another amount is. The lines still ride on it, so their stock comes
+     * back as it is confirmed; its credit note, whose lines no longer add
+     * up to the money, is spread over the invoice for that amount.
      */
     async refundOrderForCancel(
         ctx: OrganizationContext,
@@ -808,8 +880,11 @@ export class PaymentsService {
             plan: async (tx) => {
                 await input.guard(tx);
                 const refundable = await refundableLines(tx, order.id);
+                const { leftCents, onlineLeftCents } =
+                    await onlineRefundableInTx(tx, order.id);
                 return {
-                    amountCents: "REMAINING",
+                    amountCents:
+                        leftCents < onlineLeftCents ? leftCents : "REMAINING",
                     lines: planRemainingLines(
                         refundable,
                         totalToCents(order.discount),
@@ -1053,6 +1128,131 @@ export class PaymentsService {
         return outcome.kind;
     }
 
+    /**
+     * "Refund" on a capture taken at the wrong amount (PAY-06, owner
+     * decision 9 Oct): exactly what the provider captured goes back,
+     * against that payment, through the business's provider. `order:refund`,
+     * the refund permission (`payment:manage` implies it).
+     *
+     * The order or invoice is never touched — it was never paid by this
+     * money — and no credit note, timeline step or stock follows. The
+     * refund is a PaymentRefund on the attempt's intent keyed to the
+     * attempt (`mismatch-refund.ts`), reserved under the intent's lock and
+     * sent after, under its id as Saroh's reference (DEC-026). Idempotent:
+     * a refund on its way or done is returned as it is; one whose answer
+     * was lost is looked for first and sent again only if the provider has
+     * none; after a definite refusal a fresh row is sent.
+     */
+    async refundAmountMismatch(
+        ctx: OrganizationContext,
+        attemptId: string,
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "order:refund");
+        const attempt = await prisma.paymentAttempt.findFirst({
+            where: {
+                id: attemptId,
+                organizationId: ctx.organizationId,
+                ...MISMATCH_ATTEMPT_WHERE,
+            },
+            select: {
+                id: true,
+                providerRef: true,
+                rawResponse: true,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (!attempt) throw new NotFoundException("Payment not found");
+        const intent = attempt.paymentIntent;
+        const owed = owedOf(attempt.rawResponse, intent.currency);
+        if (!owed) {
+            throw new ConflictException(
+                "We don't know how much this payment took. Refund it from your payment provider's dashboard.",
+            );
+        }
+
+        const { row, fresh } = await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
+            const made = await refundsOfAttemptInTx(
+                tx,
+                ctx.organizationId,
+                intent.id,
+                attempt.id,
+            );
+            const holding = made.find((r) => r.status !== "FAILED");
+            if (holding) {
+                return {
+                    row: await tx.paymentRefund.findUniqueOrThrow({
+                        where: { id: holding.id },
+                        include: REFUND_ROW_INCLUDE,
+                    }),
+                    fresh: false,
+                };
+            }
+            return {
+                row: await tx.paymentRefund.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        paymentIntentId: intent.id,
+                        amountCents: owed.amountCents,
+                        currency: owed.currency,
+                        status: "PENDING",
+                        reason: MISMATCH_REFUND_REASON,
+                        idempotencyKey: mismatchRefundKey(
+                            attempt.id,
+                            made.length + 1,
+                        ),
+                    },
+                    include: REFUND_ROW_INCLUDE,
+                }),
+                fresh: true,
+            };
+        });
+        // Done, or taken by the provider: its webhook settles it.
+        if (row.status !== "PENDING" || row.providerRefundId) {
+            return refundResult([row]);
+        }
+
+        const paying = { ...intent, currency: row.currency };
+        let found: RefundResult | null = null;
+        if (!fresh) {
+            // Sent before and its answer lost: look before sending again.
+            try {
+                const call = await this.refundCall(
+                    ctx.organizationId,
+                    intent,
+                    attempt.providerRef,
+                );
+                found = await this.factory.get(call.provider).findRefund({
+                    reference: row.id,
+                    providerIntentId: intent.providerIntentId ?? "",
+                    providerPaymentRef: call.providerPaymentRef,
+                    credentials: call.credentials,
+                });
+            } catch {
+                throw new ServiceUnavailableException(
+                    "We couldn't reach the payment provider. Try again in a minute.",
+                );
+            }
+        }
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(
+                  ctx.organizationId,
+                  row,
+                  paying,
+                  attempt.providerRef,
+              );
+        if (outcome.kind === "REFUSED") throw refusal(outcome.error);
+        return refundResult([outcome.row]);
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -1159,6 +1359,17 @@ export class PaymentsService {
             // The order-level cap: never more than was taken and not yet
             // handed back, whatever the lines add up to.
             const split = allocateAcrossPayments(refundable, amountCents);
+            // And never more than is left on the order once refunds
+            // recorded by hand count (#865, DEC-116). An edit's difference
+            // is the order costing less, not a refund of what it kept.
+            if (!opts.forEdit) {
+                await assertWithinOrderLeftInTx(
+                    tx,
+                    order.id,
+                    amountCents,
+                    refundable[0].intent.currency,
+                );
+            }
             // Each line rides on the part its money comes back from, so a
             // part the provider refuses frees only its own lines.
             const partLines = apportionLines(
@@ -1252,13 +1463,15 @@ export class PaymentsService {
             providerIntentId: string | null;
             currency: string;
         },
+        /** The payment to refund, when it isn't the intent's latest (PAY-06). */
+        paymentRef?: string | null,
     ): Promise<RefundOutcome> {
         // Setting the call up — the business's provider and its keys — sends
         // nothing: a failure there is a refusal.
         let call: Awaited<ReturnType<PaymentsService["refundCall"]>>;
         let provider: MerchantProvider;
         try {
-            call = await this.refundCall(organizationId, intent);
+            call = await this.refundCall(organizationId, intent, paymentRef);
             provider = this.factory.get(call.provider);
         } catch (err) {
             return {
@@ -1401,6 +1614,7 @@ export class PaymentsService {
     private async refundCall(
         organizationId: string,
         intent: { id: string; provider: string },
+        paymentRef?: string | null,
     ): Promise<{
         provider: string;
         credentials: ProviderCredentials;
@@ -1410,14 +1624,25 @@ export class PaymentsService {
             organizationId,
             intent.provider,
         );
-        const attempt = await prisma.paymentAttempt.findFirst({
-            where: { paymentIntentId: intent.id, providerRef: { not: null } },
-            orderBy: { createdAt: "desc" },
-        });
+        // A mismatch's refund names its own payment (PAY-06): the intent's
+        // latest may be another.
+        const attempt =
+            paymentRef === undefined
+                ? await prisma.paymentAttempt.findFirst({
+                      where: {
+                          paymentIntentId: intent.id,
+                          providerRef: { not: null },
+                      },
+                      orderBy: { createdAt: "desc" },
+                  })
+                : null;
         return {
             provider: providerRow.provider,
             credentials: this.openCredentials(providerRow),
-            providerPaymentRef: attempt?.providerRef ?? null,
+            providerPaymentRef:
+                paymentRef === undefined
+                    ? (attempt?.providerRef ?? null)
+                    : paymentRef,
         };
     }
 
@@ -1477,7 +1702,9 @@ export class PaymentsService {
         options: { idempotencyKey?: string; provider?: string } = {},
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
-        await assertOrganizationOpen(order.organizationId);
+        // Paying an order already made is finishing it: open while the
+        // business winds down (DEC-120).
+        await assertOrganizationWindingDown(order.organizationId);
         await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);
     }
@@ -1666,7 +1893,7 @@ export class PaymentsService {
                 "This location is paused and is not taking payments.",
             );
         }
-        await assertOrganizationOpen(customer.organizationId);
+        await assertOrganizationWindingDown(customer.organizationId);
         const { organizationId } = customer;
         return this.createIntentFor(
             organizationId,
@@ -1747,7 +1974,17 @@ export class PaymentsService {
         }
 
         // Decrypt in-memory ONLY here, at the moment of the provider call.
-        const credentials = this.openCredentials(providerRow);
+        // Keys that won't open are the same handled 503 as a provider that
+        // fails: the customer reads that online payment is down, never a
+        // bare 500. An order already started stays as it is: nothing was
+        // charged, a retry with the same key tries again, and an online
+        // checkout nobody pays is closed by its job.
+        let credentials: ProviderCredentials;
+        try {
+            credentials = this.openCredentials(providerRow);
+        } catch (err) {
+            throw credentialsUnreadable(providerRow, err);
+        }
         const provider = this.factory.get(providerRow.provider);
         let intent: CreateOrderIntentResult;
         try {
@@ -1763,6 +2000,9 @@ export class PaymentsService {
             // team (UX-012).
             throw await providerOrderFailed(providerRow, err);
         }
+        // A provider order made on a connection flagged as refused: it
+        // works again, and the team hears so once (#555). Never throws.
+        if (providerRow.attentionAt) await paymentProviderWorks(providerRow);
 
         // Persist intent + first attempt atomically. rawResponse holds only the
         // non-secret client params — never any credential.
@@ -2014,8 +2254,15 @@ export class PaymentsService {
             iv: row.credentialsIv,
             authTag: row.credentialsAuthTag,
         });
-        const parsed = JSON.parse(json) as Partial<ProviderCredentials>;
-        if (!parsed.keyId || !parsed.keySecret) {
+        // A parse error quotes the text it read, which here is the secret:
+        // it is replaced, never passed on to a log.
+        let parsed: Partial<ProviderCredentials> | null;
+        try {
+            parsed = JSON.parse(json) as Partial<ProviderCredentials> | null;
+        } catch {
+            parsed = null;
+        }
+        if (!parsed?.keyId || !parsed.keySecret) {
             throw new BadRequestException(
                 "Stored provider credentials are malformed",
             );
@@ -2045,7 +2292,7 @@ export class PaymentsService {
             });
             if (!row) {
                 throw new BadRequestException(
-                    `Provider "${name}" is not connected for this organization`,
+                    `Provider "${name}" isn't connected for this business`,
                 );
             }
             if (row.status !== "CONNECTED") {
@@ -2062,12 +2309,12 @@ export class PaymentsService {
         });
         if (connected.length === 0) {
             throw new BadRequestException(
-                "No connected payment provider for this organization",
+                "No payment provider is connected for this business",
             );
         }
         if (connected.length > 1) {
             throw new ConflictException(
-                "Multiple providers connected — specify which provider to use",
+                "More than one provider is connected. Choose which one to use.",
             );
         }
         return connected[0];

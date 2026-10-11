@@ -162,13 +162,13 @@ describe("the fix beside each problem", () => {
         );
     });
 
-    it("a failed renewal offers Retry charge to someone who may write subscriptions (D13)", () => {
+    it("a failed renewal offers Try the charge again to someone who may write subscriptions (D13)", () => {
         expect(
             problemAction("renewal_failed", {
                 can: { remind: false, retry: true },
                 shop: true,
             }),
-        ).toBe("Retry charge");
+        ).toBe("Try the charge again");
         expect(
             problemAction("renewal_failed", {
                 can: { remind: true, retry: false },
@@ -186,7 +186,7 @@ describe("the fix beside each problem", () => {
         ).toBe("Open invoice");
     });
 
-    it("Retry charge stays hidden until autopay charging (D13) is live", () => {
+    it("Try the charge again stays hidden until autopay charging (D13) is live", () => {
         expect(problemAction("renewal_failed", { can, shop: true })).toBe(
             "Open subscription",
         );

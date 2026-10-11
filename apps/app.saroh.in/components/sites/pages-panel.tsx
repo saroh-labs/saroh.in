@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { AddPagePanel, MENU_ROW } from "@/components/sites/add-page-panel";
 import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
@@ -107,16 +108,13 @@ export function PagesPanel({
         router.push(`/sites/${siteId}?page=${pageId}`);
     }
 
-    async function remove(page: SitePage) {
-        if (removeInFlight.current) return;
+    async function remove(page: SitePage): Promise<ConfirmResult> {
+        if (removeInFlight.current) return false;
         removeInFlight.current = true;
         try {
             const res = await deletePage(siteId, page.id);
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            showSuccess(`Deleted ${page.title}.`);
+            if (!res.ok) return { ok: false, error: res.error };
+            showSuccess("Page deleted.");
             onClose();
             if (page.id === activePageId) router.push(`/sites/${siteId}`);
             router.refresh();
@@ -191,7 +189,7 @@ export function PagesPanel({
                                 {page.title}
                             </span>
                             {marks.unseen ? (
-                                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                                     Can&apos;t be seen
                                 </span>
                             ) : marks.notInMenu ? (
@@ -202,7 +200,6 @@ export function PagesPanel({
                             {current ? (
                                 <Check
                                     aria-hidden
-                                    strokeWidth={2.2}
                                     className="size-3.5 shrink-0 text-foreground"
                                 />
                             ) : null}
@@ -286,13 +283,13 @@ export function PagesPanel({
             <ConfirmDialog
                 open={deleteOpen}
                 onOpenChange={setDeleteOpen}
-                title={`Delete "${pendingDelete?.title ?? ""}"?`}
-                description="Everything on the page is deleted with it. This cannot be undone."
+                title={`Delete ${pendingDelete?.title ?? "this page"}?`}
+                description="Everything on the page is deleted with it. Your other pages stay as they are. This cannot be undone."
                 confirmLabel="Delete page"
-                cancelLabel="Keep page"
-                onConfirm={() => {
-                    if (pendingDelete) void remove(pendingDelete);
-                }}
+                keepLabel="Keep page"
+                onConfirm={() =>
+                    pendingDelete ? remove(pendingDelete) : undefined
+                }
             />
         </>
     );
@@ -329,14 +326,14 @@ function Disclosure({
             <span className="shrink-0 text-muted-foreground">{icon}</span>
             <span className="min-w-0 flex-1 truncate">{label}</span>
             {hint ? (
-                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                     {hint}
                 </span>
             ) : null}
             <ChevronRight
                 aria-hidden
                 className={cn(
-                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform duration-fast",
                     open && "rotate-90",
                 )}
             />

@@ -14,6 +14,7 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import {
     ANALYTICS_AGGREGATE_TYPE,
     AnalyticsAggregateHandler,
+    pastRetention,
 } from "./analytics-aggregate.handler";
 
 const eventFindMany = prisma.analyticsEvent.findMany as jest.Mock;
@@ -90,7 +91,36 @@ function jobFor(organizationId: string): Job {
 }
 
 describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+        // The day is a fixed date: pin "now" the day after it, so the
+        // retention guard (#799) never ages the fixture out.
+        jest.useFakeTimers({
+            now: new Date("2026-07-20T06:00:00Z"),
+            advanceTimers: true,
+        });
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it("leaves a day past retention as it is: no read, no rewrite (#799)", async () => {
+        wireFindMany();
+        // 400 days on, the fixture day's events may already be swept.
+        jest.setSystemTime(new Date("2027-08-24T06:00:00Z"));
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(eventFindMany).not.toHaveBeenCalled();
+        expect(aggregateUpsert).not.toHaveBeenCalled();
+    });
+
+    it("pastRetention is true only for a day that starts before the 400-day cutoff", () => {
+        const now = new Date("2027-08-23T12:00:00Z");
+        // Cutoff: 2026-07-19T12:00Z.
+        expect(pastRetention(new Date("2026-07-19T00:00:00Z"), now)).toBe(true);
+        expect(pastRetention(new Date("2026-07-20T00:00:00Z"), now)).toBe(
+            false,
+        );
+    });
 
     it("reconciles 3 site.view over 2 paths into correct count + uniqueCount", async () => {
         wireFindMany();

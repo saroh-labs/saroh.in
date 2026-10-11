@@ -1,5 +1,6 @@
 import { destructiveAlertClasses } from "../../alert";
 import { cn } from "../../lib/utils";
+import type { BusinessReach } from "../../reach-links";
 import type { DaysState } from "../flow-state";
 import type {
     BookingDay,
@@ -23,7 +24,6 @@ export function WhenStep({
     sessions,
     more,
     zone,
-    phone,
     service,
     chosen,
     business,
@@ -32,6 +32,12 @@ export function WhenStep({
     onStart,
     onMore,
     waitlist,
+    person = null,
+    onPerson,
+    skip = 0,
+    later = null,
+    onSkip,
+    reach = null,
 }: {
     daysState: DaysState;
     days: BookingDays | null;
@@ -41,7 +47,6 @@ export function WhenStep({
     sessions: BookingStart[];
     more: boolean;
     zone: string;
-    phone: boolean;
     service: BookingService;
     chosen: BookingStart | null;
     business: string;
@@ -54,7 +59,18 @@ export function WhenStep({
      * it, and say where the customer stands. Absent: full is full.
      */
     waitlist?: { placeOf: (startAt: string) => WaitlistPlace | undefined };
+    /** The person asked for ("With: Asha"); null for anyone. */
+    person?: string | null;
+    onPerson?: (id: string | null) => void;
+    /** Days from today the two weeks on show start. */
+    skip?: number;
+    /** Where "Show later dates" goes; null when there is nothing later. */
+    later?: number | null;
+    onSkip?: (skip: number) => void;
+    /** A call and a message, offered when nothing is free. */
+    reach?: BusinessReach | null;
 }) {
+    const weeks = { skip, later, onSkip };
     return (
         <div className={card}>
             <StepHead
@@ -104,12 +120,16 @@ export function WhenStep({
                     days={days}
                     day={day}
                     zone={zone}
-                    phone={phone}
                     staff={service.staff}
                     chosen={chosen}
                     onDay={onDay}
                     onStart={onStart}
                     business={business}
+                    people={days.staff ?? []}
+                    person={person}
+                    onPerson={onPerson}
+                    weeks={weeks}
+                    reach={reach}
                 />
             ) : days ? (
                 <Sessions
@@ -121,6 +141,8 @@ export function WhenStep({
                     chosen={chosen}
                     onPick={onStart}
                     waitlist={waitlist}
+                    weeks={weeks}
+                    reach={reach}
                 />
             ) : null}
         </div>

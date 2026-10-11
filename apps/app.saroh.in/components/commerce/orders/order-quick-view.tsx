@@ -1,7 +1,10 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -27,6 +30,7 @@ import {
 } from "@/lib/orders/row-menu";
 import { quickVisitsText } from "@/lib/orders/visits";
 
+import { Notice } from "@saroh/ui/notice";
 import { useOrderStep } from "./use-order-step";
 
 type Read =
@@ -154,7 +158,7 @@ export function OrderQuickView({
                     <Button
                         asChild
                         variant="outline"
-                        className="mr-auto h-[38px] cursor-pointer gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                        className="mr-auto cursor-pointer gap-[7px] active:scale-[0.98]"
                     >
                         <Link href={orderPageHref(row.store.id, row.id)}>
                             Open full page
@@ -165,7 +169,7 @@ export function OrderQuickView({
                         next.via === "page" ? (
                             <Button
                                 asChild
-                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                                className="cursor-pointer active:scale-[0.98]"
                             >
                                 <Link
                                     href={orderPageHref(
@@ -189,7 +193,7 @@ export function OrderQuickView({
                                         to: next.to,
                                     })
                                 }
-                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                                className="cursor-pointer active:scale-[0.98]"
                             >
                                 {next.label}
                             </Button>
@@ -199,31 +203,30 @@ export function OrderQuickView({
             }
         >
             {read.state === "failed" ? (
-                <div
-                    role="alert"
-                    className="flex flex-wrap items-center gap-2.5 rounded-[11px] border border-destructive-subtle-foreground/40 bg-destructive-subtle px-3.5 py-3 text-[13px] text-destructive-subtle-foreground"
-                >
-                    <span className="min-w-0 flex-1">{read.error}</span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setRead({ state: "loading" });
-                            setAttempt((n) => n + 1);
-                        }}
-                    >
-                        Try again
-                    </Button>
-                </div>
+                <Notice tone="error" align="center">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="min-w-0 flex-1">{read.error}</span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setRead({ state: "loading" });
+                                setAttempt((n) => n + 1);
+                            }}
+                        >
+                            Try again
+                        </Button>
+                    </div>
+                </Notice>
             ) : order ? (
                 <QuickViewBody order={order} />
             ) : (
-                <div className="grid gap-3" role="status">
+                <div className="grid gap-3" role="status" aria-busy="true">
                     <span className="sr-only">Loading order {ref}</span>
-                    <div className="h-6 w-3/4 rounded-full bg-muted" />
-                    <div className="h-24 rounded-[11px] bg-muted" />
-                    <div className="h-4 w-1/2 rounded-[6px] bg-muted" />
+                    <Skeleton aria-hidden className="h-6 w-3/4" />
+                    <Skeleton aria-hidden className="h-24" />
+                    <Skeleton aria-hidden className="h-4 w-1/2" />
                 </div>
             )}
         </QuickLook>
@@ -236,13 +239,12 @@ export function OrderQuickView({
  * keyboard focus.
  */
 const CUSTOMER_LINK =
-    "cursor-pointer rounded-sm text-brand transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "cursor-pointer rounded-sm text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function QuickViewBody({ order }: { order: OrderRead }) {
     const money = order.money;
     const currency = money?.currency ?? "INR";
-    const format = (a: string | number) =>
-        formatMoneyMajor(a, currency) ?? String(a);
+    const format = (a: string | number) => formatMoneyMajor(a, currency);
     // Without the money read, whether it is paid — never a figure (UX-010).
     const payment =
         quickPayment(order, format) ?? kitchenPayment(order)?.label ?? null;
@@ -296,26 +298,16 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
 
             {/* Needs attention (B15): what the API let this viewer see. */}
             {attentionLines(order.attention).map((a) => (
-                <div
-                    key={a.id}
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-[11px] py-[9px] text-[13px] leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" key={a.id}>
                     <strong>{a.head}</strong>
                     {a.detail ? ` ${a.detail}` : null}
-                </div>
+                </Notice>
             ))}
             {order.attention === null ? (
-                <div
-                    role="status"
-                    className="rounded-[9px] bg-muted px-[11px] py-[9px] text-[13px] leading-[1.45] text-muted-foreground"
-                >
-                    <strong className="text-foreground">
-                        Needs attention: not available.
-                    </strong>{" "}
-                    It couldn&apos;t be read, so check with the customer before
-                    it goes out.
-                </div>
+                <PartialRead
+                    things="what needs attention"
+                    so="Check with the customer before it goes out."
+                />
             ) : null}
 
             <section
@@ -405,7 +397,7 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                     )}
                     {c ? (
                         <span className="text-muted-foreground">
-                            {` · ${c.orderCount} ${c.orderCount === 1 ? "order" : "orders"}`}
+                            {` · ${count(c.orderCount, "order")}`}
                         </span>
                     ) : null}
                     {reach ? (

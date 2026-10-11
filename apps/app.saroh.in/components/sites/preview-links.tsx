@@ -1,19 +1,22 @@
 "use client";
 
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { QrButton } from "@/components/qr/qr-button";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import {
     createPreviewLink,
     listPreviewLinks,
     revokePreviewLink,
 } from "@/lib/sites/actions";
-import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * Share a preview (#198): the Review tab's top block.
@@ -47,25 +50,6 @@ function previewUrl(token: string): string {
     return `https://${root}/preview/${encodeURIComponent(token)}`;
 }
 
-/** "11 September 2026" — the day, which is how people say when a link dies. */
-function dayOf(iso: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC",
-    }).format(new Date(iso));
-}
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 export function PreviewLinks({ siteId }: { siteId: string }) {
     const zone = useBusinessZone();
     const [links, setLinks] = useState<SitePreviewLinkView[] | null>(null);
@@ -88,27 +72,29 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
     const active = (links ?? []).filter((l) => l.state === "active");
 
     async function create() {
-        setBusy("create");
-        const res = await createPreviewLink(siteId, days);
-        setBusy(null);
+        const res = await runAction(() => createPreviewLink(siteId, days), {
+            setBusy: (on) => setBusy(on ? "create" : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
         setLinks((prev) => [res.data, ...(prev ?? [])]);
         setSecrets((prev) => ({ ...prev, [res.data.id]: res.data.token }));
-        const copied = await copy(previewUrl(res.data.token));
+        const copied = await copyText(previewUrl(res.data.token));
         showSuccess(
             copied
-                ? `Link copied. It stops working on ${dayOf(res.data.expiresAt)}.`
-                : `Link ready. It stops working on ${dayOf(res.data.expiresAt)}.`,
+                ? `Link copied. It stops working on ${formatDate(res.data.expiresAt, "UTC", { month: "long", year: "always" })}.`
+                : `Link ready. It stops working on ${formatDate(res.data.expiresAt, "UTC", { month: "long", year: "always" })}.`,
         );
     }
 
     async function revoke(link: SitePreviewLinkView) {
-        setBusy(link.id);
-        const res = await revokePreviewLink(siteId, link.id);
-        setBusy(null);
+        const res = await runAction(() => revokePreviewLink(siteId, link.id), {
+            setBusy: (on) => setBusy(on ? link.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -121,9 +107,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
 
     return (
         <section className="shrink-0 border-b p-3">
-            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                Share a preview
-            </h3>
+            <h3 className="label">Share a preview</h3>
 
             {links === null ? (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -144,10 +128,10 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        size="sm"
-                                        className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
+                                        size="xs"
+                                        className="shrink-0 px-1.5 text-[0.6875rem]"
                                         onClick={() =>
-                                            void copy(
+                                            void copyText(
                                                 previewUrl(secrets[link.id]),
                                             ).then((ok) =>
                                                 ok
@@ -155,32 +139,53 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                                           "Link copied.",
                                                       )
                                                     : showError(
-                                                          "Could not copy. Select the link and copy it yourself.",
+                                                          copyFailedMessage(),
                                                       ),
                                             )
                                         }
                                     >
                                         Copy
                                     </Button>
+                                    <QrButton
+                                        compact="always"
+                                        variant="ghost"
+                                        className="size-6"
+                                        link={{
+                                            mode: "instant",
+                                            url: previewUrl(secrets[link.id]),
+                                            what: "this preview link",
+                                            opens: "preview",
+                                            fileName: "preview-link-qr",
+                                        }}
+                                    />
                                 </div>
                             ) : (
                                 <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
-                                    Shared {shortDate(link.createdAt, zone)}
+                                    Shared {formatDate(link.createdAt, zone)}
                                     {link.createdBy.name
                                         ? ` by ${link.createdBy.name}`
                                         : ""}
                                     . Its address was shown once, when it was
-                                    made; create a new link to share it again.
+                                    made. Create a new link to share it again.
                                 </p>
                             )}
                             <p className="mt-1.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
-                                Stops working on {dayOf(link.expiresAt)}.{" "}
+                                Stops working on{" "}
+                                {formatDate(link.expiresAt, "UTC", {
+                                    month: "long",
+                                    year: "always",
+                                })}
+                                .{" "}
                                 {link.lastUsedAt ? (
                                     <span
-                                        title={exactDate(link.lastUsedAt, zone)}
+                                        title={formatDateTime(
+                                            link.lastUsedAt,
+                                            zone,
+                                            { year: "always" },
+                                        )}
                                     >
                                         Last opened{" "}
-                                        {shortDate(link.lastUsedAt, zone)}.
+                                        {formatDate(link.lastUsedAt, zone)}.
                                     </span>
                                 ) : (
                                     "Not opened yet."
@@ -190,9 +195,9 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    size="sm"
+                                    size="xs"
                                     disabled={busy === link.id}
-                                    className="h-6 px-1.5 text-[0.6875rem]"
+                                    className="px-1.5 text-[0.6875rem]"
                                     onClick={() => void revoke(link)}
                                 >
                                     Turn off
@@ -209,35 +214,24 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
             )}
 
             <div className="mt-2 flex items-center gap-1">
-                <div
-                    role="radiogroup"
-                    aria-label="How long the link works"
-                    className="flex rounded border p-0.5"
-                >
-                    {CHOICES.map((c) => (
-                        <button
-                            key={c.days}
-                            type="button"
-                            role="radio"
-                            aria-checked={days === c.days}
-                            onClick={() => setDays(c.days)}
-                            className={cn(
-                                "rounded px-1.5 py-0.5 text-[0.6875rem] transition-colors",
-                                days === c.days
-                                    ? "bg-foreground text-background"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {c.label}
-                        </button>
-                    ))}
-                </div>
+                <Segmented
+                    label="How long the link works"
+                    value={String(days)}
+                    onValueChange={(v) => {
+                        const to = CHOICES.find((c) => String(c.days) === v);
+                        if (to) setDays(to.days);
+                    }}
+                    options={CHOICES.map((c) => ({
+                        value: String(c.days),
+                        label: c.label,
+                    }))}
+                />
                 <Button
                     type="button"
-                    size="sm"
+                    size="xs"
                     variant="brand"
                     disabled={busy === "create"}
-                    className="ml-auto h-6 px-2 text-[0.6875rem]"
+                    className="ml-auto text-[0.6875rem]"
                     onClick={() => void create()}
                 >
                     {active.length > 0 ? "New link" : "Create link"}

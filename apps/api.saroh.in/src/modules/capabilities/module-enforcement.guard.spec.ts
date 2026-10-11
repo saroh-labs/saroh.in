@@ -1,6 +1,9 @@
 jest.mock("@saroh/database", () => ({
     prisma: { store: { findFirst: jest.fn() } },
 }));
+jest.mock("./module-enforcement.log", () => ({
+    logModuleEnforcement: jest.fn(),
+}));
 
 import type { ExecutionContext } from "@nestjs/common";
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
@@ -11,10 +14,15 @@ import { prisma } from "@saroh/database";
 import { isMemberPaused, memberPaused } from "../billing/paused-errors";
 import type { OrganizationContextService } from "../organizations/organization-context.service";
 import type { ModuleAvailabilityService } from "./module-availability.service";
-import { ModuleEnforcementGuard } from "./module-enforcement.guard";
+import {
+    ModuleEnforcementGuard,
+    moduleEnforcementMode,
+} from "./module-enforcement.guard";
+import { logModuleEnforcement } from "./module-enforcement.log";
 import { IGNORE_MODULE_READINESS_KEY } from "./require-module.decorator";
 
 const storeFindFirst = prisma.store.findFirst as jest.Mock;
+const logged = logModuleEnforcement as jest.Mock;
 
 function execContext(request: unknown): ExecutionContext {
     return {
@@ -130,6 +138,171 @@ describe("ModuleEnforcementGuard", () => {
         await expect(
             guard.canActivate(execContext(REQUEST)),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    describe("MODULE_ENFORCEMENT's three modes", () => {
+        it.each([
+            [undefined, "off"],
+            ["", "off"],
+            ["0", "off"],
+            ["false", "off"],
+            ["shadow", "shadow"],
+            ["1", "on"],
+            ["true", "on"],
+        ])("%s reads as %s", (value, mode) => {
+            if (value === undefined) delete process.env.MODULE_ENFORCEMENT;
+            else process.env.MODULE_ENFORCEMENT = value;
+            expect(moduleEnforcementMode()).toBe(mode);
+        });
+    });
+
+    describe("logging (#117)", () => {
+        const ROUTED = {
+            ...REQUEST,
+            method: "POST",
+            route: { path: "/organizations/:organizationId/orders" },
+        };
+
+        it("logs nothing, and looks nothing up, while off", async () => {
+            const { guard, evaluate } = build({
+                moduleKey: "CRM",
+                blockers: [{ code: "ORG_MODULE_DISABLED" }],
+            });
+            await guard.canActivate(execContext(ROUTED));
+            expect(evaluate).not.toHaveBeenCalled();
+            expect(logged).not.toHaveBeenCalled();
+        });
+
+        it("shadow lets a request through and logs what it would refuse", async () => {
+            process.env.MODULE_ENFORCEMENT = "shadow";
+            const { guard } = build({
+                moduleKey: "COMMERCE",
+                blockers: [{ code: "ORG_MODULE_DISABLED" }],
+            });
+            await expect(guard.canActivate(execContext(ROUTED))).resolves.toBe(
+                true,
+            );
+            expect(logged).toHaveBeenCalledWith(
+                "module_enforcement_would_refuse",
+                {
+                    module: "COMMERCE",
+                    route: "POST /organizations/:organizationId/orders",
+                    org: "org_1",
+                    blockers: ["ORG_MODULE_DISABLED"],
+                    status: 403,
+                },
+            );
+        });
+
+        it("shadow names a would-be 404 for an actor who may not use the module", async () => {
+            process.env.MODULE_ENFORCEMENT = "shadow";
+            const { guard } = build({
+                moduleKey: "CRM",
+                blockers: [{ code: "UNAUTHORIZED" }],
+            });
+            await expect(guard.canActivate(execContext(ROUTED))).resolves.toBe(
+                true,
+            );
+            expect(logged).toHaveBeenCalledWith(
+                "module_enforcement_would_refuse",
+                expect.objectContaining({ status: 404 }),
+            );
+        });
+
+        it("shadow logs nothing when the module is available", async () => {
+            process.env.MODULE_ENFORCEMENT = "shadow";
+            const { guard, evaluate } = build({ moduleKey: "CRM" });
+            await expect(guard.canActivate(execContext(ROUTED))).resolves.toBe(
+                true,
+            );
+            expect(evaluate).toHaveBeenCalled();
+            expect(logged).not.toHaveBeenCalled();
+        });
+
+        it("shadow never fails a request when the lookup throws", async () => {
+            process.env.MODULE_ENFORCEMENT = "shadow";
+            const { guard, evaluate } = build({ moduleKey: "CRM" });
+            evaluate.mockRejectedValue(new Error("db down"));
+            await expect(guard.canActivate(execContext(ROUTED))).resolves.toBe(
+                true,
+            );
+            expect(logged).toHaveBeenCalledWith(
+                "module_enforcement_shadow_failed",
+                {
+                    module: "CRM",
+                    route: "POST /organizations/:organizationId/orders",
+                },
+            );
+        });
+
+        it("shadow leaves a paused member to the service, unlogged", async () => {
+            process.env.MODULE_ENFORCEMENT = "shadow";
+            const { guard } = build({
+                moduleKey: "COMMERCE",
+                resolveError: memberPaused("Rye Bakery"),
+            });
+            await expect(
+                guard.canActivate(
+                    execContext({
+                        user: { id: "u" },
+                        params: { storeId: "store_1" },
+                    }),
+                ),
+            ).resolves.toBe(true);
+            expect(logged).not.toHaveBeenCalled();
+        });
+
+        it("on logs the refusal it answers with", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const { guard } = build({
+                moduleKey: "COMMERCE",
+                blockers: [{ code: "ORG_MODULE_DISABLED" }],
+            });
+            await expect(
+                guard.canActivate(execContext(ROUTED)),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(logged).toHaveBeenCalledWith("module_enforcement_refused", {
+                module: "COMMERCE",
+                route: "POST /organizations/:organizationId/orders",
+                org: "org_1",
+                blockers: ["ORG_MODULE_DISABLED"],
+                status: 403,
+            });
+        });
+
+        it("on logs nothing for a request it lets through", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const { guard } = build({ moduleKey: "COMMERCE" });
+            await guard.canActivate(execContext(ROUTED));
+            expect(logged).not.toHaveBeenCalled();
+        });
+
+        it("names the controller and handler when there is no route template", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const { guard } = build({
+                moduleKey: "CRM",
+                blockers: [{ code: "UNAUTHORIZED" }],
+            });
+            class LeadsController {}
+            function list() {
+                return undefined;
+            }
+            const context = {
+                getHandler: () => list,
+                getClass: () => LeadsController,
+                switchToHttp: () => ({ getRequest: () => REQUEST }),
+            } as unknown as ExecutionContext;
+            await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(logged).toHaveBeenCalledWith(
+                "module_enforcement_refused",
+                expect.objectContaining({
+                    route: "LeadsController.list",
+                    status: 404,
+                }),
+            );
+        });
     });
 
     describe("a route that works before setup is finished", () => {

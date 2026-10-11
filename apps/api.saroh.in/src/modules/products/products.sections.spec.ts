@@ -453,7 +453,7 @@ describe("Products v2: sections, photos, overview (DB)", () => {
                         url: url(i + 1),
                     })),
                 }),
-            ).rejects.toThrow("Already 15 photos — take one off first.");
+            ).rejects.toThrow("Already 15 photos. Take one off first.");
         });
 
         it("moves a photo to the front, keeping its alt text", async () => {

@@ -20,10 +20,10 @@ const COPY: EditorCopy = {
     noun: "plan",
     liveLabel: "Open",
     liveClean: "Open to new sign-ups · no changes",
-    draftSaved: "Draft · saved — nobody can join it yet",
+    draftSaved: "Draft · saved, nobody can join it yet",
     draftFirstSaved:
-        "Saved as a draft — nobody can join it yet. Delete draft if you change your mind.",
-    notStarted: "Not saved yet — start with a name",
+        "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
+    notStarted: "Not saved yet. Start with a name",
     viewLabel: "View plan",
 };
 
@@ -290,7 +290,7 @@ describe("the status line", () => {
             { type: "failed", seq: 1, error: "x" },
         ]);
         expect(line(s, LIVE)).toEqual({
-            text: "Not saved — your changes are still here.",
+            text: "Not saved. Your changes are still here.",
             tone: "danger",
             action: "retry",
         });
@@ -361,7 +361,7 @@ describe("the header's actions", () => {
         expect(a.publishOn).toBe(false);
         expect(a.discard).toBe(false);
         expect(a.publishWhy).toBe(
-            "Nothing to publish yet — edits appear here as a draft first.",
+            "Nothing to publish yet. Edits appear here as a draft first.",
         );
     });
 
@@ -376,14 +376,14 @@ describe("the header's actions", () => {
         ]);
         expect(one.publishOn).toBe(false);
         expect(one.publishWhy).toBe(
-            "1 thing to fix before publishing — give it a name.",
+            "1 thing to fix before publishing: give it a name.",
         );
         const two = act(saved, DRAFT, [
             { field: "name", message: "Give it a name" },
             { field: "price", message: "Add the price" },
         ]);
         expect(two.publishWhy).toBe(
-            "2 things to fix before publishing — they're marked below.",
+            "2 things to fix before publishing. They're marked below.",
         );
     });
 
@@ -411,7 +411,7 @@ describe("the header's actions", () => {
             { type: "failed", seq: 1, error: "x" },
         ]);
         expect(act(failed, CHANGES).publishOn).toBe(false);
-        expect(act(failed, CHANGES).publishWhy).toMatch(/try again/);
+        expect(act(failed, CHANGES).publishWhy).toMatch(/Try again/);
     });
 
     it("turns Publish off while another action is out", () => {
@@ -461,10 +461,9 @@ describe("naming what would be lost", () => {
                 created: true,
                 noun: "plan",
             }),
-        ).toEqual({
-            title: "Leave with unsaved changes?",
-            body: "Your changes to price and name aren't saved, and will be lost if you leave now.",
-        });
+        ).toBe(
+            "Your changes to price and name aren't saved, and will be lost if you leave now.",
+        );
     });
 
     it("words it for a conflict, naming who", () => {
@@ -480,7 +479,7 @@ describe("naming what would be lost", () => {
                 fields: ["price"],
                 created: true,
                 noun: "plan",
-            }).body,
+            }),
         ).toBe(
             "Priya changed this plan, so your changes to price aren't saved and will be lost.",
         );
@@ -494,9 +493,8 @@ describe("naming what would be lost", () => {
                 created: false,
                 noun: "pack",
             }),
-        ).toEqual({
-            title: "Leave without saving it?",
-            body: "Nothing you've entered is kept — the pack saves as a draft once it has a name.",
-        });
+        ).toBe(
+            "Nothing you've entered is kept, because the pack saves as a draft once it has a name.",
+        );
     });
 });

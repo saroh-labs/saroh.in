@@ -1,5 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
+import * as contract from "./event-contract";
 import {
     ANALYTICS_RETENTION_DAYS,
     PUBLIC_INGESTABLE_TYPES,
@@ -91,5 +94,50 @@ describe("event-contract — validateEventProperties", () => {
 
     it("has a sane retention window constant", () => {
         expect(ANALYTICS_RETENTION_DAYS).toBe(400);
+    });
+
+    it("keeps order.refunded off the public intake too (#867)", () => {
+        expect(PUBLIC_INGESTABLE_TYPES.has("order.refunded")).toBe(false);
+        expect(
+            validateEventProperties("order.refunded", 1, {
+                orderId: "order_1",
+                amountCents: 4200,
+            }),
+        ).toEqual({ orderId: "order_1", amountCents: 4200 });
+    });
+});
+
+/**
+ * #867: `order.paid` sat in the contract for months with nothing writing
+ * it, so Insights' orders figure read 0 beside real orders. Every event
+ * type the contract declares must be named by some code outside the
+ * contract and its specs: a writer, or the intake's reader.
+ */
+describe("event-contract — every declared type is used", () => {
+    const srcRoot = join(__dirname, "..", "..");
+    const sources = (dir: string): string[] =>
+        readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+            const path = join(dir, entry.name);
+            if (entry.isDirectory()) return sources(path);
+            return entry.name.endsWith(".ts") &&
+                !entry.name.endsWith(".spec.ts") &&
+                entry.name !== "event-contract.ts"
+                ? [path]
+                : [];
+        });
+    const code = sources(srcRoot).map((file) => readFileSync(file, "utf8"));
+    const declared = Object.keys(contract).filter((name) =>
+        name.endsWith("_TYPE"),
+    );
+
+    it("finds the declared types", () => {
+        expect(declared).toEqual(
+            expect.arrayContaining(["ORDER_PAID_TYPE", "ORDER_REFUNDED_TYPE"]),
+        );
+    });
+
+    it.each(declared)("%s is named outside the contract", (name) => {
+        const named = new RegExp(`\\b${name}\\b`);
+        expect(code.some((text) => named.test(text))).toBe(true);
     });
 });

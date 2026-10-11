@@ -44,7 +44,9 @@ export function WaitlistDone({
     const listed = joined.position !== undefined;
 
     return (
-        <div className="flex flex-col gap-[18px]">
+        // What they typed, said back: the business's name, their email and
+        // their own link. Masked in a session recording (DEC-125).
+        <div className="flex flex-col gap-[18px]" data-ph-mask="">
             <div className="flex items-center gap-2.5">
                 <span
                     aria-hidden

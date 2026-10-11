@@ -141,6 +141,11 @@ describe("job producers and consumers agree", () => {
         }
     });
 
+    it("re-checks custom domains (#860): domains.recheck has its handler", () => {
+        expect(produced.has("domains.recheck")).toBe(true);
+        expect(consumed.has("domains.recheck")).toBe(true);
+    });
+
     it("names every job type with a string literal or an exported constant", () => {
         expect(unresolved).toEqual([]);
     });

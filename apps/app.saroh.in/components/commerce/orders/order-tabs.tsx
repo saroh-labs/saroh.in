@@ -1,64 +1,37 @@
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
+"use client";
 
+import { ListFilter } from "@/components/shared/list-toolbar";
 import type { OrderListPage } from "@/lib/orders/business-service";
-import type { OrdersQuery } from "@/lib/orders/list-query";
-import { ORDERS_TABS, ordersHref } from "@/lib/orders/list-query";
+import type { OrdersQuery, OrdersTab } from "@/lib/orders/list-query";
+import { ORDERS_TABS } from "@/lib/orders/list-query";
 
 /**
- * All · Open · Refunded, each with its count from the API (counted under
- * every filter but the tab, so the three agree with the list whichever is
- * picked). A tab is a link: it changes the address, and the server reads the
- * first page of it. Open's count is tinted while there is work in it.
- *
- * A tab filters the page; it is not a page. So it says `aria-current="true"`,
- * and `"page"` stays the rail's.
+ * All orders · Open · Refunded, each with its count from the API (counted
+ * under every filter but this one, so the three agree with the list
+ * whichever is picked). They narrow the one list of orders by status, so
+ * they are one of the toolbar's dropdowns, not tabs and not a row of chips.
+ * A choice goes into the address as `?tab=`, as it always has, and the
+ * server reads the first page of it.
  */
-export function OrderTabs({
+export function OrderStatusFilter({
     query,
     counts,
+    go,
 }: {
     query: OrdersQuery;
     counts: OrderListPage["counts"];
+    go: (patch: Partial<OrdersQuery>) => void;
 }) {
     return (
-        <nav
-            aria-label="Orders"
-            className="flex flex-wrap gap-0.5 border-b border-border"
-        >
-            {ORDERS_TABS.map((tab) => {
-                const on = tab.id === query.tab;
-                const n = counts[tab.id];
-                const urgent = tab.id === "open" && n > 0;
-                return (
-                    <Link
-                        key={tab.id}
-                        href={ordersHref(query, { tab: tab.id })}
-                        scroll={false}
-                        aria-current={on ? "true" : undefined}
-                        className={cn(
-                            "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                            on
-                                ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                : "font-medium text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        <span>{tab.label}</span>
-                        <span
-                            className={cn(
-                                "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                urgent
-                                    ? "bg-brand-subtle text-brand-subtle-foreground"
-                                    : on
-                                      ? "bg-muted text-foreground"
-                                      : "bg-muted text-muted-foreground",
-                            )}
-                        >
-                            {n}
-                        </span>
-                    </Link>
-                );
-            })}
-        </nav>
+        <ListFilter<OrdersTab>
+            label="Order status"
+            value={query.tab}
+            onValueChange={(tab) => go({ tab })}
+            options={ORDERS_TABS.map((tab) => ({
+                value: tab.id,
+                label: tab.id === "all" ? "All orders" : tab.label,
+                count: counts[tab.id],
+            }))}
+        />
     );
 }

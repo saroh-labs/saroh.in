@@ -29,6 +29,16 @@ model User {
   // so the User table no longer carries a password column.
   emailVerified Boolean @default(false)
 
+  // "Help improve Saroh": whether this person shares how they use the
+  // workspace, as masked session recordings (DEC-125). Null: never chosen,
+  // which reads as yes only where recording is switched on at all. False:
+  // they said no, on every device. Theirs, not a business's.
+  sharesUsage Boolean?
+  // When they dismissed the workspace's one-time notice that says how it is
+  // recorded (DEC-125, 10 Oct). Null: not yet, so it is shown, and nothing is
+  // recorded before it has been.
+  usageNoticeSeenAt DateTime?
+
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
@@ -98,6 +108,21 @@ model Organization {
   deletionReason      String?
   deletedRetainedAt   DateTime?
 
+  // Legal hold (DEC-122, owner 10 Oct): set by an operator on a business
+  // found doing something the law prohibits, lifted only by a Platform
+  // Owner. While set, nothing deletes or erases the business's data: no
+  // deletion can be scheduled, the deletion sweep, its clean-up, the
+  // retention eraser and every retention sweep leave its rows, and privacy
+  // removals and "Download your data" are refused. Read it through
+  // `organizations/legal-hold.ts`.
+  legalHoldAt       DateTime?
+  legalHoldReason   String?
+  legalHoldByUserId String?
+  // When `organization.retention.erase` finished erasing a deleted
+  // business's files and personal data, RETENTION_AFTER_DELETION_DAYS (180)
+  // after `deletedRetainedAt` (DEC-122). Null until then.
+  retentionErasedAt DateTime?
+
   // Relations
   stores              Store[]
   memberships         Membership[]
@@ -141,6 +166,9 @@ model Organization {
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
 
+  // "Download your data" (DEC-120): each zip an owner asked for.
+  dataExports DataExport[]
+
   // Products v2 (#460): photos, per-variant stock, store options, defaults.
   productImages      ProductImage[]
   variantInventory   VariantInventory[]
@@ -180,6 +208,11 @@ model Organization {
   siteVerifications    SiteVerification[]
   siteTrackers         SiteTracker[]
   siteTrackingSettings SiteTrackingSettings[]
+  // A site's QR codes and their daily scan counts.
+  qrCodes              QrCode[]
+  qrScanDays           QrScanDay[]
+  // What customers reported about this business at saroh.in/customers.
+  businessReports      BusinessReport[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -302,6 +335,13 @@ model Organization {
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
 
+  // The moments this business has seen (wave G): a first order, a first
+  // booking, a tenth order. One key per moment, with the time someone put
+  // it away or opened what it pointed at, so it is said once for the whole
+  // business, on every device. The keys are the API's fixed list
+  // (`organizations/moments.ts`). Never a count or anyone's details.
+  momentsSeen Json @default("{}")
+
   // The business's referral code (DEC-102, #812): the `?ref=` its site's
   // "Made with Saroh" credit links with on Free. 8 characters a reader can't
   // confuse, never the business name. Null until the credit is first
@@ -421,6 +461,24 @@ model BusinessProfile {
   // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
+
+  // The business's social links (DEC-128): one canonical https address per
+  // network it has set, keyed by network ("instagram", "whatsapp", …), each
+  // on that network's own host (`@saroh/block-contract` social-links.ts).
+  // Written only through the settings save, which rebuilds every value, and
+  // re-checked on the way out. Null: none.
+  socialLinks                Json?
+  // The website shows the registered address above as where to find the
+  // business (DEC-128). Off by default: it is the legal address, often a
+  // home, and a business with a location customers visit shows that
+  // instead. Read only while no such location has an address.
+  siteShowsRegisteredAddress Boolean @default(false)
+  // The registered address's place on Google Maps (DEC-128): what "Get
+  // directions" opens on the website while that address is the one shown.
+  // One canonical address on Google's own map hosts
+  // (`@saroh/block-contract` normaliseMapLink). Null: a search for the
+  // address.
+  registeredAddressMapUrl    String?
 
   // "Members can pause from their account" (round-2 A8), beside the
   // subscriptions' time zone above: on, a member pauses their own plan for
@@ -648,8 +706,47 @@ model Media {
   productPosters ProductImage[]    @relation("ProductImagePoster")
   // The business whose logo it is (at most one: a logo is per business).
   businessLogos  BusinessProfile[] @relation("BusinessLogo")
+  // The locations whose own logo it is.
+  locationLogos  Store[]           @relation("LocationLogo")
+  // The sites whose icon it is (Website › Settings).
+  siteIcons      Site[]            @relation("SiteIcon")
 
   @@index([organizationId])
+}
+
+// "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's
+// records as CSV files and its uploaded media, built by the
+// `data-export.build` job, kept in object storage behind a signed link and
+// deleted 7 days after it is ready (`data-export.expire`). One QUEUED or
+// RUNNING per business (the partial unique index): asking again while one
+// is being made is answered with that one.
+model DataExport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The owner who asked. A bare id, like AuditEvent's actor: the row
+  // outlives a membership.
+  requestedByUserId String
+
+  status String @default("QUEUED") // QUEUED | RUNNING | READY | FAILED | EXPIRED
+
+  // Where the zip is, once READY; cleared when it expires.
+  storageKey String?
+  sizeBytes  BigInt?
+  // What it holds: rows per file, and media files put in or left out.
+  counts     Json?
+  // Why it failed, in words; never a stack or a provider body.
+  failure    String?
+
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  readyAt   DateTime?
+  expiresAt DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([organizationId], map: "DataExport_one_running_per_org", where: raw("status = 'QUEUED' OR status = 'RUNNING'"))
+  @@index([organizationId, createdAt])
 }
 
 // ============================================================================
@@ -666,7 +763,13 @@ model Store {
   // L15 drops the column (a later release).
   slug        String? @unique
   description String?
+  // The location's own logo (DEC-123): the address it is served from, and
+  // the library object it came from, taken when it was set (the business
+  // logo's pattern). Both null: the location uses the business logo. An
+  // address with no object is one typed in before a logo could be uploaded.
   logo        String?
+  logoMediaId String?
+  logoMedia   Media?  @relation("LocationLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
 
   // Ownership
   // ADR-001: Store is an Organization-owned commerce channel. The nullable
@@ -1581,15 +1684,21 @@ model Order {
   currency String @default("USD")
 
   // Status
-  status        String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-  paymentStatus String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  status         String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus  String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
   // Money taken outside Saroh and recorded on the order: cash, UPI or a
   // card machine at the counter, a payment marked by hand, a difference
   // after an edit recorded as paid — less what an edit handed back from the
   // till. With the order's SUCCEEDED payments, what it has been paid
   // (`orders/hand-payments.ts`). 0 on an order paid by hand before it was
   // kept: such an order counts its total, as it did.
-  paidByHand    Decimal @default(0) @db.Decimal(12, 2)
+  paidByHand     Decimal @default(0) @db.Decimal(12, 2)
+  // Money handed back outside Saroh and recorded on the order ("Record as
+  // refunded", #865, DEC-116): every amount recorded, in full or in part.
+  // What is left to refund is what it was paid less every refund, these
+  // included (`orders/hand-refund.ts`). 0 on an order recorded refunded
+  // before it was kept: that order reads REFUNDED, so nothing is left.
+  refundedByHand Decimal @default(0) @db.Decimal(12, 2)
 
   // Relations
   items        OrderItem[]
@@ -1625,6 +1734,11 @@ model Order {
   // Its invoice, and the credit notes and supplementary invoices that
   // correct it (ADR-008, U5). The order stays the ledger.
   invoices Invoice[]
+
+  // The QR code whose scan opened the page this order was placed from
+  // (`QrCode.id`), when the page's address still carried the scan's tag.
+  // Null for every other order.
+  sourceCode String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1705,6 +1819,8 @@ model Order {
   @@index([organizationId, createdAt])
   // What an account ordered, newest first (A7).
   @@index([customerAccountId, createdAt])
+  // The QR list's Orders count: the few orders that name a code.
+  @@index([sourceCode], map: "Order_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 model OrderItem {
@@ -2076,6 +2192,11 @@ model StoreSettings {
   // ONLINE store has none of them.
   kind              String    @default("ONLINE") // SHOP | ONLINE
   address           String?   @db.Text
+  // The location's place on Google Maps (DEC-128): what "Get directions"
+  // opens on the business's website. One canonical address on Google's own
+  // map hosts (`@saroh/block-contract` normaliseMapLink). Null: a search
+  // for the address.
+  mapUrl            String?
   // Seven entries, Monday first: { day, open: "09:00", close: "18:00", closed }
   openingHours      Json?
   collectionEnabled Boolean   @default(false)
@@ -2279,6 +2400,8 @@ model Session {
 
   @@unique([token])
   @@index([userId])
+  // The security-log retention sweep reads ended sessions in this order (DEC-122).
+  @@index([expiresAt])
 }
 
 model Account {
@@ -2523,7 +2646,7 @@ model AdminOperation {
   id String @id @default(cuid())
 
   kind        String // "jobs.retry" | "webhooks.replay"
-  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED | CANCELLED (#907)
   actorUserId String
   reason      String
 
@@ -2977,6 +3100,17 @@ model Site {
   socialImageHeight Int?
   socialImageBytes  Int?
 
+  // The site's icon (the browser tab, a bookmark, a phone's home screen):
+  // a library object, and the address it is served from, taken when it was
+  // set (the business logo's shape, DEC-124). Draft like the share image:
+  // it travels into the Publication snapshot at publish. Null means none of
+  // its own, and the site then shows the business logo, else a plain tile
+  // with its initial. The library refuses to delete it while it is the
+  // icon; the SetNull is only a backstop.
+  iconMediaId String?
+  iconMedia   Media?  @relation("SiteIcon", fields: [iconMediaId], references: [id], onDelete: SetNull)
+  iconUrl     String?
+
   // The footer a merchant writes for themselves (#202): `{ format, value }`,
   // the same shape richText sections carry, so one authoring surface and one
   // sanitizer serve both.
@@ -3036,6 +3170,8 @@ model Site {
   verifications    SiteVerification[]
   trackers         SiteTracker[]
   trackingSettings SiteTrackingSettings?
+  // The site's QR codes: short links at `/q/<code>` on its Saroh address.
+  qrCodes          QrCode[]
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live
@@ -3662,6 +3798,72 @@ model SiteTrackingSettings {
   @@index([organizationId])
 }
 
+/// A QR code a business made for its site. The printed code holds a short
+/// link, `<address>.saroh.app/q/<code>`, never the target itself: the target
+/// is resolved when the code is scanned, so paper keeps working when a page
+/// moves and a code can be pointed somewhere new.
+model QrCode {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The short id in the link: 3 to 6 characters from an alphabet with no
+  // look-alikes, made by the API. Unique per site, so finding one never
+  // reads across businesses.
+  code String
+
+  // SITE | SHOP | BOOK | PRODUCT | PAGE (CHECKed in the migration).
+  targetKind String
+  // PRODUCT: the product's id. PAGE: the page's id. Null for the others.
+  // An id, not an address, so a renamed product or a moved page still opens.
+  targetRef  String?
+
+  // Where the code is placed: COUNTER | MIRROR | CARD | FLYER | OTHER
+  // (CHECKed in the migration), and the owner's own words for it.
+  place     String
+  placeNote String?
+  // The line printed with the code ("Scan to book").
+  label     String?
+
+  // PLAIN | BRANDED (CHECKed in the migration).
+  style String @default("PLAIN")
+  // "#rrggbb", lower case (CHECKed in the migration).
+  color String
+
+  // Retired, never deleted: paper outlives the row, and a retired code
+  // forwards to the site's home page without counting.
+  retiredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scanDays QrScanDay[]
+
+  @@unique([siteId, code])
+  // The target of (qrCodeId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+/// How many times a QR code was scanned on one day. One row per code and
+/// day, added to in place; nothing about a visitor is stored.
+model QrScanDay {
+  qrCodeId String
+  qrCode   QrCode @relation(fields: [qrCodeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  day   DateTime @db.Date // the UTC day bucket, as the analytics rollups
+  count Int      @default(0)
+
+  @@id([qrCodeId, day])
+  @@index([organizationId])
+}
+
 // ============================================================================
 // DOMAINS: SUBDOMAIN / CUSTOM-DOMAIN CLAIM + VERIFICATION (Stage 2 — S2-007)
 // ============================================================================
@@ -4049,7 +4251,7 @@ model Job {
   type    String // handler key, e.g. "enquiry.notify"
   payload Json // handler input
 
-  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED
+  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED; PENDING → CANCELLED (staff, #907)
   attempts    Int    @default(0)
   maxAttempts Int    @default(5)
 
@@ -4076,6 +4278,16 @@ model Job {
   @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
+  // One waiting run of the custom-domain re-check chain (#860), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_domains_recheck", where: raw("type = 'domains.recheck' AND status = 'PENDING'"))
+  // One waiting run of the daily analytics retention sweep (#799), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_analytics_retention", where: raw("type = 'analytics.retention' AND status = 'PENDING'"))
+  // One waiting run of the daily business deletion sweep (#907), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_organization_deletion", where: raw("type = 'organization.deletion' AND status = 'PENDING'"))
+  // One waiting run of the daily retention eraser (DEC-122), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_organization_retention_erase", where: raw("type = 'organization.retention.erase' AND status = 'PENDING'"))
+  // One waiting run of the daily security-log retention sweep (DEC-122), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_security_logs_retention", where: raw("type = 'security-logs.retention' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4111,6 +4323,14 @@ model Notification {
   // the message that raised it. Informational, no FK, like leadId.
   contactId String?
   messageId String?
+  // Or an order, a booking, an invoice or the website (10 Oct 2026): every
+  // notice opens the thing it is about, so every writer sets the one its
+  // type requires (`notifications/notice-target.ts` in the API).
+  // Informational, no FK, like leadId.
+  orderId   String?
+  bookingId String?
+  invoiceId String?
+  siteId    String?
 
   readAt DateTime? // null = unread
 
@@ -4312,6 +4532,11 @@ model Booking {
 
   idempotencyKey String? // dedupe double-submits (like Submission)
 
+  // The QR code whose scan opened the page this booking was made from
+  // (`QrCode.id`), when the page's address still carried the scan's tag.
+  // Null for every other booking.
+  sourceCode String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   cancelledAt DateTime?
@@ -4414,6 +4639,8 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
+  // The QR list's Bookings count: the few bookings that name a code.
+  @@index([sourceCode], map: "Booking_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
@@ -4434,11 +4661,11 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
-  services   StaffService[]
-  hours      StaffHours[]
-  timeOff    StaffTimeOff[]
-  extraHours StaffExtraHours[]
-  bookings   Booking[]
+  services    StaffService[]
+  hours       StaffHours[]
+  timeOff     StaffTimeOff[]
+  extraHours  StaffExtraHours[]
+  bookings    Booking[]
   // Invites that would give them a login (#868).
   invitations OrganizationInvitation[]
 
@@ -4745,7 +4972,8 @@ model PaymentAttempt {
   provider    String
   providerRef String? // provider payment id
   // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
-  // taken on an invoice that was already paid or void when it arrived, or
+  // taken on an invoice that was already paid or void when it arrived, or at
+  // an amount or currency the intent didn't ask for (PAY-06), or
   // STOCK_HELD: Saroh's note that this payment's order held its units
   // (stock/reserve.ts reserveOnPayment), not a provider interaction.
   status      String
@@ -4841,8 +5069,11 @@ model WebhookEvent {
 
   createdAt DateTime @default(now())
 
-  // Idempotency backstop: one row per provider event.
-  @@unique([provider, providerEventId])
+  // Idempotency backstop: one row per provider event, per business (PAY-05,
+  // #106). Unique across all businesses let one business, signing bodies to
+  // its own endpoint, claim an event id first and have another's real
+  // delivery dropped as a duplicate.
+  @@unique([organizationId, provider, providerEventId])
   @@index([organizationId])
   @@index([status])
 }
@@ -7199,4 +7430,33 @@ model SarohInvoiceSequence {
   series    String   @id
   last      Int
   updatedAt DateTime @updatedAt
+}
+
+// A report a customer sent at saroh.in/customers about a business that uses
+// Saroh: the site's address as they gave it, what happened, and an email if
+// they left one. `organizationId` is set when the address is a Saroh site,
+// else null. Staff read it in the admin console (organization:read; the
+// reporter's email only with organization:pii:read) and mark it done
+// (reports:resolve). Kept when the business is deleted.
+model BusinessReport {
+  id             String               @id @default(cuid())
+  organizationId String?
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  // The host as typed and normalised ("shop.example.com"), not a full URL.
+  siteHost       String
+  message        String
+  reporterEmail  String?
+  // A digest of the reporter's address, as the waitlist keeps one; never the address.
+  ipHash         String?
+  status         BusinessReportStatus @default(OPEN)
+  doneAt         DateTime?
+  createdAt      DateTime             @default(now())
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+enum BusinessReportStatus {
+  OPEN
+  DONE
 }

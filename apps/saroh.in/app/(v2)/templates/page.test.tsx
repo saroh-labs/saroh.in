@@ -14,8 +14,11 @@ import TemplatesPage from "./page";
  * note, and the band.
  */
 const mocked = vi.hoisted(() => {
-    const env: Record<string, string | undefined> = {};
-    return { env };
+    // The gallery's switch is on (DEC-135), as local dev and the dev site.
+    const ON: Record<string, string | undefined> = {
+        NEXT_PUBLIC_TEMPLATES: "on",
+    };
+    return { env: ON, ON };
 });
 vi.mock("@/env", () => mocked);
 vi.mock("next/link", () => ({
@@ -38,7 +41,7 @@ vi.mock("next/navigation", () => ({
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
-    mocked.env = {};
+    mocked.env = mocked.ON;
 });
 
 function renderAt(iso: string) {
@@ -54,8 +57,19 @@ describe("/templates", () => {
         );
     });
 
+    it("is a 404 with its switch off or unset, after its day and on a preview (DEC-135)", () => {
+        mocked.env = {};
+        expect(() => renderAt("2026-10-20T06:00:00Z")).toThrow(
+            "NEXT_NOT_FOUND",
+        );
+        mocked.env = { NEXT_PUBLIC_TEMPLATES: "off", RESOURCES_PREVIEW: "1" };
+        expect(() => renderAt("2026-10-20T06:00:00Z")).toThrow(
+            "NEXT_NOT_FOUND",
+        );
+    });
+
     it("shows on a preview before its day, with the pre-launch band", () => {
-        mocked.env = { RESOURCES_PREVIEW: "1" };
+        mocked.env = { ...mocked.ON, RESOURCES_PREVIEW: "1" };
         renderAt("2026-10-10T06:00:00Z");
         expect(
             screen.getByRole("heading", {

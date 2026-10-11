@@ -8,7 +8,7 @@
 /** A "Not set" row, then GST's rates, as percent strings the API takes. */
 export const GST_RATE_OPTIONS = [
     { value: "", label: "Not set" },
-    { value: "0", label: "0% — nil-rated or exempt" },
+    { value: "0", label: "0%, nil-rated or exempt" },
     { value: "0.25", label: "0.25%" },
     { value: "3", label: "3%" },
     { value: "5", label: "5%" },

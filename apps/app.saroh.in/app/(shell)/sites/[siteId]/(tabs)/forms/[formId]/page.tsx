@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ArrowLeft, Inbox } from "lucide-react";
@@ -72,8 +73,8 @@ export default async function FormEntriesPage({
                     <Button
                         asChild
                         variant="ghost"
-                        size="sm"
-                        className="-ml-2 mb-1 h-7 px-2 text-muted-foreground"
+                        size="xs"
+                        className="-ml-2 mb-1 text-muted-foreground"
                     >
                         <Link href={`/sites/${siteId}/forms`}>
                             <ArrowLeft className="mr-1 size-3.5" />
@@ -84,7 +85,7 @@ export default async function FormEntriesPage({
                         {form.name}
                     </h2>
                     <p className="text-[12.5px] text-muted-foreground">
-                        {page.total === 1 ? "1 entry" : `${page.total} entries`}
+                        {count(page.total, "entry", "entries")}
                         {form.status === "ACTIVE"
                             ? ", newest first"
                             : " · no longer taking entries"}
@@ -95,8 +96,8 @@ export default async function FormEntriesPage({
             {page.items.length === 0 ? (
                 <EmptyState
                     icon={<Inbox />}
-                    title="Nothing sent yet"
-                    description="When someone fills this form in on the live site, what they sent shows here — and they appear in Contacts and Leads."
+                    title="No entries yet"
+                    description="When someone fills this form in on your live site, what they sent shows here."
                 />
             ) : (
                 <ul className="flex flex-col gap-3">

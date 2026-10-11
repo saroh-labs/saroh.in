@@ -57,6 +57,7 @@ import { CUSTOMER_SESSION_HEADER } from "../site-accounts/customer-session.guard
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { signSiteRelay, SITE_RELAY_HEADER } from "../site-accounts/site-relay";
 import { siteRelaySecret } from "../site-accounts/site-secrets";
+import { QrCodesService } from "../sites/qr-codes.service";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -65,6 +66,8 @@ import { WebhooksService } from "../webhooks/webhooks.service";
 import { priceBag } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
+import { CheckoutSavedAddressService } from "./checkout-saved-address";
+import { CheckoutSavedAddressController } from "./checkout-saved-address.controller";
 import type { CheckoutStartDto } from "./checkout.dto";
 import { CloseAbandonedCheckoutHandler } from "./close-abandoned-checkout.handler";
 import {
@@ -106,8 +109,9 @@ beforeAll(async () => {
     });
     const moduleRef = await Test.createTestingModule({
         imports: [SiteAccountsModule],
-        controllers: [PublicCheckoutController],
+        controllers: [PublicCheckoutController, CheckoutSavedAddressController],
         providers: [
+            CheckoutSavedAddressService,
             {
                 provide: PublicCheckoutService,
                 // Generous: these tests read and start many times from one
@@ -389,7 +393,60 @@ describe("the site's checkout options and quote (G13)", () => {
             ],
             // Where a pick-up is collected (UX-025).
             pickup: { address: "12 Hill Road, Bandra", hours: null },
+            // No "Free delivery over" set at this location.
+            freeDeliveryOver: null,
         });
+    });
+
+    it("says the location's free delivery amount only where a delivery has a fee to waive", async () => {
+        const s = await shop();
+        const options = async () =>
+            (
+                await call(
+                    "GET",
+                    `/public/sites/${s.siteId}/checkout/options`,
+                    { host: s.host },
+                )
+            ).body;
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { freeShippingThreshold: "999.00" },
+        });
+        expect(await options()).toMatchObject({ freeDeliveryOver: "999.00" });
+        // Delivery costs nothing here: there is nothing to waive.
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { localDeliveryFee: null },
+        });
+        expect(await options()).toMatchObject({ freeDeliveryOver: null });
+    });
+
+    it("carries a product's own returns rule on its bag line, while its page shows one", async () => {
+        const s = await shop();
+        const returnsOf = async () =>
+            (
+                (
+                    await quote(s, {
+                        lines: [{ listingId: s.listingId, quantity: 1 }],
+                    })
+                ).body.lines as { returns: string | null }[]
+            )[0]?.returns;
+        // The location's rule (the default): nothing of the product's own.
+        expect(await returnsOf()).toBeNull();
+        await prisma.product.update({
+            where: { id: s.productId },
+            data: {
+                returnsMode: "OWN",
+                returnsText: "Exchange within 7 days, tags on",
+            },
+        });
+        expect(await returnsOf()).toBe("Exchange within 7 days, tags on");
+        // Switched to team only: off the shop, so off the bag.
+        await prisma.product.update({
+            where: { id: s.productId },
+            data: { shopFields: { returns: false } },
+        });
+        expect(await returnsOf()).toBeNull();
     });
 
     it("offers no Pick-up from a place with no address (UX-025)", async () => {
@@ -478,6 +535,7 @@ describe("starting a checkout and paying (G13)", () => {
         const res = await start(s, token, {
             fulfilment: "LOCAL_DELIVERY",
             address: {
+                phone: "98450 12345",
                 line1: "12 Hill Road",
                 city: "Mumbai",
                 state: "Maharashtra",
@@ -622,6 +680,66 @@ describe("starting a checkout and paying (G13)", () => {
         ).toBe(1);
     });
 
+    it("says online payment is down when the stored keys won't open, and a retry pays once they do", async () => {
+        // A seeded business holds placeholder keys that don't open under
+        // the server's key: a bare 500 before, with the order already made.
+        const s = await shop();
+        const row = await prisma.merchantPaymentProvider.findUniqueOrThrow({
+            where: {
+                organizationId_provider: {
+                    organizationId: s.organizationId,
+                    provider: "RAZORPAY",
+                },
+            },
+        });
+        await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { credentialsAuthTag: "AAA=" },
+        });
+        const { token } = await signIn(s.host);
+        const key = `unreadable_${next()}`.replace(/[^A-Za-z0-9_-]/g, "_");
+
+        const res = await start(s, token, { key });
+
+        expect(res.status).toBe(503);
+        expect(errorOf(res.body)).toMatchObject({
+            message:
+                "The business can't take payment online right now. Please try again later, or pay them another way.",
+            details: { reason: "provider-unavailable" },
+        });
+        // The checkout waits unpaid, as one nobody paid for: nothing was
+        // charged, no intent exists, Orders leaves it out, and its close
+        // is queued.
+        const order = await prisma.order.findFirstOrThrow({
+            where: { storeId: s.storeId },
+            select: { id: true, status: true, paymentStatus: true },
+        });
+        expect(order).toMatchObject({
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+        });
+        expect(
+            await prisma.paymentIntent.count({ where: { orderId: order.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                    payload: { equals: { orderId: order.id } },
+                },
+            }),
+        ).toBe(1);
+
+        // The keys are fixed; the same bag's retry pays the same order.
+        await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { credentialsAuthTag: row.credentialsAuthTag },
+        });
+        const again = await start(s, token, { key });
+        expect(again.status).toBe(201);
+        expect(again.body.orderId).toBe(order.id);
+    });
+
     it("refuses to start with no provider, or a paused storefront, and makes nothing", async () => {
         for (const s of [
             await shop({ provider: false }),
@@ -761,6 +879,7 @@ describe("starting a checkout and paying (G13)", () => {
             fulfilment: "LOCAL_DELIVERY",
             address: {
                 name,
+                phone: "98450 12345",
                 line1: "14, 2nd Cross",
                 city: "Bengaluru",
                 state: "Karnataka",
@@ -835,6 +954,58 @@ describe("starting a checkout and paying (G13)", () => {
         const gift = await start(s, token, delivery("9800000001"));
         expect(gift.status).toBe(201);
         expect((await contactOf()).phone).toBe("9811122233");
+    });
+
+    it("keeps the customer's note on the order, for the business to read", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const noted = await start(s, token, { notes: "No nuts, please" });
+        expect(noted.status).toBe(201);
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id: noted.body.orderId as string },
+                select: { notes: true },
+            }),
+        ).toEqual({ notes: "No nuts, please" });
+        // None typed: none kept. Longer than a note may be: refused.
+        const plain = await start(s, token);
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id: plain.body.orderId as string },
+                select: { notes: true },
+            }),
+        ).toEqual({ notes: null });
+        expect((await start(s, token, { notes: "x".repeat(501) })).status).toBe(
+            400,
+        );
+    });
+
+    it("refuses a delivery with no phone to ring, or one that isn't a number, and makes nothing", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const delivery = (phone?: string) => ({
+            fulfilment: "LOCAL_DELIVERY",
+            address: {
+                ...(phone === undefined ? {} : { phone }),
+                line1: "14, 2nd Cross",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+        for (const phone of [undefined, "ring the bell", "12"]) {
+            const res = await start(s, token, delivery(phone));
+            expect(res.status).toBe(400);
+            expect(errorOf(res.body)).toMatchObject({
+                message: "Add a phone number for the delivery.",
+                details: { reason: "phone", field: "address.phone" },
+            });
+        }
+        expect(
+            await prisma.order.count({ where: { storeId: s.storeId } }),
+        ).toBe(0);
+        // A pick-up asks for none.
+        expect((await start(s, token)).status).toBe(201);
     });
 
     it("refuses a session from site A on site B's host, or naming site B", async () => {
@@ -1513,5 +1684,363 @@ describe("a discount code at the site's checkout (DEC-104)", () => {
             discountCode: d.code,
         });
         expect(priced.body).toMatchObject({ discount: { applied: true } });
+    });
+});
+
+describe("free delivery over an amount at the site's checkout", () => {
+    const ADDRESS = {
+        phone: "98450 12345",
+        line1: "12 Hill Road",
+        city: "Mumbai",
+        state: "Maharashtra",
+        postalCode: "400050",
+    };
+
+    /** The shop with "Free delivery over" set: Local delivery is 60.00. */
+    async function freeOver(amount: string | null) {
+        const s = await shop();
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { freeShippingThreshold: amount },
+        });
+        return s;
+    }
+
+    const bag = (s: Shop, quantity: number, over = {}) => ({
+        lines: [{ listingId: s.listingId, quantity }],
+        fulfilment: "LOCAL_DELIVERY",
+        ...over,
+    });
+
+    it("charges below the amount and says how much more is needed", async () => {
+        const s = await freeOver("1000.00");
+        const res = await quote(s, bag(s, 3));
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({
+            subtotal: "750.00",
+            delivery: "60.00",
+            total: "810.00",
+            freeDelivery: { over: "1000.00", short: "250.00" },
+        });
+    });
+
+    it("is free at the amount: the quote, the order and its payment agree", async () => {
+        const s = await freeOver("1000.00");
+        const priced = await quote(s, bag(s, 4));
+        expect(priced.body).toMatchObject({
+            subtotal: "1000.00",
+            delivery: "0.00",
+            total: "1000.00",
+            freeDelivery: { over: "1000.00", short: null },
+        });
+        expect(
+            (priced.body.ways as { type: string; fee: string | null }[]).find(
+                (w) => w.type === "LOCAL_DELIVERY",
+            )?.fee,
+        ).toBeNull();
+
+        const { token } = await signIn(s.host);
+        const res = await start(s, token, {
+            ...bag(s, 4),
+            address: ADDRESS,
+        });
+        expect(res.status).toBe(201);
+        expect(res.body).toMatchObject({ total: "1000.00" });
+        expect(payment(res.body).amountCents).toBe(100_000);
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+        });
+        expect(order.shipping.toString()).toBe("0");
+        expect(order.total.toString()).toBe("1000");
+    });
+
+    it("still charges with no amount set", async () => {
+        const s = await freeOver(null);
+        const priced = await quote(s, bag(s, 8));
+        expect(priced.body).toMatchObject({
+            delivery: "60.00",
+            total: "2060.00",
+            freeDelivery: null,
+        });
+        const { token } = await signIn(s.host);
+        const res = await start(s, token, {
+            ...bag(s, 8),
+            address: ADDRESS,
+        });
+        expect(res.status).toBe(201);
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+        });
+        expect(order.shipping.toString()).toBe("60");
+    });
+
+    it("leaves pick-up at nothing either way", async () => {
+        const s = await freeOver("1000.00");
+        const res = await quote(s, bag(s, 1, { fulfilment: "PICKUP" }));
+        expect(res.body).toMatchObject({ delivery: "0.00", total: "250.00" });
+    });
+
+    it("judges the amount after a code: one that takes it under keeps the fee", async () => {
+        const s = await freeOver("1000.00");
+        const d = await prisma.discount.create({
+            data: {
+                organizationId: s.organizationId,
+                code: `FREE${seq}X${process.pid}`.toUpperCase(),
+                kind: "PERCENTAGE",
+                percentBps: 1000,
+                appliesTo: "BUSINESS",
+            },
+        });
+        // 1000.00 less 10% is 900.00: under the amount.
+        const priced = await quote(s, bag(s, 4, { discountCode: d.code }));
+        expect(priced.body).toMatchObject({
+            subtotal: "1000.00",
+            discount: { applied: true, amount: "100.00" },
+            delivery: "60.00",
+            total: "960.00",
+            freeDelivery: { short: "100.00" },
+        });
+        const { token } = await signIn(s.host);
+        const res = await start(s, token, {
+            ...bag(s, 4, { discountCode: d.code }),
+            address: ADDRESS,
+        });
+        expect(res.status).toBe(201);
+        expect(payment(res.body).amountCents).toBe(96_000);
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: res.body.orderId as string },
+        });
+        expect(order.shipping.toString()).toBe("60");
+        expect(order.discount.toString()).toBe("100");
+    });
+});
+
+describe("the QR code an order came from", () => {
+    /** A code of the shop's site, as the workspace would have made it. */
+    function qr(s: Shop, code: string, retired = false) {
+        return prisma.qrCode.create({
+            data: {
+                siteId: s.siteId,
+                organizationId: s.organizationId,
+                code,
+                targetKind: "SHOP",
+                place: "COUNTER",
+                color: "#1c1c1a",
+                retiredAt: retired ? new Date() : null,
+            },
+        });
+    }
+
+    const sourceOf = async (res: { body: Record<string, unknown> }) =>
+        (
+            await prisma.order.findUniqueOrThrow({
+                where: { id: res.body.orderId as string },
+            })
+        ).sourceCode;
+
+    const listed = async (s: Shop) =>
+        (
+            await new QrCodesService().list(
+                {
+                    organizationId: s.organizationId,
+                    userId: "u_owner",
+                    role: "OWNER",
+                },
+                s.siteId,
+            )
+        ).codes;
+
+    it("stores the code's row on a checkout started with its tag, and counts it once it is a real order", async () => {
+        const s = await shop();
+        const code = await qr(s, "h7c");
+        const { token } = await signIn(s.host);
+
+        const res = await start(s, token, { source: "qr-h7c" });
+
+        expect(res.status).toBe(201);
+        expect(JSON.stringify(res.body)).not.toContain(code.id);
+        expect(await sourceOf(res)).toBe(code.id);
+        // Started and not paid yet: a checkout, not an order.
+        expect(await listed(s)).toEqual([
+            expect.objectContaining({ id: code.id, orders: 0, bookings: 0 }),
+        ]);
+
+        await paid(s.organizationId, payment(res.body).providerIntentId);
+        expect(await listed(s)).toEqual([
+            expect.objectContaining({ id: code.id, orders: 1 }),
+        ]);
+    });
+
+    it("places the order without a source for another business's code, even one with the same short id elsewhere", async () => {
+        const rye = await shop();
+        const other = await shop();
+        await qr(other, "k9d");
+        const otherShared = await qr(other, "h7c");
+        const ryeShared = await qr(rye, "h7c");
+
+        const first = await signIn(rye.host);
+        const theirs = await start(rye, first.token, { source: "qr-k9d" });
+        expect(theirs.status).toBe(201);
+        expect(await sourceOf(theirs)).toBeNull();
+
+        const second = await signIn(rye.host);
+        const shared = await start(rye, second.token, { source: "qr-h7c" });
+        expect(shared.status).toBe(201);
+        expect(await sourceOf(shared)).toBe(ryeShared.id);
+        expect(
+            await prisma.order.count({ where: { sourceCode: otherShared.id } }),
+        ).toBe(0);
+    });
+
+    it("places the order without a source for a tag that isn't one, and never refuses over it", async () => {
+        const s = await shop({ onHand: 50 });
+        const code = await qr(s, "h7c");
+        for (const source of [
+            "newsletter",
+            "qr-",
+            // The row's own id: the browser never names a row.
+            code.id,
+            7,
+            null,
+        ] as unknown[]) {
+            const { token } = await signIn(s.host);
+            const res = await start(s, token, { source });
+            expect([String(source), res.status]).toEqual([String(source), 201]);
+            expect(await sourceOf(res)).toBeNull();
+        }
+    });
+
+    it("still stores a retired code, and no source without a tag", async () => {
+        const s = await shop();
+        const code = await qr(s, "h7c", true);
+
+        const first = await signIn(s.host);
+        const tagged = await start(s, first.token, { source: "qr-h7c" });
+        expect(tagged.status).toBe(201);
+        expect(await sourceOf(tagged)).toBe(code.id);
+
+        const second = await signIn(s.host);
+        const plain = await start(s, second.token);
+        expect(plain.status).toBe(201);
+        expect(await sourceOf(plain)).toBeNull();
+    });
+
+    it("refuses a quote that carries a source: only a start names one", async () => {
+        const s = await shop();
+        const res = await quote(s, {
+            lines: [{ listingId: s.listingId, quantity: 1 }],
+            source: "qr-h7c",
+        });
+        expect(res.status).toBe(400);
+    });
+});
+
+describe("the last delivery's address, for the bag to offer again", () => {
+    const address = (s: Shop, token: string, host = s.host) =>
+        call("GET", `/public/sites/${s.siteId}/checkout/address`, {
+            host,
+            token,
+        });
+    const delivery = (line1: string, over: Record<string, unknown> = {}) => ({
+        fulfilment: "LOCAL_DELIVERY",
+        address: {
+            name: "Kavya Iyer",
+            phone: "98450 12345",
+            line1,
+            line2: "Flat 4",
+            city: "Bengaluru",
+            state: "Karnataka",
+            postalCode: "560038",
+        },
+        ...over,
+    });
+
+    it("is nothing for a customer who has had no delivery, and needs a session", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+        const none = await address(s, token);
+        expect(none.status).toBe(200);
+        expect(none.body).toEqual({ address: null });
+        // A pick-up leaves nothing to offer.
+        expect((await start(s, token)).status).toBe(201);
+        expect((await address(s, token)).body).toEqual({ address: null });
+        expect(
+            (
+                await call(
+                    "GET",
+                    `/public/sites/${s.siteId}/checkout/address`,
+                    {
+                        host: s.host,
+                    },
+                )
+            ).status,
+        ).toBe(401);
+    });
+
+    it("is the address of the last order placed, never of a checkout left unpaid", async () => {
+        const s = await shop();
+        const { token } = await signIn(s.host);
+
+        // Started and never paid: not an order, so not offered.
+        const unpaid = await start(s, token, delivery("1 Unpaid Lane"));
+        expect(unpaid.status).toBe(201);
+        expect((await address(s, token)).body).toEqual({ address: null });
+
+        // Paid: placed, and offered.
+        await paid(s.organizationId, payment(unpaid.body).providerIntentId);
+        expect((await address(s, token)).body).toEqual({
+            address: {
+                name: "Kavya Iyer",
+                phone: "98450 12345",
+                line1: "1 Unpaid Lane",
+                line2: "Flat 4",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+
+        // A later one placed to be paid on delivery is the last now.
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { offerPayOnHandover: true },
+        });
+        const later = await start(
+            s,
+            token,
+            delivery("14, 2nd Cross", { payment: "ON_HANDOVER" }),
+        );
+        expect(later.status).toBe(201);
+        expect((await address(s, token)).body).toMatchObject({
+            address: { line1: "14, 2nd Cross" },
+        });
+    });
+
+    it("is never another customer's, another site's, or one whose lines were cleared", async () => {
+        const s = await shop();
+        const other = await shop();
+        const asha = await signIn(s.host);
+        const ravi = await signIn(s.host);
+        const first = await start(s, asha.token, delivery("12 Hill Road"));
+        await paid(s.organizationId, payment(first.body).providerIntentId);
+
+        expect((await address(s, ravi.token)).body).toEqual({ address: null });
+        // Asha's session is for her own site alone.
+        expect((await address(other, asha.token, other.host)).status).toBe(401);
+        expect((await address(other, asha.token)).status).not.toBe(200);
+
+        // A privacy removal clears an order's delivery lines: nothing left.
+        await prisma.order.update({
+            where: { id: first.body.orderId as string },
+            data: {
+                deliveryName: null,
+                deliveryPhone: null,
+                deliveryLine1: null,
+                deliveryLine2: null,
+                deliveryCity: null,
+                deliveryPostalCode: null,
+            },
+        });
+        expect((await address(s, asha.token)).body).toEqual({ address: null });
     });
 });

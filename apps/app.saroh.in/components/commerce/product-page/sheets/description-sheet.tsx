@@ -115,12 +115,10 @@ export function DescriptionSheet({
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Description saved.", () => {
-            void patchProduct(storeId, product.id, before).then((undo) => {
-                if (!undo.ok)
-                    showError("Couldn't undo. The saved description stays.");
-                router.refresh();
-            });
+        showUndo("Description saved.", async () => {
+            const undo = await patchProduct(storeId, product.id, before);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -136,8 +134,8 @@ export function DescriptionSheet({
             fullEditorHref={productEditHref(storeId, product.id, "description")}
             dirty={isDirty}
             saving={isSubmitting}
-            note={firstError ?? (isDirty ? undefined : "No changes yet")}
-            onSave={() => void form.handleSubmit(save)()}
+            note={firstError}
+            onSave={() => form.handleSubmit(save)()}
         >
             <Form {...form}>
                 <div className="flex flex-col gap-4">
@@ -163,7 +161,7 @@ export function DescriptionSheet({
                             <FormItem>
                                 <div className="flex items-center justify-between gap-2">
                                     <FormLabel>
-                                        Key points — one per line
+                                        Key points, one per line
                                     </FormLabel>
                                     <ShopSwitch
                                         field="Key points"
@@ -215,7 +213,7 @@ export function DescriptionSheet({
                                     <Textarea
                                         {...field}
                                         rows={3}
-                                        placeholder="Aqua, Niacinamide, Glycerin… — or 100% linen"
+                                        placeholder="Aqua, Niacinamide, Glycerin… or 100% linen"
                                     />
                                 </FormControl>
                                 <FormMessage />

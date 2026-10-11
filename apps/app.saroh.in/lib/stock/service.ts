@@ -50,6 +50,11 @@ export interface StockLevels {
     canWrite: boolean;
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor?: string | null;
+    /**
+     * Products the filters keep, across every page: the unit Levels pages
+     * by (a product with three sizes is three rows and one of these).
+     */
+    total?: number;
     /** Rows that need someone across the business (short, sold out, low). */
     needsYou?: number;
     /** The business's time zone. */
@@ -88,6 +93,8 @@ export interface StockLogEntry {
 export interface StockLog {
     entries: StockLogEntry[];
     nextCursor: string | null;
+    /** Entries under the filters, across every page. */
+    total?: number;
     seesPeople: boolean;
     seesOrders: boolean;
     /** The business's time zone, for the log's days. */
@@ -119,13 +126,8 @@ export interface StockChecks {
     checks: StockCheck[];
     counts: Record<StockCheckKind, number>;
     canResolve: boolean;
-    /** Pass as `cursor` for the next page; null on the last. */
-    nextCursor?: string | null;
-    /**
-     * The check the page before ended on had closed, so this is the first
-     * page again: replace the list rather than add to it.
-     */
-    restarted?: boolean;
+    /** Every open check, across every page. */
+    total?: number;
 }
 
 /** A shelf after a change. */
@@ -197,9 +199,11 @@ export async function getStockLevels(
         q?: string;
         /** Only rows that need someone. */
         needs?: boolean;
-        /** Products a page; left out, every row. */
+        /** The page by its number, from 1, at `size` products. */
+        page?: number;
+        size?: number;
+        /** Products to answer with no page asked; left out, every row. */
         limit?: number;
-        cursor?: string;
     } = {},
 ): Promise<StockLevels | null> {
     const base = await orgBase();
@@ -217,7 +221,10 @@ export async function getStockLog(
         storefront?: string;
         product?: string;
         variant?: string;
-        cursor?: string;
+        /** The page by its number, from 1, at `size` entries. */
+        page?: number;
+        size?: number;
+        /** Entries to answer with no page asked; left out, 50. */
         limit?: number;
     } = {},
 ): Promise<StockLog | null> {
@@ -229,9 +236,12 @@ export async function getStockLog(
     );
 }
 
-/** What needs looking at. */
+/**
+ * What needs looking at: a page by its number (`page`, at `size` checks),
+ * the first `limit`, or with neither every open check.
+ */
 export async function getStockChecks(
-    page: { limit?: number; cursor?: string } = {},
+    page: { page?: number; size?: number; limit?: number } = {},
 ): Promise<StockChecks | null> {
     const base = await orgBase();
     if (!base) return null;

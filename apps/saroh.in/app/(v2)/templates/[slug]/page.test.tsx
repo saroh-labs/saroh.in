@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { galleryTemplates } from "@/content/templates";
 
-import TemplatePage, { generateStaticParams } from "./page";
+import TemplatePage, { generateMetadata, generateStaticParams } from "./page";
 
 /**
  * /templates/[slug] (industry templates U13): one page per gallery template,
@@ -13,8 +13,11 @@ import TemplatePage, { generateStaticParams } from "./page";
  * button carries `template=` to the waitlist; the facts have no Plan row.
  */
 const mocked = vi.hoisted(() => {
-    const env: Record<string, string | undefined> = {};
-    return { env };
+    // The gallery's switch is on (DEC-135), as local dev and the dev site.
+    const ON: Record<string, string | undefined> = {
+        NEXT_PUBLIC_TEMPLATES: "on",
+    };
+    return { env: ON, ON };
 });
 vi.mock("@/env", () => mocked);
 vi.mock("next/link", () => ({
@@ -37,7 +40,7 @@ vi.mock("next/navigation", () => ({
 afterEach(() => {
     cleanup();
     vi.useRealTimers();
-    mocked.env = {};
+    mocked.env = mocked.ON;
 });
 
 async function renderAt(slug: string, iso: string) {
@@ -68,8 +71,22 @@ describe("/templates/[slug]", () => {
         );
     });
 
+    it("is a 404, with no metadata, while the gallery's switch is off or unset (DEC-135)", async () => {
+        mocked.env = {};
+        await expect(renderAt("gym", AFTER)).rejects.toThrow("NEXT_NOT_FOUND");
+        mocked.env = { NEXT_PUBLIC_TEMPLATES: "off", RESOURCES_PREVIEW: "1" };
+        await expect(renderAt("gym", AFTER)).rejects.toThrow("NEXT_NOT_FOUND");
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date(AFTER));
+        expect(
+            await generateMetadata({
+                params: Promise.resolve({ slug: "gym" }),
+            }),
+        ).toEqual({});
+    });
+
     it("on a preview, says early access opens 17 Oct and saves the template to the waitlist", async () => {
-        mocked.env = { RESOURCES_PREVIEW: "1" };
+        mocked.env = { ...mocked.ON, RESOURCES_PREVIEW: "1" };
         await renderAt("gym", "2026-10-10T06:00:00Z");
         expect(
             screen.getByRole("heading", {

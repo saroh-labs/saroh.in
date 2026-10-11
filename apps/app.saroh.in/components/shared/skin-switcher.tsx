@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,6 +19,7 @@ import {
     subscribeToSkin,
     VISIBLE_SKINS,
 } from "@/lib/skins";
+import { IconButton } from "@saroh/ui/icon-button";
 
 /**
  * Pick the workspace's visual world.
@@ -88,9 +88,10 @@ export function SkinSwitcher() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
+                <IconButton
+                    label={`Theme: ${active.name}. Change theme`}
+                    icon={<Palette />}
                     variant="ghost"
-                    size="icon"
                     /*
                      * No `suppressHydrationWarning` here any more, and its
                      * absence is the point: with the store above there is no
@@ -100,13 +101,10 @@ export function SkinSwitcher() {
                      * what let this ship saying the wrong skin out loud to
                      * screen readers.
                      */
-                    aria-label={`Theme: ${active.name}. Change theme`}
-                >
-                    <Palette className="size-5" />
-                </Button>
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel>Workspace theme</DropdownMenuLabel>
+                <DropdownMenuLabel>Theme</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {VISIBLE_SKINS.map((option) => {
                     const selected = option.id === skin;
@@ -142,7 +140,7 @@ export function SkinSwitcher() {
                                         {option.name}
                                     </span>
                                     {selected ? (
-                                        <Check className="size-3.5 text-brand" />
+                                        <Check className="size-3.5 text-foreground" />
                                     ) : null}
                                 </span>
                                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">

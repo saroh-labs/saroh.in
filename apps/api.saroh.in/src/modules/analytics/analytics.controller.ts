@@ -14,6 +14,7 @@ import type { AnalyticsDailyAggregate } from "@saroh/database";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import {
@@ -39,6 +40,7 @@ import { TakingsService } from "./takings.service";
  * discards it — the raw IP never lands in the ledger.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class AnalyticsPublicController {
     constructor(private readonly analytics: AnalyticsService) {}
 

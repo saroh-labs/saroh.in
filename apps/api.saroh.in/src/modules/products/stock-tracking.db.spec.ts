@@ -341,7 +341,7 @@ describe("a product's Track stock switch", () => {
         const order = await place(hill, bread, 3);
         await expect(setTracking(owner(), bread, false)).rejects.toThrow(
             new ConflictException(
-                "3 are promised to open orders — fulfil or cancel them first.",
+                "3 are promised to open orders. Fulfil or cancel them first.",
             ),
         );
         expect(
@@ -362,7 +362,7 @@ describe("a product's Track stock switch", () => {
         const bun = await product("Bun", { hill: 2 });
         const order = await place(hill, bun, 1);
         await expect(setTracking(owner(), bun, false)).rejects.toThrow(
-            "1 is promised to open orders — fulfil or cancel them first.",
+            "1 is promised to open orders. Fulfil or cancel them first.",
         );
         await orders.updateStatus(hill, order, ownerId, {
             status: "CANCELLED",
@@ -492,7 +492,7 @@ describe("toggling while an order is being made", () => {
             status: "rejected",
             reason: expect.objectContaining({
                 message:
-                    "1 is promised to open orders — fulfil or cancel them first.",
+                    "1 is promised to open orders. Fulfil or cancel them first.",
             }),
         });
         expect(await shelf(online, pie)).toMatchObject({
@@ -957,7 +957,7 @@ describe("the business's Track stock switch", () => {
         const jar = await product("Jar", { online: 2 });
         const order = await place(online, jar, 1);
         await expect(business.set(owner(), false)).rejects.toThrow(
-            "1 is promised to open orders — fulfil or cancel them first.",
+            "1 is promised to open orders. Fulfil or cancel them first.",
         );
         expect(await business.get(owner())).toEqual({
             tracked: true,

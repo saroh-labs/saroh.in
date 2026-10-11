@@ -1,3 +1,5 @@
+import { formatNumber } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
 import { z } from "zod";
 
 import { isHsnSac, rateOption } from "@/lib/invoices/gst";
@@ -70,11 +72,7 @@ const optionalMoney = z
 const text = (max: number, message?: string) =>
     z
         .string()
-        .max(
-            max,
-            message ??
-                `Keep it under ${max.toLocaleString("en-IN")} characters.`,
-        );
+        .max(max, message ?? `Keep it under ${formatNumber(max)} characters.`);
 
 const nullIfEmpty = (value: string): string | null => {
     const t = value.trim();
@@ -95,7 +93,7 @@ export const basicsSchema = z
             .trim()
             .min(
                 1,
-                "A product needs an address — it is what the link is made of.",
+                "A product needs an address. It is what the link is made of.",
             )
             .max(
                 LIMITS.slug,
@@ -446,8 +444,8 @@ export function mediaCounter(items: PhotoDraft[]): string {
     return `${photos} of ${LIMITS.photos} photos · ${videos} of ${LIMITS.videos} videos`;
 }
 
-export const PHOTOS_FULL_MESSAGE = `Already ${LIMITS.photos} photos — take one off first.`;
-export const VIDEOS_FULL_MESSAGE = `Already ${LIMITS.videos} videos — take one off first.`;
+export const PHOTOS_FULL_MESSAGE = `Already ${LIMITS.photos} photos. Take one off first.`;
+export const VIDEOS_FULL_MESSAGE = `Already ${LIMITS.videos} videos. Take one off first.`;
 export const NOT_MEDIA_MESSAGE =
     "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
 export const VIDEO_TOO_BIG_MESSAGE =
@@ -474,7 +472,7 @@ export function mediaLimitNote(items: PhotoDraft[]): {
     if (photosFull) {
         const left = LIMITS.videos - videos;
         return {
-            text: `${LIMITS.photos} photos is the most. You can still add ${left} more video${left === 1 ? "" : "s"}.`,
+            text: `${LIMITS.photos} photos is the most. You can still add ${count(left, "more video")}.`,
             full: true,
         };
     }
@@ -727,9 +725,11 @@ export function saveHint(
             ? `${names[dirty[0]]} not saved yet`
             : `${dirty.length} sections not saved yet`;
     if (stuck.length === 0) return head;
-    return `${head} · ${joinAnd(stuck.map((k) => names[k]))} ${
-        stuck.length === 1 ? "needs" : "need"
-    } a fix`;
+    return `${head} · ${joinAnd(stuck.map((k) => names[k]))} ${plural(
+        stuck.length,
+        "needs",
+        "need",
+    )} a fix`;
 }
 
 /** Save all takes the sections that can save and leaves the rest, said. */
@@ -756,9 +756,11 @@ export function savedMessage(
             ? (single ?? `${names[saved[0]]} saved.`)
             : `Saved ${saved.map((k) => names[k].toLowerCase()).join(", ")}.`;
     if (stuck.length === 0) return head;
-    return `${head} ${joinAnd(stuck.map((k) => names[k]))} ${
-        stuck.length === 1 ? "needs" : "need"
-    } a fix first.`;
+    return `${head} ${joinAnd(stuck.map((k) => names[k]))} ${plural(
+        stuck.length,
+        "needs",
+        "need",
+    )} a fix first.`;
 }
 
 /** "a, b and c". */

@@ -1,15 +1,17 @@
-import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
+import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { bookingsListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
@@ -22,7 +24,9 @@ import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 /**
  * Every booking as one list (S4-003) — the register the calendar replaced as
  * Bookings' landing page (U15). Kept whole, because its filters (upcoming,
- * past, waiting to be marked) answer questions a diary does not. The org's bookings across every service,
+ * past, waiting to be marked) answer questions a diary does not. It is the
+ * List side of the header's Calendar | List switch, which the calendar
+ * carries too. The org's bookings across every service,
  * each rendered in the booking's own timezone — the zone the booker saw —
  * because an Organization has no single zone to fold them into.
  *
@@ -71,6 +75,9 @@ export default async function BookingsPage({
           )
         : every;
 
+    // The business's first booking (wave G), said once.
+    const moment = await bookingsListMoment(every, organization);
+
     // No bookings at all yet: "Share your booking page" while it is live
     // (DEC-069, L8). Only then is the web address read, and a read that
     // fails (or a role it isn't shown to) just leaves the button out.
@@ -80,48 +87,52 @@ export default async function BookingsPage({
             : null;
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
                 breadcrumb={[
-                    <Link
-                        key="b"
-                        href="/bookings"
-                        className="hover:text-foreground"
-                    >
+                    <Link key="b" href="/bookings">
                         Bookings
                     </Link>,
                     "All bookings",
                 ]}
                 title="All bookings"
+                count={countLabel(every.length, {
+                    one: "booking",
+                    other: "bookings",
+                })}
                 description="Bookings across your services, in the timezone each was booked in."
+                meta={<BookingsViewSwitch current="list" />}
                 actions={
                     <>
-                        <Button asChild variant="outline">
-                            <Link href="/bookings">Calendar</Link>
-                        </Button>
-                        <NewBookingDialog
-                            services={services
-                                .filter((s) => s.status === "ACTIVE")
-                                .map((s) => ({
-                                    id: s.id,
-                                    name: s.name,
-                                    timezone: s.timezone,
-                                    minutes: s.durationMinutes,
-                                    priceCents: s.priceCents,
-                                }))}
-                            people={people}
-                            // Paying with a class pack spends one (ADR-007),
-                            // while Class packs is on (E12).
-                            canUsePacks={
-                                canReadPacks(organization) &&
-                                canUsePacksOnBookings(organization) &&
-                                packsOn(await modulesOrUnknown())
-                            }
-                        />
+                        {/* Only someone who may book: the API refuses the
+                            save otherwise, as the diary already asks. */}
+                        {may("booking:write") ? (
+                            <NewBookingDialog
+                                plainTrigger
+                                services={services
+                                    .filter((s) => s.status === "ACTIVE")
+                                    .map((s) => ({
+                                        id: s.id,
+                                        name: s.name,
+                                        timezone: s.timezone,
+                                        minutes: s.durationMinutes,
+                                        priceCents: s.priceCents,
+                                    }))}
+                                people={people}
+                                // Paying with a class pack spends one (ADR-007),
+                                // while Class packs is on (E12).
+                                canUsePacks={
+                                    canReadPacks(organization) &&
+                                    canUsePacksOnBookings(organization) &&
+                                    packsOn(await modulesOrUnknown())
+                                }
+                            />
+                        ) : null}
                     </>
                 }
             />
             <div className="mt-6 space-y-4">
+                {moment ? <Moment moment={moment} /> : null}
                 {since ? (
                     <SinceNotice
                         count={upcoming.length}

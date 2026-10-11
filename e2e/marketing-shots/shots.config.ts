@@ -287,21 +287,28 @@ const RYE_PLANS = "/billing/subscriptions?tab=plans";
 
 /* "Connect your own domain" and "Make your link look right when shared":
  * Northwind's site settings. Its seeded domain, northwindsupply.in, waits
- * for DNS; the domain box is typed into and never added. The web address
+ * for DNS; Add domain's dialog is typed into and never added. A row's
+ * field is in its side sheet or dialog (read first, 10 Oct), so a shot of
+ * one opens it and clips the `[role="dialog"]`. The web address
  * is the API's (`site-origin.ts` rendererHost): run the API with
  * RENDERER_URL=https://saroh.app for help-own-domain-1, so it reads
  * northwind.saroh.app as in production, not the local renderer's host. */
 const NW_SETTINGS = "/sites/seed_site_0/settings";
-const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
-const SHARE = 'section:has(h2:text-is("Social share image"))';
-const SEARCH = 'section:has(h2:text-is("Search"))';
+/* The settings' tabs (Website › Settings, 9 Oct): the domain is in
+ * Address (the first tab), the share image and the description in Search
+ * and sharing, the codes and trackers in Tracking; a shot opens its tab
+ * with `?section=`. */
+const DOMAIN = "#address";
+const SHARE = "#search-and-sharing";
+/** The verification codes fold; a shot that shows them opens them first. */
+const OPEN_CODES: Step = { click: "[data-verification-codes] summary" };
 
 /* "Verify your site and add analytics": Search and tracking, at the foot of
  * Northwind's site settings (DEC-108), with the API's RENDERER_URL set to
  * https://saroh.app as for help-own-domain-1. The Google field and the
  * Google Analytics dialog are typed into and never saved. */
 const ST = '[data-section="search-and-tracking"]';
-const ST_VERIFY = `${ST} .wk-surface:has(h3:text-is("Verify your site"))`;
+const ST_VERIFY = `${ST} [data-verification-codes]`;
 const ST_TRACKERS = `${ST} .wk-surface:has(h3:text-is("Your trackers"))`;
 /** Tall enough that the section, near the page's foot, is laid out in view. */
 const ST_DESK: Viewport = { width: 1280, height: 4800 };
@@ -414,9 +421,9 @@ const HELP_SHOTS_B: Shot[] = [
                 click: 'section:has(h2:text-is("Price")) [role="radio"]:has-text("25% deposit")',
             },
         ],
-        mark: 'button:has-text("Save changes")',
-        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
-        caption: "A change to the root canal, waiting for Save changes",
+        mark: 'button:text-is("Save")',
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save at the top right",
+        caption: "A change to the root canal, waiting for Save",
     },
     {
         key: "help-take-deposit-4",
@@ -531,8 +538,8 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions/seed_sc_rc_sub_arjun",
         viewport: { width: 1024, height: 560 },
-        mark: 'button:has-text("Retry with a new pay link")',
-        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        mark: 'button:has-text("Try again with a new pay link")',
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Try again with a new pay link",
         caption: "Arjun Mehta's renewal at Rye & Co., not paid yet",
     },
 
@@ -554,14 +561,16 @@ const HELP_SHOTS_B: Shot[] = [
         route: NW_SETTINGS,
         viewport: { width: 1280, height: 1400 },
         steps: [
+            { click: `${DOMAIN} button:text-is("Add domain")` },
+            { waitFor: '[role="dialog"] #add-domain-field' },
             {
-                fill: '[aria-label="Domain to add"]',
+                fill: '[role="dialog"] #add-domain-field',
                 value: "www.northwindsupply.in",
             },
-            { click: `${DOMAIN} h2` },
+            { click: '[role="dialog"] h2' },
         ],
-        clip: { selector: DOMAIN, pad: 12 },
-        mark: `${DOMAIN} button:has-text("Add domain")`,
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:text-is("Add domain")',
         alt: "Your own domain at Northwind Supply (demo store): a second domain typed in, ready for Add domain",
         caption: "Your own domain at Northwind Supply, a domain typed in",
     },
@@ -605,7 +614,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         clip: { selector: SHARE, pad: 12 },
         mark: `${SHARE} button:text-is("Add")`,
@@ -616,14 +625,14 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
-        steps: [{ click: `${SHARE} button:text-is("Add")` }],
-        clip: {
-            selector: `${SHARE} div.grid:has(> div:text-is("Image"))`,
-            pad: 12,
-        },
-        mark: `${SHARE} button:has-text("Choose a photo")`,
+        steps: [
+            { click: `${SHARE} button:text-is("Add")` },
+            { waitFor: '[role="dialog"] #settings-image-field' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:has-text("Choose a photo")',
         alt: "Adding a social share image at Northwind Supply (demo store): Choose a photo, or paste an image address, then Save",
         caption: "Adding a share image at Northwind Supply",
     },
@@ -631,18 +640,21 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         steps: [
-            { click: `${SEARCH} button:text-is("Edit") >> nth=1` },
             {
-                fill: '[aria-label="Search description"]',
+                click: `#settings-description button:is(:text-is("Edit"), :text-is("Write"))`,
+            },
+            { waitFor: '[role="dialog"] #settings-description-field' },
+            {
+                fill: '[role="dialog"] #settings-description-field',
                 value: "Packaging, cleaning and workshop supplies for small manufacturers in Peenya, Bengaluru. Order by phone or online.",
             },
-            { click: `${SEARCH} h2` },
+            { click: '[role="dialog"] h2' },
         ],
-        clip: { selector: SEARCH, pad: 12 },
-        mark: '[aria-label="Search description"]',
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] #settings-description-field',
         alt: "Search at Northwind Supply (demo store): a description being written, and the preview of how it reads",
         caption: "Writing Northwind Supply's description under Search",
     },
@@ -662,14 +674,11 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
-        clip: {
-            selector: `${ST} > div:first-child`,
-            until: ST_VERIFY,
-            pad: 12,
-        },
-        mark: "#search-tracking-title",
+        steps: [OPEN_CODES],
+        clip: { selector: ST_VERIFY, pad: 12 },
+        mark: "#tracking-title",
         alt: "Search and tracking in the website settings of Northwind Supply (demo store): its live address, its sitemap and the verification fields",
         caption: "Search and tracking at Northwind Supply",
     },
@@ -677,17 +686,19 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         steps: [
+            OPEN_CODES,
+            { click: '[data-verification="google"] button:text-is("Add")' },
+            { waitFor: '[role="dialog"] input' },
             {
-                fill: '[data-verification="google"] input',
+                fill: '[role="dialog"] input',
                 value: '<meta name="google-site-verification" content="northwind-demo-search-console-code" />',
             },
-            { click: `${ST_VERIFY} h3` },
         ],
-        clip: { selector: '[data-verification="google"]', pad: 12 },
-        mark: '[data-verification="google"] button:text-is("Save")',
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:text-is("Save")',
         alt: "The Google Search Console field at Northwind Supply (demo store), with Google's HTML tag pasted and the code found in it",
         caption: "Google's tag pasted in at Northwind Supply",
     },
@@ -695,8 +706,9 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
+        steps: [OPEN_CODES],
         clip: {
             selector: `${ST_VERIFY} div.grid:has([data-live-address])`,
             until: `${ST_VERIFY} div.grid:has([data-sitemap])`,
@@ -710,7 +722,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-4",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         clip: { selector: ST_TRACKERS, pad: 12 },
         mark: '[data-tracker="ga4"] button:text-is("Set up")',
@@ -721,7 +733,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-5",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: { width: 1280, height: 900 },
         steps: [
             { click: '[data-tracker="ga4"] button:text-is("Set up")' },
@@ -753,10 +765,16 @@ const HELP_SHOTS_B: Shot[] = [
 
 /* Create your business. */
 
-/** The setup form, answered as a florist would, never created. */
+/**
+ * The setup form, answered as a florist would, never created. Setup is a
+ * stepper since 11 Oct 2026 (DEC-130): Continue opens the name step. The
+ * shots below that clip "Its address on Saroh" and "Is it registered as a
+ * company?" predate DEC-130 and are retaken with the Help article.
+ */
 const SETUP_FILLED: Step[] = [
     { waitFor: 'text="What are you setting up?"' },
     { click: '[role="radio"]:has-text("A business")' },
+    { click: 'form button[type="submit"]' },
     { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
     { waitFor: 'text="Available. Your website will live here."' },
 ];
@@ -849,15 +867,20 @@ const CREATE_BUSINESS_SHOTS: Shot[] = [
 
 const NW_TAX = "/settings/organization?section=tax";
 
-/** GST switched on and a GSTIN typed, never saved. */
+/** The GST row's Change, which opens its sheet. */
+const GST_CHANGE = "#business-gst-edit";
+
+/** In the GST row's sheet: GST switched on and a GSTIN typed, never saved. */
 const GST_ON: Step[] = [
-    { click: '#business-panel button:text-is("Edit")' },
-    { click: '[role="switch"][aria-label="GST-registered"]' },
+    { click: GST_CHANGE },
+    { waitFor: '[role="dialog"]' },
+    { click: '[role="dialog"] [role="switch"][aria-label="GST-registered"]' },
     {
-        fill: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        fill: '[role="dialog"] input[placeholder="29ABCDE1234F1ZW"]',
         value: "29AAGCN4821K1Z5",
     },
-    { click: '[role="tab"]:text-is("Tax and invoices")' },
+    // Out of the field, so its parts are checked as a whole.
+    { click: '[role="dialog"] h2' },
 ];
 
 const GSTIN_SHOTS: Shot[] = [
@@ -867,8 +890,8 @@ const GSTIN_SHOTS: Shot[] = [
         role: "owner",
         route: NW_TAX,
         viewport: HELP_DESK,
-        mark: '#business-panel button:text-is("Edit")',
-        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Edit button",
+        mark: GST_CHANGE,
+        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Change button on the GST row",
         caption: "Tax and invoices at Northwind Supply, not GST-registered yet",
     },
     {
@@ -880,11 +903,11 @@ const GSTIN_SHOTS: Shot[] = [
         steps: GST_ON,
         clip: {
             selector:
-                '#business-panel div.space-y-2:has(> div > button[role="switch"])',
-            until: '#business-panel div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
+                '[role="dialog"] div.space-y-2:has(> div > button[role="switch"])',
+            until: '[role="dialog"] div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
             pad: 14,
         },
-        mark: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        mark: '[role="dialog"] input[placeholder="29ABCDE1234F1ZW"]',
         alt: "Northwind Supply (demo shop) with GST-registered switched on and a GSTIN typed, its state code, PAN, entity, Z and check character shown under it",
         caption: "GST-registered on, and the GSTIN broken into its parts",
     },
@@ -906,8 +929,13 @@ const GSTIN_SHOTS: Shot[] = [
         route: NW_TAX,
         viewport: { width: 1440, height: 1000 },
         steps: GST_ON,
-        clip: { selector: 'aside[aria-label="How it prints"]', pad: 12 },
-        mark: 'aside[aria-label="How it prints"] span:text-is("Tax invoice")',
+        // The sheet's own preview, which follows the draft; the page's
+        // shows what is saved.
+        clip: {
+            selector: '[role="dialog"] aside[aria-label="How it prints"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] aside[aria-label="How it prints"] span:text-is("Tax invoice")',
         alt: "How it prints at Northwind Supply (demo shop), showing the unsaved edit: a tax invoice with the GSTIN and Karnataka",
         caption: "How it prints, now a tax invoice with the GSTIN",
     },
@@ -1067,8 +1095,10 @@ const CASHFREE_KEYS: Step[] = [
  * of its loaves, looked at only. The Rye & caraway loaf sells as itself, so
  * its Variants section shows Add variants; pressing it, picking sizes and
  * Add to list only stage rows in the page (Save variants is never pressed).
- * A value typed on the Size option is never entered (Enter would add it).
- * The Sourdough loaf's 400g is sold only Online, which "Sell it at" shows. */
+ * Edit on the Size option opens its sheet; a value typed there is never
+ * added and the sheet is never saved (nothing reaches the catalogue until
+ * Save). The Sourdough loaf's 400g is sold only Online, which "Sell it at"
+ * shows. */
 const RYE_OPTIONS = "/commerce/products/settings?tab=options";
 const RYE_CARAWAY =
     "/commerce/products/seed_sc_rc_product_1/edit?storefront=seed_sc_rc_store";
@@ -1096,18 +1126,16 @@ const SIZES_SHOTS: Shot[] = [
         route: RYE_OPTIONS,
         viewport: { width: 1024, height: 900 },
         steps: [
+            { waitFor: 'button[aria-label="Edit Size"]' },
+            { click: 'button[aria-label="Edit Size"]' },
             { waitFor: 'input[aria-label="Add a value to Size"]' },
             { fill: 'input[aria-label="Add a value to Size"]', value: "1kg" },
-            { click: 'h2:text-is("Options")' },
         ],
-        clip: {
-            selector: 'section:has(input[aria-label="New option name"])',
-            pad: 12,
-        },
+        clip: { selector: '[role="dialog"]', pad: 12 },
         mark: 'input[aria-label="Add a value to Size"]',
-        alt: "Product settings › Options at Rye & Co. (demo bakery): Size, Grind and Pack with their values, and 1kg typed into Size's new value",
+        alt: "Product settings › Options at Rye & Co. (demo bakery): the Edit Size sheet with its values, and 1kg typed into the box for a new value",
         caption:
-            "Rye & Co.'s options: Size, Grind and Pack, each with its values",
+            "Editing Size at Rye & Co.: its values, and 1kg typed in to add",
     },
     {
         key: "help-add-sizes-2",

@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     Patch,
     Post,
     Put,
@@ -16,6 +17,8 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
+import type { ClosingNoticeView } from "./closing-notice";
+import { closingNotice } from "./closing-notice";
 import {
     OnboardOrganizationDto,
     SetLogoDto,
@@ -52,7 +55,7 @@ export class OrganizationsController {
         @CurrentUser() user: AuthUser,
         @Body() dto: OnboardOrganizationDto,
     ) {
-        return this.onboarding.onboard(user.id, dto);
+        return this.onboarding.onboard(user.id, dto, { email: user.email });
     }
 
     @Get()
@@ -96,6 +99,18 @@ export class OrganizationsController {
     }
 
     /**
+     * What the business's website shows of how to reach it (DEC-128): its
+     * public phone, contact email, where customers come and its social
+     * links, for the "Contact and social" rows of Website settings. Every
+     * value is already public on the site; `site:read`.
+     */
+    @Get(":organizationId/site-contact")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    siteContact(@OrgContext() ctx: OrganizationContext) {
+        return this.settings.siteContact(ctx);
+    }
+
+    /**
      * Edit the org's name and/or business profile (OWNER/ADMIN). The slug is
      * immutable — see {@link UpdateOrganizationDto}.
      */
@@ -123,6 +138,22 @@ export class OrganizationsController {
     @UseGuards(BetterAuthGuard, OrganizationGuard)
     removeLogo(@OrgContext() ctx: OrganizationContext) {
         return this.settings.removeLogo(ctx);
+    }
+
+    /**
+     * What a business scheduled for deletion should finish first (#921):
+     * the refunds not yet back with its customers and the autopay
+     * memberships deletion won't cancel at the provider. Anyone in the
+     * business; what it lists follows what the reader may already see.
+     * `closing: null` for any other state.
+     */
+    @Get(":organizationId/closing")
+    @Header("Cache-Control", "no-store")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    closing(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<ClosingNoticeView> {
+        return closingNotice(ctx);
     }
 
     @Get(":organizationId")

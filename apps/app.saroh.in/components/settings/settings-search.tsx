@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Popover,
@@ -14,6 +15,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * Search settings ("Saroh Settings" design): on the settings screen the top
@@ -105,16 +107,17 @@ export function SettingsSearch({
         <Popover open={open} onOpenChange={toggle}>
             <PopoverAnchor virtualRef={edge} />
             <PopoverTrigger asChild>
-                <button
-                    ref={trigger}
-                    type="button"
-                    aria-label="Search settings"
-                    aria-keyshortcuts="/"
-                    title="Search settings  /"
-                    className={className}
-                >
-                    <Search className="size-4" />
-                </button>
+                <Tip label="Search settings  /">
+                    <button
+                        ref={trigger}
+                        type="button"
+                        aria-label="Search settings"
+                        aria-keyshortcuts="/"
+                        className={className}
+                    >
+                        <Search className="size-4" />
+                    </button>
+                </Tip>
             </PopoverTrigger>
             <PopoverContent
                 align="end"
@@ -132,7 +135,7 @@ export function SettingsSearch({
                             setQuery(e.target.value);
                             setActive(0);
                         }}
-                        placeholder="Find a setting — GSTIN, invoice prefix…"
+                        placeholder="Find a setting: GSTIN, invoice prefix…"
                         aria-label="Find a setting"
                         role="combobox"
                         aria-expanded
@@ -181,9 +184,13 @@ export function SettingsSearch({
                         </button>
                     ))}
                     {hits.length === 0 ? (
-                        <p className="p-2.5 text-[13px] text-muted-foreground">
-                            Nothing called that in Settings.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            kind="no-results"
+                            things="settings"
+                            className="p-2.5"
+                            title="Nothing called that in Settings"
+                        />
                     ) : null}
                 </div>
             </PopoverContent>

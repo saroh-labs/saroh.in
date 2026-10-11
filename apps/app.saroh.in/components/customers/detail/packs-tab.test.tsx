@@ -6,8 +6,11 @@ import type {
     DetailPack,
 } from "@/lib/customer-workspace/detail";
 
+import { pinClock } from "@/lib/format/test-clock";
 import { Overview } from "./overview";
 import { PacksTab } from "./packs-tab";
+
+pinClock();
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
@@ -75,7 +78,10 @@ describe("the Packs tab", () => {
         expect(html).toContain("7 of 10");
         expect(html).toContain("Use by 20 Oct");
         expect(html).toContain("Bought 1 Sep · ₹3,000 · Cash");
-        expect(html).toContain("Can still use · 1");
+        // Which packs is a dropdown, open on the ones they can still use.
+        expect(html).toMatch(/role="combobox"[^>]*aria-label="Which packs"/);
+        expect(html).toContain(">Can still use<");
+        expect(html).not.toContain("Can still use · 1");
         expect(html).toContain("Classes booked · 1");
         expect(html).toContain('aria-expanded="false"');
         expect(html).toContain(">Extend<");
@@ -107,7 +113,10 @@ describe("the Packs tab", () => {
             }),
         ]);
         expect(html).toContain("Ran out 20 Sep with 2 unused");
-        expect(html).toMatch(/aria-pressed="true"[^>]*>Used up or expired · 1/);
+        // The box says the narrowed choice and how many it holds.
+        expect(html).toMatch(
+            />Used up or expired <span data-value-count=""[^>]*>1</,
+        );
     });
 });
 
@@ -185,7 +194,8 @@ describe("the Classes left card", () => {
                 unavailable: [{ source: "packs", label: "Class packs" }],
             }),
         );
-        expect(html).toContain("Classes left couldn&#x27;t be read just now.");
+        expect(html).toContain("Couldn&#x27;t load classes left.");
+        expect(html).toContain("Try again");
     });
 
     it("draws no card with Class packs or Appointments off", () => {

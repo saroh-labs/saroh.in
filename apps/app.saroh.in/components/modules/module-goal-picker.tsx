@@ -1,16 +1,20 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { goalFor } from "@/lib/modules/goals";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
+import { Label } from "@saroh/ui/label";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Need-based module onboarding (#119). Asks what the business needs to *do* —
@@ -52,34 +56,27 @@ interface Goal {
  */
 function goalsFor(kind: unknown): Goal[] {
     const { people } = kindWords(kind);
+    // The four a business starts with are worded once, for setup, Home and
+    // this list (`lib/modules/goals.ts`). The rest are this list's own.
+    const started = (moduleKey: string): Goal => {
+        const goal = goalFor(moduleKey, kind);
+        return {
+            moduleKey,
+            title: goal?.verb ?? moduleKey,
+            description: goal?.note ?? "",
+        };
+    };
     const goals: Goal[] = [
-        {
-            moduleKey: "COMMERCE",
-            title: "Sell products",
-            description: "Run a catalog, take orders, and manage inventory.",
-        },
-        {
-            moduleKey: "APPOINTMENTS",
-            title: "Take bookings",
-            description: `Offer services and let ${people} book time with you.`,
-        },
+        started("COMMERCE"),
+        started("APPOINTMENTS"),
         {
             moduleKey: "COURSES",
             title: "Run courses",
             description:
                 "Sell a set of dated sessions with limited seats, like a six-week class.",
         },
-        {
-            moduleKey: "WEBSITE",
-            title: "Show up online",
-            description:
-                "Publish a website with pages, forms, and your own domain.",
-        },
-        {
-            moduleKey: "CRM",
-            title: `Manage ${people} & leads`,
-            description: "Capture enquiries and track them through a pipeline.",
-        },
+        started("WEBSITE"),
+        started("CRM"),
         {
             moduleKey: "PAYMENTS",
             title: "Take payments",
@@ -244,6 +241,7 @@ export function ModuleGoalPicker({
         <div className="space-y-8">
             <TurnOnSheet
                 picked={turningOn}
+                firstRun
                 modules={modules}
                 onOpenChange={(open) => {
                     if (!open) setTurningOn(null);
@@ -262,12 +260,13 @@ export function ModuleGoalPicker({
                         const descriptionId = `goal-${goal.moduleKey}-description`;
 
                         return (
-                            // Wrapping <label> makes the whole row a real hit
+                            // The wrapping label makes the whole row a real hit
                             // target without inventing a control. No `htmlFor`:
                             // the checkbox names itself from the title alone via
                             // aria-labelledby, so the reader hears "Sell products,
                             // checkbox" rather than the row's entire prose.
-                            <label
+                            <Label
+                                data-ph-unmask=""
                                 key={goal.moduleKey}
                                 // `wk-choice` + `data-selected` carry the commit
                                 // motion (workspace.css): the row settles with a
@@ -279,9 +278,9 @@ export function ModuleGoalPicker({
                                 style={
                                     { "--wk-i": index } as React.CSSProperties
                                 }
-                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-brand/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
+                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 text-sm font-normal leading-normal hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
                                     isSelected
-                                        ? "border-brand bg-brand-subtle/40"
+                                        ? "border-border-strong bg-muted"
                                         : "border-border"
                                 }`}
                             >
@@ -303,9 +302,9 @@ export function ModuleGoalPicker({
                                             {goal.title}
                                         </span>
                                         {goal.moduleKey === suggested ? (
-                                            <span className="rounded-full bg-highlight-subtle px-2 py-0.5 text-[11px] font-medium text-highlight-subtle-foreground">
+                                            <StatusBadge tone="active">
                                                 Suggested
-                                            </span>
+                                            </StatusBadge>
                                         ) : null}
                                     </span>
                                     <span
@@ -322,7 +321,7 @@ export function ModuleGoalPicker({
                                         ) : null}
                                     </span>
                                 </span>
-                            </label>
+                            </Label>
                         );
                     })}
                 </fieldset>
@@ -330,9 +329,7 @@ export function ModuleGoalPicker({
 
             {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
-                    <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Already on
-                    </h2>
+                    <h2 className="label">Already on</h2>
                     <ul className="flex flex-wrap gap-2">
                         {available
                             .filter((g) => alreadyOn.has(g.moduleKey))
@@ -351,12 +348,9 @@ export function ModuleGoalPicker({
                     </ul>
                     <p className="text-sm text-muted-foreground">
                         Turn these off any time in{" "}
-                        <Link
-                            href="/settings/modules"
-                            className="text-brand underline-offset-4 hover:underline"
-                        >
+                        <TextLink href="/settings/modules">
                             Settings → Modules
-                        </Link>
+                        </TextLink>
                         .
                     </p>
                 </div>
@@ -370,8 +364,8 @@ export function ModuleGoalPicker({
                     aria-live="polite"
                 >
                     {resolved.size === 0
-                        ? "Nothing selected — you can add capabilities later."
-                        : `${resolved.size} ${resolved.size === 1 ? "capability" : "capabilities"} will be turned on.`}
+                        ? "Nothing selected. You can add modules later."
+                        : `${count(resolved.size, "module")} will be turned on.`}
                 </p>
                 <div className="flex items-center gap-2">
                     <Button
@@ -390,7 +384,7 @@ export function ModuleGoalPicker({
                     >
                         {resolved.size === 0
                             ? "Continue"
-                            : "Set up my workspace"}
+                            : "Set up my business"}
                     </Button>
                 </div>
             </div>

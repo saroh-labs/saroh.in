@@ -1,10 +1,12 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
@@ -20,10 +22,16 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { ContactPicker } from "@/components/shared/contact-picker";
-import { OptionSelect } from "@/components/shared/option-select";
+import {
+    lostChanges,
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/use-leave-guard";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import {
     createInvoice,
     issueInvoice,
@@ -40,6 +48,9 @@ import {
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { copyText } from "@saroh/ui/copy-button";
+import { OptionSelect } from "@saroh/ui/option-select";
+import type { BaseSyntheticEvent } from "react";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -117,15 +128,6 @@ function dueFrom(days: number): string {
     ).toISOString();
 }
 
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 /**
  * A hand-written invoice — new, or a draft being changed — after "Saroh
  * Invoice Detail" (?new=1): who it is billed to, its lines, when it falls
@@ -181,7 +183,9 @@ export function InvoiceForm({
         address: useId(),
         lines: useId(),
     };
-    const [intent, setIntent] = useState<"issue" | "draft">("issue");
+    // Which button is working, for its label. Never what a submit does:
+    // Enter in a field is the form's own submit, and that saves the draft.
+    const [intent, setIntent] = useState<"issue" | "draft">("draft");
     // Someone added from Who (UX-047) joins the list here, chosen.
     const [added, setAdded] = useState<AddedContact[]>([]);
     const contacts = [...added, ...listed];
@@ -195,6 +199,7 @@ export function InvoiceForm({
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             contactId: draft?.contact?.id ?? initialContactId ?? "",
             due: draft?.dueAt ? "kept" : 14,
@@ -235,7 +240,7 @@ export function InvoiceForm({
                   gstRate: "",
                   hsnSac: "",
               });
-    const { isSubmitting, errors } = form.formState;
+    const { isSubmitting, isDirty, errors } = form.formState;
     const lines = useWatch({ control: form.control, name: "lines" });
     const due = useWatch({ control: form.control, name: "due" });
 
@@ -251,15 +256,11 @@ export function InvoiceForm({
     );
     const noLine = good.length === 0;
     const typed = lines.some((l) => l.description || l.unitPrice);
-    const show = (cents: number) =>
-        formatMoneyMajor(cents / 100, currency) ?? String(cents / 100);
+    const show = (cents: number) => formatMoneyMajor(cents / 100, currency);
     const withLink = providerConnected;
 
-    async function onSubmit(values: FormValues) {
-        // Missing details are asked for at once, before the save (#838):
-        // asked after it, the sheet waited on a save, a refusal and a read.
-        // Closed without saving, the draft is still kept, as below.
-        const detailsReady = intent === "issue" ? await details.ensure() : true;
+    /** Keep it as a draft. Null when refused, which is said on the form. */
+    async function save(values: FormValues) {
         const input = {
             contactId: values.contactId,
             ...(draft ? {} : { currency, tax: "0" }),
@@ -299,14 +300,26 @@ export function InvoiceForm({
             } else {
                 showError(saved.error);
             }
-            return;
+            return null;
         }
-        const id = saved.data.id;
+        return saved.data;
+    }
+
+    const savedAsDraft = (who: string | undefined) =>
+        `Saved as a draft for ${who ?? "them"}. No number yet.`;
+
+    async function onSubmit(values: FormValues, want: "issue" | "draft") {
+        setIntent(want);
+        // Missing details are asked for at once, before the save (#838):
+        // asked after it, the sheet waited on a save, a refusal and a read.
+        // Closed without saving, the draft is still kept, as below.
+        const detailsReady = want === "issue" ? await details.ensure() : true;
+        const saved = await save(values);
+        if (!saved) return;
+        const id = saved.id;
         const to = `/billing/invoices/${id}`;
-        if (intent === "draft") {
-            showSuccess(
-                `Saved as a draft for ${saved.data.contact?.name ?? "them"}. No number yet.`,
-            );
+        if (want === "draft") {
+            showSuccess(savedAsDraft(saved.contact?.name));
             router.push(to);
             return;
         }
@@ -321,7 +334,7 @@ export function InvoiceForm({
         }
         if (!issued.ok) {
             // The draft is saved; only issuing failed. Say which.
-            showError(`Saved as a draft, but not issued: ${issued.error}`);
+            showError("Saved as a draft, but not issued.", issued.error);
             router.push(to);
             return;
         }
@@ -339,10 +352,11 @@ export function InvoiceForm({
                 reportFailure(link);
             } else {
                 showError(
-                    `${number} issued, but no pay link was made: ${link.error}`,
+                    `${number} issued, but no pay link was made.`,
+                    link.error,
                 );
             }
-        } else if (await copy(link.data.url)) {
+        } else if (await copyText(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
             );
@@ -354,12 +368,34 @@ export function InvoiceForm({
         router.push(to);
     }
 
-    function onInvalid(errs: FieldErrors<FormValues>) {
+    function onInvalid(
+        errs: FieldErrors<FormValues>,
+        event?: BaseSyntheticEvent,
+    ) {
         if (errs.billToGstin || errs.billToState) setBuyerOpen(true);
+        // The buyer's fields open first, so the keyboard can land on one.
+        toFirstError(errs, event);
         if (errs.lines?.root?.message ?? errs.lines?.message) {
             showError(String(errs.lines.root?.message ?? errs.lines.message));
         }
     }
+
+    // Leaving with lines typed asks first, and can keep them as a draft.
+    const guard = useLeaveGuard({
+        dirty: isDirty,
+        lost: draft ? lostChanges("this draft") : lostNew("invoice"),
+        save: async () => {
+            let kept = false;
+            await form.handleSubmit(async (values) => {
+                setIntent("draft");
+                const saved = await save(values);
+                if (!saved) return;
+                kept = true;
+                showSuccess(savedAsDraft(saved.contact?.name));
+            }, onInvalid)();
+            return kept;
+        },
+    });
 
     function onContactAdded(c: AddedContact) {
         setAdded((a) => [c, ...a]);
@@ -384,19 +420,16 @@ export function InvoiceForm({
         );
     }
 
-    const chip = (on: boolean) =>
-        cn(
-            "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
-            on
-                ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
-        );
-
     return (
         <>
             {details.step}
+            {guard.dialog}
             <form
-                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(
+                    (values) => onSubmit(values, "draft"),
+                    onInvalid,
+                )}
                 className="flex flex-wrap items-start gap-4"
                 noValidate
             >
@@ -448,7 +481,7 @@ export function InvoiceForm({
                                             maxLength={15}
                                             autoCapitalize="characters"
                                             placeholder="29AAGFL5531Q1ZO"
-                                            className="h-9 font-mono text-[13px] uppercase"
+                                            className="font-mono uppercase"
                                             aria-invalid={Boolean(
                                                 errors.billToGstin,
                                             )}
@@ -502,20 +535,21 @@ export function InvoiceForm({
                                             id={ids.address}
                                             rows={2}
                                             maxLength={500}
-                                            className="text-[13px]"
                                             disabled={isSubmitting}
                                             {...form.register("billToAddress")}
                                         />
                                     </div>
                                 </div>
                             ) : (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                    className="mt-2 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     + Their GSTIN, state and address
-                                </button>
+                                </Button>
                             )
                         ) : null}
                     </Card>
@@ -550,7 +584,7 @@ export function InvoiceForm({
                                             <Input
                                                 aria-label={`Line ${i + 1}: what it's for`}
                                                 placeholder="What it's for"
-                                                className="col-span-2 h-9 rounded-[8px] text-[13px] sm:col-span-1"
+                                                className="col-span-2 sm:col-span-1"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
                                                     lineErr?.description,
@@ -576,7 +610,7 @@ export function InvoiceForm({
                                                     id={`${ids.lines}-${i}-qty`}
                                                     aria-label={`Line ${i + 1}: quantity`}
                                                     inputMode="numeric"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    className="tabular-nums"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.quantity,
@@ -596,18 +630,25 @@ export function InvoiceForm({
                                                 >
                                                     Price each
                                                 </Label>
-                                                <Input
-                                                    id={`${ids.lines}-${i}-price`}
-                                                    aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                    inputMode="decimal"
-                                                    placeholder="₹ each"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        lineErr?.unitPrice,
-                                                    )}
-                                                    {...form.register(
-                                                        `lines.${i}.unitPrice`,
+                                                <Controller
+                                                    control={form.control}
+                                                    name={`lines.${i}.unitPrice`}
+                                                    render={({ field }) => (
+                                                        <MoneyInput
+                                                            {...field}
+                                                            id={`${ids.lines}-${i}-price`}
+                                                            aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                            currency={currency}
+                                                            onValueChange={
+                                                                field.onChange
+                                                            }
+                                                            disabled={
+                                                                isSubmitting
+                                                            }
+                                                            aria-invalid={Boolean(
+                                                                lineErr?.unitPrice,
+                                                            )}
+                                                        />
                                                     )}
                                                 />
                                             </div>
@@ -644,10 +685,11 @@ export function InvoiceForm({
                                                     )}
                                                 />
                                                 <Input
+                                                    dense
                                                     aria-label={`Line ${i + 1}: HSN or SAC`}
                                                     placeholder="HSN / SAC"
                                                     inputMode="numeric"
-                                                    className="h-8 rounded-[8px] font-mono text-[12px]"
+                                                    className="font-mono"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.hsnSac,
@@ -671,7 +713,9 @@ export function InvoiceForm({
                                 );
                             })}
                         </ul>
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             disabled={isSubmitting}
                             onClick={() =>
@@ -683,10 +727,10 @@ export function InvoiceForm({
                                     hsnSac: "",
                                 })
                             }
-                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                            className="mt-1 py-1.5 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                         >
                             + Add a line
-                        </button>
+                        </Button>
                         {registered ? (
                             <p className="mt-1 text-[12px] text-muted-foreground">
                                 Prices include GST. A line with no rate set is
@@ -696,85 +740,82 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Due">
-                        <div
-                            role="radiogroup"
-                            aria-label="Due"
-                            className="flex flex-wrap items-center gap-1.5"
-                        >
-                            {draft?.dueAt ? (
-                                <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === "kept"}
-                                    onClick={() => form.setValue("due", "kept")}
-                                    className={chip(due === "kept")}
-                                >
-                                    <ViewerDate
-                                        iso={draft.dueAt}
-                                        variant="dayMonth"
-                                    />
-                                </button>
-                            ) : null}
-                            {DUES.map((d) => (
-                                <button
-                                    key={d.days}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === d.days}
-                                    onClick={() => form.setValue("due", d.days)}
-                                    className={chip(due === d.days)}
-                                >
-                                    {d.label}
-                                </button>
-                            ))}
-                        </div>
+                        <ChipGroup
+                            label="Due"
+                            className="items-center"
+                            value={String(due)}
+                            onChange={(v) =>
+                                form.setValue(
+                                    "due",
+                                    v === "kept" ? "kept" : Number(v),
+                                )
+                            }
+                            choices={[
+                                ...(draft?.dueAt
+                                    ? [
+                                          {
+                                              value: "kept",
+                                              label: (
+                                                  <ViewerDate
+                                                      iso={draft.dueAt}
+                                                      variant="dayMonth"
+                                                  />
+                                              ),
+                                          },
+                                      ]
+                                    : []),
+                                ...DUES.map((d) => ({
+                                    value: String(d.days),
+                                    label: d.label,
+                                })),
+                            ]}
+                        />
                     </Card>
                 </div>
 
                 <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Total
-                    </h2>
+                    <h2 className="label">Total</h2>
                     <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
                         {show(total)}
                     </p>
                     <p className="text-[12px] text-muted-foreground">
                         {registered
-                            ? "GST worked out per line when it's issued — prices include it."
-                            : `No GST — ${businessName} isn't registered.`}
+                            ? "GST worked out per line when it's issued. Prices include it."
+                            : `No GST. ${businessName} isn't registered.`}
                     </p>
                     <p className="mt-3 text-[12.5px] leading-[1.5] text-foreground">
                         A draft has no number and can still change. Issuing
                         numbers it and locks the lines
                         {withLink
-                            ? ", and copies its pay link for you to send — Saroh doesn't send it."
-                            : " — Saroh doesn't send it; print it or share it yourself."}
+                            ? ", and copies its pay link for you to send. Saroh doesn't send it."
+                            : ". Saroh doesn't send it. Print it or share it yourself."}
                     </p>
                     <div className="mt-3 flex flex-col gap-2">
+                        {/* Issuing numbers the invoice and locks its lines, so
+                            it takes a press of this button. The form's one
+                            submit, which Enter runs, is the draft below. */}
                         <Button
-                            type="submit"
+                            type="button"
                             disabled={isSubmitting || noLine}
-                            onClick={() => setIntent("issue")}
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            onClick={() =>
+                                void form.handleSubmit(
+                                    (values) => onSubmit(values, "issue"),
+                                    onInvalid,
+                                )()
+                            }
+                            busy={isSubmitting && intent === "issue"}
+                            busyLabel="Issuing…"
                         >
-                            {isSubmitting && intent === "issue"
-                                ? "Issuing…"
-                                : withLink
-                                  ? "Issue with pay link"
-                                  : "Issue it"}
+                            {withLink ? "Issue with pay link" : "Issue it"}
                         </Button>
                         <Button
                             type="submit"
                             variant="outline"
                             disabled={isSubmitting || noLine}
-                            onClick={() => setIntent("draft")}
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            busy={isSubmitting && intent === "draft"}
+                            busyLabel="Saving…"
                         >
-                            {isSubmitting && intent === "draft"
-                                ? "Saving…"
-                                : draft
-                                  ? "Save the draft"
-                                  : "Save as draft"}
+                            {draft ? "Save the draft" : "Save as draft"}
                         </Button>
                     </div>
                     {noLine && typed ? (
@@ -792,9 +833,7 @@ export function InvoiceForm({
 function Card({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );
@@ -849,7 +888,7 @@ function NewContact({
                     type="button"
                     variant={solid ? "default" : "link"}
                     size="sm"
-                    className={solid ? undefined : "h-auto px-0 text-[12.5px]"}
+                    className={solid ? undefined : "h-auto px-0"}
                 >
                     New contact
                 </Button>

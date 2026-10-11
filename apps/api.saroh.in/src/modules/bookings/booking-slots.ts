@@ -315,7 +315,7 @@ export async function resolvePerson(
     throw new BadRequestException({
         message: named
             ? `That time isn't available with ${named.name}. Pick another time.`
-            : "That time is not an open slot for this service",
+            : "That time isn't open for this service.",
         field: "startAt",
     });
 }

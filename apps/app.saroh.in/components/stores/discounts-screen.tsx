@@ -3,8 +3,8 @@
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
-import { Plus, TicketPercent } from "lucide-react";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { TicketPercent } from "lucide-react";
 import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -16,20 +16,20 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { describeDiscount } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 
-/** The design's three pills. Exhausted is drawn as Expired: it will not work now. */
+/** A code used up reads Ended, as one past its date does: it will not work now. */
 const STATE: Record<
     DiscountState,
     { label: string; variant: NonNullable<BadgeProps["variant"]> }
 > = {
-    ACTIVE: { label: "Active", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "warning" },
-    EXPIRED: { label: "Expired", variant: "neutral" },
-    EXHAUSTED: { label: "Used up", variant: "neutral" },
+    ACTIVE: { label: "Live", variant: "success" },
+    SCHEDULED: { label: "Scheduled", variant: "info" },
+    EXPIRED: { label: "Ended", variant: "neutral" },
+    EXHAUSTED: { label: "Ended", variant: "neutral" },
 };
 
 const FILTERS: DataFilter<Discount>[] = [
     { id: "all", label: "All" },
-    { id: "active", label: "Active", predicate: (d) => d.state === "ACTIVE" },
+    { id: "active", label: "Live", predicate: (d) => d.state === "ACTIVE" },
     {
         id: "scheduled",
         label: "Scheduled",
@@ -127,16 +127,17 @@ export function DiscountsScreen({
     return (
         <>
             <PageHeader
-                breadcrumb={["Sell", "Discounts"]}
-                title="Discounts"
+                breadcrumb={["Sell", "Discount codes"]}
+                title="Discount codes"
+                count={countLabel(discounts.length, {
+                    one: "code",
+                    other: "codes",
+                })}
                 className="mb-0"
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link href="/commerce/discounts/new">
-                                <Plus className="mr-1.5 size-4" />
-                                New code
-                            </Link>
+                            <Link href="/commerce/discounts/new">New code</Link>
                         </Button>
                     ) : undefined
                 }
@@ -151,27 +152,26 @@ export function DiscountsScreen({
                 hideModeToggle
                 filters={FILTERS}
                 noun={{ one: "code", other: "codes" }}
+                showTotal={false}
                 searchPlaceholder="Search codes"
                 searchableColumnIds={["code"]}
                 emptyState={{
                     icon: <TicketPercent />,
                     title: "No discount codes yet",
-                    note: "A code takes money off an order — from everything, or just the locations, categories or products you choose.",
+                    note: "A code takes money off an order: everything, or only the products you choose.",
                     action: canWrite ? (
                         <Button asChild>
-                            <Link href="/commerce/discounts/new">
-                                Make a code
-                            </Link>
+                            <Link href="/commerce/discounts/new">New code</Link>
                         </Button>
                     ) : undefined,
                 }}
             />
             <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                 A code works on an order you take at the counter and, when your
-                website sells, in your customers&rsquo; bag there — with the
-                same dates, limit and reach, and one count of uses. An expired
-                code keeps its figures — how often something was used is a fact
-                about the past, not a setting.
+                website sells, in your customers&rsquo; bag there, with the same
+                dates, limit and reach, and one count of uses. An expired code
+                keeps its figures: how often something was used is a fact about
+                the past, not a setting.
             </p>
         </>
     );

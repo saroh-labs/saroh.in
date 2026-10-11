@@ -25,14 +25,14 @@ export default async function NotificationsPage() {
     ]);
 
     return (
-        <PageContainer>
-            <PageHeader
-                breadcrumb={["Workspace", "Notifications"]}
-                title="Notifications"
-            />
+        <PageContainer width="full">
+            <PageHeader breadcrumb={["Notifications"]} title="Notifications" />
             <NotificationsInbox
                 notifications={notifications}
                 businessName={organization?.name ?? "this business"}
+                // The instant "5 min ago" is counted from, the same on the
+                // server and in the browser's first paint.
+                now={new Date().toISOString()}
             />
         </PageContainer>
     );

@@ -1,30 +1,22 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import { DatePicker } from "@saroh/ui/date-picker";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
-import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { personHref } from "@/lib/contacts/person-href";
 import {
-    addSession,
     cancelEnrollment,
     removeSession,
     updateCourse,
@@ -36,11 +28,19 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { CourseDetail, Enrollment } from "@/lib/courses/service";
-import { wallClockToIso, ymd } from "@/lib/courses/sessions";
-import { formatTimeRange } from "@/lib/format/datetime";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
-import { invoiceMoney } from "@/lib/invoices/money";
+import {
+    formatMonth,
+    formatTimeRange,
+    formatWeekday,
+    zoneParts,
+} from "@/lib/format/datetime";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useHold } from "@/components/shared/use-hold";
+
+import { runAction } from "@/lib/api/run-action";
+import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
 const STANDING_WORD = {
@@ -85,9 +85,10 @@ export function CoursePage({
     const tab = courseTab({ ...course, sessions: course.sessions });
 
     async function setStatus(status: CourseDetail["status"], done: string) {
-        setBusy(true);
-        const res = await updateCourse(course.id, { status });
-        setBusy(false);
+        const res = await runAction(() => updateCourse(course.id, { status }), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(done);
         router.refresh();
@@ -124,8 +125,10 @@ export function CoursePage({
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
+                holdsData
                 className="mb-0"
                 breadcrumb={[
+                    "Bookings",
                     <Link
                         key="courses"
                         href="/courses"
@@ -179,8 +182,10 @@ export function CoursePage({
                         : STATUS_LABEL[course.status]}
                 </Badge>
                 {course.service.name} ·{" "}
-                {invoiceMoney(course.price, course.currency)} · {course.seats}{" "}
-                {course.seats === 1 ? "seat" : "seats"}
+                {formatMoneyMajor(course.price, course.currency, {
+                    decimals: "always",
+                })}{" "}
+                · {count(course.seats, "seat")}
                 {course.description ? ` · ${course.description}` : ""}
             </div>
 
@@ -233,46 +238,99 @@ function Sessions({
     now: string;
 }) {
     const router = useRouter();
+    const [adding, setAdding] = useState(false);
+    const trigger = useRef<HTMLButtonElement>(null);
+    const refocus = useRef(false);
+    // A session removed here: gone from the list at once, and removed for
+    // real when its ten seconds are up (`useHold`).
+    const { hold } = useHold();
+    const [removed, setRemoved] = useState<readonly string[]>([]);
+    const sessions = course.sessions.filter((s) => !removed.includes(s.id));
+    const count = sessions.length;
+    useEffect(() => {
+        if (!refocus.current) return;
+        refocus.current = false;
+        trigger.current?.focus();
+    }, [count]);
     const tz = course.service.timezone;
     const now = Date.parse(nowIso);
     const month = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            month: "short",
-        })
-            .format(new Date(iso))
-            .toUpperCase();
-    const dayNum = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            day: "numeric",
-        }).format(new Date(iso));
-    const weekday = (iso: string) =>
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone: tz,
-            weekday: "long",
-        }).format(new Date(iso));
+        formatMonth(iso, tz, { month: "short", year: "never" }).toUpperCase();
+    const dayNum = (iso: string) => String(zoneParts(iso, tz).day);
+    const weekday = (iso: string) => formatWeekday(iso, tz);
 
-    async function remove(sessionId: string) {
-        const res = await removeSession(course.id, sessionId);
-        if (!res.ok) return showError(res.error);
-        showSuccess("Session removed");
-        router.refresh();
+    /**
+     * Removing a session cancels the bookings on it, and the API can't put
+     * those back. So it is held: gone at once with Undo, and removed when
+     * the ten seconds are up.
+     */
+    function remove(sessionId: string) {
+        const back = () =>
+            setRemoved((ids) => ids.filter((id) => id !== sessionId));
+        setRemoved((ids) => [...ids, sessionId]);
+        hold(
+            `session:${sessionId}`,
+            "Session removed.",
+            async () => {
+                const res = await removeSession(course.id, sessionId);
+                if (!res.ok) {
+                    showError("The session wasn't removed.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
+            course.enrolled > 0
+                ? {
+                      description:
+                          "Everyone booked on it is taken off when the ten seconds are up.",
+                  }
+                : {},
+        );
     }
+
+    // One "Add session" button: in the empty line while there are none, by
+    // the heading once there are. Whichever is on screen opens the dialog
+    // and takes the keyboard back when it closes, including when the first
+    // session moves the button from one place to the other.
+    const canAdd = canWrite && course.status !== "ARCHIVED";
+    const empty = sessions.length === 0;
+    const addButton = (
+        <Button
+            ref={trigger}
+            variant="outline"
+            size={empty ? "default" : "sm"}
+            onClick={() => {
+                // The first session moves the button to the heading: the
+                // keyboard follows it there.
+                refocus.current = empty;
+                setAdding(true);
+            }}
+        >
+            Add session
+        </Button>
+    );
 
     return (
         <section className="flex min-w-0 flex-col gap-2.5">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Sessions
-            </h2>
-            {course.sessions.length === 0 ? (
-                <p className="rounded-[11px] border border-dashed border-border-strong px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No sessions yet. Add one below; a course opens once it has a
-                    session.
-                </p>
+            <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
+                <h2 className="label">Sessions</h2>
+                {canAdd && !empty ? addButton : null}
+            </div>
+            {empty ? (
+                <EmptyState
+                    size="panel"
+                    title="No sessions yet"
+                    description={
+                        canAdd
+                            ? "Add the first one, then the course can open for enrolment."
+                            : "A course can open for enrolment once it has a session."
+                    }
+                    action={canAdd ? addButton : undefined}
+                />
             ) : (
                 <ol className="divide-y overflow-hidden rounded-[11px] border border-border bg-card">
-                    {course.sessions.map((s) => {
+                    {sessions.map((s) => {
                         const past = Date.parse(s.startAt) <= now;
                         return (
                             <li
@@ -319,9 +377,8 @@ function Sessions({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="coarse:size-11"
                                         aria-label="Remove this session"
-                                        onClick={() => void remove(s.id)}
+                                        onClick={() => remove(s.id)}
                                     >
                                         <X className="size-4" aria-hidden />
                                     </Button>
@@ -336,82 +393,14 @@ function Sessions({
                 shows on the schedule with its attendees and takes a seat there
                 too. Times are in {tz}.
             </p>
-            {canWrite && course.status !== "ARCHIVED" ? (
-                <AddSession course={course} />
+            {canAdd ? (
+                <AddSessionDialog
+                    open={adding}
+                    onOpenChange={setAdding}
+                    course={course}
+                />
             ) : null}
         </section>
-    );
-}
-
-function AddSession({ course }: { course: CourseDetail }) {
-    const router = useRouter();
-    const ids = { day: useId(), time: useId() };
-    const last = course.sessions.at(-1);
-    const [day, setDay] = useState<Date | undefined>(
-        last ? new Date(Date.parse(last.startAt) + 7 * 86_400_000) : undefined,
-    );
-    const [time, setTime] = useState(
-        last
-            ? new Intl.DateTimeFormat("en-GB", {
-                  timeZone: course.service.timezone,
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hourCycle: "h23",
-              }).format(new Date(last.startAt))
-            : "18:30",
-    );
-    const [busy, setBusy] = useState(false);
-    const on = course.enrolled;
-
-    async function add() {
-        if (!day) return;
-        setBusy(true);
-        const res = await addSession(
-            course.id,
-            wallClockToIso(ymd(day), time, course.service.timezone),
-        );
-        setBusy(false);
-        if (!res.ok) return showError(res.error);
-        showSuccess(
-            on > 0
-                ? `Session added, and ${on} ${on === 1 ? "person" : "people"} booked on it`
-                : "Session added",
-        );
-        router.refresh();
-    }
-
-    return (
-        <div className="flex flex-wrap items-end gap-2 pt-1">
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.day}>New session</Label>
-                <DatePicker
-                    id={ids.day}
-                    value={day}
-                    onValueChange={setDay}
-                    className="w-[11rem]"
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.time}>Time</Label>
-                <TimeSelect
-                    id={ids.time}
-                    value={time}
-                    onValueChange={setTime}
-                    stepMinutes={15}
-                />
-            </div>
-            <Button
-                variant="outline"
-                disabled={busy || !day}
-                onClick={() => void add()}
-            >
-                {busy
-                    ? "Adding…"
-                    : on > 0
-                      ? `Add and book ${on}`
-                      : "Add session"}
-            </Button>
-        </div>
     );
 }
 
@@ -434,7 +423,7 @@ function Roster({
     );
     const full = course.seatsLeft <= 0;
     const why = full
-        ? "Every seat is taken. Add a seat in the course, or wait for someone to cancel — a cancellation frees one straight away."
+        ? "Every seat is taken. Add a seat in the course, or wait for someone to cancel. A cancellation frees one straight away."
         : course.status === "DRAFT"
           ? "Open the course to take enrolments."
           : course.status !== "OPEN"
@@ -452,9 +441,11 @@ function Roster({
                 </Badge>
             </header>
             {active.length === 0 ? (
-                <p className="px-4 py-5 text-[13px] text-muted-foreground">
-                    Nobody is on this course yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="px-4 py-5"
+                    title="No one is on this course yet."
+                />
             ) : (
                 <ul className="divide-y">
                     {active.map((e) => (
@@ -510,7 +501,7 @@ function RosterRow({
     enrollment: Enrollment;
     onCancel?: () => void;
 }) {
-    const money = invoiceMoney(e.price, e.currency);
+    const money = formatMoneyMajor(e.price, e.currency, { decimals: "always" });
     return (
         <li className="flex items-center gap-3 px-4 py-3">
             <span
@@ -540,16 +531,11 @@ function RosterRow({
                     ) : (
                         `${money} · no invoice`
                     )}
-                    {` · ${e.upcoming} ${e.upcoming === 1 ? "session" : "sessions"} to come`}
+                    {` · ${count(e.upcoming, "session")} to come`}
                 </span>
             </span>
             {onCancel ? (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="coarse:h-11"
-                    onClick={onCancel}
-                >
+                <Button variant="ghost" size="sm" onClick={onCancel}>
                     Cancel
                 </Button>
             ) : null}
@@ -577,7 +563,6 @@ function CancelEnrolmentDialog({
     const router = useRouter();
     const voidId = useId();
     const [voidToo, setVoidToo] = useState(false);
-    const [busy, setBusy] = useState(false);
     const open =
         enrollment.invoice &&
         (enrollment.invoice.standing === "ISSUED" ||
@@ -586,69 +571,55 @@ function CancelEnrolmentDialog({
             : null;
     const n = enrollment.upcoming;
 
-    async function confirm() {
-        setBusy(true);
+    async function confirm(): Promise<ConfirmResult> {
         const res = await cancelEnrollment(
             course.id,
             enrollment.id,
             voidToo && open ? open.id : undefined,
         );
-        setBusy(false);
         if (!res.ok) {
-            showError(res.error);
             router.refresh();
-            return;
+            return { ok: false, error: res.error };
         }
         showSuccess(
-            `${enrollment.contact.name} is off the course${n > 0 ? ` — ${n} ${n === 1 ? "session" : "sessions"} cancelled` : ""}`,
+            "Enrolment cancelled.",
+            `${enrollment.contact.name} is off the course${n > 0 ? `, and ${count(n, "session is", "sessions are")} cancelled` : ""}.`,
         );
-        onClose();
         router.refresh();
     }
 
     return (
-        <Dialog open onOpenChange={(o) => (o ? null : onClose())}>
-            <DialogContent className="sm:max-w-[440px]">
-                <DialogHeader>
-                    <DialogTitle className="font-display text-[18px] tracking-[-0.02em]">
-                        Take {enrollment.contact.name} off {course.name}?
-                    </DialogTitle>
-                    <DialogDescription>
-                        {n > 0
-                            ? `Their ${n} ${n === 1 ? "session" : "sessions"} still to come ${n === 1 ? "is" : "are"} cancelled, which cannot be undone, and their seat frees at once. Sessions already run stay as they were.`
-                            : "Their seat frees at once. Sessions already run stay as they were."}
-                    </DialogDescription>
-                </DialogHeader>
-                {open ? (
-                    <div className="flex items-start gap-2.5 rounded-[10px] border border-border px-3.5 py-3">
-                        <Checkbox
-                            id={voidId}
-                            checked={voidToo}
-                            onCheckedChange={(v) => setVoidToo(v === true)}
-                            className="mt-0.5"
-                        />
-                        <Label
-                            htmlFor={voidId}
-                            className="text-[13px] font-normal leading-[1.5]"
-                        >
-                            Void their open invoice {open.number} too. Leave it
-                            if they owe for sessions they had.
-                        </Label>
-                    </div>
-                ) : null}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        Keep them on
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => void confirm()}
+        <ConfirmDialog
+            open
+            onOpenChange={(o) => (o ? null : onClose())}
+            title={`Take ${enrollment.contact.name} off ${course.name}?`}
+            description={
+                n > 0
+                    ? `Their ${count(n, "session")} still to come ${plural(n, "is", "are")} cancelled, and their seat frees at once. Sessions already run stay as they were. This cannot be undone.`
+                    : "Their seat frees at once. Sessions already run stay as they were. This cannot be undone."
+            }
+            confirmLabel="Cancel enrolment"
+            keepLabel="Keep enrolment"
+            onConfirm={confirm}
+        >
+            {open ? (
+                <div className="flex items-start gap-2.5 rounded-[10px] border border-border px-3.5 py-3">
+                    <Checkbox
+                        id={voidId}
+                        checked={voidToo}
+                        onCheckedChange={(v) => setVoidToo(v === true)}
+                        className="mt-0.5"
+                    />
+                    <Label
+                        data-ph-unmask=""
+                        htmlFor={voidId}
+                        className="text-[13px] font-normal leading-[1.5]"
                     >
-                        {busy ? "Cancelling…" : "Cancel enrolment"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                        Void their open invoice {open.number} too. Leave it if
+                        they owe for sessions they had.
+                    </Label>
+                </div>
+            ) : null}
+        </ConfirmDialog>
     );
 }

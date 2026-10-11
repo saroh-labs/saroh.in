@@ -6,12 +6,12 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { ProductDetail } from "@/lib/products/service";
 import { moveProductStock } from "@/lib/products/stock-actions";
 import { movable } from "@/lib/products/stock-sheet";
 import { movedWords } from "@/lib/stock/levels";
 import type { ProductStock, SizeStock } from "@/lib/stock/product-stock";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * Move stock between locations, from the stock sheet (#523): only what
@@ -66,7 +66,7 @@ export function MoveStock({
                 : !Number.isInteger(n) || n < 1
                   ? "Whole numbers, 1 or more."
                   : n > can
-                    ? `Only ${can} can move — the rest is promised to open orders.`
+                    ? `Only ${can} can move. The rest is promised to open orders.`
                     : null);
     const nameOf = (id: string) =>
         stores.find(([sid]) => sid === id)?.[1] ?? "the location";
@@ -84,7 +84,7 @@ export function MoveStock({
                 idempotencyKey: crypto.randomUUID(),
             });
             if (!res.ok) {
-                showError("Nothing moved", res.error);
+                showError("Nothing was moved.", res.error);
                 return;
             }
             showSuccess(movedWords(n, nameOf(to)));
@@ -156,12 +156,11 @@ export function MoveStock({
                     type="button"
                     variant="outline"
                     onClick={() => void move()}
-                    disabled={
-                        pending || Boolean(problem) || units.trim() === ""
-                    }
-                    className="h-9 rounded-lg text-[12.5px]"
+                    disabled={Boolean(problem) || units.trim() === ""}
+                    busy={pending}
+                    busyLabel="Moving…"
                 >
-                    {pending ? "Moving…" : "Move"}
+                    Move
                 </Button>
             </div>
             <p

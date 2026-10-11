@@ -1,19 +1,12 @@
 "use client";
 
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "@saroh/ui/alert-dialog";
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";
+import { TabStrip } from "@saroh/ui/tabs";
 
 const LABEL: Record<SettingsTab, string> = {
     categories: "Categories",
@@ -35,9 +28,10 @@ export function useUnsaved(): Unsaved {
 }
 
 /**
- * Product settings' tabs and the one leave guard. Most changes here take
- * effect at once and offer Undo; the defaults and the SKU pattern are forms
- * with a save bar, and leaving either with changes asks first.
+ * Product settings' tabs and the one leave guard. The lists are read first:
+ * a change is made in a dialog or a side sheet, saved there and offered Undo.
+ * The defaults and the SKU pattern are forms with a save bar, and leaving
+ * either with changes asks first.
  */
 export function ProductSettings({
     tab,
@@ -50,111 +44,62 @@ export function ProductSettings({
     children: ReactNode;
 }) {
     const [dirty, setDirty] = useState(false);
-    const [leaveTo, setLeaveTo] = useState<string | null>(null);
-    useLeaveGuard(dirty);
+    // Another tab is another address, so the guard catches the tabs too.
+    const guard = useLeaveGuard({
+        dirty,
+        lost: "Your changes to the defaults or the SKU pattern will be lost.",
+    });
 
     return (
         <UnsavedContext.Provider value={{ setDirty }}>
-            <div
-                role="tablist"
-                aria-label="Product settings"
-                className="flex flex-wrap gap-0.5 border-b border-border max-[760px]:flex-nowrap max-[760px]:overflow-x-auto"
-            >
-                {tabs.map(({ key, count }) => {
-                    const on = key === tab;
-                    const href = productSettingsHref(key);
-                    return (
-                        <Link
-                            key={key}
-                            href={href}
-                            role="tab"
-                            aria-selected={on}
-                            scroll={false}
-                            onClick={(e) => {
-                                if (dirty && !on) {
-                                    e.preventDefault();
-                                    setLeaveTo(href);
-                                }
-                            }}
-                            className={cn(
-                                "inline-flex shrink-0 items-center whitespace-nowrap px-3.5 py-2.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {LABEL[key]}
-                            {count !== undefined ? (
-                                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-px text-[11px] font-semibold text-muted-foreground">
-                                    {count}
-                                </span>
-                            ) : null}
-                        </Link>
-                    );
-                })}
-            </div>
+            <TabStrip
+                label="Product settings"
+                value={tab}
+                tabs={tabs.map(({ key, count }) => ({
+                    value: key,
+                    label: LABEL[key],
+                    href: productSettingsHref(key),
+                    count,
+                }))}
+            />
             <div className="pt-5">{children}</div>
 
-            <AlertDialog
-                open={leaveTo !== null}
-                onOpenChange={(o) => {
-                    if (!o) setLeaveTo(null);
-                }}
-            >
-                <AlertDialogContent className="max-w-[380px] rounded-[14px] px-[22px] py-5">
-                    <AlertDialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        Leave with unsaved changes?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="mt-[7px] text-[13px] leading-[1.55] text-foreground/75">
-                        Your changes to the defaults or the SKU pattern will be
-                        lost.
-                    </AlertDialogDescription>
-                    <div className="mt-[18px] flex flex-wrap justify-end gap-2">
-                        <Link
-                            href={leaveTo ?? "#"}
-                            scroll={false}
-                            onClick={() => {
-                                setDirty(false);
-                                setLeaveTo(null);
-                            }}
-                            className="inline-flex h-[34px] items-center rounded-[9px] border border-border px-[13px] text-[12.5px] font-semibold text-destructive hover:bg-destructive-subtle"
-                        >
-                            Leave without saving
-                        </Link>
-                        <button
-                            type="button"
-                            autoFocus
-                            onClick={() => setLeaveTo(null)}
-                            className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90"
-                        >
-                            Stay
-                        </button>
-                    </div>
-                </AlertDialogContent>
-            </AlertDialog>
+            {guard.dialog}
         </UnsavedContext.Provider>
     );
 }
 
-/** A tab's heading and the line under it. */
+/**
+ * A tab's heading and the line under it, with the tab's one action (New
+ * category, Add field) beside them when it has one.
+ */
 export function TabIntro({
     title,
+    action,
     children,
 }: {
     title: string;
+    action?: ReactNode;
     children: ReactNode;
 }) {
     return (
-        <>
-            <h2 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                {title}
-            </h2>
-            <p className="mb-4 mt-[5px] max-w-[64ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                {children}
-            </p>
-        </>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0 flex-[1_1_320px]">
+                <h2 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
+                    {title}
+                </h2>
+                <p className="mt-[5px] max-w-[64ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
+                    {children}
+                </p>
+            </div>
+            {action}
+        </div>
     );
 }
+
+/** A problem under a field, or at the foot of a sheet. */
+export const PROBLEM =
+    "text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground";
 
 /** The design's small buttons: 28px row actions, 30px and 36px primaries. */
 export const rowBtn =
@@ -167,10 +112,3 @@ export const bigBtn =
     "inline-flex h-9 shrink-0 items-center rounded-[8px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground coarse:h-11";
 export const textBox =
     "h-9 min-w-0 rounded-[8px] border bg-card px-2.5 text-[13px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/50 coarse:h-11";
-export const chipBtn = (on: boolean) =>
-    cn(
-        "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-        on
-            ? "border-foreground bg-foreground font-semibold text-background"
-            : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-    );

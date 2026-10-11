@@ -49,12 +49,28 @@ import { z } from "zod";
  * even with the id in a local `.env`, so test runs never count as visitors
  * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
  * Even there, GA loads only once a visitor accepts the cookie notice
- * (`app/google-analytics.tsx`).
+ * (`app/site-tags.tsx`).
+ *
+ * `NEXT_PUBLIC_GOOGLE_ADS_ID` (`AW-…`) and `NEXT_PUBLIC_META_PIXEL_ID`
+ * (digits) turn the advertising tags on (DEC-127), by the same rule: a
+ * production deployment only, and only once a visitor accepts advertising
+ * cookies in the notice. They are public ids, not secrets. Unset, nothing of
+ * that platform's is loaded or sent. `NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL`
+ * and `NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL` are Google Ads' labels for the
+ * two conversions; without a label Google Ads isn't told of that one
+ * (`lib/tags.ts`).
  *
  * `RESOURCES_PREVIEW` (server-only, `1` or `true`) shows Resources pages and
  * changelog entries before their `publishOn` date (plan KTD-2), so a preview
  * deployment can be checked before the day. It is ignored on a production
  * deployment (`VERCEL_ENV=production`), whatever it is set to
+ * (`lib/resources-context.ts`).
+ *
+ * `NEXT_PUBLIC_TEMPLATES` is the Templates gallery's switch (DEC-135): `on`
+ * lets `/templates` and its pages be shown, from their `publishOn` day as
+ * any Resources page; anything else, unset included, keeps them a 404 and
+ * linked nowhere, whatever the date or `RESOURCES_PREVIEW` says. Read at
+ * build. Unset counts as `on` only under `next dev`
  * (`lib/resources-context.ts`).
  *
  * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
@@ -65,9 +81,51 @@ export const env = createEnv({
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
+        NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_GA_MEASUREMENT_ID: z
             .string()
             .regex(/^G-[A-Z0-9]+$/)
+            .optional(),
+        /** Advertising tags (DEC-127): public ids, off when unset. */
+        NEXT_PUBLIC_GOOGLE_ADS_ID: z
+            .string()
+            .regex(/^AW-\d+$/)
+            .optional(),
+        NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]+$/)
+            .optional(),
+        NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]+$/)
+            .optional(),
+        NEXT_PUBLIC_META_PIXEL_ID: z
+            .string()
+            .regex(/^\d{5,20}$/)
+            .optional(),
+        /**
+         * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
+         * address (the EU cloud when unset). Unset, nothing is loaded or
+         * sent. The browser SDK is used for exceptions, and for session
+         * replay when NEXT_PUBLIC_POSTHOG_REPLAY is "on" (off by default):
+         * only after a visitor accepts the cookie notice, never for the team
+         * or a browser that asks not to be tracked (`app/site-tags.tsx`).
+         * NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE is optional: the share of those
+         * visits recorded, from 0 to 1; unset, every one.
+         */
+        NEXT_PUBLIC_POSTHOG_KEY: z
+            .string()
+            .regex(/^phc_[A-Za-z0-9]+$/)
+            .optional(),
+        NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+        NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE: z
+            .string()
+            .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
+            .optional(),
+        /** Which environment this build is for (wrangler.jsonc, DEC-107). */
+        NEXT_PUBLIC_VERCEL_ENV: z
+            .enum(["development", "preview", "production"])
             .optional(),
     },
     server: {
@@ -94,8 +152,21 @@ export const env = createEnv({
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
+        NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_GA_MEASUREMENT_ID:
             process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+        NEXT_PUBLIC_GOOGLE_ADS_ID: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
+        NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL:
+            process.env.NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL,
+        NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL:
+            process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL,
+        NEXT_PUBLIC_META_PIXEL_ID: process.env.NEXT_PUBLIC_META_PIXEL_ID,
+        NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+        NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
+            process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
+        NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

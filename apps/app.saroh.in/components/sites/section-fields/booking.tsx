@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
+import { TextLink } from "@saroh/ui/text-link";
 
 import { Input } from "@saroh/ui/input";
 import {
@@ -13,7 +15,6 @@ import {
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { BookingContent } from "@/lib/sites/service";
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
 
@@ -51,16 +52,16 @@ export function BookingFields({
                 {load.status !== "ready" ? (
                     <ServicesLoadNotice load={load} />
                 ) : services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No services yet.{" "}
-                        <Link
-                            href="/services/new"
-                            className="underline hover:text-foreground"
-                        >
-                            Create a service
-                        </Link>{" "}
-                        first, then pick it here.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No services yet"
+                        description="Add one, then pick it here."
+                        action={
+                            <TextLink href="/services/new">
+                                New service
+                            </TextLink>
+                        }
+                    />
                 ) : (
                     <Select
                         value={c.serviceId ?? ""}
@@ -83,7 +84,7 @@ export function BookingFields({
                 )}
                 {load.status === "ready" && selectedMissing && (
                     <p className="text-xs text-muted-foreground">
-                        The selected service is no longer available — choose
+                        The selected service is no longer available. Choose
                         another.
                     </p>
                 )}

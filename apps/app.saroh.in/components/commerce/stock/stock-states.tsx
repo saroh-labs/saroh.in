@@ -1,7 +1,10 @@
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
+import { ModuleOffState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
+import { Boxes } from "lucide-react";
 
-import { StockHeader } from "./stock-header";
 import { TurnOnTracking } from "./turn-on-tracking";
 
 /**
@@ -18,12 +21,7 @@ export function StockLocked({
     role: string;
 }) {
     return (
-        <AccessDenied
-            title="You can't open stock"
-            description={`You're signed in as ${role} in ${business}. That role doesn't include seeing products or stock. An owner or admin can give you access in Team.`}
-            note={null}
-            backLabel="Go to Home"
-        />
+        <AccessDenied {...whoCanChange({ thing: "Stock", business, role })} />
     );
 }
 
@@ -41,23 +39,22 @@ export function StockTrackingOff({
 }) {
     return (
         <PageContainer width="full">
-            <StockHeader subline={null} />
+            <PageHeader breadcrumb={["Sell", "Stock"]} title="Stock" />
             <div className="px-0 py-10 sm:py-[60px]">
-                <div className="mx-auto flex max-w-[560px] flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-9 text-center">
-                    <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        {business
-                            ? `Stock isn't tracked for ${business}`
-                            : "Stock isn't tracked"}
-                    </h2>
-                    <p className="max-w-[48ch] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                        Products sell without a count, so there are no levels or
-                        log to show.{" "}
-                        {canChange
-                            ? "Turn it on if you want Saroh to count stock. Every shelf starts at 0 until you count it."
-                            : "An owner or admin can turn it on if you want Saroh to count stock."}
-                    </p>
-                    {canChange ? <TurnOnTracking /> : null}
-                </div>
+                <ModuleOffState
+                    className="mx-auto max-w-[560px]"
+                    icon={<Boxes />}
+                    name="Track stock"
+                    title={
+                        business
+                            ? `Track stock is turned off for ${business}`
+                            : "Track stock is turned off"
+                    }
+                    description="Products sell without a count, so there are no levels or log to show."
+                    canTurnOn={canChange}
+                    action={<TurnOnTracking />}
+                    who="An owner or admin can turn it on."
+                />
             </div>
         </PageContainer>
     );

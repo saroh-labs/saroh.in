@@ -95,6 +95,8 @@ export function ErrorPage({
         <section
             aria-labelledby={headingId}
             data-error-page={kind}
+            // Fixed words about what went wrong: a recording may read them.
+            data-ph-unmask=""
             className={cn(
                 "mx-auto flex w-full min-w-0 max-w-[34rem] flex-col items-center gap-3 px-4 py-16 text-center sm:py-24",
                 className,

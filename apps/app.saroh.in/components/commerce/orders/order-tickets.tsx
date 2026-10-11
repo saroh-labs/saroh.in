@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -15,6 +16,7 @@ import {
     ticketsSummary,
     ticketWho,
 } from "@/lib/orders/tickets";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Several orders' tickets, one to a printed page (plan B, B6), from the
@@ -56,49 +58,49 @@ export function OrderTickets({
     }, [orders.length]);
 
     return (
-        <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-6">
-            <div className="mb-5 flex flex-wrap items-center gap-2.5 print:hidden">
-                <div className="min-w-0 flex-1">
-                    <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em]">
-                        {summary.title}
-                    </h1>
-                    <p className="text-[12.5px] text-muted-foreground">
-                        Oldest first, one to a page.
-                        {summary.notes.length > 0
-                            ? ` ${summary.notes.join(" ")}`
-                            : ""}
-                    </p>
-                </div>
-                <Button
-                    asChild
-                    variant="outline"
-                    className="h-[38px] cursor-pointer gap-1.5 rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
-                >
-                    <Link href="/commerce/orders">
-                        <ChevronLeft aria-hidden className="size-4" />
+        <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-[26px]">
+            <PageHeader
+                holdsData="description"
+                className="mb-5 print:hidden"
+                breadcrumb={[
+                    "Sell",
+                    <Link key="orders" href="/commerce/orders">
                         Orders
-                    </Link>
-                </Button>
-                {orders.length > 0 ? (
-                    <Button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="h-[38px] cursor-pointer gap-1.5 rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
-                    >
-                        <Printer aria-hidden className="size-4" />
-                        Print
-                    </Button>
-                ) : null}
-            </div>
+                    </Link>,
+                    "Tickets",
+                ]}
+                title={summary.title}
+                description={`Oldest first, one to a page.${
+                    summary.notes.length > 0
+                        ? ` ${summary.notes.join(" ")}`
+                        : ""
+                }`}
+                actions={
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/commerce/orders">
+                                <ChevronLeft aria-hidden className="size-4" />
+                                Orders
+                            </Link>
+                        </Button>
+                        {orders.length > 0 ? (
+                            <Button
+                                type="button"
+                                onClick={() => window.print()}
+                            >
+                                <Printer aria-hidden className="size-4" />
+                                Print
+                            </Button>
+                        ) : null}
+                    </>
+                }
+            />
             {orders.length === 0 ? (
-                <p
-                    role="status"
-                    className="rounded-[11px] border border-border bg-card px-4 py-3.5 text-[13px]"
-                >
+                <Notice role="status">
                     Nothing to print.{" "}
                     {summary.notes.join(" ") ||
                         "Pick orders on the list first."}
-                </p>
+                </Notice>
             ) : (
                 <ol
                     aria-label="Tickets"
@@ -118,7 +120,7 @@ export function OrderTickets({
 function Ticket({ order }: { order: OrderRead }) {
     const money = order.money;
     const format = (a: string | number) =>
-        formatMoneyMajor(a, money?.currency ?? "INR") ?? String(a);
+        formatMoneyMajor(a, money?.currency ?? "INR");
     const attention = ticketAttention(order.attention);
     const address =
         goesToAddress(order) && order.deliveryAddress
@@ -152,9 +154,7 @@ function Ticket({ order }: { order: OrderRead }) {
                     before it goes out.
                 </div>
             ) : null}
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {order.ticketName}
-            </p>
+            <p className="label">{order.ticketName}</p>
             <h2 className="font-display text-[22px] font-semibold">
                 #{order.orderId}
             </h2>

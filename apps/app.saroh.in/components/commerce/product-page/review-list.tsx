@@ -1,15 +1,17 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
@@ -52,21 +54,21 @@ export function ReviewList({
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
-                                    className="tracking-[1px] text-highlight"
+                                    className="tracking-[1px] text-foreground"
                                 >
                                     {"★".repeat(r.rating)}
                                     {"☆".repeat(5 - r.rating)}
                                 </span>
                                 {r.customerId ? (
-                                    <Link
+                                    <TextLink
                                         href={customerHref(
                                             storeId,
                                             r.customerId,
                                         )}
-                                        className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        className="text-[13px]"
                                     >
                                         {r.displayName}
-                                    </Link>
+                                    </TextLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {r.displayName}
@@ -82,9 +84,9 @@ export function ReviewList({
                                     />
                                 </span>
                                 {hidden ? (
-                                    <span className="rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
+                                    <StatusBadge tone="neutral">
                                         Hidden from the shop
-                                    </span>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             {r.body ? (
@@ -93,7 +95,7 @@ export function ReviewList({
                                 </p>
                             ) : (
                                 <p className="mt-1.5 text-[13px] text-muted-foreground">
-                                    No comment left — just a rating.
+                                    No comment left, only a rating.
                                 </p>
                             )}
                             {r.reply && replyingTo !== r.id ? (
@@ -107,6 +109,7 @@ export function ReviewList({
 
                             {replyingTo === r.id ? (
                                 <form
+                                    onKeyDown={submitOnModEnter}
                                     className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -123,22 +126,24 @@ export function ReviewList({
                                         }
                                         placeholder="Shown under the review, on the shop"
                                         disabled={pending}
-                                        className="min-h-0 rounded-[8px] px-2.5 py-2 text-[13px] leading-[1.5]"
+                                        className="min-h-0 px-2.5 py-2 leading-[1.5]"
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
+                                            size="sm"
                                             type="submit"
-                                            disabled={pending || !draft.trim()}
-                                            className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold"
+                                            disabled={!draft.trim()}
+                                            busy={pending}
+                                            busyLabel="Posting…"
                                         >
                                             Post reply
                                         </Button>
                                         <Button
+                                            size="sm"
                                             type="button"
                                             variant="outline"
                                             onClick={cancelReply}
                                             disabled={pending}
-                                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
@@ -153,27 +158,28 @@ export function ReviewList({
                             {canReply && replyingTo !== r.id ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply ? null : (
-                                        <button
-                                            type="button"
+                                        <TextLink
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className="text-[12.5px] font-semibold text-brand hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                            className="text-[12.5px] disabled:text-disabled-foreground coarse:min-h-11"
                                         >
                                             Reply
-                                        </button>
+                                        </TextLink>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="link"
+                                        size="inline"
                                         type="button"
                                         onClick={() =>
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className="text-[12.5px] text-muted-foreground hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                        className="text-muted-foreground"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : null}
                         </Card>

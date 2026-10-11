@@ -106,9 +106,9 @@ describe("searchSettings", () => {
         const hits = searchSettings("team", owner);
         expect(hits.map((h) => h.label)).toEqual([
             "Roles and what they open",
-            "People — invite or change a role",
+            "People: invite or change a role",
         ]);
-        expect(hits[0]?.href).toBe("/settings/people?view=roles");
+        expect(hits[0]?.href).toBe("/settings/people?tab=roles");
     });
 
     it("leaves the page's name out when asked (the ⌘K menu)", () => {
@@ -164,12 +164,29 @@ describe("searchSettings", () => {
         // not the business's details, its plan or its providers.
         const hits = searchSettings("", member, { limit: 99 });
         expect(new Set(hits.map((h) => h.where))).toEqual(
-            new Set(["Team", "Modules", "Your profile"]),
+            // And the website's QR codes, which they may see.
+            new Set(["Team", "Modules", "Your profile", "Share"]),
         );
         expect(searchSettings("gstin", member)).toEqual([]);
     });
 
-    it("finds the plan for the owner alone, and alerts for anyone", () => {
+    it("finds QR codes by what people call them, while Website is on", () => {
+        for (const typed of ["qr", "scan", "share", "short link"]) {
+            expect(
+                searchSettings(typed, owner).map((h) => h.href),
+                typed,
+            ).toContain("/settings/share");
+        }
+        // The codes open pages of the website: without it, not offered.
+        // ("QR" still finds How to pay us, which holds the UPI QR.)
+        expect(
+            searchSettings("qr", { ...owner, modules: ["COMMERCE"] }).map(
+                (h) => h.href,
+            ),
+        ).toEqual(["/settings/organization?section=pay"]);
+    });
+
+    it("finds the plan for whoever may open it, and alerts for anyone", () => {
         expect(searchSettings("invoices from", owner)).toEqual([
             {
                 label: "Invoices from Saroh",
@@ -177,7 +194,29 @@ describe("searchSettings", () => {
                 href: "/settings/billing",
             },
         ]);
-        expect(searchSettings("plan", { role: "ADMIN" })).toEqual([]);
+        // An Admin opens Plan and billing, as the API reads it to them,
+        // and is never offered "Change plan": that is the owner's alone
+        // (DEC-131, amended 2026-10-11).
+        expect(
+            searchSettings("plan", { role: "ADMIN" }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
+        expect(
+            searchSettings("plan", {
+                role: "ADMIN",
+                actions: ["billing:read", "org:update"],
+            }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
+        expect(
+            searchSettings("plan", { role: "OWNER" }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Change plan", "Invoices from Saroh"]);
+        expect(searchSettings("plan", member)).toEqual([]);
+        // Read but not change: the page, never "Change plan".
+        expect(
+            searchSettings("plan", {
+                role: "MEMBER",
+                actions: ["billing:read"],
+            }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
         for (const actor of [owner, member, { role: "REVIEWER" as const }]) {
             expect(searchSettings("alerts", actor)[0]?.href).toBe(
                 "/settings/profile",
@@ -188,7 +227,7 @@ describe("searchSettings", () => {
     it("finds who changed what for those who may read it", () => {
         expect(searchSettings("who changed", owner)).toEqual([
             {
-                label: "Activity — who changed what",
+                label: "Activity: who changed what",
                 where: "Activity",
                 href: "/settings/activity",
             },
@@ -210,10 +249,10 @@ describe("searchSettings", () => {
             searchSettings("people", actor, { byPage: false }).map(
                 (h) => h.label,
             );
-        expect(labels(owner)).toEqual(["People — invite or change a role"]);
+        expect(labels(owner)).toEqual(["People: invite or change a role"]);
         expect(labels(member)).toEqual(["People on the team"]);
         expect(labels({ role: null })).toEqual([
-            "People — invite or change a role",
+            "People: invite or change a role",
         ]);
     });
 

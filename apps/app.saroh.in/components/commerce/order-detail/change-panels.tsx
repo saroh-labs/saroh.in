@@ -3,15 +3,31 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
 import { sentenceStart } from "@/lib/format/sentence";
+import type { OnlinePaymentWords } from "@/lib/orders/online-payment";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
-import { actionClass, Panel, PanelTitle } from "./parts";
+import { Notice } from "@saroh/ui/notice";
+import { Tip } from "@saroh/ui/tooltip";
+import { Panel, PanelTitle } from "./parts";
+
+/**
+ * The Change card's buttons, by the sheet each opens: where the keyboard
+ * goes back to when that sheet closes and no other button opened it (an
+ * arrival from the Orders list).
+ */
+export const CHANGE_BUTTON_ID: Partial<Record<string, string>> = {
+    edit: "od-change-edit",
+    refund: "od-change-refund",
+    fulfilment: "od-change-fulfilment",
+    cancel: "od-change-cancel",
+};
 
 /**
  * "Change this order", under Items where the controls sit by what they
  * change: edit items or address (only before preparing), refund by line,
  * and — until it is handed over — change how it's fulfilled and cancel as
- * a refund in full (B9). Only for someone who may change or refund orders:
+ * a refund in full (B9). Each opens its own side sheet; nothing is edited
+ * in the page. Only for someone who may change or refund orders:
  * a Member's page has none of it (DEC-024), so it is not drawn for them at
  * all rather than drawn disabled. Each button says why when it can't.
  */
@@ -54,64 +70,70 @@ export function ChangeCard({
               ? "Items and address can change until preparing starts. How it's fulfilled can change until it's handed over."
               : fulfilment === null
                 ? "Items are locked now that preparing has started. How it's fulfilled can still change until it's handed over."
-                : "Preparing has started — refund what is wrong and add a new order."));
+                : "Preparing has started. Refund what is wrong and add a new order."));
     return (
         <Panel aria-labelledby="od-change">
             <PanelTitle id="od-change" className="mb-2.5">
                 Change this order
             </PanelTitle>
             <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    disabled={!canEdit || !editable}
-                    title={
+                <Tip
+                    label={
                         editable
                             ? "Edit items or address"
                             : "Items are locked once preparing starts"
                     }
-                    onClick={onEdit}
                 >
-                    Edit items or address
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    disabled={canRefund !== null}
-                    title={canRefund ?? "Refund by line"}
-                    onClick={onRefund}
-                >
-                    Refund…
-                </Button>
-                {fulfilment !== undefined ? (
                     <Button
                         type="button"
                         variant="outline"
-                        className={actionClass("ghost")}
-                        disabled={fulfilment !== null}
-                        title={fulfilment ?? undefined}
-                        onClick={onFulfilment}
+                        disabled={!canEdit || !editable}
+                        id={CHANGE_BUTTON_ID.edit}
+                        onClick={onEdit}
                     >
-                        Change how it&apos;s fulfilled…
+                        Edit items or address
                     </Button>
+                </Tip>
+                <Tip label={canRefund ?? "Refund by line"}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={canRefund !== null}
+                        id={CHANGE_BUTTON_ID.refund}
+                        onClick={onRefund}
+                    >
+                        Refund…
+                    </Button>
+                </Tip>
+                {fulfilment !== undefined ? (
+                    <Tip label={fulfilment ?? undefined}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={fulfilment !== null}
+                            id={CHANGE_BUTTON_ID.fulfilment}
+                            onClick={onFulfilment}
+                        >
+                            Change how it&apos;s fulfilled…
+                        </Button>
+                    </Tip>
                 ) : null}
                 {cancel !== undefined ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                            actionClass("ghost"),
-                            cancel === null &&
-                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                        )}
-                        disabled={cancel !== null}
-                        title={cancel ?? undefined}
-                        onClick={onCancel}
-                    >
-                        Cancel order…
-                    </Button>
+                    <Tip label={cancel ?? undefined}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                                cancel === null &&
+                                    "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                            )}
+                            disabled={cancel !== null}
+                            id={CHANGE_BUTTON_ID.cancel}
+                            onClick={onCancel}
+                        >
+                            Cancel order…
+                        </Button>
+                    </Tip>
                 ) : null}
             </div>
             <p className="mt-[7px] text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
@@ -130,7 +152,7 @@ export function ChangeCard({
  * disabled beside this.
  */
 const NO_RECORD =
-    "Your role can't record payments — ask the owner or an admin to mark it paid.";
+    "Your role can't record payments. Ask the owner or an admin to mark it paid.";
 
 /**
  * The order is not paid, so the kitchen is blocked (the API offers no next
@@ -156,8 +178,14 @@ export function PaymentBanner({
     handover,
     uncollectedDays,
     onCancel,
+    online = null,
 }: {
     failed: boolean;
+    /**
+     * Its online payment waiting for the provider or not finished (#122),
+     * in words; a failed one keeps this banner's own words.
+     */
+    online?: Pick<OnlinePaymentWords, "word" | "detail" | "tone"> | null;
     first: string;
     canRecord: boolean;
     onCash: () => void;
@@ -177,157 +205,150 @@ export function PaymentBanner({
         : null;
     if (handover && !failed && waited) {
         return (
-            <div
-                role="alert"
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
-            >
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
-                        {waited}
+            <Notice tone="error" align="center">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-[1_1_260px]">
+                        <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
+                            {waited}
+                        </div>
+                        <p
+                            id={why}
+                            className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground"
+                        >
+                            {handover === "collection"
+                                ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
+                                : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
+                            Cancel it to put the stock back, or keep waiting.
+                            Nothing cancels on its own.
+                            {canRecord ? "" : ` ${NO_RECORD}`}
+                        </p>
                     </div>
-                    <p
-                        id={why}
-                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground"
-                    >
-                        {handover === "collection"
-                            ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
-                            : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
-                        Cancel it to put the stock back, or keep waiting —
-                        nothing cancels on its own.
-                        {canRecord ? "" : ` ${NO_RECORD}`}
-                    </p>
+                    {canRecord ? (
+                        <Button type="button" onClick={onCash}>
+                            Mark paid
+                        </Button>
+                    ) : (
+                        // Shown, disabled, with why (FB-1, DEC-098).
+                        <Button type="button" disabled aria-describedby={why}>
+                            Mark paid
+                        </Button>
+                    )}
+                    {onCancel ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                            )}
+                            onClick={onCancel}
+                        >
+                            Cancel order…
+                        </Button>
+                    ) : null}
                 </div>
-                {canRecord ? (
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        onClick={onCash}
-                    >
-                        Mark paid
-                    </Button>
-                ) : (
-                    // Shown, disabled, with why (FB-1, DEC-098).
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        disabled
-                        aria-describedby={why}
-                    >
-                        Mark paid
-                    </Button>
-                )}
-                {onCancel ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                            actionClass("ghost"),
-                            "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                        )}
-                        onClick={onCancel}
-                    >
-                        Cancel order…
-                    </Button>
-                ) : null}
-            </div>
+            </Notice>
         );
     }
     if (handover && !failed) {
         return (
-            <div
-                role="status"
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted px-4 py-[13px]"
-            >
+            <Notice role="status" align="center">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-[1_1_260px]">
+                        <div className="text-[13.5px] font-bold">
+                            {handover === "collection"
+                                ? "Pay on collection"
+                                : "Pay on delivery"}
+                        </div>
+                        <p
+                            id={why}
+                            className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                        >
+                            {handover === "collection"
+                                ? `${sentenceStart(first)} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
+                                : `${sentenceStart(first)} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
+                            {canRecord ? "" : ` ${NO_RECORD}`}
+                        </p>
+                    </div>
+                    {canRecord ? (
+                        <Button type="button" onClick={onCash}>
+                            Mark paid
+                        </Button>
+                    ) : (
+                        // Shown, disabled, with why (FB-1, DEC-098).
+                        <Button type="button" disabled aria-describedby={why}>
+                            Mark paid
+                        </Button>
+                    )}
+                </div>
+            </Notice>
+        );
+    }
+    // Waiting for the provider, or a payment not finished (#122).
+    const pending = !failed && online ? online : null;
+    const calm = pending?.tone === "wait";
+    const link =
+        (failed || pending?.tone === "act") && onSendLink !== undefined;
+    return (
+        <Notice
+            tone={calm ? "neutral" : "error"}
+            role={calm ? "status" : "alert"}
+            icon={false}
+        >
+            <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="text-[13.5px] font-bold">
-                        {handover === "collection"
-                            ? "Pay on collection"
-                            : "Pay on delivery"}
+                    <div
+                        className={cn(
+                            "text-[13.5px] font-bold",
+                            !calm && "text-destructive-subtle-foreground",
+                        )}
+                    >
+                        {failed
+                            ? "Payment didn't go through"
+                            : (pending?.word ?? "Not paid yet")}
                     </div>
                     <p
                         id={why}
-                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
                     >
-                        {handover === "collection"
-                            ? `${sentenceStart(first)} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
-                            : `${sentenceStart(first)} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
-                        {canRecord ? "" : ` ${NO_RECORD}`}
+                        {failed
+                            ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first}. ${link ? "Send them a pay link" : "Ask them to pay again"}, or take it in cash.`
+                            : pending
+                              ? `${pending.detail}${canRecord ? "" : ` ${NO_RECORD}`}`
+                              : canRecord
+                                ? `It waits for ${first}'s payment. Don't start it until it's paid, or take it in cash at the counter.`
+                                : `It waits for ${first}'s payment. Don't start it until it's paid. ${NO_RECORD}`}
                     </p>
                 </div>
+                {link ? (
+                    <Button
+                        type="button"
+                        onClick={onSendLink}
+                        busy={sending}
+                        busyLabel="Making a link…"
+                    >
+                        Send a pay link
+                    </Button>
+                ) : null}
                 {canRecord ? (
                     <Button
                         type="button"
-                        className={actionClass("primary")}
+                        variant={link ? "outline" : "default"}
                         onClick={onCash}
                     >
-                        Mark paid
+                        Paid in cash
                     </Button>
                 ) : (
                     // Shown, disabled, with why (FB-1, DEC-098).
                     <Button
                         type="button"
-                        className={actionClass("primary")}
+                        variant={link ? "outline" : "default"}
                         disabled
                         aria-describedby={why}
                     >
-                        Mark paid
+                        Paid in cash
                     </Button>
                 )}
             </div>
-        );
-    }
-    const link = failed && onSendLink !== undefined;
-    return (
-        <div
-            role="alert"
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
-        >
-            <div className="min-w-0 flex-[1_1_260px]">
-                <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
-                    {failed ? "Payment didn't go through" : "Not paid yet"}
-                </div>
-                <p
-                    id={why}
-                    className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
-                >
-                    {failed
-                        ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ${link ? "send them a pay link" : "ask them to pay again"}, or take it in cash.`
-                        : canRecord
-                          ? `It waits for ${first}'s payment. Don't start it until it's paid — or take it in cash at the counter.`
-                          : `It waits for ${first}'s payment. Don't start it until it's paid. ${NO_RECORD}`}
-                </p>
-            </div>
-            {link ? (
-                <Button
-                    type="button"
-                    className={actionClass("primary")}
-                    disabled={sending}
-                    onClick={onSendLink}
-                >
-                    {sending ? "Making a link…" : "Send a pay link"}
-                </Button>
-            ) : null}
-            {canRecord ? (
-                <Button
-                    type="button"
-                    variant={link ? "outline" : "default"}
-                    className={actionClass(link ? "ghost" : "primary")}
-                    onClick={onCash}
-                >
-                    Paid in cash
-                </Button>
-            ) : (
-                // Shown, disabled, with why (FB-1, DEC-098).
-                <Button
-                    type="button"
-                    variant={link ? "outline" : "default"}
-                    className={actionClass(link ? "ghost" : "primary")}
-                    disabled
-                    aria-describedby={why}
-                >
-                    Paid in cash
-                </Button>
-            )}
-        </div>
+        </Notice>
     );
 }

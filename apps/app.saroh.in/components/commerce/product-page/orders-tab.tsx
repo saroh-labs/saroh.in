@@ -1,8 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
-import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { ShoppingBag } from "lucide-react";
-import Link from "next/link";
 
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -13,6 +11,9 @@ import type { ProductOverview } from "@/lib/products/overview";
 import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
+import { LinkFilter } from "@/components/shared/link-filter";
+import { listTable } from "@/components/shared/list-toolbar";
+import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
     PanelForbidden,
@@ -42,7 +43,7 @@ export function ProductOrdersTab({
             <PanelFailed
                 what="orders"
                 retryHref={here}
-                note="The rest of the product loaded; only the order list did not. Stock figures are still right — they come from the product."
+                reassurance="Stock figures are still right. They come from the product."
                 elsewhere={{ href: "/commerce/orders", label: "Open Orders" }}
             />
         );
@@ -73,41 +74,31 @@ export function ProductOrdersTab({
     return (
         <div>
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
-                <div
-                    role="group"
-                    aria-label="Which orders"
-                    className="flex gap-1.5"
-                >
-                    {(["open", "recent"] as const).map((f) => (
-                        <Link
-                            key={f}
-                            href={f === "open" ? here : `${here}&orders=recent`}
-                            scroll={false}
-                            aria-current={f === filter ? "true" : undefined}
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-3 text-[12.5px] coarse:h-11",
-                                f === filter
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted",
-                            )}
-                        >
-                            {f === "open"
-                                ? `Open · ${data.openCount}`
-                                : "Recent"}
-                        </Link>
-                    ))}
-                </div>
+                <LinkFilter
+                    label="Which orders"
+                    value={filter}
+                    options={[
+                        {
+                            value: "open",
+                            label: "Open",
+                            count: data.openCount,
+                            href: here,
+                        },
+                        {
+                            value: "recent",
+                            label: "Recent",
+                            href: `${here}&orders=recent`,
+                        },
+                    ]}
+                />
                 <p className="flex-[1_1_200px] text-[12px] text-muted-foreground">
                     {filter === "open"
                         ? heldBy(data.recent, product.name)
                         : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
                 </p>
-                <Link
-                    href="/commerce/orders"
-                    className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
+                <TextLink href="/commerce/orders" className="text-[12.5px]">
                     All orders for it in Orders →
-                </Link>
+                </TextLink>
             </div>
 
             {rows.length === 0 ? (
@@ -122,16 +113,26 @@ export function ProductOrdersTab({
                 </TabState>
             ) : (
                 <>
-                    <Card className="overflow-x-auto rounded-[12px] px-[18px] pb-1.5 pt-0 max-[759px]:hidden">
+                    {/* The one table look: the head band, rows ruled
+                        edge to edge. */}
+                    <div
+                        data-list-table=""
+                        className={cn(
+                            listTable.frame,
+                            "overflow-x-auto max-[759px]:hidden",
+                        )}
+                    >
                         <table className="w-full min-w-[600px] text-[13px]">
                             <caption className="sr-only">
                                 Orders for {product.name}
                             </caption>
                             <thead>
                                 <tr
+                                    data-list-head=""
                                     className={cn(
                                         grid,
-                                        "border-b border-border pb-[7px] pt-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
+                                        listTable.head,
+                                        "rounded-t-[10px] text-left",
                                     )}
                                 >
                                     <th scope="col">Order</th>
@@ -148,28 +149,28 @@ export function ProductOrdersTab({
                                         key={o.id}
                                         className={cn(
                                             grid,
-                                            "items-center border-b border-border py-2.5",
+                                            listTable.row,
+                                            "items-center",
                                         )}
                                     >
                                         <td>
-                                            <Link
+                                            <TextLink
                                                 href={orderHref(storeId, o.id)}
-                                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                className="font-mono text-[12px]"
                                             >
                                                 {o.orderNumber}
-                                            </Link>
+                                            </TextLink>
                                         </td>
                                         <td className="truncate">
                                             {o.customerId ? (
-                                                <Link
+                                                <TextLink
                                                     href={customerHref(
                                                         storeId,
                                                         o.customerId,
                                                     )}
-                                                    className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                                 >
                                                     {o.customer}
-                                                </Link>
+                                                </TextLink>
                                             ) : (
                                                 // A walk-in (B13): no record to open.
                                                 o.customer
@@ -194,7 +195,7 @@ export function ProductOrdersTab({
                                                         ? "warning"
                                                         : "neutral"
                                                 }
-                                                className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                size="sm"
                                             >
                                                 {ORDER_STATUS_LABEL[o.status] ??
                                                     o.status}
@@ -204,7 +205,7 @@ export function ProductOrdersTab({
                                 ))}
                             </tbody>
                         </table>
-                    </Card>
+                    </div>
                     <ul
                         aria-label={`Orders for ${product.name}`}
                         className="flex flex-col gap-2 min-[760px]:hidden"
@@ -224,7 +225,8 @@ export function ProductOrdersTab({
                                 aside={
                                     <Badge
                                         variant={o.open ? "warning" : "neutral"}
-                                        className="flex-none whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                        size="sm"
+                                        className="flex-none"
                                     >
                                         {ORDER_STATUS_LABEL[o.status] ??
                                             o.status}

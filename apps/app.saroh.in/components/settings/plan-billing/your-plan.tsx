@@ -1,6 +1,4 @@
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { CircleAlert, Info } from "lucide-react";
 import Link from "next/link";
 
 import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
@@ -8,6 +6,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
 import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
 
+import { Notice } from "@saroh/ui/notice";
 import { CheckoutPending } from "./checkout-pending";
 import { card } from "./styles";
 
@@ -24,6 +23,11 @@ export interface YourPlanProps {
     warning?: string | null;
     /** A plan change waiting for its payment (DEC-093). */
     pending?: PendingCheckout | null;
+    /**
+     * `billing:manage`. Without it the card is read: no change of payment
+     * method, no way into a plan change and no payment to carry on.
+     */
+    canChange?: boolean;
 }
 
 /** Where a note's action goes: the picker, with its plan's change open. */
@@ -39,7 +43,7 @@ function changeHref(planId: string, cycle: string) {
  * month along the foot — left out until there is such a summary (UX-080).
  */
 export function YourPlan(props: YourPlanProps) {
-    const { next } = props;
+    const { next, canChange = true } = props;
     return (
         <section aria-label="Your plan" className={card}>
             <div className="flex flex-wrap items-start gap-3.5 px-[18px] py-4">
@@ -89,66 +93,50 @@ export function YourPlan(props: YourPlanProps) {
                     {props.method ? (
                         <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground sm:justify-end">
                             {props.method}
-                            <ChangePaymentMethod />
+                            {canChange ? <ChangePaymentMethod /> : null}
                         </p>
                     ) : null}
                 </div>
             </div>
             {props.warning ? (
-                <p
-                    role="note"
-                    className="flex items-start gap-2 border-t border-border/70 px-[18px] py-3 text-[13px] font-medium"
-                >
-                    <CircleAlert
-                        aria-hidden
-                        className="mt-px size-4 shrink-0"
-                    />
+                <Notice tone="warning" role="note" layout="banner">
                     {props.warning}
-                </p>
+                </Notice>
             ) : null}
             {(props.notes ?? []).map((n) => (
-                <div
+                <Notice
                     key={`${n.lead}${n.iso ?? ""}`}
+                    tone={n.tone === "attention" ? "warning" : "neutral"}
                     role="note"
-                    className={cn(
-                        "flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/70 px-[18px] py-3 text-[13px]",
-                        n.tone === "attention" &&
-                            "bg-warning-subtle text-warning-subtle-foreground",
-                    )}
+                    layout="banner"
+                    align="center"
                 >
-                    <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
-                        {n.tone === "attention" ? (
-                            <CircleAlert
-                                aria-hidden
-                                className="mt-px size-4 shrink-0"
-                            />
-                        ) : (
-                            <Info
-                                aria-hidden
-                                className="mt-px size-4 shrink-0"
-                            />
-                        )}
-                        <span>
-                            {n.lead}
-                            {n.iso ? <ViewerDate iso={n.iso} /> : null}
-                            {n.tail}
-                        </span>
-                    </p>
-                    {n.action ? (
-                        <Button asChild size="sm" variant="outline">
-                            <Link
-                                href={changeHref(
-                                    n.action.planId,
-                                    n.action.cycle,
-                                )}
-                            >
-                                {n.action.label}
-                            </Link>
-                        </Button>
-                    ) : null}
-                </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
+                            <span>
+                                {n.lead}
+                                {n.iso ? <ViewerDate iso={n.iso} /> : null}
+                                {n.tail}
+                            </span>
+                        </p>
+                        {n.action && canChange ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link
+                                    href={changeHref(
+                                        n.action.planId,
+                                        n.action.cycle,
+                                    )}
+                                >
+                                    {n.action.label}
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </div>
+                </Notice>
             ))}
-            {props.pending ? <CheckoutPending pending={props.pending} /> : null}
+            {props.pending && canChange ? (
+                <CheckoutPending pending={props.pending} />
+            ) : null}
             {props.footnote ? (
                 <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[13px] text-foreground/80">
                     {props.footnote}

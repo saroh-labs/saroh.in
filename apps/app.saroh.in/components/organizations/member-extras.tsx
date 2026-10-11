@@ -1,8 +1,10 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
+import { SwitchRow } from "@/components/shared/check-row";
 import type { ExtraGroup } from "@/lib/organizations/extras";
 import {
     extraGroups,
@@ -13,6 +15,7 @@ import {
     sameExtras,
 } from "@/lib/organizations/extras";
 import type { RoleCatalogue } from "@/lib/organizations/roles";
+import { couldntLoadLine } from "@saroh/ui/lib/state-copy";
 
 /**
  * The Edit drawer's extras draft: what the person holds now, what is being
@@ -76,9 +79,7 @@ export function useMemberExtras({
         groups,
         lockedReason:
             lockedReason ??
-            (catalogue
-                ? null
-                : "The list of permissions couldn't be loaded. Reload to try again."),
+            (catalogue ? null : couldntLoadLine("the list of permissions")),
         chosen,
         /** Only when the switches could have moved them. */
         changed:
@@ -105,10 +106,7 @@ export function useMemberExtras({
 export function ExtrasCell({ labels }: { labels: string[] }) {
     if (labels.length === 0) {
         return (
-            <span className="text-[13px] text-muted-foreground">
-                <span aria-hidden>—</span>
-                <span className="sr-only">No extra permissions</span>
-            </span>
+            <AbsentValue says="No extra permissions" className="text-[13px]" />
         );
     }
     return (
@@ -119,7 +117,7 @@ export function ExtrasCell({ labels }: { labels: string[] }) {
             {labels.map((label) => (
                 <li
                     key={label}
-                    className="whitespace-nowrap rounded-full bg-brand-subtle px-[9px] py-[3px] text-[11px] font-medium text-brand-subtle-foreground"
+                    className="whitespace-nowrap rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-foreground"
                 >
                     {label}
                 </li>
@@ -161,10 +159,7 @@ export function ExtraPermissions({
 }) {
     return (
         <section aria-labelledby="extra-permissions-title" className="mt-5">
-            <h3
-                id="extra-permissions-title"
-                className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <h3 id="extra-permissions-title" className="label mb-1">
                 Extra permissions
             </h3>
             <p className="mb-[11px] text-pretty text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
@@ -180,7 +175,7 @@ export function ExtraPermissions({
                             aria-label={label}
                             className="flex flex-col gap-[5px]"
                         >
-                            <p className="px-[11px] pb-0.5 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground first:pt-1">
+                            <p className="label px-[11px] pb-0.5 pt-2 first:pt-1">
                                 {label}
                             </p>
                             {choices.map(({ capability, state }) => (
@@ -209,7 +204,7 @@ export function ExtraPermissions({
 }
 
 /**
- * One row, the whole of it the switch (the design's `role="switch"` row):
+ * One row, the whole of it the switch (the shared `Switch`, with its words):
  * pointer, hover, focus and pressed states when it can move; locked rows sit
  * on the muted ground and don't respond.
  */
@@ -230,22 +225,19 @@ function ExtraSwitch({
 }) {
     const inert = locked || disabled;
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-disabled={inert || undefined}
-            aria-label={`${label}, ${on ? "on" : "off"}${locked ? ", included in the role" : ""}`}
-            onClick={() => {
-                if (!inert) onToggle(!on);
-            }}
+        <SwitchRow
+            checked={on}
+            onChange={onToggle}
+            disabled={inert}
+            size="default"
+            name={`${label}, ${on ? "on" : "off"}${locked ? ", included in the role" : ""}`}
             className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-[11px] py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
+                "w-full rounded-lg px-[11px] py-[9px] transition-colors duration-fast",
                 locked
                     ? "cursor-default bg-foreground/[0.03]"
                     : disabled
-                      ? "cursor-not-allowed bg-card opacity-60"
-                      : "cursor-pointer bg-card hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
+                      ? "bg-card opacity-60"
+                      : "bg-card hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
             )}
         >
             <span className="min-w-0 flex-1">
@@ -263,24 +255,6 @@ function ExtraSwitch({
                     </span>
                 ) : null}
             </span>
-            <span
-                aria-hidden
-                className={cn(
-                    "relative inline-block h-6 w-[42px] shrink-0 rounded-full transition-colors duration-fast",
-                    on
-                        ? locked
-                            ? "bg-muted-foreground/40"
-                            : "bg-foreground"
-                        : "bg-border",
-                )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+        </SwitchRow>
     );
 }

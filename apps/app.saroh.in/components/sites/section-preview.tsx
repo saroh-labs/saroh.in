@@ -68,7 +68,7 @@ import { resolveStyleVariables } from "@/lib/sites/style";
 const PREVIEW_SCOPE = "site-preview-scope";
 
 /** What a form sent on a draft says: it went nowhere (G5). */
-export const FORM_NOT_SENT = "Preview — not sent";
+export const FORM_NOT_SENT = "Preview, not sent";
 export const FORM_NOT_SENT_DETAIL = "Forms send from your live site.";
 
 function toRenderedSection(
@@ -287,7 +287,12 @@ export function DraftPreview({
              * the editor (G5), anything else in a new tab. On the editing
              * canvas a click selects the block, so a button can be edited
              * without leaving; ⌘/Ctrl-click opens the link there.
+             *
+             * These are not ways off the editor, so the leave guard
+             * (`components/shared/use-leave-guard.tsx`) leaves them to
+             * the handler below.
              */
+            data-leave-guard="off"
             onClickCapture={(e) => {
                 const anchor = (e.target as HTMLElement).closest("a");
                 if (!anchor) return;
@@ -408,8 +413,8 @@ function CanvasBlock({
              */
             className={`group/block relative cursor-pointer outline outline-offset-[-2px] transition-[outline-color] duration-fast ${
                 selected
-                    ? "outline-2 outline-highlight"
-                    : "outline-1 outline-transparent hover:outline-highlight/50"
+                    ? "outline-2 outline-border-strong"
+                    : "outline-1 outline-transparent hover:outline-border-strong"
             }`}
         >
             {children}
@@ -422,7 +427,7 @@ function CanvasBlock({
                     onSelect();
                 }}
                 className={cn(
-                    "absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-highlight px-2 py-0.5 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-highlight-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "label absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-foreground px-2 py-0.5 font-sans text-background transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     selected
                         ? "opacity-100"
                         : "opacity-0 group-hover/block:opacity-100",
@@ -438,14 +443,14 @@ function CanvasBlock({
                  */
                 <button
                     type="button"
-                    aria-label={`${notes} open on this block — read the feedback`}
+                    aria-label={`${notes} open on this block. Read the feedback`}
                     onClick={(e) => {
                         e.stopPropagation();
                         onOpenNotes();
                     }}
                     className="group/pin absolute right-1 top-1 z-10 flex size-11 items-center justify-center rounded-full focus-visible:outline-none"
                 >
-                    <span className="flex size-6 items-center justify-center rounded-full bg-highlight font-sans text-xs font-semibold tabular-nums text-highlight-foreground shadow-md ring-2 ring-background group-focus-visible/pin:ring-ring">
+                    <span className="flex size-6 items-center justify-center rounded-full bg-foreground font-sans text-xs font-semibold tabular-nums text-background shadow-md ring-2 ring-background group-focus-visible/pin:ring-ring">
                         {notes}
                     </span>
                 </button>

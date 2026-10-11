@@ -9,7 +9,9 @@
  * than "No phone yet".
  */
 
+import { plural } from "@/lib/format/plural";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
+import { absentText } from "@saroh/ui/lib/absent";
 
 export type AttentionKind = "ALLERGY" | "MEDICAL" | "ACCESS" | "OTHER";
 
@@ -66,7 +68,7 @@ export function attentionText(attention: PeekAttention | null): string | null {
     );
     const hidden = attention.hiddenSensitiveCount;
     if (hidden > 0) {
-        const notes = hidden === 1 ? "note" : "notes";
+        const notes = plural(hidden, "note");
         shown.push(
             shown.length
                 ? `${hidden} more your role can't see`
@@ -76,7 +78,7 @@ export function attentionText(attention: PeekAttention | null): string | null {
     return shown.length ? shown.join(" · ") : null;
 }
 
-export const NO_PHONE_ON_PAGE = "No phone yet — add it on their page";
+export const NO_PHONE_ON_PAGE = "No phone yet. Add it on their page";
 export const NO_PHONE = "No phone yet";
 
 /**
@@ -97,7 +99,7 @@ export function phoneText({
     const typed = bookerPhone?.trim();
     if (typed) return typed;
     if (!hasContact) return NO_PHONE;
-    if (!person) return "—";
+    if (!person) return absentText();
     const theirs = person.phone?.trim();
     if (theirs) return theirs;
     return NO_PHONE_ON_PAGE;

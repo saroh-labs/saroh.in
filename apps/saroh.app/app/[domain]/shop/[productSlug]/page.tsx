@@ -7,15 +7,23 @@ import {
     AskAboutOrdering,
     NotTakingOrders,
     ProductPage,
+    shopFactsLine,
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
-import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
+import { productJsonLdScript } from "@/lib/product-json-ld";
+import {
+    getSiteForHost,
+    postsPrefix,
+    shareImages,
+    siteOriginFor,
+} from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { getSignInOptions } from "@/lib/sign-in";
+import { canonical, productDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 import PostPage, {
@@ -62,9 +70,9 @@ export async function generateMetadata({
     const title = product.seoTitle?.trim()
         ? product.seoTitle
         : `${product.name} · ${name}`;
-    const description = product.seoDescription?.trim()
-        ? product.seoDescription
-        : undefined;
+    // The one its merchant wrote, else its blurb: the start of what the
+    // page says about it.
+    const description = productDescription(product);
     const cover = product.images.find((i) => i.kind !== "video");
     const images = cover ? [cover.url] : shareImages(resolved.snapshot.site);
     const url = `/shop/${product.slug}`;
@@ -78,7 +86,7 @@ export async function generateMetadata({
             description,
             images,
         },
-        metadataBase: new URL(`https://${domain}`),
+        ...canonical(resolved, domain, url),
     });
 }
 
@@ -140,7 +148,29 @@ export default async function ShopProductPage({
     // The page's main landmark (UX-082): the header and footer sit outside.
     return (
         <main className="mx-auto w-full max-w-screen-xl">
-            <ProductPage product={product} preview={false} action={action} />
+            {/* Product structured data (#473), from what this page shows. */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: productJsonLdScript({
+                        product,
+                        origin: siteOriginFor(resolved, domain),
+                        business,
+                    }),
+                }}
+            />
+            <ProductPage
+                product={product}
+                preview={false}
+                action={action}
+                // What it costs to receive, before the bag: only what this
+                // location's checkout offers now.
+                facts={
+                    checkout?.canOrder && product.listingId
+                        ? shopFactsLine(checkout)
+                        : null
+                }
+            />
         </main>
     );
 }

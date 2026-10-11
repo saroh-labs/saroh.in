@@ -2,20 +2,21 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
+import { FailedRead } from "@/components/shared/failed-read";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
-
-import { Pill } from "../pill";
+import { ShareLink } from "@saroh/ui/copy-button";
+import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /** Next collections, each with Skip — or Undo skip — while it is running. */
 export function CollectionsCard({
@@ -67,17 +68,18 @@ export function CollectionsCard({
                             </span>
                         ) : null}
                     </span>
-                    <Pill tone={u.tone}>{u.state}</Pill>
+                    <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                     {canWrite && u.canSkip ? (
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             onClick={() => onToggle(u)}
                             disabled={busyDate === u.date}
                             aria-label={`${u.skipped ? "Undo skip" : "Skip"} ${u.label}`}
-                            className="h-8 min-w-[76px] rounded-[8px] border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:bg-disabled disabled:text-disabled-foreground coarse:h-11"
                         >
                             {u.skipped ? "Undo skip" : "Skip"}
-                        </button>
+                        </Button>
                     ) : null}
                 </div>
             ))}
@@ -111,19 +113,26 @@ export function ChargesCard({
             >
                 Charges
             </h2>
-            {state !== "ok" ? (
+            {state === "failed" ? (
+                <FailedRead
+                    things="the charges"
+                    reassurance="Everything else on this page is up to date."
+                    className="border-t border-border/70 px-4 py-2.5"
+                />
+            ) : state === "denied" ? (
                 <p
-                    role={state === "failed" ? "alert" : "note"}
+                    role="note"
                     className="border-t border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground"
                 >
-                    {state === "denied"
-                        ? "Your role can't see invoices, so the charges aren't shown here."
-                        : "The charges couldn't be loaded. Everything else on this page is up to date."}
+                    Your role can&apos;t see invoices, so the charges
+                    aren&apos;t shown here.
                 </p>
             ) : rows.length === 0 ? (
-                <p className="border-t border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground">
-                    Nothing charged yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="border-t border-border/70 px-4 py-2.5"
+                    title="No charges yet."
+                />
             ) : (
                 rows.map((c) => (
                     <div
@@ -133,7 +142,7 @@ export function ChargesCard({
                         <span className="w-16 shrink-0 text-[12.5px] text-muted-foreground">
                             {c.date}
                         </span>
-                        <Pill tone={c.tone}>{c.result}</Pill>
+                        <StatusBadge tone={c.tone}>{c.result}</StatusBadge>
                         <span className="min-w-0 flex-[1_1_140px] text-[12.5px] text-muted-foreground">
                             {c.note}
                         </span>
@@ -141,25 +150,24 @@ export function ChargesCard({
                             {c.amount}
                         </span>
                         {c.number ? (
-                            <Link
+                            <TextLink
                                 href={chargeHref(c.id)}
-                                className="font-mono text-[11.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-mono text-[11.5px]"
                             >
                                 {c.number}
-                            </Link>
+                            </TextLink>
                         ) : null}
                     </div>
                 ))
             )}
             {state === "ok" && all.length > rows.length ? (
                 <div className="border-t border-border/70 px-4 py-2">
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => setEverything(true)}
-                        className="text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Show all {all.length} charges
-                    </button>
+                    </TextLink>
                 </div>
             ) : null}
             {footer ? (
@@ -243,7 +251,9 @@ export function PlanCard({
                 {price}
             </div>
             {older ? (
-                <div className="mt-[3px] text-[12px] text-brand">{older}</div>
+                <div className="mt-[3px] text-[12px] text-foreground">
+                    {older}
+                </div>
             ) : null}
             <div className="mt-2 text-[12px] text-muted-foreground">
                 {paysBy}
@@ -255,30 +265,15 @@ export function PlanCard({
 
 /** A failed charge's new pay link, shown once: the API keeps only its hash. */
 export function PayLinkRow({ url, name }: { url: string; name: string }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-[1_1_220px] truncate rounded-[8px] border border-border bg-card px-2.5 py-1.5 font-mono text-[12px]">
                 {url}
             </span>
-            <Button
-                variant="outline"
-                className="h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11"
-                onClick={() => {
-                    void navigator.clipboard.writeText(url).then(
-                        () => setCopied(true),
-                        () =>
-                            showError(
-                                "Couldn't copy it — select the link and copy it by hand.",
-                            ),
-                    );
-                }}
-            >
-                {copied ? "Copied" : "Copy link"}
-            </Button>
+            <ShareLink value={url} text="Your link to pay" />
             <span className="basis-full text-[12px] text-muted-foreground">
-                Send it to {name} yourself — Saroh doesn&apos;t send it. It
-                works until it&apos;s paid or you make another.
+                Send it to {name} yourself. Saroh doesn&apos;t send it. It works
+                until it&apos;s paid or you make another.
             </span>
         </div>
     );

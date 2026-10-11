@@ -12,6 +12,126 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Deletion — a deleted business lost its files on day one, while the law needs 180 days and the policy said 30
+
+**Symptom**: none reported. Found 10 Oct 2026 when the Terms and Privacy
+Policy were aligned with the DPDP Act and the intermediary rules: the day a
+business's deletion window ended, its clean-up deleted every uploaded file
+and its payment and messaging keys, and kept every row for ever. The
+Privacy Policy said data was "removed from live systems within 30 days".
+Neither was what the law asks: an account's data is to be kept 180 days
+after it closes, and then removed. And a business suspended for something
+the law prohibits could have its deletion scheduled the same afternoon,
+which would have destroyed its files while they were needed.
+**Cause**: #921 decided what "deleted" does to billing, the site and the
+members' door, and treated what was left as tidying up, one list of things
+to clear. Files and keys sat in that list together, though one is a record
+to keep for a period and the other a secret to drop at once; and personal
+data was in no list at all, because the rows had to stay for the tax
+records. Nobody had written down how long anything is kept, so the code,
+the policy and the law each had a different number. Security logs were the
+same: the policy said 90 days and nothing pruned them.
+**Fix** (DEC-122): the clean-up now only shuts access off and deletes
+secrets; `organization.retention.erase` erases the files and the personal
+data 180 days after `deletedRetainedAt`, never the tax records; a legal
+hold (`Organization.legalHoldAt`) stops scheduling, the sweep, the
+clean-up, the eraser, privacy removals, the data download and the
+retention sweeps; `security-logs.retention` prunes at one year. The
+retention periods are two constants in one file,
+`apps/api.saroh.in/src/modules/organizations/retention.ts`.
+**Check**: `organizations/legal-hold.deletes.spec.ts` scans the source for
+jobs that delete and fails a new one until it is hold-aware or declared
+not a business's data. `admin/retention-erase-plan.spec.ts` fails when a
+field or relation a privacy removal keeps has no decision for a deleted
+business. `organizations/retention.spec.ts` pins 180 and 365, and that the
+environment can't shorten the first.
+**Rule**: a period the policy states is a constant in `retention.ts`,
+never a number in a handler; and a thing a deletion removes is first asked
+"a secret, or a record with a period?". `docs/patterns/backend-jobs.md` →
+Retention.
+
+## Accounts — signing in opened a list of Saroh's own hosts, and four more dead ends
+
+**Symptom**: a UX audit (10 Oct 2026) signed in as a shop owner and landed
+on "Your apps": Application, "Admin: Platform control plane", "UI: The
+design system". Signing up with an address that already had an account
+said "Check your email" and no code ever came. A failed sign-in showed
+"Invalid email or password" or the browser's "Failed to fetch". An
+invitation opened while the API was restarting said "This invitation is no
+longer valid".
+**Cause**: four separate ones. `DEFAULT_DESTINATION = "/apps"` was every
+caller's fallback. Better Auth answers a duplicate sign-up with a fake
+success on purpose and sends nothing. The forms passed
+`ctx.error.message` to the screen. And `getInvitation` returned `null` for
+a network failure and for a 404 alike, so the page could only say one thing.
+**Fix**: the default is the app (`lib/return-to.ts`) and `/apps` is staff
+only. `onExistingUserSignUp` emails the address's owner, and the verify page
+offers Sign in. One `authErrorCopy` map. Reads and accepts keep their
+status, so "couldn't check" is its own state with a retry.
+**Check**: `apps/accounts.saroh.in` has a vitest suite now (it had no
+runner): `lib/return-to.test.ts`, `lib/auth-error-copy.test.ts`,
+`lib/invitations.test.ts` and `lib/copy.test.ts`, which reads the app's
+source for "Log in", banned words, em dashes and semicolons. The rules are
+in `backend-auth-and-access.md` and `frontend-error-feedback.md`.
+
+## Seed — the dev environment's businesses claimed providers they couldn't use
+
+**Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
+Providers showed Cashfree and Resend connected and its site offered to take
+money online, but checkout answered 500 and every customer email (a booking
+confirmation, say) failed five times with "Invalid authentication tag
+length: 6".
+**Cause**: the seed writes provider rows with placeholder sealed keys
+(`seed-not-a-real-credential`, rightly: it never fabricates a usable
+credential) and marked them CONNECTED. Nothing tells a row whose keys can't
+be opened from a real one until the API opens them — at checkout, or in the
+send job, which then retries. The browser specs need those rows connected
+(Pay now offered, a pay link made, Send naming email) and stub the provider
+in the browser, so it never showed locally or on CI.
+**Fix**: `packages/database/src/seed/stand-in-providers.ts`. The CONNECTED
+stand-ins (Northwind's Cashfree and Resend, the showcase's Razorpay and
+Cashfree) are written only on this machine's database, as the fixture
+password is; on any other the seed writes none and removes a placeholder
+row an earlier seed left, never touching one with real keys. The DISABLED
+Razorpay row stays: it is honest anywhere.
+**Check**: `stand-in-providers.test.ts`. Re-seed the dev environment to
+clear its old rows.
+
+## API — a site checkout answered 500 with only its request line in the log
+
+**Symptom**: 9 Oct 2026, on dev: `POST /public/sites/:siteId/checkout`
+answered 500, the shopper read "Something went wrong on our side", and the
+API log showed only the `http_request` line at error level, with no cause.
+**Cause**: the business's stored payment keys didn't open under the
+server's key (seeded placeholder credentials), so `decryptSecret` threw
+inside `createIntentFor`, outside the try that turns a failed provider call
+into the handled 503 (UX-012). The checkout order was already written,
+PENDING and unpaid. On logging: `AllExceptionsFilter` does call
+`reportError`, which writes `unhandled_exception`; a reproduction with a
+real crypto error wrote it, but with `errorName: "object"` and no stack,
+because `reportError` read the error with `instanceof Error`, which is false
+for an error from another realm (Node's crypto binding under Jest's VM).
+Why the dev log stream showed no cause line at all was not confirmed from
+the code.
+**Fix**: keys that won't open are now the same handled 503 as a failed
+provider (`credentialsUnreadable` in `payments/provider-keys.ts`, reason
+`provider-unavailable`), logged at ERROR with the provider and business,
+never the secret; a credential blob that isn't JSON no longer quotes itself
+in a parse error. The PENDING order is left as an abandoned checkout:
+nothing was charged, a retry with the same key pays it, and its close job
+ends it after a day. The site says "The business can't take payment online
+right now…" (`payments-down`) instead of our trouble. `reportError` reads
+errors by shape (`errorFacts`), keeps name, message, code and stack with
+emails, numbers and tokens masked, and the visitor's address headers are
+redacted; `structuredLogger` can no longer throw on a field JSON can't hold.
+**Check**: `all-exceptions.filter.spec.ts` → "an unexpected error";
+`payments.service.spec.ts` → "keys that won't open"; `public-checkout.db.spec.ts`
+→ "says online payment is down when the stored keys won't open".
+**Category**: observability · payments ·
+`apps/api.saroh.in/src/common/observability/report-error.ts`
+
+---
+
 ## Deploy — the merchant sites' production Worker didn't know it was production
 
 **Symptom**: none reported. Found 9 Oct 2026 in a review after Vercel was
@@ -3542,3 +3662,691 @@ Otherwise every package is affected and the step runs.
 **Check**: the helper fails closed in both cases. A gate that can't tell what
 changed runs everything.
 **Category**: tooling · `scripts/prepush.sh` → `affected()`
+
+## The dev environment's demo login used the password written in the repo
+
+**Symptom**: the demo owner on the dev environment (saroh.io), and every
+other seeded login there, signed in with the fixture password the public
+repo documents (owner, 9 Oct).
+**Cause**: every seeded login took one hard-coded fixture password, and the
+seed upserts it on every run (`update: { password }`), so any seed of a
+shared database put, and kept putting, a published password on it.
+**Fix**: `seedPassword()` in `packages/database/src/seed/data.ts`. The
+fixture is used only when the database is on this machine (localhost, as on
+CI and a local stack). Anywhere else the seed needs `SEED_PASSWORD`
+(12+ characters, never in the repo) and refuses the fixture, and it never
+prints a password it didn't get from the docs. Passwords already on the dev
+database were changed by hand.
+**Check**: the seed throws before writing anything to a database that isn't
+on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
+**Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`
+
+## Insights — the orders figure read 0 because nothing wrote order.paid (#867)
+
+**Symptom**: Insights' orders figure was always empty for a real business,
+however many orders it was paid for. Seeded businesses looked fine, because
+the seed writes the daily rollups directly.
+**Cause**: the analytics contract declared `order.paid` (S7-002), but no
+payment path ever wrote one. A declared type with no writer validates, rolls
+up and reads as zero, so nothing failed.
+**Fix**: `analytics/order-events.ts` writes `order.paid` once per order in the
+transaction that made it PAID: `moveOrderPayment` (checkout, pay link,
+webhook or lookup), Record as paid, the counter payment and a treatment paid
+in full at booking. `dedupeKey` is the order's and the insert skips
+duplicates, so a replay never aborts the payment's transaction. An order
+refunded in full writes `order.refunded`, dated at the sale, and Insights
+subtracts it. An order paid before the change is never taken off.
+**Check**: `analytics/event-contract.spec.ts` → "every declared type is used"
+fails for any `*_TYPE` the contract exports that no other source file names.
+**Category**: analytics · `apps/api.saroh.in/src/modules/analytics/order-events.ts`
+
+## Flaky tests — a timestamp, a real popover and a lost click (#846, #847, #854)
+
+**Symptom**: three tests failed now and then and passed on a re-run. (1)
+`order-kitchen.service.spec.ts` → "a Member gets the kitchen view" failed
+with `not "360"` (#847). (2) `site-editor.test.tsx` → "opens the rail from
+the foot" timed out at 5 s in two loaded `prepush --all` gates (#854). (3)
+`business-settings.spec.ts` → "the address tab is Registered address"
+couldn't find the region, on desk and phone, in CI (#846).
+**Cause**: (1) The no-money check searched the whole read for `360`, the
+fixture's total, and the read carries wall-clock timestamps. One ending in
+`.360Z` matched. (2) The test is synchronous and takes ~20 ms. On the
+batches that failed (cut before 07c263d8), the bar's menus were the real
+Radix popover. Once a test opened one, every later test in the file spent
+2–12 s in jsdom selector matching (profiled: `nwsapi` `matches`). Under load,
+the foot test crossed the timeout. (3) The settings page is server-rendered,
+so the tab is visible before React hydrates. A click before hydration does
+nothing, so the panel stays on Identity and there's no "Registered address"
+region. The serial and parallel phases don't overlap (`e2e/run.mjs` runs them
+one after the other, and each CI shard has its own Postgres), and what
+Northwind is set up as never renames that region or changes its lead.
+**Fix**: (1) Cut ISO timestamps out of the JSON before the check. (2) Keep
+the plain Popover mock (07c263d8). With it the file runs in ~1.5 s, and
+under 8 concurrent copies the foot test stays under 50 ms. No timeout was
+raised. (3) The spec clicks the tab until it shows `aria-selected=true`
+(`expect(…).toPass`), like the other "a press before hydration does
+nothing" specs, and then reads the region.
+**Check**: a browser spec that clicks a server-drawn control and then expects
+something new waits for the control's own state (`aria-selected`,
+`aria-expanded`) inside `toPass`. A unit test asserts on the text of a
+serialized read only after stripping the timestamps.
+**Category**: tests · `e2e/tests/business-settings.spec.ts`,
+`apps/app.saroh.in/components/sites/site-editor.test.tsx`,
+`apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`
+
+## Flaky tests — two settings specs on PR #913, already fixed underneath it
+
+**Symptom**: CI on PR #913 (run 37917139224, 9 Oct) failed two phone tests,
+first try and retry, and passed on a re-run. (1) `business-settings.spec.ts`
+→ "the address tab is Registered address": no "Registered address" region,
+Identity still selected, and a "Choose your business type" card on the
+page. (2) `ux-polish-874.spec.ts` → "Settings' tabs say there is more at
+320px": `expect(got.inView).toBe(true)` got false on /settings/activity,
+whose feed was full of other tests' changes.
+**Cause**: neither was another test changing Northwind. The run was cut
+before both fixes reached `development`. (1) is #846's lost click: the tab
+is server-drawn and a press before hydration does nothing; the trace has the
+click 0.5 s after the page loaded. The business-type card is the seed's
+state (not registered, no type), and the six tabs and the region's title
+are constants (`TAB_KEYS`, `SECTIONS` in `organization-settings-form.tsx`),
+so nothing a parallel test saves changes them. Fixed by 1b5224de8 (clicks
+until `aria-selected`). (2) `useEdgeFade` revealed the open tab once, on
+first paint, and web fonts widened the tabs after it; the spec looked once.
+Fixed by 310085602 (reveals again as the strip or tab resizes, and the spec
+polls `inView`). What was left in (2): the fade and the "no sideways scroll"
+checks were still one look each after the poll, the page check compared
+`scrollWidth` with `innerWidth`, which a phone widens to fit an overflow
+(so it passed on the bug), and it read Northwind's Activity and Providers
+tab, which other tests write to. The Business tab strip test pressed the
+last tab without waiting for hydration, so it could pass on Identity.
+**Fix**: Settings' tabs are read on a business the test sets up
+(`makeBusiness`), and one `expect.poll` checks the strip overflows, fades,
+shows the open tab, and that the page neither scrolls nor zooms out past
+the width set. The Business strip test presses until `aria-selected`, then
+polls. No product change: read from the code, nothing on Activity widens the page; its rows are
+clipped by the card's `overflow-hidden`, not spilled.
+**Check**: before calling a CI flake a data race, check the failing run's
+tree against `development` (`git merge-base --is-ancestor <fix> <head>`) and
+read the trace's timings. A one-shot `expect(await page.evaluate(…))` in a
+spec is the pattern the skill bans (#718); five remain in `e2e/tests` and a
+grep in `scripts/prepush.sh` could refuse new ones.
+**Category**: tests · `e2e/tests/ux-polish-874.spec.ts`,
+`.agents/skills/saroh-browser-tests/SKILL.md` → Waiting
+
+## A bakery's footer said "when the studio is open"
+
+**Symptom**: a new business, Rehearsal Bakery, started its site from Store
+and got "Your area and town — and when the studio is open" saved as its
+footer, shown in Website › Settings › Footer and on the site.
+**Cause**: Store (`ceramics`, offered to every shop and creator) was
+designed as a ceramics studio, and its footer line kept the design's
+"studio". The footer is saved to `Site.footer` at creation, so the words
+read as the merchant's own, on any kind of shop.
+**Fix**: the line names no kind of business ("Your area and town · when you
+are open"). The old line moves to `footer.formerLines`, so the pre-publish
+check still flags a site made with it and never changed; saved data is
+untouched. `frame.test.ts` now fails any template whose footer names a kind
+of business its own name does not, and any template for anyone (no
+`kinds`) that names one anywhere. Store's page body (clay, glaze, firing,
+"The studio", "Throwing since") is still ceramics-specific and left for an
+owner decision.
+**Category**: templates · `packages/templates/src/frame.test.ts`,
+`packages/templates/src/manifest.ts` → `TemplateFooter.formerLines`
+
+## A module switched off would have hidden its own history
+
+**Symptom**: the #117 audit found `@RequireModule("COMMERCE")` on the
+whole of both order controllers. With `MODULE_ENFORCEMENT` on and Commerce
+off, Sell › Orders answered 403 for orders the business had already taken,
+and the same was true of store customers and of bookings under Appointments.
+The runbook said history reads are never gated, but nothing checked it, and
+the guard logged nothing, so a shadow run could not have shown it either.
+**Cause**: a class-level gate is the easy way to annotate a controller, and
+it covers the reads beside the writes. Dark enforcement made the mistake
+invisible.
+**Fix**: those four controllers gate each write or operational handler and
+leave their history reads open. The guard has a `shadow` mode that refuses
+nothing and logs `module_enforcement_would_refuse`, and logs
+`module_enforcement_refused` when on (throttled, ids only).
+**Check**: `capabilities/history-reads.gate.spec.ts` names every handler of
+those controllers as a history read or a gated route and runs the real guard
+on each; `module-annotations.spec.ts` (now in the unit project) lists them as
+method-level, so a class-level gate fails it.
+**Category**: access · `apps/api.saroh.in/src/modules/capabilities/module-enforcement.guard.ts`
+
+## Lifecycle — "deleted" changed only a label (#921)
+
+**Symptom**: found 9 Oct 2026 building the deletion runner (#907). A
+business past its deletion window was marked `DELETED_RETAINED`, and nothing
+else changed: Saroh's billing subscription went on renewing, its website and
+custom domains stayed online, its members could still sign in and read, and
+its media, Cloudflare hostnames, payment keys and pending jobs stayed.
+**Cause**: the lifecycle states (`SUSPENDED`, `PENDING_DELETION`,
+`DELETED_RETAINED`) were added for the admin console (DEC-021) with one
+consumer, the "no new activity" gate, which lumped all three together.
+Billing, the public site reads and the member's door never read the state at
+all, and nothing asked them to: a state could be added, or given a new
+meaning, without a decision for each place it touches.
+**Fix**: one decision table, `organizations/organization-lifecycle.policy.ts`
+(`Record<state, { activity, billing, publicSite, members }>`), which every
+consumer reads instead of its own list of names. Billing refuses to start or
+send a charge for `PENDING_DELETION` and `DELETED_RETAINED`
+(`billing/business-closing.ts`; the merchant's renewals and autopay too), and
+scheduling deletion ends Saroh's provider subscription with the period paid.
+A deleted business's site answers 404 from every address
+(`SITE_ONLINE_ORGANIZATION`, `PublicSiteOnlineGuard`) and its members are
+refused (`assertMembersMayOpen`, `ORGANIZATION_DELETED`). The runner queues
+`organization.deletion.cleanup`, which cancels the subscription at the
+provider, removes custom hostnames, media and payment keys and cancels
+pending jobs, keeping orders, invoices, credit notes, customers and the audit
+trails (ADR-008). DEC-021 amended.
+**Check**: `organizations/organization-lifecycle.policy.spec.ts` — the
+states in the database's `Organization_lifecycleStatus_check` must equal the
+table's rows (and the `Record` type fails to compile without one); every
+billing charge path, public site read and membership door listed there must
+still ask the table; every `@Controller("public/sites")` must carry
+`PublicSiteOnlineGuard`; every file that asks for a paused member must also
+ask `assertMembersMayOpen`. A new state, site controller or member door fails
+it until it is decided.
+**Category**: lifecycle · `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.policy.ts`
+
+## Lifecycle — store-scoped writes never asked the lifecycle (DEC-120)
+
+**Symptom**: found 9 Oct 2026 building the deletion window's wind-down. A
+suspended business, or one scheduled for deletion, was documented as taking
+no workspace writes, and still took a New order, a product, a category, an
+import and a storefront invite.
+**Cause**: the lifecycle gate lived only in `OrganizationGuard`. Every
+`stores/:storeId/…` controller (orders, products, product details, the
+catalogue, categories, customers, imports, storefront members, `PUT
+stores/:id`) resolves its business in the service and never runs that guard,
+so nothing asked. The gate's own spec tested the guard, not the routes that
+skip it.
+**Fix**: `StoreLifecycleGuard` (`common/guards/store-lifecycle.guard.ts`)
+finds the store's business and asks the same question, with the route's
+`@LifecycleWrite` class, on every store-scoped controller.
+**Check**: `organizations/lifecycle-wind-down.spec.ts` scans every
+controller with a `stores` route and fails one without the guard; the same
+spec names every write route of the order, booking, payment, invoice,
+membership, class pack and course controllers as wind-down or refused.
+**Category**: lifecycle · `apps/api.saroh.in/src/common/guards/store-lifecycle.guard.ts`
+
+## A browser spec that only passed on weekdays
+
+**Symptom**: `public-booking.spec.ts` › "pay at the desk…" failed on desk and
+phone, first try and retry, in a Saturday gate; it had passed every weekday.
+**Cause**: it asserted the first day button's `aria-label` ends in
+"N times free", "full" or "closed". The first button is today, and on a day
+Northwind is open but nobody takes the service the label is "no times"
+(`dayAria`, UX-054), which the pattern left out.
+**Fix**: the pattern accepts all four endings `dayAria` can give.
+**Check**: none added. A spec that reads "today" must accept every state today
+can be in; read the function that writes the words, not one day's screen
+(`saroh-browser-tests` skill: date-dependent assertions).
+**Category**: browser tests · `e2e/tests/public-booking.spec.ts`
+
+## Every merchant's tab showed the framework's default icon
+
+**Symptom**: every merchant site, on its Saroh address and on its own domain,
+showed the same black circle with a triangle in the browser tab: the
+framework's default mark, not the merchant's and not chosen by anyone.
+**Cause**: `apps/saroh.app/app/favicon.ico` was the file the app was scaffolded
+with. Next serves `app/favicon.ico` on every host, and the middleware's
+matcher skips dotted root paths, so no merchant route was ever asked. The
+"merchant sites never inherit Saroh's brand" gates (`check:blocks`) look at
+tokens and typefaces, not at metadata files.
+**Fix**: the file is gone and the renderer ships no icon of its own. A site
+shows its own icon, else the business logo, else a plain tile with its
+initial (DEC-124); `/favicon.ico` and `/site-icon.svg` are in the
+middleware's matcher and answered per host.
+**Check**: `apps/saroh.app/lib/site-icon.test.ts` fails if `favicon.*`,
+`icon.*` or `apple-icon.*` appears under `apps/saroh.app/app`, or
+`public/favicon.ico`; `app/[domain]/layout.test.ts` and
+`favicon.ico/route.test.ts` pin the three cases.
+**Category**: merchant sites · `apps/saroh.app/lib/site-icon.ts`
+
+## A test that is quick locally times out at 5s on CI
+
+**Symptom**: PR #925's "Unit tests" failed on three cases in
+`packages/ui/src/lib/qr-art.decode.test.ts` with "Test timed out in
+5000ms". `pnpm prepush --all` had passed on the same tree.
+**Cause**: each case draws eight QR versions in five colours and reads every
+one back through a real decoder. Run alone on the laptop that is under a
+second. On CI's runners, beside every other package's tests, it took 5.3 to
+5.6s, past vitest's 5s default.
+**Fix**: the three cases carry their own 30s limit, with a comment saying why.
+**Rule**: a test that does real work in a loop (decoding, rasterising,
+hashing many inputs) gets an explicit timeout. CI ran this one six times
+slower than the laptop, so the local time says little.
+**Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
+
+## The gate's quick API test step hung for ever on watchman
+
+**Symptom**: `pnpm prepush` (and so `git push`) sat on `api-unit:changed`
+for ten minutes or more with jest at 0% CPU, four times in one day, in the
+batch worktree and in three agent worktrees. Killed by hand, the step
+failed and the push was refused.
+**Cause**: jest uses watchman to find changed files when watchman is
+installed. With many worktrees of the same repo open, watchman never
+answered `--changedSince`, and jest waits without a timeout.
+**Fix**: `watchman: false` in `apps/api.saroh.in/jest.config.js`. Jest crawls
+the files itself, which is about a second slower and always returns.
+**Rule**: a test runner must not depend on a machine-wide daemon. A step
+that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
+**Category**: tooling · `apps/api.saroh.in/jest.config.js`
+
+## Enter in an invoice field issued the invoice
+
+**Symptom**: pressing Enter in any field of a new or draft invoice numbered
+it and locked its lines (UX audit, 10 Oct). Nothing on screen said Enter
+would do the irreversible thing.
+**Cause**: the form had two `type="submit"` buttons and chose between them
+with an `intent` state that started as `"issue"`. Enter is the form's own
+submit: it runs the first submit button in the form, which was "Issue it".
+**Fix**: the form's one submit is Save as draft; Issue is a `type="button"`
+that calls the submit itself. The course form had the opposite fault (its
+primary was a `type="button"`, so Enter ran "Save as draft") and is fixed
+the same way round.
+**Check**: `components/invoices/invoice-form.enter.test.tsx` and
+`components/courses/course-form.enter.test.tsx` pin which button is the
+form's submit and what submitting the form does.
+**Category**: forms · `docs/patterns/frontend-forms.md` (Enter runs the
+form's first submit button, so that button is the reversible one)
+
+## Typed work was lost to a stray tap, a link or a Cancel
+
+**Symptom**: fourteen create and edit flows guarded leaving in six different
+ways or not at all; every settings sheet dropped its draft on a press
+outside; a stock count's Cancel dropped every number typed (UX audit, 10
+Oct).
+**Cause**: each flow and each sheet wrote its own leave dialog,
+`beforeunload` and `SheetContent`, so the rule was whatever the last author
+remembered. Two frames were copies "until the two are lifted into one".
+**Fix**: one guard (`components/shared/use-leave-guard.tsx`), one sheet
+frame (`components/shared/settings-sheet-frame.tsx`) that reads whether its
+draft changed from its own fields (`use-draft-changed.ts`), and Undo on the
+count's Cancel (`components/commerce/stock/use-count-mode.ts`).
+**Check**: `components/shared/leave-guard-flows.test.ts` lists the flows and
+fails one that words its own question; `settings-sheet-frame.test.tsx`
+lists the sheets and fails one that draws its own `SheetContent`;
+`cancel-way-out.test.ts` fails a `ConfirmDialog` that pairs a Cancel verb
+with the default "Cancel".
+**Category**: forms · `docs/patterns/frontend-forms.md`
+
+## People met buttons they couldn't use, and refusals in a developer's words
+
+**Symptom**: a UX audit that walked every role (10 Oct 2026) found a Member
+with live Move, Cancel and outcome buttons on every booking, a Reviewer in the
+post editor with Save and Publish, create and edit pages that opened for
+anyone who typed the address and refused on Save, and refusals reaching the
+screen as `Role "MEMBER" may not perform "store:create"`.
+**Cause**: three habits. A page drew its write controls without asking the
+permission the API asks of the write, because the API refuses anyway.
+`authorize()` threw a sentence written for a developer, and the exception
+filter keeps a 4xx's message. And each screen worded its own denial, 28 ways.
+**Fix**: `requireCan(action, { thing })` (`lib/access/require-can.tsx`) is the
+first line of every `new`, `edit` and `import` page, and a page a role may
+read but not change is drawn to read. `authorize()` throws a readable 403 with
+`details: { code: "ROLE_DENIED", action }`, which the app says in
+`lib/api/role-denied.ts`'s words. Every denial reads `whoCanChange()`.
+**Check**: `lib/access/guarded-pages.test.tsx` fails a new create, edit or
+import page with no guard; `lib/access/who-can-change.test.ts` scans for the
+old wordings; `components/shared/quick-actions.test.ts` fails a command menu
+row that names no permission; `organization-policy.spec.ts` pins the refusal's
+shape.
+**Category**: access · `docs/patterns/frontend-error-feedback.md`,
+`docs/patterns/backend-auth-and-access.md`
+
+## Every screen drew its own tabs, pills, notices and links
+
+**Symptom**: a UX audit (10 Oct 2026) counted fourteen tab strips in two
+colours and three type sizes, about twenty pill components and ninety pills
+drawn by hand (six of them in capitals), eighty-five boxed alerts in
+thirty-four styles, a hundred Saffron links, seventeen clipboard calls with
+nine failure sentences, and seven words for "customers can get it".
+**Cause**: each screen was built from its design file alone. The library had
+a tooltip, an alert and a progress bar that nothing used, so the next screen
+copied the last screen's markup and changed it.
+**Fix**: one of each, in `@saroh/ui` (`TabStrip`, `Segmented`, `ListSearch`,
+`Notice`, `TextLink`, `IconButton`, `Tip`, `CopyButton`, `ShareLink`,
+`ProgressBar`, `CountBadge`, the `.label` utility) and in
+`components/shared` (`StatusBadge`, `SectionList`, `Chip`), with the status
+words in `lib/status/vocabulary.ts`. Every call site was moved and the old
+pieces deleted.
+**Check**: `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts` fails a
+hand-rolled `role="tablist"`, a boxed alert outside `Notice`,
+`navigator.clipboard` outside the copy pieces, `uppercase` outside `.label`,
+any Saffron class outside the menu's marker, and a transition with a literal
+duration. Its allowlists name what is left, each with its reason.
+**Category**: design system · `docs/patterns/frontend-design-system.md`
+
+## A tooltip made a jsdom test take seconds
+
+**Symptom**: wrapping a button in the library's tooltip timed out twenty
+component tests in `apps/app.saroh.in` at 5s each.
+**Cause**: the one `packages/ui/vitest.setup.ts` already describes. jsdom's
+selector engine answers `:modal` and `:popover-open` by recursing to a stack
+overflow, and floating-ui asks both of every positioned tooltip. The app had
+no setup file, so it had no fix.
+**Fix**: `apps/app.saroh.in/vitest.setup.ts` mirrors the library's patch (a
+no-op under `node`), wired through `setupFiles`.
+**Check**: the suite itself: the order sheets' tests press tooltipped buttons.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
+
+## Every page said "Home" for a moment on its way in
+
+**Symptom**: moving between sections of the app, the loader's breadcrumb read
+"Home" before the page's own name appeared.
+**Cause**: the router shows the outermost loading file first on a move between
+top-level sections, before the section's own. `app/(shell)/loading.tsx` was
+written as Home's loader, with "Home" fixed in it, though it stands in for
+every address under the shell.
+**Fix**: the shell's loader is `ShellLoading`, which reads the address against
+the menu (`shellLoadingWords`) and names the section and page being opened,
+with a bar for a title it can't know.
+**Check**: `shell-loading.test.ts` (never "Home" for another address), and
+`page-chrome.test.ts` still holds every loader to the one loading shell.
+**Category**: frontend · `docs/patterns/frontend-app-structure.md`
+
+## A sign-in that answered 500 never reached error tracking
+
+**Symptom**: rehearsing PostHog on dev, 10 Oct 2026:
+`POST /api/auth/sign-in/social` for Google, on a host with no Google keys,
+answered 500 and logged "ERROR [Better Auth]: … CLIENT_ID_AND_SECRET_REQUIRED".
+Nothing arrived in PostHog, and there was no `unhandled_exception` line.
+**Cause**: every 5xx was reported from `AllExceptionsFilter`, and Better
+Auth's handler is mounted beside Nest, not inside it. It catches what it
+throws and answers the request itself, so the filter never ran. Sign-in,
+sign-up, password reset, email verification and session reads could all
+fail unseen. "Every 5xx goes through the filter" was true of Nest's routes
+only.
+**Fix**: `createAuth` takes `onServerError`, wired to Better Auth's
+`onAPIError.onError` (`packages/auth/src/server-errors.ts`); the API passes
+`reportAuthServerError` (`src/common/auth/report-auth-error.ts`), which
+calls `reportError` with the status, the method, the request id and the
+route's shape (`/api/auth/reset-password/:token`). Only what was answered
+5xx: an `APIError` below 500 (wrong password, unverified email, rate limit,
+validation) is an outcome and is dropped. The reporter is wrapped, so it
+can't throw into a sign-in.
+**Check**: `packages/auth/src/server-errors.test.ts` drives Better Auth's
+real handler: the 500 above reaches the hook once, and a wrong password and
+an invalid body do not. `report-auth-error.spec.ts` pins what is sent and
+that a token, an email and a password are not.
+**Rule**: a handler mounted outside Nest (Better Auth's today) has its own
+way to `reportError`. When one is added, ask where its 5xx goes. Read the
+installed version's source for the hook: `onError` here is handed the
+error and no request, which no type says loudly.
+**Category**: observability · `packages/auth/src/server-errors.ts`
+
+## The consistency pass broke seven things only a browser could see
+
+**Symptom**: the first browser run after the UX consistency pass (11 Oct
+2026), with every unit test, type check and lint green:
+
+- Customer Detail's ⋯ More actions opened nothing, so nobody could merge,
+  delete or remove a customer's details from there.
+- With the keyboard on a control that has a hint, Escape closed the hint and
+  left the sheet open. The site editor's block sheet on a phone took two
+  presses, and so did its Publish menu.
+- A product with a photo had no title: the heading was zero wide.
+- On a phone, a record's page (a customer, an order, an invoice) was wider
+  than the screen, and Chrome zoomed the page out to fit it.
+- A product's Orders tab on a phone was the error page.
+- A location's Pick-up sheet closed on Save with "3 minutes" typed, saying
+  nothing and keeping nothing.
+- The eyebrow on the sign-in panel was dark on dark (contrast 2.1).
+
+**Cause**: one shared piece each, changed for every screen at once.
+
+- `Tip` was put between a trigger and its control
+  (`<DropdownMenuTrigger asChild><Tip><Button/></Tip>`). `asChild` hands the
+  trigger's ref, handlers and state to its child, which was now the Tip, and
+  the Tip kept them. Four places did this.
+- A showing tooltip is Radix's topmost layer, and Radix gives Escape to the
+  topmost layer alone. Turning every `title=` into a `Tip` put a layer over
+  every focused icon button.
+- `PageHeader` wrapped `lead` in a block box. The product's cover is an
+  inline link around a photo with `size-full`: in a block box its `size-14`
+  did nothing, and the photo drew at its own 1600px.
+- `PageHeader` moved the actions inside a wrapping row and kept their
+  `shrink-0`. As a child of that row they were held to the width of all
+  their buttons in a line, so they couldn't wrap.
+- `arrivalProps` was exported from `use-arrivals.ts`, a "use client" file,
+  and `order-row.tsx` (drawn by a server component too) called it.
+- The sheet frame closes an edit whose draft is unchanged without running
+  its submit. The Pick-up sheet said "unchanged" from what the draft would
+  send, and a time it couldn't read sends nothing.
+- `.label` gained a colour (muted Ink) when the label styles became one, and
+  the panel's eyebrow, which had inherited the panel's, took it.
+
+**Fix**: `Tip` passes on what it is handed and takes itself off the page
+before Radix reads an Escape (`packages/ui/src/components/ui/tooltip.tsx`);
+`PageHeader`'s lead is a flex box and its actions hold their width only from
+`sm` up; `arrivalProps` lives in `components/shared/arrival-props.ts`, which
+is not a client file; `wayChanged` (`lib/stores/delivery-summary.ts`) counts
+a draft with something to fix as changed; the eyebrow is `text-inherit`.
+**Check**: `tooltip.test.tsx` and `tooltip-escape.test.tsx` (a real Radix
+dialog), `page-header.test.tsx`, `split-shell.test.tsx`,
+`use-arrivals.test.tsx` (neither file may say "use client") and
+`delivery-summary.test.ts`. The browser specs that found them:
+`customer-detail`, `customer-merge`, `person-page`, `site-editor-narrow`,
+`site-versions`, `product-editor`, `phone-reflow`, `product-page-stock`,
+`storefront-settings` and `a11y`.
+**Rule**: a change to a shared piece is checked in a browser, on desk and
+phone, before it is merged: none of these was visible to jsdom, which has
+no layout, no server components and no layer stack unless a test builds
+one. A wrapper that can sit under `asChild` passes on what it is given. An
+overlay's `dirty` is "differs from what is saved", not "would send
+something".
+**Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## A customer picked "13:00" on the page and was emailed "1:00 pm"
+
+**Symptom**: on a merchant's site the booking page offered "09:00 … 13:00 …
+16:30" and the account area wrote "Mon 5 Oct, 14:00", while the email the
+same customer got said "1:00 pm" and the merchant app "1:00 pm" (seen in a
+browser, 11 Oct 2026).
+**Cause**: the 12-hour decision (10 Oct) gave the merchant app and the API
+one formatter each, with a check on each. The site (`packages/site-blocks`)
+had neither: `timeIn`, `bookingWhen` and a message's time each asked `Intl`
+for `hour12: false`, and the timetable and On today drew the API's "HH:MM"
+as it came.
+**Fix**: `packages/site-blocks/src/lib/clock.ts` (`timeWords`, `clockWords`,
+`timeRangeWords`), the twin of the API's `timeWords`, drawn everywhere a
+customer reads a time. `timeIn` and `clockValue` stay the 24-hour value for
+an address and a comparison.
+**Check**: `lib/clock.test.ts` runs the API spec's cases, and fails any
+other file in the package that formats an hour.
+**Rule**: a format decided for "everywhere" has three homes: the merchant
+app, the API's sentences and the merchant's site. Change all three, and give
+each its own check.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## The code scanner found what the gate could not
+
+**Symptom**: every check on the batch's pull request passed but CodeQL, which
+raised five findings in new code: a customer's phone number written to
+`sessionStorage` with a kept booking, tags taken out of a post's body by
+replacing patterns (twice), and two test helpers that unescaped an ampersand
+first or matched `<script` in one case only. One came back after the first
+fix: a second pattern replace, done in a loop.
+**Cause**: nothing local runs the scanner, and each of these reads as
+reasonable code. Replacing a tag pattern can leave the same pattern behind
+(`<scr<script>ipt>`), however many times it is done.
+**Fix**: the kept booking holds no phone number (a signed-in customer's comes
+from their account); `postParagraphs` reads the body a character at a time
+and copies no bracket (`lib/content/plain-text.ts`, with tests for nested
+tags); the helpers unescape `&amp;` last and match without regard to case.
+**Check**: `plain-text.test.ts`; the booking flow's reload test asserts the
+phone is not in storage. The scanner itself stays CI's: read its findings on
+the pull request before calling a batch green.
+**Category**: security · `docs/patterns/frontend-data-and-state.md`
+
+## A large batch's pull request ran no integration and no browser tests on CI
+
+**Symptom**: on a pull request of 2,200 files every listed check was green,
+and three were "skipped": the integration shards, the browser shards and the
+permission states. The summary jobs passed in two seconds.
+**Cause**: CI's "What changed" job asked `printf '%s\n' "$files" | grep -qE …`
+under `set -o pipefail`. `grep -q` leaves at its first match. With a list
+longer than the pipe holds, `printf` is still writing, dies of a broken pipe,
+and pipefail turns the match into a failure: "the API didn't change", "no
+browser test is needed". A short list fits in the pipe, so small pull
+requests were right and only the largest ones were wrong.
+**Fix**: `has()` reads the list from a here-string and sends grep's output to
+`/dev/null`, so nothing is left writing. The same shape in `scripts/prepush.sh`
+(seven places) is changed the same way.
+**Check**: proven by hand on a list of 60,000 lines (old: no match; new:
+match). A skipped job on a pull request that touches `apps/` or `packages/`
+is a finding: read the "skipping" rows, not only the red ones.
+**Category**: ci · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A row of four buttons ran past a phone's edge, on CI's fonts only
+
+**Symptom**: once CI ran its browser shards on the batch, four own-domain
+specs failed on the phone project: the page had zoomed out to 414px at a
+412px screen. The same specs passed on a Mac.
+**Cause**: a site setting's row (`Row` in `components/sites/settings-rows.tsx`)
+held its actions in a `shrink-0` box. Web address has four (Copy, QR code,
+View, Change), wider than the card on a phone, so the box ran out of the card.
+On a Mac it stopped 9px short of the screen's edge. On CI's Linux fonts it
+went 2px past, and the browser zoomed out to fit.
+**Fix**: the actions' box may shrink on a phone (`min-w-0 max-w-full
+sm:shrink-0`), so the buttons wrap inside the card.
+**Check**: the specs' own `expectNothingHiddenSideways`. A row that reaches
+the screen's edge on a Mac is past it somewhere else: nothing inside a card
+may be wider than the card.
+**Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## Four list screens side by side did not match
+
+**Symptom**: the owner put Stock, Customers, Discount codes and Locations
+side by side the day after the UX consistency pass. Each had its own toolbar
+order and search width, tabs on one and chips on another, three count styles
+("Needs you · 4", "Returning 9", a grey badge, a dark one and a red one), a
+tinted table head on two and a plain one with inset rules on a third, and
+page actions at three heights.
+**Cause**: the pass built one of each small piece (tabs, chips, search,
+badges) and a scan for each, but nothing said how a list is put together
+from them, so each screen composed the right pieces its own way. A scan per
+piece cannot see a wrong arrangement of right pieces.
+**Fix**: one anatomy, in code: `ListToolbar`, `ListFilter` and `listTable`
+(`@saroh/ui`), which `DataView` draws itself, and every list moved onto
+them. Tabs are views. Every filter is a dropdown in the toolbar's one row
+(the first pass drew status filters as a row of chips under it. The owner
+looked again and asked for one row). `PageHeader` puts its actions level
+with the title in every case.
+**Check**: `components/shared/list-screens.test.ts` reads the app for a
+hand-drawn head row, a search outside the toolbar or at its own width, a
+hand-sized select, a new tab strip that is not a named set of views, a row
+of chips for a filter, more than three dropdowns or more than one attention
+toggle, a filter that reads "Any …" or a bare "All", a placeholder too long
+for the field, a pager drawn by hand, a dot-joined count and an unnamed
+attention count. Compare
+screens side by side before calling a consistency pass done, not one at a
+time.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy
+
+## The 12-hour clock broke times in two in narrow columns
+
+**Symptom**: Stock's Log read "2:40" over "pm". Activity's "Today, 12:30 pm"
+and the Bookings agenda's times wrapped the same way.
+**Cause**: the move from "14:40" to "2:40 pm" made every time a word longer
+and gave it a space to break at. The columns had been sized for the 24-hour
+clock (42px, 64px, 96px) and nothing held a time to one line.
+**Fix**: `ViewerDate` keeps a time on one line itself, the hand-drawn time
+cells take `whitespace-nowrap`, and each column was widened to fit
+"12:30 pm" at its type size.
+**Check**: `list-anatomy.test.tsx` ("a time never wraps") and the Log's own
+test. When a formatter's output gets longer, grep every fixed-width column
+that draws it.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## A separator drawn as its own flex item led its line
+
+**Symptom**: a location's readiness card read "· Sells in person only".
+**Cause**: the count and the note were two flex items in a wrapping row, and
+the note's text began with the dot. Whenever the heading wrapped, the note
+started a line, dot first.
+**Fix**: `joinFacts` (`lib/format/join.ts`) joins what is there with a dot
+held to both neighbours by no-break spaces, in one element.
+**Check**: `list-anatomy.test.tsx` ("no separator leads or trails").
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## A header button was stretched to the width of its busy label
+
+**Symptom**: Orders' "Export" was about 184px wide beside "New order".
+**Cause**: `Button` lays its label and its `busyLabel` out in one cell so
+nothing beside it moves when it is busy. Export's busy label was a sentence
+with its progress in it (`Exporting… 50 of 532`), so the button was that
+wide at rest.
+**Fix**: the busy label is the verb alone ("Exporting…") and the progress
+is said beside the button while it runs.
+**Check**: a `busyLabel` is one word, the verb's "-ing" form, as the button
+rules already say. No other template-string busy label is left in the app.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy
+
+## The code scanner found the same tag strip again
+
+**Symptom**: CodeQL failed the list batch's pull request with three findings
+of `js/incomplete-multi-character-sanitization`, all in one new test file
+(`components/shared/list-anatomy.test.tsx`): helpers that read a button's
+words with `markup.replace(/<[^>]+>/g, "")` (11 Oct 2026).
+**Cause**: the same miss as the entry above, three days on. That entry fixed
+the code and wrote the rule down, and prose did not stop an agent writing
+the pattern again in a test.
+**Fix**: the helpers take tags out in a loop until nothing changes
+(`without`). `pnpm check:tag-strip` (`scripts/check-tag-strip.mjs`) now fails
+a tag pattern replaced with nothing in one pass, anywhere in `apps`,
+`packages` or `e2e`; prepush and CI run it.
+**Rule**: to read markup's words, loop the replace until the string stops
+changing, or put a space where the tag was. Never one pass with `""`.
+**Category**: security · CodeQL on PRs · `scripts/check-tag-strip.mjs`
+
+## A notice's button sat against its words, on twenty screens
+
+**Symptom**: on Orders, the late-rule notice drew "Change it" and the
+dismiss cross straight after its sentence, with the rest of the bar empty,
+and its glyph a few pixels above the words (owner, 11 Oct 2026). Invoices'
+overdue notice, Subscriptions' unpaid one and about twenty others did the
+same.
+**Cause**: each caller laid out its own row inside `Notice` (words with
+`flex-1`, then a button) and expected the row to span the bar. `Notice`'s
+text column had no `flex-1`, so the row was only as wide as its content
+and the button had nothing to be pushed across. The glyph is set on the
+first line of text, and a row with a button in it is taller than a line.
+**Fix**: the text column in `Notice` takes the row's width, so every such
+row reaches the right edge; `align="center"` sets the glyph level with a
+row the caller's button made taller, and the callers with such a row pass
+it. The late-rule notice uses the `action` slot.
+**Rule**: a button that belongs to a notice goes in `action`. Where the
+caller needs its own row, it passes `align="center"`.
+**Check**: `packages/ui/src/components/ui/notice.test.tsx`.
+**Category**: design system · `packages/ui/src/components/ui/notice.tsx`
+
+## A toast took the press meant for a row's menu, on a phone
+
+**Symptom**: `products-list.spec.ts` ("quick look, Stop selling with Undo, and
+Duplicate") failed on the phone project in CI on `development`, both tries:
+the press on the row's "More actions" timed out because a toast "intercepts
+pointer events" (11 Oct 2026). It had passed on the pull request and locally,
+and had been written off as flaky before.
+**Cause**: the test searches down to one row, so on a phone that row sits at
+the foot of the screen, where toasts are drawn. The test had just pressed
+Undo inside a toast, and its pointer stayed there. A toast under the pointer
+waits rather than going, so it never left: waiting 20 seconds for it failed
+every time. Before, the run passed only when the list happened to lay the
+row clear of the toast.
+**Fix**: the spec moves the pointer off the toast, waits for the toasts to
+go, then presses the menu.
+**Rule**: in a browser spec, after pressing a button inside a toast, move
+the pointer away (`page.mouse.move(1, 1)`) and wait for
+`[data-sonner-toast]` to reach 0 before pressing anything that can sit under
+it on a phone. A test that fails "sometimes" has a cause; read the call log
+before calling it flaky.
+**Category**: tests · `docs/patterns/frontend-verification.md`

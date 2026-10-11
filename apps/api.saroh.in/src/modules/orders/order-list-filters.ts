@@ -258,14 +258,15 @@ export function stepSql(key: string): Prisma.Sql {
 /**
  * The order's payment standing in SQL — the same precedence as
  * {@link paymentStandingOf}. `money` is the lateral join in `order-list.ts`:
- * what SUCCEEDED payments took, and what their non-failed refunds gave back.
+ * what SUCCEEDED payments took, and what their non-failed refunds gave back;
+ * a part recorded as refunded by hand (#865) reads partly refunded too.
  */
 export function paymentSql(): Prisma.Sql {
     return Prisma.sql`(CASE
     WHEN o."paymentStatus" = 'REFUNDED'
         OR (money.captured > 0 AND money.refunded >= money.captured)
         THEN 'REFUNDED'
-    WHEN money.refunded > 0 THEN 'PARTLY_REFUNDED'
+    WHEN money.refunded > 0 OR o."refundedByHand" > 0 THEN 'PARTLY_REFUNDED'
     WHEN o."paymentStatus" = 'PAID' THEN 'PAID'
     ELSE 'UNPAID'
 END)`;

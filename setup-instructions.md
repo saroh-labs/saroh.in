@@ -105,6 +105,8 @@ pnpm --filter @saroh/database db:seed:showcase   # plus a gym, a yoga studio, a 
 pnpm --filter @saroh/database db:seed:reset      # removes both
 ```
 
+The password is for a database on your own machine only: seeding any other database (a shared dev one) needs `SEED_PASSWORD`, and the seed refuses the documented one there.
+
 Sign in as `demo@saroh.dev` / `demo-password-123`. The showcase gives the same
 account a different role in each business, so one login shows the workspace as
 an owner, an admin, a member and a reviewer — the full table is in

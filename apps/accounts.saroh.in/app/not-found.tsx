@@ -1,10 +1,12 @@
 import { NotFound } from "@saroh/ui/not-found";
 import { Wordmark } from "@saroh/ui/wordmark";
 
+import { getAppUrl } from "@/lib/app-urls";
+
 /**
  * Accounts' 404, on the same backdrop as every other screen here (the root
- * layout draws it). Signing in lands on Your apps, so that is the way on;
- * someone who is signed out is sent from there to sign in, and Sign in is
+ * layout draws it). Signing in lands on Saroh itself, so that is the way on.
+ * Someone who is signed out is sent from there to sign in, and Sign in is
  * offered beside it for them.
  */
 export default function NotFoundPage() {
@@ -14,7 +16,7 @@ export default function NotFoundPage() {
                 mark={<Wordmark style={{ fontSize: "1.75rem" }} />}
                 title="Page not found"
                 description="This address isn't a page in your Saroh account. The link may be old or mistyped."
-                primary={{ href: "/apps", label: "Go to your apps" }}
+                primary={{ href: getAppUrl(), label: "Go to Saroh" }}
                 secondary={{ href: "/login", label: "Sign in" }}
             />
         </main>

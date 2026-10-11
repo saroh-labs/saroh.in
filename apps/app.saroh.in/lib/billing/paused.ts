@@ -1,3 +1,5 @@
+import { formatNumber } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
 /**
  * What a move to a lower plan has paused (#800), as the workspace marks
  * it. The API decides (`GET …/billing/paused`, `billing/paused-view.ts`);
@@ -207,26 +209,22 @@ export function pausedListWords(
               ? "blog post is"
               : "blog posts are";
     const plan = kind === "product" ? "products" : "blog posts";
-    return `${count.toLocaleString("en-IN")} ${noun} paused. Your plan includes fewer ${plan} than you have, so your oldest are hidden from your site and read-only. Choose a plan in Plan and billing to bring ${count === 1 ? "it" : "them"} back.`;
-}
-
-function plural(n: number, one: string, many: string): string {
-    return `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
+    return `${formatNumber(count)} ${noun} paused. Your plan includes fewer ${plan} than you have, so your oldest are hidden from your site and read-only. Choose a plan in Plan and billing to bring ${plural(count, "it", "them")} back.`;
 }
 
 /** The kinds of thing a view pauses, short ("2 products, 1 location"). */
 export function pausedParts(view: PausedView): string[] {
     const parts: string[] = [];
     const people = view.people?.length ?? 0;
-    if (people > 0) parts.push(plural(people, "team member", "team members"));
+    if (people > 0) parts.push(count(people, "team member", "team members"));
     if (view.products.count > 0)
-        parts.push(plural(view.products.count, "product", "products"));
+        parts.push(count(view.products.count, "product", "products"));
     if (view.posts.count > 0)
-        parts.push(plural(view.posts.count, "blog post", "blog posts"));
+        parts.push(count(view.posts.count, "blog post", "blog posts"));
     const places = view.locations?.length ?? 0;
-    if (places > 0) parts.push(plural(places, "location", "locations"));
+    if (places > 0) parts.push(count(places, "location", "locations"));
     const sites = view.sites?.length ?? 0;
-    if (sites > 0) parts.push(plural(sites, "website", "websites"));
+    if (sites > 0) parts.push(count(sites, "website", "websites"));
     return parts;
 }
 

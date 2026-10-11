@@ -1,7 +1,8 @@
 "use client";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
+import { Field } from "@saroh/ui/field";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * "Who on the diary is this?" in the invite (#868). Someone who takes
@@ -24,32 +25,25 @@ export function InviteDiaryPerson({
     if (people.length === 0) return null;
     const picked = people.find((p) => p.id === value);
     return (
-        <div className="space-y-1.5">
-            <label
-                htmlFor="invite-diary-person"
-                className="block text-[12.5px] font-medium"
-            >
-                On the diary as
-            </label>
+        <Field
+            holdsData
+            label="On the diary as"
+            hint={
+                picked
+                    ? `${picked.name} already takes bookings, so this uses no extra seat. Their diary becomes theirs to see when they join.`
+                    : "Pick someone who takes bookings with no sign-in to give them one."
+            }
+        >
             <OptionSelect
                 id="invite-diary-person"
                 value={value}
                 onValueChange={onPick}
                 disabled={disabled}
-                aria-describedby="invite-diary-person-hint"
                 options={[
-                    { value: "", label: "No one — they don't take bookings" },
+                    { value: "", label: "No one. They don't take bookings" },
                     ...people.map((p) => ({ value: p.id, label: p.name })),
                 ]}
             />
-            <p
-                id="invite-diary-person-hint"
-                className="text-[12px] leading-[1.45] text-muted-foreground"
-            >
-                {picked
-                    ? `${picked.name} already takes bookings, so this uses no extra seat. Their diary becomes theirs to see when they join.`
-                    : "Pick someone who takes bookings with no login to give them one."}
-            </p>
-        </div>
+        </Field>
     );
 }

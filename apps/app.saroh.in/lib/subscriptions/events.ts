@@ -1,9 +1,11 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import type {
     Subscription,
     SubscriptionEvent,
     SubscriptionEventPlan,
 } from "./service";
-import { dayText, money } from "./view";
 
 /**
  * A subscription's log in words (D9), for its Changes card: what was done,
@@ -58,7 +60,7 @@ function plan(v: unknown): SubscriptionEventPlan | null {
 
 function planPrice(p: SubscriptionEventPlan): string {
     return typeof p.price === "string" && typeof p.currency === "string"
-        ? ` (${money(p.price, p.currency)})`
+        ? ` (${formatMoneyMajor(p.price, p.currency)})`
         : "";
 }
 
@@ -71,14 +73,19 @@ export function changeWhat(
     const data = event.data as Data;
     const day = (iso: unknown, withWeekday = false) => {
         const at = str(iso);
-        return at ? dayText(at, sub.timezone, now, withWeekday) : "";
+        return at
+            ? formatDate(at, sub.timezone, {
+                  now,
+                  weekday: withWeekday ? "short" : undefined,
+              })
+            : "";
     };
     const invoice = event.invoice?.number ? ` · ${event.invoice.number}` : "";
     switch (event.kind) {
         case "SUBSCRIBED": {
             const p = plan(data.plan);
             const on = p
-                ? ` on ${p.name}${p.price ? ` at ${money(p.price, p.currency)}` : ""}`
+                ? ` on ${p.name}${p.price ? ` at ${formatMoneyMajor(p.price, p.currency)}` : ""}`
                 : "";
             const starts = str(data.startsAt);
             return starts
@@ -92,19 +99,19 @@ export function changeWhat(
                 : "Paused";
         case "RESUMED": {
             if (data.restarted === true) {
-                return `Resumed — a new period started${invoice}`;
+                return `Resumed. A new period started${invoice}`;
             }
             const days = num(data.extendedDays) ?? 0;
             return days > 0
-                ? `Resumed — the paid period moved ${days} ${days === 1 ? "day" : "days"} later`
+                ? `Resumed. The paid period moved ${count(days, "day")} later`
                 : "Resumed";
         }
         case "CANCELLED":
             return "Cancelled";
         case "CANCEL_SCHEDULED":
-            return `Cancelled — ends ${day(data.endsAt)}`;
+            return `Cancelled, ends ${day(data.endsAt)}`;
         case "KEPT":
-            return "Kept going — no longer ending";
+            return "Kept going, no longer ending";
         case "ENDED":
             return "Ended with its period";
         case "PLAN_CHANGE_BOOKED": {
@@ -140,19 +147,19 @@ export function changeWhat(
                 : `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
         case "RENEWED":
             return data.uncharged === true
-                ? "Renewed — nothing charged, every collection skipped"
+                ? "Renewed. Nothing charged, every collection skipped"
                 : `Renewed${invoice}`;
         case "RETRIED":
             return `Made a new pay link${invoice}`;
         case "RESUME_REFUSED":
-            return "Couldn't resume on its own — Payments is off";
+            return "Couldn't resume on its own. Payments is off";
         case "RENEWAL_FAILED":
             // Autopay stood aside: the customer was paying by link.
             return data.reason === "CHECKOUT_OPEN"
-                ? `Autopay didn't charge — the customer was paying by link${invoice}`
+                ? `Autopay didn't charge. The customer was paying by link${invoice}`
                 : `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
-            return "Not charged — above the autopay limit";
+            return "Not charged, above the autopay limit";
         case "MANDATE_SET_UP": {
             // D12: the method the customer picked.
             const method = str(data.method);
@@ -163,13 +170,13 @@ export function changeWhat(
             // D20: autopay ends with what it was authorised for.
             switch (data.reason) {
                 case "SUBSCRIPTION_ENDED":
-                    return "Autopay cancelled — subscription ended";
+                    return "Autopay cancelled, subscription ended";
                 case "MERGED":
-                    return "Autopay cancelled — customers merged";
+                    return "Autopay cancelled, customers merged";
                 case "PRIVACY_REMOVAL":
-                    return "Autopay cancelled — their details were removed";
+                    return "Autopay cancelled, their details were removed";
                 case "REPLACED":
-                    return "Autopay replaced — they approved a new one";
+                    return "Autopay replaced. They approved a new one";
                 default:
                     return "Autopay cancelled";
             }
@@ -193,7 +200,7 @@ export function changeWhat(
                     : data.reason === "PLAN_CHANGED"
                       ? "plan changed"
                       : "cancelled";
-            return `${how} the early renewal invoice — ${why} before the renewal, autopay not charged${invoice}`;
+            return `${how} the early renewal invoice: ${why} before the renewal, autopay not charged${invoice}`;
         }
         default:
             return "Changed";
@@ -206,7 +213,7 @@ function periodText(data: Data, timeZone: string, now: Date): string {
     const end = str(data.periodEnd);
     if (!start || !end) return "a period";
     const last = new Date(new Date(end).getTime() - 86_400_000).toISOString();
-    return `${dayText(start, timeZone, now)} – ${dayText(last, timeZone, now)}`;
+    return `${formatDate(start, timeZone, { now })} to ${formatDate(last, timeZone, { now })}`;
 }
 
 /**
@@ -246,6 +253,6 @@ export function changeRows(
     return events.map((e) => ({
         id: e.id,
         what: changeWhat(e, sub, now),
-        when: `${dayText(e.createdAt, sub.timezone, now)} · ${changeWho(e, sub, viewerId)}`,
+        when: `${formatDate(e.createdAt, sub.timezone, { now })} · ${changeWho(e, sub, viewerId)}`,
     }));
 }

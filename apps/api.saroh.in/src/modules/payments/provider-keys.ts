@@ -6,10 +6,13 @@ import {
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { errorFacts } from "../../common/observability/report-error";
 import {
     isKeysRefused,
     KEYS_REFUSED,
+    NO_ATTENTION,
 } from "../../common/providers/provider-attention";
+import { queueProviderBack } from "../notifications/provider-alerts";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type {
     MerchantProvider,
@@ -102,6 +105,33 @@ export async function providerOrderFailed(
 }
 
 /**
+ * A connection whose stored keys can't be opened (the seal doesn't match
+ * the server's key, or what it holds isn't a key pair), as the same
+ * handled answer a failed provider gets: the customer reads that online
+ * payment is down, never a bare 500. Logged at ERROR, since stored keys
+ * that won't open are a broken invariant, not a provider having a bad
+ * minute; a few in a day means a business to reconnect, many means the
+ * server's key changed. The connection is not flagged: when the server's
+ * key is at fault, every business would be told to re-enter good keys.
+ * The log names the provider, the business and the error's message, which
+ * describes only the seal's shape, never a key.
+ */
+export function credentialsUnreadable(
+    row: Pick<MerchantPaymentProvider, "organizationId" | "provider">,
+    err: unknown,
+): ServiceUnavailableException {
+    logger.error(
+        `${providerLabel(row.provider)} credentials for business ${row.organizationId} could not be opened: ${
+            errorFacts(err).message
+        }`,
+    );
+    return new ServiceUnavailableException({
+        message: PROVIDER_FAILED_MESSAGE,
+        details: { reason: "provider-unavailable" },
+    });
+}
+
+/**
  * Mark a payment connection as needing attention and queue the team's
  * alert, on one transaction. Only a connection not already flagged is
  * marked, so each refusal tells the team once; true when this call did.
@@ -122,10 +152,49 @@ export async function flagPaymentProvider(
         if (marked.count === 0) return false;
         await enqueueTeamAlert(tx, row.organizationId, {
             event: "provider",
+            change: "down",
             channel: "PAYMENTS",
             providerId: row.id,
             since: now.toISOString(),
         });
         return true;
     });
+}
+
+/**
+ * A flagged payment connection whose provider order went through after all
+ * (#555): the provider let the keys back in. Clears the flag it was read
+ * with (one flagged again since stands) and queues "working again" on the
+ * same transaction, when the team was told it stopped. Never fails the
+ * customer's checkout: a failure here is only logged. True when this call
+ * cleared it.
+ */
+export async function paymentProviderWorks(
+    row: Pick<MerchantPaymentProvider, "id" | "organizationId" | "attentionAt">,
+    now: Date = new Date(),
+): Promise<boolean> {
+    const flaggedAt = row.attentionAt;
+    if (!flaggedAt) return false;
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const cleared = await tx.merchantPaymentProvider.updateMany({
+                where: {
+                    id: row.id,
+                    organizationId: row.organizationId,
+                    attentionAt: flaggedAt,
+                },
+                data: NO_ATTENTION,
+            });
+            if (cleared.count === 0) return false;
+            await queueProviderBack(tx, row, "PAYMENTS", now);
+            return true;
+        });
+    } catch (err) {
+        logger.warn(
+            `Could not clear provider ${row.id}'s attention: ${
+                err instanceof Error ? err.message : "unknown"
+            }`,
+        );
+        return false;
+    }
 }

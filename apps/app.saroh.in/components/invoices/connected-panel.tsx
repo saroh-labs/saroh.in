@@ -1,3 +1,5 @@
+import { FailedRead } from "@/components/shared/failed-read";
+import { plural } from "@/lib/format/plural";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -23,9 +25,7 @@ export function SidePanel({
 }) {
     return (
         <section className="rounded-[12px] border border-border bg-card px-4 py-[13px] print:hidden">
-            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </h2>
+            <h2 className="label mb-2">{label}</h2>
             {children}
         </section>
     );
@@ -51,7 +51,7 @@ export function ConnectedPanel({
     /** The customer's other invoices; null when they could not be read. */
     others: Invoice[] | null;
 }) {
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const who = billedTo(i);
     const first = who.name.split(" ")[0] ?? who.name;
     const src = sourceHref(i);
@@ -98,13 +98,13 @@ export function ConnectedPanel({
         who.contactId
             ? {
                   label: who.name,
-                  sub: "Customer — orders, subscriptions and all invoices",
+                  sub: "Customer: orders, subscriptions and all invoices",
                   href: customerHref(who.contactId, true),
               }
             : null,
         who.contactId && rest && rest.length > 0
             ? {
-                  label: `${rest.length} more ${rest.length === 1 ? "invoice" : "invoices"} for ${first}`,
+                  label: `${rest.length} more ${plural(rest.length, "invoice")} for ${first}`,
                   sub: unpaid ? `${unpaid} still unpaid` : "All paid",
                   href: customerHref(who.contactId, true),
               }
@@ -115,8 +115,8 @@ export function ConnectedPanel({
         <SidePanel label="Connected">
             {links.length === 0 ? (
                 <p className="text-[13px] text-muted-foreground">
-                    Written by hand for someone no longer in your contacts —
-                    nothing else is connected to it.
+                    Written by hand for someone no longer in your contacts.
+                    Nothing else is connected to it.
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1.5">
@@ -143,9 +143,10 @@ export function ConnectedPanel({
                 </ul>
             )}
             {others === null && who.contactId ? (
-                <p className="mt-2 text-[12px] text-muted-foreground">
-                    {first}&apos;s other invoices could not be counted just now.
-                </p>
+                <FailedRead
+                    className="mt-2"
+                    things={`${first}'s other invoices`}
+                />
             ) : null}
         </SidePanel>
     );
@@ -158,7 +159,7 @@ export function ConnectedPanel({
  * corrections made against it.
  */
 export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const events: { what: string; when: string | null; key: string }[] = [];
     for (const c of i.corrections ?? []) {
         events.push({
@@ -170,7 +171,7 @@ export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
     if (i.voidedAt) {
         events.push({
             key: "void",
-            what: `Voided${i.voidReason ? ` — ${i.voidReason}` : ""}`,
+            what: `Voided${i.voidReason ? `: ${i.voidReason}` : ""}`,
             when: i.voidedAt,
         });
     }

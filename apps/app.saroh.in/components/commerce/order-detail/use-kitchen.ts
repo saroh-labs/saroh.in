@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import {
     dismissToasts,
     showError,
@@ -30,7 +31,9 @@ import type {
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
+import { runAction } from "@/lib/api/run-action";
 import type { Hold } from "./hold-card";
+import type { Panel } from "./panel";
 import type { RefundChoice } from "./refund-panel";
 
 export type PendingHold = Hold & {
@@ -50,12 +53,7 @@ export type PendingHold = Hold & {
     };
 };
 
-/**
- * `courier` hands the order over; `tracking` fills in its details after;
- * `fulfilment` and `cancel` are B9's sheets.
- */
-export type Panel =
-    null | "refund" | "edit" | "courier" | "tracking" | "fulfilment" | "cancel";
+export type { Panel };
 
 /**
  * What Order Detail does, apart from how it looks: stage moves with their
@@ -68,14 +66,12 @@ export function useKitchen({
     order,
     first,
     currency,
-    format,
     refundTo,
     setPanel,
 }: {
     order: OrderRead;
     first: string;
     currency: string;
-    format: (n: number) => string;
     refundTo: string;
     setPanel: (p: Panel) => void;
 }) {
@@ -111,7 +107,8 @@ export function useKitchen({
     const undo = useCallback(
         (eventId: string, back: KitchenStage) => {
             startTransition(async () => {
-                const res = await undoStage(order.id, eventId);
+                const res = await runAction(() => undoStage(order.id, eventId));
+                if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                     return;
@@ -131,8 +128,15 @@ export function useKitchen({
         new Promise<void>((resolve) => {
             startTransition(async () => {
                 const from = order.stage;
-                const res = await moveStage(order.id, { to, ...extra });
+                const res = await runAction(() =>
+                    moveStage(order.id, { to, ...extra }),
+                );
                 resolve();
+                if (!res) {
+                    // The reply may have been lost after it moved.
+                    refresh();
+                    return;
+                }
                 if (!res.ok) {
                     showError(res.error);
                     refresh();
@@ -147,7 +151,7 @@ export function useKitchen({
                 if (to === "READY") {
                     showSuccess(
                         "Marked ready.",
-                        `It shows on the order — nothing was sent to ${first}.`,
+                        `It shows on the order. Nothing was sent to ${first}.`,
                     );
                 } else {
                     showUndo(message, () => undo(res.data.eventId, from), {
@@ -202,22 +206,30 @@ export function useKitchen({
             run: () =>
                 new Promise<void>((resolve) => {
                     startTransition(async () => {
-                        const res = await refundLines(order.id, {
-                            lines: choice.lines,
-                            putBack: choice.putBack,
-                            reason: choice.reason,
-                            goodwill: choice.goodwill,
-                            idempotencyKey: key,
-                        });
+                        const res = await runAction(() =>
+                            refundLines(order.id, {
+                                lines: choice.lines,
+                                putBack: choice.putBack,
+                                reason: choice.reason,
+                                goodwill: choice.goodwill,
+                                idempotencyKey: key,
+                            }),
+                        );
                         resolve();
+                        if (!res) {
+                            // The reply may have been lost after it went.
+                            refresh();
+                            return;
+                        }
                         if (!res.ok) {
                             showError(res.error);
                             refresh();
                             return;
                         }
-                        const sent =
-                            formatMoney(res.data.amountCents, currency) ??
-                            format(choice.amount);
+                        const sent = formatMoney(
+                            res.data.amountCents,
+                            currency,
+                        );
                         if (res.data.beingConfirmed) {
                             showInfo(
                                 `${refundTo} hasn't confirmed the ${sent} refund yet.`,
@@ -235,7 +247,7 @@ export function useKitchen({
                                 ? "A credit note is made against its invoice."
                                 : null,
                             back > 0
-                                ? `${back} go${back === 1 ? "es" : ""} back in stock when ${refundTo} confirms it.`
+                                ? `${back} ${plural(back, "goes", "go")} back in stock when ${refundTo} confirms it.`
                                 : null,
                         ].filter((n): n is string => n !== null);
                         showSuccess(
@@ -253,7 +265,10 @@ export function useKitchen({
     /** Ask again about a refund the provider hasn't answered for. */
     const retryRefund = (refundId: string) => {
         startTransition(async () => {
-            const res = await retryRefundAction(order.id, refundId);
+            const res = await runAction(() =>
+                retryRefundAction(order.id, refundId),
+            );
+            if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
                 refresh();
@@ -297,7 +312,10 @@ export function useKitchen({
             return;
         }
         startTransition(async () => {
-            const res = await saveCourierAction(order.id, fields);
+            const res = await runAction(() =>
+                saveCourierAction(order.id, fields),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -307,7 +325,7 @@ export function useKitchen({
                 fields.trackingNumber
                     ? "Tracking number saved."
                     : "Tracking details saved.",
-                `It stays on the order — nothing is sent to ${first}.`,
+                `It stays on the order. Nothing is sent to ${first}.`,
             );
             refresh();
         });
@@ -315,15 +333,17 @@ export function useKitchen({
 
     const saveEdit = (input: EditOrderInput) => {
         startTransition(async () => {
-            const res = await editBeforePreparing(order.id, input);
+            const res = await runAction(() =>
+                editBeforePreparing(order.id, input),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
             setPanel(null);
             const d = res.data;
-            const money = (c: number) =>
-                formatMoney(Math.abs(c), currency) ?? "";
+            const money = (c: number) => formatMoney(Math.abs(c), currency);
             // What is still owed, and what goes back (online, or from the
             // till for what was paid by hand). An API before the audit of
             // 6 Oct 2026 sends only `settleCents`.
@@ -336,12 +356,12 @@ export function useKitchen({
                     // The edit stands and the money is still owed; asking
                     // for it online didn't start. Nothing was lost.
                     showWarning(
-                        `Saved. ${money(due)} more is due.`,
+                        `Order saved. ${money(due)} more is due.`,
                         `It couldn't be asked for online: ${d.moneyError} ${record}`,
                     );
                 } else {
                     showSuccess(
-                        `Saved. ${money(due)} more is due.`,
+                        `Order saved. ${money(due)} more is due.`,
                         d.online === false ? record : undefined,
                     );
                 }
@@ -352,18 +372,18 @@ export function useKitchen({
                 );
             } else if (fromTill > 0 && online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
                 );
             } else if (fromTill > 0) {
                 showSuccess(
-                    `Saved. Give ${money(fromTill)} back from the till.`,
+                    `Order saved. Give ${money(fromTill)} back from the till.`,
                 );
             } else if (online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}.`,
                 );
             } else {
-                showSuccess("Saved.");
+                showSuccess("Order saved.");
             }
             refresh();
         });
@@ -375,7 +395,10 @@ export function useKitchen({
      */
     const recordPayment = (kind: CounterPayment) => {
         startTransition(async () => {
-            const res = await recordPaymentAction(order.id, kind);
+            const res = await runAction(() =>
+                recordPaymentAction(order.id, kind),
+            );
+            if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
                 refresh();
@@ -388,7 +411,7 @@ export function useKitchen({
                       ? "by UPI"
                       : "by card";
             showSuccess(
-                `${formatMoney(res.data.amountCents, currency) ?? ""} recorded, paid ${how}.`,
+                `${formatMoney(res.data.amountCents, currency)} recorded, paid ${how}.`,
                 "Nothing more is due on the order.",
             );
             refresh();

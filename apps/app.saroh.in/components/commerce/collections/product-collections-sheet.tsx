@@ -2,11 +2,12 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
+import { CheckRow } from "@/components/shared/check-row";
+import { runAction } from "@/lib/api/run-action";
 import { saveProductCollections } from "@/lib/collections/actions";
 import type { MembershipRow } from "@/lib/collections/rules";
 import { membershipRows, pickedIds, sameList } from "@/lib/collections/rules";
@@ -51,27 +52,21 @@ export function ProductCollectionsSheet({
     async function save() {
         // The hand-picked set as it was, for Undo to put back.
         const previous = pickedIds(start, all);
-        setSaving(true);
-        const res = await saveProductCollections(
-            productId,
-            pickedIds(rows, all),
+        const res = await runAction(
+            () => saveProductCollections(productId, pickedIds(rows, all)),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Its collections weren't saved.", res.error);
             return;
         }
         onOpenChange(false);
         router.refresh();
-        showUndo("Collections saved.", () => {
-            void saveProductCollections(productId, previous).then((undo) => {
-                if (!undo.ok)
-                    showError(
-                        "Couldn't undo. The saved collections stay.",
-                        undo.error,
-                    );
-                router.refresh();
-            });
+        showUndo("Collections saved.", async () => {
+            const undo = await saveProductCollections(productId, previous);
+            router.refresh();
+            return undo;
         });
     }
 
@@ -82,12 +77,12 @@ export function ProductCollectionsSheet({
             productName={productName}
             title="Edit collections"
             moreLink={{
-                href: "/commerce/products?view=collections",
+                href: "/commerce/products?tab=collections",
                 label: "All collections",
             }}
             dirty={dirty}
             saving={saving}
-            onSave={() => void save()}
+            onSave={save}
         >
             {rows.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
@@ -97,41 +92,25 @@ export function ProductCollectionsSheet({
             ) : (
                 <div className="flex flex-col gap-2">
                     {rows.map((r) => (
-                        <button
+                        <CheckRow
                             key={r.id}
-                            type="button"
-                            role="checkbox"
-                            aria-checked={r.on}
-                            aria-disabled={r.locked}
-                            onClick={() => {
-                                if (r.locked) return;
+                            checked={r.on}
+                            disabled={r.locked}
+                            onChange={(on) =>
                                 setRows((had) =>
                                     had.map((x) =>
-                                        x.id === r.id ? { ...x, on: !x.on } : x,
+                                        x.id === r.id ? { ...x, on } : x,
                                     ),
-                                );
-                            }}
+                                )
+                            }
                             className={cn(
-                                "flex w-full items-start gap-2.5 rounded-[9px] border border-border px-3 py-2.5 text-left text-foreground coarse:min-h-11",
+                                "w-full items-start gap-2.5 rounded-[9px] border border-border px-3 py-2.5 text-foreground",
                                 r.locked
-                                    ? "cursor-not-allowed bg-disabled"
+                                    ? "bg-disabled"
                                     : "bg-card hover:bg-muted",
                             )}
+                            boxClassName="mt-px"
                         >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "mt-px flex size-4 shrink-0 items-center justify-center rounded-[4px]",
-                                    r.on
-                                        ? "bg-foreground text-background"
-                                        : "border-[1.5px] border-border-strong bg-card",
-                                    r.locked && r.on && "bg-muted-foreground",
-                                )}
-                            >
-                                {r.on ? (
-                                    <Check className="size-3" strokeWidth={3} />
-                                ) : null}
-                            </span>
                             <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-semibold">
                                     {r.name}
@@ -140,7 +119,7 @@ export function ProductCollectionsSheet({
                                     {r.note}
                                 </span>
                             </span>
-                        </button>
+                        </CheckRow>
                     ))}
                 </div>
             )}

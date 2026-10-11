@@ -1,7 +1,5 @@
+import { count, plural } from "@/lib/format/plural";
 import type { ContactRemoval, RemovalPreview } from "./service";
-
-const count = (n: number, one: string, many: string) =>
-    `${n} ${n === 1 ? one : many}`;
 
 /** "Asha Rao deleted, with 2 leads, 1 subscription and 1 class pack". */
 export function deletedLine(name: string, data: ContactRemoval): string {
@@ -19,7 +17,7 @@ export function deletedLine(name: string, data: ContactRemoval): string {
             : `, with ${went.length === 1 ? went[0] : `${went.slice(0, -1).join(", ")} and ${went.at(-1)}`}`;
     const cancelled =
         data.bookingsCancelled > 0
-            ? `. ${count(data.bookingsCancelled, "booking", "bookings")} still to come ${data.bookingsCancelled === 1 ? "was" : "were"} cancelled`
+            ? `. ${count(data.bookingsCancelled, "booking", "bookings")} still to come ${plural(data.bookingsCancelled, "was", "were")} cancelled`
             : "";
     return `${name} deleted${withWhat}${cancelled}`;
 }
@@ -138,13 +136,13 @@ export function removalBody(p: Pick<RemovalPreview, "goes" | "stays">): string {
     const { orders } = p.stays;
     if (orders > 0) {
         parts.push(
-            `Their ${count(orders, "order", "orders")} ${orders === 1 ? "stays" : "stay"} in Orders as “Removed customer”, so your totals and records stay right.`,
+            `Their ${count(orders, "order", "orders")} ${plural(orders, "stays", "stay")} in Orders as “Removed customer”, so your totals and records stay right.`,
         );
     }
     const { bookingsCancelled } = p.goes;
     if (bookingsCancelled > 0) {
         parts.push(
-            `Their ${count(bookingsCancelled, "booking", "bookings")} still to come ${bookingsCancelled === 1 ? "is" : "are"} cancelled.`,
+            `Their ${count(bookingsCancelled, "booking", "bookings")} still to come ${plural(bookingsCancelled, "is", "are")} cancelled.`,
         );
     }
     if (p.goes.autopay > 0) {

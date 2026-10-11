@@ -20,6 +20,16 @@
   `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS` and
   `PAYMENTS_ENC_KEY` are validated by the API and missing from its examples.
 
+- **Current** — **A build-time switch that hides something is off when
+  unset.** `NEXT_PUBLIC_TEMPLATES` (DEC-135) shows templates only when it is
+  `on`, so production hides them by leaving it out and a misspelled value
+  never shows them. Unset counts as on only where
+  `env.NODE_ENV === "development"` (`next dev`). Such a switch is set in the
+  development `vars` of the app's `wrangler.jsonc`, CI's browser-test env and
+  `scripts/prepush.sh`, declared in `turbo.json`, and listed in
+  `ENVIRONMENT.md`. It hides a feature and protects nothing: what must stay
+  private needs the API's flag (below).
+
 ## A missing production variable fails loudly — **Current**
 
 A fallback to a production address hides a missing variable: the deployment
@@ -113,3 +123,13 @@ hot-reload hygiene and protects nothing.
   `docs/architecture/RLS_ROLLOUT_AND_OPS.md`.
 - **Adopted** — **Every flag has a deletion plan and a count of its readers,**
   written where it is declared. Gap: none of the keys in `flags.ts` has one.
+- **Current** — **A switch that only hides a screen is a `NEXT_PUBLIC_*`
+  enum, `on` or `off`, where only `on` shows it.** Unset is off, so the
+  environment that leaves it out is the one that hides. It is validated in the
+  app's `env.ts`, read through one small module that everything else asks,
+  set to `on` in the development `vars` of `wrangler.jsonc`, on CI's browser
+  stack (`ci.yml`), in `scripts/prepush.sh` and in the app's `dev` script,
+  and declared in `turbo.json`. Its module says how it is removed and who
+  reads it. It protects nothing: the API half is still the flag. The
+  workspace's plans are the worked example (`NEXT_PUBLIC_PLANS`,
+  `lib/saroh-billing/plans-shown.ts`, DEC-136).

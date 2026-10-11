@@ -7,11 +7,13 @@ import {
     CalendarClock,
     Clock,
     CreditCard,
+    Download,
     Globe,
     Home,
     KanbanSquare,
     LayoutGrid,
     Link2,
+    QrCode,
     ReceiptText,
     SlidersHorizontal,
     Store,
@@ -23,6 +25,7 @@ import {
 import { mayAddWebsite } from "@/lib/business-limits";
 import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -107,7 +110,24 @@ export type NavAction =
     | "course:read"
     | "pack:read"
     | "pack:sell"
-    | "pack:write";
+    | "pack:write"
+    // "New service" and "New location" in the command menu make one too:
+    // the API asks these of the write, so the palette asks them of the row.
+    | "service:write"
+    | "store:create"
+    // The command menu's daily starts (10 Oct 2026): New order, New
+    // booking, New product, New customer and New discount code, each
+    // asked the permission the API asks of that write.
+    | "order:create"
+    | "booking:write"
+    | "store:write"
+    | "contact:write"
+    | "discount:write"
+    // Settings › Plan and billing: what Saroh costs the business and its
+    // invoices. Owner and Admin by default, as the API has it; changing the
+    // plan is `billing:manage`, the Owner's alone, which the page asks
+    // (`plan-access.ts`).
+    | "billing:read";
 
 /**
  * Role → what it may reach here.
@@ -145,8 +165,16 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:write",
         "pack:sell",
         "pack:write",
+        "service:write",
+        "store:create",
+        "order:create",
+        "booking:write",
+        "store:write",
+        "contact:write",
+        "discount:write",
         "lead:read",
         "pipeline:read",
+        "billing:read",
     ],
     ADMIN: [
         "org:read",
@@ -174,8 +202,16 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "course:write",
         "pack:sell",
         "pack:write",
+        "service:write",
+        "store:create",
+        "order:create",
+        "booking:write",
+        "store:write",
+        "contact:write",
+        "discount:write",
         "lead:read",
         "pipeline:read",
+        "billing:read",
     ],
     MEMBER: [
         "org:read",
@@ -324,7 +360,7 @@ export interface NavGroup {
      *
      * It was pinned once before, then only ruled, because the gap above it
      * read as a rendering fault on a rail with twelve destinations. It is
-     * pinned again by choice (2026-09-25): Workspace sits at the bottom, where
+     * pinned again by choice (2026-09-25): Manage sits at the bottom, where
      * account-level things live, apart from running the business. The space
      * above it is a flexible spacer, never less than the old 10px, so a rail
      * too long for the window scrolls with the rule still in place.
@@ -457,7 +493,7 @@ export const NAV_GROUPS: NavGroup[] = [
                     },
                     {
                         href: "/commerce/discounts",
-                        label: "Discounts",
+                        label: "Discount codes",
                         action: "discount:read",
                     },
                     {
@@ -599,7 +635,7 @@ export const NAV_GROUPS: NavGroup[] = [
         // appears here when it has a route.
     },
     {
-        label: "Workspace",
+        label: "Manage",
         pinToBottom: true,
         items: [
             /*
@@ -688,7 +724,15 @@ export function navGroupsWithSites(
     groups: readonly NavGroup[],
     sites: readonly { id: string; name: string }[],
     role: NavRole | null = null,
+    /**
+     * The permissions the API resolved for this person. A role the business
+     * made is judged by what was ticked for it, never by the built-in it maps
+     * to: one ticked `site:create` is offered "New site", and one without it
+     * is not offered a row that ends in a refusal.
+     */
+    actions: readonly string[] | null = null,
 ): NavGroup[] {
+    const actor = { role, actions };
     /*
      * What a site holds depends on what this person came to do with it.
      *
@@ -699,7 +743,7 @@ export function navGroupsWithSites(
      * not a dead link: it opens, and then says they cannot change anything. A
      * rail that lists it promises otherwise.
      */
-    const mayAuthor = navRoleCan(role, "section:write");
+    const mayAuthor = navCan(actor, "section:write");
     const rowsFor = (siteId: string): NavChild[] =>
         mayAuthor
             ? [
@@ -738,7 +782,7 @@ export function navGroupsWithSites(
                     // merchant going to the list page to find the button. Only
                     // for a role that may actually make one, and only while
                     // the business has no website yet (ADR-006).
-                    ...(navRoleCan(role, "site:create") &&
+                    ...(navCan(actor, "site:create") &&
                     mayAddWebsite(sites.length)
                         ? [
                               {
@@ -956,7 +1000,9 @@ export function navFor({
 }): NavGroup[] {
     const tracked = filterNavGroupsByRole(
         filterNavGroups(
-            sites ? navGroupsWithSites(NAV_GROUPS, sites, role) : NAV_GROUPS,
+            sites
+                ? navGroupsWithSites(NAV_GROUPS, sites, role, actions)
+                : NAV_GROUPS,
             moduleKeys,
         ),
         role,
@@ -1112,11 +1158,16 @@ export function isNavSectionActive(
     );
 }
 
+/** Settings › Plan and billing, hidden while plans aren't shown. */
+const PLAN_PAGE_HREF = "/settings/billing";
+
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
  * everyone signed in may (Your profile is about the person, not the
- * business). `ownerOnly` narrows it further to the business's owner, by role:
- * a plan and its invoices are the owner's to see, as the design has it.
+ * business). `ownerOnly` narrows it further to the business's owner, by role,
+ * where the API does too ("Your data", DEC-120). Plan and billing is not one
+ * of those: the API reads it to `billing:read`, which an Admin holds, and
+ * the tab follows the API (10 Oct 2026).
  */
 export interface SettingsPage {
     href: string;
@@ -1129,8 +1180,10 @@ export interface SettingsPage {
 
 /**
  * The settings screen's tabs, in the design's order (2026-09-25): the
- * business, who is on it, what it runs, what Saroh costs it, you, who
- * changed what, and the services behind it. The settings layout draws them as vertical tabs and the
+ * business, who is on it, what it runs, what Saroh costs it, you, what
+ * it hands customers to scan (Share, 2026-10-10: after Your profile, so
+ * `/settings` still opens Your profile for someone who reaches nothing else
+ * of the business's), who changed what, and the services behind it. The settings layout draws them as vertical tabs and the
  * command menu lists them, each only for an actor who may open it.
  */
 export const SETTINGS_PAGES = [
@@ -1160,14 +1213,22 @@ export const SETTINGS_PAGES = [
         label: "Plan and billing",
         description: "What Saroh costs and your invoices",
         icon: CreditCard,
-        action: "org:settings:read",
-        ownerOnly: true,
+        action: "billing:read",
     },
     {
         href: "/settings/profile",
         label: "Your profile",
-        description: "Your login and the alerts you get",
+        description: "Your sign-in and the alerts you get",
         icon: UserRound,
+    },
+    {
+        href: "/settings/share",
+        label: "Share",
+        description: "QR codes for the counter and your cards",
+        icon: QrCode,
+        // Whoever may see the website may see its codes; making and
+        // changing one is `site:update`, which the page and the API judge.
+        action: "site:read",
     },
     {
         href: "/settings/activity",
@@ -1185,6 +1246,16 @@ export const SETTINGS_PAGES = [
         icon: Link2,
         action: "provider:read",
     },
+    {
+        // "Download your data" (DEC-120): the owner's alone, by role, as
+        // the API has it. Last, after everything the business runs on.
+        href: "/settings/data",
+        label: "Your data",
+        description: "Download everything as one file",
+        icon: Download,
+        action: "org:settings:read",
+        ownerOnly: true,
+    },
 ] as const satisfies readonly SettingsPage[];
 
 /**
@@ -1193,11 +1264,16 @@ export const SETTINGS_PAGES = [
  * The action as `navCan` judges it, and for an owner-only page the role too.
  * A null role is "we do not know yet" and fails open, as everywhere in the
  * nav: the page itself still refuses anyone who is not the owner.
+ *
+ * Plan and billing is nobody's while plans aren't shown (DEC-136): the
+ * tabs, `/settings`, the command menu and Settings search all ask here, so
+ * it leaves them together, and its address is a 404.
  */
 export function mayOpenSettingsPage(
     actor: { role: NavRole | null; actions?: readonly string[] | null },
     page: SettingsPage,
 ): boolean {
+    if (page.href === PLAN_PAGE_HREF && !plansShown()) return false;
     if (page.action && !navCan(actor, page.action)) return false;
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
         return false;

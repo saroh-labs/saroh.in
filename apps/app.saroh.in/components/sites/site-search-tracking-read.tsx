@@ -10,11 +10,13 @@ import {
 } from "@/components/sites/search-tracking/parts";
 import type { TrackerStanding } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerRow } from "@/components/sites/search-tracking/tracker-row";
+import { VerificationCodes } from "@/components/sites/search-tracking/verification-codes";
 import { VerifyAddress } from "@/components/sites/search-tracking/verify-address";
 import type { SearchTrackingRead } from "@/lib/sites/search-tracking";
 import { PRIVACY_NOTE, VERIFICATION_WORDS } from "@/lib/sites/search-tracking";
 import type { SiteAddress } from "@/lib/sites/share-links";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * "Search and tracking" for someone who may see the site and not change it
@@ -54,33 +56,14 @@ export function SiteSearchTrackingRead({
             </p>
             {view.switchedOff ? <SwitchedOffNotice /> : null}
 
-            <Block title="Verify your site">
-                <VerifyAddress address={address} />
-                {VERIFICATION_SERVICES.map((service) => {
-                    const code = view.verifications[service];
-                    return (
-                        <LineRow
-                            key={service}
-                            label={VERIFICATION_WORDS[service].label}
-                        >
-                            {code ? (
-                                <span className="font-mono">{code}</span>
-                            ) : (
-                                <span className="text-muted-foreground">
-                                    Not set
-                                </span>
-                            )}
-                        </LineRow>
-                    );
-                })}
-            </Block>
-
             <Block title="Your trackers">
                 {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
                 {view.trackers.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">
-                        No trackers connected yet.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        className="px-4 py-3"
+                        title="No trackers connected yet."
+                    />
                 ) : (
                     TRACKER_KINDS.filter((k) => byKind.has(k)).map((kind) => (
                         <TrackerRow
@@ -100,6 +83,33 @@ export function SiteSearchTrackingRead({
                     )}
                 </LineRow>
             </Block>
+
+            <VerificationCodes
+                services={VERIFICATION_SERVICES}
+                added={
+                    VERIFICATION_SERVICES.filter((s) => view.verifications[s])
+                        .length
+                }
+            >
+                <VerifyAddress address={address} />
+                {VERIFICATION_SERVICES.map((service) => {
+                    const code = view.verifications[service];
+                    return (
+                        <LineRow
+                            key={service}
+                            label={VERIFICATION_WORDS[service].label}
+                        >
+                            {code ? (
+                                <span className="font-mono">{code}</span>
+                            ) : (
+                                <span className="text-muted-foreground">
+                                    Not set
+                                </span>
+                            )}
+                        </LineRow>
+                    );
+                })}
+            </VerificationCodes>
         </SearchTrackingFrame>
     );
 }

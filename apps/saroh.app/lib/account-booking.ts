@@ -1,5 +1,7 @@
 import type { SignedInBookRequest } from "@saroh/site-blocks";
 
+import { qrSourceTag } from "./qr-resolve";
+
 /**
  * The body the signed-in booking sends the API (round-2 plan A, A9), built
  * from what the page asked for — an allow-list, since a server action's
@@ -81,5 +83,8 @@ export function accountBookingBody(
     }
     const bookerPhone = text(r.bookerPhone, 24);
     if (bookerPhone && PHONE.test(bookerPhone)) body.bookerPhone = bookerPhone;
+    // The tag of the QR code whose scan opened the page, if it is one.
+    const source = qrSourceTag(r.source);
+    if (source) body.source = source;
     return body;
 }

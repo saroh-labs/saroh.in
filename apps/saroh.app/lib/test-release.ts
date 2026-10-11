@@ -7,6 +7,8 @@ import { env } from "@/env";
 import { modulePageStatesOf } from "@/lib/module-pages";
 import { servedHost } from "@/lib/origin";
 import { classifySiteHost } from "@/lib/site-host-mode";
+import type { SiteIcon } from "@/lib/site-icon";
+import { siteIconOf } from "@/lib/site-icon";
 import { relayFor, SITE_RELAY_HEADER } from "@/lib/site-relay";
 import { TEST_RELEASE_HEADER } from "@/lib/test-host";
 import { serverApiUrl } from "./api-url";
@@ -52,6 +54,8 @@ export type TestReleaseLookup =
           /** The REAL site's id: every live read (shop, booking) keys on it. */
           siteId: string;
           modules: ModulePageStates | null;
+          /** The icon the release shows (DEC-124); null for the plain tile. */
+          icon: SiteIcon | null;
           release: TestReleaseInfo;
           /** The live site's address; null if it has never been published. */
           liveUrl: string | null;
@@ -140,6 +144,7 @@ export async function fetchTestRelease(
         snapshot?: unknown;
         siteId?: string;
         modules?: unknown;
+        icon?: unknown;
         release?: unknown;
         liveUrl?: unknown;
     } | null;
@@ -157,6 +162,7 @@ export async function fetchTestRelease(
         snapshot: body.snapshot,
         siteId: body.siteId,
         modules: modulePageStatesOf(body.modules),
+        icon: siteIconOf(body.icon),
         release,
         liveUrl: safeUrl(body.liveUrl),
     };

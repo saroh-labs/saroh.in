@@ -7,7 +7,7 @@ import {
     requestOrigin,
     safeDestination,
 } from "./origins";
-import { sessionCookieDomain } from "./server";
+import { existingUserSignUpHook, sessionCookieDomain } from "./server";
 
 describe("origins", () => {
     it("matches a trusted *.saroh.in origin (with or without path)", () => {
@@ -156,7 +156,7 @@ describe("createAuthMiddleware", () => {
         expect(joined.headers.get("location")).toBe(
             "https://accounts.saroh.in/invite/abc123",
         );
-        // Every other path still goes to log in, with its way back.
+        // Every other path still goes to sign in, with its way back.
         const other = invite(
             fakeRequest({ href: "https://app.saroh.in/sites" }),
         );
@@ -480,5 +480,66 @@ describe("isJoinDestination — an invitee's sign-in (UX-029)", () => {
         expect(
             isJoinDestination("https://app.saroh.in/onboarding?invite=x"),
         ).toBe(false);
+    });
+});
+
+describe("existingUserSignUpHook: a sign-up for an address that has an account", () => {
+    it("tells the owner of the address, and nobody else", async () => {
+        const send = vi.fn();
+        await existingUserSignUpHook(send)({
+            user: { email: "asha@example.com" },
+        });
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledWith({ to: "asha@example.com" });
+    });
+
+    it("passes on the sign-up page's origin only when it is a trusted one", async () => {
+        // Pinned: the list comes from the environment the suite runs in.
+        vi.stubEnv("BETTER_AUTH_TRUSTED_ORIGINS", "https://accounts.saroh.in");
+        const send = vi.fn();
+        const from = (origin: string) =>
+            new Request("https://api.saroh.in/api/auth/sign-up/email", {
+                method: "POST",
+                headers: { origin },
+            });
+        const hook = existingUserSignUpHook(send);
+        await hook(
+            { user: { email: "asha@example.com" } },
+            from("https://accounts.saroh.in"),
+        );
+        await hook(
+            { user: { email: "asha@example.com" } },
+            from("https://evil.example"),
+        );
+        expect(send.mock.calls).toEqual([
+            [{ to: "asha@example.com", origin: "https://accounts.saroh.in" }],
+            [{ to: "asha@example.com" }],
+        ]);
+        vi.unstubAllEnvs();
+    });
+
+    it("does nothing when no sender is given", async () => {
+        await expect(
+            existingUserSignUpHook(undefined)({
+                user: { email: "asha@example.com" },
+            }),
+        ).resolves.toBeUndefined();
+    });
+
+    it("never lets a failed send change the sign-up's answer", async () => {
+        const logged = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const send = vi.fn().mockRejectedValue(new Error("smtp down"));
+        await expect(
+            existingUserSignUpHook(send)({
+                user: { email: "asha@example.com" },
+            }),
+        ).resolves.toBeUndefined();
+        // The address is not written to the log.
+        expect(JSON.stringify(logged.mock.calls)).not.toContain(
+            "asha@example.com",
+        );
+        logged.mockRestore();
     });
 });

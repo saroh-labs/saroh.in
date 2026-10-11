@@ -50,7 +50,7 @@ export const metadata = {
 const navbar = (
     <Navbar
         logo={<Wordmark suffix="Docs" />}
-        projectLink="https://github.com/saroh-io/saroh.io"
+        projectLink="https://github.com/saroh-labs/saroh.in"
     />
 );
 
@@ -62,7 +62,7 @@ const footer = (
         © {new Date().getFullYear()} Saroh ·{" "}
         <a href="https://saroh.in">saroh.in</a> ·{" "}
         <a href="https://help.saroh.in">Help centre</a> ·{" "}
-        <a href="https://github.com/saroh-io/saroh.io/blob/main/LICENSE.md">
+        <a href="https://github.com/saroh-labs/saroh.in/blob/main/LICENSE.md">
             Licence
         </a>
     </Footer>
@@ -103,7 +103,7 @@ export default async function RootLayout({ children }) {
                     navbar={navbar}
                     footer={footer}
                     pageMap={await getPageMap()}
-                    docsRepositoryBase="https://github.com/saroh-io/saroh.io/tree/main/apps/docs.saroh.in"
+                    docsRepositoryBase="https://github.com/saroh-labs/saroh.in/tree/main/apps/docs.saroh.in"
                 >
                     {children}
                 </Layout>

@@ -27,7 +27,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             updateMany: jest.fn(),
         },
-        paymentAttempt: { create: jest.fn() },
+        // findFirst: whether a refunded payment is a mismatch's (PAY-06).
+        paymentAttempt: {
+            create: jest.fn(),
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
         paymentRefund: {
             findFirst: jest.fn(),
             // The credit note's read of a settled refund (E8): a booking's
@@ -507,7 +511,11 @@ describe("webhook refund on an invoice intent", () => {
             providerRefundId: "rfnd_1",
             paymentIntent: { orderId: null },
         };
-        refundFindFirst.mockResolvedValueOnce({ id: "rf_1" });
+        // Asked twice: whether it is a mismatch's refund (PAY-06, no key:
+        // it isn't), then by the invoice's own refund path.
+        refundFindFirst
+            .mockResolvedValueOnce({ id: "rf_1" })
+            .mockResolvedValueOnce({ id: "rf_1" });
         refundFindUnique.mockResolvedValueOnce(row);
         const raw = bodyOf({
             eventType: "refund.processed",
@@ -525,7 +533,9 @@ describe("webhook refund on an invoice intent", () => {
         });
 
         refundUpdate.mockClear();
-        refundFindFirst.mockResolvedValueOnce({ id: "rf_1" });
+        refundFindFirst
+            .mockResolvedValueOnce({ id: "rf_1" })
+            .mockResolvedValueOnce({ id: "rf_1" });
         refundFindUnique.mockResolvedValueOnce({ ...row, status: "SUCCEEDED" });
         expect(
             await deliver(

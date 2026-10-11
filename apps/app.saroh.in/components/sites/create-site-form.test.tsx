@@ -141,4 +141,25 @@ describe("the template picker (K15)", () => {
         expect(html).not.toContain("(optional)");
         // Radix draws the picked name only once hydrated; e2e reads it.
     });
+
+    it("with the template choice switched off, shows no template to pick or name (DEC-135)", () => {
+        const html = renderToStaticMarkup(
+            <CreateSiteForm
+                templates={templates}
+                choice={false}
+                defaults={{ siteName: "Asha Rao Studio", address: "asha" }}
+                defaultTemplateId="portfolio"
+                startTemplateId="writing"
+                suggested={["portfolio", "writing"]}
+            />,
+        );
+        expect(html).not.toMatch(/template/i);
+        for (const t of templates) expect(html).not.toContain(t.name);
+        expect(html).toContain(
+            "Your site starts with pages for what you&#x27;re setting up.",
+        );
+        // The rest of the form is as before.
+        expect(html).toContain('value="asha"');
+        expect(html).toContain("Create site");
+    });
 });

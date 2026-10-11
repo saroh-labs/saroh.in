@@ -1,4 +1,6 @@
 import { cn } from "../../lib/utils";
+import type { BusinessReach } from "../../reach-links";
+import { ReachLinks } from "../../reach-links";
 import { card, focusRing } from "../styles";
 
 /**
@@ -13,6 +15,7 @@ export function ExpiredCard({
     when,
     business,
     checkoutPaid = false,
+    reach = null,
     headingRef,
     onAgain,
 }: {
@@ -20,6 +23,8 @@ export function ExpiredCard({
     business: string;
     /** The provider's window had closed on a payment. */
     checkoutPaid?: boolean;
+    /** How to get in touch about money that left: a call, a message. */
+    reach?: BusinessReach | null;
     headingRef: React.RefObject<HTMLHeadingElement | null>;
     onAgain: () => void;
 }) {
@@ -37,6 +42,9 @@ export function ExpiredCard({
                     ? `${when} went back on the calendar before your payment was confirmed. If money left your account, get in touch with ${business} and they can refund it.`
                     : `${when} wasn't paid for within 15 minutes, so it went back on the calendar. Nothing was charged.`}
             </p>
+            {checkoutPaid ? (
+                <ReachLinks reach={reach} className="mt-1" />
+            ) : null}
             <button
                 type="button"
                 onClick={onAgain}

@@ -91,7 +91,7 @@ steps:
                 mono: true,
             }
     # WORDS: lastUpdateLine(), "Last payment update from Razorpay: just now."
-    # and "No payment updates received yet — check the webhook in Razorpay."
+    # and "No payment updates received yet. Check the webhook in Razorpay."
     # ROWS: the "Connected" pill. SETUP: a connected provider's button is "Save keys".
     - title: Check that payment updates arrive
       body: "Make a test payment, such as a booking deposit or an invoice's pay link. Razorpay's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook and the secret match. When you're ready, enter your live keys and add the same webhook in Razorpay's live mode."
@@ -112,7 +112,7 @@ faq:
     # SECRET: Saroh checks the signature before believing a webhook.
     - q: Why do I need a webhook?
       a: "It's how Razorpay tells Saroh a payment went through, failed or was refunded. Saroh checks each message's signature with your webhook signing secret before believing it. Without the webhook, a customer who paid would stay 'Awaiting payment'."
-    # ROWS: "Needs its webhook signing secret — payments can't be confirmed
+    # ROWS: "Needs its webhook signing secret. Payments can't be confirmed
     # until you add it." with the button "Add webhook secret".
     - q: What if Saroh says the webhook signing secret is missing?
       a: "Razorpay's row in Settings › Providers shows Add webhook secret. Press it and enter your keys again with the same secret you set in Razorpay's webhook. Keys can't be read back once saved, so they're entered again too."

@@ -1,11 +1,12 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { listTable } from "@/components/shared/list-toolbar";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { ProductDetail } from "@/lib/products/service";
 import type {
     ProductStock,
@@ -13,17 +14,21 @@ import type {
     SizeStock,
 } from "@/lib/stock/product-stock";
 import { shelfName, warnsAt } from "@/lib/stock/product-stock";
+import { TextLink } from "@saroh/ui/text-link";
 
-/** The design's pills: in stock green, "Only N left" saffron, short or sold out red. */
+/** In stock green, "Only N left" the warning tint, short or sold out red. */
 export const TONE_BADGE: Record<
     ShelfTone,
-    "success" | "draft" | "error" | "neutral"
+    "success" | "warning" | "error" | "neutral"
 > = {
     ok: "success",
-    low: "draft",
+    low: "warning",
     bad: "error",
     muted: "neutral",
 };
+
+/** The card's own gutter, which its title and footnote keep too. */
+const GUTTER = "px-[18px]";
 
 const GRID =
     "grid grid-cols-[minmax(130px,1.4fr)_64px_68px_72px_68px_minmax(112px,1fr)] gap-2";
@@ -69,7 +74,9 @@ export function StockTable({
                 <div
                     ref={box}
                     onScroll={measure}
-                    className="overflow-x-auto px-[18px] pb-1"
+                    // No side padding here: it is each row's own, so the
+                    // head band and the row rules run edge to edge.
+                    className="overflow-x-auto pb-1"
                 >
                     <div
                         className="min-w-[540px]"
@@ -78,10 +85,8 @@ export function StockTable({
                     >
                         <div
                             role="row"
-                            className={cn(
-                                GRID,
-                                "border-b border-border pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
-                            )}
+                            data-list-head=""
+                            className={cn(GRID, listTable.head, GUTTER)}
                         >
                             <span role="columnheader">
                                 {product.option?.name ?? "Size"}
@@ -120,9 +125,10 @@ export function StockTable({
                                         }
                                         className={cn(
                                             GRID,
-                                            "-mx-1.5 items-center rounded-md px-1.5 py-[11px] text-[13px]",
-                                            open &&
-                                                "cursor-pointer hover:bg-muted/60",
+                                            GUTTER,
+                                            "items-center py-[11px] text-[13px]",
+                                            open && listTable.wash,
+                                            open && listTable.pressable,
                                         )}
                                     >
                                         <span
@@ -142,7 +148,6 @@ export function StockTable({
                                                     {t.title}
                                                     <ChevronRight
                                                         aria-hidden
-                                                        strokeWidth={2.2}
                                                         className="size-3 text-muted-foreground"
                                                     />
                                                 </button>
@@ -209,6 +214,7 @@ export function StockTable({
                                                   role="row"
                                                   className={cn(
                                                       GRID,
+                                                      GUTTER,
                                                       "items-center pb-[9px] text-[12.5px] text-neutral-700 dark:text-muted-foreground",
                                                   )}
                                               >
@@ -240,14 +246,13 @@ export function StockTable({
                                                       className="text-right tabular-nums"
                                                   >
                                                       {shelf.promised > 0 ? (
-                                                          <Link
+                                                          <TextLink
                                                               href={ordersHref}
                                                               scroll={false}
-                                                              aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
-                                                              className="rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                              aria-label={`${shelf.promised} promised to open ${shelf.name} orders, open them`}
                                                           >
                                                               {shelf.promised}
-                                                          </Link>
+                                                          </TextLink>
                                                       ) : (
                                                           <span className="text-muted-foreground">
                                                               0
@@ -285,6 +290,7 @@ export function StockTable({
                             role="row"
                             className={cn(
                                 GRID,
+                                GUTTER,
                                 "items-center pb-3 pt-[11px] text-[12.5px] text-muted-foreground",
                             )}
                         >
@@ -391,7 +397,7 @@ export function StockCards({
                         className={cn(
                             "relative -mx-1.5 flex items-start gap-2 rounded-md border-b border-border px-1.5 py-3",
                             open &&
-                                "transition-colors hover:bg-muted/60 active:bg-muted",
+                                "transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
                         )}
                     >
                         <div className="grid min-w-0 flex-1 gap-1">
@@ -462,8 +468,8 @@ export function StockCards({
                                                     <Link
                                                         href={ordersHref}
                                                         scroll={false}
-                                                        aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
-                                                        className="relative z-[1] inline-flex items-center rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                                        aria-label={`${shelf.promised} promised to open ${shelf.name} orders, open them`}
+                                                        className="relative z-[1] inline-flex items-center rounded-sm text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                                                     >
                                                         {shelf.promised}{" "}
                                                         promised
@@ -492,7 +498,6 @@ export function StockCards({
                         {open ? (
                             <ChevronRight
                                 aria-hidden
-                                strokeWidth={2.2}
                                 className="mt-1 size-3.5 flex-none text-muted-foreground"
                             />
                         ) : null}
@@ -511,12 +516,5 @@ export function StockCards({
 }
 
 export function ShelfBadge({ tone, text }: { tone: ShelfTone; text: string }) {
-    return (
-        <Badge
-            variant={TONE_BADGE[tone]}
-            className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-        >
-            {text}
-        </Badge>
-    );
+    return <StatusBadge tone={TONE_BADGE[tone]}>{text}</StatusBadge>;
 }

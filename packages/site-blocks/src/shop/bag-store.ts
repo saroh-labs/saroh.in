@@ -211,3 +211,23 @@ export function onOpenBag(open: () => void): () => void {
         openers.delete(open);
     };
 }
+
+// ── Saying the bag is open ─────────────────────────────────────────────────
+
+const shownListeners = new Set<() => void>();
+
+/** The header's bag says it has opened, however it was opened. */
+export function bagShown(): void {
+    shownListeners.forEach((heard) => heard());
+}
+
+/**
+ * Hear the bag open. "Added to your bag · View bag" listens: over an open
+ * bag it covered Place order and offered what was already on screen.
+ */
+export function onBagShown(heard: () => void): () => void {
+    shownListeners.add(heard);
+    return () => {
+        shownListeners.delete(heard);
+    };
+}

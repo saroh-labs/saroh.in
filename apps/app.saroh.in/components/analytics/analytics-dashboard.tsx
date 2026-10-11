@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format/money";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -6,13 +7,15 @@ import type {
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
+import { ordersHref } from "@/lib/analytics/takings-words";
 import {
     dayReadout,
     dayTick,
+    ordersLine,
     pageTitle,
     tickEvery,
 } from "@/lib/analytics/website-words";
-import { NUMBER_LOCALE } from "@/lib/format/locale";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import type { ReadoutBar } from "./readout-bars";
 import { ReadoutBars } from "./readout-bars";
@@ -39,17 +42,17 @@ function Tile({
 }) {
     const body = (
         <>
-            <span className="flex items-center justify-between gap-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground sm:text-[11px]">
+            <span className="label flex items-center justify-between gap-1 sm:text-[11px]">
                 {label}
                 {href ? (
                     <ChevronRight
                         aria-hidden
-                        className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                        className="size-3.5 shrink-0 opacity-60 transition-opacity duration-fast group-hover:opacity-100"
                     />
                 ) : null}
             </span>
             <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground sm:text-[22px]">
-                {value.toLocaleString(NUMBER_LOCALE)}
+                {formatNumber(value)}
             </span>
         </>
     );
@@ -58,7 +61,7 @@ function Tile({
     return href ? (
         <Link
             href={href}
-            className={`group ${shape} transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+            className={`group ${shape} transition-colors duration-base hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
         >
             {body}
         </Link>
@@ -82,7 +85,7 @@ function DailyVisits({ daily }: { daily: DailyPoint[] }) {
             max > 0 ? Math.max(2, Math.round((d.views / max) * 100)) : 2,
         tone:
             busiest?.date === d.date && d.views > 0
-                ? "bg-brand-700 dark:bg-brand-400"
+                ? "bg-foreground "
                 : "bg-neutral-700 dark:bg-neutral-300",
         readout: dayReadout(d),
         ...(i % wide === 0
@@ -99,9 +102,10 @@ function DailyVisits({ daily }: { daily: DailyPoint[] }) {
                 Tap a day to read its visits and visitors.
             </p>
             {daily.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    No visits recorded in this range yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No visits in this range yet."
+                />
             ) : (
                 <ReadoutBars
                     bars={bars}
@@ -122,9 +126,7 @@ function TopPages({ pages }: { pages: TopPage[] }) {
                 Pages people opened most
             </h3>
             {pages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    No page visits yet.
-                </p>
+                <EmptyState size="inline" title="No page visits yet." />
             ) : (
                 <ol className="divide-y divide-foreground/10">
                     {pages.map((p) => (
@@ -141,7 +143,7 @@ function TopPages({ pages }: { pages: TopPage[] }) {
                                 </span>
                             </span>
                             <span className="shrink-0 text-sm font-medium tabular-nums">
-                                {p.views.toLocaleString(NUMBER_LOCALE)}
+                                {formatNumber(p.views)}
                                 <span className="sr-only"> visits</span>
                             </span>
                         </li>
@@ -152,19 +154,41 @@ function TopPages({ pages }: { pages: TopPage[] }) {
     );
 }
 
-export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
+/** The days the website's figures cover, as the range buttons chose them. */
+export interface WebsiteRange {
+    /** First day, `YYYY-MM-DD`. */
+    from: string;
+    /** Last day (today), `YYYY-MM-DD`. */
+    to: string;
+    /** "30 days". */
+    label: string;
+}
+
+export function AnalyticsDashboard({
+    view,
+    range,
+}: {
+    view: AnalyticsView;
+    range: WebsiteRange;
+}) {
     const { summary, daily, topPages } = view;
+    const ordersNote = ordersLine({
+        orders: summary.orders,
+        from: range.from,
+        rangeLabel: range.label,
+    });
     return (
         // One column that may shrink: a grid item's min-content (thirty
         // day columns, a long page path) otherwise widened the page at 320px.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {/*
-             * No "Orders" tile here any more (DEC-075): it counted
-             * `order.paid` events, which nothing emits, so it read 0 beside
-             * the real orders the takings above count from Orders itself.
-             * Three across on a phone too (F11): three numbers, one row.
+             * Orders is back (#919, amending DEC-075): every payment writes
+             * `order.paid` since #867, net of full refunds. It isn't Sales'
+             * "Orders, 4 weeks" again: it covers the days the range buttons
+             * chose, beside the visits and enquiries of those same days.
+             * Two by two on a phone: four labels don't fit across 320px.
              */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-[11px]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-[11px]">
                 <Tile label="Visits" value={summary.siteViews} />
                 <Tile label="Visitors" value={summary.uniqueVisitors} />
                 <Tile
@@ -172,7 +196,20 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
                     value={summary.enquiries}
                     href="/leads"
                 />
+                <Tile
+                    label="Orders"
+                    value={summary.orders}
+                    href={ordersHref(range.from, range.to)}
+                />
             </div>
+            {ordersNote ? (
+                <p
+                    data-testid="website-orders-note"
+                    className="-mt-1 max-w-[68ch] text-[13px] leading-[1.5] text-muted-foreground"
+                >
+                    {ordersNote}
+                </p>
+            ) : null}
             <DailyVisits daily={daily} />
             <TopPages pages={topPages} />
         </div>

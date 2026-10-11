@@ -21,7 +21,7 @@ const FEATURES: readonly Omit<AlsoSellFeature, "on">[] = [
     {
         key: "COURSES",
         label: "Courses",
-        note: "A fixed run of dated sessions with seats — e.g. a 6-week programme.",
+        note: "A fixed run of dated sessions with seats, such as a 6-week programme.",
     },
     {
         key: "CLASS_PACKS",
@@ -52,6 +52,6 @@ export function alsoSellFeatures(
 /** What flipping one says. Only what is true today: the menu, and nothing sold lost. */
 export function alsoSellToast(label: string, turnedOn: boolean): string {
     return turnedOn
-        ? `${label} is on — it's in the Bookings menu now. Settings › Modules shows the same switch.`
-        : `${label} is off — it's gone from the Bookings menu, and nothing already sold changes. Settings › Modules shows the same switch.`;
+        ? `${label} is on. It's in the Bookings menu now. Settings › Modules shows the same switch.`
+        : `${label} is off. It's gone from the Bookings menu, and nothing already sold changes. Settings › Modules shows the same switch.`;
 }

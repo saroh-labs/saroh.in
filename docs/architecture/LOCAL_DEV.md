@@ -41,7 +41,7 @@ looks equivalent and is not:
 
 **Set `BETTER_AUTH_TRUSTED_ORIGINS` when you run the stack yourself.** Unset, it
 falls back to the `*.saroh.in` production list, so a return-to on a `.localhost`
-origin is correctly refused and sign-in lands on the app launcher instead of the
+origin is correctly refused and sign-in lands on the app's front door instead of the
 page asked for (#222). The root `.env.example` has the value; an ad-hoc `turbo run dev`
 with your own env does not inherit it. A second copy of the app under another
 portless name (a worktree's `customers-app.saroh`, say) must add its own origin
@@ -71,13 +71,27 @@ pnpm --filter @saroh/database db:seed        # "Northwind Supply"
 
 Sign in as the owner `demo@saroh.dev` / `demo-password-123`, or as
 `reviewer@saroh.dev` (same password) to see the Reviewer role — fixture values
-for a throwaway database, from `packages/database/src/seed/data.ts`. The seed lays down 24
+for a throwaway database, from `packages/database/src/seed/data.ts`. They
+are used only when the database is on this machine (localhost, as here and on
+CI); seeding any other database needs `SEED_PASSWORD` (12+ characters, kept
+out of the repo), and the seed refuses the documented one there
+(`seedPassword()`). The seed lays down 24
 contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 — enough for every operational surface to have something on it. Northwind has
 two storefronts: "Northwind Supply Store" (`seed_store`) and "Online"
 (`seed_store_online`), which sells six of the products from its own shelves
 (one low, one out) so Move stock has somewhere to go (#526). Northwind is the
 write sandbox; re-seeding counts every shelf back.
+
+Provider connections are stand-ins (`seed/stand-in-providers.ts`): the seed
+never writes a real credential, so their sealed keys are placeholders the API
+can't open. On this machine's database Northwind's Cashfree and Resend, and
+the showcase's Razorpay and Cashfree, read as CONNECTED so the browser specs
+and films can offer Pay now, make pay links and name email on Send — the
+specs stub the provider in the browser — but a real checkout there fails and
+an email sent through Northwind's own provider fails on every retry. On any
+other database (the dev environment's) the seed writes none, and removes one
+an earlier seed left; connect real test keys in Settings › Providers instead.
 
 ### Showcase (the product film's world)
 
@@ -218,7 +232,8 @@ for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
 
 #### Demo accounts
 
-Every account's password is `demo-password-123`, and every email is verified.
+Every account's password is `demo-password-123` on a local database (the
+`SEED_PASSWORD` you set anywhere else), and every email is verified.
 
 | Email                | Business and role                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

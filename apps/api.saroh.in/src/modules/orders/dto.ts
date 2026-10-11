@@ -10,6 +10,7 @@ import {
     IsString,
     IsUrl,
     Matches,
+    Max,
     MaxLength,
     Min,
     MinLength,
@@ -451,6 +452,20 @@ export class UpdateOrderDto {
     @IsOptional()
     @IsIn(PAYMENT_METHODS, { message: "Pick how it was handed back." })
     refundedHow?: PaymentMethod;
+
+    /**
+     * Recorded as refunded by hand, another amount (#865, DEC-116): what
+     * went back, in the order's currency ("50" or "49.50"). Absent: the
+     * full amount left. The API caps it at what is left to refund; less
+     * than that leaves the order PAID. Read only with `paymentStatus`
+     * REFUNDED.
+     */
+    @IsOptional()
+    @IsString({ message: "Type the amount handed back." })
+    @Matches(/^\d+(\.\d{1,2})?$/, {
+        message: "Type an amount like 50 or 49.50.",
+    })
+    refundAmount?: string;
 }
 
 /** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */
@@ -606,6 +621,20 @@ export class ListOrdersQuery {
     @IsString()
     @MaxLength(64)
     cursor?: string;
+
+    /** Or the page by its number, from 1 (a list with numbered pages). */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt({ message: "page must be a whole number" })
+    @Min(1)
+    @Max(100_000)
+    page?: number;
+
+    /** Rows per page: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn([10, 25, 50, 100], { message: "size is 10, 25, 50 or 100" })
+    size?: number;
 
     /**
      * "true": this page is read for Export (B16), which takes

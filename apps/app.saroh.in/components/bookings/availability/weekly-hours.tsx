@@ -1,7 +1,10 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { X } from "lucide-react";
 import { useState } from "react";
 
@@ -12,7 +15,6 @@ import {
     rangeRefusal,
     WEEK,
 } from "@/lib/services/availability-rules";
-import { clock } from "@/lib/services/diary";
 import { openingNote, whollyOutside } from "@/lib/services/in-person-hours";
 import type { WeeklyRange } from "@/lib/staff/types";
 
@@ -20,8 +22,9 @@ import { ClockSelect } from "./clock-select";
 
 /**
  * One person's week (the design's "Weekly hours"): each day's ranges as
- * chips, "+ Hours" to add one (an end before the start, or an overlap, is
- * refused on the spot), Monday copied to the weekdays, and — under any day —
+ * chips, "+ Hours" to add one in a small popover over the row, so no other
+ * day moves (an end before the start, or an overlap, is refused there and
+ * keeps it open), Monday copied to the weekdays, and — under any day —
  * the bookings the new hours would leave outside. They stay booked. With
  * opening hours set, hours outside them are drawn as not bookable in
  * person, and the day says why (DEC-087).
@@ -63,8 +66,8 @@ export function WeeklyHours({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         variant="outline"
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
                         onClick={() => {
                             const monday = dayRanges(hours, 1);
                             onChange([
@@ -107,7 +110,7 @@ export function WeeklyHours({
                                 {name}
                             </span>
                             <div className="flex min-w-0 flex-[1_1_240px] flex-wrap items-center gap-1.5">
-                                {!ranges.length && !open ? (
+                                {!ranges.length ? (
                                     <span className="text-[12.5px] text-muted-foreground">
                                         Not bookable
                                     </span>
@@ -127,12 +130,14 @@ export function WeeklyHours({
                                                 : "px-[11px]",
                                         )}
                                     >
-                                        {clock(r.startMinute)}–
-                                        {clock(r.endMinute)}
+                                        {formatClockRange(
+                                            r.startMinute,
+                                            r.endMinute,
+                                        )}
                                         {canEdit ? (
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${clock(r.startMinute)} to ${clock(r.endMinute)} on ${name}`}
+                                                aria-label={`Remove ${formatClockRange(r.startMinute, r.endMinute)} on ${name}`}
                                                 onClick={() =>
                                                     onChange(
                                                         hours.filter(
@@ -158,56 +163,11 @@ export function WeeklyHours({
                                         ) : null}
                                     </span>
                                 ))}
-                                {open ? (
-                                    <span className="inline-flex flex-wrap items-center gap-1.5">
-                                        <ClockSelect
-                                            label="From"
-                                            value={open.from}
-                                            onChange={(from) =>
-                                                setAdding({ ...open, from })
-                                            }
-                                        />
-                                        <span className="text-[12px] text-muted-foreground">
-                                            to
-                                        </span>
-                                        <ClockSelect
-                                            label="To"
-                                            upTo
-                                            value={open.to}
-                                            onChange={(to) =>
-                                                setAdding({ ...open, to })
-                                            }
-                                        />
-                                        <Button
-                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
-                                            disabled={Boolean(bad)}
-                                            onClick={() => {
-                                                if (bad) return;
-                                                onChange([
-                                                    ...hours,
-                                                    {
-                                                        dayOfWeek: day,
-                                                        startMinute: open.from,
-                                                        endMinute: open.to,
-                                                    },
-                                                ]);
-                                                setAdding(null);
-                                            }}
-                                        >
-                                            Add
-                                        </Button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setAdding(null)}
-                                            className="px-1 text-[12px] text-muted-foreground hover:text-foreground"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </span>
-                                ) : canEdit ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
+                                {canEdit ? (
+                                    <Popover
+                                        open={Boolean(open)}
+                                        onOpenChange={(o) => {
+                                            if (!o) return setAdding(null);
                                             const last = ranges.at(-1);
                                             const from = last
                                                 ? Math.min(
@@ -221,39 +181,124 @@ export function WeeklyHours({
                                                 to: Math.min(from + 180, 1440),
                                             });
                                         }}
-                                        className="h-[30px] rounded-full border border-dashed border-border-strong px-2.5 text-[12px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
                                     >
-                                        + Hours
-                                    </button>
+                                        <PopoverTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="h-[30px] rounded-full border border-dashed border-border-strong px-2.5 text-[12px] font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:h-11"
+                                            >
+                                                + Hours
+                                            </button>
+                                        </PopoverTrigger>
+                                        {open ? (
+                                            <PopoverContent
+                                                align="start"
+                                                collisionPadding={12}
+                                                aria-label={`Add hours on ${name}`}
+                                                className="w-auto max-w-[calc(100vw-1.5rem)] rounded-[12px] p-3"
+                                            >
+                                                <form
+                                                    onKeyDown={submitOnModEnter}
+                                                    className="grid gap-2.5"
+                                                    onSubmit={(e) => {
+                                                        e.preventDefault();
+                                                        if (bad) return;
+                                                        onChange([
+                                                            ...hours,
+                                                            {
+                                                                dayOfWeek: day,
+                                                                startMinute:
+                                                                    open.from,
+                                                                endMinute:
+                                                                    open.to,
+                                                            },
+                                                        ]);
+                                                        setAdding(null);
+                                                    }}
+                                                >
+                                                    <p className="text-[12.5px] font-semibold">
+                                                        Add hours on {name}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <ClockSelect
+                                                            label="From"
+                                                            value={open.from}
+                                                            onChange={(from) =>
+                                                                setAdding({
+                                                                    ...open,
+                                                                    from,
+                                                                })
+                                                            }
+                                                        />
+                                                        <span className="text-[12px] text-muted-foreground">
+                                                            to
+                                                        </span>
+                                                        <ClockSelect
+                                                            label="To"
+                                                            upTo
+                                                            value={open.to}
+                                                            onChange={(to) =>
+                                                                setAdding({
+                                                                    ...open,
+                                                                    to,
+                                                                })
+                                                            }
+                                                        />
+                                                    </div>
+                                                    {bad ? (
+                                                        <p
+                                                            role="alert"
+                                                            className="max-w-[16rem] text-pretty text-[12px] text-destructive-subtle-foreground"
+                                                        >
+                                                            {bad}
+                                                        </p>
+                                                    ) : null}
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            type="submit"
+                                                            disabled={Boolean(
+                                                                bad,
+                                                            )}
+                                                        >
+                                                            Add hours
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() =>
+                                                                setAdding(null)
+                                                            }
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                </form>
+                                            </PopoverContent>
+                                        ) : null}
+                                    </Popover>
                                 ) : null}
                             </div>
-                            {bad ? (
-                                <p
-                                    role="alert"
-                                    className="basis-full text-[12px] text-destructive-subtle-foreground"
-                                >
-                                    {bad}
-                                </p>
-                            ) : null}
                             {closedNote ? (
                                 <p className="basis-full text-[12px] text-muted-foreground">
                                     {closedNote}
                                 </p>
                             ) : null}
                             {out.length ? (
-                                <p className="basis-full text-[12px] text-brand-subtle-foreground">
+                                <p className="basis-full text-[12px] text-foreground">
                                     {out.length}{" "}
                                     {out.length === 1
                                         ? "booking this week falls"
                                         : "bookings this week fall"}{" "}
-                                    outside these hours —{" "}
+                                    outside these hours:{" "}
                                     {out
                                         .map(
                                             (b) =>
-                                                `${b.who.split(" ")[0]} ${clock(b.start)}`,
+                                                `${b.who.split(" ")[0]} ${formatClock(b.start)}`,
                                         )
                                         .join(", ")}
-                                    . They stay booked; move them if you need
+                                    . They stay booked. Move them if you need
                                     to.
                                 </p>
                             ) : null}

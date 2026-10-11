@@ -61,9 +61,11 @@ export interface AlertChange {
  * - **Rows** are offered only when the person's role reads what they are
  *   about (`ALERT_READS`) and the module they belong to is on for the
  *   business and rolled out to it (DEC-057: a module that is rolled out
- *   off is never named). The Website row also needs `SITE_TEST_RELEASES`:
- *   only a scheduled go-live raises it, and a business without test
- *   releases is not told of them.
+ *   off is never named). The Website row also needs `SITE_TEST_RELEASES`
+ *   (a scheduled go-live, a business without test releases is not told
+ *   of) or a verified custom domain of the business's own (#917: one that
+ *   stops working is told on it), so nobody hears on a row they can't
+ *   turn off.
  * - **Channels** are only what can deliver: the bell to someone who sees
  *   the inbox, email through the business's own connected provider
  *   (DEC-011), and WhatsApp never — Saroh keeps no WhatsApp number for a
@@ -199,17 +201,33 @@ export class NotificationPreferencesService {
                 ),
             ),
         );
-        const releases =
-            readable.includes("site") &&
-            (await this.flags.isEnabled(
-                FlagKey.SITE_TEST_RELEASES,
-                ctx.organizationId,
-            ));
+        const website =
+            readable.includes("site") && (await this.websiteRowOn(ctx));
         return readable.filter((e) => {
-            if (e === "site" && !releases) return false;
+            if (e === "site" && !website) return false;
             const module = ALERT_MODULE[e];
             return module === null || on.get(module) === true;
         });
+    }
+
+    /**
+     * Whether the Website row has anything to tell this business: test
+     * releases on (a scheduled go-live), or a verified custom domain
+     * (#917). The domain is asked only when the flag is off.
+     */
+    private async websiteRowOn(ctx: OrganizationContext): Promise<boolean> {
+        if (
+            await this.flags.isEnabled(
+                FlagKey.SITE_TEST_RELEASES,
+                ctx.organizationId,
+            )
+        ) {
+            return true;
+        }
+        const domains = await prisma.domain.count({
+            where: { organizationId: ctx.organizationId, status: "VERIFIED" },
+        });
+        return domains > 0;
     }
 
     /**

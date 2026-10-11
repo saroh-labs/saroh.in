@@ -124,7 +124,7 @@ describe("the sign-in email changed notice", () => {
         const html = siteEmailChangedEmail('Kavi <b>"Dental"</b>');
         expect(html).toContain("Kavi &lt;b&gt;&quot;Dental&quot;&lt;/b&gt;");
         expect(html).not.toContain("<b>");
-        expect(html).toContain("was just changed to another address");
+        expect(html).toContain("was changed to another address");
         expect(html).toContain("If you didn't make this change");
         expect(html).not.toMatch(/@/);
     });

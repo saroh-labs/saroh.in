@@ -170,6 +170,13 @@
   keys tie a membership's collection and product, and a collection's
   category, to one business. Archived products show in neither kind. A
   product merge (#530) moves its memberships.
+- **Current** — **A location uses the business logo unless it has its
+  own** (DEC-123). `Store.logo` and `Store.logoMediaId` follow the business
+  logo's shape (`BusinessProfile.logoUrl`, `logoMediaId`); both null means
+  the business's. Read a location's logo through `stores/location-logo.ts`
+  (`locationLogos`: own, the business's, the one to show), never
+  `store.logo` alone, which is null for most locations. Paper keeps the
+  business logo (DEC-082).
 - **Current** — **A backfill that merges rows is a TypeScript script** in
   `packages/database/src/backfill/`, exported so the integration suite can seed
   old-shape rows, run it twice and check the second run changes nothing
@@ -242,6 +249,20 @@
   and every personal-looking field on a model reachable from `Contact` or
   `Customer` needs an entry in `personal-data.ts` — a rule, or "kept" and
   why (`personal-data.spec.ts`).
+- **Current** — **What a removal keeps is decided again for a deleted
+  business** (DEC-122). 180 days after a business is deleted,
+  `organization.retention.erase` runs the privacy removal's own writes for
+  every contact, then erases what no single removal reaches (store
+  customers with no contact, a walk-in's name on an order) and the CRM a
+  removal leaves to the business. So a field marked "kept" in
+  `personal-data.ts`, or a relation `REMOVAL_RULES` keeps, also needs a
+  decision in `admin/retention-erase-plan.ts` (`KEPT_FIELD_DECISIONS`,
+  `KEPT_RELATION_DECISIONS`): erased at 180 days, or kept and why
+  (`retention-erase-plan.spec.ts`). Invoices, credit notes and an order's
+  lines, amounts and place of supply are never erased (ADR-008). A new
+  table holding a person's details that hangs off neither `Contact` nor
+  `Customer` adds its write to `retention-erase-writes.ts` and its line to
+  `RETENTION_ERASED`.
 
 ## Money — **Current**
 

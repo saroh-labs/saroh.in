@@ -5,16 +5,14 @@ import {
 } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import {
-    BUSINESS_TYPE_ANCHOR,
-    businessTypeOf,
-} from "@/lib/organizations/business-types";
+import { businessEditHref } from "@/lib/organizations/business-rows";
+import { businessTypeOf } from "@/lib/organizations/business-types";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { ReadyAside, ReadyChecklist, ReadyItem, ReadyStep } from "./ready";
 import {
-    business,
     emailAttention,
     emailHeldByPlan,
     handlesMoney,
@@ -29,6 +27,10 @@ import {
  *
  * - **Email**, while Communications is on and no email provider sends
  *   (`emailAttention`) — the danger dot when one that was sending stopped.
+ * - **Who customers are buying from** (DEC-121), for a business with a
+ *   published website, until it has a legal name, a registered address and
+ *   a contact (an email or the website's phone): its site says "Sold by" in
+ *   those details, and with none set says only its name.
  * - **Business type**, until one is chosen, for a business that didn't say
  *   Registered at setup. One that did is asked by the take-money steps
  *   instead (`readyChecklist`): Registered saves no type, so the real one
@@ -103,6 +105,38 @@ function email(
     };
 }
 
+const filled = (v: string | null | undefined) => !!v?.trim();
+
+/**
+ * The details the website's "Sold by" block shows (DEC-121). Asked only
+ * with a website published now: `setup` counts them, and unread (an older
+ * API) is not asked. The address is the one the site prints: a first line.
+ */
+function seller(
+    settings: Pick<
+        OrganizationSettings,
+        "profile" | "setup" | "registeredAddress"
+    >,
+): Nudge | null {
+    const { setup, profile, registeredAddress } = settings;
+    if (!setup || setup.sites - setup.sitesNotLive <= 0) return null;
+    // Absent from an API older than the registered address: unknown.
+    if (registeredAddress === undefined) return null;
+    const set =
+        filled(profile?.legalName) &&
+        filled(registeredAddress.line1) &&
+        (filled(profile?.contactEmail) || filled(profile?.phone));
+    return {
+        key: "seller",
+        label: "Add your business's legal name, address and a contact",
+        why: "Customers must be able to see who they're buying from.",
+        cta: "Add details",
+        href: businessEditHref("address"),
+        broken: false,
+        left: !set,
+    };
+}
+
 function businessType(
     settings: Pick<OrganizationSettings, "profile">,
 ): Nudge | null {
@@ -111,10 +145,10 @@ function businessType(
     return {
         key: "businessType",
         label: "Choose your business type",
-        why: "Sole proprietor, partnership, LLP, private limited or another — so your business details are complete.",
+        why: "Sole proprietor, partnership, LLP, private limited or another, so your business details are complete.",
         cta: "Choose type",
-        // Straight to the Type field, not the top of the tab.
-        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
+        // Straight to the Type row's sheet, not the top of the tab.
+        href: businessEditHref("type"),
         broken: false,
         left: businessTypeOf(settings.profile?.type) === "",
     };
@@ -128,7 +162,7 @@ function logo(settings: Pick<OrganizationSettings, "logo">): Nudge | null {
         label: "Add your logo",
         why: "It goes on every receipt and invoice.",
         cta: "Add logo",
-        href: business("identity"),
+        href: businessEditHref("logo"),
         broken: false,
         left: settings.logo === null,
     };
@@ -141,9 +175,9 @@ function pipeline(modules: readonly ModuleView[] | null): Nudge | null {
         ?.blockers.find((b) => b.code === "CRM_NO_PIPELINE");
     return {
         key: "pipeline",
-        label: "Create a pipeline",
-        why: "So enquiries don't get lost.",
-        cta: "Set up",
+        label: "Add your first lead",
+        why: "So enquiries don't get lost. Your pipeline starts with it.",
+        cta: "Add a lead",
         href: blocker?.actionHref ?? "/settings/modules",
         broken: false,
         left: blocker !== undefined,
@@ -175,7 +209,7 @@ export function emailAside(input: {
         label: "Email your customers",
         why: EMAIL_PROMPT_MISSED,
         comesWith: "Comes with a paid plan",
-        cta: "See plans",
+        cta: planLabel(),
         href: SEE_PLANS_HREF,
     };
 }
@@ -187,7 +221,10 @@ export function settingsNudges({
     messaging,
     emailSetup,
 }: {
-    settings: Pick<OrganizationSettings, "profile" | "logo" | "setup">;
+    settings: Pick<
+        OrganizationSettings,
+        "profile" | "logo" | "setup" | "registeredAddress"
+    >;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
     /** Whether the plan can connect one (DEC-091); unread asks as before. */
@@ -197,6 +234,7 @@ export function settingsNudges({
     const money = handlesMoney(modules, settings.setup) !== false;
     return [
         email(modules, messaging, emailSetup),
+        seller(settings),
         money ? businessType(settings) : null,
         money ? logo(settings) : null,
         pipeline(modules),

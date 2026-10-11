@@ -128,11 +128,22 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
     });
 
     it("starts the footer as one left-set line that says what to write", () => {
-        expect(ceramicsTemplate.footer).toEqual({
+        expect(ceramicsTemplate.footer).toMatchObject({
             line: CERAMICS_FOOTER_LINE,
             layout: "left",
         });
-        expect(CERAMICS_FOOTER_LINE).toMatch(/^Your [^—]+ — /);
+        expect(CERAMICS_FOOTER_LINE).toMatch(/^Your .+ · .+/);
+    });
+
+    it("names no kind of business in the footer: any shop can start from Store", () => {
+        expect(CERAMICS_FOOTER_LINE).toBe(
+            "Your area and town · when you are open",
+        );
+        expect(CERAMICS_FOOTER_LINE).not.toMatch(/studio|—/i);
+        // The old line is kept only so the pre-publish check still knows it.
+        expect(ceramicsTemplate.footer?.formerLines).toEqual([
+            "Your area and town — and when the studio is open",
+        ]);
     });
 
     it("leads the header menu with Collection and Material, Collection only while it is laid down", () => {

@@ -1,5 +1,14 @@
-import { Controller, Get, Header, Headers, Ip, Param } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Header,
+    Headers,
+    Ip,
+    Param,
+    UseGuards,
+} from "@nestjs/common";
 
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicPlans } from "./public-plans.service";
 import { PublicPlansService } from "./public-plans.service";
@@ -18,6 +27,7 @@ import { PublicPlansService } from "./public-plans.service";
  * `by-subdomain/plans` still reaches the publication read, not this one.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicPlansController {
     constructor(private readonly plans: PublicPlansService) {}
 

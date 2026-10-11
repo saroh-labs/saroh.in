@@ -33,7 +33,10 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             updateMany: jest.fn(),
         },
+        // Active autopay memberships per provider (#921): none here.
+        paymentMandate: { groupBy: jest.fn(async () => []) },
         job: { create: jest.fn() },
+        customerNotice: { findFirst: jest.fn() },
         paymentIntent: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
@@ -75,6 +78,7 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    Logger,
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
@@ -466,6 +470,30 @@ describe("PaymentsService.listProviders", () => {
         });
         expect(rows[0]).not.toHaveProperty("encryptedCredentials");
         expect(JSON.stringify(rows)).not.toContain("super-secret-value");
+    });
+
+    it("says how many autopay memberships are active at each provider (#921)", async () => {
+        const { service } = makeService();
+        providerFindMany.mockResolvedValue([
+            connectedRow(),
+            connectedRow({ provider: "CASHFREE" }),
+        ]);
+        const groupBy = prisma.paymentMandate.groupBy as jest.Mock;
+        groupBy.mockResolvedValueOnce([
+            { provider: "RAZORPAY", _count: { _all: 3 } },
+        ]);
+
+        const rows = await service.listProviders(ctx());
+
+        expect(groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", status: "ACTIVE" },
+            }),
+        );
+        expect(rows.map((r) => [r.provider, r.activeMemberships])).toEqual([
+            ["RAZORPAY", 3],
+            ["CASHFREE", 0],
+        ]);
     });
 
     it("denies a MEMBER? no — payment:read allows nobody but OWNER/ADMIN", async () => {
@@ -1154,6 +1182,48 @@ describe("PaymentsService.initiateRefund", () => {
         expect(fake.refundCalls).toHaveLength(0);
     });
 
+    describe("after part was recorded as refunded by hand (#865, DEC-116)", () => {
+        // ₹42.50 paid online; ₹10 of it handed back by hand.
+        beforeEach(() => {
+            orderFindUnique.mockResolvedValue({
+                ...ORDER,
+                total: "42.50",
+                paymentStatus: "PAID",
+                paidByHand: "0.00",
+                refundedByHand: "10.00",
+            });
+        });
+
+        it("refuses the whole online balance: only what is left on the order", async () => {
+            const { service, fake } = makeService();
+            await expect(
+                service.initiateRefund(ctx(), "order_1"),
+            ).rejects.toThrow("At most ₹32.50 can be refunded.");
+            await expect(
+                service.initiateRefund(ctx(), "order_1", {
+                    kind: "goodwill",
+                    reason: "Late",
+                    amountCents: 4250,
+                }),
+            ).rejects.toThrow("At most ₹32.50 can be refunded.");
+            expect(refundCreate).not.toHaveBeenCalled();
+            expect(fake.refundCalls).toHaveLength(0);
+        });
+
+        it("sends what is left", async () => {
+            const { service, fake } = makeService();
+            const result = await service.initiateRefund(ctx(), "order_1", {
+                kind: "goodwill",
+                reason: "Late",
+                amountCents: 3250,
+            });
+            expect(result.amountCents).toBe(3250);
+            expect(fake.refundCalls[0]).toEqual(
+                expect.objectContaining({ amountCents: 3250 }),
+            );
+        });
+    });
+
     describe("split across two payments", () => {
         // ₹30 paid first, ₹12.50 taken later (an edit's difference).
         const FIRST = { ...PAYMENT, id: "pi_1", amountCents: 3000 };
@@ -1486,6 +1556,43 @@ describe("PaymentsService — keys checked on connect (UX-012)", () => {
         expect(result.attention).toBeNull();
     });
 
+    it("tells the team it works again when the keys end a refusal they were told of, but not whoever entered them (#555)", async () => {
+        const { service } = makeService();
+        const jobCreate = prisma.job.create as jest.Mock;
+        providerFindUnique.mockResolvedValue({
+            attentionAt: new Date("2026-10-08T09:00:00Z"),
+        });
+        (prisma.customerNotice.findFirst as jest.Mock).mockResolvedValue({
+            eventKey: "team:provider:mpp_1:down:2026-10-08T09:00:00.000Z",
+        });
+
+        await service.connectProvider(ctx(), KEYS);
+
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "PAYMENTS",
+                    providerId: "mpp_1",
+                    since: expect.any(String),
+                    actorUserId: "user_1",
+                },
+            },
+        });
+    });
+
+    it("says nothing on keys entered for a connection that was working", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue({ attentionAt: null });
+
+        await service.connectProvider(ctx(), KEYS);
+
+        expect(prisma.job.create).not.toHaveBeenCalled();
+    });
+
     it("lists a connection that refused its keys as needing attention, and since when", async () => {
         const { service } = makeService();
         const since = new Date("2026-10-07T09:30:00Z");
@@ -1562,6 +1669,7 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
             type: "team.alert",
             payload: {
                 event: "provider",
+                change: "down",
                 channel: "PAYMENTS",
                 providerId: "mpp_1",
                 since: expect.any(String),
@@ -1600,6 +1708,127 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
         ).toMatchObject({ details: { reason: "provider-unavailable" } });
         expect(updateMany).not.toHaveBeenCalled();
         expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("answers keys that won't open with the same handled 503, calling no provider and logging no secret", async () => {
+        // A seeded business's placeholder keys: the seal doesn't open under
+        // the server's key, and that was a bare 500 with nothing logged.
+        const { service, fake } = makeService();
+        providerFindMany.mockResolvedValue([
+            { ...connectedRow(), credentialsAuthTag: "AAA=" },
+        ]);
+        const logged = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+
+        const err = await service
+            .createIntentForOrder(ctx(), "order_1")
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect((err as ServiceUnavailableException).getResponse()).toEqual({
+            message:
+                "The business can't take payment online right now. Please try again later, or pay them another way.",
+            details: { reason: "provider-unavailable" },
+        });
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+        // Not flagged: the server's key may be what's wrong, not theirs.
+        expect(updateMany).not.toHaveBeenCalled();
+        // Logged once, naming the provider, the business and the cause.
+        expect(logged).toHaveBeenCalledTimes(1);
+        const line = String(logged.mock.calls[0][0]);
+        expect(line).toContain("Razorpay");
+        expect(line).toContain("org_1");
+        expect(line).toMatch(/authentication tag/i);
+        expect(line).not.toContain("super-secret-value");
+        logged.mockRestore();
+    });
+
+    it("answers keys that open to something other than a key pair the same way, quoting none of it", async () => {
+        const { service, fake } = makeService();
+        const sealed = encryptSecret("not-json super-secret-value");
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                encryptedCredentials: sealed.ciphertext,
+                credentialsIv: sealed.iv,
+                credentialsAuthTag: sealed.authTag,
+            },
+        ]);
+        const logged = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        expect(fake.calls).toHaveLength(0);
+        expect(String(logged.mock.calls[0][0])).not.toContain(
+            "super-secret-value",
+        );
+        logged.mockRestore();
+    });
+
+    it("clears the flag when a provider order goes through after all, and tells the team it works again (#555)", async () => {
+        const { service } = makeService();
+        const flaggedAt = new Date("2026-10-08T09:00:00Z");
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: flaggedAt,
+            },
+        ]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+        updateMany.mockResolvedValue({ count: 1 });
+        (prisma.customerNotice.findFirst as jest.Mock).mockResolvedValue({
+            eventKey: `team:provider:mpp_1:down:${flaggedAt.toISOString()}`,
+        });
+
+        await service.createIntentForOrder(ctx(), "order_1");
+
+        expect(updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "mpp_1",
+                organizationId: "org_1",
+                attentionAt: flaggedAt,
+            },
+            data: { attentionReason: null, attentionAt: null },
+        });
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "PAYMENTS",
+                    providerId: "mpp_1",
+                    since: expect.any(String),
+                    actorUserId: null,
+                },
+            },
+        });
+    });
+
+    it("still makes the customer's order when clearing the flag fails", async () => {
+        const { service } = makeService();
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: new Date("2026-10-08T09:00:00Z"),
+            },
+        ]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+        updateMany.mockRejectedValue(new Error("db down"));
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).resolves.toMatchObject({ paymentIntentId: "pi_1" });
     });
 
     it("still answers the customer when the flag can't be written", async () => {

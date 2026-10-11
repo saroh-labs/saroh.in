@@ -138,13 +138,20 @@ describe("ordersAccess", () => {
 });
 
 describe("ordersLockedCopy", () => {
-    it("says what a Reviewer's role covers, and who can change it", () => {
+    const WHO = "An owner or admin can change this in Settings › Team.";
+
+    it("says a Reviewer's role, that it doesn't include Orders, and who can change it", () => {
         const copy = ordersLockedCopy({ role: "REVIEWER" }, "Rye & Co.");
         expect(copy.description).toBe(
-            "Your role in Rye & Co. is Reviewer, which covers one website and nothing about the business around it. Orders are not part of it.",
+            "Your role in Rye & Co. is Reviewer. It doesn't include Orders.",
         );
-        expect(copy.note).toBe(
-            "The rail does not offer Sell to this role, so you have reached it by address. Ask an Owner or Admin of Rye & Co. if you need it.",
+        expect(copy.note).toBe(WHO);
+    });
+
+    it("never says how they got here: a link leads here as well as an address", () => {
+        const copy = ordersLockedCopy({ role: "MEMBER" }, "Rye & Co.");
+        expect(`${copy.description} ${copy.note}`).not.toMatch(
+            /by address|rail does not offer/,
         );
     });
 
@@ -155,7 +162,7 @@ describe("ordersLockedCopy", () => {
                 "Rye & Co.",
             ).description,
         ).toBe(
-            "Your role in Rye & Co. is Catalogue. Orders are not part of it.",
+            "Your role in Rye & Co. is Catalogue. It doesn't include Orders.",
         );
     });
 
@@ -163,25 +170,39 @@ describe("ordersLockedCopy", () => {
         expect(
             ordersLockedCopy({ role: "MEMBER", roleLabel: null }, "Rye & Co.")
                 .description,
-        ).toBe("Your role in Rye & Co. doesn't include orders.");
+        ).toBe("Your role in Rye & Co. doesn't include Orders.");
+        // A made role maps to MEMBER, and its key is never shown.
+        expect(
+            ordersLockedCopy(
+                { role: "MEMBER", roleKey: "role_8f2c" },
+                "Rye & Co.",
+            ).description,
+        ).toBe("Your role in Rye & Co. doesn't include Orders.");
+    });
+
+    it("names a Member the API said is the built-in", () => {
+        expect(
+            ordersLockedCopy({ role: "MEMBER", roleKey: "MEMBER" }, "Rye & Co.")
+                .description,
+        ).toBe("Your role in Rye & Co. is Member. It doesn't include Orders.");
     });
 });
 
 describe("orderLockedText", () => {
-    it("is the design's sentence for a Reviewer", () => {
+    const WHO = "An owner or admin can change this in Settings › Team.";
+
+    it("is the one sentence for a Reviewer", () => {
         expect(orderLockedText({ role: "REVIEWER" })).toBe(
-            "Your role is Reviewer, which can see the website but not this. An owner or admin can change that in Team.",
+            `Your role is Reviewer. It doesn't include Orders. ${WHO}`,
         );
     });
 
     it("names any other role, or leaves the name out", () => {
         expect(
             orderLockedText({ role: "MEMBER", roleLabel: "Catalogue" }),
-        ).toBe(
-            "Your role is Catalogue, which doesn't include orders. An owner or admin can change that in Team.",
-        );
+        ).toBe(`Your role is Catalogue. It doesn't include Orders. ${WHO}`);
         expect(orderLockedText({ role: "MEMBER" })).toBe(
-            "Your role doesn't include orders. An owner or admin can change that in Team.",
+            `Your role doesn't include Orders. ${WHO}`,
         );
     });
 });

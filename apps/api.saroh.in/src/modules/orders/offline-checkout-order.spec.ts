@@ -174,6 +174,21 @@ describe("an order paid at the handover", () => {
         // Unpaid: the column defaults, nothing sets it paid.
         expect(data.paymentStatus).toBeUndefined();
         expect(data.paidAt).toBeUndefined();
+        // No QR code named: none stored.
+        expect(data.sourceCode).toBeNull();
+    });
+
+    it("names the QR code it came from, as the checkout resolved it", async () => {
+        await createCheckoutOrder(scope, account, {
+            lines: [line],
+            type: "PICKUP",
+            shippingCents: 0,
+            currency: "INR",
+            dto: { ...dto, payment: "ON_HANDOVER" },
+            payOnHandover: true,
+            sourceCode: "qr_1",
+        });
+        expect(db.order.create.mock.calls[0][0].data.sourceCode).toBe("qr_1");
     });
 
     it("promises its units at once, as a staff pay-later order does", async () => {

@@ -291,7 +291,7 @@ describe("timetable", () => {
                 .map((h) => h.textContent),
         ).toContain("Mon 5 Oct");
         expect(
-            within(table).getByRole("rowheader", { name: "18:30" }),
+            within(table).getByRole("rowheader", { name: "6:30 pm" }),
         ).toBeTruthy();
     });
 
@@ -383,7 +383,7 @@ describe("hours", () => {
             .getAllByRole("row")
             .find((r) => r.getAttribute("aria-current") === "date");
         expect(today?.textContent).toContain("Tuesday");
-        expect(today?.textContent).toContain("7:30am – 5pm");
+        expect(today?.textContent).toContain("7:30am to 5pm");
         expect(screen.getByText("Open now · closes 5pm")).toBeTruthy();
     });
 

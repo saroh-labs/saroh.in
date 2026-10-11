@@ -1,5 +1,7 @@
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import type { Plan } from "./service";
-import { classesText, longPrice, money, olderPriceNotes } from "./view";
+import { classesText, longPrice, olderPriceNotes } from "./view";
 
 /**
  * How the Plans tab says a plan (D3, after "Saroh Subscriptions", Plans
@@ -31,11 +33,11 @@ function subscribersLine(
 ): string {
     const n = plan.subscriberCount;
     if (!n) return "No subscribers yet";
-    const people = `${n} ${n === 1 ? "subscriber" : "subscribers"}`;
+    const people = count(n, "subscriber");
     // Whole rupees: a card's figure is a sense of size, not a ledger line.
     const monthly = Math.round(Number(plan.monthlyFromMembers));
     return monthly > 0
-        ? `${people} · brings in ${money(monthly, plan.currency)} a month`
+        ? `${people} · brings in ${formatMoneyMajor(monthly, plan.currency)} a month`
         : `${people} · none paying right now`;
 }
 
@@ -80,7 +82,7 @@ export function archiveToast(
     if (!archived) return `${plan.name} is open to sign-ups again.`;
     const n = plan.subscriberCount;
     return n
-        ? `${plan.name} archived. Its ${n} ${n === 1 ? "subscriber carries" : "subscribers carry"} on; nobody new can join.`
+        ? `${plan.name} archived. Its ${count(n, "subscriber carries", "subscribers carry")} on, and nobody new can join.`
         : `${plan.name} archived. Nobody new can join.`;
 }
 

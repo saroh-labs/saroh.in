@@ -31,6 +31,12 @@ export interface ConnectedPaymentProvider {
      */
     webhookSecretMissing?: boolean;
     attention?: ProviderAttention | null;
+    /**
+     * Customers' autopay memberships active at this provider (#921):
+     * disconnecting cancels none of them there, and the confirm says how
+     * many. Absent from an older API: read as none.
+     */
+    activeMemberships?: number;
     updatedAt: string;
 }
 
@@ -192,7 +198,7 @@ export function connectPaymentProvider(
         "/payment-providers",
         "POST",
         input,
-        "Could not connect the payment provider",
+        "Couldn't connect the payment provider.",
     );
 }
 
@@ -201,7 +207,7 @@ export function disconnectPaymentProvider(
 ): Promise<CrmResult<{ id: string }>> {
     return destroy<{ id: string }>(
         `/payment-providers/${provider}`,
-        "Could not disconnect the payment provider",
+        "Couldn't disconnect the payment provider.",
     );
 }
 
@@ -212,7 +218,7 @@ export function connectCommsProvider(
         "/comms-providers",
         "POST",
         input,
-        "Could not connect the messaging provider",
+        "Couldn't connect the messaging provider.",
     );
 }
 
@@ -221,6 +227,6 @@ export function disconnectCommsProvider(
 ): Promise<CrmResult<{ id: string }>> {
     return destroy<{ id: string }>(
         `/comms-providers/${channel}`,
-        "Could not disconnect the messaging provider",
+        "Couldn't disconnect the messaging provider.",
     );
 }

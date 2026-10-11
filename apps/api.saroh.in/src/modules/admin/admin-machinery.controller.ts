@@ -12,6 +12,7 @@ import {
     ListJobsDto,
     ListWebhooksDto,
     OperationTargetsDto,
+    OperatorReasonDto,
     StartOperationDto,
 } from "./dto";
 
@@ -68,6 +69,32 @@ export class AdminMachineryController {
         });
     }
 
+    /**
+     * What cancelling would do, changing nothing (#907). Only a job that
+     * hasn't started or is waiting to retry is cancelled; the people who
+     * retry jobs cancel them.
+     */
+    @Post("jobs/cancel/plan")
+    @RequireAdminPermission(AdminPermission.JobsRetry)
+    planCancel(@Body() dto: OperationTargetsDto) {
+        return this.operations.plan("jobs.cancel", dto.ids);
+    }
+
+    @Post("jobs/cancel")
+    @RequireAdminPermission(AdminPermission.JobsRetry)
+    cancelJobs(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Body() dto: StartOperationDto,
+    ) {
+        return this.operations.start({
+            staff,
+            kind: "jobs.cancel",
+            targetIds: dto.ids,
+            reason: dto.reason,
+            idempotencyKey: dto.idempotencyKey,
+        });
+    }
+
     @Get("webhooks/summary")
     @RequireAdminPermission(AdminPermission.WebhooksRead)
     webhookSummary() {
@@ -112,6 +139,27 @@ export class AdminMachineryController {
     @RequireAdminPermission(AdminPermission.PlatformRead)
     operation(@Param("operationId") operationId: string) {
         return this.operations.get(operationId);
+    }
+
+    /**
+     * Stop an operation's rows that have not started (#907). Reading it is
+     * `platform:read`; cancelling also needs the permission it was started
+     * under (a retry's `jobs:retry`, a replay's `webhooks:replay`, …), which
+     * the service checks against the operation's kind.
+     */
+    @Post("operations/:operationId/cancel")
+    @RequireAdminPermission(AdminPermission.PlatformRead)
+    cancelOperation(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("operationId") operationId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.operations.cancel({
+            staff,
+            operationId,
+            reason: dto.reason,
+            idempotencyKey: dto.idempotencyKey,
+        });
     }
 
     @Get("providers")

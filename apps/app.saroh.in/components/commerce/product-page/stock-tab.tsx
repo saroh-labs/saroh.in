@@ -60,7 +60,7 @@ export function ProductStockTab({
     const { product } = overview;
     const [openId, setOpenId] = useState<string | null>(null);
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const counts = tracking.counts;
     const counted =
         overview.stock.mode === "variant" || overview.stock.product !== null;
@@ -79,6 +79,7 @@ export function ProductStockTab({
         return (
             <div className="flex flex-col gap-3">
                 <TabState
+                    data-ph-mask=""
                     icon={Box}
                     title="Not tracked"
                     description={`${untrackedShort(product.storefronts ?? [])} ${
@@ -138,13 +139,7 @@ export function ProductStockTab({
     }
 
     if (!stock) {
-        return (
-            <PanelFailed
-                what="stock"
-                retryHref={retryHref}
-                note="The rest of the product loaded; only its stock by location did not. Nothing about the stock has changed."
-            />
-        );
+        return <PanelFailed what="stock" retryHref={retryHref} />;
     }
 
     if (!counted) {

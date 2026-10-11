@@ -1,6 +1,5 @@
-import { useSyncExternalStore } from "react";
-
 import type { PublicVisit } from "../blocks/visit-us";
+import { timeWords } from "../lib/clock";
 import { weekSummary } from "../lib/opening-hours";
 import type {
     BookingDays,
@@ -8,25 +7,7 @@ import type {
     BookingStart,
     BookPay,
 } from "./model";
-import { dateIn, dateText, timeIn } from "./model";
-
-// ── The phone breakpoint, read without a render-time window ─────────────
-
-const PHONE_QUERY = "(max-width: 699px)";
-
-function subscribePhone(onChange: () => void): () => void {
-    const mq = window.matchMedia(PHONE_QUERY);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-}
-
-export function usePhone(): boolean {
-    return useSyncExternalStore(
-        subscribePhone,
-        () => window.matchMedia(PHONE_QUERY).matches,
-        () => false,
-    );
-}
+import { dateIn, dateText } from "./model";
 
 export function newKey(): string {
     return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -75,10 +56,10 @@ export function nextFreeStart(
     );
 }
 
-/** "That time has just gone. We've chosen the next free one: Sun 20 Sep at 08:00." */
+/** "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am." */
 export function nextChosenText(start: BookingStart, zone: string): string {
     const day = dateText(dateIn(start.startAt, zone), true);
-    return `That time has just gone. We've chosen the next free one: ${day} at ${timeIn(start.startAt, zone)}.`;
+    return `That time has gone. We've chosen the next free one: ${day} at ${timeWords(start.startAt, zone)}.`;
 }
 
 // ── The header's facts (E6) ─────────────────────────────────────────────
@@ -92,7 +73,7 @@ export function pageTitle(services: BookingService[]): string {
 
 /** What the header says about the business, from G8's public visit read. */
 export interface HeaderFacts {
-    /** "12th Main, Indiranagar · Open Mon–Sat 9am–7pm", or null for neither. */
+    /** "12th Main, Indiranagar · Open Mon to Sat 9am to 7pm", or null for neither. */
     place: string | null;
     /** The public phone, E.164 (for `tel:`), or null when none is set. */
     phone: string | null;
@@ -130,7 +111,7 @@ export function headerFacts(
 /**
  * What the live site does at the booking page's last step, for a test
  * release's stop: "the customer signs in here and books Haircut, Sat 4 Oct
- * at 11:00 with Asha and pays ₹500".
+ * at 11:00 am with Asha and pays ₹500".
  */
 export function testReleaseBookingLine({
     serviceName,

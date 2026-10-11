@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import {
     COMING_NEXT,
     changelogView,
 } from "@/content/changelog";
+import { byComingGroup } from "@/content/coming";
 
 import ChangelogPage from "./page";
 
@@ -100,6 +101,50 @@ describe("/changelog", () => {
                 li.textContent.includes(CHANGELOG.notYet),
             ),
         ).toBe(true);
+        expect(CHANGELOG.notYet).toBe("Not available yet");
+    });
+
+    it("Coming next: each group's label is drawn once, over its rows, in order", () => {
+        renderAt(AFTER);
+        const section = screen
+            .getByRole("heading", { name: CHANGELOG.comingTitle })
+            .closest("section");
+        if (!section) throw new Error("no Coming next section");
+        const labels = within(section).getAllByRole("heading", { level: 3 });
+        expect(labels.map((h) => h.textContent)).toEqual([
+            "Nov–Dec 2026",
+            "Early 2027",
+            "Later",
+        ]);
+        const groups = byComingGroup(COMING_NEXT);
+        const lists = within(section).getAllByRole("list");
+        expect(lists).toHaveLength(groups.length);
+        lists.forEach((list, i) => {
+            const group = groups[i];
+            expect(list.getAttribute("aria-labelledby")).toBe(labels[i].id);
+            const rows = within(list).getAllByRole("listitem");
+            expect(rows).toHaveLength(group.rows.length);
+            // The label is on the group's first row and no other.
+            expect(rows[0].contains(labels[i])).toBe(true);
+            rows.forEach((row, r) => {
+                expect(row.textContent).toContain(group.rows[r].name);
+                expect(row.textContent).toContain(group.rows[r].line);
+                if (r > 0) expect(row.textContent).not.toContain(group.label);
+            });
+        });
+    });
+
+    it("Coming next: no row names a plan or a price, or anything built", () => {
+        renderAt(AFTER);
+        const section = screen
+            .getByRole("heading", { name: CHANGELOG.comingTitle })
+            .closest("section");
+        expect(section?.textContent).not.toMatch(
+            /every plan|free plan|\bplans?\b|\bgrow\b|\bpro\b|₹|\bprice/i,
+        );
+        expect(section?.textContent).not.toMatch(
+            /\bcsv\b|\bpixel\b|google analytics/i,
+        );
     });
 
     it("lists CSV import as shipped, never as coming (#816)", () => {

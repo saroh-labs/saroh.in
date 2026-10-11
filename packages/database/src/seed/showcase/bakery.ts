@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
 import { seedPlanId } from "../pricing";
+import { seedStandInPaymentProvider } from "../stand-in-providers";
 import type { BakeryProduct, CategoryKey, StoreKey } from "./bakery-catalogue";
 import {
     ALLERGENS,
@@ -597,24 +598,13 @@ export async function seedBakery(
             currentPeriodEnd: istAt(now, 30, 9 * 60),
         },
     });
-    await prisma.merchantPaymentProvider.upsert({
-        where: {
-            organizationId_provider: {
-                organizationId: orgId,
-                provider: "RAZORPAY",
-            },
-        },
-        update: { status: "CONNECTED" },
-        create: {
-            id: sid("payments", "razorpay"),
-            organizationId: orgId,
-            provider: "RAZORPAY",
-            status: "CONNECTED",
-            // Placeholders: the seed never fabricates a usable credential.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    // Razorpay reads as connected on the film set, on this machine's
+    // database only: its keys are placeholders, so on a shared database
+    // the seed writes no connection (`stand-in-providers.ts`).
+    await seedStandInPaymentProvider(prisma, {
+        id: sid("payments", "razorpay"),
+        organizationId: orgId,
+        provider: "RAZORPAY",
     });
 
     // --- the storefronts: the shop on Hill Road, which also delivers, and

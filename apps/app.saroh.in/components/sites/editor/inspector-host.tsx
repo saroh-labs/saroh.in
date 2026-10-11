@@ -1,9 +1,7 @@
 "use client";
 
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { BlockFeedback } from "@/components/sites/block-feedback";
 import { BlockInspector } from "@/components/sites/block-inspector";
 import { EditorTabs } from "@/components/sites/editor-chrome";
@@ -26,6 +24,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * The right column: the inspector (#340). Block is what can be changed about
@@ -130,29 +129,20 @@ export function InspectorHost({
                  */}
                 {inspector === "feedback" && active ? (
                     <div className="px-4 pt-4">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Whose feedback"
                             value={feedbackScope}
-                            onValueChange={(v) => {
-                                if (v === "block" || v === "site") {
-                                    setFeedbackScope(v);
-                                }
-                            }}
-                            aria-label="Whose feedback"
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="block" className={SEGMENT}>
-                                This block
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="site" className={SEGMENT}>
-                                Whole site
-                                {openNotes > 0 ? (
-                                    <span className="ml-1.5 tabular-nums text-highlight">
-                                        {openNotes}
-                                    </span>
-                                ) : null}
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            onValueChange={setFeedbackScope}
+                            options={[
+                                { value: "block", label: "This block" },
+                                {
+                                    value: "site",
+                                    label: "Whole site",
+                                    count:
+                                        openNotes > 0 ? openNotes : undefined,
+                                },
+                            ]}
+                        />
                     </div>
                 ) : null}
                 {inspector === "feedback" &&

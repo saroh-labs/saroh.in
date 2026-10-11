@@ -31,7 +31,7 @@ export interface QueueSummary {
 export interface JobRow {
     id: string;
     type: string;
-    status: "PENDING" | "PROCESSING" | "DONE" | "FAILED";
+    status: "PENDING" | "PROCESSING" | "DONE" | "FAILED" | "CANCELLED";
     attempts: number;
     maxAttempts: number;
     runAt: string;
@@ -81,8 +81,8 @@ export interface ProviderRollup {
 
 export interface OperationSummary {
     id: string;
-    kind: "jobs.retry" | "webhooks.replay" | "waitlist.invite";
-    status: "PENDING" | "RUNNING" | "DONE" | "FAILED";
+    kind: "jobs.retry" | "jobs.cancel" | "webhooks.replay" | "waitlist.invite";
+    status: "PENDING" | "RUNNING" | "DONE" | "FAILED" | "CANCELLED";
     actorUserId: string;
     reason: string;
     total: number;

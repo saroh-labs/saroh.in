@@ -154,7 +154,7 @@ describe("picking by hand, up to 500", () => {
         );
         expect(capacity(full.length)).toMatchObject({
             full: true,
-            words: "Full — a collection holds up to 500 products.",
+            words: "Full. A collection holds up to 500 products.",
         });
         expect(capacity(12)).toMatchObject({ left: 488, words: "12 of 500" });
         expect(
@@ -263,7 +263,7 @@ describe("the product page's Edit collections", () => {
             ["full", false, true],
         ]);
         expect(rows[1]?.note).toBe(
-            "Fills itself from the category Breads — change the product's category to change this.",
+            "Fills itself from the category Breads. Change the product's category to change this.",
         );
         expect(rows[2]?.note).toMatch(/^Full/);
         expect(pickedIds(rows, all)).toEqual(["gifts"]);

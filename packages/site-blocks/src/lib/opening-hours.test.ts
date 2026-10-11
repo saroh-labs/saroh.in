@@ -204,7 +204,9 @@ describe("clockText", () => {
 
 describe("weekSummary", () => {
     it("says each run of days with the same hours once, closed days left out", () => {
-        expect(weekSummary(PULSE)).toBe("Mon–Fri 6am–9pm · Sat 7am–1pm");
+        expect(weekSummary(PULSE)).toBe(
+            "Mon to Fri 6am to 9pm · Sat 7am to 1pm",
+        );
         expect(
             weekSummary(
                 week({
@@ -216,7 +218,7 @@ describe("weekSummary", () => {
                     SUN: ["07:00", "19:00"],
                 }),
             ),
-        ).toBe("Tue–Sun 7am–7pm");
+        ).toBe("Tue to Sun 7am to 7pm");
         expect(
             weekSummary(
                 week({
@@ -229,7 +231,7 @@ describe("weekSummary", () => {
                     SUN: ["10:00", "13:00"],
                 }),
             ),
-        ).toBe("Mon–Sat 9am–7pm · Sun 10am–1pm");
+        ).toBe("Mon to Sat 9am to 7pm · Sun 10am to 1pm");
     });
 
     it("breaks a run at a closed day", () => {
@@ -237,7 +239,7 @@ describe("weekSummary", () => {
             weekSummary(
                 week({ MON: ["09:00", "17:00"], WED: ["09:00", "17:00"] }),
             ),
-        ).toBe("Mon 9am–5pm · Wed 9am–5pm");
+        ).toBe("Mon 9am to 5pm · Wed 9am to 5pm");
     });
 
     it("is null with nothing to say", () => {

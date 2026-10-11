@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
+import { runAction } from "@/lib/api/run-action";
 
 /**
  * "Open on the test address" (DEC-071, T12): the release as a visitor would
@@ -23,15 +24,16 @@ export function OpenOnTestAddress({
         <Button
             type="button"
             variant="outline"
-            disabled={opening}
             onClick={async () => {
-                setOpening(true);
-                await openReleaseInNewTab(siteId, releaseId);
-                setOpening(false);
+                await runAction(() => openReleaseInNewTab(siteId, releaseId), {
+                    setBusy: setOpening,
+                });
             }}
+            busy={opening}
+            busyLabel="Opening…"
         >
             <ExternalLink aria-hidden className="size-4" />
-            {opening ? "Opening…" : "Open on the test address"}
+            Open on the test address
         </Button>
     );
 }

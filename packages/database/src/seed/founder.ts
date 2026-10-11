@@ -1,4 +1,4 @@
-import { FOUNDER_EMAIL, FOUNDER_PASSWORD, MODULE_STATES } from "./data";
+import { FOUNDER_EMAIL, MODULE_STATES, seedPassword } from "./data";
 import type { Db } from "./helpers";
 import { hashPassword, id } from "./helpers";
 
@@ -25,13 +25,13 @@ export async function seedFounder(prisma: Db): Promise<string> {
     // better-auth's own hasher, as for the owner and the reviewer.
     await prisma.account.upsert({
         where: { id: id("account", "founder") },
-        update: { password: await hashPassword(FOUNDER_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "founder"),
             accountId: founder.id,
             providerId: "credential",
             userId: founder.id,
-            password: await hashPassword(FOUNDER_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
     await seedFirstRuns(prisma, founder.id, "first-run", FIRST_RUNS);

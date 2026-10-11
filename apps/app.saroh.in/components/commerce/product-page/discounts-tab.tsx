@@ -1,8 +1,8 @@
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Tag } from "lucide-react";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -10,9 +10,9 @@ import type { ProductOverview } from "@/lib/products/overview";
 import {
     DISCOUNT_REACH_LABEL,
     discountAmount,
-    plural,
 } from "@/lib/products/overview-rules";
 
+import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
     PanelForbidden,
@@ -21,10 +21,10 @@ import {
 } from "./panel-state";
 
 const STATE = {
-    ACTIVE: { label: "Applies now", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "neutral" },
+    ACTIVE: { label: "Live", variant: "success" },
+    SCHEDULED: { label: "Scheduled", variant: "info" },
     EXPIRED: { label: "Ended", variant: "neutral" },
-    EXHAUSTED: { label: "Used up", variant: "neutral" },
+    EXHAUSTED: { label: "Ended", variant: "neutral" },
 } as const;
 
 /**
@@ -47,7 +47,7 @@ export function ProductDiscountsTab({
     if (discounts.status === "forbidden")
         return <PanelForbidden what="discounts" />;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
 
     if (discounts.data.length === 0) {
         return (
@@ -64,7 +64,7 @@ export function ProductDiscountsTab({
     return (
         <div>
             <p className="mb-3 text-pretty text-[12.5px] text-muted-foreground">
-                Discounts that reach this product — set on it, its category, the
+                Discounts that reach this product: set on it, its category, the
                 location or everything. Set up in Discounts.
             </p>
             <ul className="flex flex-col gap-2.5">
@@ -89,23 +89,20 @@ export function ProductDiscountsTab({
                                     <span className="font-mono text-[13px] font-medium">
                                         {d.code}
                                     </span>
-                                    <Badge
-                                        variant={state.variant}
-                                        className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-                                    >
+                                    <Badge variant={state.variant} size="sm">
                                         {state.label}
                                     </Badge>
-                                    <Link
+                                    <TextLink
                                         href="/commerce/discounts"
-                                        className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        className="ml-auto text-[12px]"
                                     >
                                         Open in Discounts
-                                    </Link>
+                                    </TextLink>
                                 </div>
                                 <p className="mt-1.5 text-[13.5px]">
                                     {discountAmount(d, money)}{" "}
                                     {DISCOUNT_REACH_LABEL[d.appliesTo] ?? ""}
-                                    {d.description ? ` — ${d.description}` : ""}
+                                    {d.description ? ` · ${d.description}` : ""}
                                 </p>
                                 <p className="mt-1 text-[12px] text-muted-foreground">
                                     {d.endsAt ? (
@@ -119,9 +116,8 @@ export function ProductDiscountsTab({
                                     ) : (
                                         "No end date"
                                     )}
-                                    {" · "}used{" "}
-                                    {plural(d.usedOnProduct, "time")} on this
-                                    product
+                                    {" · "}used {count(d.usedOnProduct, "time")}{" "}
+                                    on this product
                                 </p>
                             </Card>
                         </li>

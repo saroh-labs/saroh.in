@@ -8,6 +8,7 @@ import {
     CommandItem,
     CommandList,
 } from "@saroh/ui/command";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -60,6 +61,7 @@ export function ContactPicker({
         <Popover open={open} onOpenChange={setOpen} modal>
             <PopoverTrigger asChild>
                 <Button
+                    data-ph-mask=""
                     id={id}
                     type="button"
                     variant="outline"
@@ -70,7 +72,7 @@ export function ContactPicker({
                     aria-invalid={invalid}
                     disabled={disabled}
                     className={cn(
-                        "flex h-10 w-full min-w-0 justify-between bg-field font-normal",
+                        "flex w-full min-w-0 justify-between bg-field font-normal",
                         !picked && "text-muted-foreground",
                     )}
                 >
@@ -110,9 +112,7 @@ export function ContactPicker({
                 >
                     <CommandInput placeholder="Search by name or email" />
                     <CommandList>
-                        <CommandEmpty>
-                            No one by that name or email.
-                        </CommandEmpty>
+                        <CommandEmpty>{noMatchLine("contacts")}</CommandEmpty>
                         {contacts.map((c) => (
                             <CommandItem
                                 key={c.id}

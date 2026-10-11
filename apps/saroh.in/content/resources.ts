@@ -1,10 +1,14 @@
 /**
  * The Resources pages (plan U1): ONE list that drives the nav's Resources
- * menu, the footer's Resources column, the sitemap and the breadcrumbs.
+ * and Tools menus, the footer's Resources and Tools columns, the sitemap and
+ * the breadcrumbs. The free tools (`menu: "tools"`) are things to use, not
+ * things to read, so they sit in their own menu (owner, 10 Oct 2026).
  *
  * A page is shown — linked anywhere, or listed in the sitemap — only when
- * both hold:
+ * all of these hold:
  *
+ * - it is **not switched off** (`PublishContext.off`): Templates stays
+ *   hidden until its switch is on, whatever the date (DEC-135);
  * - it is **published**: its `publishOn` day has begun in India
  *   (`isPublished`, KTD-2), or the deployment is a preview with
  *   `RESOURCES_PREVIEW` on (`lib/resources-context.ts`);
@@ -30,6 +34,8 @@ export interface ResourcePage {
     href: string;
     /** The day it goes live, in India (Asia/Kolkata). */
     publishOn: IsoDay;
+    /** The menu and footer column it is listed in. Resources when unset. */
+    menu?: "tools";
     /**
      * Pages under it the sitemap lists with it, each shown only when its
      * route exists (`/integrations/razorpay` needs `/integrations/[provider]`).
@@ -37,7 +43,7 @@ export interface ResourcePage {
     children?: readonly string[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, Templates, Link preview tool. */
+/** In the plan's order: Help, Integrations, Changelog, Templates, then the Tools menu's free tools (Link preview, QR code maker). */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -80,6 +86,16 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         line: "See how your link looks when it's shared, and what to fix.",
         href: "/tools/link-preview",
         publishOn: "2026-10-05",
+        menu: "tools",
+    },
+    {
+        id: "qr-code-maker",
+        name: "QR code maker",
+        line: "A QR code for your link, with your logo and colour. Free.",
+        href: "/tools/qr-code-maker",
+        // With early access, as Help and Templates (QR codes plan U9).
+        publishOn: "2026-10-17",
+        menu: "tools",
     },
 ];
 
@@ -95,7 +111,10 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         href: "/privacy",
         // 8 Oct: merchants' own trackers (DEC-108). 9 Oct: Vercel removed
         // from the processors; Cloudflare serves every site (DEC-107).
-        publishOn: "2026-10-09",
+        // 10 Oct: aligned with India's DPDP Act (rev 55).
+        // Also 10 Oct: the QR code maker's email and how long it is kept
+        // (QR codes plan U9).
+        publishOn: "2026-10-10",
     },
     {
         id: "terms",
@@ -103,8 +122,10 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         line: "The agreement for using Saroh.",
         href: "/terms",
         // 7 Oct: the term ends with a request to pay (DEC-100). 8 Oct:
-        // merchants' own trackers (DEC-108).
-        publishOn: "2026-10-08",
+        // merchants' own trackers (DEC-108). 9 Oct: the business is
+        // responsible for its sales, suspending at once, fair use (rev 46).
+        // 10 Oct: aligned with India's DPDP Act (rev 55).
+        publishOn: "2026-10-10",
     },
     {
         id: "refunds",
@@ -148,6 +169,22 @@ export interface PublishContext {
      * (a unit test that does not care): then every route counts as built.
      */
     routes: readonly string[] | null;
+    /**
+     * The ids of Resources pages switched off (DEC-135): never shown,
+     * whatever the date or the preview flag, and nothing under them either.
+     * None when unset.
+     */
+    off?: readonly string[];
+}
+
+/** Whether `href` is a switched-off Resources page, or a page under one. */
+function switchedOff(href: string, ctx: PublishContext): boolean {
+    if (!ctx.off || ctx.off.length === 0) return false;
+    return RESOURCE_PAGES.some(
+        (p) =>
+            ctx.off?.includes(p.id) &&
+            (href === p.href || href.startsWith(`${p.href}/`)),
+    );
 }
 
 /** Whether `path` is answered by one of the build's routes, dynamic segments included. */
@@ -174,17 +211,26 @@ export function isLive(
     return ctx.preview || isPublished(page.publishOn, ctx.now);
 }
 
-/** Whether a page may be linked: live, and its route is in this build. */
+/** Whether a page may be linked: not switched off, live, and its route is in this build. */
 export function isShown(
     page: { publishOn: IsoDay; href: string },
     ctx: PublishContext,
 ): boolean {
-    return isLive(page, ctx) && routeExists(page.href, ctx.routes);
+    return (
+        !switchedOff(page.href, ctx) &&
+        isLive(page, ctx) &&
+        routeExists(page.href, ctx.routes)
+    );
 }
 
-/** The Resources pages the nav and footer list now. */
+/** The Resources pages the nav and footer list now, the free tools apart. */
 export function shownResources(ctx: PublishContext): ResourcePage[] {
-    return RESOURCE_PAGES.filter((p) => isShown(p, ctx));
+    return RESOURCE_PAGES.filter((p) => !p.menu && isShown(p, ctx));
+}
+
+/** The free tools the nav's and footer's Tools list now. */
+export function shownTools(ctx: PublishContext): ResourcePage[] {
+    return RESOURCE_PAGES.filter((p) => p.menu === "tools" && isShown(p, ctx));
 }
 
 /** The legal pages the footer links now. */

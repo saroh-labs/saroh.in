@@ -166,3 +166,22 @@ export function heldCents(order: {
     );
     return Math.max(0, handPaidCents(order) + online);
 }
+
+/**
+ * What is left to refund on an order, in minor units: what it holds of what
+ * was paid ({@link heldCents}) less what was handed back by hand already.
+ */
+export function leftToRefundCents(order: {
+    total: DecimalLike;
+    paymentStatus: string;
+    paidByHand?: DecimalLike | null;
+    refundedByHand?: DecimalLike | null;
+    paymentIntents: readonly {
+        amountCents: number;
+        refunds: readonly { amountCents: number }[];
+    }[];
+}): number {
+    if (order.paymentStatus === "REFUNDED") return 0;
+    const byHand = order.refundedByHand ? cents(order.refundedByHand) : 0;
+    return Math.max(0, heldCents(order) - byHand);
+}

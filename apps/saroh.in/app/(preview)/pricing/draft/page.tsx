@@ -17,7 +17,7 @@ import { pricingPageModel } from "@/lib/pricing-view";
  * member who opened a preview link (`/pricing/preview?token=…`, KTD-10). The
  * token rides in an HttpOnly cookie and goes to the API with every request;
  * nothing is cached. Not indexed, no referrer, no Google Analytics
- * (`app/google-analytics.tsx`); `next.config.js` sets the same as headers.
+ * (`app/site-tags.tsx`); `next.config.js` sets the same as headers.
  *
  * Outside the `(v2)` group so the amber bar sits above the nav, as the
  * design draws it; it brings the V2 chrome itself.

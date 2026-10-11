@@ -22,6 +22,12 @@ jest.mock("@saroh/database", () => {
     const webhookEvent = { create: jest.fn() };
     return {
         prisma: {
+            // An active business may be charged (#921).
+            organization: {
+                findUnique: jest
+                    .fn()
+                    .mockResolvedValue({ lifecycleStatus: "ACTIVE" }),
+            },
             plan,
             subscription,
             merchantPaymentProvider,
@@ -37,6 +43,7 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { roleDenial } from "../organizations/organization-policy";
 import { PlansService } from "./plans.service";
 import {
     FakeBillingProvider,
@@ -74,7 +81,8 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
         organizationId: "org_1",
         userId: "user_1",
-        role: "ADMIN",
+        // Changing the plan is the Owner's alone (DEC-131, amended).
+        role: "OWNER",
         ...over,
     };
 }
@@ -114,6 +122,32 @@ describe("SubscriptionsService authz", () => {
             service.subscribe(ctx({ role: "MEMBER" }), { planKey: "pro" }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(planFindFirst).not.toHaveBeenCalled();
+    });
+
+    it.each(["ADMIN", "MEMBER", "REVIEWER"] as const)(
+        "denies %s subscribing and cancelling, in the owner-only sentence",
+        async (role) => {
+            const { service } = makeService();
+            const refusal = { response: roleDenial("billing:manage") };
+
+            await expect(
+                service.subscribe(ctx({ role }), { planKey: "pro" }),
+            ).rejects.toMatchObject(refusal);
+            await expect(
+                service.cancel(ctx({ role }), {}),
+            ).rejects.toMatchObject(refusal);
+            expect(planFindFirst).not.toHaveBeenCalled();
+            expect(subFindUnique).not.toHaveBeenCalled();
+        },
+    );
+
+    it("lets an ADMIN read the subscription (billing:read)", async () => {
+        const { service } = makeService();
+        subFindUnique.mockResolvedValue(null);
+
+        await expect(
+            service.getCurrent(ctx({ role: "ADMIN" })),
+        ).resolves.toBeNull();
     });
 
     it("denies a MEMBER reading the subscription (billing:read)", async () => {

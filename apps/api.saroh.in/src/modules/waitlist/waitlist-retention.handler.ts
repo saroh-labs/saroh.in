@@ -3,7 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
-import { LINK_PREVIEW_SOURCE } from "./waitlist-keys";
+import { LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE } from "./waitlist-keys";
 
 /** The self-rescheduling job that deletes old waitlist entries (U30, KTD-17). */
 export const WAITLIST_RETENTION_TYPE = "waitlist.retention";
@@ -65,12 +65,14 @@ export class WaitlistRetentionHandler {
      * The link preview tool's rule (Privacy: "a link-preview report: with
      * the email it was sent to, 12 months"): an entry that only ever asked
      * for a report goes 12 months after its last check, and any other entry
-     * forgets the link it checked then. Counts only deleted entries.
+     * forgets the link it checked then. The QR code maker's entries (QR
+     * codes plan U9) follow the same rule from their last use: they hold
+     * an email and that date, never a link. Counts only deleted entries.
      */
     private async sweepLinkReports(cutoff: Date): Promise<number> {
         const { count } = await prisma.waitlistSignup.deleteMany({
             where: {
-                source: LINK_PREVIEW_SOURCE,
+                source: { in: [LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE] },
                 checkedAt: { lt: cutoff },
                 invitedAt: null,
                 joinedAt: null,

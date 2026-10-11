@@ -363,6 +363,13 @@ export interface FindMandateChargeInput {
 export interface FoundMandateCharge {
     status: "NONE" | "PENDING" | "SUCCEEDED" | "FAILED";
     providerPaymentRef: string | null;
+    /**
+     * On `SUCCEEDED`: what the provider captured, in minor units, and its
+     * currency — compared with the charge before the invoice is paid
+     * (PAY-06). Absent: the provider's read didn't say.
+     */
+    amountCents?: number | null;
+    currency?: string | null;
 }
 
 /**

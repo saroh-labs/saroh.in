@@ -104,7 +104,7 @@ export function TimeZoneSelect({
                                     {o.name ? (
                                         <span className="text-muted-foreground">
                                             {" "}
-                                            — {o.name}
+                                            · {o.name}
                                         </span>
                                     ) : null}
                                 </span>

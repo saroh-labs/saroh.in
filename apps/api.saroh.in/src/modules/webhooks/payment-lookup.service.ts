@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { captureDiffers, describeMismatch } from "../payments/capture-mismatch";
 import { OPEN_INTENT_STATUSES } from "../payments/intent-state";
 import { openProviderCredentials } from "../payments/provider-credentials";
 import type {
@@ -28,7 +29,8 @@ import { WebhooksService } from "./webhooks.service";
  *   webhook, or another look-up, came first).
  * - `NOT_PAID` — no captured payment on the order yet.
  * - `MISMATCH` — a captured payment whose amount or currency is not the
- *   intent's: never settled, and logged for someone to look at.
+ *   intent's: never settled; logged, recorded as owed back and the intent
+ *   failed, as the webhook does (PAY-06).
  * - `UNAVAILABLE` — nothing to ask: no connection, or an adapter that can't
  *   look an order up.
  * - `ERROR` — the provider could not say. Nothing settled.
@@ -313,13 +315,23 @@ export class PaymentLookupService {
         );
         if (!captured) return this.stamp(intent, "NOT_PAID");
 
-        if (
-            captured.amountCents !== intent.amountCents ||
-            (captured.currency ?? "").toUpperCase() !==
-                intent.currency.toUpperCase()
-        ) {
+        const event = settlementEvent(
+            intent.provider,
+            providerIntentId,
+            intent,
+            captured,
+        );
+        // Strict: the provider's own read must name the amount it took.
+        if (captureDiffers(intent, captured, { strict: true })) {
             this.logger.warn(
-                `Payment ${captured.providerPaymentRef} on ${intent.provider} order ${providerIntentId} is ${String(captured.amountCents)} ${String(captured.currency)}, not intent ${intent.id}'s ${intent.amountCents} ${intent.currency}; not settled`,
+                `Payment ${captured.providerPaymentRef} on ${intent.provider} order ${providerIntentId} for intent ${intent.id}: ${describeMismatch(intent, captured)}; not settled`,
+            );
+            // Recorded as the webhook records it (PAY-06): owed back, and
+            // the intent failed so the customer can pay again.
+            await this.webhooks.recordLookedUpMismatch(
+                intent.provider,
+                intent.organizationId,
+                event,
             );
             return this.stamp(intent, "MISMATCH");
         }
@@ -327,12 +339,7 @@ export class PaymentLookupService {
         const { applied } = await this.webhooks.settleLookedUp(
             intent.provider,
             intent.organizationId,
-            settlementEvent(
-                intent.provider,
-                providerIntentId,
-                intent,
-                captured,
-            ),
+            event,
         );
         if (applied) {
             this.logger.log(
@@ -424,6 +431,9 @@ function settlementEvent(
         orderRef: intent.orderId ?? intent.invoiceId ?? undefined,
         providerPaymentRef: payment.providerPaymentRef,
         feeCents: payment.feeCents,
+        // Compared again by the reconciliation itself (PAY-06).
+        capturedAmountCents: payment.amountCents ?? undefined,
+        capturedCurrency: payment.currency ?? undefined,
         mandateLink,
     };
 }

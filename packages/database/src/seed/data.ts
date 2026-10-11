@@ -13,8 +13,64 @@
 export const SEED_PREFIX = "seed_";
 
 export const OWNER_EMAIL = "demo@saroh.dev";
-/** Not a secret: this database is allow-listed as development-only. */
-export const OWNER_PASSWORD = "demo-password-123";
+
+/**
+ * The password every seeded login gets on a LOCAL or CI throwaway database
+ * (its host is this machine). It is written in the docs and the repo is
+ * public, so it never goes on any other database: there the seed takes
+ * `SEED_PASSWORD` instead, and refuses this one (owner, 9 Oct: the dev
+ * environment's demo login shared it). See {@link seedPassword}.
+ */
+export const FIXTURE_PASSWORD = "demo-password-123";
+
+/** Hosts that are this machine: a local or CI throwaway database. */
+const THROWAWAY_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** Whether a connection string points at this machine. */
+export function isThrowawayDatabase(url: string | undefined): boolean {
+    if (!url) return false;
+    try {
+        return THROWAWAY_HOSTS.has(new URL(url).hostname);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The password the seed gives every login it writes.
+ *
+ * - `SEED_PASSWORD` when set: at least 12 characters, and never the
+ *   documented fixture on a database that isn't this machine's.
+ * - Otherwise the fixture, on a local or CI throwaway database only.
+ * - Otherwise it refuses: a shared database (the dev environment's) must
+ *   not get a password anyone can read in the repo.
+ */
+export function seedPassword(env: NodeJS.ProcessEnv = process.env): string {
+    const own = env.SEED_PASSWORD?.trim();
+    const local = isThrowawayDatabase(env.DATABASE_URL);
+    if (own) {
+        if (own.length < 12) {
+            throw new Error("SEED_PASSWORD must be at least 12 characters.");
+        }
+        if (!local && own === FIXTURE_PASSWORD) {
+            throw new Error(
+                "SEED_PASSWORD is the documented fixture password. Choose another for a database that isn't on this machine.",
+            );
+        }
+        return own;
+    }
+    if (local) return FIXTURE_PASSWORD;
+    throw new Error(
+        "This database isn't on this machine, so the seed won't use the documented password. Set SEED_PASSWORD (12+ characters) and keep it out of the repo.",
+    );
+}
+
+/** How the seed's closing lines name the password: the fixture, or not at all. */
+export function passwordHint(password: string): string {
+    return password === FIXTURE_PASSWORD
+        ? password
+        : "the SEED_PASSWORD you set";
+}
 
 /**
  * Someone invited to look at the website and say what they think (#193, #276).
@@ -30,7 +86,6 @@ export const OWNER_PASSWORD = "demo-password-123";
  * covered by the API's `reviewer-scope.spec.ts`.
  */
 export const REVIEWER_EMAIL = "reviewer@saroh.dev";
-export const REVIEWER_PASSWORD = "demo-password-123";
 
 /**
  * Farah, on Northwind Store's counter: on the team as "Storefront team"
@@ -39,7 +94,14 @@ export const REVIEWER_PASSWORD = "demo-password-123";
  * the browser spec `storefront-team-orders.spec.ts` signs in as her.
  */
 export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
-export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
+
+/**
+ * Tara, on Northwind's diary with a login: on the team as "Calendar only"
+ * (#868), so she reads and changes her own bookings and nothing else of the
+ * business. The browser spec `role-calendar-only.spec.ts` signs in as her
+ * (`seed/calendar-only-teammate.ts`).
+ */
+export const CALENDAR_ONLY_EMAIL = "tara.calendar@saroh.dev";
 
 /**
  * Someone just starting out (DEC-070, K2). Browser specs about setting up
@@ -48,7 +110,6 @@ export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
  * with nothing turned on, for reading a first run (K3, `seed/founder.ts`).
  */
 export const FOUNDER_EMAIL = "founder@saroh.dev";
-export const FOUNDER_PASSWORD = "demo-password-123";
 
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
@@ -700,25 +761,29 @@ export const POSTS: readonly {
 // --- Providers -----------------------------------------------------------
 
 /**
- * A second payment provider, this one live.
+ * A second payment provider, the one Northwind takes money through.
  *
  * The RAZORPAY row the seed already writes is DISABLED, which on its own makes
  * `/settings/providers` report Payments as "Not working" — a true reading of a
- * merchant who has connected nothing that works, but not the state most of them
- * are in. Adding CASHFREE as CONNECTED (rather than editing the Razorpay row)
- * leaves that deliberate fixture intact and tells a story merchants recognise:
- * they switched processor and never removed the old connection.
+ * merchant who has connected nothing that works. CASHFREE is a stand-in
+ * connection (`stand-in-providers.ts`): CONNECTED on a throwaway database,
+ * where the browser specs need Pay now, pay links and Send to work, and not
+ * written at all on a shared one, where its placeholder keys could only make
+ * checkout fail. Left beside the Razorpay row, it tells a story merchants
+ * recognise: they switched processor and never removed the old connection.
  */
 export const LIVE_PAYMENT_PROVIDER = {
     provider: "CASHFREE",
-    status: "CONNECTED",
 } as const;
 
-/** The org's sending identity, so Communications reports a real connection. */
+/**
+ * The org's sending identity, a stand-in connection like Cashfree's: on a
+ * throwaway database Communications reads as connected; on a shared one
+ * there is none, so no email is queued through keys nobody can open.
+ */
 export const COMMUNICATION_PROVIDER = {
     channel: "EMAIL",
     provider: "RESEND",
-    status: "CONNECTED",
     fromAddress: "northwind@example.com",
 } as const;
 

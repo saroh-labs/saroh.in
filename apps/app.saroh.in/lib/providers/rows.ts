@@ -1,3 +1,4 @@
+import { membershipsWarning } from "@/lib/payments/memberships-warning";
 import { providerName } from "@/lib/payments/providers";
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
@@ -271,7 +272,19 @@ export function needsWebhookSecret(p: ConnectedPaymentProvider): boolean {
 }
 
 const PAYMENTS_CONSEQUENCE =
-    "Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back.";
+    "Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again. They cannot be read back.";
+
+/**
+ * Disconnecting a payment provider, in the confirm: what stops, and what it
+ * doesn't cancel at the provider — the customers' autopay memberships there,
+ * with how many are active (owner, 9 Oct, #921).
+ */
+export function paymentsConsequence(p: {
+    provider: string;
+    activeMemberships?: number;
+}): string {
+    return `${PAYMENTS_CONSEQUENCE} ${membershipsWarning(p.provider, p.activeMemberships ?? 0)}`;
+}
 
 export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
     const has = (key: ProviderHealth["key"]) =>
@@ -361,16 +374,16 @@ function paymentEntry(
         type: "Payments",
         state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
-            ? "Disconnected — checkout can't take online payments through it until it is connected again."
+            ? "Disconnected. Checkout can't take online payments through it until it is connected again."
             : refused
-              ? `Needs attention — ${providerName(p.provider)} refused its keys, so no one can pay online through it. Enter the keys again to clear it.`
+              ? `Needs attention. ${providerName(p.provider)} refused its keys, so no one can pay online through it. Enter the keys again to clear it.`
               : noKey
-                ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+                ? "Needs its key id. Checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
                 : noSecret
-                  ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
+                  ? "Needs its webhook signing secret. Payments can't be confirmed until you add it."
                   : stores.length > 0
                     ? sentence(`Takes online payments at ${words(stores)}`)
-                    : "Ready to take online payments — no location's checkout uses it yet.",
+                    : "Ready to take online payments. No location's checkout uses it yet.",
         fix: refused
             ? "Enter keys again"
             : noKey
@@ -391,7 +404,7 @@ function paymentEntry(
         manageHref: live ? dashboardFor(p.provider) : null,
         target: live ? { kind: "payments", provider: p.provider } : null,
         setup: { kind: "payments", provider: p.provider },
-        consequence: PAYMENTS_CONSEQUENCE,
+        consequence: paymentsConsequence(p),
         // Connecting it again is one more of the business's own accounts:
         // the plan's to allow, as the API asks it (UX-017).
         lock: live
@@ -426,17 +439,17 @@ const CHANNEL = {
         type: "Email",
         purpose: "Email to your customers and leads.",
         stopped:
-            "Disconnected — email isn't sent until a provider is connected again.",
+            "Disconnected. Email isn't sent until a provider is connected again.",
         consequence:
-            "Email stops being sent straight away; ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back.",
+            "Email stops being sent straight away. Ones already sent are not affected. Connecting again means entering the keys again. They cannot be read back.",
     },
     WHATSAPP: {
         type: "WhatsApp",
         purpose: "WhatsApp messages to your customers and leads.",
         stopped:
-            "Disconnected — WhatsApp messages aren't sent until a provider is connected again.",
+            "Disconnected. WhatsApp messages aren't sent until a provider is connected again.",
         consequence:
-            "WhatsApp messages stop being sent straight away; ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back.",
+            "WhatsApp messages stop being sent straight away. Ones already sent are not affected. Connecting again means entering the keys again. They cannot be read back.",
     },
 } as const;
 
@@ -446,13 +459,13 @@ const CHANNEL = {
  * before disconnecting one, when Saroh would take over.
  */
 const SAROH_TAKES_OVER =
-    "Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance. All other email stops being sent. Ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back.";
+    "Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance. All other email stops being sent. Ones already sent are not affected. Connecting again means entering the keys again. They cannot be read back.";
 
 function disconnectedEmailNote(state: SarohEmailState | null | undefined) {
     if (!state || !sarohRouteOn(state)) return null;
     return state.state === "PAUSED"
-        ? `Disconnected — Saroh's booking emails are paused until ${state.resetsOn}; other email isn't sent until a provider is connected again.`
-        : "Disconnected — Saroh sends your booking emails for now, counted against your plan; other email isn't sent until a provider is connected again.";
+        ? `Disconnected. Saroh's booking emails are paused until ${state.resetsOn}. Other email isn't sent until a provider is connected again.`
+        : "Disconnected. Saroh sends your booking emails for now, counted against your plan. Other email isn't sent until a provider is connected again.";
 }
 
 function commsEntry(
@@ -472,7 +485,7 @@ function commsEntry(
         type: spec.type,
         state: refused ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: refused
-            ? `Needs attention — ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
+            ? `Needs attention. ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
             : live
               ? spec.purpose
               : ((email ? disconnectedEmailNote(sarohEmail) : null) ??

@@ -17,20 +17,27 @@ import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
-import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
+import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
 import { dontCachePage, pageCacheRules } from "@/lib/page-cache/site-rules";
-import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
+import {
+    getMovedTo,
+    getSiteForHost,
+    shareImages,
+    siteOriginFor,
+} from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
-import { getFooterFacts } from "@/lib/site-footer";
+import { getSiteContact } from "@/lib/site-contact";
+import { getFooterFacts, siteSeller, soldByFor } from "@/lib/site-footer";
 import { getSiteHead, NO_HEAD } from "@/lib/site-head";
 import { classifySiteHost } from "@/lib/site-host-mode";
+import { siteIconMetadata } from "@/lib/site-icon";
 import { relayFor } from "@/lib/site-relay";
 import {
     isPlatformAddress,
@@ -40,7 +47,7 @@ import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { needsConsent } from "@/lib/trackers";
-import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
+import { reportBusinessHref, SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { SITE_FACES } from "@/lib/site-fonts";
 import {
@@ -48,7 +55,12 @@ import {
     requestSignInCode,
     verifySignInCode,
 } from "./account/actions";
-import { checkoutStanding, quoteBag, startCheckout } from "./shop/actions";
+import {
+    checkoutStanding,
+    quoteBag,
+    savedDeliveryAddress,
+    startCheckout,
+} from "./shop/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -111,6 +123,9 @@ export async function generateMetadata({
         {
             title,
             description,
+            // The site's own icon, else the business logo, else its plain
+            // tile (DEC-124): resolved by the read above, never Saroh's.
+            icons: siteIconMetadata(resolved?.icon ?? null),
             openGraph: {
                 title,
                 description,
@@ -129,7 +144,9 @@ export async function generateMetadata({
                 description,
                 images,
             },
-            metadataBase: new URL(`https://${domain}`),
+            // Share cards name the site's primary address (its own domain
+            // when it has one), whichever host this request came on.
+            metadataBase: new URL(siteOriginFor(resolved, domain)),
             ...(verification ? { verification } : {}),
         },
     );
@@ -200,26 +217,34 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout, visit, footerFacts, navigation, head] =
-        await Promise.all([
-            siteId ? getBookingPage(siteId) : null,
-            siteId ? getCatalogue(siteId) : null,
-            siteId ? getCheckoutOptions(siteId) : null,
-            // The footer's public phone and place (UX-038).
-            siteId ? getBookingVisit(siteId) : null,
-            // Its contact email and, on Free, the Saroh credit (DEC-101,
-            // DEC-102).
-            siteId ? getFooterFacts(siteId) : null,
-            // The menu less entries to home sections with nothing to show
-            // now (a Journal with no posts, Plans with none on sale): read
-            // beside the rest, not after it.
-            liveMenu(snapshot, siteId),
-            // The merchant's own trackers (DEC-108): live hosts only. Shared
-            // with generateMetadata's read of the codes through `cache`.
-            siteId && test.mode !== "test" && !resolved.release
-                ? getSiteHead(siteId)
-                : NO_HEAD,
-        ]);
+    const [
+        booking,
+        catalogue,
+        checkout,
+        contact,
+        footerFacts,
+        navigation,
+        head,
+    ] = await Promise.all([
+        siteId ? getBookingPage(siteId) : null,
+        siteId ? getCatalogue(siteId) : null,
+        siteId ? getCheckoutOptions(siteId) : null,
+        // The footer's contact group: the business's public phone and
+        // contact email, where customers come and its social links
+        // (UX-038, DEC-101, DEC-128), read live.
+        siteId ? getSiteContact(siteId) : null,
+        // On Free, the Saroh credit (DEC-102).
+        siteId ? getFooterFacts(siteId) : null,
+        // The menu less entries to home sections with nothing to show
+        // now (a Journal with no posts, Plans with none on sale): read
+        // beside the rest, not after it.
+        liveMenu(snapshot, siteId),
+        // The merchant's own trackers (DEC-108): live hosts only. Shared
+        // with generateMetadata's read of the codes through `cache`.
+        siteId && test.mode !== "test" && !resolved.release
+            ? getSiteHead(siteId)
+            : NO_HEAD,
+    ]);
     const asksConsent = head.trackers.some((t) => needsConsent(t.kind));
     const shopServes = catalogue?.ok ?? false;
     // Whose page this is for the page cache (#863), and what limits keeping
@@ -261,10 +286,12 @@ export default async function SiteLayout({
             <ShopBag
                 site={siteId}
                 businessName={snapshot.site.name}
+                soldBy={soldByFor(footerFacts, snapshot.site.name, true)}
                 api={{
                     quote: quoteBag,
                     start: startCheckout,
                     standing: checkoutStanding,
+                    savedAddress: savedDeliveryAddress,
                 }}
                 apiUrl={publicApiUrl()}
                 account={{
@@ -372,14 +399,34 @@ export default async function SiteLayout({
                             footer={snapshot.site.footer}
                             name={snapshot.site.name}
                             contact={{
-                                phone: visit?.phone ?? null,
-                                address: visit?.address ?? null,
-                                email: footerFacts?.email ?? null,
+                                phone: contact?.phone ?? null,
+                                email: contact?.email ?? null,
+                                address: null,
+                                places: contact?.places ?? [],
+                                social: contact?.social ?? [],
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
-                            credit={footerFacts?.credit ?? null}
+                            // "Report" rides with it: no Saroh link on a
+                            // paid site (DEC-121).
+                            credit={
+                                footerFacts?.credit
+                                    ? {
+                                          ...footerFacts.credit,
+                                          reportHref: reportBusinessHref(
+                                              test.host,
+                                          ),
+                                      }
+                                    : null
+                            }
                             // "Cookie choices" while a tracker asks (DEC-108).
                             cookieChoices={asksConsent}
+                            // "Sold by ‹legal name›" in the business's own
+                            // details, on every plan (DEC-121).
+                            seller={siteSeller(
+                                footerFacts,
+                                snapshot.site.name,
+                                shopServes,
+                            )}
                         />
                     }
                 >

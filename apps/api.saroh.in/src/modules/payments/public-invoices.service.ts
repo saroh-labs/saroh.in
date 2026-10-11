@@ -26,7 +26,10 @@ import {
     businessContactOf,
     businessPayInstructionsOf,
 } from "../organizations/business-pay-instructions";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import {
+    assertOrganizationOpen,
+    assertOrganizationWindingDown,
+} from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
@@ -323,9 +326,12 @@ export class PublicInvoicesService {
                     ? businessPayInstructionsOf(found.organizationId)
                     : undefined,
             ]);
-            // No way to pay set: a way to reach the business instead (UX-007).
+            // A way to reach the business: with no way to pay set (UX-007),
+            // and under Pay, for the customer with a question about the
+            // bill before they pay it. Not beside "How to pay us", which
+            // says how already.
             const businessContact =
-                payInstructions === null
+                payInstructions === null || (owed && payOnline)
                     ? await businessContactOf(found.organizationId)
                     : undefined;
             const view: PublicInvoiceView = autopay
@@ -516,7 +522,9 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        await assertOrganizationOpen(found.organizationId);
+        // Paying an invoice already sent is finishing it (DEC-120); a new
+        // autopay mandate, below, is not.
+        await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const invoice = await prisma.invoice.findFirst({
                 where: {

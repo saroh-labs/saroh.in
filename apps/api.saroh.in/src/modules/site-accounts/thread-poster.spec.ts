@@ -27,7 +27,7 @@ describe("invoiceSentence", () => {
         expect(
             invoiceSentence("INVOICE_SENT", invoice(), "Asia/Kolkata", now),
         ).toBe(
-            "Invoice RC-0012 for ₹2,400.00 is ready to pay. It's due by 15 Oct 2026.",
+            "Invoice RC-0012 for ₹2,400 is ready to pay. It's due by 15 Oct 2026.",
         );
     });
 
@@ -40,7 +40,7 @@ describe("invoiceSentence", () => {
                 now,
             ),
         ).toBe(
-            "A reminder: invoice RC-0012 for ₹2,400.00 is still to pay. It was due on 1 Oct 2026.",
+            "A reminder: invoice RC-0012 for ₹2,400 is still to pay. It was due on 1 Oct 2026.",
         );
     });
 
@@ -52,6 +52,6 @@ describe("invoiceSentence", () => {
                 "Asia/Kolkata",
                 now,
             ),
-        ).toBe("Invoice RC-0012 for ₹2,400.00 is ready to pay.");
+        ).toBe("Invoice RC-0012 for ₹2,400 is ready to pay.");
     });
 });

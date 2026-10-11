@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
-
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentValue } from "@saroh/ui/absent-value";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
 import type { OrderFilter } from "@/lib/customer-workspace/view";
@@ -11,11 +13,13 @@ import {
     orderStatus,
     orderWhat,
     ordersShown,
-    whenText,
 } from "@/lib/customer-workspace/view";
-import { money } from "@/lib/subscriptions/view";
 
-import { Chips, Empty, RowPill } from "./parts";
+import { listTable } from "@/components/shared/list-toolbar";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { cn } from "@saroh/ui/lib/utils";
+import { TextLink } from "@saroh/ui/text-link";
+import { Chips, Empty } from "./parts";
 
 const COLS =
     "grid grid-cols-[70px_minmax(0,1.6fr)_90px_90px_100px_90px] gap-2.5";
@@ -25,6 +29,13 @@ const COLS =
  * the desk a table; on a phone (under 760px) a card per order in the Orders
  * list's own frame, so nothing hides sideways.
  */
+/** The tab with nothing under its filter: what is true, in one line. */
+function ordersEmpty(filter: OrderFilter) {
+    return filter === "open"
+        ? { title: "Nothing open", description: "Every order is done." }
+        : { title: "No past orders yet" };
+}
+
 export function OrdersTab({
     rows,
     count,
@@ -55,18 +66,27 @@ export function OrdersTab({
                 value={filter}
                 onChange={onFilter}
                 chips={[
-                    { key: "all", label: `All · ${count}` },
+                    { key: "all", label: "All orders", count },
                     {
                         key: "open",
-                        label: `Open · ${rows.filter(isOpen).length}`,
+                        label: "Open",
+                        count: rows.filter(isOpen).length,
                     },
                     { key: "past", label: "Past" },
                 ]}
             />
-            <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5 max-[759px]:hidden">
+            {/* The one table look: the head band, rows ruled edge to edge. */}
+            <div
+                data-list-table=""
+                className={cn(
+                    listTable.frame,
+                    "overflow-x-auto max-[759px]:hidden",
+                )}
+            >
                 <div className="min-w-[560px]">
                     <div
-                        className={`${COLS} border-b border-foreground/10 pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground`}
+                        data-list-head=""
+                        className={cn(COLS, listTable.head, "rounded-t-[10px]")}
                     >
                         <span>Order</span>
                         <span>What</span>
@@ -78,41 +98,50 @@ export function OrdersTab({
                     {shown.map((o) => (
                         <div
                             key={o.id}
-                            className={`${COLS} items-center border-b border-foreground/10 py-2.5 text-[13px] last:border-b-0`}
+                            className={cn(
+                                COLS,
+                                listTable.row,
+                                "items-center text-[13px]",
+                            )}
                         >
-                            <Link
+                            <TextLink
                                 href={`/commerce/orders/${o.id}`}
-                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-mono text-[12px]"
                             >
                                 #{o.number}
-                            </Link>
+                            </TextLink>
                             <span className="text-foreground/75">
                                 {orderWhat(o)}
                             </span>
                             <span className="tabular-nums">
-                                {o.total && o.currency
-                                    ? money(o.total, o.currency)
-                                    : "—"}
+                                {o.total && o.currency ? (
+                                    formatMoneyMajor(o.total, o.currency)
+                                ) : (
+                                    <AbsentValue says="Not known" />
+                                )}
                             </span>
                             <span className="text-muted-foreground">
                                 {o.via.storefront.name}
                             </span>
                             <span className="text-muted-foreground">
-                                {whenText(o.placedAt, timeZone, now)}
+                                {formatDate(o.placedAt, timeZone, {
+                                    now,
+                                    relative: true,
+                                })}
                             </span>
                             <span>
-                                <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                <StatusBadge tone={isOpen(o) ? "ok" : "off"}>
                                     {orderStatus(o)}
-                                </RowPill>
+                                </StatusBadge>
                             </span>
                         </div>
                     ))}
                     {!shown.length ? (
-                        <p className="py-3 text-[13px] text-muted-foreground">
-                            {filter === "open"
-                                ? "Nothing open — every order is done."
-                                : "No past orders yet."}
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="py-3"
+                            {...ordersEmpty(filter)}
+                        />
                     ) : null}
                 </div>
             </div>
@@ -136,7 +165,7 @@ export function OrdersTab({
                             aside={
                                 o.total && o.currency ? (
                                     <span className="font-display text-[14px] font-semibold tabular-nums">
-                                        {money(o.total, o.currency)}
+                                        {formatMoneyMajor(o.total, o.currency)}
                                     </span>
                                 ) : null
                             }
@@ -145,14 +174,19 @@ export function OrdersTab({
                                     <span className="font-mono">
                                         #{o.number}
                                     </span>
-                                    <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                    <StatusBadge
+                                        tone={isOpen(o) ? "ok" : "off"}
+                                    >
                                         {orderStatus(o)}
-                                    </RowPill>
+                                    </StatusBadge>
                                 </>
                             }
                             footer={
                                 <div className="text-[12px] text-muted-foreground">
-                                    {whenText(o.placedAt, timeZone, now)}
+                                    {formatDate(o.placedAt, timeZone, {
+                                        now,
+                                        relative: true,
+                                    })}
                                     {` · ${o.via.storefront.name}`}
                                 </div>
                             }
@@ -160,21 +194,16 @@ export function OrdersTab({
                     ))}
                 </ul>
             ) : (
-                <p className="rounded-xl border border-border bg-card p-3 text-[13px] text-muted-foreground min-[760px]:hidden">
-                    {filter === "open"
-                        ? "Nothing open — every order is done."
-                        : "No past orders yet."}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="rounded-xl border border-border bg-card p-3 min-[760px]:hidden"
+                    {...ordersEmpty(filter)}
+                />
             )}
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
                     The latest {rows.length} of {count} orders.{" "}
-                    <Link
-                        href="/commerce/orders"
-                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
-                        All orders
-                    </Link>
+                    <TextLink href="/commerce/orders">All orders</TextLink>
                 </p>
             ) : null}
         </>

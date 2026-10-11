@@ -45,6 +45,8 @@ jest.mock("@saroh/database", () => {
         // A template's enquiry sections get their Form (K15): the starter
         // has none.
         form: { create: jest.fn() },
+        // The logo that stands in for a site's icon (DEC-124): none here.
+        businessProfile: { findUnique: jest.fn(async () => null) },
         // The shop's rollout flag, never configured here: off.
         featureFlagOverride: { findUnique: jest.fn(async () => null) },
         featureFlag: { findUnique: jest.fn(async () => null) },
@@ -68,6 +70,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { roleDenial } from "../organizations/organization-policy";
 import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
@@ -504,7 +507,9 @@ describe("SitesService.createFromTemplate", () => {
             service.createFromTemplate(ctx({ role: "MEMBER" }), {
                 name: "Acme",
             }),
-        ).rejects.toThrow(/MEMBER.*site:create/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:create"),
+        });
 
         // Denied before any DB work.
         expect(orgFindUnique).not.toHaveBeenCalled();
@@ -548,6 +553,35 @@ describe("SitesService.getSite", () => {
         // What the canvas renders as markup is what publish would write.
         expect(site.footerPreview?.value).toContain("<p>Hill Road</p>");
         expect(site.footerPreview?.value).not.toMatch(/script|onerror/i);
+    });
+
+    it("dates each page by its last change, page or sections (#908)", async () => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            pages: [
+                {
+                    id: "page_1",
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    hidden: false,
+                    kind: "FREE",
+                    inMenu: true,
+                    updatedAt: new Date("2026-10-01T09:00:00Z"),
+                    versions: [{ updatedAt: new Date("2026-10-05T12:00:00Z") }],
+                },
+            ],
+        });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        expect(site.pages[0]).toEqual(
+            expect.objectContaining({
+                id: "page_1",
+                updatedAt: new Date("2026-10-05T12:00:00Z"),
+            }),
+        );
+        // The draft is read for its date only; it never leaves the API.
+        expect(site.pages[0]).not.toHaveProperty("versions");
     });
 
     it("has no footer preview when there is no footer", async () => {

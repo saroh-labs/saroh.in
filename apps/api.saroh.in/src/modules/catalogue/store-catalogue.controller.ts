@@ -14,6 +14,7 @@ import {
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
@@ -42,7 +43,7 @@ import { SkuService } from "./sku.service";
  * rules and calls the same organization-scoped service.
  */
 @Controller("stores/:storeId")
-@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@UseGuards(BetterAuthGuard, StoreLifecycleGuard, ModuleEnforcementGuard)
 @RequireModule("COMMERCE")
 export class CatalogueController {
     constructor(

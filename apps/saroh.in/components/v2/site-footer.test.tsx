@@ -29,9 +29,22 @@ describe("SiteFooter", () => {
         ).toBe("mailto:contact@saroh.in");
     });
 
+    it("links customers of a business to /customers, always (DEC-121)", () => {
+        render(<SiteFooter />);
+        expect(
+            screen
+                .getByRole("link", { name: "Bought from a business on Saroh?" })
+                .getAttribute("href"),
+        ).toBe("/customers");
+    });
+
     it("says who makes Saroh, and has no Resources column, Privacy or Terms before they're live", () => {
         render(<SiteFooter />);
-        expect(screen.getByText(MADE_BY)).toBeTruthy();
+        expect(
+            screen.getByText(
+                `${MADE_BY}. © ${new Date().getFullYear()}. All rights reserved.`,
+            ),
+        ).toBeTruthy();
         expect(screen.queryByText("Resources")).toBeNull();
         expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
         expect(screen.queryByRole("link", { name: /Terms/ })).toBeNull();
@@ -62,5 +75,48 @@ describe("SiteFooter", () => {
             screen.getByRole("button", { name: "Cookie choices" }),
         ).toBeTruthy();
         expect(screen.queryByRole("link", { name: /Terms/ })).toBeNull();
+    });
+
+    it("lists the free tools in a Tools column of their own", () => {
+        render(
+            <SiteFooter
+                resources={[
+                    { name: "Changelog", line: "", href: "/changelog" },
+                ]}
+                tools={[
+                    {
+                        name: "QR code maker",
+                        line: "",
+                        href: "/tools/qr-code-maker",
+                    },
+                ]}
+            />,
+        );
+        const tool = screen.getByRole("link", { name: "QR code maker" });
+        expect(tool.parentElement?.firstElementChild?.textContent).toBe(
+            "Tools",
+        );
+    });
+
+    it("says what the name means under the logo", () => {
+        render(<SiteFooter />);
+        expect(screen.getByText("Let's rise together.")).toBeTruthy();
+        expect(
+            screen.getByText(/sa \(with\) \+ aaroh \(rising\)/),
+        ).toBeTruthy();
+    });
+
+    it("links each of Saroh's accounts by name, as a mark", () => {
+        render(<SiteFooter />);
+        const follow = screen.getByRole("list", { name: "Follow Saroh" });
+        expect(follow.querySelectorAll("a")).toHaveLength(5);
+        for (const [name, href] of [
+            ["Saroh on Instagram", "https://www.instagram.com/sarohlabs"],
+            ["Saroh on GitHub", "https://github.com/saroh-labs/saroh.in"],
+        ] as const) {
+            const link = screen.getByRole("link", { name });
+            expect(link.getAttribute("href")).toBe(href);
+            expect(link.querySelectorAll("svg path").length).toBeGreaterThan(0);
+        }
     });
 });

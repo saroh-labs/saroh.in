@@ -125,7 +125,7 @@ describe("settingsNudges (DEC-056)", () => {
             key: "businessType",
             left: true,
             // Straight to the Type field on Business › Identity.
-            href: "/settings/organization?section=identity#business-type",
+            href: "/settings/organization?section=identity&edit=type",
         });
         // A type this app doesn't know reads as Not set; `company` is Pvt Ltd.
         expect(
@@ -449,5 +449,76 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
             "Reconnect email",
         );
         expect(list.outside).toEqual([]);
+    });
+});
+
+describe("who customers are buying from (DEC-121)", () => {
+    const published = { ...invoicing, sites: 1, sitesNotLive: 0 };
+    const noAddress = {
+        line1: null,
+        line2: null,
+        city: null,
+        postalCode: null,
+        state: null,
+        stateName: null,
+    };
+    const seller = (
+        settings: Parameters<typeof settingsNudges>[0]["settings"],
+    ) =>
+        settingsNudges({ settings, modules: [], messaging: null }).find(
+            (n) => n.key === "seller",
+        );
+
+    it("asks a business with a published site for its legal name, address and a contact", () => {
+        expect(
+            seller({
+                profile,
+                logo: null,
+                setup: published,
+                registeredAddress: noAddress,
+            }),
+        ).toMatchObject({
+            label: "Add your business's legal name, address and a contact",
+            why: "Customers must be able to see who they're buying from.",
+            left: true,
+        });
+    });
+
+    it("is done with all three, an email or the website's phone as the contact", () => {
+        const base = {
+            logo: null,
+            setup: published,
+            registeredAddress: { ...noAddress, line1: "12 Hill Road" },
+        };
+        const named = { ...profile, legalName: "Rye Foods LLP" };
+        expect(
+            seller({
+                ...base,
+                profile: { ...named, contactEmail: "hello@rye.example.com" },
+            })?.left,
+        ).toBe(false);
+        expect(
+            seller({ ...base, profile: { ...named, phone: "+919845012345" } })
+                ?.left,
+        ).toBe(false);
+        // A name and an address, but nobody to reach.
+        expect(seller({ ...base, profile: named })?.left).toBe(true);
+    });
+
+    it("is not asked without a published site, or when the address is unread", () => {
+        expect(
+            seller({
+                profile,
+                logo: null,
+                setup: { ...published, sitesNotLive: 1 },
+                registeredAddress: noAddress,
+            }),
+        ).toBeUndefined();
+        expect(
+            seller({ profile, logo: null, setup: published }),
+        ).toBeUndefined();
+        expect(
+            seller({ profile, logo: null, registeredAddress: noAddress }),
+        ).toBeUndefined();
     });
 });

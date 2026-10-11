@@ -1,5 +1,12 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import { PageLoading } from "@/components/shared/page-loading";
 
 export default function Loading() {
-    return <ListSkeleton />;
+    return (
+        <PageLoading
+            shape="dashboard"
+            width="full"
+            breadcrumb={["Bookings", "Calendar"]}
+            label="Loading the calendar"
+        />
+    );
 }

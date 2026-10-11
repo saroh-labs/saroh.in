@@ -173,6 +173,7 @@ export function BusinessCalendar({
     return (
         <>
             <PageHeader
+                holdsData={false}
                 breadcrumb={["Home", "Overview"]}
                 title={monthTitle(data.month)}
                 className="mb-0"
@@ -278,9 +279,9 @@ export function BusinessCalendar({
 
             <p className="!mt-3 text-[11.5px] text-muted-foreground">
                 Everything here is read from orders, subscriptions, invoices and
-                bookings — nothing is entered on the calendar itself.{" "}
+                bookings. Nothing is entered on the calendar itself.{" "}
                 <span className="min-[760px]:hidden">
-                    Each dot is a layer with something that day; red means
+                    Each dot is a layer with something that day, and red means
                     something that needs you. Tap a day to see it.
                 </span>
                 {cash ? (

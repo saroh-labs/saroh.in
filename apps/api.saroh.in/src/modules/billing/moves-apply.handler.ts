@@ -3,8 +3,9 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay } from "../invoices/invoice-paper-view";
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
@@ -20,6 +21,7 @@ import {
 } from "./plan-ending";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
+import { remindRenewals } from "./renewal-reminder-notice";
 import { endTermAtInTx } from "./term-end";
 import { remindEndingTerms } from "./term-ending-notice";
 
@@ -49,6 +51,8 @@ import { remindEndingTerms } from "./term-ending-notice";
  *    move pauses; a move the business chose for its period's end, or one
  *    that already happened, is told here (`move-down-notice.ts`). Each
  *    notice that lists what pauses starts the 7-day clock (`over-limit.ts`).
+ * 6. **Renewals** (#804). An autopay charge due within 3 days is told once,
+ *    by email (`renewal-reminder.ts`, `renewal-reminder-notice.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -143,6 +147,7 @@ export class MovesApplyHandler {
             this.paused,
             this.access,
         );
+        out.reminded += await remindRenewals(now, this.logger);
         return out;
     }
 
@@ -270,7 +275,7 @@ export class MovesApplyHandler {
             stage,
         );
         const zone = await businessTimezone(prisma, organizationId);
-        const endsOn = paperDay(ending.endsAt.toISOString(), zone);
+        const endsOn = dayWords(ending.endsAt, zone, { year: true });
         // What the end pauses (#801), read as the business will be then.
         const measure = await this.paused.previewAt(
             organizationId,
@@ -305,7 +310,8 @@ export class MovesApplyHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId,
-                    type: PLAN_ENDING_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_ENDING_NOTIFICATION_TYPE, {}),
                     title: words.title,
                     body: words.body,
                 },

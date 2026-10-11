@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { demoUser, urls } from "../playwright.config";
-import { asNewVisitor, signInOnSheet } from "./site-codes";
+import { asNewVisitor, nameThenBook, signInOnSheet } from "./site-codes";
 
 /**
  * A customer's session on a merchant's site (ADR-011; round-2 plan A, A3),
@@ -84,12 +84,13 @@ test.describe("site sign-in: the API side", () => {
     test("a workspace session doesn't sign anyone in on the site", async ({
         page,
     }) => {
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
+        // The password form: /login alone asks for an email code.
+        await page.goto(`${urls.ACCOUNTS_URL}/login?with=password`);
         await page.getByLabel("Email").fill(demoUser.email);
         await page
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
+        await page.getByRole("button", { name: "Sign in" }).click();
         await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
             timeout: 30_000,
         });
@@ -116,12 +117,13 @@ test.describe("site sign-in: in the browser", () => {
     test.beforeEach(({ page }) => asNewVisitor(page));
 
     async function signInStaff(page: Page) {
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
+        // The password form: /login alone asks for an email code.
+        await page.goto(`${urls.ACCOUNTS_URL}/login?with=password`);
         await page.getByLabel("Email").fill(demoUser.email);
         await page
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
+        await page.getByRole("button", { name: "Sign in" }).click();
         await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
             timeout: 30_000,
         });
@@ -151,7 +153,7 @@ test.describe("site sign-in: in the browser", () => {
         );
         await openDays.nth(day).click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-            hasText: /^\d{2}:\d{2}$/,
+            hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
         await expect(times.nth(nth)).toBeVisible({ timeout: 15_000 });
         await times.nth(nth).click();
@@ -164,7 +166,6 @@ test.describe("site sign-in: in the browser", () => {
         const email = `signin-${testInfo.project.name}-${Date.now()}@example.in`;
 
         await chooseTime(page);
-        await page.getByLabel("Name").fill("Asha Rao");
         const desk = page.getByRole("radio", { name: /Pay at the desk/ });
         if (await desk.count()) await desk.click();
         await page
@@ -177,6 +178,8 @@ test.describe("site sign-in: in the browser", () => {
             ),
         ).toBeVisible();
         await signInOnSheet(page, email);
+        // A new account: its name is asked once signed in.
+        await nameThenBook(page, "Asha Rao");
         await expect(
             page.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });

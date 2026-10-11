@@ -190,7 +190,8 @@ describe("Take ₹X at the desk", () => {
         typeInto(cashGiven(), "300");
         expect(dialog().textContent).toContain("Short ₹200");
         expect(dialog().textContent).toContain("That's ₹200 short.");
-        expect(button(/^Take ₹500 cash$/).disabled).toBe(true);
+        // The button stays on: what is wrong is already said.
+        expect(button(/^Take ₹500 cash$/).disabled).toBe(false);
     });
 
     it("takes cash with what was given, says the change, and refreshes", async () => {
@@ -204,7 +205,7 @@ describe("Take ₹X at the desk", () => {
             receivedCents: 100_000,
         });
         expect(showSuccess).toHaveBeenCalledWith(
-            "₹500 taken in cash — give ₹500 change.",
+            "₹500 taken in cash. Give ₹500 change.",
         );
         expect(refresh).toHaveBeenCalled();
         expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -265,14 +266,16 @@ describe("Take ₹X at the desk", () => {
     it("never offers a link for what's left after a deposit, or without a provider", () => {
         openTake({ byLink: false });
         expect(chip("Send a pay link").disabled).toBe(true);
-        expect(chip("Send a pay link").title).toContain("take the rest here");
+        expect(
+            chip("Send a pay link").getAttribute("aria-description"),
+        ).toContain("take the rest here");
         act(() => root.unmount());
         root = createRoot(host);
         openTake({ canLink: false });
         expect(chip("Send a pay link").disabled).toBe(true);
-        expect(chip("Send a pay link").title).toContain(
-            "Connect a payment provider",
-        );
+        expect(
+            chip("Send a pay link").getAttribute("aria-description"),
+        ).toContain("No payment provider connected");
     });
 });
 
@@ -362,7 +365,7 @@ describe("the booking page's Take ₹X", () => {
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
         expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments — ask an owner or admin.",
+            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
         );
         // No desk at all (an older page): nothing to say.
         renderDetail(detail({}));
@@ -484,7 +487,7 @@ describe("the calendar quick look's Take ₹X", () => {
         const trigger = peekTake();
         expect(trigger?.textContent).toBe("Take ₹500");
         expect(document.body.textContent).toContain(
-            "Not yet — pays at the session",
+            "Not yet. Pays at the session",
         );
         act(() => trigger?.click());
         const dialogs = document.querySelectorAll('[role="dialog"]');
@@ -497,7 +500,7 @@ describe("the calendar quick look's Take ₹X", () => {
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
         expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments — ask an owner or admin.",
+            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
         );
     });
 

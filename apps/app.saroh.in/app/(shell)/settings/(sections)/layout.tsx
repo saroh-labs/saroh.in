@@ -11,8 +11,8 @@ import { emailAttention, providersTabNote } from "@/lib/settings/ready";
  * left, headed "Settings", and the tab's page to the right, each page its own
  * `<main>` (`SettingsPanel`).
  *
- * No breadcrumb and no title band (2026-09-25): the rail's Settings row and
- * the tabs' own heading say where you are. From 760px the screen fills the
+ * Each page draws the one page header ("Settings › Team" over its title,
+ * 10 Oct 2026), as every screen does. From 760px the screen fills the
  * window below the top bar and only the page scrolls, so the tabs stay in
  * reach however long a page runs. On a phone the tabs are a row above the page and
  * the page scrolls as any other does.

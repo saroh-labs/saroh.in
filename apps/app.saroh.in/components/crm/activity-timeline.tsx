@@ -1,14 +1,16 @@
 "use client";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /** A friendly label for an activity type. */
 function activityLabel(type: string): string {
@@ -62,14 +64,15 @@ function CompleteTaskButton({
     const [busy, setBusy] = useState(false);
 
     async function onClick() {
-        setBusy(true);
-        const res = await completeTask(leadId, activityId);
-        setBusy(false);
+        const res = await runAction(() => completeTask(leadId, activityId), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Task completed");
+        showSuccess("Task completed.");
         router.refresh();
     }
 
@@ -79,10 +82,11 @@ function CompleteTaskButton({
             size="sm"
             variant="outline"
             className="wk-press"
-            disabled={busy}
             onClick={onClick}
+            busy={busy}
+            busyLabel="Completing…"
         >
-            {busy ? "Completing…" : "Mark done"}
+            Mark done
         </Button>
     );
 }
@@ -97,14 +101,15 @@ function CompleteTaskButton({
 export function ActivityTimeline({
     leadId,
     activities,
+    canWrite = true,
 }: {
     leadId: string;
     activities: LeadActivity[];
+    /** `activity:write`: may mark a follow-up done. */
+    canWrite?: boolean;
 }) {
     if (activities.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">No activity yet.</p>
-        );
+        return <EmptyState size="inline" title="No activity yet." />;
     }
 
     return (
@@ -146,26 +151,29 @@ export function ActivityTimeline({
                             {isTask && entry.dueAt && (
                                 <p className="text-xs text-muted-foreground">
                                     Due{" "}
-                                    {new Date(entry.dueAt).toLocaleString(
-                                        DISPLAY_LOCALE,
-                                    )}
+                                    <ViewerDate
+                                        iso={entry.dueAt}
+                                        variant="datetime"
+                                    />
                                     {done && entry.completedAt && (
                                         <>
                                             {" · completed "}
-                                            {new Date(
-                                                entry.completedAt,
-                                            ).toLocaleString(DISPLAY_LOCALE)}
+                                            <ViewerDate
+                                                iso={entry.completedAt}
+                                                variant="datetime"
+                                            />
                                         </>
                                     )}
                                 </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                {new Date(entry.createdAt).toLocaleString(
-                                    DISPLAY_LOCALE,
-                                )}
+                                <ViewerDate
+                                    iso={entry.createdAt}
+                                    variant="datetime"
+                                />
                             </p>
                         </div>
-                        {isTask && !done && (
+                        {isTask && !done && canWrite && (
                             <CompleteTaskButton
                                 leadId={leadId}
                                 activityId={entry.id}

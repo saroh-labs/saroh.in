@@ -1,5 +1,7 @@
 "use client";
 
+import { EditorLoading } from "@/components/sites/editor-loading";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import {
     Select,
@@ -28,14 +30,11 @@ const RichTextEditor = dynamic(
         ),
     {
         ssr: false,
-        loading: () => (
-            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
-        ),
+        loading: () => <EditorLoading className="min-h-40" />,
     },
 );
 
 import type { RichTextContent } from "@/lib/sites/service";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { TextPhotoFields } from "./text-photo";
@@ -110,7 +109,7 @@ export function RichTextFields({
                 onChange={(on) => patch({ partLabels: on ? true : undefined })}
                 note="Sets the text's smaller headings as small capitals, to name the parts of a longer piece."
             />
-            <Field label="Box after the text">
+            <Field optional label="Box after the text">
                 <Textarea
                     value={c.callout?.text ?? ""}
                     onChange={(e) => {
@@ -124,7 +123,7 @@ export function RichTextFields({
                         });
                     }}
                     rows={2}
-                    placeholder="Optional. A result or the one thing to remember, set in a box."
+                    placeholder="A result or the one thing to remember, set in a box."
                 />
             </Field>
             {c.callout?.text.trim() ? (

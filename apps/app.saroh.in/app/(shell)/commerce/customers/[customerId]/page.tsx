@@ -5,9 +5,10 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
+import { EditStoreCustomer } from "@/components/customers/edit-store-customer";
+import { FailedRead } from "@/components/shared/failed-read";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { CustomerForm } from "@/components/stores/customer-form";
 import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
@@ -24,9 +25,9 @@ export const metadata = { title: "Customer" };
 
 const STANDING: Record<
     OrderStanding,
-    { label: string; variant: "draft" | "success" | "neutral" }
+    { label: string; variant: "active" | "success" | "neutral" }
 > = {
-    UNFULFILLED: { label: "Unfulfilled", variant: "draft" },
+    UNFULFILLED: { label: "Unfulfilled", variant: "active" },
     FULFILLED: { label: "Fulfilled", variant: "success" },
     REFUNDED: { label: "Refunded", variant: "neutral" },
     CANCELLED: { label: "Cancelled", variant: "neutral" },
@@ -37,8 +38,9 @@ const STANDING: Record<
  *
  * A customer is stored per storefront, and the list merges the records that
  * share an email into one person. This page is one of those records — its
- * details are what that storefront knows — with the person's orders beside
- * it, and the other storefronts they buy at one click away.
+ * details are what that storefront knows, read as rows with Edit details
+ * opening them in a side sheet — with the person's orders beside it, and the
+ * other storefronts they buy at one click away.
  *
  * A record someone linked to a contact opens Customer Detail instead.
  */
@@ -82,6 +84,7 @@ export default async function CustomerPage({
         <PageContainer width="full">
             <div className="flex flex-col gap-6">
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={[
                         "Sell",
@@ -107,22 +110,46 @@ export default async function CustomerPage({
                     }
                 />
                 <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-                    <Card title="Details">
-                        <div className="max-w-[560px] p-4 sm:p-5">
-                            <CustomerForm
-                                key={customer.id}
+                    <Card
+                        title="Details"
+                        action={
+                            <EditStoreCustomer
                                 storeId={store.id}
+                                storeName={store.name}
                                 customer={customer}
                             />
-                        </div>
+                        }
+                    >
+                        <dl>
+                            {detailRows(customer).map((row) => (
+                                <div
+                                    key={row.label}
+                                    className="flex flex-wrap gap-x-4 gap-y-0.5 border-b border-foreground/10 px-4 py-3 last:border-b-0"
+                                >
+                                    <dt className="w-[110px] shrink-0 text-[12.5px] text-muted-foreground">
+                                        {row.label}
+                                    </dt>
+                                    <dd
+                                        className={
+                                            row.value
+                                                ? "min-w-0 flex-1 text-[13.5px] [overflow-wrap:anywhere]"
+                                                : "min-w-0 flex-1 text-[13.5px] text-muted-foreground"
+                                        }
+                                    >
+                                        {row.value || "Not added"}
+                                    </dd>
+                                </div>
+                            ))}
+                        </dl>
                     </Card>
                     <div className="flex min-w-0 flex-col gap-4">
                         <Card title="Orders">
                             {orders === null ? (
-                                <p className="px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                                    Their orders could not be read just now.
-                                    Nothing about them has changed.
-                                </p>
+                                <FailedRead
+                                    things="their orders"
+                                    reassurance="Nothing about them has changed."
+                                    className="px-4 py-3.5"
+                                />
                             ) : theirs.length === 0 ? (
                                 <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     No orders at {store.name} yet. An order
@@ -215,12 +242,51 @@ export default async function CustomerPage({
     );
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+/** What this location knows about them, read as rows. */
+function detailRows(customer: Customer): { label: string; value: string }[] {
+    const join = (parts: (string | null)[], by: string) =>
+        parts
+            .map((p) => p?.trim())
+            .filter(Boolean)
+            .join(by);
+    return [
+        {
+            label: "Name",
+            value: join([customer.firstName, customer.lastName], " "),
+        },
+        { label: "Email", value: customer.email },
+        { label: "Phone", value: customer.phone?.trim() ?? "" },
+        {
+            label: "Address",
+            value: join(
+                [
+                    customer.city,
+                    customer.state,
+                    customer.zipCode,
+                    customer.country,
+                ],
+                ", ",
+            ),
+        },
+    ];
+}
+
+function Card({
+    title,
+    action,
+    children,
+}: {
+    title: string;
+    /** The card's one button, at the end of its heading. */
+    action?: ReactNode;
+    children: ReactNode;
+}) {
     return (
         <section className="overflow-hidden rounded-[12px] border border-border bg-card">
-            <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {title}
-            </h2>
+            <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-muted px-4 py-1.5">
+                <h2 className="label">{title}</h2>
+                {action}
+            </div>
             {children}
         </section>
     );

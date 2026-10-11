@@ -106,22 +106,23 @@ function render(initial: EditorRecord<Plan> | null) {
             noun: "plan",
             liveLabel: "Open",
             liveClean: "Open to new sign-ups · no changes",
-            draftSaved: "Draft · saved — nobody can join it yet",
+            draftSaved: "Draft · saved, nobody can join it yet",
             draftFirstSaved:
-                "Saved as a draft — nobody can join it yet. Delete draft if you change your mind.",
-            notStarted: "Not saved yet — start with a name",
+                "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
+            notStarted: "Not saved yet. Start with a name",
             viewLabel: "View plan",
         },
         initial,
         emptyValues: EMPTY,
         canEdit: true,
-        crumbs: (
-            <nav>
-                {/* A plain link: the guard catches any <a>, Next's or not. */}
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                <a href="/billing/subscriptions?tab=plans">Plans</a>
-            </nav>
-        ),
+        breadcrumb: [
+            // A plain link: the guard catches any <a>, Next's or not.
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
+            <a key="plans" href="/billing/subscriptions?tab=plans">
+                Plans
+            </a>,
+            "Monthly",
+        ],
         titleOf: (v, r) => v.name.trim() || (r ? "Untitled plan" : "New plan"),
         problemsOf: (v) => [
             ...(v.name.trim()
@@ -248,7 +249,7 @@ describe("the editor shell", () => {
         );
         render(null);
         expect(heading()).toBe("New plan");
-        expect(status()).toBe("Not saved yet — start with a name");
+        expect(status()).toBe("Not saved yet. Start with a name");
         // No problems marked before anything is typed.
         expect(host.querySelector("[role=alert]")).toBeNull();
 
@@ -263,14 +264,14 @@ describe("the editor shell", () => {
             price: "",
         });
         expect(status()).toBe(
-            "Saved as a draft — nobody can join it yet. Delete draft if you change your mind.",
+            "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
         );
         expect(window.location.pathname).toBe("/billing/plans/pl-1/edit");
         // Draft: Publish (off, the price is missing) and Delete draft.
         expect(button("Publish").disabled).toBe(true);
         expect(buttons("Delete draft").length).toBeGreaterThan(0);
         expect(host.textContent).toContain(
-            "1 thing to fix before publishing — add the price.",
+            "1 thing to fix before publishing: add the price.",
         );
     });
 
@@ -319,7 +320,7 @@ describe("the editor shell", () => {
         );
         // The first save's words stay for the visit, as the design has them.
         expect(status()).toBe(
-            "Saved as a draft — nobody can join it yet. Delete draft if you change your mind.",
+            "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
         );
     });
 
@@ -363,7 +364,7 @@ describe("the editor shell", () => {
         render(rec());
         type(field("Price"), "1500");
         await wait(800);
-        expect(status()).toBe("Not saved — your changes are still here.");
+        expect(status()).toBe("Not saved. Your changes are still here.");
         expect(field("Price").value).toBe("1500");
         expect(button("Publish").disabled).toBe(true);
 
@@ -382,7 +383,7 @@ describe("the editor shell", () => {
         click(button("Try again"));
         await wait();
         expect(adapter.saveDraft).toHaveBeenCalledTimes(2);
-        expect(status()).toBe("Draft · saved — nobody can join it yet");
+        expect(status()).toBe("Draft · saved, nobody can join it yet");
     });
 
     it("a field refusal from the server shows beside that field", async () => {
@@ -446,7 +447,7 @@ describe("the editor shell", () => {
         expect(status()).toBe("Open to new sign-ups · no changes");
         expect(button("Publish changes").disabled).toBe(true);
         expect(host.textContent).toContain(
-            "Nothing to publish yet — edits appear here as a draft first.",
+            "Nothing to publish yet. Edits appear here as a draft first.",
         );
         expect(buttons("Discard changes")).toHaveLength(0);
 

@@ -11,8 +11,10 @@ import { useState } from "react";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { OpenTask } from "@/lib/leads/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Every follow-up still to do, soonest first, with the lead it belongs to and
@@ -21,7 +23,10 @@ import type { OpenTask } from "@/lib/leads/service";
 export function FollowUpsList({
     tasks,
     leads,
+    canWrite = true,
 }: {
+    /** `activity:write`: may mark one done. Without it the list only reads. */
+    canWrite?: boolean;
     tasks: OpenTask[] | null;
     /** Lead titles and who they are for, by id, to name each task's lead. */
     leads: Record<string, { title: string; who: string | null }>;
@@ -35,13 +40,8 @@ export function FollowUpsList({
     if (tasks === null) {
         return (
             <FailedState
-                title="Follow-ups could not be loaded"
-                description="Nothing has changed and nothing is lost — this list could not be read just now."
-                action={
-                    <Button variant="outline" onClick={() => router.refresh()}>
-                        Try again
-                    </Button>
-                }
+                title={couldntLoad("follow-ups")}
+                onRetry={() => router.refresh()}
             />
         );
     }
@@ -49,24 +49,26 @@ export function FollowUpsList({
         return (
             <EmptyState
                 icon={<CalendarCheck />}
-                title="Nothing to follow up"
-                description="A follow-up set on a lead lands here with its date, so it waits in one place instead of inside a lead nobody opens."
+                title="No follow-ups yet"
+                description="A follow-up set on a lead shows here with its date."
             />
         );
     }
 
     async function done(task: OpenTask) {
-        setBusy(task.id);
-        const res = await completeTask(task.leadId, task.id);
-        setBusy(null);
+        const res = await runAction(() => completeTask(task.leadId, task.id), {
+            setBusy: (on) => setBusy(on ? task.id : null),
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
-        showSuccess("Done");
+        showSuccess("Follow-up completed.");
         router.refresh();
     }
 
     return (
         <ListCard
             main="Follow-up"
+            paged={{ list: "follow-ups", things: "follow-ups" }}
             end="Due"
             note="Marking one done records it on the lead's activity. A new follow-up is set from the lead."
         >
@@ -114,15 +116,17 @@ export function FollowUpsList({
                                             "No date"
                                         )}
                                     </span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={busy === t.id}
-                                        aria-label={`Mark "${t.body ?? "follow-up"}" done`}
-                                        onClick={() => void done(t)}
-                                    >
-                                        Done
-                                    </Button>
+                                    {canWrite ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={busy === t.id}
+                                            aria-label={`Mark "${t.body ?? "follow-up"}" done`}
+                                            onClick={() => void done(t)}
+                                        >
+                                            Done
+                                        </Button>
+                                    ) : null}
                                 </>
                             }
                         />

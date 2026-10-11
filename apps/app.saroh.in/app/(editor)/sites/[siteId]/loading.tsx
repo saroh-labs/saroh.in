@@ -1,11 +1,13 @@
-import { DetailSkeleton } from "@/components/shared/detail-skeleton";
+import { PageLoading } from "@/components/shared/page-loading";
 
 /**
  * Segment loading state. Without a `loading.tsx` this route has no Suspense
  * boundary, so the App Router holds the PREVIOUS page on screen until the
- * server render resolves — the click registers and nothing moves. Shape and
- * width match the page below so nothing jumps when the real content lands.
+ * server render resolves — the click registers and nothing moves. The editor
+ * owns its whole viewport, so its loader takes the whole width too.
  */
 export default function Loading() {
-    return <DetailSkeleton maxWidth="max-w-5xl" />;
+    return (
+        <PageLoading shape="editor" width="full" label="Loading the editor" />
+    );
 }

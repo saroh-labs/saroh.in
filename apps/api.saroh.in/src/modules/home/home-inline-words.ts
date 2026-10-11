@@ -107,7 +107,7 @@ export function retryMandateWords(first: string | null): Words {
 export function retryWords(first: string | null): Words {
     const whose = first ? `${first}'s` : "this";
     return {
-        label: "Retry by pay link",
+        label: "Try again by pay link",
         confirm: `This makes a new pay link for ${whose} renewal, and the link sent before stops working. Saroh doesn't send it: copy it and send it to ${first ?? "them"} yourself.`,
         yes: "Make a new link",
         done: "New pay link ready",
@@ -180,6 +180,30 @@ export function reviewReplyWords(first: string | null): Words {
         yes: "Post reply",
         done: "Reply posted",
         sends: true,
+    };
+}
+
+/**
+ * Refund (REFUND, PAY-06): a payment the provider took at a different
+ * amount than asked goes back whole — `amount` is what it captured,
+ * already formatted — through the business's provider, to how they paid.
+ * The order or invoice it was for stays unpaid, and a refund can't be
+ * taken back. The provider tells the customer, not Saroh.
+ */
+export function refundMismatchWords(
+    first: string | null,
+    amount: string,
+    provider: string,
+    paper: "order" | "invoice" | null,
+): Words {
+    const who = first ?? "the customer";
+    const stays = paper ? ` The ${paper} stays unpaid, as it is now.` : "";
+    return {
+        label: "Refund",
+        confirm: `${amount} goes back to ${who} through ${provider}, the way they paid.${stays} A refund can't be undone.`,
+        yes: `Refund ${amount}`,
+        done: first ? `Refund on its way to ${first}` : "Refund on its way",
+        sends: false,
     };
 }
 

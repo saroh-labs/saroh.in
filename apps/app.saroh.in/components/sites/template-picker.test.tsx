@@ -210,7 +210,7 @@ describe("the template picker (U12)", () => {
             ["Starter", true],
             ["Bakery", false],
         ]);
-        expect(button("Suggested").getAttribute("aria-pressed")).toBe("true");
+        expect(button("Suggested").getAttribute("aria-checked")).toBe("true");
     });
 
     it("lists every template under All", async () => {
@@ -226,7 +226,7 @@ describe("the template picker (U12)", () => {
     it("starts on All when the asked-for template isn't suggested", () => {
         render({ startTemplateId: "studio" });
         expect(radios("Template")).toContainEqual(["Studio", true]);
-        expect(button("All 3").getAttribute("aria-pressed")).toBe("true");
+        expect(button("All 3").getAttribute("aria-checked")).toBe("true");
     });
 
     it("keeps a template chosen under All in view under Suggested", async () => {
@@ -307,7 +307,9 @@ describe("the template picker (U12)", () => {
 describe("with no templates to choose from", () => {
     it("says a failed catalogue, offers a retry, and still creates the site", async () => {
         render({ templates: null });
-        expect(host.textContent).toContain("The templates couldn't be loaded.");
+        expect(host.textContent).toContain(
+            "Couldn't load the templates. You can still create the site.",
+        );
         await click(button("Try again"));
         expect(refresh).toHaveBeenCalled();
         await submit();

@@ -1,19 +1,18 @@
 "use client";
 
 import { resolveVariant } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type { JournalContent } from "@/lib/sites/service";
 
+import { Segmented } from "@saroh/ui/segmented";
 import {
     DisplayOptions,
     hiddenFlag,
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
@@ -61,24 +60,22 @@ export function JournalFields({
                         Latest posts to show three or six as cards.
                     </p>
                     <Field label="Posts listed">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Posts listed"
                             value={c.archiveLimit ? "latest" : "all"}
                             onValueChange={(v) => {
                                 if (v === "all")
                                     patch({ archiveLimit: undefined });
                                 if (v === "latest") patch({ archiveLimit: 3 });
                             }}
-                            aria-label="Posts listed"
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="all" className={SEGMENT}>
-                                Every post
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="latest" className={SEGMENT}>
-                                Latest 3, and a link to all
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            options={[
+                                { value: "all", label: "Every post" },
+                                {
+                                    value: "latest",
+                                    label: "Latest 3, and a link to all",
+                                },
+                            ]}
+                        />
                     </Field>
                     <OptionSwitch
                         label="Group by year"
@@ -118,24 +115,19 @@ export function JournalFields({
             ) : (
                 <>
                     <Field label="Posts shown">
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Posts shown"
                             value={String(c.count ?? 3)}
                             onValueChange={(v) => {
                                 // Three is the default, so it is stored as absent.
                                 if (v === "3") patch({ count: undefined });
                                 if (v === "6") patch({ count: 6 });
                             }}
-                            aria-label="Posts shown"
-                            className={SEGMENTED}
-                        >
-                            <ToggleGroupItem value="3" className={SEGMENT}>
-                                Latest 3
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="6" className={SEGMENT}>
-                                Latest 6
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            options={[
+                                { value: "3", label: "Latest 3" },
+                                { value: "6", label: "Latest 6" },
+                            ]}
+                        />
                     </Field>
 
                     <DisplayOptions

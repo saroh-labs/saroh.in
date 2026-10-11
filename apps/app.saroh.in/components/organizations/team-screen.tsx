@@ -7,6 +7,7 @@ import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import type { PausedTeam } from "@/lib/billing/paused";
 import { NONE_PAUSED, pausedWords, teamOverLimit } from "@/lib/billing/paused";
+import { count } from "@/lib/format/plural";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -17,14 +18,7 @@ import {
 } from "@saroh/ui/avatar";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     Form,
     FormControl,
@@ -35,20 +29,19 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
-import { Check, Info, Mail, Plus, Users } from "lucide-react";
+import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { LeaveBusiness } from "@/components/organizations/leave-business";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { FormSheet } from "@/components/shared/form-sheet";
+import { useHold } from "@/components/shared/use-hold";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
 import {
@@ -73,6 +66,7 @@ import {
     teamCounts,
     usesSeat,
 } from "@/lib/organizations/invitations";
+import { isOnlyOwner, onlyOwnerLine } from "@/lib/organizations/leave-business";
 import {
     inviteMember,
     removeMember,
@@ -95,6 +89,16 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { ChoiceGroup } from "@/components/shared/choice-group";
+import {
+    ListTable,
+    listTable,
+    ListTableHead,
+} from "@/components/shared/list-toolbar";
+import { runAction } from "@/lib/api/run-action";
+import { TabStrip } from "@saroh/ui/tabs";
+import { Tip } from "@saroh/ui/tooltip";
 import { InviteDiaryPerson } from "./invite-diary-person";
 import { LastActiveLine } from "./last-active-line";
 import {
@@ -118,15 +122,16 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
 /**
  * What each role is for, in the words a small business would use — and only
  * what the API's policy grants (`organization-policy.ts`): a business may
- * have several owners and never none; an admin lacks only closing the
- * business, so cannot change or remove an owner either; a member runs the
+ * have several owners and never none; an admin lacks closing the
+ * business and changing what it pays Saroh (the plan, DEC-131 amended
+ * 2026-10-11), so cannot change or remove an owner either; a member runs the
  * day — reads it and moves orders along — sees the business's settings
  * without changing them, and sees no money.
  */
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
-    ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
+    ADMIN: "Can do everything an owner can, except close the business, change the Saroh plan, or change or remove an owner.",
+    MEMBER: "Runs the day: sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -134,8 +139,8 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
 /** The same, in a few words, under a role's name wherever one is picked. */
 const ROLE_PLAIN: Record<OrganizationRole, string> = {
     OWNER: "can open everything",
-    ADMIN: "everything except removing an owner",
-    MEMBER: "runs the day — no money or settings",
+    ADMIN: "everything except the Saroh plan and removing an owner",
+    MEMBER: "runs the day, no money or settings",
     REVIEWER: "invited websites, nothing else",
 };
 
@@ -182,7 +187,7 @@ function isBuiltIn(key: string): key is OrganizationRole {
     return (ROLES as readonly string[]).includes(key);
 }
 
-/** The Team screen's two views, as `?view=` names them. */
+/** The Team screen's two tabs, as `?tab=` names them. */
 const TEAM_TABS = ["roles", "people"] as const;
 
 /**
@@ -276,7 +281,10 @@ export function TeamScreen({
     paused?: PausedTeam;
 }) {
     // In the address, so Search settings can open Roles.
-    const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
+    const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people", {
+        // The tab was `?view=` until every screen's tabs became `?tab=`.
+        alias: "view",
+    });
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
@@ -310,13 +318,13 @@ export function TeamScreen({
             if (isBuiltIn(key)) return ROLE_BLURB[key];
             if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_BLURB;
             const n = byKey.get(key)?.actions.length ?? 0;
-            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${n === 1 ? "1 permission" : `${n} permissions`}.`;
+            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it: ${count(n, "permission")}.`;
         },
         plainOf: (key) => {
             if (isBuiltIn(key)) return ROLE_PLAIN[key];
             if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_PLAIN;
             const n = byKey.get(key)?.actions.length ?? 0;
-            return n === 1 ? "1 permission" : `${n} permissions`;
+            return count(n, "permission");
         },
         withinReach: (key) => {
             const role = byKey.get(key);
@@ -360,51 +368,23 @@ export function TeamScreen({
                     actions={
                         // On People, where the person invited will appear.
                         canManage && tab === "people" ? (
-                            <Button onClick={openInvite}>
-                                <Plus className="mr-1.5 size-4" />
-                                {invite.label}
-                            </Button>
+                            <Button onClick={openInvite}>{invite.label}</Button>
                         ) : undefined
                     }
                     readOnlyNote={readOnlyNote}
+                    className="mb-0"
                 />
-                <div className="flex items-end gap-3 border-b border-border">
-                    <div
-                        role="group"
-                        aria-label="View"
-                        className="flex gap-0.5"
-                    >
-                        {tabs.map((t) => {
-                            const on = t.id === tab;
-                            return (
-                                <button
-                                    key={t.id}
-                                    type="button"
-                                    aria-pressed={on}
-                                    onClick={() => setTab(t.id)}
-                                    className={cn(
-                                        "flex items-center gap-2 rounded-t-md px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                        on
-                                            ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                            : "font-medium text-muted-foreground hover:text-foreground",
-                                    )}
-                                >
-                                    {t.label}
-                                    <span
-                                        className={cn(
-                                            "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                            on
-                                                ? "bg-muted text-foreground"
-                                                : "bg-foreground/[0.04] text-muted-foreground",
-                                        )}
-                                    >
-                                        {t.count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                <TabStrip
+                    label="Team"
+                    idPrefix="team-tab"
+                    value={tab}
+                    onValueChange={setTab}
+                    tabs={tabs.map((t) => ({
+                        value: t.id,
+                        label: t.label,
+                        count: t.count,
+                    }))}
+                />
             </div>
 
             {limitNotice}
@@ -418,9 +398,9 @@ export function TeamScreen({
                         bookableNoLogin,
                     )}
                     {over
-                        ? " — the team is over its plan's limit."
+                        ? ". The team is over its plan's limit."
                         : teamLimit.full
-                          ? " — the team is at its plan's limit."
+                          ? ". The team is at its plan's limit."
                           : ""}
                 </p>
             ) : null}
@@ -440,25 +420,17 @@ export function TeamScreen({
                     rolesLock={rolesLock}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
-                <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
-                    <Users
-                        aria-hidden
-                        className="size-8 stroke-[1.7] text-muted-foreground"
-                    />
-                    <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                        No one else yet
-                    </p>
-                    <p className="max-w-[46ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                        You are the only person in {organizationName} so far. An
-                        invitation adds someone to this business only — it gives
-                        them nothing in any other.
-                    </p>
-                    {canManage ? (
-                        <Button className="mt-1" onClick={openInvite}>
-                            {invite.label}
-                        </Button>
-                    ) : null}
-                </div>
+                <EmptyState
+                    data-ph-mask=""
+                    icon={<Users />}
+                    title="No one else yet"
+                    description={`You are the only person in ${organizationName} so far.`}
+                    action={
+                        canManage ? (
+                            <Button onClick={openInvite}>{invite.label}</Button>
+                        ) : undefined
+                    }
+                />
             ) : (
                 <PeopleTab
                     organizationName={organizationName}
@@ -514,7 +486,7 @@ export function TeamScreen({
                 onClose={() => setRemoving(null)}
             />
             {canManage ? (
-                <InviteDialog
+                <InviteSheet
                     open={inviteOpen}
                     onOpenChange={setInviteOpen}
                     organizationName={organizationName}
@@ -564,10 +536,16 @@ function PeopleTab({
     // buttons. The Extra permissions column shows only once someone has
     // one (F15, F17): a column that says "—" for everyone says nothing.
     const withExtras = anyoneHasExtras(members);
+    // The only owner can't leave: no button on their row, and why below.
+    const onlyOwner = isOnlyOwner(members) === true;
     const grid = withExtras
         ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
         : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
     const rowButton = "text-[12.5px]";
+    // A page of people at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("team", members, {
+        label: "Pages of people",
+    });
 
     return (
         <div className="space-y-3.5">
@@ -585,20 +563,15 @@ function PeopleTab({
                 />
             ) : null}
 
-            <div className="overflow-hidden rounded-xl border border-border">
-                <div
-                    className={cn(
-                        grid,
-                        "hidden h-[38px] border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground xl:grid",
-                    )}
-                >
+            <ListTable>
+                <ListTableHead className={cn(grid, "hidden xl:grid")}>
                     <span>Person</span>
                     <span>Role</span>
                     {withExtras ? <span>Extra permissions</span> : null}
                     <span />
-                </div>
+                </ListTableHead>
                 <ul>
-                    {members.map((m) => {
+                    {paged.map((m) => {
                         const role = m.roleKey ?? m.role;
                         const extras = extraLabels(
                             m.extraActions ?? [],
@@ -606,7 +579,8 @@ function PeopleTab({
                         );
                         // An owner is moved to another role first (Edit), and
                         // no one is removed by someone they outrank, by role
-                        // or by extras. Leaving is not removing yourself.
+                        // or by extras. Leaving is not removing yourself: it
+                        // is on your own row, whatever your role.
                         const canRemove =
                             canManage &&
                             role !== "OWNER" &&
@@ -615,10 +589,7 @@ function PeopleTab({
                         return (
                             <li
                                 key={m.userId}
-                                className={cn(
-                                    grid,
-                                    "border-b border-border px-4 py-[11px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
-                                )}
+                                className={cn(grid, listTable.row)}
                             >
                                 <div className="flex min-w-0 items-center gap-[11px]">
                                     <Avatar
@@ -654,7 +625,7 @@ function PeopleTab({
                                         <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
                                             {m.email}
                                             {m.role === "REVIEWER"
-                                                ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
+                                                ? ` · ${count(m.siteIds.length, "site")}`
                                                 : ""}
                                         </p>
                                         {m.storefronts &&
@@ -689,6 +660,17 @@ function PeopleTab({
                                     </div>
                                 ) : null}
                                 <div className="flex flex-wrap justify-end gap-1.5">
+                                    {m.isSelf && !onlyOwner ? (
+                                        <LeaveBusiness
+                                            business={organizationName}
+                                            onlyOwner={false}
+                                            locations={(
+                                                m.storefronts ?? []
+                                            ).map((s) => s.name)}
+                                            size="sm"
+                                            className={rowButton}
+                                        />
+                                    ) : null}
                                     {canRemove ? (
                                         <Button
                                             size="sm"
@@ -719,7 +701,8 @@ function PeopleTab({
                         );
                     })}
                 </ul>
-            </div>
+            </ListTable>
+            {paging}
 
             <div className="flex items-start gap-[9px] rounded-[10px] bg-foreground/[0.03] px-[15px] py-3">
                 <Info
@@ -730,6 +713,7 @@ function PeopleTab({
                     A person&apos;s role sets what they can reach in{" "}
                     {organizationName}. Leaving this business touches nothing in
                     any other.
+                    {onlyOwner ? ` ${onlyOwnerLine(organizationName)}` : null}
                 </p>
             </div>
         </div>
@@ -742,8 +726,10 @@ function PeopleTab({
  *
  * Resend is the API's own re-invite: inviting an address that already has an
  * invitation refreshes it in place — a new link, a fresh week, a new email —
- * and the old link stops working. Cancel withdraws it for good; there is no
- * undo, because the link it voided cannot be revived, only replaced.
+ * and the old link stops working. Cancel withdraws it for good, and the
+ * link it voids cannot be revived, only replaced. So it is held: the row
+ * goes at once with Undo, and it is cancelled when the ten seconds are up
+ * (`useHold`). Resend tells someone, so it waits its ten seconds too.
  */
 function PendingInvites({
     invitations,
@@ -757,54 +743,63 @@ function PendingInvites({
 }) {
     const router = useRouter();
     const zone = useBusinessZone();
-    const [busy, setBusy] = useState<{
-        id: string;
-        action: "resend" | "cancel";
-    } | null>(null);
+    const { hold, send, pending } = useHold();
+    const [cancelled, setCancelled] = useState<readonly string[]>([]);
+    const shown = invitations.filter((i) => !cancelled.includes(i.id));
 
-    async function resend(invitation: OrganizationInvitation) {
+    function resend(invitation: OrganizationInvitation) {
         const role = invitation.roleKey ?? invitation.role;
-        setBusy({ id: invitation.id, action: "resend" });
-        const res = await inviteMember({
-            email: invitation.email,
-            role,
-            ...(role === "REVIEWER" ? { siteIds: invitation.siteIds } : {}),
+        send(`resend:${invitation.id}`, {
+            description: `A new link goes to ${invitation.email}. The old one stops working.`,
+            run: () =>
+                inviteMember({
+                    email: invitation.email,
+                    role,
+                    ...(role === "REVIEWER"
+                        ? { siteIds: invitation.siteIds }
+                        : {}),
+                }),
+            sent: `Sent to ${invitation.email}.`,
+            onSent: () => router.refresh(),
         });
-        setBusy(null);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess(`Invite sent again to ${invitation.email}.`);
-        router.refresh();
     }
 
-    async function cancel(invitation: OrganizationInvitation) {
-        setBusy({ id: invitation.id, action: "cancel" });
-        const res = await revokeInvitation(invitation.id);
-        setBusy(null);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess(
-            `Invite to ${invitation.email} cancelled — the link no longer works.`,
+    function cancel(invitation: OrganizationInvitation) {
+        const back = () =>
+            setCancelled((ids) => ids.filter((id) => id !== invitation.id));
+        setCancelled((ids) => [...ids, invitation.id]);
+        hold(
+            `invitation:${invitation.id}`,
+            "Invitation cancelled.",
+            async () => {
+                const res = await revokeInvitation(invitation.id);
+                if (!res.ok) {
+                    showError("The invitation wasn't cancelled.", res.error);
+                    back();
+                }
+                router.refresh();
+            },
+            back,
+            { description: "Its link no longer works." },
         );
-        router.refresh();
     }
+
+    if (shown.length === 0) return null;
 
     return (
         <section
             aria-label="Invited, not joined yet"
-            className="overflow-hidden rounded-xl border border-border"
+            className={listTable.card}
         >
-            <p className="flex h-[38px] items-center border-b border-muted bg-foreground/[0.03] px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <p className={cn(listTable.head, "flex")}>
                 Invited · not joined yet
             </p>
             <ul>
-                {invitations.map((invitation, i) => {
+                {shown.map((invitation) => {
                     const role = invitation.roleKey ?? invitation.role;
-                    const mine = busy?.id === invitation.id;
+                    const resending = pending.includes(
+                        `resend:${invitation.id}`,
+                    );
                     // The API refuses to re-invite at a role that can do more
                     // than the person sending it.
                     const beyond = !book.withinReach(role);
@@ -812,8 +807,8 @@ function PendingInvites({
                         <li
                             key={invitation.id}
                             className={cn(
-                                "flex flex-wrap items-center gap-3 px-4 py-[11px]",
-                                i > 0 && "border-t border-border",
+                                "flex flex-wrap items-center gap-3",
+                                listTable.rowStill,
                             )}
                         >
                             <span
@@ -845,33 +840,33 @@ function PendingInvites({
                                 {book.labelOf(role)}
                             </span>
                             <div className="flex gap-1.5">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!!busy || beyond}
-                                    title={
+                                <Tip
+                                    label={
                                         beyond
                                             ? "Can do more than you can"
                                             : undefined
                                     }
-                                    onClick={() => resend(invitation)}
-                                    aria-label={`Resend the invite to ${invitation.email}`}
                                 >
-                                    {mine && busy.action === "resend"
-                                        ? "Sending…"
-                                        : "Resend"}
-                                </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={beyond}
+                                        onClick={() => resend(invitation)}
+                                        aria-label={`Resend the invite to ${invitation.email}`}
+                                        busy={resending}
+                                        busyLabel="Sending…"
+                                    >
+                                        Resend
+                                    </Button>
+                                </Tip>
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={!!busy}
                                     onClick={() => cancel(invitation)}
-                                    aria-label={`Cancel the invite to ${invitation.email}`}
+                                    aria-label={`Cancel the invitation to ${invitation.email}`}
                                     className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                                 >
-                                    {mine && busy.action === "cancel"
-                                        ? "Cancelling…"
-                                        : "Cancel invite"}
+                                    Cancel invitation
                                 </Button>
                             </div>
                         </li>
@@ -946,7 +941,7 @@ function MemberDrawer({
     }
 
     async function save() {
-        if (!member || !changed) return;
+        if (!member) return;
         // A reviewer holds named sites; making someone one needs sites they
         // already have, or a fresh reviewer invitation.
         if (role === "REVIEWER" && member.siteIds.length === 0) {
@@ -955,20 +950,28 @@ function MemberDrawer({
             );
             return;
         }
-        setSaving(true);
-        // The role first: the extras are judged against the role they'll
-        // sit on top of.
-        const res = roleChanged
-            ? await updateMemberRole(member.userId, {
-                  role,
-                  ...(role === "REVIEWER" ? { siteIds: member.siteIds } : {}),
-              })
-            : null;
-        const extrasRes =
-            (res === null || res.ok) && extras.changed
-                ? await setMemberExtraActions(member.userId, extras.chosen)
-                : null;
-        setSaving(false);
+        const userId = member.userId;
+        const siteIds = member.siteIds;
+        const saved = await runAction(
+            async () => {
+                // The role first: the extras are judged against the role
+                // they'll sit on top of.
+                const res = roleChanged
+                    ? await updateMemberRole(userId, {
+                          role,
+                          ...(role === "REVIEWER" ? { siteIds } : {}),
+                      })
+                    : null;
+                const extrasRes =
+                    (res === null || res.ok) && extras.changed
+                        ? await setMemberExtraActions(userId, extras.chosen)
+                        : null;
+                return { res, extrasRes };
+            },
+            { setBusy: setSaving },
+        );
+        if (!saved) return;
+        const { res, extrasRes } = saved;
         const failed = [res, extrasRes].find((r) => r && !r.ok);
         if (failed && !failed.ok) {
             showError(failed.error);
@@ -977,70 +980,69 @@ function MemberDrawer({
             return;
         }
         showSuccess(
+            roleChanged ? "Role saved." : "Permissions saved.",
             roleChanged
                 ? `${nameOf(member)} is now ${book.labelOf(role)} in ${organizationName}.`
-                : `${nameOf(member)}’s permissions in ${organizationName} are saved.`,
+                : undefined,
         );
         close();
         router.refresh();
     }
 
     return (
-        <Sheet
+        <FormSheet
             open={!!member}
-            onOpenChange={(open) => {
-                if (!open) close();
-            }}
+            eyebrow={member?.email}
+            title={member ? nameOf(member) : "Team member"}
+            description={`Their role in ${organizationName}, and anything extra they may do. It applies as soon as you save.`}
+            pending={saving}
+            dirty={changed}
+            saveOff={outranks}
+            extra={
+                /* Everyone else is removed from their row. An owner has no
+                   Remove there, so this is the one way to remove a second
+                   owner. The viewer leaves from their own row. */
+                member && !locked && current === "OWNER" && !member.isSelf ? (
+                    <Button
+                        data-ph-mask=""
+                        type="button"
+                        variant="ghost"
+                        className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
+                        disabled={saving}
+                        onClick={() => {
+                            // A role picked and not saved must not follow
+                            // the sheet to the next person it opens for.
+                            setDraft(null);
+                            onRemove(member);
+                        }}
+                    >
+                        Remove from {organizationName}
+                    </Button>
+                ) : null
+            }
+            onClose={close}
+            onSubmit={save}
         >
-            <SheetContent
-                side="right"
-                className="flex w-[396px] max-w-[90vw] flex-col gap-0 p-0 sm:max-w-[396px]"
-            >
-                {member ? (
-                    <>
-                        <div className="flex items-center gap-[11px] border-b border-muted px-[18px] py-4 pr-12">
-                            <Avatar size="panel" ringTone={roleRingTone(role)}>
-                                <AvatarFallback>
-                                    {avatarInitials(member.name, member.email)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                                <SheetTitle className="font-display text-[17px] font-semibold tracking-[-0.025em]">
-                                    {nameOf(member)}
-                                </SheetTitle>
-                                <SheetDescription className="mt-0.5 truncate text-[11.5px]">
-                                    {member.email}
-                                </SheetDescription>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-[18px]">
-                            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                Role in {organizationName}
-                            </p>
-                            <div
-                                role="radiogroup"
-                                aria-label="Role"
-                                className="flex flex-col gap-[5px]"
-                            >
-                                {book.all.map(({ key: r }) => {
-                                    const on = r === role;
-                                    const beyond = !book.withinReach(r);
-                                    return (
-                                        <button
-                                            key={r}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={on}
-                                            disabled={locked || beyond}
-                                            onClick={() => setDraft(r)}
-                                            className={cn(
-                                                "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
-                                                on
-                                                    ? "border-border-strong bg-foreground/[0.03]"
-                                                    : "border-muted hover:border-border-strong active:bg-accent-active",
-                                            )}
-                                        >
+            {member ? (
+                <>
+                    <div>
+                        <p className="label mb-2.5">
+                            Role in {organizationName}
+                        </p>
+                        <ChoiceGroup
+                            label="Role"
+                            className="flex flex-col gap-[5px]"
+                            value={role}
+                            onChange={setDraft}
+                            disabled={locked}
+                            choices={book.all.map(({ key: r }) => {
+                                const on = r === role;
+                                const beyond = !book.withinReach(r);
+                                return {
+                                    value: r,
+                                    disabled: beyond,
+                                    label: (
+                                        <>
                                             <RoleDot role={r} />
                                             <span className="min-w-0 flex-1">
                                                 <span
@@ -1065,74 +1067,50 @@ function MemberDrawer({
                                                     className="size-4 shrink-0"
                                                 />
                                             ) : null}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                        </>
+                                    ),
+                                };
+                            })}
+                            itemClassName={(on, choice) =>
+                                cn(
+                                    "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left coarse:min-h-11",
+                                    on
+                                        ? "border-border-strong bg-foreground/[0.03]"
+                                        : cn(
+                                              "border-muted",
+                                              !choice.disabled &&
+                                                  "hover:border-border-strong active:bg-accent-active",
+                                          ),
+                                )
+                            }
+                        />
 
-                            <ExtraPermissions
-                                roleLabel={book.labelOf(role)}
-                                groups={extras.groups}
-                                lockedReason={extras.lockedReason}
-                                disabled={saving}
-                                onToggle={extras.toggle}
+                        <ExtraPermissions
+                            roleLabel={book.labelOf(role)}
+                            groups={extras.groups}
+                            lockedReason={extras.lockedReason}
+                            disabled={saving}
+                            onToggle={extras.toggle}
+                        />
+
+                        <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
+                            <Info
+                                aria-hidden
+                                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                             />
-
-                            <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
-                                <Info
-                                    aria-hidden
-                                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                                />
-                                <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
-                                    {lastOwner
-                                        ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
-                                        : outranks
-                                          ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
-                                          : (extras.summary ??
-                                            `${book.labelOf(role)}: ${book.blurbOf(role)}`)}
-                                </p>
-                            </div>
+                            <p className="text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
+                                {lastOwner
+                                    ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
+                                    : outranks
+                                      ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
+                                      : (extras.summary ??
+                                        `${book.labelOf(role)}: ${book.blurbOf(role)}`)}
+                            </p>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
-                            <Button
-                                onClick={save}
-                                disabled={!changed || saving || outranks}
-                            >
-                                {saving
-                                    ? "Saving…"
-                                    : changed
-                                      ? "Save changes"
-                                      : "No changes yet"}
-                            </Button>
-                            <Button variant="outline" onClick={close}>
-                                Cancel
-                            </Button>
-                            {/* Everyone else is removed from their row.
-                                An owner and the viewer have no Remove
-                                there, so this is the one way to remove a
-                                second owner, or to leave. */}
-                            {!locked &&
-                            (current === "OWNER" || member.isSelf) ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        // A role picked and not saved must
-                                        // not follow the drawer to the next
-                                        // person it opens for.
-                                        setDraft(null);
-                                        onRemove(member);
-                                    }}
-                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
-                                >
-                                    Remove from {organizationName}
-                                </button>
-                            ) : null}
-                        </div>
-                    </>
-                ) : null}
-            </SheetContent>
-        </Sheet>
+                    </div>
+                </>
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -1158,19 +1136,16 @@ function RemoveMember({
     const router = useRouter();
     const name = member ? nameOf(member) : "They";
 
-    async function remove() {
+    async function remove(): Promise<ConfirmResult> {
         if (!member) return;
         const res = await removeMember(member.userId);
-        onClose();
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
+        if (!res.ok) return { ok: false, error: res.error };
         const links = res.data.revokedLinks;
         showSuccess(
+            `${name} removed.`,
             links > 0
-                ? `${name} removed — they can no longer open ${organizationName}, and ${links} share link${links === 1 ? "" : "s"} they made stopped working`
-                : `${name} removed — they can no longer open ${organizationName}`,
+                ? `They can no longer open ${organizationName}, and ${count(links, "share link")} they made stopped working.`
+                : `They can no longer open ${organizationName}.`,
         );
         router.refresh();
     }
@@ -1186,8 +1161,9 @@ function RemoveMember({
                 member?.storefronts && member.storefronts.length > 0
                     ? ` They come off ${new Intl.ListFormat("en", { type: "conjunction" }).format(member.storefronts.map((s) => s.name))} too.`
                     : ""
-            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
+            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again. This cannot be undone.`}
             confirmLabel="Remove from team"
+            keepLabel="Keep on team"
             onConfirm={remove}
         />
     );
@@ -1197,14 +1173,19 @@ function RemoveMember({
 
 /**
  * "Invite to <business>" ("Saroh Settings" design): an email, a role picked
- * from a list that says what each one is for, Cancel and Send invite.
+ * from a list that says what each one is for, Cancel and Send invite. A
+ * side sheet, as inviting someone to a location is (`InvitePersonSheet`).
+ *
+ * An invite tells someone, so it waits ten seconds with Undo (`useHold`):
+ * the sheet closes, keeping what was typed, and a refusal or an Undo
+ * opens it again with that.
  *
  * Owner is not offered — the design invites people to run the day, and a
  * second owner is made from the Edit drawer once they have joined. Roles the
  * business invented are offered beside the built-ins; one that can do more
  * than the person inviting is shown and disabled, because the API refuses it.
  */
-function InviteDialog({
+function InviteSheet({
     open,
     onOpenChange,
     organizationName,
@@ -1261,6 +1242,7 @@ function InviteDialog({
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
+    const { send } = useHold();
     const role = useWatch({ control: form.control, name: "role" });
     const staffId = useWatch({ control: form.control, name: "staffId" });
     // Someone already on the diary takes bookings, so holds a seat
@@ -1282,297 +1264,240 @@ function InviteDialog({
         );
     }
 
-    function setOpen(next: boolean) {
-        if (!next)
-            form.reset({
-                email: "",
-                role: startRole,
-                siteIds: [],
-                staffId: "",
-            });
-        onOpenChange(next);
+    const blank = () =>
+        form.reset({
+            email: "",
+            role: startRole,
+            siteIds: [],
+            staffId: "",
+        });
+
+    function close() {
+        blank();
+        onOpenChange(false);
     }
 
-    async function submit(values: InviteValues) {
-        const res = await inviteMember({
-            email: values.email.trim().toLowerCase(),
-            role: values.role,
-            ...(values.role === "REVIEWER" ? { siteIds: values.siteIds } : {}),
-            ...(values.staffId ? { staffId: values.staffId } : {}),
+    function submit(values: InviteValues) {
+        const email = values.email.trim().toLowerCase();
+        // What the API said, for when the sheet opens again.
+        let onEmail: string | null = null;
+        let planned = false;
+        // Closed with what was typed kept: a refusal or an Undo needs it.
+        onOpenChange(false);
+        send(`invite:${email}`, {
+            description: `${email} joins as ${book.labelOf(values.role)}.`,
+            run: async () => {
+                const res = await inviteMember({
+                    email,
+                    role: values.role,
+                    ...(values.role === "REVIEWER"
+                        ? { siteIds: values.siteIds }
+                        : {}),
+                    ...(values.staffId ? { staffId: values.staffId } : {}),
+                });
+                if (res.ok) return { ok: true };
+                // The plan's team limit (U13): its notice, not a toast.
+                if (res.plan) {
+                    planned = true;
+                    showPlanRefusal(res.plan);
+                    return { ok: false, error: "", said: true };
+                }
+                // A refusal about the address ("already in this business")
+                // goes on the field; anything else is a toast.
+                if (res.field === "email") onEmail = res.error;
+                return {
+                    ok: false,
+                    error: res.error,
+                    said: res.field === "email",
+                };
+            },
+            sent: `Sent to ${email}.`,
+            onSent: () => {
+                blank();
+                onSent();
+                router.refresh();
+            },
+            onBack: () => {
+                if (planned) return blank();
+                onOpenChange(true);
+                if (onEmail) form.setError("email", { message: onEmail });
+            },
         });
-        if (!res.ok) {
-            // The plan's team limit (U13): its notice, not a toast.
-            if (res.plan) {
-                onOpenChange(false);
-                showPlanRefusal(res.plan);
-                return;
-            }
-            // A refusal about the address ("already in this workspace") goes
-            // on the field; anything else is a toast.
-            if (res.field === "email") {
-                form.setError("email", { message: res.error });
-            } else {
-                showError(res.error);
-            }
-            return;
-        }
-        showSuccess(
-            `Invite sent to ${res.data.email} — they join as ${book.labelOf(values.role)}.`,
-        );
-        setOpen(false);
-        onSent();
-        router.refresh();
     }
 
     const errorText =
         "text-[12.5px] font-normal text-destructive-subtle-foreground";
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="max-w-[440px] gap-0 overflow-hidden p-0 sm:rounded-[14px]">
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(submit)} noValidate>
-                        <DialogHeader className="space-y-1 px-[22px] pb-1 pt-[18px] text-left">
-                            <DialogTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                                Invite to {organizationName}
-                            </DialogTitle>
-                            <DialogDescription className="text-[13px]">
-                                They get an email with a link. It adds them to
-                                this business only.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="grid max-h-[60vh] gap-3.5 overflow-y-auto px-[22px] py-3.5">
-                            <FormField
-                                control={form.control}
-                                name="email"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-1.5">
-                                        <FormLabel className="text-[12.5px] font-medium">
-                                            Email
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="email"
-                                                autoComplete="off"
-                                                placeholder="name@example.in"
-                                                disabled={sending}
-                                                className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage
-                                            role="alert"
-                                            className={errorText}
-                                        />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <InviteDiaryPerson
-                                people={diaryPeople}
-                                value={staffId ?? ""}
-                                disabled={sending}
-                                onPick={pickDiaryPerson}
-                            />
-
-                            <FormField
-                                control={form.control}
-                                name="role"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-1.5">
-                                        <p
-                                            id="invite-role-label"
-                                            className="text-[12.5px] font-medium"
-                                        >
-                                            Role
-                                        </p>
-                                        {!staffId &&
-                                        (seatReason ?? viewOnlyReason) ? (
-                                            <p className="text-[12px] leading-[1.45] text-muted-foreground">
-                                                {seatReason ?? viewOnlyReason}
-                                            </p>
-                                        ) : null}
-                                        <div
-                                            role="radiogroup"
-                                            aria-labelledby="invite-role-label"
-                                            className="grid gap-1.5"
-                                        >
-                                            {offered.map((offer) => {
-                                                const r = offer.key;
-                                                return (
-                                                    <RoleChoice
-                                                        key={r}
-                                                        name={field.name}
-                                                        value={r}
-                                                        label={book.labelOf(r)}
-                                                        blurb={book.blurbOf(r)}
-                                                        checked={
-                                                            r === field.value
-                                                        }
-                                                        // The API refuses to
-                                                        // invite anyone at a role
-                                                        // that can do more than
-                                                        // the inviter.
-                                                        beyond={
-                                                            !book.withinReach(r)
-                                                        }
-                                                        // Full seats take no one
-                                                        // who needs one; full
-                                                        // view-only places take
-                                                        // no one view-only.
-                                                        noRoom={noRoom(offer)}
-                                                        disabled={sending}
-                                                        onPick={() =>
-                                                            field.onChange(r)
-                                                        }
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    </FormItem>
-                                )}
-                            />
-
-                            {role === "REVIEWER" ? (
-                                <FormField
-                                    control={form.control}
-                                    name="siteIds"
-                                    render={({ field }) => (
-                                        <FormItem className="space-y-1.5">
-                                            <p className="text-[12.5px] font-medium">
-                                                Websites they may review
-                                            </p>
-                                            {sites.length === 0 ? (
-                                                <p className="text-[12.5px] text-muted-foreground">
-                                                    You have no websites yet.
-                                                    Make one first, then invite
-                                                    someone to review it.
-                                                </p>
-                                            ) : (
-                                                sites.map((site) => {
-                                                    const on =
-                                                        field.value.includes(
-                                                            site.id,
-                                                        );
-                                                    return (
-                                                        <label
-                                                            key={site.id}
-                                                            className="flex items-center gap-2 text-[13px]"
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={on}
-                                                                onChange={() =>
-                                                                    field.onChange(
-                                                                        on
-                                                                            ? field.value.filter(
-                                                                                  (
-                                                                                      s,
-                                                                                  ) =>
-                                                                                      s !==
-                                                                                      site.id,
-                                                                              )
-                                                                            : [
-                                                                                  ...field.value,
-                                                                                  site.id,
-                                                                              ],
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    sending
-                                                                }
-                                                                className="size-4 rounded-[4px] border-border-strong"
-                                                            />
-                                                            {site.name}
-                                                        </label>
-                                                    );
-                                                })
-                                            )}
-                                            <FormMessage
-                                                role="alert"
-                                                className={errorText}
-                                            />
-                                        </FormItem>
-                                    )}
+        <Form {...form}>
+            <FormSheet
+                open={open}
+                title={`Invite to ${organizationName}`}
+                description="They get an email with a link. It adds them to this business only."
+                pending={sending}
+                saveLabel="Send invite"
+                savingLabel="Sending…"
+                fieldsClassName="gap-3.5"
+                onClose={close}
+                onSubmit={(e) => void form.handleSubmit(submit)(e)}
+            >
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                            <FormLabel className="text-[12.5px] font-medium">
+                                Email
+                            </FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="email"
+                                    autoComplete="off"
+                                    placeholder="name@example.in"
+                                    disabled={sending}
+                                    className="aria-[invalid=true]:border-destructive-subtle-foreground"
+                                    {...field}
                                 />
-                            ) : null}
-                        </div>
+                            </FormControl>
+                            <FormMessage role="alert" className={errorText} />
+                        </FormItem>
+                    )}
+                />
 
-                        <DialogFooter className="gap-2 border-t border-muted bg-foreground/[0.03] px-[22px] py-3 sm:justify-end">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setOpen(false)}
+                <InviteDiaryPerson
+                    people={diaryPeople}
+                    value={staffId ?? ""}
+                    disabled={sending}
+                    onPick={pickDiaryPerson}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                            <p
+                                id="invite-role-label"
+                                className="text-[12.5px] font-medium"
                             >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={sending}>
-                                {sending ? "Sending…" : "Send invite"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
-    );
-}
+                                Role
+                            </p>
+                            {!staffId && (seatReason ?? viewOnlyReason) ? (
+                                <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                                    {seatReason ?? viewOnlyReason}
+                                </p>
+                            ) : null}
+                            <ChoiceGroup
+                                labelledBy="invite-role-label"
+                                className="grid gap-1.5"
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={sending}
+                                choices={offered.map((offer) => {
+                                    const r = offer.key;
+                                    // The API refuses to invite anyone
+                                    // at a role that can do more than
+                                    // the inviter.
+                                    const beyond = !book.withinReach(r);
+                                    // Full seats take no one who needs
+                                    // one; full view-only places take no
+                                    // one view-only.
+                                    const full = noRoom(offer);
+                                    const off = beyond || full !== null;
+                                    const checked = r === field.value;
+                                    return {
+                                        value: r,
+                                        disabled: off,
+                                        tip: beyond
+                                            ? "Can do more than you can"
+                                            : (full ?? undefined),
+                                        label: (
+                                            <>
+                                                <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
+                                                    {book.labelOf(r)}
+                                                    {/* Which one is picked, beyond the border (UX-029). */}
+                                                    {checked && !off ? (
+                                                        <Check
+                                                            aria-hidden
+                                                            className="size-4 shrink-0"
+                                                        />
+                                                    ) : null}
+                                                </span>
+                                                <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                                                    {book.blurbOf(r)}
+                                                </span>
+                                            </>
+                                        ),
+                                    };
+                                })}
+                                itemClassName={(on, choice) =>
+                                    cn(
+                                        "block w-full rounded-[9px] border px-3 py-[9px] text-left coarse:min-h-11",
+                                        choice.disabled
+                                            ? "border-border opacity-50"
+                                            : on
+                                              ? "border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
+                                              : "border-border bg-card hover:border-border-strong",
+                                    )
+                                }
+                            />
+                        </FormItem>
+                    )}
+                />
 
-/** One role in the invite's list: its name, and what it is for. */
-function RoleChoice({
-    name,
-    value,
-    label,
-    blurb,
-    checked,
-    beyond,
-    noRoom = null,
-    disabled,
-    onPick,
-}: {
-    name: string;
-    value: string;
-    label: string;
-    blurb: string;
-    checked: boolean;
-    beyond: boolean;
-    /** The plan has no room for this role (UX-028, DEC-105), and why. */
-    noRoom?: string | null;
-    disabled: boolean;
-    onPick: () => void;
-}) {
-    const off = beyond || noRoom !== null;
-    return (
-        <label
-            title={beyond ? "Can do more than you can" : (noRoom ?? undefined)}
-            className={cn(
-                "block rounded-[9px] border px-3 py-[9px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                off
-                    ? "cursor-not-allowed border-border opacity-50"
-                    : checked
-                      ? "cursor-pointer border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
-                      : "cursor-pointer border-border bg-card hover:border-border-strong",
-            )}
-        >
-            <input
-                type="radio"
-                name={name}
-                value={value}
-                checked={checked}
-                disabled={off || disabled}
-                onChange={onPick}
-                className="sr-only"
-            />
-            <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
-                {label}
-                {/* Which one is picked, beyond the border (UX-029). */}
-                {checked && !off ? (
-                    <Check aria-hidden className="size-4 shrink-0" />
+                {role === "REVIEWER" ? (
+                    <FormField
+                        control={form.control}
+                        name="siteIds"
+                        render={({ field }) => (
+                            <FormItem className="space-y-1.5">
+                                <p className="text-[12.5px] font-medium">
+                                    Websites they may review
+                                </p>
+                                {sites.length === 0 ? (
+                                    <p className="text-[12.5px] text-muted-foreground">
+                                        You have no websites yet. Make one
+                                        first, then invite someone to review it.
+                                    </p>
+                                ) : (
+                                    sites.map((site) => {
+                                        const on = field.value.includes(
+                                            site.id,
+                                        );
+                                        return (
+                                            <CheckRow
+                                                key={site.id}
+                                                checked={on}
+                                                disabled={sending}
+                                                onChange={() =>
+                                                    field.onChange(
+                                                        on
+                                                            ? field.value.filter(
+                                                                  (s) =>
+                                                                      s !==
+                                                                      site.id,
+                                                              )
+                                                            : [
+                                                                  ...field.value,
+                                                                  site.id,
+                                                              ],
+                                                    )
+                                                }
+                                            >
+                                                {site.name}
+                                            </CheckRow>
+                                        );
+                                    })
+                                )}
+                                <FormMessage
+                                    role="alert"
+                                    className={errorText}
+                                />
+                            </FormItem>
+                        )}
+                    />
                 ) : null}
-            </span>
-            <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                {blurb}
-            </span>
-        </label>
+            </FormSheet>
+        </Form>
     );
 }

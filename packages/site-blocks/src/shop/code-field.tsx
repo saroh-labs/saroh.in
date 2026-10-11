@@ -11,7 +11,7 @@ import type { CheckoutQuote } from "./api";
  */
 
 const field = cn(
-    "border-site-border text-site-fg block h-11 w-full min-w-0 flex-1 rounded-[calc(var(--site-radius)+8px)] border px-3 text-[15px] uppercase",
+    "border-site-border text-site-fg block h-11 w-full min-w-0 flex-1 rounded-[calc(var(--site-radius)+8px)] border px-3 text-base uppercase",
     inputFill,
     focusRing,
 );

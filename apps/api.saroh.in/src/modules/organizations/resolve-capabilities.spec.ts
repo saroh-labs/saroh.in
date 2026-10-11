@@ -114,7 +114,12 @@ describe("allows / authorize", () => {
             actions: resolveCapabilities("stock-clerk", ["order:read"]),
         });
         expect(allows(actor, "org:delete")).toBe(false);
-        expect(() => authorize(actor, "org:delete")).toThrow(/may not perform/);
+        expect(() => authorize(actor, "org:delete")).toThrow(
+            /Only the owner can do this/,
+        );
+        expect(() => authorize(actor, "order:write")).toThrow(
+            /Your role can't do this/,
+        );
     });
 
     it("falls back to the shipped map when nothing was resolved", () => {
@@ -126,13 +131,18 @@ describe("allows / authorize", () => {
         expect(allows(ctx({ role: "REVIEWER" }), "member:read")).toBe(false);
     });
 
-    it("names the invented role in the refusal, not the floor it maps to", () => {
+    it("refuses an invented role in words, naming neither its key nor the floor it maps to", () => {
         const actor = ctx({
             role: "MEMBER",
             roleKey: "stock-clerk",
             actions: new Set<never>(),
         });
-        expect(() => authorize(actor, "order:read")).toThrow(/stock-clerk/);
+        expect(() => authorize(actor, "order:read")).toThrow(
+            "Your role can't do this. An owner or admin can change that in Settings › Team.",
+        );
+        expect(() => authorize(actor, "order:read")).not.toThrow(
+            /stock-clerk|MEMBER|order:read/,
+        );
     });
 });
 
@@ -201,12 +211,14 @@ describe("the split order powers (B16)", () => {
         });
         expect(allows(actor, "order:create")).toBe(true);
         expect(allows(actor, "order:read")).toBe(true);
-        expect(() => authorize(actor, "order:edit")).toThrow(/may not perform/);
+        expect(() => authorize(actor, "order:edit")).toThrow(
+            /Your role can't do this/,
+        );
         expect(() => authorize(actor, "order:refund")).toThrow(
-            /may not perform/,
+            /Your role can't do this/,
         );
         expect(() => authorize(actor, "order:export")).toThrow(
-            /may not perform/,
+            /Your role can't do this/,
         );
     });
 });

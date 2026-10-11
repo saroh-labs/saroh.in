@@ -9,11 +9,16 @@ import { APIError } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 
 import {
+    CODE_ALLOWED_ATTEMPTS,
+    CODE_LIMIT_MAX,
+    CODE_LIMIT_WINDOW_SECONDS,
     sessionCookiePrefix,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
-import { getTrustedOrigins } from "./origins";
+import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import type { OnAuthServerError } from "./server-errors";
+import { serverErrorHook } from "./server-errors";
 
 // Re-export so existing consumers (api) keep importing it from @saroh/auth.
 export { getTrustedOrigins, isTrustedOrigin } from "./origins";
@@ -21,9 +26,14 @@ export { getTrustedOrigins, isTrustedOrigin } from "./origins";
 // browser must import these from `@saroh/auth/constants` instead — see the note
 // in that file.
 export {
+    CODE_ALLOWED_ATTEMPTS,
+    CODE_LIMIT_MAX,
+    CODE_LIMIT_WINDOW_SECONDS,
+    CODE_RESEND_SECONDS,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+export type { AuthServerFault, OnAuthServerError } from "./server-errors";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -96,6 +106,25 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     sendResetPassword?: EmailSender;
     /**
+     * Tell the owner of an address that someone tried to sign up with it.
+     *
+     * With `requireEmailVerification` on, Better Auth answers a sign-up for an
+     * address that already has an account exactly as it answers a new one, so
+     * the screen cannot be used to find out who is registered. No code is
+     * sent, though, and the person is left reading "Check your email" with
+     * nothing arriving. This mail is the way out, and it reaches only the
+     * mailbox's owner: it says they already have an account and offers
+     * Sign in and Reset password.
+     */
+    sendExistingAccountNotice?: (args: {
+        to: string;
+        /**
+         * The sign-up page's own origin, when the request named a trusted
+         * one: where its Sign in and Reset password pages are.
+         */
+        origin?: string;
+    }) => Promise<void> | void;
+    /**
      * Approve an email change. Sent to the account's CURRENT address (not the
      * new one) — that is what makes the flow takeover-resistant: whoever holds
      * the existing mailbox authorizes the move. `newEmail` is included so the
@@ -109,6 +138,49 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
+    /**
+     * Told once, after a user's row is first written (sign-up by password
+     * or through a provider). Handed the id only, never the email or name.
+     * Whatever it throws is swallowed: it can't fail a sign-up.
+     */
+    onUserCreated?: (user: { id: string }) => void;
+    /**
+     * Told when Better Auth answered a request 5xx: the thrown value and the
+     * status, for the host's error reporter. Never told about an expected
+     * outcome (a wrong password, an unverified email, a rate limit, a failed
+     * validation). Whatever it throws is swallowed: it can't fail a sign-in.
+     * See `server-errors.ts`.
+     */
+    onServerError?: OnAuthServerError;
+}
+
+/**
+ * Better Auth's `emailAndPassword.onExistingUserSignUp` (1.6): called when a
+ * sign-up names an address that already has an account, and only while the
+ * duplicate answer is the generic one (`requireEmailVerification`).
+ *
+ * A failure to send must not change what the sign-up answers, or the two
+ * cases could be told apart again. So it is logged here and goes no further.
+ */
+export function existingUserSignUpHook(
+    send: CreateAuthOptions["sendExistingAccountNotice"],
+) {
+    return async (
+        { user }: { user: { email: string } },
+        request?: Request,
+    ): Promise<void> => {
+        if (!send) return;
+        const asked = request?.headers.get("origin") ?? undefined;
+        const origin = asked && isTrustedOrigin(asked) ? asked : undefined;
+        try {
+            await send({ to: user.email, ...(origin ? { origin } : {}) });
+        } catch (error) {
+            console.error(
+                "[auth] The existing-account email could not be sent.",
+                error instanceof Error ? error.name : "unknown error",
+            );
+        }
+    };
 }
 
 /**
@@ -160,7 +232,7 @@ async function assertNotSoleOwner(userId: string): Promise<void> {
         throw new APIError("BAD_REQUEST", {
             message:
                 `You are the only owner of ${stranded.join(", ")}. Make someone else an owner, ` +
-                `or delete the organization first, then delete your account.`,
+                `or delete the business first, then delete your account.`,
         });
     }
 }
@@ -204,8 +276,34 @@ export function sessionCookieDomain(apiUrl: string | undefined): string | null {
  * session validation.
  *
  * Milestone 1: core only (email/password + verification + reset, GitHub +
- * Google OAuth) plus `emailOTP` for code-based verification. Advanced plugins
- * are layered on per M2 slice.
+ * Google OAuth) plus `emailOTP`. Advanced plugins are layered on per M2
+ * slice.
+ *
+ * **A merchant signs up and signs in with an emailed code** (owner, 10 Oct
+ * 2026); a password is optional and set later from the account page. Both
+ * are `emailOTP`'s own endpoints, nothing of ours:
+ * `POST /email-otp/send-verification-otp` with `type: "sign-in"`, then
+ * `POST /sign-in/email-otp`. What makes that safe to offer is the plugin's,
+ * and `sign-in-code.test.ts` runs the real library to hold it there:
+ *
+ * - asking for a code answers the same whether or not the address has an
+ *   account, and sends the same email, so the screen can't be used to learn
+ *   who is registered;
+ * - a right code for a new address makes the account, already verified, and
+ *   signs it in; for an existing one it only signs in, password untouched;
+ * - a right code for an account whose address was never proven first removes
+ *   the password and sessions it was made with
+ *   (`revokeUnprovenAccountAccess`), so nobody who signed up with someone
+ *   else's address keeps a way in once the owner arrives;
+ * - a code is single use, hashed at rest, good for
+ *   `VERIFICATION_OTP_EXPIRY_SECONDS`, and spent after
+ *   `CODE_ALLOWED_ATTEMPTS` wrong tries;
+ * - both endpoints are rate limited (`CODE_LIMIT_MAX` per
+ *   `CODE_LIMIT_WINDOW_SECONDS`), as the verify step always was.
+ *
+ * `disableSignUp` stays off on purpose: with it on, a code for an unknown
+ * address is never sent, and "Check your email" with nothing arriving is
+ * the dead end the duplicate sign-up email was written to cover.
  *
  * The explicit `BetterAuthOptions` / `BetterAuthInstance` annotations below are
  * required, not stylistic: plugin endpoints are typed with zod schemas, so an
@@ -217,6 +315,14 @@ export function sessionCookieDomain(apiUrl: string | undefined): string | null {
  * plugin-aware types from `createAuthClient` in ./client instead.
  */
 export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
+    return betterAuth(authOptions(opts));
+}
+
+/**
+ * {@link createAuth}'s options, on their own so a test can run the real
+ * library on them with a database of its own (`sign-in-code.test.ts`).
+ */
+export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const cookieDomain = sessionCookieDomain(process.env.BETTER_AUTH_URL);
 
@@ -227,6 +333,30 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
         database: prismaAdapter(prisma, {
             provider: "postgresql",
         }),
+        // Only when the host asked to be told: no hook otherwise.
+        ...(opts.onUserCreated
+            ? {
+                  databaseHooks: {
+                      user: {
+                          create: {
+                              after: (user: { id: string }) => {
+                                  try {
+                                      opts.onUserCreated?.({ id: user.id });
+                                  } catch {
+                                      // Never a sign-up's problem.
+                                  }
+                                  return Promise.resolve();
+                              },
+                          },
+                      },
+                  },
+              }
+            : {}),
+        // Only when the host asked to be told: Better Auth's own logging of
+        // these errors otherwise.
+        ...(opts.onServerError
+            ? { onAPIError: serverErrorHook(opts.onServerError) }
+            : {}),
         account: {
             accountLinking: {
                 enabled: true,
@@ -252,10 +382,16 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
             sendResetPassword: async ({ user, url, token }) => {
                 await opts.sendResetPassword?.({ to: user.email, url, token });
             },
+            // A second sign-up for an address that has an account: the
+            // screen says the same as for a new one, and the mailbox's owner
+            // is told how to get in.
+            onExistingUserSignUp: existingUserSignUpHook(
+                opts.sendExistingAccountNotice,
+            ),
         },
         emailVerification: {
             sendOnSignUp: true,
-            // Someone who signed up, missed the code and came back to log in
+            // Someone who signed up, missed the code and came back to sign in
             // gets a fresh one automatically — so the 403 below is always
             // actionable. The login form reads EMAIL_NOT_VERIFIED and forwards
             // them to the verify screen, where that code is already waiting.
@@ -345,7 +481,14 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
                 // Codes are short and guessable by construction, so the lockout
                 // — not the entropy — is the control. 5 tries, then the code is
                 // burned and the user must request a new one.
-                allowedAttempts: 5,
+                allowedAttempts: CODE_ALLOWED_ATTEMPTS,
+                // The plugin's own default, written down because the code
+                // step's "Resend code in 30s" is worked out from it
+                // (`CODE_RESEND_SECONDS`).
+                rateLimit: {
+                    window: CODE_LIMIT_WINDOW_SECONDS,
+                    max: CODE_LIMIT_MAX,
+                },
                 // Never store a usable code at rest: a DB leak must not hand an
                 // attacker a working second factor for every pending signup.
                 storeOTP: "hashed",
@@ -356,7 +499,7 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
         ],
     };
 
-    return betterAuth(options);
+    return options;
 }
 
 export type Auth = ReturnType<typeof createAuth>;

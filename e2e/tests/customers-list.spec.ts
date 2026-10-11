@@ -65,18 +65,19 @@ test.describe("customers list", () => {
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";
         await page
-            .getByRole("searchbox", { name: /Search by name/ })
+            .getByRole("searchbox", { name: "Search customers" })
             .fill(name);
         await expect(page).toHaveURL(/[?&]q=/);
         await expect(
             page.getByRole("link", { name: new RegExp(escape(name)) }).first(),
         ).toBeVisible();
 
-        await page.getByRole("button", { name: /^Returning/ }).click();
+        // Who to show is one of the toolbar's dropdowns.
+        const show = page.getByRole("combobox", { name: "Show" });
+        await show.click();
+        await page.getByRole("option", { name: /^Returning/ }).click();
         await expect(page).toHaveURL(/chip=returning/);
-        await expect(
-            page.getByRole("button", { name: /^Returning/ }),
-        ).toHaveAttribute("aria-pressed", "true");
+        await expect(show).toContainText("Returning");
 
         await page.getByRole("combobox", { name: "Sort" }).click();
         await page.getByRole("option", { name: "Spent, highest" }).click();
@@ -110,9 +111,7 @@ test.describe("customers list", () => {
         await expect(
             page.getByText("No customers match “zzzz-nobody-zzzz”"),
         ).toBeVisible();
-        await page
-            .getByRole("button", { name: "Clear search and filters" })
-            .click();
+        await page.getByRole("button", { name: "Clear search" }).click();
         await expect(page).toHaveURL(/\/commerce\/customers$/);
     });
 

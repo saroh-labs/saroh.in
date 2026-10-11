@@ -19,9 +19,15 @@ import {
     payLinkRefusal,
     payLinkStanding,
 } from "../orders/order-pay-link";
-import type { PayInstructionsView } from "../organizations/business-pay-instructions";
-import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import type {
+    BusinessContactView,
+    PayInstructionsView,
+} from "../organizations/business-pay-instructions";
+import {
+    businessContactOf,
+    businessPayInstructionsOf,
+} from "../organizations/business-pay-instructions";
+import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { orderPayOnline } from "./order-pay-online";
 import type { CreateIntentResult } from "./payments.service";
@@ -71,6 +77,13 @@ export interface PublicOrderPayView {
      * Null when nothing is due or the business set none.
      */
     payInstructions: PayInstructionsView | null;
+    /**
+     * The business's public phone and contact email, while the order is
+     * DUE and the page has no "How to pay us" to show: under Pay, for a
+     * question before paying, or as the way to pay them directly. Null
+     * when it set neither; absent otherwise.
+     */
+    businessContact?: BusinessContactView | null;
 }
 
 /** Reads per caller per minute: a page reload is fine, a scraper is not. */
@@ -170,6 +183,10 @@ export class PublicOrderPayService {
                 orderPayOnline(prisma, found.organizationId, order.storeId),
             ]);
             const status = payLinkStanding(order);
+            const payInstructions =
+                status === "DUE"
+                    ? await businessPayInstructionsOf(found.organizationId)
+                    : null;
             const first = order.customer
                 ? (order.customer.firstName?.trim() ?? "")
                 : (order.walkInName?.trim().split(/\s+/)[0] ?? "");
@@ -198,10 +215,14 @@ export class PublicOrderPayService {
                     ? siteStyleVariables(parseSiteStyle(site.style))
                     : null,
                 payUrl: await orderPayLinkUrlFor(found.organizationId, token),
-                payInstructions:
-                    status === "DUE"
-                        ? await businessPayInstructionsOf(found.organizationId)
-                        : null,
+                payInstructions,
+                ...(status === "DUE" && (payOnline || payInstructions === null)
+                    ? {
+                          businessContact: await businessContactOf(
+                              found.organizationId,
+                          ),
+                      }
+                    : {}),
             };
         });
     }
@@ -223,7 +244,8 @@ export class PublicOrderPayService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        await assertOrganizationOpen(found.organizationId);
+        // Paying what the business already asked for (DEC-120).
+        await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const order = await prisma.order.findFirst({
                 where: { id: found.id, organizationId: found.organizationId },

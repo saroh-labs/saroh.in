@@ -15,6 +15,7 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
@@ -110,7 +111,7 @@ export class OrganizationCategoriesController {
  * same organization-scoped service.
  */
 @Controller("stores/:storeId/categories")
-@UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
+@UseGuards(BetterAuthGuard, StoreLifecycleGuard, ModuleEnforcementGuard)
 @RequireModule("COMMERCE")
 export class CategoriesController {
     constructor(

@@ -24,7 +24,7 @@ describe("PlanEndingBanner", () => {
         expect(html).toContain("Your Grow plan ends in 7 days");
         expect(html).toContain("on Free, and everything you made is kept");
         expect(html).toContain('href="/settings/billing#change-plan"');
-        expect(html).toContain("Choose a plan");
+        expect(html).toContain("See plans");
     });
 
     it("says 1 day, not 1 days", () => {

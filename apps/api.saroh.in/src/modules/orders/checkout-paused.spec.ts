@@ -4,8 +4,13 @@
 jest.mock("../billing/over-limit.service", () => ({
     overLimit: { pausedNow: jest.fn() },
 }));
+jest.mock("@saroh/database", () => ({
+    prisma: { organization: { findUnique: jest.fn() } },
+}));
 
 import { ConflictException } from "@nestjs/common";
+
+import { prisma } from "@saroh/database";
 
 import { overLimit } from "../billing/over-limit.service";
 import { PAUSED_BY_PLAN } from "../billing/paused-errors";
@@ -34,7 +39,38 @@ function paused(over: {
     };
 }
 
-beforeEach(() => pausedNow.mockReset());
+const lifecycle = prisma.organization.findUnique as jest.Mock;
+
+beforeEach(() => {
+    pausedNow.mockReset();
+    lifecycle.mockReset();
+    lifecycle.mockResolvedValue({ lifecycleStatus: "ACTIVE" });
+});
+
+describe("a business suspended or closing (DEC-120)", () => {
+    it.each(["SUSPENDED", "PENDING_DELETION"])(
+        "reads as a paused site while %s: no orders, no bookings",
+        async (status) => {
+            lifecycle.mockResolvedValue({ lifecycleStatus: status });
+            pausedNow.mockResolvedValue(null);
+            await expect(
+                shopPause("org_1", "site_1", "store_1"),
+            ).resolves.toEqual({ kept: {}, takingOrders: false });
+            await expect(siteTakingBookings("org_1", "site_1")).resolves.toBe(
+                false,
+            );
+            await expect(siteTakingOrders("org_1", "site_1")).resolves.toBe(
+                false,
+            );
+        },
+    );
+
+    it("an active business is asked about the plan only", async () => {
+        pausedNow.mockResolvedValue(null);
+        await expect(siteTakingBookings("org_1", "site_1")).resolves.toBe(true);
+        expect(pausedNow).toHaveBeenCalled();
+    });
+});
 
 describe("shopPause (#800)", () => {
     it("takes orders and keeps every product when nothing is paused (enforcement off too)", async () => {

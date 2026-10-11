@@ -116,10 +116,20 @@ const CERAMICS_SCALARS = {
 
 /**
  * The footer's line as it starts: where the design has the area and the
- * studio's open day, words that say what to write there.
+ * open day, words that say what to write there. "Store" is offered to every
+ * shop (a bakery, a clothes shop, a maker), and the line is saved as the
+ * site's footer, so it names no kind of business: "the studio" was wrong on
+ * everyone else's site.
  */
-export const CERAMICS_FOOTER_LINE =
-    "Your area and town — and when the studio is open";
+export const CERAMICS_FOOTER_LINE = "Your area and town · when you are open";
+
+/**
+ * The line sites made from v1 started with until it was reworded. Never
+ * written again; the pre-publish check still knows it as the template's.
+ */
+export const CERAMICS_FORMER_FOOTER_LINES: readonly string[] = [
+    "Your area and town — and when the studio is open",
+];
 
 export const ceramicsTemplate: TemplateManifest = {
     id: CERAMICS_TEMPLATE_ID,
@@ -132,7 +142,11 @@ export const ceramicsTemplate: TemplateManifest = {
     shape: "store",
     sample: { name: "Kiln", host: "kiln.saroh.app" },
     uses: [COMMERCE],
-    footer: { line: CERAMICS_FOOTER_LINE, layout: "left" },
+    footer: {
+        line: CERAMICS_FOOTER_LINE,
+        layout: "left",
+        formerLines: CERAMICS_FORMER_FOOTER_LINES,
+    },
     styles: [
         {
             // Unbleached paper, ink and a deep green; hairlines, not cards.

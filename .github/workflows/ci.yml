@@ -101,7 +101,11 @@ jobs:
           # instead of reading as "nothing changed".)
           all=$(git diff --name-only "$base" HEAD)
           files=$(printf '%s\n' "$all" | grep -vE '^(docs/|.*\.md$)' || true)
-          has() { printf '%s\n' "$files" | grep -qE "$1"; }
+          # Not `| grep -q`: grep -q leaves at its first match, the writer
+          # behind it dies of a broken pipe once the list is longer than the
+          # pipe holds, and under pipefail that read as "no match". A batch
+          # of 2,000 files so ran no integration and no browser shard.
+          has() { grep -E "$1" <<<"$files" >/dev/null; }
           if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
             everything
           fi
@@ -188,6 +192,15 @@ jobs:
       - name: Site blocks gate
         run: pnpm run check:blocks
 
+      # Merchant sites never load a tracker of Saroh's: no PostHog SDK,
+      # address or public key under apps/saroh.app or packages/site-blocks
+      # (DEC-125). Their own server's errors are reported server-side only.
+      # And Saroh's ad tags (Google Ads, Meta Pixel) live on saroh.in alone:
+      # none in the merchant sites, the workspace, the console or accounts
+      # (DEC-127).
+      - name: No Saroh tracker on merchant sites
+        run: pnpm run check:merchant-site-tracking
+
       # Each migration folder has its own timestamp, so replay order is chosen.
       - name: Migration ids
         run: pnpm run check:migration-ids
@@ -196,10 +209,27 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # No tag is stripped by one pattern replace with nothing: the code
+      # scanner refuses it, and nothing else runs the scanner before a push.
+      - name: Tag stripping
+        run: pnpm run check:tag-strip
+
       # One word each (UX-078): no "Reschedule", "Shut" or "reservation" in
       # what merchants and customers read.
       - name: One word each
         run: pnpm run check:words
+
+      # One formatter each: no Intl or toLocaleString outside the merchant
+      # app's lib/format, no plural built by hand, no "successfully" in a
+      # toast.
+      - name: One formatter each
+        run: pnpm run check:formats
+
+      # What a merchant reads in the workspace: no em dash, no semicolon, a
+      # range says "to", and none of the words the product never says
+      # (organization, workspace, storefront, inventory, Retry, …).
+      - name: The workspace's words
+        run: pnpm run check:copy
 
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
@@ -293,7 +323,7 @@ jobs:
               printf '%s\n' "$out"
               exit 0
             fi
-            if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
+            if ! grep -E 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError' <<<"$out" >/dev/null; then
               printf '%s\n' "$out"
               exit 1
             fi
@@ -523,6 +553,10 @@ jobs:
       # reads `localhost` as a tenant subdomain and rewrites every request —
       # `/preview/<token>` included — into a tenant lookup that finds nothing.
       NEXT_PUBLIC_ROOT_DOMAIN: localhost
+      # Saroh's own plans are shown on this stack (DEC-136): the plan specs
+      # need Settings › Plan and billing and its prompts. Production leaves
+      # it out.
+      NEXT_PUBLIC_PLANS: "on"
       EMAIL_FROM: Saroh <noreply@saroh.in>
       E2E_APP_URL: http://localhost:3003
       E2E_ACCOUNTS_URL: http://localhost:3000
@@ -539,6 +573,9 @@ jobs:
       # specs run instead of skipping. Never production: the site ignores it
       # there (plan KTD-2).
       RESOURCES_PREVIEW: "1"
+      # Templates on (DEC-135): saroh.in's gallery and the app's template
+      # picker, which the templates specs open. Unset, as production, is off.
+      NEXT_PUBLIC_TEMPLATES: "on"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.

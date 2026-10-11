@@ -1,7 +1,12 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -21,25 +26,23 @@ import {
     chargeRow,
     chargingText,
     collectionRows,
-    dayText,
     failWhy,
     gstNote,
     headline,
     initials,
     listTab,
     longPrice,
-    money,
     olderPrice,
     paysBy,
     retryOffer,
     sortCharges,
 } from "@/lib/subscriptions/view";
 
-import { PaymentsCrumbs } from "../payments-crumbs";
-import { Pill } from "../pill";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { SubscribeDialog } from "../subscribe-dialog";
-import type { Step } from "./action-sheets";
-import { ActionSheet } from "./action-sheets";
+import type { Step } from "./action-dialogs";
+import { ActionDialog } from "./action-dialogs";
 import { AutopayActions } from "./autopay-panel";
 import { ChangesCard } from "./changes-card";
 import {
@@ -50,9 +53,6 @@ import {
     PlanCard,
 } from "./panels";
 import { useSubscriptionActions } from "./use-subscription-actions";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 interface Action {
     label: string;
     kind: "primary" | "plain" | "danger";
@@ -149,9 +149,9 @@ export function SubscriptionDetail({
         window.history.replaceState(null, "", url.pathname + url.search);
     }, []);
 
-    const periodEndText = dayText(sub.currentPeriodEnd, tz, now);
+    const periodEndText = formatDate(sub.currentPeriodEnd, tz, { now });
     const nextText = sub.nextRenewalAt
-        ? dayText(sub.nextRenewalAt, tz, now)
+        ? formatDate(sub.nextRenewalAt, tz, { now })
         : null;
 
     const failedId = sub.failedCharge?.id;
@@ -265,46 +265,40 @@ export function SubscriptionDetail({
 
     return (
         <>
-            <PaymentsCrumbs
-                here={name}
-                back={{
-                    href: "/billing/subscriptions",
-                    label: "Subscriptions",
-                }}
-            />
-            <div className="flex flex-col gap-4 px-6 pb-[26px] pt-5">
+            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
+                <PageHeader
+                    holdsData
+                    className="mb-0"
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="list" href="/billing/subscriptions">
+                            Subscriptions
+                        </Link>,
+                        name,
+                    ]}
+                    title={name}
+                    badge={
+                        <StatusBadge tone={head.pill.tone}>
+                            {head.pill.label}
+                        </StatusBadge>
+                    }
+                    description={[
+                        sub.plan.name,
+                        longPrice(sub.price, sub.currency, sub.interval),
+                        `Since ${formatDate(sub.startedAt, tz, { now })}`,
+                        bizName,
+                    ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                />
                 <section
                     aria-label="Next charge"
                     className="flex flex-wrap items-end gap-5 rounded-xl border border-border-strong bg-card px-5 py-[18px]"
                 >
                     <div className="min-w-0 flex-[1_1_300px]">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em]">
-                                {name}
-                            </h1>
-                            <Pill tone={head.pill.tone}>{head.pill.label}</Pill>
-                        </div>
-                        <p className="mt-1 text-[12.5px] text-muted-foreground">
-                            {[
-                                sub.plan.name,
-                                longPrice(
-                                    sub.price,
-                                    sub.currency,
-                                    sub.interval,
-                                ),
-                                `Since ${dayText(sub.startedAt, tz, now)}`,
-                                bizName,
-                            ]
-                                .filter(Boolean)
-                                .join(" · ")}
-                        </p>
-                    </div>
-                    <div className="flex-[0_1_auto] text-right">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Next charge
-                        </div>
+                        <div className="label">Next charge</div>
                         <div className="mt-0.5 font-display text-[30px] font-semibold tabular-nums leading-[1.15] tracking-[-0.02em]">
-                            {head.big}
+                            <AbsentOr says="None">{head.big}</AbsentOr>
                         </div>
                         <div className="text-[12.5px] text-muted-foreground">
                             {head.when}
@@ -324,7 +318,6 @@ export function SubscriptionDetail({
                                         disabled={busy}
                                         onClick={a.go}
                                         className={cn(
-                                            BTN,
                                             a.kind === "danger" &&
                                                 "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
                                         )}
@@ -347,10 +340,7 @@ export function SubscriptionDetail({
                 ) : null}
 
                 {tab === "failed" ? (
-                    <div
-                        role="alert"
-                        className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
-                    >
+                    <Notice tone="error">
                         <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                             {failWhy(sub, now)}
                         </div>
@@ -359,26 +349,28 @@ export function SubscriptionDetail({
                                 ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
                                 : sub.retryVia === "MANDATE"
                                   ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
-                                  : `Saroh doesn't charge a card or try again on its own — ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
+                                  : `Saroh doesn't charge a card or try again on its own. ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
                         </div>
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />
                         ) : null}
-                    </div>
+                    </Notice>
                 ) : null}
 
                 {pending && canWrite ? (
-                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5">
-                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-brand-subtle-foreground">
+                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5">
+                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-foreground">
                             Changes to {pending.name} (
-                            {money(pending.price, pending.currency)}) from{" "}
-                            {dayText(pending.from, tz, now)}. No part-payment.
+                            {formatMoneyMajor(pending.price, pending.currency)})
+                            from {formatDate(pending.from, tz, { now })}. No
+                            part-payment.
                         </span>
                         <Button
+                            size="sm"
                             variant="outline"
                             disabled={busy}
                             onClick={keepCurrentPlan}
-                            className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            className="border-border-strong"
                         >
                             Keep current plan
                         </Button>
@@ -394,7 +386,7 @@ export function SubscriptionDetail({
                                 hint={
                                     tab === "failed"
                                         ? "Not collected until the renewal is paid"
-                                        : "Skip one — nothing is refunded, it just isn't collected"
+                                        : "Skip one. Nothing is refunded, and it isn't collected"
                                 }
                                 canWrite={canWrite}
                                 busyDate={busyDate}
@@ -431,7 +423,7 @@ export function SubscriptionDetail({
                             )}
                             older={
                                 older
-                                    ? `Keeps ${money(sub.price, sub.currency)} — the plan is ${money(older.listPrice, sub.currency)} for new sign-ups`
+                                    ? `Keeps ${formatMoneyMajor(sub.price, sub.currency)}. The plan is ${formatMoneyMajor(older.listPrice, sub.currency)} for new sign-ups`
                                     : null
                             }
                             // What the customer set up (D12) comes first;
@@ -464,7 +456,7 @@ export function SubscriptionDetail({
                 </div>
             </div>
 
-            <ActionSheet
+            <ActionDialog
                 step={step}
                 onClose={() => setStep(null)}
                 busy={busy}
@@ -472,7 +464,7 @@ export function SubscriptionDetail({
                 pauseNote={(option) => pauseNote(option, sub, now)}
                 plans={plans}
                 currentPlanId={sub.plan.id}
-                switchNote={`Starts at the next renewal${nextText ? `, ${nextText}` : ""}. This period stays as it is — no part-payments.`}
+                switchNote={`Starts at the next renewal${nextText ? `, ${nextText}` : ""}. This period stays as it is, with no part-payments.`}
                 onPause={pause}
                 onSwitch={switchTo}
                 cancel={{

@@ -1,9 +1,14 @@
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { Notice } from "@saroh/ui/notice";
+import { PlanWay } from "./plan-way";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -20,7 +25,8 @@ export function daysLeft(endsAt: string, now: Date): number {
  * gave for a while, that moves the business to a cheaper one. Shown above
  * every page in its last 30 days (the API decides, `planEnding`), with the
  * way to stay on it; the same end is emailed 30, 7 and 1 days ahead.
- * Nothing when there is none, or the role can't read billing.
+ * Nothing when there is none, the role can't read billing, or plans
+ * aren't shown (DEC-136).
  */
 export function PlanEndingBanner({
     ending,
@@ -29,24 +35,33 @@ export function PlanEndingBanner({
     ending: BillingAccessView["planEnding"] | undefined;
     now?: Date;
 }) {
-    if (!ending) return null;
+    if (!ending || !plansShown()) return null;
     const days = daysLeft(ending.endsAt, now);
     return (
-        <div
-            role="status"
-            className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-brand-300 bg-brand-subtle px-4 py-2.5 dark:border-brand-700 sm:px-6"
+        <Notice
+            tone="info"
+            layout="banner"
+            // Saroh's words and Saroh's plan names; the day count and the
+            // date's digits are hidden in a recording all the same.
+            data-ph-unmask=""
+            align="center"
         >
-            <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
-                <span className="font-semibold">
-                    Your {ending.planName} plan ends in {days}{" "}
-                    {days === 1 ? "day" : "days"}
-                </span>
-                , on <ViewerDate iso={ending.endsAt} />. After that you&rsquo;re
-                on {ending.nextPlanName}, and everything you made is kept.
-            </p>
-            <Button asChild size="sm" className="shrink-0">
-                <Link href={upgradeHref()}>Choose a plan</Link>
-            </Button>
-        </div>
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+                <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
+                    <span className="font-semibold">
+                        Your {ending.planName} plan ends in {days}{" "}
+                        {plural(days, "day")}
+                    </span>
+                    , on <ViewerDate iso={ending.endsAt} />. After that
+                    you&rsquo;re on {ending.nextPlanName}, and everything you
+                    made is kept.
+                </p>
+                <PlanWay className="text-foreground/80">
+                    <Button asChild size="sm" className="shrink-0">
+                        <Link href={upgradeHref()}>{planLabel()}</Link>
+                    </Button>
+                </PlanWay>
+            </div>
+        </Notice>
     );
 }

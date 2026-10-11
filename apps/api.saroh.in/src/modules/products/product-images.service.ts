@@ -276,7 +276,7 @@ export class ProductImagesService {
             if (!input.mediaId) {
                 throw new BadRequestException({
                     message:
-                        "A video has to be uploaded — an address can't be one.",
+                        "A video has to be uploaded. An address can't be one.",
                     field: "images",
                 });
             }

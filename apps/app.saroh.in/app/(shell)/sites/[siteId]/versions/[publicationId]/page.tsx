@@ -1,3 +1,5 @@
+import { formatDateTime } from "@/lib/format/datetime";
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -9,9 +11,10 @@ import { PastVersionPreview } from "@/components/sites/past-version-preview";
 import { RestoreVersion } from "@/components/sites/restore-version";
 import { activeBusinessZone } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { exactDate } from "@/lib/sites/format-date";
 import { releaseTitle } from "@/lib/sites/release-review";
 import { getPublication, getSite } from "@/lib/sites/service";
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * One past version, as it was served (#283, #194).
@@ -71,7 +74,19 @@ export default async function PastVersionPage({
     return (
         <PageContainer>
             <PageHeader
-                title={`Version from ${exactDate(publication.publishedAt, zone)}`}
+                breadcrumb={[
+                    <Link key="site" href={`/sites/${siteId}/pages`}>
+                        Website
+                    </Link>,
+                    <Link key="versions" href={`/sites/${siteId}/versions`}>
+                        Version history
+                    </Link>,
+                    formatDateTime(publication.publishedAt, zone, {
+                        year: "always",
+                    }),
+                ]}
+                holdsData
+                title={`Version from ${formatDateTime(publication.publishedAt, zone, { year: "always" })}`}
                 description={
                     publication.publishedBy
                         ? `${site.name} · published by ${publication.publishedBy}`
@@ -86,32 +101,28 @@ export default async function PastVersionPage({
                 }
             />
 
-            <p
-                role="status"
-                className="rounded-lg border bg-muted px-4 py-3 text-sm"
-            >
+            <Notice role="status">
                 {isCurrent
                     ? "This is the version visitors see now."
                     : "A past version, as it was served. It is not what visitors see now, and nothing here can be edited."}
                 {release ? (
                     <>
                         {" It went live from "}
-                        <Link
+                        <TextLink
                             href={`/sites/${siteId}/releases/${release.id}`}
-                            className="font-medium underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
                         >
                             {releaseTitle(release)}
-                        </Link>
+                        </TextLink>
                         .
                     </>
                 ) : null}
-            </p>
+            </Notice>
 
             {renderable ? null : (
                 <PartialNotice>
                     {unrenderable.length === 0
                         ? "This version's stored copy could not be read, so none of it can be shown."
-                        : `${unrenderable.length === 1 ? "One section" : `${unrenderable.length} sections`} in this version can no longer be drawn by your site as it is today, and ${unrenderable.length === 1 ? "is" : "are"} left out below.`}
+                        : `${unrenderable.length === 1 ? "One section" : `${unrenderable.length} sections`} in this version can no longer be drawn by your site as it is today, and ${plural(unrenderable.length, "is", "are")} left out below.`}
                 </PartialNotice>
             )}
 
@@ -133,6 +144,7 @@ export default async function PastVersionPage({
                 >
                     {pages.map((p) => (
                         <Button
+                            data-ph-mask=""
                             key={p.path}
                             asChild
                             size="sm"

@@ -25,7 +25,8 @@ describe("a person's weekly hours (U3)", () => {
                 { dayOfWeek: 1, startMinute: 660, endMinute: 780 },
             ]),
         ).toEqual({
-            message: "Monday's hours overlap: 9:00–12:00 and 11:00–13:00.",
+            message:
+                "Monday's hours overlap: 9:00 am to 12:00 pm and 11:00 am to 1:00 pm.",
             field: "hours",
         });
     });
@@ -37,7 +38,7 @@ describe("a person's weekly hours (U3)", () => {
             ]),
         ).toEqual({
             message:
-                "Wednesday: the end (9:00) must be after the start (12:00).",
+                "Wednesday: the end (9:00 am) must be after the start (12:00 pm).",
             field: "hours",
         });
     });

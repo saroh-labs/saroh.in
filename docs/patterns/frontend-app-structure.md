@@ -27,10 +27,12 @@ components/shared/             app shell, navigation, command menu
 
 - **Current** — **Every shell page renders inside `PageContainer`.**
   `components/shared/page-container.tsx` owns the page's gutter and measure, so
-  a screen cannot arrive with its own. Three widths, the scale
-  `docs/design-system/04_LAYOUT_SYSTEM.md` proposed: `form` (`max-w-2xl`,
-  settings and create/edit forms), the default (`max-w-5xl`, lists, details and
-  dashboards) and `wide` (`max-w-7xl`, tables, boards and analytics grids).
+  a screen cannot arrive with its own. Four widths: `full` (the whole work
+  area, for lists, boards and dashboards), `form` (`max-w-2xl`, create and
+  edit forms), the default (`max-w-5xl`, a record) and `wide` (`max-w-7xl`).
+  Which screen takes which, and the page header and loader every screen
+  shares, are in `frontend-design-system.md` → Components and status and
+  `frontend-error-feedback.md`.
   It is LEFT-ALIGNED: centring each page inside its own max-width moved the
   heading between screens, which is what made the app feel unsettled. Full-bleed
   editors — the site editor, the post editor — are deliberately outside it.
@@ -38,9 +40,9 @@ components/shared/             app shell, navigation, command menu
   "Saroh Product Detail" design draws its header, access line, archived
   banner and tab bar edge to edge, each ruled off by a full-width border,
   with a 22px gutter inside them (`px-4 sm:px-[22px]`, the design's own) —
-  not PageContainer's 26px. Its header, banners and tab panel carry that
-  gutter themselves, and the crumbs bar above them the design's `9px 14px`
-  (`px-3.5`); keep them in step if one changes.
+  not PageContainer's 26px. Its header (the one `PageHeader`, with the
+  breadcrumb in it since 10 Oct 2026), banners and tab panel carry that
+  gutter themselves; keep them in step if one changes.
 - **Current** — **Pages are Server Components that read.** A `page.tsx` calls
   `requireSession()` and its `lib/<domain>/service.ts`, and may hold
   view-shaping helpers for that page (`siteState()` in `sites/page.tsx`).
@@ -57,7 +59,7 @@ components/shared/             app shell, navigation, command menu
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A
-  section's `layout.tsx` renders `ModuleGate` (`CapabilityOffState` when the
+  section's `layout.tsx` renders `ModuleGate` (`ModuleOffState` when the
   module is off, so a deep link is covered once), and nav groups carry a
   `moduleKey`. Both fail open when availability is unknown; the API enforces.
   See `saroh-product.md` and `.agents/skills/saroh-module-capability/SKILL.md`.
@@ -76,6 +78,14 @@ components/shared/             app shell, navigation, command menu
   couldn't read is said in general terms), and each unpaid invoice on the
   Invoices tab offers Record payment — Invoice Detail's own
   `RecordPaymentDialog`, on `invoice:write` as there (DEC-098).
+  Its header's New order and New booking (#247) are links into the flows
+  that already exist — `/commerce/orders?new=1&contactId=` and
+  `/bookings?new=1&contactId=` — each shown only with its module on and the
+  permission that flow's own button asks (`personNewActions`). The page they
+  land on reads the person (`readCustomerPick`) and opens the sheet or
+  dialog with them picked; a person it can't read opens it empty. A new
+  flow reached from a person takes the same `?new=1&contactId=` rather than
+  a copy of the flow on the person page.
 - **Adopted** — **Every app has `app/error.tsx` and `app/loading.tsx`,** and a
   route group that can fail on its own gets its own boundary. Gap: templates,
   saroh.in and ui have neither.
@@ -91,6 +101,19 @@ components/shared/             app shell, navigation, command menu
   drawing in panels there (`editor-top-bar`, `editor-rail`, `editor-canvas`,
   `inspector-host`). A new editor panel or piece of editor state goes there,
   not back into `site-editor.tsx`.
+- **Current** — **A QR beside a link is `QrButton`** (DEC-118,
+  `components/qr/qr-button.tsx`, its panel `qr-panel.tsx`), never a second
+  drawing. A page that stays (the website, the shop, the booking page, a
+  product) takes `mode: "saved"`: the panel finds the target's code or
+  offers "Make this code" as a press of its own, so opening it never
+  writes. A link that belongs to one record (a pay link, a preview link)
+  takes `mode: "instant"`: drawn in the browser, nothing saved, and it says
+  it isn't counted. Draw the button only where there is a link to open
+  (absent, not broken), and let the panel finish the job: make, download
+  and copy happen in it; "More options" is never a required step. A file
+  the API draws (a print PDF) comes through the app's own route
+  (`app/api/qr-codes/…/print`, as an invoice's PDF does), so the session
+  stays server-side.
 - **Current** — **The editor's page menu offers what the API lists** (round-2
   G16): `components/sites/pages-panel.tsx` (the list), `page-settings.tsx`
   (the open page's title, address, In the menu, On the site, Delete) and

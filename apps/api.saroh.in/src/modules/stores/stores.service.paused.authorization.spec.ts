@@ -74,6 +74,7 @@ describe("StoresService — a paused team member (#800)", () => {
         });
         organizationFindUnique.mockResolvedValue({ name: "Rye Bakery" });
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_late",
             role: "ADMIN",
             extraActions: [],
@@ -132,6 +133,7 @@ describe("StoresService — a paused team member (#800)", () => {
 
     it("never pauses the owner, nor asks", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_owner",
             role: "OWNER",
             extraActions: [],

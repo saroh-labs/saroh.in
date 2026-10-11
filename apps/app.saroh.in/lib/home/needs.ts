@@ -1,5 +1,6 @@
-import { localDateKey } from "@/lib/format/datetime";
+import { formatTime, localDateKey } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { HomeBooking, HomeNeed, HomeUnavailable } from "./service";
 
@@ -47,7 +48,7 @@ function capitalise(text: string): string {
 /** "1 thing", "4 things"; nothing for none, as the design leaves it blank. */
 export function thingsLabel(n: number): string {
     if (n <= 0) return "";
-    return n === 1 ? "1 thing" : `${n} things`;
+    return count(n, "thing");
 }
 
 /** The rows to draw: the first twelve, or every one once asked for. */
@@ -105,11 +106,6 @@ export function nextLine(upcoming: readonly HomeBooking[], now: Date): string {
                 localDateKey(now, b.timezone),
     );
     if (!next) return "Enjoy the quiet.";
-    const time = new Intl.DateTimeFormat("en-GB", {
-        timeZone: next.timezone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(next.startAt));
+    const time = formatTime(next.startAt, next.timezone);
     return `Next: ${time} ${next.serviceName}.`;
 }

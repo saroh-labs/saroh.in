@@ -1,5 +1,6 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { Layers, Pencil } from "lucide-react";
@@ -16,13 +17,11 @@ import { collectionNote, whyIn } from "@/lib/collections/rules";
 import type { CollectionSummary } from "@/lib/collections/service";
 import type { ProductOverview } from "@/lib/products/overview";
 import { websiteSummary } from "@/lib/products/overview-words";
+import { EmptyState } from "@saroh/ui/data-state";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { CollectionSheet } from "./collection-sheet";
 import { ProductCollectionsSheet } from "./product-collections-sheet";
-
-const EDIT_BUTTON =
-    "h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11";
-
 /**
  * The product's Collections tab (#524), after "Saroh Product Detail": the
  * collections it is in, each saying how many products it shows and why this
@@ -104,20 +103,20 @@ export function ProductCollectionsTab({
                     title="Not in a collection, not on the website"
                     description={
                         canEdit && handPicked
-                            ? "Collections are how it shows up on the site — a Breads section, a Weekend list. Add it to one here, or make one from Products."
-                            : "Collections are how it shows up on the site — a Breads section, a Weekend list. Add it to one from Products."
+                            ? "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one here, or make one from Products."
+                            : "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one from Products."
                     }
                 >
                     {canEdit && handPicked ? (
                         <Button
+                            size="sm"
                             type="button"
                             onClick={() => setEditing(true)}
-                            className="h-[34px] rounded-[9px] px-3.5 text-[12.5px] coarse:min-h-11"
                         >
                             Add to a collection
                         </Button>
                     ) : null}
-                    <StateLink href="/commerce/products?view=collections">
+                    <StateLink href="/commerce/products?tab=collections">
                         Open Products
                     </StateLink>
                 </TabState>
@@ -138,26 +137,23 @@ export function ProductCollectionsTab({
                     </h2>
                     {canEdit ? (
                         <Button
+                            size="xs"
                             type="button"
                             variant="outline"
                             onClick={() => setEditing(true)}
                             aria-label="Edit collections"
-                            className={EDIT_BUTTON}
                         >
-                            <Pencil
-                                className="size-3"
-                                strokeWidth={2}
-                                aria-hidden
-                            />
+                            <Pencil className="size-3" aria-hidden />
                             Edit
                         </Button>
                     ) : null}
                 </div>
                 <div className="flex flex-col gap-2.5">
                     {inIt.length === 0 ? (
-                        <p className="rounded-[12px] border border-dashed border-border-strong px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                            Not in any collection.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            title="Not in any collection."
+                        />
                     ) : (
                         inIt.map((c) => {
                             const full = byId.get(c.id);
@@ -180,14 +176,13 @@ export function ProductCollectionsTab({
                                         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">
                                             {c.name}
                                         </p>
-                                        <button
-                                            type="button"
+                                        <TextLink
                                             onClick={() => setOpened(c.id)}
                                             aria-label={`Open ${c.name}`}
-                                            className="shrink-0 text-[12px] text-brand hover:text-foreground coarse:min-h-11"
+                                            className="shrink-0 text-[12px] coarse:min-h-11"
                                         >
                                             Open
-                                        </button>
+                                        </TextLink>
                                     </div>
                                     <p className="mt-1 text-[12px] text-muted-foreground">
                                         {note}
@@ -199,7 +194,7 @@ export function ProductCollectionsTab({
                                     ) : null}
                                     {!c.showing ? (
                                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                            Hidden while it is archived; selling
+                                            Hidden while it is archived. Selling
                                             it again brings it back.
                                         </p>
                                     ) : null}
@@ -209,11 +204,11 @@ export function ProductCollectionsTab({
                     )}
                 </div>
                 {collections === null ? (
-                    <p className="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground">
-                        The business&apos;s collections couldn&apos;t be read
-                        just now, so their sizes aren&apos;t shown and they
-                        can&apos;t be changed here. Try again in a moment.
-                    </p>
+                    <FailedRead
+                        className="mt-2"
+                        things="the business's collections"
+                        reassurance="Their sizes aren't shown and they can't be changed here."
+                    />
                 ) : null}
             </section>
             <section aria-labelledby="on-website">
@@ -239,9 +234,7 @@ export function ProductCollectionsTab({
                             </Card>
                         ))
                     ) : (
-                        <p className="rounded-[12px] border border-dashed border-border-strong px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                            {web.lines[0]}
-                        </p>
+                        <EmptyState size="inline" title={web.lines[0]} />
                     )}
                 </div>
                 {placement.data.website.pages.length > 0 ? (

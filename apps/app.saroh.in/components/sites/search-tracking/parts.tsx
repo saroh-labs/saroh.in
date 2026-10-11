@@ -3,16 +3,17 @@
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { FailedState } from "@saroh/ui/data-state";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { SAVES_WORDS } from "@/components/sites/settings-rows";
+import { PlanWay } from "@/components/billing/plan-way";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { CopyButton } from "@saroh/ui/copy-button";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The pieces the "Search and tracking" section (DEC-108, U7) shares
@@ -31,44 +32,22 @@ export type SaveOutcome =
 
 export type SaveSection = (input: SearchTrackingSave) => Promise<SaveOutcome>;
 
-export const SECTION_TITLE = "Search and tracking";
+export const SECTION_TITLE = "Tracking";
 
-export const SECTION_DESCRIPTION =
-    "Show Google and others this site is yours, and connect your own analytics and ad tools.";
-
-/** The section's heading, then its cards. */
+/**
+ * The section's cards, inside the settings' Tracking group (which draws
+ * the heading). Everything here applies as soon as it's saved, the
+ * settings' default, so it carries no "Next publish".
+ */
 export function SearchTrackingFrame({
     children,
 }: {
     children: React.ReactNode;
 }) {
     return (
-        <section
-            aria-labelledby="search-tracking-title"
-            className="space-y-3"
-            data-section="search-and-tracking"
-        >
-            <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-x-2">
-                    <h2
-                        id="search-tracking-title"
-                        className="text-sm font-semibold"
-                    >
-                        {SECTION_TITLE}
-                    </h2>
-                    <span
-                        data-saves="now"
-                        className="text-xs text-muted-foreground"
-                    >
-                        · {SAVES_WORDS.now}
-                    </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {SECTION_DESCRIPTION}
-                </p>
-            </div>
-            <div className="space-y-4">{children}</div>
-        </section>
+        <div className="space-y-4" data-section="search-and-tracking">
+            {children}
+        </div>
     );
 }
 
@@ -105,18 +84,13 @@ export function SearchTrackingFailed() {
     const [pending, startTransition] = useTransition();
     return (
         <FailedState
-            title="Search and tracking couldn't be loaded"
-            description="Your codes and trackers are unchanged. Try again in a moment."
-            action={
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => startTransition(() => router.refresh())}
-                >
-                    {pending ? "Trying…" : "Retry"}
-                </Button>
-            }
+            size="panel"
+            title={couldntLoad("tracking")}
+            description={nothingChanged(
+                "Your codes and trackers are as they were.",
+            )}
+            onRetry={() => startTransition(() => router.refresh())}
+            retrying={pending}
         />
     );
 }
@@ -124,10 +98,7 @@ export function SearchTrackingFailed() {
 /** Saroh staff switched this site's trackers off (#897). */
 export function SwitchedOffNotice() {
     return (
-        <div
-            role="status"
-            className="rounded-lg border bg-muted px-4 py-3 text-sm"
-        >
+        <Notice role="status">
             <p className="font-medium">{SWITCHED_OFF_LINE}</p>
             <p className="text-muted-foreground">
                 None of your trackers run, and none can be turned on. To ask
@@ -140,7 +111,7 @@ export function SwitchedOffNotice() {
                 </a>
                 .
             </p>
-        </div>
+        </Notice>
     );
 }
 
@@ -152,35 +123,31 @@ export function LockNotice({ lock }: { lock: TrackersLock }) {
             className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
         >
             <span className="min-w-0">{lock.line}</span>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link href={lock.href}>{lock.cta}</Link>
-            </Button>
+            <PlanWay>
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                >
+                    <Link href={lock.href}>{lock.cta}</Link>
+                </Button>
+            </PlanWay>
         </div>
     );
 }
 
-/** Copy a value, with a toast once it's on the clipboard. */
+/** Copy a value: the button says "Copied" itself. */
 export function CopyValue({ value, label }: { value: string; label: string }) {
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(value);
-            showSuccess(`${label} copied`);
-        } catch {
-            showError(`Couldn't copy. Select it and copy it yourself.`);
-        }
-    }
     return (
-        <Button
-            type="button"
+        <CopyButton
+            value={value}
+            label="Copy"
+            thing={label.toLowerCase()}
             variant="ghost"
-            size="sm"
-            onClick={() => void copy()}
             aria-label={`Copy ${label.toLowerCase()}`}
             className="shrink-0"
-        >
-            <Copy aria-hidden className="size-4" />
-            Copy
-        </Button>
+        />
     );
 }
 

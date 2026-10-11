@@ -23,15 +23,16 @@ export const SOLUTION_ITEMS: NavItem[] = solutionList.map((s) => ({
 }));
 
 /**
- * The Resources menu: the pages `content/resources.ts` shows now, which the
- * server works out (published, and built) and hands to the nav.
+ * The Resources menu, and the Tools menu: the pages `content/resources.ts`
+ * shows now, which the server works out (published, and built) and hands to
+ * the nav.
  */
 export function resourceItems(pages: readonly ResourcePage[]): NavItem[] {
     return pages.map((p) => ({ name: p.name, line: p.line, href: p.href }));
 }
 
 export type NavSection =
-    "features" | "solutions" | "pricing" | "resources" | null;
+    "features" | "solutions" | "pricing" | "resources" | "tools" | null;
 
 /** Whether `pathname` is the page `href` or a page under it. */
 const within = (pathname: string, href: string) =>
@@ -41,10 +42,12 @@ const within = (pathname: string, href: string) =>
 export function sectionOf(
     pathname: string,
     resources: readonly NavItem[] = [],
+    tools: readonly NavItem[] = [],
 ): NavSection {
     if (FEATURE_ITEMS.some((i) => i.href === pathname)) return "features";
     if (SOLUTION_ITEMS.some((i) => i.href === pathname)) return "solutions";
     if (pathname === "/pricing") return "pricing";
     if (resources.some((i) => within(pathname, i.href))) return "resources";
+    if (tools.some((i) => within(pathname, i.href))) return "tools";
     return null;
 }

@@ -182,8 +182,10 @@ describe("what each role is offered", () => {
             "/settings/modules",
             "/settings/billing",
             "/settings/profile",
+            "/settings/share",
             "/settings/activity",
             "/settings/providers",
+            "/settings/data",
         ]);
         expect(offered).toContain("/sites/site_1");
         expect(offered).toContain("/sites/site_2");
@@ -309,6 +311,8 @@ describe("what each role is offered", () => {
             "/settings/people",
             "/settings/modules",
             "/settings/profile",
+            // They read the website, so its QR codes too: to see, not change.
+            "/settings/share",
         ]);
         expect(navCan({ role: "MEMBER" }, "notification:read")).toBe(false);
         // A member reads sites and authors none.
@@ -377,7 +381,7 @@ describe("what each role is offered", () => {
             moduleKeys: AVAILABLE_TO.REVIEWER,
             sites: SITES,
         });
-        // "Workspace" held five destinations, all of them refused. A heading
+        // The last group ("Manage" now) held five destinations, all of them refused. A heading
         // over an empty list names something the reader does not have.
         expect(groups.map((g) => g.label)).toEqual([undefined, "Presence"]);
         for (const group of groups)
@@ -1196,37 +1200,44 @@ describe("the person page sits in the section that holds people (#869)", () => {
 });
 
 describe("settings tabs — owner only, and everyone's", () => {
-    it("keeps Plan and billing to the owner, by role", () => {
-        // An admin holds org:settings:read and every other business tab, and
-        // is still not offered what Saroh charges the business.
-        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/billing");
-        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/organization");
+    it("offers Plan and billing to whoever the API reads it to: billing:read", () => {
+        // Owner and Admin by default, as the API's own map has it.
         expect(tabsFor({ role: "OWNER" })).toContain("/settings/billing");
-        // Resolved permissions do not make an invented role the owner.
+        expect(tabsFor({ role: "ADMIN" })).toContain("/settings/billing");
+        expect(tabsFor({ role: "MEMBER" })).not.toContain("/settings/billing");
+        expect(tabsFor({ role: "REVIEWER" })).not.toContain(
+            "/settings/billing",
+        );
+        // By permission, never the role's name: a role the business made
+        // that holds it is offered the tab, and an owner's stale list
+        // without it is not.
         expect(
-            tabsFor({
-                role: "MEMBER",
-                actions: ["org:settings:read", "billing:read"],
-            }),
+            tabsFor({ role: "MEMBER", actions: ["billing:read"] }),
+        ).toContain("/settings/billing");
+        expect(
+            tabsFor({ role: "OWNER", actions: ["org:settings:read"] }),
         ).not.toContain("/settings/billing");
     });
 
-    it("still needs the page's action as well as the role", () => {
-        const billing = SETTINGS_PAGES.find(
-            (page) => page.href === "/settings/billing",
+    it("keeps Your data to the owner, by role, as the API does", () => {
+        const data = SETTINGS_PAGES.find(
+            (page) => page.href === "/settings/data",
         );
-        expect(billing).toBeDefined();
-        if (!billing) return;
+        expect(data).toBeDefined();
+        if (!data) return;
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/data");
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/data");
+        // It still needs the page's action as well as the role.
         expect(
             mayOpenSettingsPage(
                 { role: "OWNER", actions: ["member:read"] },
-                billing,
+                data,
             ),
         ).toBe(false);
         expect(
             mayOpenSettingsPage(
                 { role: "OWNER", actions: ["org:settings:read"] },
-                billing,
+                data,
             ),
         ).toBe(true);
     });
@@ -1239,7 +1250,13 @@ describe("settings tabs — owner only, and everyone's", () => {
         for (const role of ROLES) {
             expect(tabsFor({ role })).toContain("/settings/profile");
         }
-        expect(tabsFor({ role: "REVIEWER" })).toEqual(["/settings/profile"]);
+        // A reviewer may see the website, so its QR codes too (Share), to
+        // look at and download; Your profile still comes first, so that is
+        // where `/settings` opens for them.
+        expect(tabsFor({ role: "REVIEWER" })).toEqual([
+            "/settings/profile",
+            "/settings/share",
+        ]);
         // An invented role granted nothing of the business still has itself.
         expect(tabsFor({ role: "MEMBER", actions: [] })).toEqual([
             "/settings/profile",
@@ -1253,9 +1270,31 @@ describe("settings tabs — owner only, and everyone's", () => {
             "Modules",
             "Plan and billing",
             "Your profile",
+            "Share",
             "Activity",
             "Providers",
+            "Your data",
         ]);
+    });
+
+    it("offers Share to whoever may see the website", () => {
+        for (const role of ROLES) {
+            expect(tabsFor({ role })).toContain("/settings/share");
+        }
+        expect(tabsFor({ role: "MEMBER", actions: ["site:read"] })).toContain(
+            "/settings/share",
+        );
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["order:read"] }),
+        ).not.toContain("/settings/share");
+    });
+
+    it("keeps Your data to the owner (DEC-120)", () => {
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/data");
+        expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/data");
+        expect(
+            tabsFor({ role: "MEMBER", actions: ["org:settings:read"] }),
+        ).not.toContain("/settings/data");
     });
 
     it("offers Activity to whoever the API lets read the audit stream", () => {

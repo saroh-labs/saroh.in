@@ -9,12 +9,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { showError } from "@saroh/ui/toast";
+import { planLabel, WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
+import { showError, showRefusal } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { useCanChangePlan } from "./plan-way";
 
 /**
  * A write the business's plan refused, shown as the notice it is (plans
@@ -27,6 +30,11 @@ type Listener = (refusal: PlanRefusal) => void;
 const listeners = new Set<Listener>();
 
 export function showPlanRefusal(refusal: PlanRefusal): void {
+    // Plans aren't shown (DEC-136): what stopped, and no way to a plan.
+    if (!plansShown()) {
+        showError(refusal.title);
+        return;
+    }
     // No host (a surface outside the shell): still the notice's words.
     if (listeners.size === 0) {
         showError(refusal.title, refusal.body || undefined);
@@ -38,18 +46,48 @@ export function showPlanRefusal(refusal: PlanRefusal): void {
 /**
  * The failure of a write, said: the plan's notice when its plan refused it,
  * else the API's guarded message (or `fallback`) as a toast.
+ *
+ * A refusal by the person's role (`denied`, `lib/api/role-denied.ts`) is a
+ * notice, not an error: nothing broke, and red tells someone to try again
+ * at a thing that will only be refused again. It uses the toast module's
+ * neutral style (`showRefusal`), which stays ten seconds. A result with no
+ * `denied` mark whose sentence is a refusal is said the same way, by
+ * `showError` itself (`setRefusalTest`).
  */
 export function reportFailure(
-    res: { error: string; plan?: PlanRefusal },
+    res: { error: string; plan?: PlanRefusal; denied?: boolean },
     fallback?: string,
 ): void {
-    if (res.plan) showPlanRefusal(res.plan);
-    else
-        showError(
-            res.error.trim()
-                ? res.error
-                : (fallback ?? "That didn't work. Try again."),
-        );
+    if (res.plan) {
+        showPlanRefusal(res.plan);
+        return;
+    }
+    const said = res.error.trim()
+        ? res.error
+        : (fallback ?? "That didn't work. Try again.");
+    if (res.denied) showRefusal(said);
+    else showError(said);
+}
+
+/**
+ * The same failure, for a confirm or an overlay that stays open on a
+ * refusal: the reason to show inside it. A plan's refusal is its own
+ * notice, which takes over, so the confirm closes (`true`).
+ */
+export function refusedResult(
+    res: { error: string; plan?: PlanRefusal },
+    fallback?: string,
+): true | { ok: false; error: string } {
+    if (res.plan) {
+        showPlanRefusal(res.plan);
+        return true;
+    }
+    return {
+        ok: false,
+        error: res.error.trim()
+            ? res.error
+            : (fallback ?? "That didn't work. Try again."),
+    };
 }
 
 export function PlanRefusalHost() {
@@ -62,6 +100,8 @@ export function PlanRefusalHost() {
     }, []);
 
     const full = refusal?.code === "PLAN_LIMIT_REACHED";
+    // Someone who can't change the plan reads who can, and closes it.
+    const canChangePlan = useCanChangePlan();
     return (
         <Dialog
             open={refusal !== null}
@@ -69,11 +109,9 @@ export function PlanRefusalHost() {
                 if (!open) setRefusal(null);
             }}
         >
-            <DialogContent className="max-w-[440px]">
-                <DialogHeader className="text-left">
-                    <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                        {refusal?.title}
-                    </DialogTitle>
+            <DialogContent size="md">
+                <DialogHeader>
+                    <DialogTitle>{refusal?.title}</DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
                         {refusal?.body}
                     </DialogDescription>
@@ -86,22 +124,40 @@ export function PlanRefusalHost() {
                         <div className="h-full w-full rounded-full bg-destructive" />
                     </div>
                 ) : null}
-                <DialogFooter className="gap-2 sm:space-x-0">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setRefusal(null)}
+                {canChangePlan ? null : (
+                    <p
+                        data-plan-who
+                        className="text-pretty text-[13px] leading-[1.55] text-foreground/80"
                     >
-                        Not now
-                    </Button>
-                    <Button asChild>
-                        <Link
-                            href={upgradeHref(refusal?.upgradeTo?.planId)}
-                            onClick={() => setRefusal(null)}
-                        >
-                            {refusal?.cta ?? "See plans"}
-                        </Link>
-                    </Button>
+                        {WHO_CAN_CHANGE_PLAN}
+                    </p>
+                )}
+                <DialogFooter>
+                    {canChangePlan ? (
+                        <>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRefusal(null)}
+                            >
+                                Not now
+                            </Button>
+                            <Button asChild>
+                                <Link
+                                    href={upgradeHref(
+                                        refusal?.upgradeTo?.planId,
+                                    )}
+                                    onClick={() => setRefusal(null)}
+                                >
+                                    {refusal?.cta ?? planLabel()}
+                                </Link>
+                            </Button>
+                        </>
+                    ) : (
+                        <Button type="button" onClick={() => setRefusal(null)}>
+                            Close
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

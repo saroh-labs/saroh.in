@@ -86,7 +86,7 @@ describe("Catalogue settings (DB)", () => {
                 categories.rename(orgId, faceCare, {
                     name: "SERUMS",
                 }),
-            ).rejects.toThrow(/use Merge/);
+            ).rejects.toThrow(/Use Merge/);
         });
 
         it("allows a case-only rename of itself, and reports the old name", async () => {
@@ -285,7 +285,7 @@ describe("Catalogue settings (DB)", () => {
                 options.removeValue(orgId, sizeId, m?.id ?? ""),
             ).rejects.toThrow(/used by a variant/);
             await expect(options.remove(orgId, sizeId)).rejects.toThrow(
-                /Used by 1 product —/,
+                /Used by 1 product\./,
             );
 
             const s = size.values.find((v) => v.value === "S");

@@ -5,6 +5,7 @@ import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { CsvImport } from "@/components/stores/csv-import";
+import { requireCan } from "@/lib/access/require-can";
 import { planMeter } from "@/lib/billing/meter";
 import { describeImport } from "@/lib/imports/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
@@ -51,11 +52,31 @@ export default async function ImportProductsPage({
         describeImport(store.id, "products"),
         billingAccessOrNull(),
     ]);
-    if (!descriptor) notFound();
+    if (!descriptor) {
+        /*
+         * The API describes an import only to someone who may write to this
+         * location: `store:write`, or a role at the location itself, which
+         * only the API knows. So the check can't come first, as it does on
+         * the other create pages. A refusal for someone without
+         * `store:write` is their role's, and is said as one, not as a
+         * missing page.
+         */
+        const access = await requireCan("store:write", {
+            thing: "Import products",
+            back: {
+                href: "/commerce/products",
+                label: "Back to Products",
+                needs: "store:read",
+            },
+        });
+        if (access.denied) return access.denied;
+        notFound();
+    }
 
     return (
         <PageContainer width="default">
             <PageHeader
+                holdsData="description"
                 breadcrumb={sellCrumbs(
                     { label: "Products", href: "/commerce/products" },
                     "Import",

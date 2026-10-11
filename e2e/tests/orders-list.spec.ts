@@ -1,5 +1,5 @@
 // @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/tickets api:orders api:payments api:customer-workspace
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
@@ -11,7 +11,7 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * The Orders list's rows and tabs (plan B, B3), after "Saroh Orders Screen":
  * All · Open · Refunded with the API's counts, a step pill with its progress
  * said in words, the age or "Late", the unpaid line, and paging by the API's
- * cursor — against the seeded stack.
+ * page number and size — against the seeded stack.
  *
  * Counts, pages and "the first row" are read on Rye & Co., as its owner:
  * a film set, which no test writes to, so what the API said a moment ago is
@@ -84,30 +84,61 @@ const orders = (page: Page) =>
 const cards = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
 /**
- * The filter bar at this width (B4, B5). At the desk it is on the page; on a
- * phone it sits in a sheet behind the Filters button, which this opens. The
- * button is drawn once per layout (hidden at the desk), so only the visible
- * one is pressed.
+ * The filters behind the Filters button (B4, B5), which this opens: a
+ * popover at the desk (Step, How it's fulfilled, Payment, Product, Late),
+ * and on a phone one sheet that also holds the Date and Needs attention.
+ * Both are a dialog named "Filter orders". The button is drawn once per
+ * layout, so only the visible one is pressed. Call it once per page load:
+ * a second press closes the desk's popover.
  */
 async function filterBar(page: Page) {
-    if (cards(page)) {
-        await page
-            .getByRole("button", { name: /^Filters/ })
-            .filter({ visible: true })
-            .click();
-        return page
-            .getByRole("dialog", { name: "Filter orders" })
-            .getByRole("group", { name: "Filter orders" });
-    }
+    await page
+        .getByRole("button", { name: /^Filters/ })
+        .filter({ visible: true })
+        .click();
     return page
-        .getByRole("group", { name: "Filter orders" })
-        .filter({ visible: true });
+        .getByRole("dialog", { name: "Filter orders" })
+        .getByRole("group", { name: "Filter orders" });
 }
 
-const tab = (page: Page, name: string) =>
-    page.getByRole("navigation", { name: "Orders" }).getByRole("link", {
-        name: new RegExp(`^${name}`),
-    });
+/**
+ * All orders, Open and Refunded narrow the one list by status: one of the
+ * toolbar's dropdowns. Its box says the chosen one ("Open 3").
+ */
+const status = (page: Page) =>
+    page.getByRole("combobox", { name: "Order status" });
+
+/** An option of the open status dropdown, by the words it starts with. */
+const statusOption = (page: Page, name: string) =>
+    page.getByRole("option", { name: new RegExp(`^${name}\\b`) });
+
+async function pickStatus(page: Page, name: string) {
+    await status(page).click();
+    await statusOption(page, name).click();
+}
+
+/** A count as it is drawn: grouped, as every figure in the app. */
+const chipCount = (n: number) => new Intl.NumberFormat("en-IN").format(n);
+
+/**
+ * The Date filter: in the toolbar's row at the desk, in the Filters sheet
+ * (`bar`) on a phone.
+ */
+const dateBox = (page: Page, bar: Locator) =>
+    cards(page)
+        ? bar.getByRole("combobox", { name: "Date" })
+        : page.getByRole("combobox", { name: "Date" });
+
+/**
+ * Needs attention, the list's one toggle: after the dropdowns at the desk,
+ * in the Filters sheet (`bar`) on a phone.
+ */
+const attentionToggle = (page: Page, bar: Locator) =>
+    cards(page)
+        ? bar.getByRole("button", { name: "Needs attention" })
+        : page
+              .getByRole("button", { name: "Needs attention" })
+              .filter({ visible: true });
 
 test.describe("orders list", () => {
     test("the Open tab lists only open orders, with the API's counts", async ({
@@ -119,18 +150,20 @@ test.describe("orders list", () => {
         const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await expect(status(page)).toContainText("All orders");
+        // Open, each option says how many it holds.
+        await status(page).click();
         for (const [name, n] of [
-            ["All", all.counts.all],
+            ["All orders", all.counts.all],
             ["Open", all.counts.open],
             ["Refunded", all.counts.refunded],
         ] as const) {
-            await expect(tab(page, name)).toContainText(String(n));
+            await expect(statusOption(page, name)).toContainText(chipCount(n));
         }
 
-        await tab(page, "Open").click();
+        await statusOption(page, "Open").click();
         await expect(page).toHaveURL(/tab=open/);
-        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "true");
+        await expect(status(page)).toContainText("Open");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
             await expect(
@@ -175,8 +208,8 @@ test.describe("orders list", () => {
         await expect(
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
-        await page.getByRole("button", { name: "View all orders" }).click();
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await page.getByRole("button", { name: "Show all orders" }).click();
+        await expect(status(page)).toContainText("All orders");
     });
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
@@ -207,7 +240,9 @@ test.describe("orders list", () => {
         }
     });
 
-    test("pages by the cursor, and back", async ({ page }) => {
+    test("pages by number, and changes how many rows a page holds", async ({
+        page,
+    }) => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         const first = await list(page, LISTS);
@@ -215,16 +250,25 @@ test.describe("orders list", () => {
 
         await page.goto("/commerce/orders");
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
-        await page.getByRole("link", { name: "Next" }).click();
-        await expect(page).toHaveURL(/cursor=/);
-        await expect(page.getByText(/Showing 51–/)).toBeVisible();
-        await page.getByRole("link", { name: "Previous" }).click();
+        const pages = page.getByRole("navigation", { name: "Pages of orders" });
+        await pages.getByRole("link", { name: "Next" }).click();
+        await expect(page).toHaveURL(/page=2/);
+        await expect(page.getByText(/Showing 51 to /)).toBeVisible();
+        await pages.getByRole("link", { name: "Previous" }).click();
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
-        await expect(page).not.toHaveURL(/cursor=/);
+        await expect(page).not.toHaveURL(/page=/);
+
+        // Ten rows a page: the address says so, and the list is ten long.
+        await page.getByRole("combobox", { name: "Rows per page" }).click();
+        await page.getByRole("option", { name: "10", exact: true }).click();
+        await expect(page).toHaveURL(/size=10/);
+        await expect(
+            page.getByText(`Showing 1 to 10 of ${first.counts.all}`),
+        ).toBeVisible();
     });
 
     test("rows name their storefront only when there are several", async ({
@@ -236,7 +280,7 @@ test.describe("orders list", () => {
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
-        const filter = page.getByRole("button", { name: /Location filter/ });
+        const filter = page.getByRole("combobox", { name: "Location" });
         const row = orders(page).getByRole("listitem").first();
         // Counting the filter before the list is drawn counts nothing.
         await expect(row).toBeVisible();
@@ -326,11 +370,12 @@ test.describe("orders list", () => {
         await expect(sheet).toBeVisible();
         const bar = sheet.getByRole("group", { name: "Filter orders" });
         await expect(bar.getByRole("combobox", { name: "Date" })).toBeVisible();
-        await bar.getByRole("button", { name: "Late" }).click();
+        // Late is one of the dropdowns.
+        await bar.getByRole("combobox", { name: "Late" }).click();
+        await page.getByRole("option", { name: "Late only" }).click();
         await expect(page).toHaveURL(/late=true/);
-        await expect(bar.getByRole("button", { name: "Late" })).toHaveAttribute(
-            "aria-pressed",
-            "true",
+        await expect(bar.getByRole("combobox", { name: "Late" })).toContainText(
+            "Late only",
         );
 
         await sheet.getByRole("button", { name: "Done" }).click();
@@ -364,7 +409,7 @@ test.describe("orders list", () => {
         if (rows.length > 0) {
             // Money is left out by the API, not hidden by the screen.
             expect(rows.every((r) => r.total === undefined)).toBe(true);
-            await tab(page, "Open").click();
+            await pickStatus(page, "Open");
             await expect(page).toHaveURL(/tab=open/);
             // The pill says the step in words on either layout; the desk
             // grid adds the bar, itself said in words.
@@ -435,7 +480,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
                 .filter({ hasText: `#${t.orderId}` });
             await expect(row).toContainText(
                 t.nextVisit
-                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    ? /Next (today|tomorrow|yesterday|\d{1,2} \w{3})/
                     : "Next visit not booked",
             );
             await expect(row).not.toContainText(/\bLate\b/);
@@ -525,13 +570,14 @@ test.describe("orders list filters (B4)", () => {
         await expect(
             bar.getByRole("combobox", { name: "How it's fulfilled" }),
         ).toContainText(type.label);
-        await expect(bar.getByRole("combobox", { name: "Date" })).toContainText(
-            "This month",
+        await expect(dateBox(page, bar)).toContainText("This month");
+        // Close the popover or the sheet before reading the page.
+        await page.keyboard.press("Escape");
+        await status(page).click();
+        await expect(statusOption(page, "All orders")).toContainText(
+            chipCount(expected.counts.all),
         );
-        if (cards(page)) await page.keyboard.press("Escape");
-        await expect(tab(page, "All")).toContainText(
-            String(expected.counts.all),
-        );
+        await page.keyboard.press("Escape");
         if (expected.rows.length === 0) {
             await expect(
                 page.getByRole("button", { name: "Clear filters" }).last(),
@@ -561,30 +607,33 @@ test.describe("orders list filters (B4)", () => {
         await expect(page).not.toHaveURL(/step=|date=/);
     });
 
-    test("Late and Needs attention are toggles in the address (B15)", async ({
+    test("Late and Needs attention are filters in the address (B15)", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
         const bar = await filterBar(page);
-        const late = bar.getByRole("button", { name: "Late" });
-        await expect(late).toHaveAttribute("aria-pressed", "false");
+        const late = bar.getByRole("combobox", { name: "Late" });
+        await expect(late).toContainText("On time and late");
         await late.click();
+        await page.getByRole("option", { name: "Late only" }).click();
         await expect(page).toHaveURL(/late=true/);
-        await expect(late).toHaveAttribute("aria-pressed", "true");
+        await expect(late).toContainText("Late only");
 
-        const attention = bar.getByRole("button", { name: "Needs attention" });
+        // The desk's toggle is in the row, behind the open popover.
+        if (!cards(page)) await page.keyboard.press("Escape");
+        const attention = attentionToggle(page, bar);
         await expect(attention).toHaveAttribute("aria-pressed", "false");
         await attention.click();
         await expect(page).toHaveURL(/attention=true/);
         await expect(attention).toHaveAttribute("aria-pressed", "true");
         await page.reload();
-        await expect(
-            (await filterBar(page)).getByRole("button", {
-                name: "Needs attention",
-            }),
-        ).toHaveAttribute("aria-pressed", "true");
+        const again = cards(page) ? await filterBar(page) : bar;
+        await expect(attentionToggle(page, again)).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
     });
 
     test("a customer's allergy tags their orders, and the filter keeps them (B15)", async ({
@@ -654,7 +703,7 @@ test.describe("orders quick view and row menu (B5)", () => {
             panel.getByRole("link", { name: /Open full page/ }),
         ).toBeVisible();
         // As the design draws it (DEC-073): Close is a plain X, and a
-        // customer with a record is a Saffron link to it.
+        // customer with a record is an underlined link to it.
         const close = panel.getByRole("button", { name: "Close quick view" });
         await expect(close).toBeVisible();
         await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -664,7 +713,7 @@ test.describe("orders quick view and row menu (B5)", () => {
             .first();
         if (await customer.count()) {
             await expect(customer).toHaveAttribute("href", /\/customers\//);
-            await expect(customer).toHaveClass(/text-brand/);
+            await expect(customer).toHaveClass(/underline/);
         }
 
         await page.keyboard.press("Escape");

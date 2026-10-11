@@ -568,6 +568,39 @@ describe("amountDueCents", () => {
         );
     });
 
+    it("reads part recorded as refunded by hand: refunded so far and what is left (#865)", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                paidByHand: "400.00",
+                refundedByHand: "150.00",
+                paymentIntents: [],
+            },
+            opts(true),
+        );
+        expect(read.paymentStatus).toBe("PAID");
+        expect(read.refundStanding).toBe("PARTLY_REFUNDED");
+        expect(read.money).toEqual(
+            expect.objectContaining({
+                paid: "400.00",
+                refunded: "150.00",
+                refundedByHand: "150.00",
+                leftToRefund: "250.00",
+                due: "0.00",
+            }),
+        );
+        // Online, after a line refund: what is left takes both off.
+        expect(
+            serializeOrderRead({ ...base, refundedByHand: "80.00" }, opts(true))
+                .money,
+        ).toEqual(
+            expect.objectContaining({
+                refunded: "200.00",
+                leftToRefund: "200.00",
+            }),
+        );
+    });
+
     it("shows the variant's photo and SKU, falling back to the cover", () => {
         const line = (variant: RawOrderRead["items"][number]["variant"]) =>
             serializeOrderRead(

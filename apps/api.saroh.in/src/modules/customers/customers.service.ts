@@ -145,7 +145,7 @@ export class CustomersService {
         const orders = existing._count.orders;
         if (orders > 0) {
             throw new ConflictException({
-                message: `This customer has ${orders === 1 ? "an order" : `${orders} orders`}, and an order keeps who bought it — so they stay.`,
+                message: `This customer has ${orders === 1 ? "an order" : `${orders} orders`}, and an order keeps who bought it, so they stay.`,
                 orders,
             });
         }

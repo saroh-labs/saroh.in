@@ -7,10 +7,13 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { LATE_AFTER_ANCHOR } from "@/components/stores/fulfilment-section";
+import { runAction } from "@/lib/api/run-action";
 import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";
 import { dismissLateRuleNotice } from "@/lib/stores/storefront-actions";
 import type { LateRuleNotice } from "@/lib/stores/storefronts";
+import { IconButton } from "@saroh/ui/icon-button";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * One storefront's one-time notice on Orders (plan B, B17): pick-up orders
@@ -34,7 +37,10 @@ export function LateRuleNoticeCard({
     const dismiss = () => {
         setGone(true);
         start(async () => {
-            const res = await dismissLateRuleNotice(notice.storeId);
+            const res = await runAction(() =>
+                dismissLateRuleNotice(notice.storeId),
+            );
+            if (!res) return setGone(false);
             if (!res.ok) {
                 setGone(false);
                 showError(res.error);
@@ -43,11 +49,43 @@ export function LateRuleNoticeCard({
     };
 
     return (
-        <div
+        // The words on the left; what to do about them on the right, level
+        // with the words. On a phone the buttons go under the words.
+        <Notice
+            tone="info"
             role="note"
-            className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2 sm:gap-2.5 sm:py-2.5"
+            className="mb-4 sm:items-center"
+            action={
+                <>
+                    {canChange ? (
+                        <Button
+                            size="sm"
+                            asChild
+                            variant="outline"
+                            className="border-border-strong"
+                        >
+                            <Link
+                                href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                            >
+                                Change it
+                            </Link>
+                        </Button>
+                    ) : (
+                        <span className="text-[12px] text-muted-foreground">
+                            An owner or admin can change it in Locations.
+                        </span>
+                    )}
+                    <IconButton
+                        label={`Dismiss this notice for ${notice.name}`}
+                        icon={<X />}
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={dismiss}
+                    />
+                </>
+            }
         >
-            <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
+            <p className="text-pretty text-[13px] text-foreground">
                 <strong className="font-semibold">
                     Pick-up orders at {notice.name} now count as late after{" "}
                     {lateAfterWords(notice.pickupLateAfterMinutes)}.
@@ -55,35 +93,7 @@ export function LateRuleNoticeCard({
                 <span className="max-sm:hidden">
                     Set it to what suits your counter.
                 </span>
-            </span>
-            {canChange ? (
-                <Button
-                    asChild
-                    variant="outline"
-                    className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
-                >
-                    <Link
-                        href={`${storefrontHref(notice.storeId)}#${LATE_AFTER_ANCHOR}`}
-                    >
-                        Change it
-                    </Link>
-                </Button>
-            ) : (
-                <span className="text-[12px] text-muted-foreground">
-                    An owner or admin can change it in Locations.
-                </span>
-            )}
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={pending}
-                onClick={dismiss}
-                aria-label={`Dismiss this notice for ${notice.name}`}
-                className="size-[30px] text-brand-subtle-foreground coarse:size-11"
-            >
-                <X aria-hidden className="size-4" />
-            </Button>
-        </div>
+            </p>
+        </Notice>
     );
 }

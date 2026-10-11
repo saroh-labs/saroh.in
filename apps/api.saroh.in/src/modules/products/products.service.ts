@@ -233,11 +233,13 @@ export class ProductsService {
         /**
          * A page of it (#519): narrowed further by `where` (which carries
          * the keyset after the page before, `afterInList`), `take` rows in
-         * the same order. Left out, all of it.
+         * the same order, after `skip` of them for a page asked by its
+         * number. Left out, all of it.
          */
         page: {
             where?: Prisma.ProductWhereInput;
             take?: number;
+            skip?: number;
         } = {},
     ): Promise<CatalogueItemDto[]> {
         const { status, storefront } = filter;
@@ -252,6 +254,7 @@ export class ProductsService {
             },
             orderBy: [{ createdAt: "desc" }, { id: "asc" }],
             ...(page.take !== undefined ? { take: page.take } : {}),
+            ...(page.skip ? { skip: page.skip } : {}),
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { variants: true } },
@@ -389,7 +392,7 @@ export class ProductsService {
         const slug = slugify(dto.slug ?? dto.name);
         if (!slug) {
             throw new BadRequestException({
-                message: "Could not derive a slug from the name",
+                message: "That name has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }
@@ -853,7 +856,7 @@ export class ProductsService {
                 const sold = await tx.orderItem.count({ where: { productId } });
                 if (sold > 0) {
                     throw new ConflictException(
-                        "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the location and its order history stays.",
+                        "This product has been ordered, so it can't be deleted. Archive it instead: it leaves the location and its order history stays.",
                     );
                 }
                 // The stock log is never edited (DEC-032): deleting the

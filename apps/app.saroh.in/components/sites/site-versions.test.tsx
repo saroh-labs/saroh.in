@@ -92,7 +92,7 @@ describe("version history (T12)", () => {
             "Asha went live without approval. Publishing needs approval on this site, and an owner overrode it.",
         );
         expect(out).toContain(
-            "Published without approval by Ravi — a reviewer had asked for changes.",
+            "Published without approval by Ravi. A reviewer had asked for changes.",
         );
         // Four versions, three routes worth a badge.
         expect(html.match(/Overridden by|Bypassed<|>Approved</g)).toHaveLength(
@@ -160,7 +160,7 @@ describe("version history (T12)", () => {
         expect(html).toContain('href="/sites/site_1/releases/rel_3"');
 
         expect(text(render({ scheduled: { state: "failed" } }))).toContain(
-            "Couldn't check for scheduled go-lives.",
+            "Couldn't load scheduled go-lives.",
         );
     });
 });
@@ -235,20 +235,20 @@ describe("version times in the business's zone (UX-008)", () => {
 
     it("says an evening in India as the business's evening, not UTC's afternoon", () => {
         const out = at("2025-10-06T14:59:00Z", "Asia/Kolkata");
-        expect(out).toContain("6 Oct 2025, 20:29");
+        expect(out).toContain("6 Oct 2025, 8:29 pm");
         expect(out).not.toContain("UTC");
     });
 
     it("puts a time just before UTC's midnight on the business's next day", () => {
         expect(at("2025-10-05T20:00:00Z", "Asia/Kolkata")).toContain(
-            "6 Oct 2025, 01:30",
+            "6 Oct 2025, 1:30 am",
         );
         expect(at("2025-10-05T20:00:00Z", "Europe/London")).toContain(
-            "5 Oct 2025, 21:00",
+            "5 Oct 2025, 9:00 pm",
         );
     });
 
     it("reads India's outside a business, never the server's UTC", () => {
-        expect(at("2025-10-05T20:00:00Z")).toContain("6 Oct 2025, 01:30");
+        expect(at("2025-10-05T20:00:00Z")).toContain("6 Oct 2025, 1:30 am");
     });
 });

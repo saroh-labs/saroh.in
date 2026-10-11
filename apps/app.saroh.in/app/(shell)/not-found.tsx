@@ -14,7 +14,7 @@ export default function ShellNotFound() {
         <PageContainer>
             <NotFound
                 title="Page not found"
-                description="This address isn't a page in your workspace. The link may be old or mistyped."
+                description="This address isn't a page in your business. The link may be old or mistyped."
                 primary={{ href: "/", label: "Back to Home" }}
             />
         </PageContainer>

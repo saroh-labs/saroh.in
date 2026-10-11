@@ -126,7 +126,8 @@ pnpm --filter @saroh/database db:seed:showcase && pnpm dev:app
 
 Open https://app.saroh.localhost and sign in as `demo@saroh.dev` /
 `demo-password-123`. The showcase gives that login a gym, a yoga studio, a
-clinic and a shop to look around — the same businesses as the film above. Every
+clinic and a shop to look around — the same businesses as the film above.
+The password is for a database on your own machine only: seeding any other database (a shared dev one) needs `SEED_PASSWORD`, and the seed refuses the documented one there. Every
 step is explained in [setup-instructions.md](setup-instructions.md).
 
 ## How it is built

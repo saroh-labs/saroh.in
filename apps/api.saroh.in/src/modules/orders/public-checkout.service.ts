@@ -10,7 +10,8 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { isCustomerPhone } from "../../common/customer-phone";
+import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
@@ -18,6 +19,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import { qrSourceFor } from "../sites/qr-source";
 import {
     commerceOpen,
     effectiveStorefront,
@@ -36,7 +38,7 @@ import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
 import { shopPause } from "./checkout-paused";
 import type { BagLine, CheckoutQuote, CheckoutWay } from "./checkout-quote";
-import { feeCents } from "./checkout-quote";
+import { feeCents, freeOverCents } from "./checkout-quote";
 import type {
     CheckoutPayment,
     CheckoutPayOption,
@@ -69,7 +71,7 @@ import { fromCents } from "./order-pricing";
  *   quantities; prices, GST (DEC-023), the ways an order can leave and "can
  *   sell" are re-read here (`checkout-quote.ts`).
  * - **Offered only when it can be paid.** Online needs a plan with online
- *   payments and a provider; paying on handover ("Pay when you collect",
+ *   payments and a provider; paying on handover ("Pay at pick-up",
  *   "Pay on delivery") is always open on a plan without them, and on a plan
  *   with them only when the storefront turns it on (`checkout-readiness.ts`).
  *   A storefront that is paused, or that neither way can pay for, has no
@@ -109,6 +111,12 @@ export interface CheckoutOptions {
      * hours, the business's public details. Null when Pick-up isn't offered.
      */
     pickup: PickupPlace | null;
+    /**
+     * The location's "Free delivery over", "999.00", when a delivery it
+     * offers has a fee for it to waive; else null. The product page says
+     * it under the price. Absent from an older API.
+     */
+    freeDeliveryOver?: string | null;
     /**
      * True when a move to a lower plan stopped this website or its location
      * taking orders (#800): the site says "This business isn't taking
@@ -219,6 +227,7 @@ export class PublicCheckoutService {
                       };
                   })
                 : [];
+            const over = freeOverCents(settings.fees);
             if (scope.takingOrders === false) {
                 return {
                     canOrder: false,
@@ -242,6 +251,10 @@ export class PublicCheckoutService {
                 pickup: ways.some((w) => w.type === "PICKUP")
                     ? settings.pickup
                     : null,
+                freeDeliveryOver:
+                    over !== null && ways.some((w) => w.fee !== null)
+                        ? fromCents(over)
+                        : null,
             };
         });
     }
@@ -303,8 +316,11 @@ export class PublicCheckoutService {
             if (scope.organizationId !== customer.organizationId) {
                 throw signedOut();
             }
-            await assertOrganizationOpen(scope.organizationId);
+            // Not taking orders — a paused site (#800), or a business
+            // suspended or closing (DEC-120) — answers in the paused words
+            // first; the lifecycle gate stays behind it.
             if (scope.takingOrders === false) throw notTakingOrders();
+            await assertOrganizationOpen(scope.organizationId);
             const ready = await checkoutReadiness(
                 prisma,
                 scope.organizationId,
@@ -401,15 +417,33 @@ export class PublicCheckoutService {
                     field: "address",
                 });
             }
+            // A delivery needs a number to ring: the rider at the gate, the
+            // courier with a parcel. Pick-up asks for none.
+            if (shipsToAddress(type) && !isCustomerPhone(dto.address?.phone)) {
+                throw new BadRequestException({
+                    message: "Add a phone number for the delivery.",
+                    details: { reason: "phone", field: "address.phone" },
+                });
+            }
 
+            // The QR code whose scan opened the page, if its address
+            // still carried the tag: this site's own code or nothing, and
+            // never a reason to refuse the order.
+            const sourceCode = await qrSourceFor(
+                { siteId, organizationId: scope.organizationId },
+                dto.source,
+            );
             const orderId = await createCheckoutOrder(scope, account, {
                 lines,
                 type,
-                shippingCents: feeCents(type, settings.fees),
+                // The delivery the bag showed for this way: free at or
+                // above the storefront's "Free delivery over" (`deliveryCents`).
+                shippingCents: toMinor(quote.delivery),
                 currency: settings.currency,
                 dto,
                 payOnHandover: payBy === "ON_HANDOVER",
                 discount: applied,
+                sourceCode,
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)

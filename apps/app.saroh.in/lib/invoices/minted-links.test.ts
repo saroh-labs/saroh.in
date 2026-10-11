@@ -195,7 +195,7 @@ describe("copyLinkLabel", () => {
     });
 
     it("says it is working while the link is made", () => {
-        expect(copyLinkLabel({ ...base, busy: true })).toBe("Making a link…");
+        expect(copyLinkLabel({ ...base, busy: true })).toBe("Making…");
     });
 });
 
@@ -242,7 +242,7 @@ describe("the unseen link's words", () => {
     it("asks before replacing it, naming who gets the new one", () => {
         expect(UNSEEN_LINK.confirmTitle).toBe("Make a new pay link?");
         expect(UNSEEN_LINK.confirmLabel).toBe("Make a new link");
-        expect(UNSEEN_LINK.cancelLabel).toBe("Keep the old one");
+        expect(UNSEEN_LINK.keepLabel).toBe("Keep the old link");
         expect(newLinkWarning("Farah Khan")).toBe(
             "The link that's out stops working straight away, for anyone who has it. Send Farah Khan the new one.",
         );

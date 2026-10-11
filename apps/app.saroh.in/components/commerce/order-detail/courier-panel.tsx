@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
+import { Input } from "@saroh/ui/input";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { CourierFields, Shipment } from "@/lib/orders/courier";
@@ -16,11 +16,14 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
-import { actionClass, FOCUS, PanelTitle, WorkPanel } from "./parts";
-
-const FIELD =
-    "mt-[5px] block h-9 w-full rounded-lg border border-border bg-card px-2.5 font-mono text-[13px] font-normal coarse:h-11";
-
+import { ChipGroup } from "@/components/shared/choice-group";
+import { Field } from "@saroh/ui/field";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 /**
  * The courier's details (B10, DEC-045): who took it, their tracking number
  * and, if they gave one, the tracking link — every one optional, since the
@@ -29,18 +32,38 @@ const FIELD =
  *
  * `handover` is the "Hand to courier" step itself (the design's panel);
  * `change` fills them in or corrects them afterwards — "No tracking number
- * yet · Add" on the customer card opens it.
+ * yet · Add" on the customer card opens it. Either way it is a side sheet
+ * over the order: a refusal leaves it open with what was typed.
  */
 export function CourierPanel({
-    mode,
-    to,
-    first,
-    busy,
-    before,
-    onPrint,
-    onCancel,
-    onSave,
-}: {
+    open,
+    returnFocus,
+    ...draft
+}: CourierProps & {
+    open: boolean;
+    /** Put the keyboard back on the button that opened it. */
+    returnFocus?: () => void;
+}) {
+    const handover = draft.mode === "handover";
+    return (
+        <OrderSheet
+            open={open}
+            title={handover ? "Hand to courier" : "Tracking"}
+            description={
+                handover
+                    ? `To ${draft.to}`
+                    : `Add or correct what the courier gave you. It stays on the order. Nothing is sent to ${draft.first}.`
+            }
+            busy={draft.busy}
+            onClose={draft.onCancel}
+            returnFocus={returnFocus}
+        >
+            <CourierDraft {...draft} />
+        </OrderSheet>
+    );
+}
+
+interface CourierProps {
     mode: "handover" | "change";
     /** Where it is going, one line. */
     to: string;
@@ -52,7 +75,17 @@ export function CourierPanel({
     onPrint?: () => void;
     onCancel: () => void;
     onSave: (fields: CourierFields) => void;
-}) {
+}
+
+/** What is typed in the sheet: a fresh one each time it opens. */
+function CourierDraft({
+    mode,
+    first,
+    busy,
+    before,
+    onPrint,
+    onSave,
+}: CourierProps) {
     const ids = useId();
     const choices = courierChoices(before?.courier ?? null);
     const [courier, setCourier] = useState<string>(
@@ -61,6 +94,7 @@ export function CourierPanel({
     const [otherName, setOtherName] = useState("");
     const [number, setNumber] = useState(before?.number ?? "");
     const [link, setLink] = useState(before?.url ?? "");
+    useOrderSheetDraft([courier, otherName, number, link]);
     const numberRef = useRef<HTMLInputElement>(null);
     const otherRef = useRef<HTMLInputElement>(null);
     const own = courier === OWN_DRIVER;
@@ -82,159 +116,111 @@ export function CourierPanel({
         if (!handover) numberRef.current?.focus();
     }, [handover]);
 
-    const title = handover ? "Hand to courier" : "Tracking";
-
     return (
-        <WorkPanel label={title}>
-            <PanelTitle>{title}</PanelTitle>
-            <p className="mt-[3px] text-[12px] text-muted-foreground">
-                {handover
-                    ? `To ${to}`
-                    : `Add or correct what the courier gave you. It stays on the order; nothing is sent to ${first}.`}
-            </p>
-            <div
-                className="mb-1.5 mt-3 text-[12px] font-medium"
-                id={`${ids}-courier`}
-            >
-                Courier
-            </div>
-            <div
-                role="radiogroup"
-                aria-labelledby={`${ids}-courier`}
-                className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((c) => {
-                    const on = c === courier;
-                    return (
-                        <button
-                            key={c}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => pickChip(c)}
-                            className={cn(
-                                FOCUS,
-                                "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
-                                on
-                                    ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                    : "border-border bg-card font-medium text-neutral-700 hover:border-border-strong hover:bg-accent active:bg-accent-active dark:text-muted-foreground",
-                            )}
-                        >
-                            {c}
-                        </button>
-                    );
-                })}
-            </div>
-            {other ? (
-                <label className="mt-3 block text-[12px] font-medium">
-                    Courier&apos;s name
-                    <input
-                        ref={otherRef}
-                        type="text"
-                        value={otherName}
-                        maxLength={COURIER_FIELD_MAX}
-                        autoComplete="off"
-                        onChange={(e) => setOtherName(e.target.value)}
-                        placeholder="DTDC, India Post…"
-                        aria-describedby={`${ids}-other-help`}
-                        className={cn(FIELD, "font-sans")}
-                    />
-                    <span
-                        id={`${ids}-other-help`}
-                        className="mt-[5px] block text-[11.5px] font-normal text-muted-foreground"
+        <>
+            <OrderSheetBody>
+                <div
+                    className="mb-1.5 text-[12px] font-medium"
+                    id={`${ids}-courier`}
+                >
+                    Courier
+                </div>
+                <ChipGroup
+                    labelledBy={`${ids}-courier`}
+                    value={courier}
+                    onChange={pickChip}
+                    choices={choices.map((c) => ({ value: c, label: c }))}
+                />
+                {other ? (
+                    <Field
+                        label="Courier's name"
+                        hint="As the order will name it."
+                        className="mt-3"
                     >
-                        As the order will name it.
-                    </span>
-                </label>
-            ) : null}
-            {!own ? (
-                <>
-                    <label className="mt-3 block text-[12px] font-medium">
-                        Tracking number
-                        <input
-                            ref={numberRef}
+                        <Input
+                            ref={otherRef}
                             type="text"
-                            value={number}
+                            value={otherName}
                             maxLength={COURIER_FIELD_MAX}
                             autoComplete="off"
-                            spellCheck={false}
-                            onChange={(e) => setNumber(e.target.value)}
-                            placeholder="Leave empty if you don't have it yet"
-                            aria-describedby={`${ids}-number-help`}
-                            className={FIELD}
+                            onChange={(e) => setOtherName(e.target.value)}
+                            placeholder="DTDC, India Post…"
+                            className="w-full font-mono"
                         />
-                    </label>
-                    <p
-                        id={`${ids}-number-help`}
-                        className="mt-[5px] text-[11.5px] text-muted-foreground"
-                    >
-                        {handover
-                            ? "You can add it later, once the courier sends it."
-                            : `As ${name || "the courier"} gave it to you.`}
-                    </p>
-                    <label className="mt-3 block text-[12px] font-medium">
-                        Tracking link
-                        <input
-                            type="url"
-                            inputMode="url"
-                            value={link}
-                            onChange={(e) => setLink(e.target.value)}
-                            placeholder="https://"
-                            aria-invalid={bad || undefined}
-                            aria-describedby={`${ids}-link-help`}
-                            className={FIELD}
-                        />
-                    </label>
-                    <p
-                        id={`${ids}-link-help`}
-                        className={cn(
-                            "mt-[5px] text-[11.5px]",
-                            bad
-                                ? "text-destructive-subtle-foreground"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {bad
-                            ? "That isn't a web address — paste the whole link, starting https://."
-                            : `Optional. Paste the link ${name || "the courier"} gave you. It stays on the order; nothing is sent to ${first}.`}
-                    </p>
-                </>
-            ) : null}
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-                {handover && onPrint ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className={actionClass("ghost")}
-                        onClick={onPrint}
-                    >
-                        Packing slip
-                    </Button>
+                    </Field>
                 ) : null}
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="button"
-                    className={actionClass("primary")}
-                    disabled={bad || unnamed || busy}
-                    onClick={() =>
-                        onSave(
-                            courierFields(
-                                { courier: name, number, link },
-                                handover ? undefined : before,
-                            ),
-                        )
-                    }
-                >
-                    {handover ? "Handed over" : "Save"}
-                </Button>
-            </div>
-        </WorkPanel>
+                {!own ? (
+                    <>
+                        <Field
+                            holdsData
+                            label="Tracking number"
+                            className="mt-3"
+                            hint={
+                                handover
+                                    ? "You can add it later, once the courier sends it."
+                                    : `As ${name || "the courier"} gave it to you.`
+                            }
+                        >
+                            <Input
+                                ref={numberRef}
+                                type="text"
+                                value={number}
+                                maxLength={COURIER_FIELD_MAX}
+                                autoComplete="off"
+                                spellCheck={false}
+                                onChange={(e) => setNumber(e.target.value)}
+                                placeholder="Leave empty if you don't have it yet"
+                                className="w-full font-mono"
+                            />
+                        </Field>
+                        <Field
+                            holdsData
+                            label="Tracking link"
+                            optional
+                            className="mt-3"
+                            error={
+                                bad
+                                    ? "That isn't a web address. Paste the whole link, starting https://."
+                                    : null
+                            }
+                            hint={`Paste the link ${name || "the courier"} gave you. It stays on the order. Nothing is sent to ${first}.`}
+                        >
+                            <Input
+                                type="url"
+                                inputMode="url"
+                                value={link}
+                                onChange={(e) => setLink(e.target.value)}
+                                placeholder="https://"
+                                className="w-full font-mono"
+                            />
+                        </Field>
+                    </>
+                ) : null}
+            </OrderSheetBody>
+            <OrderSheetFoot
+                saveLabel={handover ? "Mark handed over" : "Save"}
+                saveOff={bad || unnamed}
+                extra={
+                    handover && onPrint ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={onPrint}
+                        >
+                            Packing slip
+                        </Button>
+                    ) : null
+                }
+                onSubmit={() =>
+                    onSave(
+                        courierFields(
+                            { courier: name, number, link },
+                            handover ? undefined : before,
+                        ),
+                    )
+                }
+            />
+        </>
     );
 }

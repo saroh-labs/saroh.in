@@ -15,6 +15,7 @@ import {
 
 import type { Booking } from "@saroh/database";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -55,16 +56,24 @@ import type { ServiceView } from "./service-fields";
  * `@OrgContext()`; the service enforces `service:*`/`booking:*` on top. The
  * PUBLIC booking endpoint is deliberately NOT here — it lives in the guardless
  * {@link PublicBookingsController}.
+ *
+ * Appointments is required per handler, not on the class (#117): services,
+ * rules, availability and every booking write carry
+ * `@RequireModule("APPOINTMENTS")`. The three reads of bookings already made
+ * — the calendar range, a service's bookings and one booking — are history,
+ * and stay readable when a business switches Appointments off
+ * (`MODULE_ROLLOUT.md`); the service still asks `booking:read`. Cancelling a
+ * booking already made is winding down, and stays open too.
  */
 @Controller("organizations/:organizationId/services")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("APPOINTMENTS")
 export class BookingsController {
     constructor(private readonly bookings: BookingsService) {}
 
     // ── Services ────────────────────────────────────────────────────────────
 
     @Post()
+    @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     createService(
         @OrgContext() ctx: OrganizationContext,
@@ -74,6 +83,7 @@ export class BookingsController {
     }
 
     @Get()
+    @RequireModule("APPOINTMENTS")
     listServices(
         @OrgContext() ctx: OrganizationContext,
     ): Promise<ServiceView[]> {
@@ -95,6 +105,7 @@ export class BookingsController {
     }
 
     @Get(":serviceId")
+    @RequireModule("APPOINTMENTS")
     getService(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -103,6 +114,7 @@ export class BookingsController {
     }
 
     @Patch(":serviceId")
+    @RequireModule("APPOINTMENTS")
     updateService(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -112,6 +124,7 @@ export class BookingsController {
     }
 
     @Delete(":serviceId")
+    @RequireModule("APPOINTMENTS")
     removeService(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -122,6 +135,7 @@ export class BookingsController {
     // ── Availability rules ──────────────────────────────────────────────────
 
     @Get(":serviceId/rules")
+    @RequireModule("APPOINTMENTS")
     listRules(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -130,6 +144,7 @@ export class BookingsController {
     }
 
     @Put(":serviceId/rules")
+    @RequireModule("APPOINTMENTS")
     replaceRules(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -139,6 +154,7 @@ export class BookingsController {
     }
 
     @Post(":serviceId/rules")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     addRule(
         @OrgContext() ctx: OrganizationContext,
@@ -149,6 +165,7 @@ export class BookingsController {
     }
 
     @Delete(":serviceId/rules/:ruleId")
+    @RequireModule("APPOINTMENTS")
     deleteRule(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -160,6 +177,7 @@ export class BookingsController {
     // ── Availability preview ────────────────────────────────────────────────
 
     @Get(":serviceId/availability")
+    @RequireModule("APPOINTMENTS")
     availability(
         @OrgContext() ctx: OrganizationContext,
         @Param("serviceId") serviceId: string,
@@ -182,6 +200,7 @@ export class BookingsController {
 
     /** A booking made by the merchant for someone (#384). */
     @Post(":serviceId/bookings")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     bookByHand(
         @OrgContext() ctx: OrganizationContext,
@@ -214,6 +233,7 @@ export class BookingsController {
      * thing about a booking and leaves its terms alone.
      */
     @Patch("bookings/:bookingId")
+    @RequireModule("APPOINTMENTS")
     rescheduleBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
@@ -230,6 +250,8 @@ export class BookingsController {
      * appointment is, the other says what happened at it.
      */
     @Post("bookings/:bookingId/outcome")
+    @LifecycleWrite("wind-down")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(200)
     recordOutcome(
         @OrgContext() ctx: OrganizationContext,
@@ -247,6 +269,8 @@ export class BookingsController {
      * new link and retires the old one. Saroh sends nothing itself yet.
      */
     @Post("bookings/:bookingId/pay-link")
+    @LifecycleWrite("wind-down")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     async payLink(
@@ -265,6 +289,8 @@ export class BookingsController {
      * answers as it did.
      */
     @Post("bookings/:bookingId/desk-payment")
+    @LifecycleWrite("wind-down")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(200)
     takeDeskPayment(
         @OrgContext() ctx: OrganizationContext,
@@ -280,6 +306,7 @@ export class BookingsController {
      * visit is booked, or when this one already is; never invoiced.
      */
     @Post("treatments/:orderId/visits")
+    @RequireModule("APPOINTMENTS")
     @HttpCode(201)
     bookVisit(
         @OrgContext() ctx: OrganizationContext,
@@ -296,8 +323,13 @@ export class BookingsController {
      * the class paid for goes back even inside the free-cancellation window.
      * `?closesClass=true` when the whole class is cancelled: its waitlist is
      * closed rather than offered the place (A12).
+     *
+     * Not gated on Appointments (#117, owner 9 Oct): a business that
+     * switched Appointments off can still cancel a booking already made,
+     * and the refund its policy gives (DEC-058). `booking:*` still applies.
      */
     @Delete("bookings/:bookingId")
+    @LifecycleWrite("wind-down")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,

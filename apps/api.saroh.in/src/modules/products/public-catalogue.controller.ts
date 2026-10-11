@@ -6,8 +6,10 @@ import {
     Ip,
     Param,
     Query,
+    UseGuards,
 } from "@nestjs/common";
 
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { RawGridQuery } from "./product-grid";
 import { parseGridQuery } from "./product-grid";
@@ -38,6 +40,7 @@ import { PublicCatalogueService } from "./public-catalogue.service";
  * with none of `PublicSitesController`'s routes.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicCatalogueController {
     constructor(private readonly catalogue: PublicCatalogueService) {}
 

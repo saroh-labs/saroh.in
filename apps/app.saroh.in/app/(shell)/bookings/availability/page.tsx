@@ -1,10 +1,10 @@
-import { Button } from "@saroh/ui/button";
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
+
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { KeptBooking } from "@/lib/services/availability-rules";
@@ -28,6 +28,7 @@ import {
     listStaff,
     readBookingPayment,
 } from "@/lib/staff/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Availability (U16): each person's weekly hours, time off and
@@ -68,19 +69,15 @@ export default async function AvailabilityPage() {
 
     if (!staffList) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Availability" />
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Availability"]}
+                    title="Availability"
+                />
+                <div>
                     <FailedState
-                        title="Couldn't load everyone's hours"
-                        description="Nothing has been changed. Try again in a moment."
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href="/bookings/availability">
-                                    Try again
-                                </Link>
-                            </Button>
-                        }
+                        title={couldntLoad("everyone's hours")}
+                        retryHref="/bookings/availability"
                     />
                 </div>
             </PageContainer>
@@ -150,14 +147,14 @@ export default async function AvailabilityPage() {
     );
 
     return (
-        <PageContainer width="full" className={BARE}>
-            <BookingsTopBar page="Availability" />
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <PageContainer width="full">
+            <div>
                 {calendar ? null : (
-                    <PartialNotice className="mb-3">
-                        Bookings could not be loaded, so the hours below
-                        can&apos;t say which bookings they would leave out.
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things="bookings"
+                        so="The hours below can't say which bookings they would leave out."
+                    />
                 )}
                 {/* Everyone who takes bookings uses a team seat (DEC-105). */}
                 {may("service:write") ? (

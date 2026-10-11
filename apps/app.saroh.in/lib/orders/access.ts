@@ -1,4 +1,6 @@
+import { whoCanChange } from "@/lib/access/who-can-change";
 import { permits, permitsFor } from "@/lib/organizations/permits";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import type { Organization } from "@/lib/organizations/service";
 
 /**
@@ -60,7 +62,7 @@ export interface OrderPowers {
 }
 
 export function orderPowers(
-    organization: Pick<Organization, "role" | "actions"> | null,
+    organization: { role: string; actions?: readonly string[] } | null,
 ): OrderPowers {
     if (!organization) {
         return {
@@ -102,6 +104,8 @@ export function ordersPlace(pathname: string | null): "list" | "order" | null {
 /** Whose role it is, as the locked cards name it. */
 interface Viewer {
     role: string;
+    /** The role as stored: a built-in name, or a made role's key. */
+    roleKey?: string | null;
     /** The business's own name for the role, for one it made. */
     roleLabel?: string | null;
 }
@@ -115,24 +119,19 @@ export function ordersLockedCopy(
     viewer: Viewer,
     businessName: string,
 ): { description: string; note: string } {
-    const named = viewer.roleLabel?.trim();
-    const description =
-        viewer.role === "REVIEWER" && !named
-            ? `Your role in ${businessName} is Reviewer, which covers one website and nothing about the business around it. Orders are not part of it.`
-            : named
-              ? `Your role in ${businessName} is ${named}. Orders are not part of it.`
-              : `Your role in ${businessName} doesn't include orders.`;
-    return {
-        description,
-        note: `The rail does not offer Sell to this role, so you have reached it by address. Ask an Owner or Admin of ${businessName} if you need it.`,
-    };
+    const { description, note } = whoCanChange({
+        thing: "Orders",
+        business: businessName,
+        role: knownRoleName(viewer),
+    });
+    return { description, note };
 }
 
 /** Order Detail's locked card, in the design's words. */
 export function orderLockedText(viewer: Viewer): string {
-    const named = viewer.roleLabel?.trim();
-    if (viewer.role === "REVIEWER" && !named) {
-        return "Your role is Reviewer, which can see the website but not this. An owner or admin can change that in Team.";
-    }
-    return `Your role${named ? ` is ${named}, which` : ""} doesn't include orders. An owner or admin can change that in Team.`;
+    const { description, note } = whoCanChange({
+        thing: "Orders",
+        role: knownRoleName(viewer),
+    });
+    return `${description} ${note}`;
 }

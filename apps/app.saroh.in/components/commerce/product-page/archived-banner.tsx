@@ -1,11 +1,14 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { patchProduct } from "@/lib/products/actions";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Under an archived product's header: when it went, what that means, and
@@ -28,9 +31,12 @@ export function ArchivedBanner({
 
     function restore() {
         start(async () => {
-            const res = await patchProduct(storeId, productId, {
-                status: "DRAFT",
-            });
+            const res = await runAction(() =>
+                patchProduct(storeId, productId, {
+                    status: "DRAFT",
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -38,9 +44,12 @@ export function ArchivedBanner({
             router.refresh();
             showUndo("Restored as a draft. Publish it when it is ready.", () =>
                 start(async () => {
-                    const undo = await patchProduct(storeId, productId, {
-                        status: "ARCHIVED",
-                    });
+                    const undo = await runAction(() =>
+                        patchProduct(storeId, productId, {
+                            status: "ARCHIVED",
+                        }),
+                    );
+                    if (!undo) return;
                     if (!undo.ok) showError(undo.error);
                     router.refresh();
                 }),
@@ -49,38 +58,38 @@ export function ArchivedBanner({
     }
 
     return (
-        <div
-            role="note"
-            className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted px-4 py-[11px] sm:px-[22px]"
-        >
-            <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
-                <strong className="font-semibold text-foreground">
-                    {archivedAt ? (
-                        <>
-                            Archived on{" "}
-                            <ViewerDate
-                                iso={archivedAt}
-                                variant="dayMonthLong"
-                            />
-                            .
-                        </>
-                    ) : (
-                        "Archived."
-                    )}
-                </strong>{" "}
-                It is not sold and its page does not open. Past orders, reviews
-                and stock history are kept below.
-            </p>
-            {canWrite ? (
-                <button
-                    type="button"
-                    disabled={pending}
-                    onClick={restore}
-                    className="h-8 rounded-[9px] bg-foreground px-3 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:opacity-60 coarse:h-11"
-                >
-                    {pending ? "Restoring…" : "Restore as a draft"}
-                </button>
-            ) : null}
-        </div>
+        <Notice layout="banner" align="center">
+            <div className="flex flex-wrap items-center gap-2.5">
+                <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
+                    <strong className="font-semibold text-foreground">
+                        {archivedAt ? (
+                            <>
+                                Archived on{" "}
+                                <ViewerDate
+                                    iso={archivedAt}
+                                    variant="dayMonthLong"
+                                />
+                                .
+                            </>
+                        ) : (
+                            "Archived."
+                        )}
+                    </strong>{" "}
+                    It is not sold and its page does not open. Past orders,
+                    reviews and stock history are kept below.
+                </p>
+                {canWrite ? (
+                    <Button
+                        size="sm"
+                        type="button"
+                        onClick={restore}
+                        busy={pending}
+                        busyLabel="Restoring…"
+                    >
+                        Restore as a draft
+                    </Button>
+                ) : null}
+            </div>
+        </Notice>
     );
 }

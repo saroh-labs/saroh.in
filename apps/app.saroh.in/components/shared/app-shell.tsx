@@ -4,33 +4,46 @@ import { cookies, headers } from "next/headers";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
-import { AccessDenied } from "@/components/shared/access-denied";
+import { PlanAccessProvider } from "@/components/billing/plan-way";
+import { ClosingBanner } from "@/components/organizations/closing-banner";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { JoinedNotice } from "@/components/shared/joined-notice";
+import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
-import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
+import { navCan, NOTIFICATIONS_NAV } from "@/components/shared/nav-items";
 import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
+import { PageContainer } from "@/components/shared/page-container";
 import { TabBar } from "@/components/shared/tab-bar";
+import {
+    recordingSwitchedOn,
+    UsageRecording,
+} from "@/components/shared/usage-recording";
 import { accountsUrl } from "@/lib/accounts";
+import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
-import { MEMBER_PAUSED_BODY } from "@/lib/organizations/choose";
+import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
+import { usageSharingOrNull } from "@/lib/usage-sharing/service";
+import { Button } from "@saroh/ui/button";
+import { PausedState } from "@saroh/ui/data-state";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -66,22 +79,36 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     // Every business they're in has paused their access (#800): the API
     // would refuse each read, so say why once instead of a page of denials.
+    // Paused, not denied: no role changed, and the way back is the plan.
     if (activeOrg?.paused) {
         return (
             <div className="flex min-h-screen flex-col">
                 <AppHeader onboarding user={session.user} />
                 <main id="main-content" className="flex-1">
-                    <AccessDenied
-                        title={`Your access to ${activeOrg.name} is paused`}
-                        description={MEMBER_PAUSED_BODY}
-                        note={null}
-                        backHref={`${accountsUrl}/apps`}
-                        backLabel="Your businesses"
-                    />
+                    <PageContainer>
+                        <PausedState
+                            business={activeOrg.name}
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <a href={`${accountsUrl}/apps`}>
+                                        Your businesses
+                                    </a>
+                                </Button>
+                            }
+                        />
+                    </PageContainer>
                 </main>
             </div>
         );
     }
+
+    // Whether session recording is switched on for this environment
+    // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
+    const recordingOn = recordingSwitchedOn();
 
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
@@ -96,51 +123,73 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, modules, home, sites, storefronts, stock, billing, paused] =
-        await Promise.all([
-            unreadNotificationCount(),
-            listModules().catch(() => null),
-            // The rail's work counts come from the same ranked read model Home uses,
-            // so the two can never disagree. Non-fatal: a rail without badges is a
-            // working rail, and this renders on every page.
-            getHome().catch(() => null),
-            /*
-             * The merchant's own sites, for the command palette's jump to one.
-             *
-             * Non-fatal like the counts: a palette without them still works, and
-             * this renders on every screen in the app. It joins the same
-             * Promise.all rather than being awaited after, so it costs the slowest
-             * of four round trips instead of adding a fifth in series.
-             */
-            listSites().catch(() => []),
-            /*
-             * How many storefronts, and how many the plan allows (ADR-010):
-             * the palette stops offering "New storefront" at the limit, and
-             * the rail names the row "Storefronts" once there are several.
-             * `null` on failure: the palette then offers it, and the page
-             * says whether another can be made.
-             */
-            getStorefrontAllowance().catch(() => null),
-            /*
-             * The business's Track stock switch (#515): off, Sell › Stock has
-             * nothing to show and the rail leaves it out. `null` on failure
-             * (or a role that can't read stock, which the row's own action
-             * already withholds): the nav fails open.
-             */
-            getStockTracking().catch(() => null),
-            /*
-             * What the plan locks (U14), for the rail's locks. An aid: null
-             * when it can't be read or the role may not (the page and the
-             * API still say so).
-             */
-            billingAccessOrNull(),
-            // What a move to a lower plan paused, or will (#800): the banner.
-            // An aid; null when unread, and the API still refuses.
-            pausedOrNull(),
-        ]);
+    const [
+        unread,
+        modules,
+        home,
+        sites,
+        storefronts,
+        stock,
+        billing,
+        paused,
+        closing,
+        usageSharing,
+    ] = await Promise.all([
+        unreadNotificationCount(),
+        listModules().catch(() => null),
+        // The rail's work counts come from the same ranked read model Home uses,
+        // so the two can never disagree. Non-fatal: a rail without badges is a
+        // working rail, and this renders on every page.
+        getHome().catch(() => null),
+        /*
+         * The merchant's own sites, for the command palette's jump to one.
+         *
+         * Non-fatal like the counts: a palette without them still works, and
+         * this renders on every screen in the app. It joins the same
+         * Promise.all rather than being awaited after, so it costs the slowest
+         * of four round trips instead of adding a fifth in series.
+         */
+        listSites().catch(() => []),
+        /*
+         * How many storefronts, and how many the plan allows (ADR-010):
+         * the palette stops offering "New storefront" at the limit, and
+         * the rail names the row "Storefronts" once there are several.
+         * `null` on failure: the palette then offers it, and the page
+         * says whether another can be made.
+         */
+        getStorefrontAllowance().catch(() => null),
+        /*
+         * The business's Track stock switch (#515): off, Sell › Stock has
+         * nothing to show and the rail leaves it out. `null` on failure
+         * (or a role that can't read stock, which the row's own action
+         * already withholds): the nav fails open.
+         */
+        getStockTracking().catch(() => null),
+        /*
+         * What the plan locks (U14), for the rail's locks. An aid: null
+         * when it can't be read or the role may not (the page and the
+         * API still say so).
+         */
+        billingAccessOrNull(),
+        // What a move to a lower plan paused, or will (#800): the banner.
+        // An aid; null when unread, and the API still refuses.
+        pausedOrNull(),
+        // Scheduled for deletion (#921): the refunds still owed and
+        // the memberships it won't cancel. Read only then.
+        activeOrg?.lifecycleStatus === "PENDING_DELETION"
+            ? closingOrNull()
+            : null,
+        // "Help improve Saroh" (DEC-125): the person's own choice and
+        // whether they have seen the notice, read before the recorder
+        // could start, and only where session recording is switched on at
+        // all. Null when unread: not recorded.
+        recordingOn ? usageSharingOrNull() : null,
+    ]);
     // Available modules, plus those shut only by the plan: locked, not off,
-    // so they stay in the rail with a lock and a way up (U14).
-    const planLocked = modules ? planLockedModuleKeys(modules) : [];
+    // so they stay in the rail with a lock and a way up (U14). None while
+    // plans aren't shown (DEC-136): a lock would name a plan.
+    const planLocked =
+        modules && plansShown() ? planLockedModuleKeys(modules) : [];
     const moduleKeys = modules
         ? [
               ...modules
@@ -187,7 +236,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const roleKey = activeOrg?.roleKey ?? null;
 
     return (
-        <div className="flex min-h-screen flex-col">
+        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -196,7 +245,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              */}
             <a
                 href="#main-content"
-                className="sr-only bg-background text-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
                 Skip to content
             </a>
@@ -207,12 +256,26 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * both (#313). It comes off the resolved active organization, so
              * switching workspaces changes it with everything else.
              */}
+            {/*
+             * The page reads again by itself, the unread count sits in the
+             * tab's title, and "signed out" gets its Sign in button (10 Oct
+             * 2026). Draws nothing.
+             */}
+            <LiveRefresh
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={role}
                 roleKey={roleKey}
                 actions={actions}
                 kind={activeOrg?.kind}
+                // What was opened in this business, not in another.
+                recentsScope={activeOrg?.id ?? ""}
                 sites={navSites}
                 stockTracked={stockTracked}
                 storefronts={storefronts}
@@ -275,10 +338,27 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/*
+                             * PostHog in the signed-in shell (DEC-125):
+                             * internal ids beside the workspace's error
+                             * reports, the one-time notice that it is
+                             * recorded, and the recorder, which waits for
+                             * that notice. Nothing without a key.
+                             */}
+                            <UsageRecording
+                                userId={session.user.id}
+                                organizationId={activeOrg?.id}
+                                usage={usageSharing}
+                            />
+                            {/* Scheduled for deletion (#921). */}
+                            <ClosingBanner view={closing} />
                             {/* A plan that ends within 30 days (#805). */}
                             <PlanEndingBanner ending={billing?.planEnding} />
                             {/* What a lower plan paused, or will (#800). */}
                             <PausedBanner view={paused} />
+                            {/* Just accepted an invitation: which business
+                                this is and what their role opens, once. */}
+                            <JoinedNotice />
                             {children}
                         </BusinessZoneProvider>
                     </div>
@@ -298,6 +378,26 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 storefronts={storefronts?.used ?? null}
                 kind={activeOrg?.kind ?? null}
             />
-        </div>
+        </ShellFrame>
+    );
+}
+
+/**
+ * The shell's outer box, which also says once whether this person may
+ * change the plan (`billing:manage`): every plan prompt under it offers the
+ * way to another plan to someone who may, and says who can to anyone else
+ * (`PlanWay`).
+ */
+function ShellFrame({
+    canChangePlan,
+    children,
+}: {
+    canChangePlan: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <div className="flex min-h-screen flex-col">{children}</div>
+        </PlanAccessProvider>
     );
 }

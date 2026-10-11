@@ -1,5 +1,7 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -12,12 +14,10 @@ import type {
     SubscriptionEvent,
     SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-const LINK =
-    "text-[12.5px] font-semibold text-brand hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground coarse:min-h-11";
-
 /**
  * Changes: what was done to the subscription and by whom, from its log
  * (D9), newest first — the latest ten, then "See all", which reads older
@@ -41,6 +41,15 @@ export function ChangesCard({
     const [cursor, setCursor] = useState(first?.nextCursor ?? null);
     const [everything, setEverything] = useState(false);
     const [loading, setLoading] = useState(false);
+    // The card keeps the pages it has read. A first page that failed and
+    // then arrived (Try again reads the page again) starts it from that
+    // page, or the card would draw "ok" with nothing in it.
+    const [arrived, setArrived] = useState(first !== null);
+    if (first && !arrived) {
+        setArrived(true);
+        setEvents(first.events);
+        setCursor(first.nextCursor);
+    }
 
     const all = changeRows(events, sub, viewerId, now);
     const rows = everything ? all : all.slice(0, FIRST_CHANGES);
@@ -69,14 +78,14 @@ export function ChangesCard({
             <h2 id="changes-title" className={cn(TITLE, "mb-2")}>
                 Changes
             </h2>
-            {page.state !== "ok" ? (
-                <p
-                    role={page.state === "failed" ? "alert" : "note"}
-                    className="text-[12.5px] text-muted-foreground"
-                >
-                    {page.state === "denied"
-                        ? "Your role can't see what changed on this subscription."
-                        : "The changes couldn't be loaded. Everything else on this page is up to date."}
+            {page.state === "failed" ? (
+                <FailedRead
+                    things="the changes"
+                    reassurance="Everything else on this page is up to date."
+                />
+            ) : page.state !== "ok" ? (
+                <p role="note" className="text-[12.5px] text-muted-foreground">
+                    Your role can&apos;t see what changed on this subscription.
                 </p>
             ) : (
                 <>
@@ -91,23 +100,28 @@ export function ChangesCard({
                         </div>
                     ))}
                     {more ? (
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={() => setEverything(true)}
-                            className={cn(LINK, "mt-1.5")}
+                            className="mt-1.5"
                         >
                             See all
-                        </button>
+                        </Button>
                     ) : null}
                     {everything && cursor ? (
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={() => void older()}
-                            disabled={loading}
-                            className={cn(LINK, "mt-1.5")}
+                            className="mt-1.5"
+                            busy={loading}
+                            busyLabel="Loading…"
                         >
-                            {loading ? "Loading…" : "Show older changes"}
-                        </button>
+                            Show older changes
+                        </Button>
                     ) : null}
                     {/* Said once the oldest recorded change is on show. */}
                     {first?.earlierUnrecorded && !more && !cursor ? (
@@ -115,9 +129,7 @@ export function ChangesCard({
                             Earlier changes weren&apos;t recorded.
                         </p>
                     ) : rows.length === 0 ? (
-                        <p className="text-[12.5px] text-muted-foreground">
-                            Nothing has changed yet.
-                        </p>
+                        <EmptyState size="inline" title="No changes yet." />
                     ) : null}
                 </>
             )}

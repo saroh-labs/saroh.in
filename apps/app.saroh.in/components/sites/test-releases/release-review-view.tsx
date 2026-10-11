@@ -85,6 +85,7 @@ export function ReleaseReviewView({
                     >
                         {pages.map((p) => (
                             <Button
+                                data-ph-mask=""
                                 key={p.path}
                                 asChild
                                 size="sm"

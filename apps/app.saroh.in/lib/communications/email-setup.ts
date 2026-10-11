@@ -1,3 +1,6 @@
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { planLabel } from "@saroh/ui/lib/state-copy";
+
 /**
  * A business's messages to its customers — invoices, booking and order
  * updates, review invitations — go only through its own connected email
@@ -76,12 +79,13 @@ export function emailPrompt(
 ): EmailPrompt | null {
     if (!setup || setup.connected) return null;
     if (setup.canConnect === false) {
-        if (!may.plans) return null;
+        // No plans to see while they aren't shown (DEC-136).
+        if (!may.plans || !plansShown()) return null;
         return {
             kind: "plans",
             title: EMAIL_PROMPT_TITLE,
             text: `${EMAIL_PROMPT_MISSED} ${EMAIL_PROMPT_PLAN}`,
-            action: { href: SEE_PLANS_HREF, label: "See plans" },
+            action: { href: SEE_PLANS_HREF, label: planLabel() },
         };
     }
     if (!may.connect || !connectHref) return null;
@@ -108,9 +112,10 @@ export function emailRefusalNote(
     if (setup.canConnect === false) {
         return {
             text: words.plans,
-            action: may.plans
-                ? { href: SEE_PLANS_HREF, label: "See plans" }
-                : null,
+            action:
+                may.plans && plansShown()
+                    ? { href: SEE_PLANS_HREF, label: planLabel() }
+                    : null,
         };
     }
     return {

@@ -1,3 +1,5 @@
+import { DEFAULT_PAGE_SIZE, pagesOf, readPageSize } from "@saroh/ui/lib/paging";
+
 import { sinceParam } from "@/lib/views/since";
 
 import type { OrderFilterOptions, OrderListParams } from "./business-service";
@@ -18,9 +20,10 @@ import {
  * API for one page. Pure: the screen builds its links from it, and the page
  * its request. The filters' own rules are in `list-filters.ts`.
  *
- * Paging is by the API's cursor, which only goes forward. So the address
- * carries the cursor of the page on screen and `back`, the cursors of the
- * pages before it (the first page has none), and Previous pops one off.
+ * Paging is by number: the address carries `page` (from 1) and `size`
+ * (rows a page; 50 unless chosen), so the footer can offer any page. An
+ * address from before, carrying the API's cursor, opens the first page.
+ * Export still walks the cursor (`order-export.tsx`).
  */
 
 export type OrdersTab = "all" | "open" | "refunded";
@@ -35,10 +38,10 @@ export interface OrdersQuery extends OrdersFilters {
      * rows and the tab counts agree.
      */
     since: string | null;
-    /** Where the page on screen starts; null on the first page. */
-    cursor: string | null;
-    /** The cursors of the pages before this one, oldest first. */
-    back: string[];
+    /** The page on screen, from 1. */
+    page: number;
+    /** Rows a page: 10, 25, 50 or 100. */
+    size: number;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -49,8 +52,8 @@ export const ORDERS_TABS: readonly { id: OrdersTab; label: string }[] = [
     { id: "refunded", label: "Refunded" },
 ];
 
-/** How many rows the API puts on a page (`ORDER_PAGE_SIZE` there). */
-export const ORDERS_PAGE_SIZE = 50;
+/** Rows a page before anyone chooses (`ORDER_PAGE_SIZE` in the API). */
+export const ORDERS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 /**
  * The tab ids the list used before B3 (`?view=`). A link carrying one still
@@ -69,11 +72,17 @@ function one(params: Params, key: string): string | undefined {
     return value?.trim() ? value.trim() : undefined;
 }
 
-/** What the address asks for. An unknown tab is All. */
-export function readOrdersQuery(params: Params): OrdersQuery {
+/**
+ * What the address asks for. An unknown tab is All; an address with no
+ * size opens at `remembered`, the size this browser last chose.
+ */
+export function readOrdersQuery(
+    params: Params,
+    remembered: number = ORDERS_PAGE_SIZE,
+): OrdersQuery {
     const tab = one(params, "tab");
     const view = one(params, "view");
-    const cursor = one(params, "cursor") ?? null;
+    const page = Number(one(params, "page"));
     return {
         tab:
             ORDERS_TABS.find((t) => t.id === tab)?.id ??
@@ -84,28 +93,27 @@ export function readOrdersQuery(params: Params): OrdersQuery {
         // A malformed or future instant is no filter (`sinceParam`).
         since: sinceParam(params)?.toISOString() ?? null,
         ...readOrdersFilters(params),
-        cursor,
-        // Only meaningful past the first page.
-        back: cursor
-            ? (one(params, "back") ?? "").split(",").filter(Boolean)
-            : [],
+        page: Number.isInteger(page) && page >= 1 ? page : 1,
+        size: readPageSize(one(params, "size"), remembered),
     };
 }
 
-/** Keys whose change lists something else, so the old cursor is void. */
+/** Keys whose change lists something else, so the page number is void. */
 const RELISTING: readonly (keyof OrdersQuery)[] = [
     "tab",
     "q",
     "storefront",
     "since",
     ...FILTER_KEYS,
+    // Another size cuts the list into other pages.
+    "size",
 ];
 
 /**
  * The list at `query` with `patch` applied; defaults leave the URL. Changing
  * what is listed (the tab, the search, the storefront, a filter) starts
- * again at the first page, because the old cursor points into a different
- * list.
+ * again at the first page, because page 3 of another list is somebody
+ * else's page 3.
  */
 export function ordersHref(
     query: OrdersQuery,
@@ -114,7 +122,7 @@ export function ordersHref(
     const relists = RELISTING.some((key) => key in patch);
     const next: OrdersQuery = {
         ...query,
-        ...(relists ? { cursor: null, back: [] } : {}),
+        ...(relists ? { page: 1 } : {}),
         ...patch,
     };
     const q = new URLSearchParams();
@@ -123,47 +131,35 @@ export function ordersHref(
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.since) q.set("since", next.since);
     writeOrdersFilters(next, q);
-    if (next.cursor) {
-        q.set("cursor", next.cursor);
-        if (next.back.length) q.set("back", next.back.join(","));
-    }
+    if (next.page > 1) q.set("page", String(next.page));
+    if (next.size !== ORDERS_PAGE_SIZE) q.set("size", String(next.size));
     const s = q.toString();
     return s ? `/commerce/orders?${s}` : "/commerce/orders";
 }
 
-/** The next page, from the API's `nextCursor`. */
-export function nextPageHref(query: OrdersQuery, nextCursor: string): string {
-    return ordersHref(query, {
-        cursor: nextCursor,
-        back: query.cursor ? [...query.back, query.cursor] : [],
-    });
+/** The list at page `page`, everything else kept. */
+export function pageHref(query: OrdersQuery, page: number): string {
+    return ordersHref(query, { page });
 }
 
-/** The page before this one; null on the first page. */
-export function previousPageHref(query: OrdersQuery): string | null {
-    if (!query.cursor) return null;
-    const back = query.back.slice(0, -1);
-    return ordersHref(query, { cursor: query.back.at(-1) ?? null, back });
-}
-
-/** Which page is on screen, from 1. */
-export function pageNumber(query: OrdersQuery): number {
-    return query.cursor ? query.back.length + 2 : 1;
+/** How many pages the tab's `total` rows make at this size. */
+export function pageCount(query: OrdersQuery, total: number): number {
+    return pagesOf(total, query.size);
 }
 
 /**
- * "51–100 of 312": where the rows on screen sit in the tab's count. Null
- * when everything fits on one page, where the tab's count already says it.
+ * "51 to 100 of 312": where the rows on screen sit in the tab's count.
+ * Null when everything fits on one page, where the tab's count already
+ * says it.
  */
 export function pageRange(
     query: OrdersQuery,
     shown: number,
     total: number,
-    more: boolean,
 ): string | null {
-    if (!query.cursor && !more) return null;
-    const start = (pageNumber(query) - 1) * ORDERS_PAGE_SIZE + 1;
-    return shown === 0 ? null : `${start}–${start + shown - 1} of ${total}`;
+    if (shown === 0 || (query.page === 1 && total <= shown)) return null;
+    const start = (query.page - 1) * query.size + 1;
+    return `${start} to ${start + shown - 1} of ${total}`;
 }
 
 /** The API request for `query`, leaving out what it doesn't narrow. */
@@ -174,7 +170,8 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
         storeId: query.storefront ?? undefined,
         since: query.since ?? undefined,
         ...filterParams(query),
-        cursor: query.cursor ?? undefined,
+        page: query.page > 1 ? query.page : undefined,
+        size: query.size !== ORDERS_PAGE_SIZE ? query.size : undefined,
     };
 }
 
@@ -242,7 +239,7 @@ export function ordersEmptyCopy(
     return {
         kind: "first-run",
         title: "No orders yet",
-        note: `The first order in ${storeName ?? "your locations"} appears here the moment someone checks out.`,
+        note: "Orders from your website and counter show here.",
         action: null,
     };
 }

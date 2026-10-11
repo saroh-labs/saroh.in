@@ -14,6 +14,21 @@ export function previewOn(
     return flag === "1" || flag?.toLowerCase() === "true";
 }
 
+/**
+ * Whether the Templates gallery may be shown at all (DEC-135): only when
+ * `NEXT_PUBLIC_TEMPLATES` is `on`. Unset or anything else is off, so a
+ * production build that leaves it out shows no templates. Unset counts as
+ * on only under `next dev`, so local work sees the gallery without a
+ * setting; `off` there checks the hidden state.
+ */
+export function templatesOn(
+    flag: string | undefined,
+    nodeEnv: string | undefined,
+): boolean {
+    if (flag) return flag === "on";
+    return nodeEnv === "development";
+}
+
 /** The build's routes from `SAROH_BUILT_ROUTES`, or null when it isn't set or readable. */
 export function parseBuiltRoutes(raw: string | undefined): string[] | null {
     if (!raw) return null;
@@ -30,7 +45,7 @@ export function parseBuiltRoutes(raw: string | undefined): string[] | null {
 
 /**
  * What every server render decides publishing with: the time now, the
- * preview flag and the build's routes. Server only (it reads server env);
+ * preview flag, the build's routes and the pages switched off. Server only (it reads server env);
  * client components get the shown pages as props.
  */
 export function resourcesContext(now: Date = new Date()): PublishContext {
@@ -38,5 +53,8 @@ export function resourcesContext(now: Date = new Date()): PublishContext {
         now,
         preview: previewOn(env.RESOURCES_PREVIEW, env.VERCEL_ENV),
         routes: parseBuiltRoutes(env.SAROH_BUILT_ROUTES),
+        off: templatesOn(env.NEXT_PUBLIC_TEMPLATES, env.NODE_ENV)
+            ? []
+            : ["templates"],
     };
 }

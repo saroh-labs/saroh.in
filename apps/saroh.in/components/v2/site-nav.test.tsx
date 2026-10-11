@@ -5,6 +5,7 @@ import {
     fireEvent,
     render,
     screen,
+    within,
 } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -247,6 +248,58 @@ describe("SiteNav: Resources (plan U1)", () => {
             sheet.querySelectorAll("#nav-sheet-resources a"),
         ).map((a) => a.getAttribute("href"));
         expect(links).toEqual(["/help", "/integrations", "/changelog"]);
+    });
+});
+
+/** The Tools menu the server would pass on 17 Oct. */
+const TOOLS = [
+    { name: "Link preview tool", line: "Check.", href: "/tools/link-preview" },
+    { name: "QR code maker", line: "Make.", href: "/tools/qr-code-maker" },
+];
+
+describe("SiteNav: Tools, a menu of its own", () => {
+    it("has no Tools menu while no tool is live", () => {
+        render(<SiteNav resources={RESOURCES} />);
+        expect(screen.queryAllByRole("button", { name: /^Tools/ })).toEqual([]);
+    });
+
+    it("lists the tools under Tools, and Resources never has them", () => {
+        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        fireEvent.click(button("Tools"));
+        expect(
+            within(screen.getByRole("menu", { name: "Tools" }))
+                .getAllByRole("menuitem")
+                .map((i) => i.getAttribute("href")),
+        ).toEqual(["/tools/link-preview", "/tools/qr-code-maker"]);
+        fireEvent.click(button("Resources"));
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).toEqual(["/help", "/integrations", "/changelog"]);
+    });
+
+    it("on a tool, underlines Tools and not Resources", () => {
+        pathname = "/tools/qr-code-maker";
+        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        expect(button("Tools").className).toContain("decoration-brand-500");
+        expect(button("Resources").className).not.toContain(
+            "decoration-brand-500",
+        );
+    });
+
+    it("the phone sheet has Tools, open on a tool", () => {
+        pathname = "/tools/link-preview";
+        render(<SiteNav resources={RESOURCES} tools={TOOLS} />);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const row = screen
+            .getAllByRole("button", { name: /^Tools/ })
+            .find((b) => sheet.contains(b));
+        expect(row?.getAttribute("aria-expanded")).toBe("true");
+        expect(
+            Array.from(sheet.querySelectorAll("#nav-sheet-tools a")).map((a) =>
+                a.getAttribute("href"),
+            ),
+        ).toEqual(["/tools/link-preview", "/tools/qr-code-maker"]);
     });
 });
 

@@ -11,6 +11,7 @@ import type { AdminAccessSession } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
 import type { AdminAuditInput } from "./admin-audit.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
@@ -18,15 +19,8 @@ import { AdminPermission } from "./admin-permissions";
 const ACCESS_DURATION_MS = 30 * 60 * 1000;
 const MIN_REASON_LENGTH = 4;
 
-export const OrganizationLifecycleStatus = {
-    Active: "ACTIVE",
-    Suspended: "SUSPENDED",
-    PendingDeletion: "PENDING_DELETION",
-    DeletedRetained: "DELETED_RETAINED",
-} as const;
-
-export type OrganizationLifecycleStatus =
-    (typeof OrganizationLifecycleStatus)[keyof typeof OrganizationLifecycleStatus];
+// The states and what each one means live in one table (#921).
+export { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
 
 const ALLOWED_LIFECYCLE_TRANSITIONS: Record<
     OrganizationLifecycleStatus,

@@ -1,15 +1,17 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
+import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
+
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
+import { arrivalContactId } from "@/lib/customers/prefill";
+import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -37,6 +39,7 @@ import { requireSession } from "@/lib/session";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
 import { withClosures } from "@/lib/staff/time-off";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Calendar (U15). The day by person by default, the week, or the
@@ -47,7 +50,8 @@ import { withClosures } from "@/lib/staff/time-off";
  * and the screen says free times are missing. The bookings read failing is
  * the page failing — a diary with nothing in it would be a lie.
  *
- * The register this page used to be lives on at /bookings/all.
+ * The register this page used to be lives on at /bookings/all, the List
+ * side of the header's Calendar | List switch.
  */
 export const metadata = { title: "Bookings" };
 
@@ -131,19 +135,16 @@ export default async function BookingsPage({
 
     if (!calendar) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Calendar" />
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Calendar"]}
+                    title="Calendar"
+                    meta={<BookingsViewSwitch current="calendar" />}
+                />
+                <div>
                     <FailedState
-                        title="Couldn't load the calendar"
-                        description="Nothing has been changed. Try again in a moment."
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href={calendarHref(layout, date)}>
-                                    Try again
-                                </Link>
-                            </Button>
-                        }
+                        title={couldntLoad("the calendar")}
+                        retryHref={calendarHref(layout, date)}
                     />
                 </div>
             </PageContainer>
@@ -151,8 +152,18 @@ export default async function BookingsPage({
     }
 
     const active = services.filter((s) => s.status === "ACTIVE");
+    // Opened from a person's page (#247, `?new=1&contactId=`): New booking
+    // arrives open with them chosen, read only for someone who may book
+    // and search. With no service to book it doesn't open; its button says
+    // why, as before.
+    const arriving = params.new === "1" && may("booking:write");
+    const forContact = arriving ? arrivalContactId(params) : null;
+    const initialWho =
+        forContact && people.canSearch
+            ? await readCustomerPick(forContact)
+            : null;
     return (
-        <PageContainer width="full" className={BARE}>
+        <PageContainer width="full">
             <CalendarScreen
                 layout={layout}
                 date={date}
@@ -185,7 +196,6 @@ export default async function BookingsPage({
                             // Keyed: it renders among the screen's own children.
                             key="new-booking"
                             plainTrigger
-                            triggerClassName="h-[38px] rounded-[9px] px-4 text-[13px]"
                             services={active.map((s) => ({
                                 id: s.id,
                                 name: s.name,
@@ -194,6 +204,8 @@ export default async function BookingsPage({
                                 priceCents: s.priceCents,
                             }))}
                             people={people}
+                            openOnArrival={arriving}
+                            initialWho={initialWho}
                             // Paying with a class pack spends one (ADR-007),
                             // while Class packs is on (E12).
                             canUsePacks={

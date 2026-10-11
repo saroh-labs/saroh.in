@@ -181,7 +181,7 @@ export function consentLines(
         const outcome = c.ifKept[sideOf(preview, hereId, column)];
         const word = CHANNEL_WORD[c.channel];
         if (outcome.status === null) {
-            lines.push(`${word}: not asked — they'll need to say yes again`);
+            lines.push(`${word}: not asked. They'll need to say yes again`);
             continue;
         }
         const answer = outcome.status === "GRANTED" ? "Yes" : "No";
@@ -192,9 +192,9 @@ export function consentLines(
             : null;
         const from =
             fromColumn === "here"
-                ? " — from this record"
+                ? ", from this record"
                 : fromColumn === "there"
-                  ? ` — from ${names.there}'s record`
+                  ? `, from ${names.there}'s record`
                   : "";
         lines.push(`${word}: ${answer}${from}`);
     }

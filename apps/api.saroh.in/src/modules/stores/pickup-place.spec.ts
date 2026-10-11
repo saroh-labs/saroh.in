@@ -22,7 +22,7 @@ describe("pickupPlaceOf", () => {
             }),
         ).toEqual({
             address: "12 Hill Road",
-            hours: "Mon 10:00–19:00, Tue–Sun closed",
+            hours: "Mon 10:00 am to 7:00 pm, Tue to Sun closed",
         });
     });
 

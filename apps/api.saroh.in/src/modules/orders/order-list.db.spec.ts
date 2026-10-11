@@ -207,6 +207,35 @@ describe("paging and counts", () => {
         expect(second.counts).toEqual(first.counts);
     });
 
+    it("reads any page by its number, at the size asked", async () => {
+        const all = await list({ size: 100 });
+        expect(all.rows).toHaveLength(60);
+        expect(all.pageSize).toBe(100);
+        expect(all.nextCursor).toBeNull();
+
+        const third = await list({ page: 3, size: 25 });
+        expect(third.pageSize).toBe(25);
+        // 60 rows at 25 a page: the third holds the last ten, in order.
+        expect(third.rows.map((r) => r.id)).toEqual(
+            all.rows.slice(50).map((r) => r.id),
+        );
+        expect(third.counts).toEqual(all.counts);
+        expect(
+            (await list({ page: 2, size: 10 })).rows.map((r) => r.id),
+        ).toEqual(all.rows.slice(10, 20).map((r) => r.id));
+        // Past the end is an empty page, not an error.
+        expect((await list({ page: 9, size: 25 })).rows).toEqual([]);
+        // The default is still 50.
+        expect((await list()).pageSize).toBe(50);
+    });
+
+    it("refuses a cursor and a page number together", async () => {
+        const first = await list();
+        await expect(
+            list({ cursor: first.nextCursor!, page: 2 }),
+        ).rejects.toThrow("Page by a cursor or a page number, not both.");
+    });
+
     it("answers every order of the business, across its pages", async () => {
         const all = await prisma.order.findMany({
             where: {

@@ -1,43 +1,50 @@
 import { cn } from "@saroh/ui/lib/utils";
+import { PageContainer } from "@saroh/ui/page-container";
+import type { PageHeaderProps } from "@saroh/ui/page-header";
+import { PageHeader } from "@saroh/ui/page-header";
 import { Lock } from "lucide-react";
 
 /**
- * One settings tab's page, beside the tabs ("Saroh Settings" design).
- *
- * "Settings" heads the tab column, so a tab's own name is the panel's
- * heading: an h2 at 22px on the display face, its line of description under
- * it, its main action on the heading's line, and — for someone who may only
- * look — a note saying who can change it.
+ * One Settings section's title, beside the side list: the page header every
+ * other screen draws ("Settings › Team", the name at 30px, its line, its
+ * actions), and, for someone who may only look, a note saying who can change
+ * it. A section is a page, so its name is the page's one heading.
  */
 export function SettingsPanelHeader({
     title,
     description,
+    count,
     actions,
     readOnlyNote,
+    className,
+    holdsData = false,
 }: {
     title: string;
     description?: React.ReactNode;
+    /**
+     * `PageHeader`'s own: say so when the description shows a record's data,
+     * and a session recording masks it. A section's name is a menu word.
+     */
+    holdsData?: PageHeaderProps["holdsData"];
+    /** How many the section lists ("4 people"); nothing at zero. */
+    count?: React.ReactNode;
     actions?: React.ReactNode;
     /** For someone who may look but not change: who can. */
     readOnlyNote?: string;
+    /** The gap under it, where a section puts its tabs straight after. */
+    className?: string;
 }) {
     return (
-        <div>
-            <div className="mb-1 flex flex-wrap items-center gap-3.5">
-                <h2 className="font-display text-[22px] font-semibold leading-[1.1] tracking-[-0.025em]">
-                    {title}
-                </h2>
-                {actions ? (
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
-                        {actions}
-                    </div>
-                ) : null}
-            </div>
-            {description ? (
-                <p className="max-w-[64ch] text-pretty text-[13px] leading-normal text-muted-foreground">
-                    {description}
-                </p>
-            ) : null}
+        <div className={cn("mb-8", className)}>
+            <PageHeader
+                className="mb-0"
+                breadcrumb={["Settings", title]}
+                holdsData={holdsData}
+                title={title}
+                count={count}
+                description={description}
+                actions={actions}
+            />
             {readOnlyNote ? (
                 <p
                     role="note"
@@ -52,31 +59,35 @@ export function SettingsPanelHeader({
 }
 
 /**
- * The panel itself: the page's `<main>` (the layout draws the tabs beside
- * it), padded 20px 26px as the design's panel is. `width` keeps
- * each page at the measure it had on its own — a form stays form-wide.
+ * How wide a Settings section's body runs. One rule for the sections made of
+ * rows and cards (`rows`): 760px, growing to 1040px from a 1440px window, as
+ * Sell › Location does. A table (Team) or a grid of cards (Share) takes the
+ * panel (`full`).
+ */
+export type SettingsWidth = "rows" | "full";
+
+/** The `rows` measure, for a section that lays its body out itself. */
+export const SETTINGS_ROWS = "max-w-[760px] min-[1440px]:max-w-[1040px]";
+
+/**
+ * The panel itself: the page's `<main>` (the layout draws the side list
+ * beside it), in the page container every screen sits in.
  */
 export function SettingsPanel({
-    width = "full",
+    width = "rows",
     header,
     children,
 }: {
-    width?: "form" | "default" | "full";
+    width?: SettingsWidth;
     header?: React.ReactNode;
     children: React.ReactNode;
 }) {
     return (
-        <main className="w-full space-y-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
+        <PageContainer width="full">
             {header}
-            <div
-                className={cn(
-                    "space-y-6",
-                    width === "form" && "max-w-2xl",
-                    width === "default" && "max-w-5xl",
-                )}
-            >
+            <div className={cn("space-y-6", width === "rows" && SETTINGS_ROWS)}>
                 {children}
             </div>
-        </main>
+        </PageContainer>
     );
 }

@@ -499,7 +499,7 @@ describe("Track", () => {
         expect(body).toMatchObject({
             state: "refunded",
             status: "Refunded",
-            refund: "Money back in 5–7 days",
+            refund: "Money back in 5 to 7 days",
         });
         expect(body.steps.every((x) => x.state === "done")).toBe(true);
         expect(body.steps.map((x) => x.label)).toEqual([
@@ -509,7 +509,7 @@ describe("Track", () => {
             "Collected",
             "Refunded",
         ]);
-        expect(body.steps.at(-1)?.line).toBe("Money back in 5–7 days");
+        expect(body.steps.at(-1)?.line).toBe("Money back in 5 to 7 days");
 
         const list = await call("GET", ORDERS, { host: s.host, token });
         expect((list.body as Row[])[0]).toMatchObject({

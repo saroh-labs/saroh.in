@@ -327,7 +327,7 @@ describe("CustomerWorkspaceService", () => {
         ).toEqual([
             "Linked when they paid",
             "Linked when the list was set up",
-            "Linked to their store record by your team",
+            "Linked to their location record by your team",
         ]);
     });
 

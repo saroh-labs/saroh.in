@@ -166,3 +166,16 @@ describe("a reply to a low-star review (F2)", () => {
         expect(failedText(review)).toBe("Your reply wasn't posted.");
     });
 });
+
+describe("Refund on a payment taken at the wrong amount (PAY-06)", () => {
+    const refund = inline({ kind: "REFUND", sends: false, undoable: false });
+
+    it("is made at once, with nothing to take back", () => {
+        expect(runOf(refund)).toBe("once");
+        expect(keepsUndo(refund)).toBe(false);
+    });
+
+    it("says nothing went back when the refund is refused", () => {
+        expect(failedText(refund)).toBe("Nothing was refunded.");
+    });
+});

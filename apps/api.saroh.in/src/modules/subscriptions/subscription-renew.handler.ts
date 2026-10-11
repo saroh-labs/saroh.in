@@ -3,6 +3,10 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
+import {
+    BILLING_ORGANIZATION,
+    BILLING_STATES,
+} from "../organizations/organization-lifecycle.policy";
 import { AUTOPAY_LEAD_DAYS } from "./autopay-timing";
 import { pauseEndedWhere, refusedPauseIds } from "./pause-until";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
@@ -100,10 +104,14 @@ export class SubscriptionRenewHandler {
                 where: {
                     ...(seen.length > 0 ? { id: { notIn: [...seen] } } : {}),
                     OR: [
+                        // A closing or deleted business renews nothing
+                        // (#921): its members' periods wait, and catch up
+                        // if it is reinstated.
                         {
                             currentPeriodEnd: { lte: now },
                             status: "ACTIVE",
                             organization: {
+                                ...BILLING_ORGANIZATION,
                                 organizationModules: {
                                     none: PAYMENTS_SWITCHED_OFF,
                                 },
@@ -118,7 +126,10 @@ export class SubscriptionRenewHandler {
                         },
                         // A pause whose end date has come resumes (D8) —
                         // with Payments off too, which may refuse it once.
-                        pauseEndedWhere(now, refused),
+                        {
+                            ...pauseEndedWhere(now, refused),
+                            organization: BILLING_ORGANIZATION,
+                        },
                     ],
                 },
                 orderBy: { currentPeriodEnd: "asc" },
@@ -172,6 +183,10 @@ export class SubscriptionRenewHandler {
             LEFT JOIN "BusinessProfile" b ON b."organizationId" = s."organizationId"
             WHERE s.status = 'ACTIVE'
               AND NOT s."cancelAtPeriodEnd"
+              AND EXISTS (
+                    SELECT 1 FROM "Organization" o
+                    WHERE o.id = s."organizationId"
+                      AND o."lifecycleStatus" = ANY(${[...BILLING_STATES]}))
               AND s."currentPeriodEnd" > ${now}
               AND s."currentPeriodEnd" <= ${horizon}
               AND COALESCE(

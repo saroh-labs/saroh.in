@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SiteSelling } from "@/lib/sites/sells-from";
+import type { LocationPeople } from "@/lib/stores/people";
 import type {
     StorefrontSettings,
     StorefrontSummary,
@@ -9,18 +10,38 @@ import type {
 
 import { StorefrontsScreen } from "./storefronts-screen";
 
+/** The address's `?section=`, as each test sets it. */
+const address = vi.hoisted(() => ({ section: null as string | null }));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+    useSearchParams: () =>
+        new URLSearchParams(
+            address.section ? `section=${address.section}` : "",
+        ),
 }));
 vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: vi.fn(),
 }));
+vi.mock("@/lib/stores/actions", () => ({ updateStore: vi.fn() }));
+vi.mock("@/lib/members/actions", () => ({
+    inviteMember: vi.fn(),
+    removeMember: vi.fn(),
+    revokeInvitation: vi.fn(),
+    updateMemberRole: vi.fn(),
+}));
+
+beforeEach(() => {
+    address.section = null;
+});
 
 /**
- * Sell → Locations (DEC-069, L9): the screen says location, the two kinds
- * read "Customers visit" and "No counter" (KTD-12), and the chosen location
- * says where it sells. Identifiers stay storefront; the words don't.
+ * Sell › Location (DEC-069, L9; the 9 Oct audit, tabs from the owner): the
+ * page is titled with the location's name, says what it still needs above
+ * its tabs, and splits its parts by job into tabs: The place, Payments,
+ * Delivery, Customers, People, Pause or close, the open one in `?section=`.
+ * Identifiers stay storefront; the words don't. Made-up names only.
  */
 
 const hill: StorefrontSettings = {
@@ -36,7 +57,7 @@ const hill: StorefrontSettings = {
     shippingEnabled: false,
     freeShippingThreshold: null,
     unfulfilled: 0,
-    address: "12 Hill Road",
+    address: "12 Hill Road\nBandra",
     openingHours: null,
     collectionEnabled: true,
     fulfilmentTypes: ["PICKUP"],
@@ -58,22 +79,29 @@ const summary = (s: StorefrontSettings): StorefrontSummary => ({
 const online: StorefrontSettings = {
     ...hill,
     id: "st_online",
-    name: "Online",
+    name: "Rye Online",
     kind: "ONLINE",
     address: null,
+    orderCount: 0,
+    currencyLocked: false,
+    fulfilmentTypes: [],
 };
 
-const site = (sellsFromId: string): SiteSelling => ({
+const site = (sellsFromId: string | null, products = 2): SiteSelling => ({
     siteId: "site_1",
     origin: "https://rye.saroh.app",
     sellsFrom: {
-        storefront: { id: sellsFromId, name: "It" },
-        choices: [{ id: sellsFromId, name: "It", products: 2 }],
+        storefront: sellsFromId ? { id: sellsFromId, name: "It" } : null,
+        choices: sellsFromId ? [{ id: sellsFromId, name: "It", products }] : [],
     },
 });
 
-const screen = (props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {}) =>
-    renderToStaticMarkup(
+const screen = (
+    props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {},
+    section: string | null = null,
+) => {
+    address.section = section;
+    return renderToStaticMarkup(
         <StorefrontsScreen
             businessName="Rye & Co."
             storefronts={[summary(hill)]}
@@ -84,28 +112,209 @@ const screen = (props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {}) =>
             {...props}
         />,
     );
+};
 
 /** What a person reads: the text, not the ids and classes. */
 const text = (html: string) =>
     html
         .replace(/<[^>]+>/g, " ")
         .replace(/&#x27;/g, "'")
+        .replace(/&quot;/g, '"')
+        // Last, so "&amp;quot;" reads as the text "&quot;", not a quote.
         .replace(/&amp;/g, "&")
         .replace(/\s+/g, " ");
 
-describe("StorefrontsScreen as Locations (DEC-069, L9)", () => {
-    it("one location: titled Location, with New location and the kind choice", () => {
-        const t = text(screen());
-        expect(t).toContain("Location");
-        expect(t).toContain("New location");
-        expect(t).toContain("Location name");
-        expect(t).toContain("Do customers come here?");
-        expect(t).toContain("Customers visit");
-        expect(t).toContain("No counter");
-        expect(t).toContain("Location address");
-        expect(t).toContain("stays the same at every location");
-        // One location, no list (the singular rule, `pick.ts`).
-        expect(t).not.toContain("1 location");
+/** The open tab's panel, without the page above it. */
+const panel = (html: string) => html.slice(html.indexOf('role="tabpanel"'));
+
+const h1 = (html: string) =>
+    text(/<h1[^>]*>(.*?)<\/h1>/.exec(html)?.[1] ?? "").trim();
+
+/** The tabs' names, in order, and which one is open. */
+const tabsOf = (html: string) => ({
+    names: Array.from(
+        html.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g),
+        (m: RegExpMatchArray) => text(String(m[1])).trim(),
+    ),
+    open: text(
+        /<button[^>]*aria-selected="true"[^>]*>(.*?)<\/button>/.exec(
+            html,
+        )?.[1] ?? "",
+    ).trim(),
+});
+
+describe("StorefrontsScreen as a location's own page", () => {
+    it("is titled with the location's name; the crumb keeps the word", () => {
+        const html = screen();
+        expect(h1(html)).toBe("Hill Road");
+        expect(html).toMatch(/aria-label="Breadcrumb"[^]*Sell[^]*Location/);
+        // The line under it: a place customers visit, by its address.
+        expect(text(html)).toContain("Customers visit · 12 Hill Road");
+        expect(text(html)).toContain("New location");
+    });
+
+    it("a No counter location says what it is for under its name", () => {
+        const t = text(
+            screen({ storefronts: [summary(online)], selected: online }),
+        );
+        expect(t).toContain("No counter · stock for online orders");
+    });
+
+    it("tabs by job, Pause or close last, The place open, and no Behaviour", () => {
+        const html = screen();
+        expect(tabsOf(html)).toEqual({
+            names: [
+                "The place",
+                "Payments",
+                "Delivery",
+                "Customers",
+                "People",
+                "Pause or close",
+            ],
+            open: "The place",
+        });
+        expect(html).toContain('role="tablist"');
+        expect(html).toMatch(
+            /role="tabpanel"[^>]*aria-labelledby="location-tab-the-place"|aria-labelledby="location-tab-the-place"[^>]*role="tabpanel"/,
+        );
+        const t = text(html);
+        // Only the open tab is drawn.
+        expect(t).toContain("Customers come here");
+        expect(t).not.toContain("Online payments");
+        expect(t).not.toContain("Behaviour");
+        expect(t).not.toContain("How orders leave");
+        // The scroll list is gone with the tabs.
+        expect(html).not.toContain('aria-label="On this page"');
+    });
+
+    it("opens the tab the address names, and The place for one it doesn't", () => {
+        expect(tabsOf(screen({}, "delivery")).open).toBe("Delivery");
+        expect(screen({}, "delivery")).toContain('id="delivery-pickup"');
+        expect(tabsOf(screen({}, "nonsense")).open).toBe("The place");
+        // A tab the page doesn't offer falls back too.
+        expect(
+            tabsOf(
+                screen({ canEdit: false, canClose: false }, "pause-or-close"),
+            ).open,
+        ).toBe("The place");
+    });
+
+    it("keeps the title and the readiness card above every tab", () => {
+        for (const section of [
+            null,
+            "payments",
+            "delivery",
+            "customers",
+            "people",
+            "pause-or-close",
+        ]) {
+            const html = screen({}, section);
+            expect(h1(html)).toBe("Hill Road");
+            expect(html).toContain(
+                'data-setup-checklist="location" data-state="open"',
+            );
+        }
+    });
+
+    it("The place reads first: a row for each thing saved, with no open field", () => {
+        const html = screen({
+            selected: {
+                ...hill,
+                openingHours: [
+                    "MON",
+                    "TUE",
+                    "WED",
+                    "THU",
+                    "FRI",
+                    "SAT",
+                    "SUN",
+                ].map((day) => ({
+                    day: day as "MON",
+                    open: "09:00",
+                    close: "18:00",
+                    closed: day === "SUN",
+                })),
+            },
+            details: { description: null, logo: null, businessLogo: null },
+        });
+        const t = text(panel(html));
+        expect(t).toContain("Name Hill Road Edit");
+        expect(t).toContain(
+            "Customers come here Yes, they visit It has an address and opening hours, and can offer pick-up. Change",
+        );
+        expect(t).toContain("Address 12 Hill Road, Bandra Edit");
+        expect(t).toContain(
+            "Opening hours Mon to Sat · 9:00 am to 6:00 pm Edit",
+        );
+        expect(t).toContain(
+            "Description and logo No description yet · no logo yet Edit",
+        );
+        // Nothing to type in until a row's Edit opens its sheet.
+        expect(panel(html)).not.toContain("<input");
+        expect(panel(html)).not.toContain("<textarea");
+        expect(panel(html)).not.toContain("<form");
+        expect(t).not.toContain("Save");
+        expect(t).not.toContain("Do customers come here?");
+        // Each Edit says what it edits, and that it opens a dialog.
+        for (const name of [
+            "Edit name",
+            "Change whether customers come here",
+            "Edit address",
+            "Edit opening hours",
+            "Edit description and logo",
+        ]) {
+            expect(panel(html)).toMatch(
+                new RegExp(
+                    `<button[^>]*aria-haspopup="dialog"[^>]*aria-label="${name}"`,
+                ),
+            );
+        }
+    });
+
+    it("an address or hours still to add say so, and their button says what to do", () => {
+        const html = screen({ selected: { ...hill, address: null } });
+        const t = text(panel(html));
+        expect(t).toContain("Address No address yet Add address");
+        expect(t).toContain("Opening hours Not set yet Set hours");
+    });
+
+    it("a No counter location has no address or hours row", () => {
+        const html = screen({
+            storefronts: [summary(online)],
+            selected: online,
+        });
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Customers come here No, online only Its address and opening hours aren't shown, and it can't offer pick-up. Change",
+        );
+        expect(html).not.toContain('id="location-address"');
+        expect(html).not.toContain('id="location-hours"');
+        expect(t).not.toContain("Opening hours ");
+        expect(t).not.toContain("No address yet");
+    });
+
+    it("no counter with Pick-up still on: offers turning it off right there", () => {
+        const t = text(
+            screen({
+                storefronts: [summary(online)],
+                selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+            }),
+        );
+        expect(t).toContain("Pick-up is still on");
+        expect(t).toContain("Turn Pick-up off");
+        // Not offered when it is off, or to a role that can't change it.
+        expect(
+            text(screen({ storefronts: [summary(online)], selected: online })),
+        ).not.toContain("Turn Pick-up off");
+        expect(
+            text(
+                screen({
+                    storefronts: [summary(online)],
+                    selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+                    canEdit: false,
+                }),
+            ),
+        ).not.toContain("Turn Pick-up off");
     });
 
     it("says no merchant-visible storefront, in any state", () => {
@@ -120,52 +329,458 @@ describe("StorefrontsScreen as Locations (DEC-069, L9)", () => {
             }),
             screen({ storefronts: [], selected: null }),
             screen({ selected: null }),
+            screen({ canEdit: false, canClose: false }),
+            screen({}, "payments"),
+            screen({}, "delivery"),
+            screen({}, "customers"),
+            screen({}, "pause-or-close"),
         ]) {
             expect(text(html)).not.toMatch(/storefront/i);
             expect(text(html)).not.toMatch(/online store/i);
         }
     });
 
-    it("the Sells from location sells in person and online", () => {
-        const html = screen({ site: site("st_hill") });
-        expect(text(html)).toContain("Sells in person and online");
+    it("has no selling line in The place: the readiness card says it", () => {
+        for (const html of [
+            screen({ site: site("st_hill", 0) }),
+            screen({
+                storefronts: [summary(online)],
+                selected: online,
+                site: site("st_hill"),
+            }),
+        ]) {
+            expect(html).not.toContain('data-testid="location-selling"');
+            expect(text(html)).not.toContain("isn't live yet");
+        }
+    });
+
+    it("several locations: the list, and the chosen one's name as the title", () => {
+        const html = screen({
+            storefronts: [summary(hill), summary(online)],
+            selected: online,
+            site: site("st_online"),
+        });
+        expect(h1(html)).toBe("Rye Online");
+        expect(text(html)).toContain("2 locations");
+        expect(html).toMatch(/aria-label="Breadcrumb"[^]*Locations/);
+    });
+
+    it("The place says what is saved of the description and logo, with Edit to their sheet", () => {
+        const html = screen({
+            details: {
+                description: "Sourdough since 2019",
+                logo: null,
+                businessLogo: "https://cdn.example.com/rye.png",
+            },
+        });
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Description and logo Description added · using your business logo Edit",
+        );
+        // The logo it uses, small, beside the words.
+        expect(panel(html)).toMatch(
+            /<img[^>]*src="https:\/\/cdn\.example\.com\/rye\.png"[^>]*data-testid="location-logo-thumb"/,
+        );
+        // A button that opens a sheet, not a link away to a page.
+        expect(html).not.toContain("/details");
+        expect(html).toMatch(
+            /<button[^>]*id="location-details-edit"[^>]*aria-label="Edit description and logo"/,
+        );
+        expect(t).not.toContain("Web address");
+        expect(
+            text(
+                panel(
+                    screen({
+                        details: {
+                            description: null,
+                            logo: null,
+                            businessLogo: null,
+                        },
+                    }),
+                ),
+            ),
+        ).toContain("No description yet · no logo yet");
+    });
+
+    it("leaves the row out when they couldn't be read, rather than say none", () => {
+        const t = text(panel(screen()));
+        expect(t).not.toContain("Description and logo");
+        expect(t).not.toContain("No description");
+    });
+
+    it("has no loose buttons under The place: people are a tab (10 Oct)", () => {
+        const html = screen({
+            details: { description: null, logo: null, businessLogo: null },
+        });
+        expect(text(html)).not.toContain("People who work here");
+        expect(html).not.toContain("/people");
+        // Nor a link to a details page: the row's Edit is a sheet.
+        expect(panel(html)).not.toContain("<a ");
+    });
+
+    it("no location yet: says so, and offers New location", () => {
+        const html = screen({ storefronts: [], selected: null });
+        expect(text(html)).toContain("No locations yet");
+        expect(text(html)).toContain("New location");
+        expect(h1(html)).toBe("Location");
+    });
+
+    it("a location that couldn't be read keeps its name and offers Try again", () => {
+        const html = screen({ selected: null, chosenId: hill.id });
+        expect(h1(html)).toBe("Hill Road");
+        expect(text(html)).toContain("Couldn't load this location");
+        expect(text(html)).toContain("Try again");
+        expect(html).not.toContain('role="tablist"');
+    });
+});
+
+describe("the People tab", () => {
+    const people: LocationPeople = {
+        members: [
+            {
+                userId: "u_owner",
+                name: "Asha Rao",
+                email: "asha.rao@example.com",
+                role: "OWNER",
+                kind: "owner",
+            },
+            {
+                userId: "u_dev",
+                name: "Dev Shah",
+                email: "dev.shah@example.com",
+                role: "EDITOR",
+                kind: "member",
+            },
+        ],
+        invitations: [
+            {
+                id: "inv_1",
+                email: "mira.sen@example.com",
+                role: "VIEWER",
+                status: "PENDING",
+                expiresAt: "2026-10-20T00:00:00.000Z",
+                createdAt: "2026-10-10T00:00:00.000Z",
+            },
+        ],
+        canManage: true,
+        canInvite: true,
+    };
+
+    it("shows the roster on the location's own page, with the one line about Team", () => {
+        const html = screen({ people }, "people");
+        expect(tabsOf(html).open).toBe("People");
+        const t = text(panel(html));
+        expect(t).toContain(
+            "Who can see Hill Road's products and orders, and move its orders along. An Admin, Manager or Editor can also take orders here and change its name and description. Everyone here is also on your team, under Team.",
+        );
+        expect(t).toContain("Asha Rao asha.rao@example.com Owner");
+        expect(t).toContain("Dev Shah dev.shah@example.com");
+        expect(t).toContain("Invited mira.sen@example.com Invited as viewer");
+        expect(t).toContain("Invite someone");
+        // Read first: no open invite form on the tab.
+        expect(panel(html)).not.toContain("<input");
+    });
+
+    it("a roster that couldn't be read fails on its own tab, not the page", () => {
+        const html = screen({ people: null }, "people");
+        expect(h1(html)).toBe("Hill Road");
+        expect(html).toContain('role="tablist"');
+        const t = text(panel(html));
+        expect(t).toContain("Couldn't load the people here");
+        expect(t).toContain("Try again");
+        expect(panel(html)).toContain('role="alert"');
+        // The other tabs are untouched by it.
+        expect(text(screen({ people: null }))).toContain("Customers come here");
+    });
+});
+
+describe("the readiness card", () => {
+    it("a No counter location: done first, then each step with its one link", () => {
+        const html = screen({
+            storefronts: [summary(online)],
+            selected: {
+                ...online,
+                fulfilmentTypes: ["SHIPPING"],
+                siteShop: true,
+            },
+            site: site(null),
+        });
+        const t = text(html);
+        expect(t).toContain("Get ready for online orders 1 of 3 done");
+        // Goal gradient: the done step comes first.
+        expect(t.indexOf("Shipping on")).toBeLessThan(
+            t.indexOf("Take payments online"),
+        );
+        expect(html).toMatch(
+            /href="\/settings\/providers"[^>]*>Connect a provider/,
+        );
+        expect(html).toMatch(
+            /href="\/sites\/site_1\/settings#sells-from"[^>]*>Turn on your shop/,
+        );
+    });
+
+    it("folds to one quiet line once everything is done, keeping the shop's link", () => {
+        const html = screen({
+            storefronts: [summary(online)],
+            selected: {
+                ...online,
+                fulfilmentTypes: ["LOCAL_DELIVERY"],
+                effectiveProvider: "RAZORPAY",
+                providers: [{ provider: "RAZORPAY", status: "CONNECTED" }],
+            },
+            site: site("st_online"),
+        });
+        expect(html).toContain(
+            'data-setup-checklist="location" data-state="folded"',
+        );
+        expect(html).not.toContain(
+            'data-setup-checklist="location" data-state="open"',
+        );
+        expect(text(html)).toContain("Ready for online orders.");
         expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
-    it("a location the shop doesn't sell from sells in person only", () => {
-        expect(text(screen({ site: site("st_online") }))).toContain(
-            "Sells in person only",
+    it("a counter the shop sells from counts both, and links the live shop", () => {
+        const html = screen({ site: site("st_hill") });
+        expect(text(html)).toContain(
+            "Get ready for the counter and online orders",
+        );
+        expect(html).toContain('href="https://rye.saroh.app/shop"');
+    });
+
+    it("a counter that sells in person counts its address and hours, and says so", () => {
+        const t = text(screen({ site: site("st_online") }));
+        expect(t).toContain(
+            "Get ready for the counter 1 of 2 done · Sells in person only",
+        );
+        expect(t).toContain("Address on receipts");
+        expect(t).toContain("Save its opening hours");
+        // The website couldn't be read: nothing said about selling.
+        expect(text(screen())).not.toContain("Sells in person only");
+    });
+
+    it("a location past the plan's limit (#800) is not ready, and says why", () => {
+        const t = text(screen({ notTakingOrders: [hill.id] }));
+        expect(t).toContain("Not taking orders on your plan");
+        expect(t).toContain("See plans");
+    });
+
+    it("a paused location counts its pause as a step left", () => {
+        const paused = { ...hill, pausedAt: "2026-10-01T00:00:00Z" };
+        expect(text(screen({ selected: paused }))).toContain(
+            "Paused: customers can't pay here",
+        );
+        expect(text(screen({ selected: paused }, "pause-or-close"))).toContain(
+            "Resume location",
+        );
+    });
+});
+
+describe("Payments", () => {
+    it("says Not connected and links to connect one", () => {
+        const html = screen({}, "payments");
+        expect(text(html)).toContain("Online payments Not connected");
+        expect(html).toMatch(/href="\/settings\/providers"/);
+    });
+
+    it("currency: no Editable pill; Locked only once it locks", () => {
+        const unlocked = text(
+            screen(
+                { storefronts: [summary(online)], selected: online },
+                "payments",
+            ),
+        );
+        expect(unlocked).not.toContain("Editable");
+        expect(unlocked).not.toContain("Locked");
+        expect(unlocked).toContain("Locks after the first order.");
+        expect(text(screen({}, "payments"))).toContain(
+            "Locked by the 3 orders taken here",
         );
     });
 
-    it("a No counter Sells from sells online only", () => {
+    it("lists the providers only when there is a choice to make here", () => {
+        const one = text(
+            screen(
+                {
+                    selected: {
+                        ...hill,
+                        effectiveProvider: "RAZORPAY",
+                        providers: [
+                            { provider: "RAZORPAY", status: "CONNECTED" },
+                        ],
+                    },
+                },
+                "payments",
+            ),
+        );
+        expect(one).toContain("Checkout here charges through Razorpay.");
+        expect(one).not.toContain("In use here");
+        const two = text(
+            screen(
+                {
+                    selected: {
+                        ...hill,
+                        providers: [
+                            { provider: "RAZORPAY", status: "CONNECTED" },
+                            { provider: "CASHFREE", status: "CONNECTED" },
+                        ],
+                    },
+                },
+                "payments",
+            ),
+        );
+        expect(two).toContain("Choose one");
+        expect(two).toContain("Use here");
+    });
+});
+
+describe("Delivery", () => {
+    const delivery = (
+        props: Partial<Parameters<typeof StorefrontsScreen>[0]>,
+    ) => screen(props, "delivery");
+    const summaryOf = (html: string, way: string) =>
+        text(
+            new RegExp(
+                `data-testid="delivery-${way}-summary"[^>]*>(.*?)</span>`,
+            ).exec(html)?.[1] ?? "",
+        ).trim();
+
+    it("reads first: a sentence per way, with Edit, and no open fields", () => {
+        const html = delivery({
+            selected: {
+                ...hill,
+                fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+                siteShop: true,
+                localDeliveryFee: "40.00",
+                freeShippingThreshold: "999.00",
+                lateAfterMinutes: {
+                    PICKUP: 120,
+                    LOCAL_DELIVERY: 1440,
+                    SHIPPING: 2880,
+                },
+            },
+        });
+        expect(summaryOf(html, "local_delivery")).toBe(
+            "₹40 · free over ₹999 · late after 24 h",
+        );
+        expect(summaryOf(html, "shipping")).toBe("Free · late after 2 days");
+        expect(summaryOf(html, "pickup")).toBe("Free · late after 2 h");
+        expect(html).not.toContain("<input");
+        expect(html).not.toContain('role="switch"');
+        expect(html.match(/>Edit</g)).toHaveLength(3);
+        expect(text(html)).toContain("Your website checkout offers these.");
+        expect(text(html)).toContain(
+            "Bookings and digital products need none of these.",
+        );
+    });
+
+    it("a way that is off says Off", () => {
+        const html = delivery({
+            selected: { ...hill, fulfilmentTypes: ["PICKUP"] },
+        });
+        expect(summaryOf(html, "shipping")).toBe("Off");
+    });
+
+    it("Pick-up where customers can't visit: Not offered, and the way to a counter", () => {
+        const html = delivery({
+            storefronts: [summary(online)],
+            selected: online,
+        });
+        const t = text(html);
+        expect(summaryOf(html, "pickup")).toBe("Not offered");
+        expect(t).toContain("Customers can't visit this location.");
+        expect(t).toContain("Add an address");
+        // No Edit for it: there is nothing it could be turned on to.
+        expect(html.match(/>Edit</g)).toHaveLength(2);
+        // The 35-word warning is gone.
+        expect(t).not.toContain("Choose Customers visit and add the address");
+    });
+
+    it("Pick-up saved on where customers can't visit: says so, and offers Turn off", () => {
+        const html = delivery({
+            storefronts: [summary(online)],
+            selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+        });
+        expect(text(html)).toContain(
+            "Not on your website: customers can't visit this location.",
+        );
+        expect(text(html)).toContain("Turn off");
+    });
+
+    it("no fee to say while the online shop is closed", () => {
+        const html = delivery({
+            selected: {
+                ...hill,
+                fulfilmentTypes: ["SHIPPING"],
+                shippingFee: "60.00",
+            },
+        });
+        expect(summaryOf(html, "shipping")).toBe("On · late after 2 days");
+        expect(text(html)).not.toContain("Your website checkout offers these");
+    });
+
+    it("the free-over amount isn't a way of its own", () => {
         const t = text(
-            screen({
-                storefronts: [summary(hill), summary(online)],
-                selected: online,
-                site: site("st_online"),
+            delivery({
+                selected: {
+                    ...hill,
+                    fulfilmentTypes: ["LOCAL_DELIVERY"],
+                    freeShippingThreshold: "999.00",
+                    siteShop: true,
+                },
             }),
         );
-        expect(t).toContain("Online only");
-        // Several: the list, counted and badged by kind.
-        expect(t).toContain("Locations");
-        expect(t).toContain("2 locations");
+        expect(t).not.toContain("Free delivery over");
     });
 
-    it("says nothing about selling when the site couldn't be read", () => {
-        const html = screen({ site: undefined });
-        expect(html).not.toContain('data-testid="location-selling"');
+    it("keeps the late-after anchor Orders' notice links to", () => {
+        expect(delivery({})).toContain('id="late-after"');
     });
 
-    it("links to Description and logo, with no Web address (L14)", () => {
-        const t = text(screen());
-        expect(t).toContain("Description and logo");
-        expect(t).not.toContain("Web address");
+    it("read-only: the sentences, without Edit or Turn off", () => {
+        const html = delivery({
+            canEdit: false,
+            storefronts: [summary(online)],
+            selected: { ...online, fulfilmentTypes: ["PICKUP", "SHIPPING"] },
+        });
+        expect(html).not.toContain(">Edit<");
+        expect(html).not.toContain(">Turn off<");
+        expect(text(html)).not.toContain("Add an address");
     });
 
-    it("no location yet: says so, and offers Add a location", () => {
-        const t = text(screen({ storefronts: [], selected: null }));
-        expect(t).toContain("No location yet");
-        expect(t).toContain("Add a location");
+    it("the tabs without rows draw no card, and none a visible title", () => {
+        // The place, as Delivery, is one card of rows.
+        expect(panel(screen())).toMatch(/<h2[^>]*class="sr-only"/);
+        for (const section of ["payments", "customers", "pause-or-close"]) {
+            const html = screen({}, section);
+            expect(panel(html)).not.toMatch(/rounded-xl/);
+            expect(html).toMatch(/<h2[^>]*class="sr-only"/);
+        }
+    });
+});
+
+describe("roles", () => {
+    it("read-only: says so, and offers no Edit, Pause or in-page fixes", () => {
+        const html = screen({
+            canEdit: false,
+            canClose: false,
+            selected: { ...hill, address: null },
+            details: { description: null, logo: null, businessLogo: null },
+        });
+        const t = text(html);
+        expect(t).toContain(
+            "Your role can read these settings but not change them.",
+        );
+        // The rows, saying what is saved, with nothing to press.
+        expect(t).toContain("Name Hill Road");
+        expect(t).toContain("Address No address yet");
+        expect(t).toContain("Opening hours Not set yet");
+        expect(t).toContain(
+            "Description and logo No description yet · no logo yet",
+        );
+        expect(panel(html)).not.toContain("<button");
+        expect(t).not.toContain("Add address");
+        expect(t).not.toContain("Set hours");
+        expect(tabsOf(html).names).not.toContain("Pause or close");
     });
 });

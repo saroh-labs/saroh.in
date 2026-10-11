@@ -6,6 +6,8 @@ import type {
     CreateSignedUploadUrlInput,
     HeadObjectResult,
     ObjectStorage,
+    PutObjectBody,
+    PutObjectOptions,
     SignedDownloadUrl,
     SignedDownloadUrlOptions,
     SignedUploadUrl,
@@ -158,6 +160,40 @@ export function createMemoryStorage(
             return Promise.resolve(bytes ? bytes.slice(0, length) : null);
         },
 
+        async putObject(
+            key: string,
+            body: PutObjectBody,
+            opts: PutObjectOptions,
+        ): Promise<void> {
+            const bytes =
+                body instanceof Uint8Array ? body : await collect(body);
+            store.set(key, {
+                key,
+                contentType: opts.contentType,
+                contentLength: bytes.byteLength,
+            });
+            bytesByKey.set(key, bytes);
+        },
+
+        readObject(key: string): Promise<AsyncIterable<Uint8Array> | null> {
+            const bytes = bytesByKey.get(key);
+            if (!bytes) return Promise.resolve(null);
+            return Promise.resolve({
+                [Symbol.asyncIterator]() {
+                    let sent = false;
+                    return {
+                        next: () => {
+                            const step: IteratorResult<Uint8Array> = sent
+                                ? { done: true, value: undefined }
+                                : { done: false, value: bytes.slice() };
+                            sent = true;
+                            return Promise.resolve(step);
+                        },
+                    };
+                },
+            });
+        },
+
         putBytes(key: string, bytes: Uint8Array): void {
             if (!store.has(key)) {
                 throw new Error(`No upload was minted for ${key}`);
@@ -193,4 +229,22 @@ export function createMemoryStorage(
             bytesByKey.clear();
         },
     };
+}
+
+/** A stream's bytes, in memory: the in-memory adapter keeps them so. */
+async function collect(stream: NodeJS.ReadableStream): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    for await (const chunk of stream as AsyncIterable<Uint8Array | string>) {
+        parts.push(
+            typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk,
+        );
+    }
+    const total = parts.reduce((n, p) => n + p.byteLength, 0);
+    const out = new Uint8Array(total);
+    let at = 0;
+    for (const p of parts) {
+        out.set(p, at);
+        at += p.byteLength;
+    }
+    return out;
 }

@@ -6,6 +6,8 @@ import {
 } from "../customers/anonymise-customer";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { IntentForState, OnlinePaymentDto } from "./online-payment";
+import { onlinePaymentOf } from "./online-payment";
 import type { OrderAttention, OrderAttentionTag } from "./order-attention";
 import { attentionTags } from "./order-attention";
 import { lineName } from "./order-line";
@@ -113,6 +115,13 @@ export interface OrderRowDto extends FulfilmentView, LateView {
      * left out when it couldn't be read (the row then says nothing of it).
      */
     nextVisit?: NextVisitDto | null;
+    /**
+     * Where its online payment stands when it isn't simply paid (#122):
+     * failed, waiting for the provider, or not finished; null when there is
+     * nothing to chase. No amount, so the kitchen sees it too. Left out
+     * when it couldn't be read.
+     */
+    onlinePayment?: OnlinePaymentDto | null;
 }
 
 /** What `order-list.ts` loads for each row. */
@@ -132,6 +141,8 @@ export interface RawOrderRow {
     total: DecimalLike;
     /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
     paidByHand?: DecimalLike | null;
+    /** Handed back outside Saroh and recorded on it (#865). */
+    refundedByHand?: DecimalLike | null;
     createdAt: Date;
     courierName: string | null;
     trackingNumber: string | null;
@@ -180,6 +191,11 @@ export interface RowView {
      * booked. Absent, the row carries no `nextVisit`.
      */
     nextVisit?: NextVisitDto | null;
+    /**
+     * The order's newest open, failed or succeeded payment intent (#122);
+     * null when it has none. Absent, the row carries no `onlinePayment`.
+     */
+    latestIntent?: IntentForState | null;
 }
 
 export function serializeOrderRow(
@@ -190,10 +206,15 @@ export function serializeOrderRow(
         (s, p) => s + p.amountCents,
         0,
     );
-    const refunded = order.paymentIntents.reduce(
-        (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
-        0,
-    );
+    // Online refunds, and what was recorded as handed back by hand (#865).
+    const refunded =
+        order.paymentIntents.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        ) +
+        (order.refundedByHand
+            ? Math.round(Number(order.refundedByHand.toString()) * 100)
+            : 0);
     const names: string[] = [];
     for (const item of order.items) {
         const name = lineName(item);
@@ -286,6 +307,18 @@ export function serializeOrderRow(
                       : null,
               }),
         ...(view.nextVisit === undefined ? {} : { nextVisit: view.nextVisit }),
+        ...(view.latestIntent === undefined
+            ? {}
+            : {
+                  onlinePayment: onlinePaymentOf(
+                      view.latestIntent,
+                      {
+                          status: order.status,
+                          owedCents: amountDueCents(order, captured),
+                      },
+                      view.now,
+                  ),
+              }),
     };
 }
 

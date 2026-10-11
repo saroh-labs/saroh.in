@@ -39,6 +39,8 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             create: jest.fn(),
         },
+        // The logo that stands in for a site's icon (DEC-124): none here.
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
         siteApproval: {
             findFirst: jest.fn(),
             // #278 reads every verdict and decides the route from all of them.
@@ -66,6 +68,7 @@ import { starterTemplate } from "@saroh/templates";
 import { draftFingerprint } from "./review-route";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { roleDenial } from "../organizations/organization-policy";
 import type { UpdateDraftSectionsDto } from "./dto";
 import { defaultSiteStyle } from "./site-style";
 import { SitesService } from "./sites.service";
@@ -285,7 +288,9 @@ describe("SitesService.replaceDraftSections", () => {
                     sections: [],
                 },
             ),
-        ).rejects.toThrow(/MEMBER.*section:write/);
+        ).rejects.toMatchObject({
+            response: roleDenial("section:write"),
+        });
 
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();
@@ -353,7 +358,9 @@ describe("SitesService.getPageDraft", () => {
     it("denies section:write to a MEMBER", async () => {
         await expect(
             service.getPageDraft(ctx({ role: "MEMBER" }), "site_1", "page_1"),
-        ).rejects.toThrow(/MEMBER.*section:write/);
+        ).rejects.toMatchObject({
+            response: roleDenial("section:write"),
+        });
     });
 
     it("SANITIZES a stored draft on the way out, so the editor preview never renders it raw (#280)", async () => {
@@ -671,7 +678,9 @@ describe("SitesService.restorePublication (#279)", () => {
                 "site_1",
                 "pub_old",
             ),
-        ).rejects.toThrow(/MEMBER.*site:publish/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:publish"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();
     });
@@ -1125,7 +1134,9 @@ describe("SitesService.publishSite", () => {
     it("denies site:publish to a MEMBER before any DB work", async () => {
         await expect(
             service.publishSite(ctx({ role: "MEMBER" }), "site_1"),
-        ).rejects.toThrow(/MEMBER.*site:publish/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:publish"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
     });
 });
@@ -1135,6 +1146,7 @@ describe("SitesService public read (drafts never leak)", () => {
         const publishedAt = new Date("2026-07-18T00:00:00.000Z");
         siteFindFirst.mockResolvedValue({
             id: "site_1",
+            subdomain: "acme",
             currentPublication: { snapshot: { pages: [] }, publishedAt },
         });
 
@@ -1150,21 +1162,36 @@ describe("SitesService public read (drafts never leak)", () => {
                 AND: [
                     { subdomain: "acme", deletedAt: null },
                     { currentPublication: { kind: "LIVE" } },
+                    // Offline with a deleted business (#921).
+                    {
+                        organization: {
+                            lifecycleStatus: {
+                                in: ["ACTIVE", "SUSPENDED", "PENDING_DELETION"],
+                            },
+                        },
+                    },
                 ],
             },
             select: {
                 id: true,
                 organizationId: true,
+                // Its own address, for the host it is primarily served at.
+                subdomain: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
             },
         });
-        // No module pages: nothing is added to the read (G15).
+        // No module pages: nothing is added to the read (G15). No icon of
+        // its own and no logo: none, and the renderer draws the plain tile
+        // (DEC-124).
         expect(result).toEqual({
             snapshot: { pages: [] },
             publishedAt,
             siteId: "site_1",
+            icon: null,
+            // No custom domain of its own: its Saroh address.
+            primaryHost: expect.stringMatching(/^acme\./),
         });
     });
 

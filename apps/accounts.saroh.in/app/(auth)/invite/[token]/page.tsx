@@ -5,10 +5,15 @@ import Link from "next/link";
 
 import { INVITE_PANEL } from "@/components/auth/panel-copy";
 import { getAppUrl } from "@/lib/app-urls";
-import { ROLE_MEANS, getInvitation } from "@/lib/invitations";
+import {
+    INVITATION_GONE,
+    INVITATION_UNREACHABLE,
+    ROLE_MEANS,
+    getInvitation,
+} from "@/lib/invitations";
 
 export const metadata: Metadata = {
-    title: "You have been invited | Saroh",
+    title: "You have been invited · Saroh",
     description: "Someone has invited you to their business on Saroh.",
 };
 
@@ -24,13 +29,17 @@ const ROLE_LABEL = {
  *
  * Someone following this link may never have heard of Saroh. Asking them to
  * create an account and only then telling them what they joined is the thing
- * the flow design set out to fix — so this page names the business, who asked,
+ * the flow design set out to fix. So this page names the business, who asked,
  * the role, and what that role can actually do, and only then offers the two
  * doors.
  *
  * Nothing is accepted here. Accepting needs a session and happens on the
- * workspace host; this page carries the token through sign-up or log-in so the
+ * app's host. This page carries the token through sign-up or sign-in so the
  * person lands back on it.
+ *
+ * An invitation that cannot be shown and an API that did not answer are two
+ * states with two ways on (`lib/invitations.ts`): the first is over, the
+ * second is worth trying again.
  */
 export default async function InvitePage({
     params,
@@ -38,24 +47,49 @@ export default async function InvitePage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const invitation = await getInvitation(token);
+    const read = await getInvitation(token);
 
-    if (!invitation) {
+    if (read.status === "unreachable") {
         return (
             <SplitShell>
                 <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                    This invitation is no longer valid
+                    {INVITATION_UNREACHABLE.title}
+                </h1>
+                <p
+                    role="alert"
+                    className="sa-rise dark:text-muted-foreground mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600"
+                >
+                    {INVITATION_UNREACHABLE.description}
+                </p>
+                <Button
+                    asChild
+                    className="sa-cta h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
+                >
+                    {/* A plain link on purpose: a full load of this page is
+                        what asks the API again. */}
+                    <a href={`/invite/${encodeURIComponent(token)}`}>
+                        Try again
+                    </a>
+                </Button>
+            </SplitShell>
+        );
+    }
+
+    if (read.status === "gone") {
+        return (
+            <SplitShell>
+                <h1 className="sa-rise font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                    {INVITATION_GONE.title}
                 </h1>
                 <p className="sa-rise dark:text-muted-foreground mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-neutral-600">
-                    It may have been withdrawn, already used, or simply run out.
-                    Whoever invited you can send another.
+                    {INVITATION_GONE.description}
                 </p>
                 <p className="sa-rise text-muted-foreground text-[12.5px]">
                     <Link
                         href="/login"
                         className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                     >
-                        Log in
+                        Sign in
                     </Link>{" "}
                     if you already have an account.
                 </p>
@@ -63,14 +97,16 @@ export default async function InvitePage({
         );
     }
 
+    const { invitation } = read;
+
     // Both doors carry where this ends, not where it started. `/join/:token`
-    // on the workspace host is the route that ACCEPTS — coming back here would
+    // on the app's host is the route that ACCEPTS. Coming back here would
     // only redraw this page and its two doors, forever. It is an absolute URL
-    // on a trusted origin, which `safeDestination` passes and the login form
+    // on a trusted origin, which `safeDestination` passes and the sign-in form
     // knows to reach with a full navigation rather than the client router.
     //
-    // The account has to be the one the invitation was sent to — `accept`
-    // refuses any other — so the address rides along and fills the field in.
+    // The account has to be the one the invitation was sent to (`accept`
+    // refuses any other), so the address rides along and fills the field in.
     const carry =
         `?redirect=${encodeURIComponent(`${getAppUrl()}/join/${token}`)}` +
         `&email=${encodeURIComponent(invitation.email)}`;
@@ -93,7 +129,7 @@ export default async function InvitePage({
             </p>
 
             <div className="sa-rise bg-muted mb-[22px] mt-4 rounded-[9px] px-[13px] py-[11px]">
-                {/* A role the business made is described by what it GRANTS —
+                {/* A role the business made is described by what it GRANTS,
                     the only true thing to say about it. Describing it as the
                     built-in it maps to would tell someone they are joining
                     with powers they will not have. */}
@@ -118,7 +154,7 @@ export default async function InvitePage({
                     href={`/login${carry}`}
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
-                    Log in
+                    Sign in
                 </Link>
             </p>
         </SplitShell>

@@ -209,6 +209,7 @@ describe("SitePreviewLinksService.revoke", () => {
 describe("SitePreviewLinksService.resolve (public)", () => {
     it("builds the draft with the same builder publish uses", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "link_1",
             siteId: "site_1",
             organizationId: "org_1",
@@ -243,6 +244,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
 
     it("says which module pages show now, as the live site does (G19)", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "link_1",
             siteId: "site_1",
             organizationId: "org_1",
@@ -267,6 +269,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
 
     it("carries no module states for a draft without module pages", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "link_1",
             siteId: "site_1",
             organizationId: "org_1",
@@ -284,6 +287,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
 
     it("is 410 with the reason once expired", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "link_1",
             siteId: "site_1",
             organizationId: "org_1",
@@ -300,6 +304,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
 
     it("is 410 with the reason once revoked — immediately, nothing cached", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "link_1",
             siteId: "site_1",
             organizationId: "org_1",
@@ -311,6 +316,16 @@ describe("SitePreviewLinksService.resolve (public)", () => {
         expect((err as GoneException).getResponse()).toMatchObject({
             details: { reason: "revoked" },
         });
+    });
+
+    it("is a plain 404 once its business is deleted: the site is offline (#921)", async () => {
+        linkFindUnique.mockResolvedValue({
+            ...ACTIVE,
+            organization: { lifecycleStatus: "DELETED_RETAINED" },
+        });
+        await expect(service.resolve("tok")).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
     });
 
     it("is a plain 404 for a token that never existed", async () => {
@@ -326,6 +341,7 @@ describe("SitePreviewLinksService.resolve (public)", () => {
 // ---------------------------------------------------------------------------
 
 const ACTIVE = {
+    organization: { lifecycleStatus: "ACTIVE" },
     id: "link_1",
     siteId: "site_1",
     organizationId: "org_1",
@@ -396,6 +412,7 @@ describe("SitePreviewLinksService.posts (public)", () => {
 
     it("serves no writing once the link is taken back", async () => {
         linkFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             ...ACTIVE,
             revokedAt: new Date(),
         });

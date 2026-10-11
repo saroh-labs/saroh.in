@@ -42,6 +42,7 @@ export default async function BusinessesPage({
         plan: clean(raw.plan),
         module: clean(raw.module),
         health: raw.health === "attention" ? "attention" : undefined,
+        legalHold: raw.legalHold === "on" ? "on" : undefined,
         cursor: clean(raw.cursor),
     };
 
@@ -56,6 +57,7 @@ export default async function BusinessesPage({
         query.plan,
         query.module,
         query.health,
+        query.legalHold,
     ].some((value) => value !== undefined);
     const canSearchEmail = can(staff, "organization:pii:read");
 
@@ -75,8 +77,8 @@ export default async function BusinessesPage({
                         defaultValue={query.q}
                         placeholder={
                             canSearchEmail
-                                ? "Name, slug, id or a member's email"
-                                : "Name, slug or id"
+                                ? "Name, web address, id or a member's email"
+                                : "Name, web address or id"
                         }
                     />
                     <FilterSelect
@@ -115,6 +117,12 @@ export default async function BusinessesPage({
                         options={[
                             { value: "attention", label: "Needs attention" },
                         ]}
+                    />
+                    <FilterSelect
+                        label="Legal hold"
+                        name="legalHold"
+                        defaultValue={query.legalHold}
+                        options={[{ value: "on", label: "On legal hold" }]}
                     />
                 </FilterBar>
 

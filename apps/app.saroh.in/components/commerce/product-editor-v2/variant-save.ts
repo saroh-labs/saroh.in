@@ -19,7 +19,7 @@ import { sameRows } from "@/lib/products/variant-rows";
 
 /** A save that never reached the API, as opposed to one it refused. */
 export const DROPPED =
-    "Couldn't save variants — the connection dropped. The product itself is saved.";
+    "Couldn't save variants because the connection dropped. The product itself is saved.";
 
 /** What a save of the Variants list did. */
 export interface VariantSave {

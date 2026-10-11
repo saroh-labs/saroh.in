@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
@@ -7,6 +8,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { findCustomers } from "@/lib/customers/actions";
 import type { CustomerSearch } from "@/lib/customers/picker";
 import { resultLabel } from "@/lib/customers/picker";
+import { Field } from "@saroh/ui/field";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 /** How long typing settles before the search runs. */
 const SETTLE_MS = 200;
@@ -61,23 +64,21 @@ export function MergeSearch({
         status = read.forbidden
             ? "Your role can't search customers."
             : "Couldn't search just now. Try again in a moment.";
-    else if (results.length === 0) status = `No other customer matches “${q}”.`;
+    else if (results.length === 0) status = noMatchLine("other customers", q);
 
     return (
         <div className="mt-3.5 grid gap-1.5">
-            <label htmlFor={id} className="text-[12.5px] font-medium">
-                Find the other record
-            </label>
-            <Input
-                id={id}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Name, phone or email"
-                autoComplete="off"
-                autoFocus
-                aria-describedby={`${id}-status`}
-                className="h-[38px] rounded-[9px] text-[14px]"
-            />
+            <Field label="Find the other record">
+                <Input
+                    id={id}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name, phone or email"
+                    autoComplete="off"
+                    autoFocus
+                    aria-describedby={`${id}-status`}
+                />
+            </Field>
             <p
                 id={`${id}-status`}
                 role="status"
@@ -86,8 +87,7 @@ export function MergeSearch({
                     !status && "sr-only",
                 )}
             >
-                {status ??
-                    `${results.length} ${results.length === 1 ? "match" : "matches"}`}
+                {status ?? count(results.length, "match", "matches")}
             </p>
             {results.length > 0 ? (
                 <ul className="grid gap-1" aria-label="Matching customers">

@@ -186,12 +186,26 @@ describe("a refused module write's words (DEC-057)", () => {
         );
     });
 
-    it("says the role line for a permission key", () => {
+    it("keeps a refusal by role as the API now says it (ROLE_DENIED)", () => {
+        // The API's own sentence, and the closer one `role-denied.ts` reads
+        // from its `details`: both are for a merchant, and pass as they are.
+        for (const said of [
+            "Your role can't do this. An owner or admin can change that in Settings › Team.",
+            "Your role can't turn modules on or off. An owner or admin can change this in Settings › Team.",
+        ]) {
+            expect(moduleErrorSentence(said)).toBe(said);
+        }
+    });
+
+    it("still says the role line for an older API's permission key", () => {
         expect(
             moduleErrorSentence(
                 'Role "MEMBER" may not perform "module:manage"',
             ),
         ).toBe(BLOCKER_COPY.UNAUTHORIZED);
+        expect(BLOCKER_COPY.UNAUTHORIZED).toBe(
+            "Your role doesn't include this. An owner or admin can change this in Settings › Team.",
+        );
     });
 
     it("says the fallback for a key, a status or an empty message", () => {
@@ -204,9 +218,9 @@ describe("a refused module write's words (DEC-057)", () => {
         ]) {
             const out = moduleErrorSentence(
                 said,
-                "Could not update the module.",
+                "Couldn't update the module.",
             );
-            expect(out).toBe("Could not update the module.");
+            expect(out).toBe("Couldn't update the module.");
         }
     });
 

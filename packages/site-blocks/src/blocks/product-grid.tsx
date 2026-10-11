@@ -14,6 +14,7 @@ import {
     productCardsOf,
     productGridQuery,
 } from "../lib/product-grid-read";
+import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
@@ -219,21 +220,21 @@ export default function ProductGridSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your products just now.
+                We couldn&apos;t load your products right now.
             </GridNote>
         );
     }
     if (state.kind === "off") {
         return (
             <GridNote title={title}>
-                Your site doesn&apos;t sell from a storefront yet, or Commerce
-                is off, so this section is left off your live site. Choose where
-                it sells from in the site&apos;s settings.
+                Your site doesn&apos;t sell from a location yet, or Sell is off,
+                so this section is left off your live site. Choose where it
+                sells from in the site&apos;s settings.
             </GridNote>
         );
     }
     if (state.products.length === 0) {
-        const where = state.storefront ?? "your storefront";
+        const where = state.storefront ?? "your location";
         return (
             <GridNote title={title}>
                 {content.source === "picked"
@@ -482,7 +483,7 @@ function ListRowBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    loading="lazy"
+                    {...siteImage()}
                     className={listPhoto}
                 />
             ) : null}
@@ -508,7 +509,7 @@ function CardBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    loading="lazy"
+                    {...siteImage()}
                     className="mb-1.5 h-[130px] w-full object-cover"
                 />
             ) : (
@@ -627,7 +628,7 @@ function BareGrid({
                                     <img
                                         src={p.image.url}
                                         alt={p.image.alt}
-                                        loading="lazy"
+                                        {...siteImage()}
                                         className="h-full w-full object-cover"
                                     />
                                 ) : null}

@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setConsent } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
@@ -21,7 +22,10 @@ import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
 export function ConsentToggle({
     contactId,
     consent,
+    canWrite = true,
 }: {
+    /** `consent:write`: may grant or revoke. Without it each row only reads. */
+    canWrite?: boolean;
     contactId: string;
     /** Current consent status per channel; absent = no record (allowed). */
     consent: Partial<Record<MessageChannel, ConsentStatus>>;
@@ -30,17 +34,19 @@ export function ConsentToggle({
     const [busy, setBusy] = useState<MessageChannel | null>(null);
 
     async function toggle(channel: MessageChannel, next: ConsentStatus) {
-        setBusy(channel);
-        const res = await setConsent({ contactId, channel, status: next });
-        setBusy(null);
+        const res = await runAction(
+            () => setConsent({ contactId, channel, status: next }),
+            { setBusy: (on) => setBusy(on ? channel : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
         showSuccess(
             next === "GRANTED"
-                ? `${CHANNEL_LABEL[channel]} consent granted`
-                : `${CHANNEL_LABEL[channel]} consent revoked`,
+                ? `${CHANNEL_LABEL[channel]} consent granted.`
+                : `${CHANNEL_LABEL[channel]} consent revoked.`,
         );
         router.refresh();
     }
@@ -67,20 +73,19 @@ export function ConsentToggle({
                                 {status ?? "No record"}
                             </Badge>
                         </div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="wk-press"
-                            disabled={busy === channel}
-                            onClick={() => toggle(channel, next)}
-                        >
-                            {busy === channel
-                                ? "Saving…"
-                                : revoked
-                                  ? "Grant"
-                                  : "Revoke"}
-                        </Button>
+                        {canWrite ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="wk-press"
+                                onClick={() => toggle(channel, next)}
+                                busy={busy === channel}
+                                busyLabel="Saving…"
+                            >
+                                {revoked ? "Grant" : "Revoke"}
+                            </Button>
+                        ) : null}
                     </li>
                 );
             })}

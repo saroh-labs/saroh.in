@@ -1,8 +1,8 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
-import { shortDay } from "./balance";
 import type { MoneyTotal, PackKind } from "./pack-cards";
-import { editHref, money, packKind, unitWord } from "./pack-cards";
+import { editHref, packKind, unitWord } from "./pack-cards";
 import type { PackDetail, PackHolder, PackOverview } from "./pack-detail-data";
 
 /**
@@ -110,13 +110,10 @@ export function tabMeta(
 
 // — Words ——————————————————————————————————————————————————————————————
 
-export const count = (n: number, one: string, other: string) =>
-    `${n} ${n === 1 ? one : other}`;
-
 export const people = (n: number) => count(n, "person", "people");
 
 export function totals(list: readonly MoneyTotal[]): string {
-    return list.map((t) => money(t.amount, t.currency)).join(" + ");
+    return list.map((t) => formatMoneyMajor(t.amount, t.currency)).join(" + ");
 }
 
 /** "Hatha, Vinyasa and Yin". */
@@ -132,25 +129,7 @@ export function each(pack: PackDetail, kind: PackKind): string | null {
     if (!Number.isFinite(price) || price <= 0 || pack.credits <= 0) {
         return null;
     }
-    return `${money(Math.round(price / pack.credits), pack.currency)} a ${unitWord(kind, 1)}`;
-}
-
-/** "12 Oct" — a day, in the business's zone. */
-export function day(iso: string, timeZone: string): string {
-    return shortDay(iso, timeZone).replace("Sept", "Sep");
-}
-
-/** "Sat 18 Oct" — a day with its weekday, for a new use-by date. */
-export function dayWithWeekday(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-    })
-        .format(new Date(iso))
-        .replace(",", "")
-        .replace("Sept", "Sep");
+    return `${formatMoneyMajor(Math.round(price / pack.credits), pack.currency)} a ${unitWord(kind, 1)}`;
 }
 
 // — Header —————————————————————————————————————————————————————————————
@@ -186,7 +165,7 @@ export function detailHeader(pack: PackDetail): DetailHeader {
     const holders = pack.overview.holders;
     const services = pack.services.map((s) => s.name).join(", ");
     const meta = [
-        money(pack.price, pack.currency),
+        formatMoneyMajor(pack.price, pack.currency),
         each(pack, kind),
         `use within ${count(pack.validityDays, "day", "days")}`,
         services || null,
@@ -200,7 +179,7 @@ export function detailHeader(pack: PackDetail): DetailHeader {
             ? { label: "Draft", tone: "off" }
             : archived
               ? { label: "Archived", tone: "off" }
-              : { label: "On sale", tone: "ok" },
+              : { label: "Live", tone: "ok" },
         kindLabel: kind === "ONE_TO_ONE" ? "One-to-one" : "Classes",
         firstOnly: Boolean(pack.firstPackOnly),
         pending: onSale && Boolean(pack.hasPendingChanges),
@@ -219,7 +198,7 @@ export function detailHeader(pack: PackDetail): DetailHeader {
                     head: "Archived.",
                     body:
                         holders > 0
-                            ? `Nobody new can buy it. ${holders} ${holders === 1 ? "person keeps" : "people keep"} their ${units} until their dates.`
+                            ? `Nobody new can buy it. ${count(holders, "person keeps", "people keep")} their ${units} until their dates.`
                             : "Nobody new can buy it. Its sales and history stay here.",
                 }
               : null,
@@ -233,7 +212,7 @@ export function archiveToast(pack: PackDetail, archived: boolean): string {
     const n = pack.overview.holders;
     const units = unitWord(packKind(pack), 2);
     return n > 0
-        ? `${pack.name} archived. ${n} ${n === 1 ? "person keeps" : "people keep"} their ${units}.`
+        ? `${pack.name} archived. ${count(n, "person keeps", "people keep")} their ${units}.`
         : `${pack.name} archived. Nobody new can buy it.`;
 }
 

@@ -305,7 +305,7 @@ describe("enrolling", () => {
             .mockResolvedValueOnce({ id: "bk_1" })
             .mockResolvedValueOnce({ id: "bk_2" })
             .mockRejectedValueOnce(
-                new ConflictException("This slot is fully booked"),
+                new ConflictException("That time is fully booked."),
             );
         await expect(
             service.enrol(owner, "course_1", { contactId: "c_1" }),

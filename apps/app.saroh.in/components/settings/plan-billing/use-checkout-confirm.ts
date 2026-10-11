@@ -1,10 +1,10 @@
 "use client";
 
+import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
-import { formatShortDate } from "@/lib/format/datetime";
 import { confirmCheckoutAction } from "@/lib/saroh-billing/billing-actions";
 import type { ConfirmResult } from "@/lib/saroh-billing/plan-view";
 
@@ -41,12 +41,10 @@ export function useCheckoutConfirm(planName: string) {
                         if (state === "completed") {
                             showSuccess(`You're on ${name} now.`);
                         } else if (state === "scheduled" && res.ok) {
-                            const zone =
-                                Intl.DateTimeFormat().resolvedOptions()
-                                    .timeZone;
+                            const zone = viewerTimeZone();
                             showSuccess(
                                 res.data.startAt
-                                    ? `${name} starts on ${formatShortDate(res.data.startAt, zone)}, as you authorised.`
+                                    ? `${name} starts on ${formatDate(res.data.startAt, zone)}, as you authorised.`
                                     : `${name} is set up, as you authorised.`,
                             );
                         } else if (state === "failed") {

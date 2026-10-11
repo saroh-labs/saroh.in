@@ -104,3 +104,36 @@ describe("getMovedTo", () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 });
+
+describe("a site's primary host", () => {
+    it("is a bare host name, lower-cased, or nothing", async () => {
+        const { hostOrNull, siteOriginFor } = await import("./publication");
+        expect(hostOrNull("WWW.RyeBakery.in")).toBe("www.ryebakery.in");
+        expect(hostOrNull("rye.saroh.app.localhost")).toBe(
+            "rye.saroh.app.localhost",
+        );
+        for (const not of [
+            null,
+            undefined,
+            7,
+            "",
+            "localhost",
+            "https://ryebakery.in",
+            "ryebakery.in/shop",
+            "rye bakery.in",
+            "-rye.in",
+            "rye.in:3000",
+        ]) {
+            expect(hostOrNull(not)).toBeNull();
+        }
+        expect(
+            siteOriginFor({ primaryHost: "www.ryebakery.in" }, "rye.saroh.app"),
+        ).toBe("https://www.ryebakery.in");
+        expect(siteOriginFor({ primaryHost: null }, "rye.saroh.app")).toBe(
+            "https://rye.saroh.app",
+        );
+        expect(siteOriginFor(null, "rye.saroh.app")).toBe(
+            "https://rye.saroh.app",
+        );
+    });
+});

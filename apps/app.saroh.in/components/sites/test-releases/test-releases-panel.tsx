@@ -1,13 +1,14 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import type { EditorTestReleases } from "@/components/sites/editor/use-test-releases";
 import { ReleaseRow } from "@/components/sites/test-releases/release-row";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /** How many earlier releases show before "Show all". */
 const EARLIER_SHOWN = 3;
@@ -67,32 +68,26 @@ export function TestReleasesPanel({
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                 {read.state === "failed" ? (
                     <FailedState
-                        title="Test releases couldn't be loaded"
-                        description="Nothing has changed. Try again in a moment."
-                        action={
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={retrying}
-                                onClick={() => {
-                                    setRetrying(true);
-                                    void state
-                                        .refresh()
-                                        .finally(() => setRetrying(false));
-                                }}
-                            >
-                                {retrying ? "Trying…" : "Try again"}
-                            </Button>
-                        }
+                        size="panel"
+                        title={couldntLoad("test releases")}
+                        retrying={retrying}
+                        onRetry={() => {
+                            setRetrying(true);
+                            void state
+                                .refresh()
+                                .finally(() => setRetrying(false));
+                        }}
                     />
                 ) : releases.length === 0 ? (
-                    <p className="rounded-lg border border-dashed px-4 py-6 text-center text-[12.5px] leading-normal text-muted-foreground">
-                        No test releases yet.
-                        {abilities.canUpdate
-                            ? " Make one to share this version before it goes live."
-                            : " Someone who edits the site can make one."}
-                    </p>
+                    <EmptyState
+                        size="panel"
+                        title="No test releases yet"
+                        description={
+                            abilities.canUpdate
+                                ? "Make one to share this version before it goes live."
+                                : "Someone who edits the site can make one."
+                        }
+                    />
                 ) : (
                     <div className="grid gap-5">
                         {current.length > 0 ? (
@@ -123,9 +118,7 @@ export function TestReleasesPanel({
                                 aria-label="Earlier"
                                 className="grid gap-2"
                             >
-                                <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                    Earlier
-                                </h3>
+                                <h3 className="label">Earlier</h3>
                                 <ul className="grid divide-y rounded-xl border">
                                     {shownEarlier.map((release) => {
                                         const status = releaseStatusCopy(

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { CheckoutQuote, QuoteLine } from "./api";
-import { holdReason, overStock, payWords, stockNotice } from "./bag-sheet";
+import { returnsLines } from "./bag-lines";
+import {
+    freeDeliveryNote,
+    holdReason,
+    overStock,
+    payWords,
+    placeLabel,
+    stockNotice,
+} from "./bag-sheet";
 import { cleanCode, codeSettled } from "./code-field";
 
 /**
@@ -21,10 +29,8 @@ describe("payWords", () => {
     });
 
     it("says at the handover once the quote offers only that", () => {
-        expect(
-            payWords({ type: "ON_HANDOVER", label: "Pay when you collect" }),
-        ).toBe(
-            "You'll pay when you collect your order. Your order is placed now.",
+        expect(payWords({ type: "ON_HANDOVER", label: "Pay at pick-up" })).toBe(
+            "You'll pay at pick-up. Your order is placed now.",
         );
     });
 });
@@ -62,7 +68,7 @@ describe("overStock and stockNotice", () => {
         const over = overStock([line({ state: "short", available: 1 })]);
         expect(over.map((o) => o.left)).toEqual([1]);
         expect(stockNotice(over)).toBe(
-            "Only 1 left — we've set your bag to 1.",
+            "Only 1 left, so we've set your bag to 1.",
         );
     });
 
@@ -85,7 +91,7 @@ describe("overStock and stockNotice", () => {
             }),
         ]);
         expect(stockNotice(over)).toBe(
-            "Fewer are left than you asked for — we've set Linen kurta (M) to 1, Tote to 2.",
+            "Fewer are left than you asked for, so we've set Linen kurta (M) to 1, Tote to 2.",
         );
     });
 });
@@ -159,5 +165,158 @@ describe("the bag's discount code (DEC-104)", () => {
         expect(codeSettled({ ...base, discount: null }, null)).toBe(true);
         // An API before site codes never answers for one.
         expect(codeSettled(base, "SAVE10")).toBe(true);
+    });
+});
+
+/**
+ * The location's "Free delivery over" under the bag's delivery row: a nudge
+ * while the items are under it, a plain "free" once they reach it, and
+ * nothing for Pick-up or a shop with no amount.
+ */
+describe("freeDeliveryNote", () => {
+    const ways = (local: string | null, shipping: string | null) =>
+        [
+            { type: "PICKUP", label: "Pick-up", fee: null },
+            { type: "LOCAL_DELIVERY", label: "Local delivery", fee: local },
+            { type: "SHIPPING", label: "Shipping", fee: shipping },
+        ] satisfies CheckoutQuote["ways"];
+
+    it("says how much more makes delivery free while the bag is under it", () => {
+        const under = quote({
+            ways: ways("60.00", "120.00"),
+            freeDelivery: { over: "999.00", short: "120.00" },
+        });
+        expect(freeDeliveryNote(under, "LOCAL_DELIVERY")).toBe(
+            "Add ₹120 more for free delivery.",
+        );
+        // Before a way is chosen, too.
+        expect(freeDeliveryNote(under, null)).toBe(
+            "Add ₹120 more for free delivery.",
+        );
+    });
+
+    it("says delivery is free once the bag reaches it", () => {
+        const reached = quote({
+            ways: ways(null, null),
+            freeDelivery: { over: "999.00", short: null },
+        });
+        expect(freeDeliveryNote(reached, "SHIPPING")).toBe(
+            "Free delivery on orders of ₹999 or more.",
+        );
+        expect(freeDeliveryNote(reached, null)).toBeNull();
+    });
+
+    it("says nothing for Pick-up, with no amount, or for a way with no fee", () => {
+        const under = quote({
+            ways: ways(null, "120.00"),
+            freeDelivery: { over: "999.00", short: "120.00" },
+        });
+        expect(freeDeliveryNote(under, "PICKUP")).toBeNull();
+        expect(freeDeliveryNote(under, "LOCAL_DELIVERY")).toBeNull();
+        expect(
+            freeDeliveryNote(
+                quote({ ways: ways("60.00", null), freeDelivery: null }),
+                "LOCAL_DELIVERY",
+            ),
+        ).toBeNull();
+        // An API before free delivery sends nothing.
+        expect(
+            freeDeliveryNote(quote({ ways: ways("60.00", null) }), null),
+        ).toBeNull();
+    });
+});
+
+/**
+ * The bag's button says what pressing it does. Signed out, the email code
+ * is the last step: an order paid at the handover is placed straight after
+ * it, so the button never reads a bare "Continue".
+ */
+describe("placeLabel", () => {
+    const base = { busy: false, total: "₹560" };
+
+    it("says Place order to someone signed in, however it is paid", () => {
+        expect(placeLabel({ ...base, signedIn: true, pay: "ONLINE" })).toBe(
+            "Place order · ₹560",
+        );
+        expect(
+            placeLabel({ ...base, signedIn: true, pay: "ON_HANDOVER" }),
+        ).toBe("Place order · ₹560");
+    });
+
+    it("signed out, says the order is placed when nothing is paid online", () => {
+        expect(
+            placeLabel({ ...base, signedIn: false, pay: "ON_HANDOVER" }),
+        ).toBe("Sign in and place order · ₹560");
+    });
+
+    it("signed out, says it leads to paying when it is paid online", () => {
+        expect(placeLabel({ ...base, signedIn: false, pay: "ONLINE" })).toBe(
+            "Sign in and pay · ₹560",
+        );
+    });
+
+    it("promises neither before the quote says how it is paid, and drops the dot without a total", () => {
+        expect(
+            placeLabel({ busy: false, total: "", signedIn: false, pay: null }),
+        ).toBe("Sign in to order");
+        expect(
+            placeLabel({ busy: false, total: "", signedIn: true, pay: null }),
+        ).toBe("Place order");
+    });
+
+    it("says it is starting while a checkout starts", () => {
+        expect(
+            placeLabel({ ...base, busy: true, signedIn: false, pay: "ONLINE" }),
+        ).toBe("Starting…");
+    });
+
+    it("never says Continue", () => {
+        for (const signedIn of [true, false]) {
+            for (const pay of ["ONLINE", "ON_HANDOVER", null] as const) {
+                expect(placeLabel({ ...base, signedIn, pay })).not.toMatch(
+                    /continue/i,
+                );
+            }
+        }
+    });
+});
+
+/** The returns rule above the bag's button: what the product pages say. */
+describe("returnsLines", () => {
+    it("says one rule once when every line shares it", () => {
+        expect(
+            returnsLines([
+                line({ returns: "Exchange within 7 days" }),
+                line({
+                    listingId: "l-2",
+                    name: "Cotton scarf",
+                    returns: " Exchange within 7 days ",
+                }),
+            ]),
+        ).toEqual(["Returns: Exchange within 7 days"]);
+    });
+
+    it("names the products a rule covers when the bag holds more than one, or some have none", () => {
+        expect(
+            returnsLines([
+                line({ returns: "Exchange within 7 days" }),
+                line({
+                    listingId: "l-2",
+                    name: "Cotton scarf",
+                    returns: "No returns on sale items",
+                }),
+                line({ listingId: "l-3", name: "Tote bag", returns: null }),
+            ]),
+        ).toEqual([
+            "Returns for Linen kurta: Exchange within 7 days",
+            "Returns for Cotton scarf: No returns on sale items",
+        ]);
+    });
+
+    it("says nothing with no rule, and nothing for a line no longer sold", () => {
+        expect(returnsLines([line(), line({ returns: " " })])).toEqual([]);
+        expect(
+            returnsLines([line({ state: "gone", returns: "Old rule" })]),
+        ).toEqual([]);
     });
 });

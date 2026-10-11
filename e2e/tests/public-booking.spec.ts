@@ -4,7 +4,12 @@ import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { asNewVisitor, signInOnSheet } from "./site-codes";
+import {
+    asNewVisitor,
+    expectNoZoomOnFocus,
+    nameThenBook,
+    signInOnSheet,
+} from "./site-codes";
 
 /**
  * The customer's booking page on a merchant's site, end to end (U19):
@@ -81,7 +86,7 @@ async function pickTime(
     expect(count, "open days on the walkthrough").toBeGreaterThan(8);
     await openDays.nth(count - fromEnd).click();
     const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-        hasText: /^\d{2}:\d{2}$/,
+        hasText: /^\d{1,2}:\d{2} [ap]m$/,
     });
     await expect(times.first()).toBeVisible({ timeout: 15_000 });
     const time = times.first();
@@ -91,7 +96,10 @@ async function pickTime(
     return { label, serviceId };
 }
 
-/** Who they are: a name — the email is confirmed with a code (A9). */
+/**
+ * Who they are: nothing typed before signing in. The email is confirmed
+ * with a code (A9), and a new account's name is asked after it.
+ */
 async function details(page: Page) {
     await expect(
         page.getByText(/You'll confirm your email with a code/),
@@ -102,16 +110,25 @@ async function details(page: Page) {
     await expect(page.getByLabel(/Phone/)).toHaveAccessibleName(
         "Phone (optional)",
     );
-    await page.getByLabel("Name").fill("Asha Rao");
+    // Signed out, no name is asked for: an account that has one already
+    // would have typed it for nothing.
+    await expect(page.getByLabel("Name")).toHaveCount(0);
+    // A phone doesn't zoom into the field, and offers the right keyboard.
+    await expectNoZoomOnFocus(page.getByLabel(/Phone/));
+    await expect(page.getByLabel(/Phone/)).toHaveAttribute("inputmode", "tel");
 }
 
-/** The last step: sign in with a code, and the booking is made. */
+/**
+ * The last step: sign in with a code. These are new accounts, so the page
+ * then asks their name, and the next press makes the booking.
+ */
 async function continueAndSignIn(page: Page, email: string) {
     await page
         .getByRole("button", { name: "Continue to sign in" })
         .first()
         .click();
     await signInOnSheet(page, email);
+    await nameThenBook(page, "Asha Rao");
 }
 
 /** The pay token a hold's payment is started with (E11). */
@@ -232,13 +249,18 @@ test.describe("the booking page", () => {
         const email = `desk-${testInfo.project.name}-${Date.now()}@example.in`;
         await pickTime(page, 0);
 
-        // Days say what they are: Full, Closed, or how many are free.
+        // Days say what they are: how many are free, Full, Closed, or No
+        // times (open, but nobody takes this service then: the first day is
+        // today, and on a weekend that is what Northwind's says).
         await expect(
             page
                 .getByRole("radiogroup", { name: "Day" })
                 .getByRole("radio")
                 .first(),
-        ).toHaveAttribute("aria-label", /: (\d+ times? free|full|closed)$/);
+        ).toHaveAttribute(
+            "aria-label",
+            /: (\d+ times? free|full|closed|no times)$/,
+        );
 
         await details(page);
         await page.getByRole("radio", { name: /Pay at the desk/ }).click();
@@ -250,11 +272,20 @@ test.describe("the booking page", () => {
         await expect(
             page.getByText(/at the front desk when you arrive/),
         ).toBeVisible();
+        // What happens next: an email when the business's own provider
+        // sends one, else where the booking is kept. One or the other.
         await expect(
             page.getByText(
-                /We've saved this to your details with Northwind Supply\./,
+                /^(We've emailed \S+@\S+\.|It's saved in your account\.)$/,
             ),
         ).toBeVisible();
+        // Google Calendar, beside the calendar file.
+        await expect(
+            page.getByRole("link", { name: "Add to Google Calendar" }),
+        ).toHaveAttribute(
+            "href",
+            /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/,
+        );
         await expect(
             page.getByRole("button", { name: "Add to calendar" }),
         ).toBeVisible();
@@ -312,7 +343,7 @@ test.describe("the booking page", () => {
             page.getByRole("heading", { name: /to confirm your place$/ }),
         ).toBeVisible();
         await expect(
-            page.getByText(/held for you until \d{2}:\d{2}/),
+            page.getByText(/held for you until \d{1,2}:\d{2} [ap]m/),
         ).toBeVisible();
 
         // Everyone else, meanwhile, is no longer offered that time.
@@ -347,7 +378,7 @@ test.describe("the booking page", () => {
         // Released: its token is cleared with its draft invoice, and the
         // time is offered again.
         expect(after.status()).toBe(404);
-        expect(label).toMatch(/^\d{2}:\d{2}$/);
+        expect(label).toMatch(/^\d{1,2}:\d{2} [ap]m$/);
         const again = await page.request.get(
             `${urls.API_URL}/public/services/${serviceId}/days`,
         );
@@ -533,6 +564,7 @@ test.describe("the booking page", () => {
                     .filter({ visible: true })
                     .click();
                 await signInOnSheet(page, email);
+                await nameThenBook(page, "Asha Rao");
                 payToken = payTokenOf(await intent);
                 expect(bookBodies.map((b) => b.pay)).toEqual(["DEPOSIT"]);
 

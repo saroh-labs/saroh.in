@@ -3,6 +3,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
+import type { SocialLinks } from "@saroh/block-contract";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
@@ -18,6 +19,12 @@ import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
+import {
+    enqueuePageRevalidation,
+    pageCacheRevalidationOn,
+} from "../sites/page-cache-revalidate";
+import type { PublicContact } from "./business-contact";
+import { businessPublicContactOf } from "./business-contact";
 import { logoProblem } from "./business-logo";
 import type { PayInstructionsView } from "./business-pay-instructions";
 import {
@@ -26,6 +33,7 @@ import {
     payInstructionsWrite,
 } from "./business-pay-instructions";
 import { phoneWrite } from "./business-phone";
+import { socialLinksRead, socialLinksWrite } from "./business-social";
 import type {
     RegisteredAddressView,
     TaxSettingsView,
@@ -39,6 +47,7 @@ import {
 } from "./business-tax-settings";
 import { businessTypeRead, businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
+import { mapLinkRead, mapLinkWrite } from "./map-link";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
 import { authorize } from "./organization-policy";
@@ -109,7 +118,49 @@ export interface OrganizationSettings {
      * until set.
      */
     payInstructions: PayInstructionsView;
+    /**
+     * The business's social links (DEC-128): one canonical address per
+     * network that is set, on that network's own host. Empty: none.
+     */
+    socialLinks: SocialLinks;
+    /**
+     * Its website shows the registered address as where to find it
+     * (DEC-128), while no location customers visit has an address.
+     */
+    siteShowsRegisteredAddress: boolean;
+    /**
+     * The registered address's place on Google Maps (DEC-128), which "Get
+     * directions" opens while the website shows that address; null when
+     * none is set.
+     */
+    registeredAddressMapUrl: string | null;
 }
+
+/**
+ * What the business's website shows of how to reach it
+ * ({@link PublicContact}), and whether the registered address was chosen
+ * for it. For the "Contact and social" rows of Website settings.
+ */
+export interface SiteContactView {
+    contact: PublicContact;
+    registeredAddressChosen: boolean;
+}
+
+/**
+ * The columns whose change alters what a published page shows of the
+ * business's contact details (DEC-128), read live by the site.
+ */
+const SITE_CONTACT_COLUMNS: ReadonlySet<string> = new Set([
+    "phone",
+    "contactEmail",
+    "socialLinks",
+    "siteShowsRegisteredAddress",
+    "registeredAddressMapUrl",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "postalCode",
+]);
 
 /** The checklist's facts ({@link OrganizationSettings.setup}). */
 export interface SetupFacts {
@@ -159,6 +210,9 @@ const PROFILE_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    socialLinks: true,
+    siteShowsRegisteredAddress: true,
+    registeredAddressMapUrl: true,
     ...PAY_SELECT,
 } as const;
 
@@ -184,6 +238,9 @@ interface ProfileRow {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    socialLinks?: unknown;
+    siteShowsRegisteredAddress?: boolean | null;
+    registeredAddressMapUrl?: string | null;
     payUpiId?: string | null;
     payBankAccountName?: string | null;
     payBankAccountNumber?: string | null;
@@ -203,6 +260,9 @@ function splitProfile(
             registeredAddress: addressView(null),
             logo: null,
             payInstructions: payInstructionsView(null),
+            socialLinks: {},
+            siteShowsRegisteredAddress: false,
+            registeredAddressMapUrl: null,
         };
     }
     const {
@@ -225,6 +285,9 @@ function splitProfile(
         payBankIfsc: _bi,
         payBankName: _bn,
         payNote: _pn,
+        socialLinks,
+        siteShowsRegisteredAddress,
+        registeredAddressMapUrl,
         ...profile
     } = p;
     return {
@@ -238,6 +301,9 @@ function splitProfile(
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
         payInstructions: payInstructionsView(p),
+        socialLinks: socialLinksRead(socialLinks),
+        siteShowsRegisteredAddress: siteShowsRegisteredAddress ?? false,
+        registeredAddressMapUrl: mapLinkRead(registeredAddressMapUrl),
     };
 }
 
@@ -367,6 +433,37 @@ export class OrganizationSettingsService {
                   }),
               )
             : {};
+        // Social links (DEC-128): each sent one rebuilt into its canonical
+        // address or refused on its field, over the ones already kept.
+        const socialData = dto.socialLinks
+            ? socialLinksWrite(
+                  dto.socialLinks,
+                  (
+                      await prisma.businessProfile.findUnique({
+                          where: { organizationId: ctx.organizationId },
+                          select: { socialLinks: true },
+                      })
+                  )?.socialLinks,
+              )
+            : {};
+        // The registered address's Google Maps link: Google's own map
+        // pages only, refused on its field otherwise.
+        const map = mapLinkWrite(dto.registeredAddressMapUrl);
+        if ("problem" in map) {
+            throw new BadRequestException({
+                message: map.problem,
+                details: { field: "registeredAddressMapUrl" },
+            });
+        }
+        const siteData = {
+            ...(dto.siteShowsRegisteredAddress === undefined
+                ? {}
+                : {
+                      siteShowsRegisteredAddress:
+                          dto.siteShowsRegisteredAddress,
+                  }),
+            ...("url" in map ? { registeredAddressMapUrl: map.url } : {}),
+        };
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),
@@ -374,6 +471,8 @@ export class OrganizationSettingsService {
             ...Object.keys(phone),
             ...Object.keys(taxData),
             ...Object.keys(payData),
+            ...Object.keys(socialData),
+            ...Object.keys(siteData),
         ];
 
         // Nothing to do — return current state rather than writing an empty
@@ -415,6 +514,8 @@ export class OrganizationSettingsService {
                 ...phone,
                 ...taxData,
                 ...payData,
+                ...socialData,
+                ...siteData,
             };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({
@@ -429,7 +530,7 @@ export class OrganizationSettingsService {
 
             const organization = await tx.organization.findUnique(read);
             if (!organization) {
-                throw new NotFoundException("Organization not found");
+                throw new NotFoundException("Business not found");
             }
             return { settings: organization, before };
         });
@@ -456,6 +557,11 @@ export class OrganizationSettingsService {
                 ) as unknown as Prisma.InputJsonArray,
             },
         });
+
+        // The site reads these live (DEC-128): tell the pages it keeps.
+        if (changed.some((column) => SITE_CONTACT_COLUMNS.has(column))) {
+            await this.contactChangedOnSites(ctx.organizationId);
+        }
 
         return {
             id: settings.id,
@@ -511,6 +617,7 @@ export class OrganizationSettingsService {
             update: data,
         });
         await this.recordLogo(ctx, had?.logoUrl ? "changed" : "added");
+        await this.logoChangedOnSites(ctx.organizationId);
         return this.read(ctx.organizationId);
     }
 
@@ -527,8 +634,79 @@ export class OrganizationSettingsService {
             },
             data: { logoMediaId: null, logoUrl: null },
         });
-        if (count > 0) await this.recordLogo(ctx, "removed");
+        if (count > 0) {
+            await this.recordLogo(ctx, "removed");
+            await this.logoChangedOnSites(ctx.organizationId);
+        }
         return this.read(ctx.organizationId);
+    }
+
+    /**
+     * The logo is the icon of a site with none of its own (DEC-124), read
+     * live by the public site read, so the pages the merchant sites keep
+     * (#863) carry the old one in their head until told. Queued after the
+     * write, for the business's published sites; with the cache off there
+     * is nothing to tell, so nothing is read.
+     */
+    private async logoChangedOnSites(organizationId: string): Promise<void> {
+        if (!pageCacheRevalidationOn()) return;
+        const sites = await prisma.site.findMany({
+            where: {
+                organizationId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+            },
+            select: { id: true },
+        });
+        await enqueuePageRevalidation(prisma, {
+            cause: "icon",
+            siteIds: sites.map((s) => s.id),
+        });
+    }
+
+    /**
+     * The phone, the contact email, the social links and the address the
+     * site shows are read live by the public contact read (DEC-128), as the
+     * phone always was, so a save needs no publish. The pages the merchant
+     * sites keep (#863) carry the old ones in their footer until told.
+     * Queued after the write, for the business's published sites.
+     */
+    private async contactChangedOnSites(organizationId: string): Promise<void> {
+        if (!pageCacheRevalidationOn()) return;
+        const sites = await prisma.site.findMany({
+            where: {
+                organizationId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+            },
+            select: { id: true },
+        });
+        await enqueuePageRevalidation(prisma, {
+            cause: "contact",
+            siteIds: sites.map((s) => s.id),
+        });
+    }
+
+    /**
+     * What the business's website shows of how to reach it (DEC-128): the
+     * public contact read itself, for whoever may read the site in the
+     * workspace (`site:read`). Nothing here is private: every value is
+     * already on the site.
+     */
+    async siteContact(ctx: OrganizationContext): Promise<SiteContactView> {
+        authorize(ctx, "site:read");
+        const [contact, profile] = await Promise.all([
+            businessPublicContactOf(ctx.organizationId),
+            prisma.businessProfile.findUnique({
+                where: { organizationId: ctx.organizationId },
+                select: { siteShowsRegisteredAddress: true },
+            }),
+        ]);
+        return {
+            contact,
+            registeredAddressChosen:
+                profile?.siteShowsRegisteredAddress ?? false,
+        };
     }
 
     /**
@@ -568,7 +746,7 @@ export class OrganizationSettingsService {
             },
         });
         if (!organization) {
-            throw new NotFoundException("Organization not found");
+            throw new NotFoundException("Business not found");
         }
         return {
             id: organization.id,

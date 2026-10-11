@@ -258,7 +258,7 @@ describe("Needs attention (DB)", () => {
         await expect(
             allergens.remove(owner.organizationId, peanutsId),
         ).rejects.toThrow(
-            "Peanuts is on 1 customer's Needs attention — take it off first.",
+            "Peanuts is on 1 customer's Needs attention. Take it off first.",
         );
 
         await attention.remove(owner, contactId, entry.id);

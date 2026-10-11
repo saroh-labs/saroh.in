@@ -1,10 +1,16 @@
+import { DEFAULT_PAGE_SIZE, readPageSize } from "@saroh/ui/lib/paging";
+
 import type { CatalogueView, ProductStatus } from "./service";
 
 /**
  * The Products list's address (#519). Everything that narrows it — the chip,
  * the search, the storefront, the status, a category or a collection —
  * lives in the URL, so a narrowed list is a link someone can share, and the
- * server reads it once to ask the API for the first page. Pure.
+ * server reads it once to ask the API for one page. Pure.
+ *
+ * Paging is by number, as on Orders: the address carries `page` (from 1)
+ * and `size` (rows a page; 50 unless chosen), so the footer can offer any
+ * page.
  */
 export interface ListQuery {
     view: CatalogueView;
@@ -13,7 +19,14 @@ export interface ListQuery {
     status: ProductStatus | null;
     category: string | null;
     collection: string | null;
+    /** The page on screen, from 1. */
+    page: number;
+    /** Rows a page: 10, 25, 50 or 100. */
+    size: number;
 }
+
+/** Rows a page before anyone chooses (the API's own default). */
+export const PRODUCTS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 type Params = Record<string, string | string[] | undefined>;
 
@@ -23,6 +36,8 @@ const VIEWS: readonly CatalogueView[] = [
     "inventory",
     "needs",
 ];
+/** The views that are tabs of the screen, written as `?tab=`. */
+const TAB_VIEWS: readonly CatalogueView[] = ["collections", "inventory"];
 const STATUSES: readonly ProductStatus[] = ["PUBLISHED", "DRAFT", "ARCHIVED"];
 
 function one(params: Params, key: string): string | undefined {
@@ -32,11 +47,20 @@ function one(params: Params, key: string): string | undefined {
 }
 
 /**
- * What the address asks for. An unknown chip is "All"; the old "Needs
- * restock" chip (`?view=restock`) is "Show only these".
+ * What the address asks for. Collections and Inventory are the screen's
+ * tabs, so they are `?tab=`; "Show only these" is the list's saved filter,
+ * `?view=needs`. A link from before the tabs moved (`?view=collections`)
+ * still lands on its tab. An unknown one is "All"; the old "Needs restock"
+ * chip (`?view=restock`) is "Show only these". An address with no size
+ * opens at `remembered`, the size this browser last chose.
  */
-export function readListQuery(params: Params): ListQuery {
-    const view = one(params, "view");
+export function readListQuery(
+    params: Params,
+    remembered: number = PRODUCTS_PAGE_SIZE,
+): ListQuery {
+    const page = Number(one(params, "page"));
+    const tab = one(params, "tab");
+    const view = TAB_VIEWS.find((v) => v === tab) ?? one(params, "view");
     const status = one(params, "status");
     return {
         view:
@@ -48,22 +72,37 @@ export function readListQuery(params: Params): ListQuery {
         status: STATUSES.find((s) => s === status) ?? null,
         category: one(params, "category") ?? null,
         collection: one(params, "collection") ?? null,
+        page: Number.isInteger(page) && page >= 1 ? page : 1,
+        size: readPageSize(one(params, "size"), remembered),
     };
 }
 
-/** The list at `query` with `patch` applied; defaults leave the URL. */
+/**
+ * The list at `query` with `patch` applied; defaults leave the URL.
+ * Changing what is listed (the chip, the search, the storefront, a filter)
+ * or the size starts again at the first page, because page 3 of another
+ * list is somebody else's page 3.
+ */
 export function listHref(
     query: ListQuery,
     patch: Partial<ListQuery> = {},
 ): string {
-    const next = { ...query, ...patch };
+    const relists = Object.keys(patch).some((key) => key !== "page");
+    const next: ListQuery = {
+        ...query,
+        ...(relists ? { page: 1 } : {}),
+        ...patch,
+    };
     const q = new URLSearchParams();
-    if (next.view !== "all") q.set("view", next.view);
+    if (TAB_VIEWS.includes(next.view)) q.set("tab", next.view);
+    else if (next.view !== "all") q.set("view", next.view);
     if (next.q) q.set("q", next.q);
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.status) q.set("status", next.status);
     if (next.category) q.set("category", next.category);
     if (next.collection) q.set("collection", next.collection);
+    if (next.page > 1) q.set("page", String(next.page));
+    if (next.size !== PRODUCTS_PAGE_SIZE) q.set("size", String(next.size));
     const s = q.toString();
     return s ? `/commerce/products?${s}` : "/commerce/products";
 }
@@ -77,7 +116,15 @@ export function newCollectionHref(query: ListQuery): string {
     return `${href}${href.includes("?") ? "&" : "?"}new=collection`;
 }
 
-/** The API filter for `query`, leaving out what it doesn't narrow. */
+/** The list at page `page`, everything else kept. */
+export function pageHref(query: ListQuery, page: number): string {
+    return listHref(query, { page });
+}
+
+/**
+ * The API request for `query`: its filters, leaving out what it doesn't
+ * narrow, and the page asked by its number at the size on screen.
+ */
 export function catalogueFilter(query: ListQuery) {
     return {
         view: query.view === "all" ? undefined : query.view,
@@ -86,6 +133,8 @@ export function catalogueFilter(query: ListQuery) {
         status: query.status ?? undefined,
         category: query.category ?? undefined,
         collection: query.collection ?? undefined,
+        page: query.page > 1 ? query.page : undefined,
+        size: query.size,
     };
 }
 
@@ -137,7 +186,7 @@ export function emptyCopy(
             return {
                 kind: "chip",
                 title: "No collections yet",
-                note: "Collections group products into the sets people browse — Bread, Gifts, new arrivals.",
+                note: "Collections group products into the sets people browse: Bread, Gifts, new arrivals.",
                 action: "new-collection",
             };
         }
@@ -155,7 +204,7 @@ export function emptyCopy(
         return {
             kind: "chip",
             title: "Nothing tracked yet",
-            note: "Turn on inventory tracking for a product and its stock level shows here.",
+            note: "Turn on stock tracking for a product and its stock level shows here.",
             action: "add-product",
         };
     }

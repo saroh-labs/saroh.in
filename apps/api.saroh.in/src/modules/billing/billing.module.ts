@@ -3,6 +3,7 @@ import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { env } from "../../env";
+import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -14,6 +15,7 @@ import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
+import { DeletedBusinessBilling } from "./business-closing";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
@@ -90,6 +92,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  */
 @Module({
     imports: [
+        // The activation ledger: the first paid plan (DEC-125). Imports
+        // nothing itself, so it adds no cycle.
+        AnalyticsCoreModule,
         AuditModule,
         FeatureFlagModule,
         JobsModule,
@@ -116,10 +121,13 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AddonsService,
         AddonsSyncHandler,
         FreeRowsHandler,
+        // A deleted business's billing, ended by its clean-up (#921).
+        DeletedBusinessBilling,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
     exports: [
+        DeletedBusinessBilling,
         CatalogueAccessService,
         EntitlementService,
         MeteringService,

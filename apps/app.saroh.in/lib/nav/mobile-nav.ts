@@ -75,8 +75,11 @@ export interface MobileNav {
     note: string;
 }
 
-/** The sheet heading over the rows that belong to no section. */
-export const WORKSPACE_HEADING = "Workspace";
+/**
+ * The sheet heading over the rows that belong to no section: the same
+ * word as the rail's last group (owner, 11 Oct; "Workspace" before).
+ */
+export const MANAGE_HEADING = "Manage";
 
 const isSection = (item: NavItem) =>
     item.children?.some((child) => child.href) ?? false;
@@ -178,7 +181,7 @@ export function buildMobileNav({
 
     // The sheet: every section, seated or not — one tab opens one page, so
     // the rest of a seated section's pages have to be somewhere — then what
-    // is left, under Workspace.
+    // is left, under Manage.
     const sheet: MobileSheetGroup[] = [];
     for (const item of rows) {
         if (!isSection(item)) continue;
@@ -202,7 +205,7 @@ export function buildMobileNav({
     );
     if (rest.length > 0) {
         sheet.push({
-            label: WORKSPACE_HEADING,
+            label: MANAGE_HEADING,
             rows: rest.map((item) => ({
                 key: item.href,
                 label: item.label,

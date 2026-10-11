@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     Sheet,
     SheetContent,
@@ -12,6 +13,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
@@ -22,6 +24,7 @@ import {
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
+import { TextLink } from "@saroh/ui/text-link";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -49,7 +52,7 @@ export function VariantDrawer({
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const edit = (section: "variants" | "stock") =>
         productEditHref(storeId, product.id, section);
     const open = product.variants.find((v) => v.id === variantId) ?? null;
@@ -96,11 +99,7 @@ export function VariantDrawer({
                                 </SheetDescription>
                             </div>
                             {overview.canWrite ? (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
-                                >
+                                <Button size="sm" asChild variant="outline">
                                     <Link href={edit("variants")}>Edit</Link>
                                 </Button>
                             ) : null}
@@ -124,7 +123,7 @@ export function VariantDrawer({
                                             {open.price === null ||
                                             open.price === product.price
                                                 ? "The product's price"
-                                                : `Its own price — the product's is ${money(product.price)}`}
+                                                : `Its own price. The product's is ${money(product.price)}`}
                                         </p>
                                         <p className="mt-1 font-mono text-[11.5px] text-muted-foreground">
                                             SKU {open.sku}
@@ -161,7 +160,8 @@ export function VariantDrawer({
                                         </div>
                                         <Badge
                                             variant={WORD_BADGE[openLine.word]}
-                                            className="mt-2.5 rounded-full px-2 text-[11.5px] font-semibold"
+                                            size="sm"
+                                            className="mt-2.5"
                                         >
                                             Customers see:{" "}
                                             {customersSee(openLine)}
@@ -182,9 +182,10 @@ export function VariantDrawer({
                                 {orders ? (
                                     <>
                                         {mineOrders.length === 0 ? (
-                                            <p className="text-[12.5px] text-muted-foreground">
-                                                No open orders for this size.
-                                            </p>
+                                            <EmptyState
+                                                size="inline"
+                                                title="No open orders for this size"
+                                            />
                                         ) : (
                                             <ul>
                                                 {mineOrders.map((o) => (
@@ -192,15 +193,15 @@ export function VariantDrawer({
                                                         key={o.id}
                                                         className="flex items-center gap-2.5 border-b border-foreground/10 py-2 last:border-0"
                                                     >
-                                                        <Link
+                                                        <TextLink
                                                             href={orderHref(
                                                                 storeId,
                                                                 o.id,
                                                             )}
-                                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                            className="font-mono text-[12px]"
                                                         >
                                                             {o.orderNumber}
-                                                        </Link>
+                                                        </TextLink>
                                                         <span className="min-w-0 flex-1 truncate">
                                                             {o.customer} · ×{" "}
                                                             {o.lines
@@ -223,7 +224,7 @@ export function VariantDrawer({
                                                                     ? "success"
                                                                     : "draft"
                                                             }
-                                                            className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                                            size="sm"
                                                         >
                                                             {ORDER_STATUS_LABEL[
                                                                 o.status
@@ -238,11 +239,14 @@ export function VariantDrawer({
                                             sold this month.
                                         </p>
                                     </>
+                                ) : overview.orders.status === "failed" ? (
+                                    <FailedRead
+                                        things="orders"
+                                        reassurance="Stock figures above are still right."
+                                    />
                                 ) : (
                                     <p className="text-[12.5px] text-muted-foreground">
-                                        {overview.orders.status === "failed"
-                                            ? "Couldn't load orders. Stock figures above are still right."
-                                            : "Your role can't see orders."}
+                                        Your role can&apos;t see orders.
                                     </p>
                                 )}
                             </DrawerSection>
@@ -250,10 +254,10 @@ export function VariantDrawer({
                             <DrawerSection title="Reviews from people who bought it">
                                 {reviews ? (
                                     mineReviews.length === 0 ? (
-                                        <p className="text-[12.5px] text-muted-foreground">
-                                            No reviews from people who bought
-                                            this size yet.
-                                        </p>
+                                        <EmptyState
+                                            size="inline"
+                                            title="No reviews from people who bought this size yet"
+                                        />
                                     ) : (
                                         <ul className="flex flex-col gap-2">
                                             {mineReviews.map((r) => (
@@ -265,7 +269,7 @@ export function VariantDrawer({
                                                         <span
                                                             role="img"
                                                             aria-label={`${r.rating} out of 5`}
-                                                            className="tracking-[1px] text-highlight"
+                                                            className="tracking-[1px] text-foreground"
                                                         >
                                                             {"★".repeat(
                                                                 r.rating,
@@ -292,11 +296,11 @@ export function VariantDrawer({
                                             ))}
                                         </ul>
                                     )
+                                ) : overview.reviews.status === "failed" ? (
+                                    <FailedRead things="reviews" />
                                 ) : (
                                     <p className="text-[12.5px] text-muted-foreground">
-                                        {overview.reviews.status === "failed"
-                                            ? "Couldn't load reviews."
-                                            : "Your role can't see reviews."}
+                                        Your role can&apos;t see reviews.
                                     </p>
                                 )}
                             </DrawerSection>
@@ -334,9 +338,7 @@ function DrawerSection({
 }) {
     return (
         <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {title}
-            </h3>
+            <h3 className="label mb-2">{title}</h3>
             {children}
         </section>
     );

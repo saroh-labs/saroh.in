@@ -117,6 +117,10 @@ export const MODULE_PAGE_DEFAULTS: Record<ModulePageKind, KindDefaults> = {
  * `/pay/o/<token>` to its pay pages before any page is looked up, so a page
  * at `/pay` would never be reached once pay links live on the site.
  *
+ * `/q` is the short link a QR code holds (`/q/<code>`): the renderer's own
+ * route answers it before any page, counts the scan and forwards, so a page
+ * under it would never be reached.
+ *
  * `purpose` finishes the sentence "/book is …" in the merchant's words.
  */
 export const RESERVED_PAGE_PATHS: readonly {
@@ -136,6 +140,11 @@ export const RESERVED_PAGE_PATHS: readonly {
         root: "/account",
         kind: null,
         purpose: "where your customers see their account",
+    },
+    {
+        root: "/q",
+        kind: null,
+        purpose: "where your QR codes open",
     },
 ];
 

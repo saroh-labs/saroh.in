@@ -36,6 +36,7 @@ import {
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
     saveDraftSections as saveDraftSectionsApi,
+    saveSiteIcon as saveSiteIconApi,
     setCommentResolved as setCommentResolvedApi,
     updatePage as updatePageApi,
     updateSiteFooter as updateSiteFooterApi,
@@ -113,6 +114,11 @@ export async function updateSiteSettings(
     input: SiteSettingsInput,
 ) {
     return updateSiteSettingsApi(siteId, input);
+}
+
+/** Set the site's own icon from the library, or take it off (null). */
+export async function saveSiteIcon(siteId: string, mediaId: string | null) {
+    return saveSiteIconApi(siteId, mediaId);
 }
 
 /**

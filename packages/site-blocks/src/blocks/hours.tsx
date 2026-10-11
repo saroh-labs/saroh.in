@@ -91,7 +91,9 @@ export function hoursRows(
         if (!open && !showClosed) continue;
         rows.push({
             day,
-            hours: open ? `${clockText(d.open)} – ${clockText(d.close)}` : null,
+            hours: open
+                ? `${clockText(d.open)} to ${clockText(d.close)}`
+                : null,
         });
     }
     return rows;

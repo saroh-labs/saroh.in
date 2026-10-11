@@ -229,7 +229,7 @@ export default function PlansSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your plans just now.
+                We couldn&apos;t load your plans right now.
             </PlansNote>
         );
     }
@@ -253,7 +253,7 @@ export default function PlansSection({
     if (state.plans.length === 0) {
         return (
             <PlansNote title={title}>
-                No plans on sale yet. Publish a plan and it shows here; until
+                No plans on sale yet. Publish a plan and it shows here. Until
                 then this section is left off your live site.
             </PlansNote>
         );

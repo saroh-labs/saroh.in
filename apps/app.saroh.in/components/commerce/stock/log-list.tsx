@@ -1,31 +1,39 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { formatTime } from "@/lib/format/datetime";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productHref } from "@/lib/products/links";
+import type { StockHref, StockListPage } from "@/lib/stock/list-query";
+import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
 import type { LogKindId } from "@/lib/stock/log";
 import {
     allStorefrontsWords,
     entryNote,
     entryQuantity,
-    entryTime,
     entryTone,
     entryWho,
     groupByDay,
     LOG_KINDS,
     logCountWords,
-    logKinds,
 } from "@/lib/stock/log";
-import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
-import { chipClass, pillClass, TEXT_TONE } from "./tones";
+import {
+    ListFilter,
+    ListPaging,
+    listTable,
+    ListTableHead,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
+import { PILL_TONE, TEXT_TONE } from "./tones";
 
 /**
  * A log entry on a phone: a wrapping row whose `order`s put the time, the
@@ -38,8 +46,13 @@ const PHONE_ENTRY =
 /**
  * The stock log (#521): every change to every shelf, newest first, grouped
  * by the business's day — by kind, storefront and product, a page at a
- * time. Names only for a role that reads the audit trail, order links only
+ * time under the one list footer (rows per page, the page numbers,
+ * Previous and Next). Names only for a role that reads the audit trail, order links only
  * for one that reads orders; the API leaves them out otherwise.
+ *
+ * It follows the one list toolbar and the one table look: the location
+ * the product and the kind of change are dropdown filters in one row, and
+ * the days are groups inside one card under one head band.
  *
  * On a phone (under 760px, T3) each entry is two wrapping lines, by CSS
  * alone (no hydration flash, nothing rendered twice): the time, the product
@@ -53,108 +66,109 @@ export function LogList({
     storefronts,
     products,
     href,
-    pageSize,
+    paging,
 }: {
     log: StockLog | "failed";
     filter: { kind: LogKindId; store: string; product: string };
     storefronts: { id: string; name: string }[];
     products: { id: string; name: string }[];
-    href: (change: Record<string, string | undefined>) => string;
-    pageSize: number;
+    /** The screen's address with these changed. */
+    href: StockHref;
+    /** The page on screen and its rows per page. */
+    paging: StockListPage;
 }) {
     const router = useRouter();
-    const [loaded, setLoaded] = useState(() => ({
-        from: log,
-        entries: log === "failed" ? [] : log.entries,
-        next: log === "failed" ? null : log.nextCursor,
-    }));
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [pending, start] = useTransition();
-    if (loaded.from !== log) {
-        setLoaded({
-            from: log,
-            entries: log === "failed" ? [] : log.entries,
-            next: log === "failed" ? null : log.nextCursor,
-        });
-    }
 
+    // The one list toolbar, in one row: the kind of change, the location
+    // and the product are its dropdown filters, and how many entries the
+    // filters keep, across every page, is the count on the right.
     const filters = (
-        <>
-            <div
-                role="group"
-                aria-label="Kind of change"
-                className="mb-2 flex flex-wrap items-center gap-2"
-            >
-                {LOG_KINDS.map((k) => (
-                    <Link
-                        key={k.id}
-                        href={href({ kind: k.id === "all" ? undefined : k.id })}
-                        scroll={false}
-                        aria-current={filter.kind === k.id ? "true" : undefined}
-                        className={chipClass(filter.kind === k.id)}
-                    >
-                        {k.label}
-                    </Link>
-                ))}
-            </div>
-            <div className="mb-3.5 flex flex-wrap items-center gap-2">
-                {storefronts.length > 1 ? (
-                    <div
-                        role="group"
-                        aria-label="Location"
-                        className="flex flex-wrap gap-2"
-                    >
-                        {[
-                            {
-                                id: "all",
-                                label: allStorefrontsWords(storefronts.length),
-                            },
-                            ...storefronts.map((s) => ({
-                                id: s.id,
-                                label: s.name,
+        <ListToolbar
+            className="mb-3.5"
+            filters={
+                <>
+                    <ListFilter<LogKindId>
+                        label="Kind of change"
+                        value={filter.kind}
+                        onValueChange={(id) =>
+                            router.push(
+                                href({ kind: id === "all" ? undefined : id }),
+                                { scroll: false },
+                            )
+                        }
+                        options={LOG_KINDS.map((k) => ({
+                            value: k.id,
+                            label: k.id === "all" ? "All changes" : k.label,
+                        }))}
+                    />
+                    {storefronts.length > 1 ? (
+                        <ListFilter
+                            holdsData
+                            label="Location"
+                            value={filter.store}
+                            options={[
+                                {
+                                    value: "all",
+                                    label: allStorefrontsWords(
+                                        storefronts.length,
+                                    ),
+                                },
+                                ...storefronts.map((s) => ({
+                                    value: s.id,
+                                    label: s.name,
+                                })),
+                            ]}
+                            onValueChange={(v) =>
+                                router.push(
+                                    href({
+                                        store: v === "all" ? undefined : v,
+                                    }),
+                                    { scroll: false },
+                                )
+                            }
+                        />
+                    ) : null}
+                    <ListFilter
+                        holdsData
+                        label="Product"
+                        className="max-w-[260px]"
+                        value={filter.product}
+                        options={[
+                            { value: "", label: "All products" },
+                            ...products.map((p) => ({
+                                value: p.id,
+                                label: p.name,
                             })),
-                        ].map((s) => (
-                            <Link
-                                key={s.id}
-                                href={href({
-                                    store: s.id === "all" ? undefined : s.id,
-                                })}
-                                scroll={false}
-                                aria-current={
-                                    filter.store === s.id ? "true" : undefined
-                                }
-                                className={chipClass(filter.store === s.id)}
-                            >
-                                {s.label}
-                            </Link>
-                        ))}
-                    </div>
-                ) : null}
-                <OptionSelect
-                    size="sm"
-                    aria-label="Product"
-                    className="h-[30px] w-auto min-w-[160px] max-w-[260px] rounded-[8px] text-[12.5px] coarse:h-11"
-                    value={filter.product}
-                    options={[
-                        { value: "", label: "All products" },
-                        ...products.map((p) => ({
-                            value: p.id,
-                            label: p.name,
-                        })),
-                    ]}
-                    onValueChange={(v) =>
-                        router.push(href({ product: v || undefined }), {
-                            scroll: false,
-                        })
-                    }
-                />
-                {log !== "failed" ? (
-                    <span className="ml-auto text-[12px] text-muted-foreground">
-                        {logCountWords(loaded.entries.length, !!loaded.next)}
-                    </span>
-                ) : null}
-            </div>
-        </>
+                        ]}
+                        onValueChange={(v) =>
+                            router.push(href({ product: v || undefined }), {
+                                scroll: false,
+                            })
+                        }
+                    />
+                </>
+            }
+            onClear={
+                filter.kind !== "all" ||
+                filter.store !== "all" ||
+                filter.product
+                    ? () =>
+                          router.push(
+                              href({
+                                  kind: undefined,
+                                  store: undefined,
+                                  product: undefined,
+                              }),
+                              { scroll: false },
+                          )
+                    : undefined
+            }
+            count={
+                log !== "failed"
+                    ? logCountWords(log.total ?? log.entries.length)
+                    : null
+            }
+        />
     );
 
     if (log === "failed") {
@@ -162,202 +176,234 @@ export function LogList({
             <div>
                 {filters}
                 <FailedState
-                    title="The stock log couldn't be loaded"
-                    description="Nothing is lost — every change is still recorded. Saroh just couldn't read the log right now."
-                    action={
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("the stock log")}
+                    description={nothingChanged(
+                        "Every change is still recorded.",
+                    )}
+                    onRetry={() => router.refresh()}
                 />
             </div>
         );
     }
 
     const timezone = log.timezone ?? "Asia/Kolkata";
-    const days = groupByDay(loaded.entries, timezone);
-    const byId = new Map(loaded.entries.map((e) => [e.id, e]));
+    const days = groupByDay(log.entries, timezone);
+    const byId = new Map(log.entries.map((e) => [e.id, e]));
     const pairOf = (e: StockLogEntry) =>
         e.pairId
-            ? (loaded.entries.find(
+            ? (log.entries.find(
                   (o) => o.pairId === e.pairId && o.id !== e.id,
               ) ??
               byId.get(e.pairId) ??
               null)
             : null;
 
-    const more = () =>
-        start(async () => {
-            if (!loaded.next) return;
-            setLoadError(null);
-            const res = await loadLogPage({
-                kind: logKinds(filter.kind),
-                storefront: filter.store === "all" ? undefined : filter.store,
-                product: filter.product || undefined,
-                cursor: loaded.next,
-                limit: pageSize,
-            });
-            if (!res.ok) {
-                setLoadError(res.error);
-                return;
-            }
-            setLoaded((l) => ({
-                ...l,
-                entries: [...l.entries, ...res.data.entries],
-                next: res.data.nextCursor,
-            }));
-        });
-
     // The design's columns; the two number columns grow for a business
     // that counts in thousands, and every row of a day shares them. Desk
     // only: a phone stacks each entry instead (`PHONE_*`).
+    // The time's column fits "12:30 pm" on one line at its 12px type: at
+    // 42px, the 12-hour clock broke it in two ("2:40" over "pm").
     const grid =
-        "min-[760px]:grid min-[760px]:min-w-[540px] min-[760px]:grid-cols-[42px_minmax(130px,1.4fr)_78px_minmax(34px,auto)_minmax(62px,auto)_minmax(120px,1fr)] min-[760px]:gap-x-2";
+        "min-[760px]:grid min-[760px]:min-w-[580px] min-[760px]:grid-cols-[62px_minmax(130px,1.4fr)_78px_minmax(34px,auto)_minmax(62px,auto)_minmax(120px,1fr)] min-[760px]:gap-x-2";
+    // A part of that grid that spans it and hands its columns on.
+    const span = "col-span-full min-[760px]:grid min-[760px]:grid-cols-subgrid";
 
     return (
         <div>
             {filters}
             <div className="grid gap-4">
-                {days.map((d) => (
-                    <section
-                        key={d.key}
-                        aria-label={d.label}
-                        className="min-w-0"
+                {days.length > 0 ? (
+                    // One card for the whole log, in the one table look:
+                    // the head band, each day a group inside it, and rows
+                    // ruled edge to edge on one set of columns.
+                    <div
+                        data-list-table=""
+                        className={cn(
+                            listTable.frame,
+                            "min-[760px]:overflow-x-auto",
+                        )}
                     >
-                        <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            {d.label}
-                        </h3>
-                        <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
-                            <ul className={cn(grid, "px-4")}>
-                                {d.rows.map((e, i) => {
-                                    const qty = entryQuantity(e.quantity);
-                                    const who = entryWho(e);
-                                    const note = entryNote(e, pairOf(e));
-                                    return (
-                                        <li
-                                            key={e.id}
-                                            className={cn(
-                                                "col-span-full py-2.5 text-[13px] min-[760px]:grid min-[760px]:grid-cols-subgrid min-[760px]:items-baseline",
-                                                PHONE_ENTRY,
-                                                i > 0 &&
-                                                    "border-t border-border",
-                                            )}
-                                        >
-                                            <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-1 max-[759px]:shrink-0">
-                                                {entryTime(
-                                                    e.createdAt,
-                                                    timezone,
-                                                )}
-                                            </span>
-                                            <span className="grid min-w-0 gap-px max-[759px]:contents">
-                                                <Link
-                                                    href={productHref(
-                                                        e.storeId,
-                                                        e.productId,
-                                                        "variants",
+                        <div className={grid}>
+                            <ListTableHead
+                                className={cn(
+                                    span,
+                                    "rounded-t-[10px] max-[759px]:hidden",
+                                )}
+                            >
+                                <span>Time</span>
+                                <span>Product</span>
+                                <span>Kind</span>
+                                <span className="text-right">Change</span>
+                                <span>On hand</span>
+                                <span>Note</span>
+                            </ListTableHead>
+                            {days.map((d) => (
+                                <section
+                                    key={d.key}
+                                    aria-label={d.label}
+                                    // A rule between one day and the next:
+                                    // a day's last entry draws none.
+                                    className={cn(
+                                        span,
+                                        "min-w-0 border-t border-border first-of-type:border-t-0",
+                                    )}
+                                >
+                                    <h3
+                                        data-ph-unmask=""
+                                        className={cn(
+                                            listTable.group,
+                                            "col-span-full",
+                                        )}
+                                    >
+                                        {d.label}
+                                    </h3>
+                                    <ul className={span}>
+                                        {d.rows.map((e) => {
+                                            const qty = entryQuantity(
+                                                e.quantity,
+                                            );
+                                            const who = entryWho(e);
+                                            const note = entryNote(
+                                                e,
+                                                pairOf(e),
+                                            );
+                                            return (
+                                                <li
+                                                    key={e.id}
+                                                    className={cn(
+                                                        span,
+                                                        listTable.rowStill,
+                                                        "text-[13px] min-[760px]:items-baseline",
+                                                        PHONE_ENTRY,
                                                     )}
-                                                    className="font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
                                                 >
-                                                    {e.variantTitle
-                                                        ? `${e.productName} ${e.variantTitle}`
-                                                        : e.productName}
-                                                </Link>
-                                                <span
-                                                    aria-hidden
-                                                    className="hidden max-[759px]:order-4 max-[759px]:block max-[759px]:basis-full"
-                                                />
-                                                <span className="text-[11.5px] text-muted-foreground max-[759px]:order-5">
-                                                    {e.storeName}
-                                                </span>
-                                            </span>
-                                            <span className="max-[759px]:order-6">
-                                                <span
-                                                    className={pillClass(
-                                                        entryTone(e),
-                                                    )}
-                                                >
-                                                    {e.kind === "REVERSED"
-                                                        ? "Undo"
-                                                        : e.word}
-                                                </span>
-                                            </span>
-                                            <span
-                                                className={cn(
-                                                    "text-right font-semibold tabular-nums max-[759px]:order-3 max-[759px]:shrink-0",
-                                                    TEXT_TONE[qty.tone],
-                                                )}
-                                            >
-                                                {qty.text}
-                                            </span>
-                                            <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-7">
-                                                {`${e.before} → ${e.after}`}
-                                            </span>
-                                            <span
-                                                className={cn(
-                                                    "grid min-w-0 gap-px text-[12.5px] max-[759px]:order-8 max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-baseline max-[759px]:gap-x-2",
-                                                    !who &&
-                                                        !note &&
-                                                        "max-[759px]:hidden",
-                                                )}
-                                            >
-                                                {e.order ? (
-                                                    <Link
-                                                        href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
+                                                    <span
+                                                        className={cn(
+                                                            listTable.time,
+                                                            "text-[12px] text-muted-foreground max-[759px]:order-1",
+                                                        )}
                                                     >
-                                                        {who}
-                                                    </Link>
-                                                ) : who ? (
-                                                    <span className="text-foreground/80">
-                                                        {who}
+                                                        {formatTime(
+                                                            e.createdAt,
+                                                            timezone,
+                                                        )}
                                                     </span>
-                                                ) : null}
-                                                <span className="text-pretty text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]">
-                                                    {note}
-                                                </span>
-                                            </span>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
+                                                    <span className="grid min-w-0 gap-px max-[759px]:contents">
+                                                        <Link
+                                                            href={productHref(
+                                                                e.storeId,
+                                                                e.productId,
+                                                                "variants",
+                                                            )}
+                                                            className="font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
+                                                        >
+                                                            {e.variantTitle
+                                                                ? `${e.productName} ${e.variantTitle}`
+                                                                : e.productName}
+                                                        </Link>
+                                                        <span
+                                                            aria-hidden
+                                                            className="hidden max-[759px]:order-4 max-[759px]:block max-[759px]:basis-full"
+                                                        />
+                                                        <span className="text-[11.5px] text-muted-foreground max-[759px]:order-5">
+                                                            {e.storeName}
+                                                        </span>
+                                                    </span>
+                                                    <span className="max-[759px]:order-6">
+                                                        <StatusBadge
+                                                            tone={
+                                                                PILL_TONE[
+                                                                    entryTone(e)
+                                                                ]
+                                                            }
+                                                        >
+                                                            {e.kind ===
+                                                            "REVERSED"
+                                                                ? "Undo"
+                                                                : e.word}
+                                                        </StatusBadge>
+                                                    </span>
+                                                    <span
+                                                        className={cn(
+                                                            "text-right font-semibold tabular-nums max-[759px]:order-3 max-[759px]:shrink-0",
+                                                            TEXT_TONE[qty.tone],
+                                                        )}
+                                                    >
+                                                        {qty.text}
+                                                    </span>
+                                                    <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-7">
+                                                        {`${e.before} → ${e.after}`}
+                                                    </span>
+                                                    <span
+                                                        className={cn(
+                                                            "grid min-w-0 gap-px text-[12.5px] max-[759px]:order-8 max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-baseline max-[759px]:gap-x-2",
+                                                            !who &&
+                                                                !note &&
+                                                                "max-[759px]:hidden",
+                                                        )}
+                                                    >
+                                                        {e.order ? (
+                                                            <TextLink
+                                                                href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
+                                                                className="max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
+                                                            >
+                                                                {who}
+                                                            </TextLink>
+                                                        ) : who ? (
+                                                            <span className="text-foreground/80">
+                                                                {who}
+                                                            </span>
+                                                        ) : null}
+                                                        <span className="text-pretty text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]">
+                                                            {note}
+                                                        </span>
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </section>
+                            ))}
                         </div>
-                    </section>
-                ))}
-                {days.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        {filter.kind === "all" &&
-                        filter.store === "all" &&
-                        !filter.product
-                            ? "No stock changes yet. Counts, sales, deliveries and moves show here as they happen."
-                            : "Nothing matches these filters."}
                     </div>
                 ) : null}
+                {days.length === 0 ? (
+                    filter.kind === "all" &&
+                    filter.store === "all" &&
+                    !filter.product ? (
+                        <EmptyState
+                            size="panel"
+                            title="No stock changes yet"
+                            description="Counts, sales, deliveries and moves show here as they happen."
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="stock changes"
+                            cause="filters"
+                            title="No stock changes match these filters"
+                            clearHref={href({
+                                kind: undefined,
+                                store: undefined,
+                                product: undefined,
+                            })}
+                        />
+                    )
+                ) : null}
             </div>
-            {loaded.next ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={pending}
-                        onClick={more}
-                    >
-                        {pending ? "Loading…" : "Show older"}
-                    </Button>
-                    {loadError ? (
-                        <span
-                            role="alert"
-                            className="text-[12px] text-destructive"
-                        >
-                            {loadError}
-                        </span>
-                    ) : null}
-                </div>
-            ) : null}
+            <ListPaging
+                label={STOCK_PAGES_LABEL.log}
+                page={paging.page}
+                total={log.total ?? log.entries.length}
+                size={paging.size}
+                to={(n) => ({ href: href({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize(STOCK_LISTS.log, size);
+                    router.push(href({ size }), { scroll: false });
+                }}
+            />
             <p className="mt-3.5 max-w-[72ch] text-pretty text-[12px] leading-normal text-muted-foreground">
                 Sold and Returned come from orders, so nobody can type them.
                 Entries can&apos;t be deleted. A mistake is fixed with a new

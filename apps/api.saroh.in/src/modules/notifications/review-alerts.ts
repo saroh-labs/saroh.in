@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
+import { noticeOf } from "./notice-target";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 
 /**
@@ -24,9 +25,11 @@ import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 type Tx = Prisma.TransactionClient;
 
 /** The bell's notice types, on the Website row (`alert-preferences.ts`). */
-export const SITE_REVIEW_APPROVED_NOTIFICATION_TYPE = "site.review.approved";
-export const SITE_REVIEW_CHANGES_NOTIFICATION_TYPE = "site.review.changes";
-export const SITE_REVIEW_NOTE_NOTIFICATION_TYPE = "site.review.note";
+export const SITE_REVIEW_APPROVED_NOTIFICATION_TYPE =
+    "site.review.approved" as const;
+export const SITE_REVIEW_CHANGES_NOTIFICATION_TYPE =
+    "site.review.changes" as const;
+export const SITE_REVIEW_NOTE_NOTIFICATION_TYPE = "site.review.note" as const;
 
 /** How much of a note the notice quotes. */
 const NOTE_QUOTE_MAX = 140;
@@ -182,8 +185,9 @@ async function wordApproval(
         lastAsker(tx, organizationId, a.siteId, a.testReleaseId, a.createdAt),
     ]);
     const noteWords = `${notes} open note${notes === 1 ? "" : "s"}`;
+    // The test release's own page: there is no list of them to open.
     const path = a.testReleaseId
-        ? `/sites/${a.siteId}/releases`
+        ? `/sites/${a.siteId}/releases/${a.testReleaseId}`
         : `/sites/${a.siteId}/pages`;
     if (a.outcome === "APPROVED") {
         const body =
@@ -192,7 +196,9 @@ async function wordApproval(
                 : "No notes are left open.";
         return {
             ...base,
-            type: SITE_REVIEW_APPROVED_NOTIFICATION_TYPE,
+            ...noticeOf(SITE_REVIEW_APPROVED_NOTIFICATION_TYPE, {
+                siteId: a.siteId,
+            }),
             title: `${who} approved ${subject}`,
             body,
             mail: { heading: `${mailWho} approved ${mailSubject}`, body },
@@ -206,7 +212,9 @@ async function wordApproval(
             : "Open the review to see what they asked for.";
     return {
         ...base,
-        type: SITE_REVIEW_CHANGES_NOTIFICATION_TYPE,
+        ...noticeOf(SITE_REVIEW_CHANGES_NOTIFICATION_TYPE, {
+            siteId: a.siteId,
+        }),
         title: `${who} asked for changes to ${subject}`,
         body,
         mail: {
@@ -286,7 +294,7 @@ async function wordNote(
         event: "site",
         eventKey: `team:review-note:${c.siteId}:${c.testReleaseId ?? "draft"}:${c.authorUserId}:${round?.id ?? "none"}`,
         notificationId: null,
-        type: SITE_REVIEW_NOTE_NOTIFICATION_TYPE,
+        ...noticeOf(SITE_REVIEW_NOTE_NOTIFICATION_TYPE, { siteId: c.siteId }),
         title: `${nameOf(c.author)} left a note on ${subjectOf(c.site.name, c.testRelease)}`,
         body: `${where}“${quote}”`,
         // The note is free text: the bell quotes it, the email doesn't.
@@ -295,7 +303,7 @@ async function wordNote(
             body: "Open the review in Saroh to read it.",
         },
         path: c.testReleaseId
-            ? `/sites/${c.siteId}/releases`
+            ? `/sites/${c.siteId}/releases/${c.testReleaseId}`
             : `/sites/${c.siteId}/pages`,
         skipUserId: c.authorUserId,
     };

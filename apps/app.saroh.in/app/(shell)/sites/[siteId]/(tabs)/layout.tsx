@@ -2,11 +2,11 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { navRoleCan } from "@/components/shared/nav-items";
+import { navCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
-import { listPosts } from "@/lib/content/service";
+import { listPostCategories, listPosts } from "@/lib/content/service";
 import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
@@ -74,6 +74,12 @@ export default async function WebsiteTabsLayout({
                   .reduce((n, f) => n + f.submissionCount, 0)
         : undefined;
 
+    // The Posts tab's "Categories" sheet, for someone who may change them.
+    // A failed read is `null`, which the sheet says, never an empty list.
+    const postCategories = site.can.edit
+        ? await listPostCategories(siteId).catch(() => null)
+        : undefined;
+
     const summaries = (
         sites.some((s) => s.id === site.id) ? sites : [site]
     ).map((s) => ({
@@ -83,6 +89,7 @@ export default async function WebsiteTabsLayout({
         paused: pausedSites.includes(s.id),
     }));
     const thisPaused = pausedSites.includes(site.id);
+    const reached = siteAddressOf(site, webAddress, RENDERER_APEX);
 
     return (
         <PageContainer width="full">
@@ -102,18 +109,25 @@ export default async function WebsiteTabsLayout({
                         paused: thisPaused,
                     }}
                     sites={summaries}
-                    address={
-                        siteAddressOf(site, webAddress, RENDERER_APEX)?.host ??
-                        `/${site.slug}`
+                    address={reached?.host ?? `/${site.slug}`}
+                    // A link only once the site is live: before that the
+                    // address opens nothing.
+                    liveUrl={
+                        site.currentPublication && reached ? reached.url : null
                     }
+                    qrUrl={reached?.url ?? null}
                     canEdit={site.can.edit}
-                    mayCreate={navRoleCan(
-                        organization?.role ?? null,
+                    mayCreate={navCan(
+                        {
+                            role: organization?.role ?? null,
+                            actions: organization?.actions,
+                        },
                         "site:create",
                     )}
                     pageCount={site.pages.length}
                     postCount={posts?.length ?? null}
                     formEntries={formEntries}
+                    postCategories={postCategories}
                 />
                 {thisPaused ? (
                     <PausedNote>{pausedWords("site")}</PausedNote>

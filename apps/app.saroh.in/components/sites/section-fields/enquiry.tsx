@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import {
@@ -12,13 +13,13 @@ import {
 } from "@saroh/ui/select";
 import { Textarea } from "@saroh/ui/textarea";
 
+import { CheckRow } from "@/components/shared/check-row";
 import type {
     EnquiryContent,
     EnquiryField,
     EnquiryFieldType,
 } from "@/lib/sites/service";
 import { ENQUIRY_FIELD_TYPES, FIELD_LABEL } from "./constants";
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 /**
@@ -73,13 +74,13 @@ export function EnquiryFields({
                 <Input
                     value={c.successMessage ?? ""}
                     onChange={(e) => patch({ successMessage: e.target.value })}
-                    placeholder="Thanks — we'll be in touch soon."
+                    placeholder="Thanks, we'll be in touch soon."
                 />
             </Field>
             <div className="grid gap-2">
                 <Label className={FIELD_LABEL}>Fields</Label>
                 <p className="text-xs text-muted-foreground">
-                    Include at least one email field — it identifies the person
+                    Include at least one email field. It identifies the person
                     who enquired.
                 </p>
                 {c.fields.map((field, i) => (
@@ -161,18 +162,15 @@ export function EnquiryFields({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    checked={field.required ?? false}
-                                    onChange={(e) =>
-                                        patchField(i, {
-                                            required: e.target.checked,
-                                        })
-                                    }
-                                />
+                            <CheckRow
+                                checked={field.required ?? false}
+                                onChange={(required) =>
+                                    patchField(i, { required })
+                                }
+                                className="text-sm"
+                            >
                                 Required
-                            </label>
+                            </CheckRow>
                         </div>
                     </div>
                 ))}

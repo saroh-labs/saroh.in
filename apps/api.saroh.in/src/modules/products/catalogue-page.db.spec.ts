@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { CollectionsService } from "../collections/collections.service";
@@ -155,6 +155,51 @@ describe("Catalogue page (DB)", () => {
         const last = await page({ limit: 2, cursor: second.nextCursor ?? "" });
         expect(last.items.map((i) => i.id)).toEqual([sourdough]);
         expect(last.nextCursor).toBeNull();
+    });
+
+    it("reads any page by its number, at the size asked", async () => {
+        // The DTO offers 10, 25, 50 and 100; the read takes the size it is
+        // given, so five products make three pages of two here.
+        const first = await page({ page: 1, size: 2 });
+        expect(first.items.map((i) => i.id)).toEqual([mug, draft]);
+        expect(first.total).toBe(5);
+        expect(first.pageSize).toBe(2);
+        expect(first.nextCursor).toBe(draft);
+
+        const second = await page({ page: 2, size: 2 });
+        expect(second.items.map((i) => i.id)).toEqual([rye, bun]);
+        const third = await page({ page: 3, size: 2 });
+        expect(third.items.map((i) => i.id)).toEqual([sourdough]);
+        expect(third.nextCursor).toBeNull();
+        // The counts are the whole catalogue's on every page.
+        expect(third.total).toBe(5);
+        expect(third.counts).toEqual(first.counts);
+
+        // Past the end is an empty page, not an error.
+        const past = await page({ page: 9, size: 2 });
+        expect(past.items).toEqual([]);
+        expect(past.total).toBe(5);
+
+        // A size alone is the first page; `limit` is the size without one.
+        expect((await page({ size: 10 })).pageSize).toBe(10);
+        expect((await page({})).pageSize).toBe(50);
+        const byLimit = await page({ limit: 2, page: 2 });
+        expect(byLimit.items.map((i) => i.id)).toEqual([rye, bun]);
+    });
+
+    it("pages a narrowed list by number, and counts what matches", async () => {
+        const first = await page({ status: "PUBLISHED", page: 1, size: 2 });
+        const second = await page({ status: "PUBLISHED", page: 2, size: 2 });
+        expect(first.total).toBe(4);
+        expect(first.items.map((i) => i.id)).toEqual([mug, rye]);
+        expect(second.items.map((i) => i.id)).toEqual([bun, sourdough]);
+        expect(second.nextCursor).toBeNull();
+    });
+
+    it("refuses a cursor and a page number together", async () => {
+        await expect(page({ cursor: draft, page: 2 })).rejects.toThrow(
+            BadRequestException,
+        );
     });
 
     it("searches names and SKUs, any case", async () => {

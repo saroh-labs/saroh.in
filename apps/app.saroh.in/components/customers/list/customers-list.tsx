@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Plus, Upload } from "lucide-react";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
+import { Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useTransition } from "react";
@@ -13,10 +14,10 @@ import {
     emptyTitle,
     isNarrowed,
     listHref,
-    pageCount,
     pageText,
 } from "@/lib/customers/list";
 
+import { ListPaging } from "@/components/shared/list-toolbar";
 import { Filters } from "./filters";
 import { NoMatch, Rows } from "./rows";
 import { ListFirstRun, ListHeading, ListNote } from "./states";
@@ -75,16 +76,16 @@ export function CustomersList({
                 </Button>
             ) : null}
             <Button asChild>
-                <Link href={newCustomerHref()}>
-                    <Plus className="mr-1.5 size-4" />
-                    Add customer
-                </Link>
+                <Link href={newCustomerHref()}>New customer</Link>
             </Button>
         </>
     );
 
     const heading = (
-        <ListHeading count={customersText(page.everyone)} actions={actions} />
+        <ListHeading
+            count={page.everyone > 0 ? customersText(page.everyone) : null}
+            actions={actions}
+        />
     );
     const notice = (
         <UnlinkedNotice
@@ -98,7 +99,7 @@ export function CustomersList({
     // yet" is true. Unlinked paying customers still get their notice.
     if (page.everyone === 0 && !isNarrowed(query)) {
         return (
-            <div className="max-w-[1100px]">
+            <div>
                 {heading}
                 {notice}
                 <ListFirstRun
@@ -109,11 +110,16 @@ export function CustomersList({
         );
     }
 
-    const pages = pageCount(page);
     return (
-        <div className="max-w-[1100px]">
+        <div>
             {heading}
-            <Filters query={query} page={page} go={go} />
+            <Filters
+                query={query}
+                page={page}
+                go={go}
+                searching={navigating}
+                count={page.total > page.pageSize ? pageText(page) : null}
+            />
             {notice}
             <div aria-busy={navigating}>
                 <Rows
@@ -121,6 +127,7 @@ export function CustomersList({
                     empty={
                         <NoMatch
                             title={emptyTitle(query)}
+                            searched={Boolean(query.q)}
                             onClear={() =>
                                 go({ q: "", chip: "all", store: null })
                             }
@@ -128,36 +135,17 @@ export function CustomersList({
                     }
                 />
             </div>
-            {page.total > page.pageSize ? (
-                <nav
-                    aria-label="Pages"
-                    className="mt-3 flex items-center gap-2 text-[12.5px] text-muted-foreground"
-                >
-                    <span className="flex-1 tabular-nums">
-                        {pageText(page)}
-                    </span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page <= 1}
-                        onClick={() => go({ page: page.page - 1 })}
-                        className="h-[30px] rounded-[8px] px-3 text-[12.5px]"
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page >= pages}
-                        onClick={() => go({ page: page.page + 1 })}
-                        className="h-[30px] rounded-[8px] px-3 text-[12.5px]"
-                    >
-                        Next
-                    </Button>
-                </nav>
-            ) : null}
+            <ListPaging
+                label="Pages of customers"
+                page={page.page}
+                total={page.total}
+                size={page.pageSize}
+                to={(n) => ({ onClick: () => go({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize("customers", size);
+                    go({ size });
+                }}
+            />
             <ListNote />
         </div>
     );

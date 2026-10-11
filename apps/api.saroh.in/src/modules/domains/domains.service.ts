@@ -4,21 +4,32 @@ import {
     ForbiddenException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
+import type { Domain } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
+import { queueDomainAlert } from "../notifications/domain-alerts";
+import {
+    errorResult,
+    logDeletionProviderCall,
+} from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
 import type { DomainHosting } from "./domain-hosting";
 import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
+import type { OnLiveChange } from "./domain-hosting-sync";
 import { hostingView, syncHosting } from "./domain-hosting-sync";
 import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
 import { isTestReservedHostname, TEST_RESERVED_HOSTNAME_MSG } from "./dto";
+
+/** A deleted business's hostnames, on its deletion trail (#921). */
+const deletionLog = new Logger("OrganizationDeletion");
 
 /** Input for {@link DomainsService.claim} — the validated {@link ClaimDomainDto}. */
 export interface ClaimDomainInput {
@@ -71,7 +82,7 @@ export class DomainsService {
             !(await this.entitlements.can(ctx.organizationId, "customDomain"))
         ) {
             throw new ForbiddenException(
-                "Custom domains require a paid plan; upgrade to add one.",
+                "Custom domains come with a paid plan. Upgrade to add one.",
             );
         }
 
@@ -144,10 +155,44 @@ export class DomainsService {
         authorize(ctx, "domain:manage");
 
         const domain = await this.requireOwned(ctx, domainId);
+        const result = await this.check(domain, ctx.userId);
+        return result.verified
+            ? { domain: this.withHosting(result.domain), verified: true }
+            : {
+                  domain: this.withHosting(result.domain),
+                  verified: false,
+                  reason: result.reason,
+              };
+    }
 
+    /**
+     * The check behind {@link verify}, for a row already loaded and scoped:
+     * a VERIFIED domain has its hosting synced; any other is checked in DNS
+     * and, on a pass, verified, routed and registered. The background
+     * re-check (`domain-recheck.handler.ts`, #860) calls it for each due
+     * domain, so "Check now" and the job never disagree. Never throws for a
+     * DNS or host failure: both are recorded on the row.
+     *
+     * A check that moves a live domain to a problem, or back to live, tells
+     * the team (#917, `notifications/domain-alerts.ts`) on the same
+     * transaction as its write, whichever of the two ran it, once per
+     * incident. `actorUserId` pressed "Check now": the screen has told
+     * them, so they aren't emailed.
+     */
+    async check(
+        domain: Domain,
+        actorUserId: string | null = null,
+    ): Promise<
+        | { domain: Domain; verified: true }
+        | { domain: Domain; verified: false; reason: VerificationFailure }
+    > {
         if (domain.status === "VERIFIED") {
-            const synced = await syncHosting(this.hosting, domain);
-            return { domain: this.withHosting(synced), verified: true };
+            const synced = await syncHosting(
+                this.hosting,
+                domain,
+                tellTeam(actorUserId),
+            );
+            return { domain: synced, verified: true };
         }
 
         const checkedAt = new Date();
@@ -168,7 +213,7 @@ export class DomainsService {
                 },
             });
             return {
-                domain: this.withHosting(checked),
+                domain: checked,
                 verified: false,
                 reason: outcome.reason satisfies VerificationFailure,
             };
@@ -193,8 +238,12 @@ export class DomainsService {
             });
         }
 
-        const hosted = await syncHosting(this.hosting, verified);
-        return { domain: this.withHosting(hosted), verified: true };
+        const hosted = await syncHosting(
+            this.hosting,
+            verified,
+            tellTeam(actorUserId),
+        );
+        return { domain: hosted, verified: true };
     }
 
     /**
@@ -244,6 +293,76 @@ export class DomainsService {
         await prisma.domain.delete({ where: { id: domain.id } });
 
         return { id: domain.id, deleted: true };
+    }
+
+    /**
+     * A deleted business's domains go offline (#921): each hostname is
+     * deleted at the host (Cloudflare for SaaS), then its claim is released
+     * as {@link remove} releases one, so the hostname is free to be claimed
+     * again. Run by `organization.deletion.cleanup` with no caller context.
+     *
+     * One domain at a time, host first: a host that doesn't answer leaves
+     * that domain (and its row) as it was, the others go on, and the call
+     * throws at the end so the clean-up is retried. Idempotent: a released
+     * domain has no row, and a hostname the host doesn't have is a success.
+     */
+    async releaseForDeletedBusiness(
+        organizationId: string,
+    ): Promise<{ released: number; failed: number }> {
+        const domains = await prisma.domain.findMany({
+            where: { organizationId },
+            select: {
+                id: true,
+                hostname: true,
+                status: true,
+                hostingId: true,
+                siteId: true,
+            },
+        });
+        let released = 0;
+        let failed = 0;
+        for (const domain of domains) {
+            // The host's id for it, or the row's when it was never there.
+            const ref = domain.hostingId ?? domain.id;
+            try {
+                await this.removeFromHosting(domain);
+                logDeletionProviderCall(deletionLog, {
+                    organizationId,
+                    provider: "cloudflare",
+                    call: "hostname.remove",
+                    result: "ok",
+                    ref,
+                });
+            } catch (error) {
+                logDeletionProviderCall(deletionLog, {
+                    organizationId,
+                    provider: "cloudflare",
+                    call: "hostname.remove",
+                    result: errorResult(error),
+                    ref,
+                });
+                failed += 1;
+                continue;
+            }
+            await prisma.$transaction(async (tx) => {
+                if (domain.siteId) {
+                    await tx.site.updateMany({
+                        where: { id: domain.siteId, customDomainId: domain.id },
+                        data: { customDomainId: null },
+                    });
+                }
+                await tx.domain.deleteMany({
+                    where: { id: domain.id, organizationId },
+                });
+            });
+            released += 1;
+        }
+        if (failed > 0) {
+            throw new Error(
+                `domains_release_incomplete released=${released} failed=${failed}`,
+            );
+        }
+        return { released, failed };
     }
 
     /**
@@ -329,11 +448,17 @@ export class DomainsService {
     }
 }
 
+/** Queue the team's alert for a domain that went down or came back (#917). */
+function tellTeam(actorUserId: string | null): OnLiveChange {
+    return (tx, before, after) =>
+        queueDomainAlert(tx, before, after, actorUserId);
+}
+
 /** The 503 a removal answers when the host couldn't delete the hostname. */
 function hostingUnavailable(): ServiceUnavailableException {
     return new ServiceUnavailableException({
         message:
-            "We couldn't disconnect this domain from our hosting just now, so it hasn't been removed. Try again in a few minutes.",
+            "We couldn't disconnect this domain from our hosting, so it hasn't been removed. Try again in a few minutes.",
         details: { reason: "hosting-unavailable" },
     });
 }

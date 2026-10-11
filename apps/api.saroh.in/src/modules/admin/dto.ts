@@ -152,6 +152,16 @@ export class ConfirmedOperatorDto extends OperatorReasonDto {
     confirmName!: string;
 }
 
+/**
+ * Suspend, optionally with a legal hold (DEC-122): "Suspended for activity
+ * the law prohibits — keep its data". The reason given is the hold's.
+ */
+export class SuspendDto extends ConfirmedOperatorDto {
+    @IsOptional()
+    @IsBoolean()
+    legalHold?: boolean;
+}
+
 export class ScheduleDeletionDto extends ConfirmedOperatorDto {
     @IsOptional()
     @Type(() => Number)
@@ -236,6 +246,11 @@ export class ListOrganizationsDto {
     @IsIn(["attention"])
     health?: "attention";
 
+    /** `on`: only businesses on legal hold (DEC-122). */
+    @IsOptional()
+    @IsIn(["on"])
+    legalHold?: "on";
+
     /** `picker`: the flag screen's id/name/slug list, unpaged. */
     @IsOptional()
     @IsIn(["picker"])
@@ -245,6 +260,27 @@ export class ListOrganizationsDto {
     @IsString()
     @MaxLength(200)
     cursor?: string;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+}
+
+/** Storage used per business (#798): sorted by size, one page at a time. */
+export class ListStorageUsageDto {
+    @IsOptional()
+    @IsIn(["most", "least"])
+    order?: "most" | "least";
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100_000)
+    page?: number;
 
     @IsOptional()
     @Type(() => Number)
@@ -332,7 +368,7 @@ export class StartOperationDto extends OperatorReasonDto {
 
 export class ListJobsDto {
     @IsOptional()
-    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED"])
+    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED", "CANCELLED"])
     status?: string;
 
     @IsOptional()
@@ -415,6 +451,21 @@ export class ListWaitlistDto {
 
 /** Remove one entry when its owner asks (U30, KTD-17). */
 export class DeleteWaitlistDto extends OperatorReasonDto {}
+
+/** Customers' reports (saroh.in/customers), newest first. */
+export class ListBusinessReportsDto {
+    @IsOptional()
+    @IsIn(["open", "done", "all"])
+    status?: "open" | "done" | "all";
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
+
+/** Marking a report done carries a reason, as every operator write does. */
+export class MarkBusinessReportDoneDto extends OperatorReasonDto {}
 
 /**
  * A catalogue override on one business (plans catalogue U11): grant or

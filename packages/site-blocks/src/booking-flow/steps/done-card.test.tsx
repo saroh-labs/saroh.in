@@ -39,7 +39,7 @@ function done(over: Partial<Extract<Phase, { kind: "done" }>> = {}) {
         booking: BOOKING,
         paid: false,
         price: "₹600",
-        when: "Mon 12 Oct, 10:00",
+        when: "Mon 12 Oct, 10:00 am",
         first: "Asha",
         ...over,
     };
@@ -106,5 +106,95 @@ describe("the confirmation's way to change it (UX-055)", () => {
         });
         expect(link).toHaveAttribute("href", "/account/bookings");
         expect(document.body.textContent).not.toMatch(/Get in touch/);
+    });
+});
+
+describe("who the booking is with (DEC-121)", () => {
+    const phase = {
+        kind: "done" as const,
+        booking: BOOKING,
+        paid: false,
+        price: "₹600",
+        when: "Mon 12 Oct, 10:00 am",
+        first: "Asha",
+    };
+    const card = (soldBy?: string) =>
+        render(
+            <DoneCard
+                phase={phase}
+                headingRef={createRef()}
+                business="Rye"
+                where={null}
+                rules={{
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: null,
+                }}
+                soldBy={soldBy}
+                onAgain={() => undefined}
+            />,
+        );
+
+    it("names the business's legal name, in one quiet line", () => {
+        card("Run by Rye Studio LLP");
+        expect(screen.getByText("Run by Rye Studio LLP")).toHaveClass(
+            "text-site-muted",
+        );
+    });
+
+    it("draws no line without one, and never Saroh's sentence", () => {
+        const { container } = card();
+        expect(container.querySelector("[data-sold-by]")).toBeNull();
+        expect(container.textContent).not.toMatch(/responsible/);
+    });
+});
+
+/**
+ * What happens next: the card says an email went only when the API says
+ * one does, to the signed-in customer's address.
+ */
+describe("the booked card says whether a message is coming", () => {
+    function card(reach: BookResult["reach"], email: string | null) {
+        return render(
+            <DoneCard
+                phase={{
+                    kind: "done",
+                    booking: { ...BOOKING, reach },
+                    paid: false,
+                    price: null,
+                    when: "Mon 12 Oct, 10:00 am",
+                    first: "Asha",
+                }}
+                headingRef={createRef()}
+                business="Rye"
+                where={null}
+                rules={{
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: null,
+                }}
+                email={email}
+                onAgain={() => undefined}
+            />,
+        );
+    }
+
+    it("says the address it emailed when an email goes", () => {
+        card("EMAIL", "asha@example.com");
+        expect(
+            screen.getByText("We've emailed asha@example.com."),
+        ).toBeVisible();
+        expect(screen.queryByText("It's saved in your account.")).toBeNull();
+    });
+
+    it("says it is saved in their account when none goes, or the API didn't say", () => {
+        for (const reach of ["ACCOUNT", "NONE", undefined] as const) {
+            const { unmount } = card(reach, "asha@example.com");
+            expect(
+                screen.getByText("It's saved in your account."),
+            ).toBeVisible();
+            expect(screen.queryByText(/We've emailed/)).toBeNull();
+            unmount();
+        }
     });
 });

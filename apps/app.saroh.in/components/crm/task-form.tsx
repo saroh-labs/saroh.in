@@ -1,9 +1,15 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
-import { Form, FormControl, FormField, FormItem } from "@saroh/ui/form";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -11,14 +17,17 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
 import { createTask } from "@/lib/leads/actions";
 
 /**
- * Follow-up task form for a lead (S3-007). Captures what to do (`body`) and a
- * due date/time, then calls the `createTask` server action (`activity:write`)
- * which records an `Activity{ type:"TASK", dueAt }`. On success it clears the
- * form and refreshes so the new task shows on the timeline. The picked day and
- * time are joined in the viewer's own timezone and sent as ISO for the api's
+ * Follow-up task form for a lead (S3-007), drawn inside the lead's "Schedule
+ * follow-up" sheet. Captures what to do (`body`) and a due date/time, then
+ * calls the `createTask` server action (`activity:write`) which records an
+ * `Activity{ type:"TASK", dueAt }`. On success it closes the sheet (`onDone`)
+ * and refreshes so the new task shows on the timeline; a refusal is a toast
+ * and the sheet stays open with what was filled in. The picked day and time
+ * are joined in the viewer's own timezone and sent as ISO for the api's
  * `IsISO8601` check.
  *
  * Validation is schema-driven (zod + react-hook-form via the shared `@saroh/ui`
@@ -27,7 +36,7 @@ import { createTask } from "@/lib/leads/actions";
  */
 
 const formSchema = z.object({
-    body: z.string().trim().min(1),
+    body: z.string().trim().min(1, "Say what to do."),
     dueDate: z.date().optional(),
     dueTime: z.string(),
 });
@@ -42,7 +51,14 @@ function joinDue(date: Date, time: string): Date {
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function TaskForm({ leadId }: { leadId: string }) {
+export function TaskForm({
+    leadId,
+    onDone,
+}: {
+    leadId: string;
+    /** The follow-up was saved: close the sheet. */
+    onDone: () => void;
+}) {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -53,12 +69,10 @@ export function TaskForm({ leadId }: { leadId: string }) {
         },
     });
     const { isSubmitting } = form.formState;
-    const body = form.watch("body");
-    const dueDate = form.watch("dueDate");
 
     async function onSubmit(values: FormValues) {
         if (!values.dueDate) {
-            showError("Pick a due date");
+            form.setError("dueDate", { message: "Pick a due date." });
             return;
         }
         const parsed = joinDue(values.dueDate, values.dueTime);
@@ -70,43 +84,41 @@ export function TaskForm({ leadId }: { leadId: string }) {
             showError(res.error);
             return;
         }
-        form.reset({ body: "", dueDate: undefined, dueTime: "09:00" });
-        showSuccess("Follow-up scheduled");
+        showSuccess("Follow-up added.");
+        onDone();
         router.refresh();
     }
 
     return (
         <Form {...form}>
-            <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="grid gap-2 sm:grid-cols-[1fr_auto]"
-            >
-                <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+            <>
+                <FormSheetBody className="gap-4">
                     <FormField
                         control={form.control}
                         name="body"
                         render={({ field }) => (
                             <FormItem>
+                                <FormLabel>What to do</FormLabel>
                                 <FormControl>
                                     <Input
-                                        aria-label="Follow-up task"
                                         placeholder="Follow up with…"
                                         disabled={isSubmitting}
                                         {...field}
                                     />
                                 </FormControl>
+                                <FormMessage />
                             </FormItem>
                         )}
                     />
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-4">
                         <FormField
                             control={form.control}
                             name="dueDate"
                             render={({ field }) => (
                                 <FormItem>
+                                    <FormLabel>Due date</FormLabel>
                                     <FormControl>
                                         <DatePicker
-                                            aria-label="Due date"
                                             value={field.value}
                                             onValueChange={field.onChange}
                                             disabled={isSubmitting}
@@ -115,6 +127,7 @@ export function TaskForm({ leadId }: { leadId: string }) {
                                             }}
                                         />
                                     </FormControl>
+                                    <FormMessage />
                                 </FormItem>
                             )}
                         />
@@ -123,9 +136,9 @@ export function TaskForm({ leadId }: { leadId: string }) {
                             name="dueTime"
                             render={({ field }) => (
                                 <FormItem>
+                                    <FormLabel>Due time</FormLabel>
                                     <FormControl>
                                         <TimeSelect
-                                            aria-label="Due time"
                                             value={field.value}
                                             onValueChange={field.onChange}
                                             disabled={isSubmitting}
@@ -135,19 +148,14 @@ export function TaskForm({ leadId }: { leadId: string }) {
                             )}
                         />
                     </div>
-                </div>
-                <div className="flex justify-end sm:col-span-2">
-                    <Button
-                        type="submit"
-                        size="sm"
-                        variant="secondary"
-                        className="wk-press"
-                        disabled={isSubmitting || !body.trim() || !dueDate}
-                    >
-                        {isSubmitting ? "Scheduling…" : "Add follow-up"}
-                    </Button>
-                </div>
-            </form>
+                </FormSheetBody>
+                <FormSheetFoot
+                    saveLabel="Add follow-up"
+                    savingLabel="Adding…"
+                    pending={isSubmitting}
+                    onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
+                />
+            </>
         </Form>
     );
 }

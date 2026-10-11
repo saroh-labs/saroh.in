@@ -59,6 +59,8 @@ export class FakeWebhookProvider implements WebhookProvider {
             orderRef: body.orderRef,
             providerPaymentRef: body.providerPaymentRef,
             feeCents: body.feeCents,
+            capturedAmountCents: body.capturedAmountCents,
+            capturedCurrency: body.capturedCurrency,
             providerRefundId: body.providerRefundId,
             refundAmountCents: body.refundAmountCents,
             refundReference: body.refundReference,

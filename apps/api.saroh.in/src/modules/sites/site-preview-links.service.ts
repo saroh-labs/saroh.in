@@ -3,11 +3,14 @@ import { prisma } from "@saroh/database";
 import { createHash, randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
 import { authorize } from "../organizations/organization-policy";
 import type { PublicModulePageStates } from "./module-pages";
 import { publicModulePageStates } from "./module-pages";
 import { sanitizeRichHtml } from "./sanitize";
 import { assertSiteInOrg } from "./site-access";
+import type { PublicSiteIcon } from "./site-icon";
+import { publicSiteIcon } from "./site-icon";
 import type { SiteSnapshot } from "./sites.service";
 import { SitesService } from "./sites.service";
 
@@ -79,6 +82,8 @@ export interface PreviewView {
      * preview without them reads as before.
      */
     modules?: PublicModulePageStates;
+    /** The icon publishing would show (DEC-124); null for the plain tile. */
+    icon?: PublicSiteIcon | null;
 }
 
 /**
@@ -316,6 +321,9 @@ export class SitePreviewLinksService {
             siteId: link.siteId,
             expiresAt: link.expiresAt,
             ...(modules ? { modules } : {}),
+            // The icon publishing would show (DEC-124): the draft's own,
+            // else the business logo.
+            icon: await publicSiteIcon(snapshot, link.organizationId),
         };
     }
 
@@ -397,9 +405,11 @@ export class SitePreviewLinksService {
                 organizationId: true,
                 expiresAt: true,
                 revokedAt: true,
+                organization: { select: { lifecycleStatus: true } },
             },
         });
-        if (!link) {
+        // Offline with its business (#921): as if the link never was.
+        if (!link || !publicSiteOnline(link.organization.lifecycleStatus)) {
             throw new NotFoundException("No preview at this address");
         }
         const state = previewLinkState(link);
@@ -425,6 +435,11 @@ export class SitePreviewLinksService {
             })
             .catch(() => undefined);
 
-        return link;
+        return {
+            id: link.id,
+            siteId: link.siteId,
+            organizationId: link.organizationId,
+            expiresAt: link.expiresAt,
+        };
     }
 }

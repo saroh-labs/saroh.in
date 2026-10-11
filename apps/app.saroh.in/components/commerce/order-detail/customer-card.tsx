@@ -1,3 +1,4 @@
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -6,6 +7,7 @@ import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel } from "./parts";
 
 export function initials(name: string): string {
@@ -162,15 +164,12 @@ export function CustomerCard({
 function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
     if (attention === null) {
         return (
-            <div
-                role="status"
-                className="mt-2.5 rounded-lg bg-muted px-2.5 py-2 text-[12.5px] leading-[1.45] text-muted-foreground"
-            >
+            <Notice role="status" className="mt-2.5">
                 <span className="font-semibold text-foreground">
                     Needs attention: not available.
                 </span>{" "}
                 Check with them before it goes out.
-            </div>
+            </Notice>
         );
     }
     const card = cardAttention(attention);
@@ -232,17 +231,15 @@ export function TrackingRow({
     const { courier, number, url, ownDriver, canChange } = shipment;
     const shown = number ?? (url ? url.replace(/^https?:\/\//, "") : null);
     const action = (label: string, name: string) => (
-        <button
+        <Button
+            variant="link"
+            size="inline"
             type="button"
             onClick={onChange}
             aria-label={name}
-            className={cn(
-                FOCUS,
-                "rounded-sm font-sans text-[12.5px] font-semibold text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground coarse:min-h-11",
-            )}
         >
             {label}
-        </button>
+        </Button>
     );
     return (
         <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12.5px]">

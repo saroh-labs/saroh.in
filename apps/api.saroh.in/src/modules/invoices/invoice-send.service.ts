@@ -10,8 +10,8 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { dayWords, moneyWords, whenWords } from "../../common/words-format";
 import type { AccountThreadPoster } from "../communications/account-thread";
 import {
     ACCOUNT_THREAD_POSTER,
@@ -261,7 +261,7 @@ export class InvoiceSendService {
             if (reminder && view.nextReminderAt) {
                 throw new HttpException(
                     {
-                        message: `One reminder a day. The next can go after ${formatWhen(new Date(view.nextReminderAt), zone)}.`,
+                        message: `One reminder a day. The next can go after ${whenWords(new Date(view.nextReminderAt), zone)}.`,
                         details: { retryAt: view.nextReminderAt },
                     },
                     HttpStatus.TOO_MANY_REQUESTS,
@@ -291,9 +291,9 @@ export class InvoiceSendService {
                             business: org?.name ?? "",
                             firstName: firstName(row),
                             number: row.number ?? "",
-                            total: formatMoney(row.total, row.currency),
+                            total: moneyWords(row.total, row.currency),
                             dueOn: row.dueAt
-                                ? formatDay(row.dueAt, zone)
+                                ? dayWords(row.dueAt, zone, { year: true })
                                 : null,
                             overdue: isPastDue(row, now),
                             payOnline: view.payOnline,
@@ -488,41 +488,4 @@ function firstName(row: SendRow): string | null {
             .filter(Boolean)
             .join(" ");
     return name.trim().split(/\s+/)[0] || null;
-}
-
-/** "₹2,400.00", from the decimal string: the amount itself never floats. */
-export function formatMoney(
-    total: { toString(): string },
-    currency: string,
-): string {
-    const amount = toMoneyString(total);
-    const [whole = "0", frac = "00"] = amount.replace("-", "").split(".");
-    const grouped = new Intl.NumberFormat("en-IN").format(BigInt(whole));
-    const symbol =
-        new Intl.NumberFormat("en-IN", { style: "currency", currency })
-            .formatToParts(0)
-            .find((p) => p.type === "currency")?.value ?? currency;
-    return `${amount.startsWith("-") ? "-" : ""}${symbol}${grouped}.${frac}`;
-}
-
-/** "3 Oct 2026", in the business's zone. */
-export function formatDay(at: Date, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone,
-    }).format(at);
-}
-
-/** "4 Oct, 10:05 am", in the business's zone. */
-export function formatWhen(at: Date, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-        timeZone,
-    }).format(at);
 }

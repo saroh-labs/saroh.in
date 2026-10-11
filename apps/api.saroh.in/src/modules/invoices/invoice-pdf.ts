@@ -32,8 +32,11 @@ const FONT_DIR = join(__dirname, "..", "..", "..", "assets", "fonts");
 
 let fonts: { regular: Buffer; bold: Buffer } | null = null;
 
-/** Read once, on the first PDF: most processes never draw one. */
-function loadFonts(): { regular: Buffer; bold: Buffer } {
+/**
+ * Read once, on the first PDF: most processes never draw one. Shared with
+ * the QR print files (`sites/qr-print.ts`), so the process holds one copy.
+ */
+export function loadFonts(): { regular: Buffer; bold: Buffer } {
     fonts ??= {
         regular: readFileSync(join(FONT_DIR, "NotoSans-Regular.ttf")),
         bold: readFileSync(join(FONT_DIR, "NotoSans-Bold.ttf")),
@@ -118,7 +121,7 @@ export function renderInvoicePdf(
 type Doc = PDFKit.PDFDocument;
 
 /** pdfkit's parsed image: `openImage` is public but untyped. */
-interface OpenedImage {
+export interface OpenedImage {
     width: number;
     height: number;
     /** png-js's parse, on a PNG. */
@@ -129,7 +132,7 @@ interface OpenedImage {
  * Parse the logo before anything is drawn, so an image whose signature
  * passed but whose data is broken leaves the page untouched.
  */
-function openLogo(doc: Doc, bytes: Buffer): OpenedImage | null {
+export function openLogo(doc: Doc, bytes: Buffer): OpenedImage | null {
     try {
         const image = (
             doc as Doc & { openImage(src: Buffer): OpenedImage }

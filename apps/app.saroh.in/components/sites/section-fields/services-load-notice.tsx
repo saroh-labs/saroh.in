@@ -24,8 +24,8 @@ export function ServicesLoadNotice({ load }: { load: ServicesLoad }) {
     if (load.forbidden) {
         return (
             <p className="text-sm text-muted-foreground">
-                Your role can&apos;t see this organization&apos;s services, so
-                they can&apos;t be chosen here.
+                Your role can&apos;t see this business&apos;s services, so they
+                can&apos;t be chosen here.
             </p>
         );
     }

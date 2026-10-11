@@ -20,7 +20,7 @@ export function EmailPromptBlock({ prompt }: { prompt: EmailPrompt }) {
     return (
         <section
             aria-labelledby={id}
-            className="flex max-w-[720px] flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-[10px] border border-brand-300 bg-brand-subtle px-3.5 py-3 dark:border-brand-700"
+            className="flex max-w-[720px] flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-[10px] border border-border-strong bg-muted px-3.5 py-3"
         >
             <div className="grid min-w-0 flex-[1_1_320px] gap-1.5">
                 <h3

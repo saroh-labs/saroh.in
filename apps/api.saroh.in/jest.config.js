@@ -13,6 +13,11 @@
  */
 module.exports = {
     preset: "ts-jest",
+    // Jest asks watchman which files changed when one is installed. With
+    // several worktrees open it never answers, and `--changedSince` (the
+    // gate's quick run) sat at 0% CPU until killed (DEV_LEARNINGS, 10 Oct
+    // 2026). The plain file crawl is a second slower and always returns.
+    watchman: false,
     // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
     // them natively; Jest's CommonJS runtime needs them transformed too.
     transform: {
@@ -34,6 +39,9 @@ module.exports = {
         // S1-009 audit: append-only AuditService + read-authorization specs,
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",
+        // DEC-120: the export's cells and zip, DB-free; its rows are in
+        // data-export.db.spec.ts.
+        "<rootDir>/src/modules/data-export/**/*.spec.ts",
         // Internal control plane: fixed staff permissions, admin read models,
         // and services with mocked Prisma. Never touch a DB.
         "<rootDir>/src/modules/admin/**/*.spec.ts",
@@ -76,6 +84,12 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
+        // #117: the guard's shadow/refused log lines and their throttle, the
+        // history reads that stay open with a module off, and the source
+        // scan of what is gated — no database.
+        "<rootDir>/src/modules/capabilities/module-enforcement.log.spec.ts",
+        "<rootDir>/src/modules/capabilities/history-reads.gate.spec.ts",
+        "<rootDir>/src/modules/capabilities/module-annotations.spec.ts",
         // #274 the same guard with the REAL availability service, per role:
         // which roles reach which module under MODULE_ENFORCEMENT (mocked I/O).
         "<rootDir>/src/modules/capabilities/module-enforcement.roles.spec.ts",
@@ -86,6 +100,9 @@ module.exports = {
         "<rootDir>/src/modules/stores/**/*.authorization.spec.ts",
         // ADR-006: one storefront per business, with a mocked Prisma.
         "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
+        // DEC-123 a location's logo: which one a read says and what a save
+        // writes, with a mocked Prisma and stubbed store and media services.
+        "<rootDir>/src/modules/stores/location-logo.spec.ts",
         // S2-008 media: MediaService specs with a jest-mocked Prisma AND a fake
         // ObjectStorage port (never touch a DB, R2, or the network).
         "<rootDir>/src/modules/media/**/*.spec.ts",
@@ -108,6 +125,9 @@ module.exports = {
         // $transaction) — the public submit command's acceptance + security
         // cases (isolation, idempotency, validation, rate-limit); no DB, no net.
         "<rootDir>/src/modules/enquiry/**/*.spec.ts",
+        // Terms rev 46: customers' reports about a business — the address
+        // rules, the DTO and the public write, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/business-reports/**/*.spec.ts",
         // S3-005 CRM: ContactsService, PipelinesService, and LeadsService specs
         // with a jest-mocked Prisma (incl. $transaction) — org-scoped reads,
         // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and
@@ -160,6 +180,9 @@ module.exports = {
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
+        // The Products list's query: a page by number and its sizes, with a
+        // mocked Prisma.
+        "<rootDir>/src/modules/products/catalogue-page.dto.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         // #517 photos and videos: limits, kind/type match, posters from the
         // library, with a jest-mocked Prisma.
@@ -174,6 +197,8 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
+        // The stock lists' numbered pages: the window and the DTOs — pure.
+        "<rootDir>/src/modules/stock/stock-paging.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",
@@ -209,6 +234,9 @@ module.exports = {
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
+        // #122: an order's online payment in words — failed, waiting, not
+        // finished — with a mocked Prisma.
+        "<rootDir>/src/modules/orders/online-payment.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
         // B13: New order's rules and how a walk-in reads, DB-free. The
@@ -231,6 +259,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/uncollected.spec.ts",
         // Record as refunded's amount and words (UX-061).
         "<rootDir>/src/modules/orders/hand-payments.spec.ts",
+        // Another amount recorded by hand (#865, DEC-116), pure.
+        "<rootDir>/src/modules/orders/hand-refund.spec.ts",
+        // What a cancel sends back once part went back by hand (#918).
+        "<rootDir>/src/modules/orders/order-cancel.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
@@ -379,6 +411,9 @@ module.exports = {
         // Link preview tool (resources plan U2): the SSRF guard, the head
         // parser, the report and the gate, with fake DNS and transports.
         "<rootDir>/src/modules/link-preview/**/*.spec.ts",
+        // QR code maker (QR codes plan U9): its email gate, with a mocked
+        // Prisma and mailer.
+        "<rootDir>/src/modules/tools/**/*.spec.ts",
         // Which social sign-in buttons the accounts pages show: only
         // providers with both keys set. Pure; no DB.
         "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",

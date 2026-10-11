@@ -64,6 +64,12 @@ export interface FakeMandateCharge {
     providerIntentId: string;
     providerMandateId: string;
     amountCents: number;
+    currency: string;
+    /**
+     * What the bank took, when a test makes it differ from the charge
+     * (PAY-06); otherwise the charge's own amount.
+     */
+    capturedAmountCents?: number;
     debitAfter: Date;
     preDebitStatus: PreDebitStatus;
     providerPaymentRef: string | null;
@@ -170,6 +176,14 @@ export class FakeMerchantProvider implements MerchantProvider {
                 return {
                     status: charge.paymentStatus ?? "NONE",
                     providerPaymentRef: charge.providerPaymentRef,
+                    ...(charge.paymentStatus === "SUCCEEDED"
+                        ? {
+                              amountCents:
+                                  charge.capturedAmountCents ??
+                                  charge.amountCents,
+                              currency: charge.currency,
+                          }
+                        : {}),
                 };
             }),
         cancel: (input) => {
@@ -542,6 +556,7 @@ export class FakeMerchantProvider implements MerchantProvider {
             providerIntentId,
             providerMandateId: input.providerMandateId,
             amountCents: input.amountCents,
+            currency: input.currency,
             debitAfter: needsNotice ? input.debitAt : this.now(),
             preDebitStatus: needsNotice ? "PENDING" : "NOT_NEEDED",
             providerPaymentRef: null,

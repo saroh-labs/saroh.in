@@ -318,7 +318,8 @@ test.describe(
             // putting it away again.
             const publishTitle = async () => {
                 const publish = await publishButton(page);
-                const title = await publish.getAttribute("title");
+                // Its hint is its description (`Tip`), not a `title`.
+                const title = await publish.getAttribute("aria-description");
                 if (onPhone(page)) {
                     await page.keyboard.press("Escape");
                     /*

@@ -15,6 +15,7 @@ import {
     timingOptions,
 } from "@/lib/subscriptions/autopay-timing";
 
+import { runAction } from "@/lib/api/run-action";
 import { TimingCard } from "./timing-card";
 
 /**
@@ -48,14 +49,15 @@ export function AutopayTimingSetting({
         const before = value;
         setValue(next);
         start(async () => {
-            const res = await setAutopayChargeTiming(next);
+            const res = await runAction(() => setAutopayChargeTiming(next));
+            if (!res) return setValue(before);
             if (!res.ok) {
                 setValue(before);
                 showError(res.error);
                 return;
             }
             showSuccess(
-                "Saved. Renewals from now on charge this way; charges already on their way keep their date.",
+                "Timing saved. Renewals from now on charge this way. Charges already on their way keep their date.",
             );
             router.refresh();
         });

@@ -259,6 +259,24 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         expect(jobCreate.mock.calls[0][0].data.organizationId).toBe("org_SVC");
     });
 
+    it("names no QR code unless a signed-in customer's site has the one the page sent", async () => {
+        const service = new PublicBookingsService();
+        wireBookHappyPath();
+
+        // A tag with nobody signed in on a site to look it up on: the
+        // booking is made, and names no code. (The signed-in path, with a
+        // real code, is `account-bookings.controller.db.spec.ts`.)
+        await service.book(
+            "svc_1",
+            baseInput({ sourceTag: "qr-h7c" }),
+            "iphash",
+        );
+
+        const data = bookingCreate.mock.calls[0][0].data;
+        expect(data.sourceCode).toBeNull();
+        expect(JSON.stringify(data.snapshot)).not.toContain("qr-h7c");
+    });
+
     it("409s when the in-tx re-count is already at capacity — creates nothing", async () => {
         const service = new PublicBookingsService();
         wireBookHappyPath();
@@ -431,6 +449,30 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(transaction).not.toHaveBeenCalled();
     });
+
+    it.each(["SUSPENDED", "PENDING_DELETION"])(
+        "a %s business takes no booking, in the paused words that name no state (DEC-120)",
+        async (lifecycleStatus) => {
+            const service = new PublicBookingsService();
+            serviceFindUnique.mockResolvedValue({
+                ...SERVICE,
+                availabilityRules: RULES,
+            });
+            const lifecycle = prisma.organization.findUnique as jest.Mock;
+            lifecycle.mockResolvedValue({ lifecycleStatus });
+            const err = await service
+                .book("svc_1", baseInput(), "iphash")
+                .catch((e: unknown) => e)
+                .finally(() => lifecycle.mockResolvedValue(null));
+            expect(err).toBeInstanceOf(ConflictException);
+            const body = (err as ConflictException).getResponse();
+            expect(body).toMatchObject({
+                details: { code: "NOT_TAKING_ORDERS" },
+            });
+            expect(JSON.stringify(body)).not.toMatch(/clos|delet|suspend/i);
+            expect(transaction).not.toHaveBeenCalled();
+        },
+    );
 
     it("404s a missing/soft-deleted service and 410s an archived one", async () => {
         const service = new PublicBookingsService();

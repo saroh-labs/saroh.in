@@ -11,6 +11,7 @@
     ],
     "exports": {
         ".": "./src/index.ts",
+        "./site-icon": "./src/site-icon.ts",
         "./tailwind-preset": "./src/tailwind-preset.ts",
         "./test-release-words": "./src/test-release-words.ts",
         "./url-path": "./src/url-path.ts"

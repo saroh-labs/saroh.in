@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { PutObjectCommandInput } from "@aws-sdk/client-s3";
 import {
     DeleteObjectCommand,
     GetObjectCommand,
@@ -15,6 +16,8 @@ import type {
     CreateSignedUploadUrlInput,
     HeadObjectResult,
     ObjectStorage,
+    PutObjectBody,
+    PutObjectOptions,
     SignedDownloadUrl,
     SignedDownloadUrlOptions,
     SignedUploadUrl,
@@ -241,6 +244,38 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                     contentLength: out.ContentLength,
                     etag: out.ETag,
                 };
+            } catch (error) {
+                if (isNotFound(error)) return null;
+                throw error;
+            }
+        },
+
+        async putObject(
+            key: string,
+            body: PutObjectBody,
+            opts: PutObjectOptions,
+        ): Promise<void> {
+            await client.send(
+                new PutObjectCommand({
+                    Bucket: config.bucket,
+                    Key: key,
+                    Body: body as PutObjectCommandInput["Body"],
+                    ContentType: opts.contentType,
+                    ContentLength: opts.contentLength,
+                }),
+            );
+        },
+
+        async readObject(
+            key: string,
+        ): Promise<AsyncIterable<Uint8Array> | null> {
+            try {
+                const out = await client.send(
+                    new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+                );
+                // In Node the SDK's body is a Readable: chunks as they come.
+                const body = out.Body as AsyncIterable<Uint8Array> | undefined;
+                return body ?? null;
             } catch (error) {
                 if (isNotFound(error)) return null;
                 throw error;

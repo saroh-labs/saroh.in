@@ -73,7 +73,7 @@ export default async function AuditPage({
                         defaultValue={query.actorUserId}
                     />
                     <FilterField
-                        label="Organization ID"
+                        label="Business ID"
                         name="organizationId"
                         defaultValue={query.organizationId}
                     />

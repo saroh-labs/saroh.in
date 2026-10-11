@@ -154,7 +154,7 @@ export function maskedEmail(email: string): string {
  * contact's email only, never how they sign in (ADR-011, DEC-049).
  */
 export function signInNote(accountEmail: string): string {
-    return `They sign in with ${maskedEmail(accountEmail)}; messages about their orders go there.`;
+    return `They sign in with ${maskedEmail(accountEmail)}. Messages about their orders go there.`;
 }
 
 /**

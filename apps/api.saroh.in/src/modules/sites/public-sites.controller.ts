@@ -8,11 +8,15 @@ import {
     Ip,
     Param,
     Query,
+    UseGuards,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import type { PublicContact } from "../organizations/business-contact";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
+import { PublicContactService } from "./public-contact.service";
 import type { PublicFooter } from "./public-footer.service";
 import { PublicFooterService } from "./public-footer.service";
 import type { PublicHead } from "./public-head.service";
@@ -41,6 +45,7 @@ import { resolveTestRelease, TEST_TOKEN_HEADER } from "./test-release-lookup";
  * unpublished or unknown site is a 404.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicSitesController {
     /**
      * A speed bump on the test-host lookup, per visitor when the renderer
@@ -59,6 +64,7 @@ export class PublicSitesController {
         private readonly visits: PublicVisitService,
         private readonly footers: PublicFooterService,
         private readonly heads: PublicHeadService,
+        private readonly contacts: PublicContactService,
     ) {}
 
     /**
@@ -217,6 +223,24 @@ export class PublicSitesController {
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicFooter> {
         return this.footers.read(siteId, visitorKey(ip, relay));
+    }
+
+    /**
+     * How to reach the site's business (DEC-128): its public phone, contact
+     * email, where customers come and its social links. What the footer
+     * and the home page's structured data show, and what a pay or booking
+     * page can offer as "get in touch". Read live, never cached, so a
+     * change in Settings shows without a publish. The visitor is relayed
+     * as for `/visit`.
+     */
+    @Get(":siteId/contact")
+    @Header("Cache-Control", "no-store")
+    contact(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<PublicContact> {
+        return this.contacts.read(siteId, visitorKey(ip, relay));
     }
 
     /**

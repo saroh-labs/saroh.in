@@ -2,8 +2,9 @@ import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay } from "../invoices/invoice-paper-view";
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import type { PausesWords } from "./billing-emails";
 import { moveDownNotice } from "./billing-emails";
@@ -102,7 +103,9 @@ export async function pausesForMoveInTx(
     if (!measure || !anythingPauses(measure)) return null;
     const toldAt = await claimGraceInTx(tx, organizationId, measure, now);
     return {
-        pausesOn: paperDay(pauseDate(toldAt, effectiveAt).toISOString(), zone),
+        pausesOn: dayWords(pauseDate(toldAt, effectiveAt), zone, {
+            year: true,
+        }),
         lines: pauseLines(summaryOf(measure)),
     };
 }
@@ -340,7 +343,7 @@ async function tell(input: {
             nextPlanName: input.nextPlanName,
             movesOn:
                 input.mode === "scheduled"
-                    ? paperDay(input.effectiveAt.toISOString(), zone)
+                    ? dayWords(input.effectiveAt, zone, { year: true })
                     : null,
             pausesOn: pauses.pausesOn,
             lines: pauses.lines,
@@ -349,7 +352,8 @@ async function tell(input: {
         const notice = await tx.notification.create({
             data: {
                 organizationId,
-                type: PLAN_ENDING_NOTIFICATION_TYPE,
+                // It opens Plan and billing.
+                ...noticeOf(PLAN_ENDING_NOTIFICATION_TYPE, {}),
                 title: words.title,
                 body: words.body,
             },

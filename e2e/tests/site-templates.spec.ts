@@ -70,10 +70,17 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
             await openHome(page, FIRST_RUN[kind]);
             const sheet = await openWebsiteSheet(page);
             await expectStartsFrom(sheet, name);
-            // The address is the API's prefill, not left blank.
-            await expect
-                .poll(() => sheet.getByLabel("Web address").inputValue())
-                .not.toBe("");
+            // The address chosen at setup is said, not asked again: the
+            // API's prefill, never blank, and no box to type it in.
+            await expect(
+                sheet.getByRole("term").filter({ hasText: "Web address" }),
+            ).toBeVisible();
+            await expect(
+                sheet
+                    .getByRole("definition")
+                    .filter({ hasText: /^[a-z0-9-]+\.saroh\.app$/ }),
+            ).toBeVisible();
+            await expect(sheet.getByLabel("Web address")).toHaveCount(0);
         });
     }
 
@@ -88,12 +95,13 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
         await expectStartsFrom(sheet, "Portfolio");
         await sheet.getByRole("button", { name: /^Turn on$/ }).click();
 
-        // Website's own screen, then the new site's editor.
-        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-        const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
+        // A first run lands on the thing itself (`goalHref`): the new
+        // site, open in its editor.
+        await page.waitForURL(/\/sites\/[^/?#]+$/, { timeout: 30_000 });
+        const id = /\/sites\/([^/?#]+)$/.exec(
+            new URL(page.url()).pathname,
+        )?.[1];
         if (id === undefined) throw new Error(`no site id in ${page.url()}`);
-        await expect(page.getByRole("main")).toContainText("/work");
-        await page.goto(`/sites/${id}`);
         await expect(
             page
                 .getByRole("button", { name: /^Projects block, 2 of 3/ })
@@ -106,5 +114,8 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
                 .filter({ visible: true })
                 .first(),
         ).toBeVisible();
+        // Its pages are the portfolio's.
+        await page.goto(`/sites/${id}/pages`);
+        await expect(page.getByRole("main")).toContainText("/work");
     });
 });

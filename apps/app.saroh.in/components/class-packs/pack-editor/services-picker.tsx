@@ -1,7 +1,8 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
+import { EmptyState } from "@saroh/ui/data-state";
+import { FieldError } from "@saroh/ui/field";
+import { TextLink } from "@saroh/ui/text-link";
 import { useId } from "react";
 
 import type {
@@ -15,7 +16,8 @@ import {
 } from "@/lib/class-packs/pack-editor";
 import { formatMoney } from "@/lib/format/money";
 
-import { FieldError, HELP, PackChip, PackSection } from "./parts";
+import { FailedRead } from "@/components/shared/failed-read";
+import { PackChip, PackSection } from "./parts";
 
 /**
  * Good for (E18): the services a credit pays for, filtered by the pack's
@@ -46,10 +48,11 @@ export function ServicesPicker({
     return (
         <PackSection title="Good for" sub="What a credit can be used on.">
             {services === null ? (
-                <p role="alert" className={cn(HELP, "mt-2")}>
-                    Your services couldn&apos;t be loaded, so what this pack is
-                    good for stays as it is. Reload to change it.
-                </p>
+                <FailedRead
+                    things="your services"
+                    reassurance="What this pack is good for stays as it is."
+                    className="mt-2"
+                />
             ) : options.length ? (
                 <div
                     role="group"
@@ -76,20 +79,21 @@ export function ServicesPicker({
                     })}
                 </div>
             ) : (
-                <p className={cn(HELP, "mt-2")}>
-                    {kind === "ONE_TO_ONE"
-                        ? "No one-to-one services are taking bookings yet."
-                        : "No classes are taking bookings yet."}{" "}
-                    <Link
-                        href="/services/new"
-                        className="rounded-[4px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
-                    >
-                        Add a service
-                    </Link>{" "}
-                    and it can pay for its {units}.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="mt-2"
+                    title={
+                        kind === "ONE_TO_ONE"
+                            ? "No one-to-one services are taking bookings yet"
+                            : "No classes are taking bookings yet"
+                    }
+                    description={`Add a service and it can pay for its ${units}.`}
+                    action={
+                        <TextLink href="/services/new">Add a service</TextLink>
+                    }
+                />
             )}
-            <FieldError id={ids.error} message={error} />
+            <FieldError id={ids.error}>{error}</FieldError>
         </PackSection>
     );
 }

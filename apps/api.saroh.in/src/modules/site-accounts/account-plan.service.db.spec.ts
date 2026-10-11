@@ -630,7 +630,7 @@ describe("pause, resume and cancel from the account", () => {
         });
         expect(res.status).toBe(409);
         expect(res.body.error.message).toBe(
-            "Your plan can't restart online just now. Ask the business to restart it for you.",
+            "Your plan can't restart online right now. Ask the business to restart it for you.",
         );
     });
 });

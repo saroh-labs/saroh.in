@@ -3,6 +3,8 @@ import {
     SETTINGS_PAGES,
     settingsPagesFor,
 } from "@/components/shared/nav-items";
+import { mayChangePlan } from "@/lib/billing/plan-access";
+import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
 
@@ -37,8 +39,8 @@ export function settingsPageLabel(
 }
 
 /** The query a settings page reads its own tab from. */
-export const BUSINESS_TAB_PARAM = "section";
-export const TEAM_TAB_PARAM = "view";
+export { BUSINESS_TAB_PARAM };
+export const TEAM_TAB_PARAM = "tab";
 
 export interface SettingsEntry {
     label: string;
@@ -79,7 +81,7 @@ const team = (label: string, value: string): SettingsEntry => ({
 
 /**
  * In the design's order: Business by its tabs, then Team, Modules, Plan and
- * billing, Your profile, Activity, Providers.
+ * billing, Your profile, Share, Activity, Providers.
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
@@ -114,6 +116,18 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Contact email", "contact"),
     business("Phone on your website", "contact"),
     business("Website", "contact"),
+    {
+        ...business("Social links", "contact"),
+        words: [
+            "Instagram",
+            "Facebook",
+            "WhatsApp",
+            "YouTube",
+            "LinkedIn",
+            "Pinterest",
+            "Telegram",
+        ],
+    },
     business("GST registration", "tax"),
     business("GSTIN or tax ID", "tax"),
     business("Invoice prefix and numbers", "tax"),
@@ -139,7 +153,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Country", "address"),
     team("Roles and what they open", "roles"),
     {
-        ...team("People — invite or change a role", "people"),
+        ...team("People: invite or change a role", "people"),
         action: "member:invite",
     },
     {
@@ -148,21 +162,33 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     // Names no module: the ones Saroh hasn't rolled out aren't named (DEC-057).
     {
-        label: "Modules — turn parts of Saroh on or off",
+        label: "Modules: turn parts of Saroh on or off",
         page: "/settings/modules",
     },
     { label: "Contacts pipeline", page: "/settings/modules", module: "CRM" },
     { label: "Plan and billing", page: "/settings/billing" },
-    { label: "Change plan", page: "/settings/billing" },
+    {
+        label: "Change plan",
+        page: "/settings/billing",
+        action: "billing:manage",
+    },
     { label: "Invoices from Saroh", page: "/settings/billing" },
     { label: "Your profile and password", page: "/settings/profile" },
-    { label: "Alerts — the bell and email", page: "/settings/profile" },
-    { label: "Activity — who changed what", page: "/settings/activity" },
+    { label: "Alerts: the bell and email", page: "/settings/profile" },
     {
-        label: "Providers — hosting, email, payments",
+        label: "QR codes: for the counter, a mirror or a card",
+        page: "/settings/share",
+        words: ["Share", "QR", "Scan", "Short link", "Print"],
+        // The codes open pages of the website.
+        module: "WEBSITE",
+    },
+    { label: "Activity: who changed what", page: "/settings/activity" },
+    {
+        label: "Providers: hosting, email, payments",
         page: "/settings/providers",
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },
+    { label: "Download your data", page: "/settings/data" },
     {
         label: "Payment provider",
         page: "/settings/providers",
@@ -188,12 +214,14 @@ export interface SettingsActor {
 /**
  * Does this actor hold `action`? The API's resolved permissions when there
  * are some, else what an owner or admin holds — the pages' own fallback.
+ * Changing the plan is the owner's alone (`mayChangePlan`), so an Admin
+ * with no permissions to read is not offered "Change plan".
  */
 function holds(actor: SettingsActor, action: string): boolean {
     if (actor.actions) return actor.actions.includes(action);
-    return (
-        actor.role === null || actor.role === "OWNER" || actor.role === "ADMIN"
-    );
+    if (actor.role === null) return true;
+    if (action === "billing:manage") return mayChangePlan(actor);
+    return actor.role === "OWNER" || actor.role === "ADMIN";
 }
 
 export interface SettingsHit {

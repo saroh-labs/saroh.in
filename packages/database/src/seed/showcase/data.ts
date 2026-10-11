@@ -44,7 +44,6 @@ export const SHOWCASE_SEED = 20_260_922;
 /** Showcase ids read `seed_sc_<business>_…`, inside the base seed's prefix. */
 export const SHOWCASE_KEY = "sc";
 
-export const SHOWCASE_PASSWORD = "demo-password-123";
 export const TIMEZONE = "Asia/Kolkata";
 
 export type OrgRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
@@ -1024,7 +1023,10 @@ export interface ShowcaseBusiness {
     bookings: number;
     /** Extra weight for a weekday in the diary, Sunday first. */
     weekdayWeights?: readonly number[];
-    /** A Razorpay connection, so Payments reads as working. */
+    /**
+     * A payment connection, so Payments reads as working: a stand-in, on this
+     * machine's database only (`stand-in-providers.ts`).
+     */
     paymentProvider?: "RAZORPAY" | "CASHFREE";
     /**
      * The registered address its invoices print (DEC-068: issuing one, or

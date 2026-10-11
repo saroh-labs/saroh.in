@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resourceItems } from "@/components/v2/nav-items";
+import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
 import { indexedPaths } from "@/lib/site-pages";
 
 import { galleryTemplates } from "./templates";
@@ -15,6 +16,7 @@ import {
     routeExists,
     shownLegal,
     shownResources,
+    shownTools,
 } from "./resources";
 
 /**
@@ -39,6 +41,7 @@ const ALL_ROUTES = [
     "/templates/[slug]",
     "/terms",
     "/tools/link-preview",
+    "/tools/qr-code-maker",
     "/waitlist",
 ];
 
@@ -95,17 +98,17 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
     it("the legal pages are out of the footer and sitemap until their day in India", () => {
         const legalBefore = at("2026-10-04T18:29:00Z");
         const refundsAfter = at("2026-10-04T18:31:00Z");
-        // The Terms' date moved to 8 Oct with merchants' own trackers
-        // (DEC-108), and Privacy's to 9 Oct when Vercel left its processors
-        // (DEC-107): until those days only the Refunds page shows.
-        const termsAfter = at("2026-10-07T18:31:00Z");
-        const privacyAfter = at("2026-10-08T18:31:00Z");
+        // The Terms' and Privacy's date moved to 10 Oct when both were
+        // aligned with India's DPDP Act (rev 55): until that day only the
+        // Refunds page shows.
+        const termsBefore = at("2026-10-08T18:31:00Z");
+        const privacyAfter = at("2026-10-09T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
             expect(indexedPaths("waitlist", privacyAfter)).toContain(href);
         }
-        expect(indexedPaths("waitlist", termsAfter)).not.toContain("/privacy");
+        expect(indexedPaths("waitlist", termsBefore)).not.toContain("/privacy");
         expect(indexedPaths("waitlist", refundsAfter)).not.toContain(
             "/privacy",
         );
@@ -115,8 +118,7 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         expect(
             shownLegal(at("2026-10-07T18:29:00Z")).map((p) => p.href),
         ).toEqual(["/refunds"]);
-        expect(shownLegal(termsAfter).map((p) => p.href)).toEqual([
-            "/terms",
+        expect(shownLegal(termsBefore).map((p) => p.href)).toEqual([
             "/refunds",
         ]);
         expect(shownLegal(privacyAfter).map((p) => p.href)).toEqual([
@@ -152,6 +154,62 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
                 p.startsWith("/templates/"),
             ),
         ).toBe(false);
+    });
+
+    it("Templates switched off is linked and listed nowhere, after its day and on a preview (DEC-135)", () => {
+        for (const preview of [false, true]) {
+            const off: PublishContext = {
+                ...after,
+                preview,
+                off: ["templates"],
+            };
+            const ids = shownResources(off).map((p) => p.id);
+            expect(ids).not.toContain("templates");
+            // Only Templates: the pages beside it stay.
+            expect(ids).toEqual(
+                shownResources({ ...after, preview })
+                    .map((p) => p.id)
+                    .filter((id) => id !== "templates"),
+            );
+            expect(resourcePaths(off)).not.toContain("/templates");
+            expect(
+                indexedPaths("waitlist", off).filter((p) =>
+                    p.startsWith("/templates"),
+                ),
+            ).toEqual([]);
+            // A link into the gallery (the launch entry's "See templates").
+            expect(linkShown("/templates", off)).toBe(false);
+            expect(linkShown("/templates/gym", off)).toBe(false);
+            expect(linkShown("/help", off)).toBe(true);
+        }
+        expect(linkShown("/templates/gym", after)).toBe(true);
+    });
+
+    it("the QR code maker joins the nav, footer and sitemap on 17 Oct, beside the link preview tool", () => {
+        const names = (ctx: PublishContext) =>
+            resourceItems(shownTools(ctx)).map((i) => i.name);
+        expect(names(before)).toEqual(["Link preview tool"]);
+        expect(indexedPaths("waitlist", before)).not.toContain(
+            "/tools/qr-code-maker",
+        );
+        expect(qrCodeMakerLive(before)).toBe(false);
+        // The tools have their own menu, and Resources never lists them.
+        expect(names(after)).toEqual(["Link preview tool", "QR code maker"]);
+        expect(
+            shownResources(after).filter((p) => p.href.startsWith("/tools/")),
+        ).toEqual([]);
+        expect(indexedPaths("waitlist", after)).toContain(
+            "/tools/qr-code-maker",
+        );
+        expect(qrCodeMakerLive(after)).toBe(true);
+        // A preview shows it early; a build without its route never does.
+        expect(qrCodeMakerLive({ ...before, preview: true })).toBe(true);
+        const unbuilt = at(
+            "2026-10-16T18:31:00Z",
+            ALL_ROUTES.filter((r) => r !== "/tools/qr-code-maker"),
+        );
+        expect(qrCodeMakerLive(unbuilt)).toBe(false);
+        expect(names(unbuilt)).not.toContain("QR code maker");
     });
 
     it("the launch entry joins the sitemap on its day", () => {

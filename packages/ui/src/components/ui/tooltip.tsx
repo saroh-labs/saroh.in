@@ -1,7 +1,9 @@
 "use client";
 
+import { Slot } from "@radix-ui/react-slot";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as React from "react";
+import { flushSync } from "react-dom";
 import { cn } from "../../lib/utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
@@ -13,17 +15,245 @@ const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
     React.ElementRef<typeof TooltipPrimitive.Content>,
     React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-    <TooltipPrimitive.Content
-        ref={ref}
-        sideOffset={sideOffset}
-        className={cn(
-            "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md duration-base ease-out animate-in fade-in-0 data-[state=closed]:duration-fast data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-            className,
-        )}
-        {...props}
-    />
+>(({ className, sideOffset = 6, ...props }, ref) => (
+    <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+            ref={ref}
+            sideOffset={sideOffset}
+            className={cn(
+                "z-50 max-w-[260px] overflow-hidden rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium leading-[1.4] text-primary-foreground shadow-md duration-base ease-out animate-in fade-in-0 data-[state=closed]:duration-fast data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+                className,
+            )}
+            {...props}
+        />
+    </TooltipPrimitive.Portal>
 ));
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
+
+export interface TipProps extends Omit<
+    React.HTMLAttributes<HTMLElement>,
+    "children"
+> {
+    /** Handed down by a trigger this stands under, for the control. */
+    ref?: React.Ref<HTMLButtonElement>;
+    /** What the control is or does, in a few words. Nothing renders without it. */
+    label: React.ReactNode;
+    /** One element that takes a ref: a button, a link. */
+    children: React.ReactElement;
+    side?: "top" | "right" | "bottom" | "left";
+    align?: "start" | "center" | "end";
+}
+
+/**
+ * A tooltip in one tag, in place of `title=`: it shows on hover AND on
+ * keyboard focus, in the product's own type, and it is not read twice by a
+ * screen reader when the control already has that name.
+ *
+ * It is a hint, never the only place something is said: a thumb has no
+ * hover, so a touch screen never sees it. An icon-only control carries its
+ * name itself (`IconButton`'s `label`); a reason a control is off is written
+ * beside it.
+ *
+ * It can stand between a trigger and its control
+ * (`<DropdownMenuTrigger asChild><Tip …><Button /></Tip>`): whatever the
+ * trigger hands down (its ref, its handlers, its state) goes on to the
+ * control. Dropped here, the menu never opened.
+ *
+ * It is not a thing to close. Escape, with the hint showing, belongs to
+ * the sheet, dialog or menu the control sits in (`Hint`).
+ */
+export function Tip({
+    label,
+    children,
+    side = "top",
+    align,
+    ...handed
+}: TipProps) {
+    if (label === undefined || label === null || label === "") {
+        return Object.keys(handed).length ? (
+            <Slot {...handed}>{children}</Slot>
+        ) : (
+            children
+        );
+    }
+    return (
+        <Hint label={label} side={side} align={align} handed={handed}>
+            {children}
+        </Hint>
+    );
+}
+
+/**
+ * A closed hint's fade is the fast token (120ms at most across the skins).
+ * By this long after it closed it is taken off the page whatever happened.
+ */
+const FADED_BY_MS = 200;
+
+/** The hints on the page right now, each by the way to take it off. */
+const showing = new Set<() => void>();
+let listening = false;
+
+/**
+ * Wait until the layers under a hint have drawn again without it. Two
+ * frames, not a fixed time: on a busy machine a fixed 30ms ran out before
+ * the sheet had redrawn, and the handed-on key was let go like the first.
+ */
+function afterRedraw(then: () => void) {
+    if (typeof requestAnimationFrame !== "function") {
+        window.setTimeout(then, 30);
+        return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => then()));
+}
+
+/**
+ * One listener for every hint, on the window, ahead of Radix's own.
+ *
+ * Radix gives Escape to the topmost layer, and each layer works out whether
+ * it is topmost when it draws. Taking the hint away is not enough inside
+ * the same key press: the sheet under it has not drawn again yet, still
+ * believes the hint is above it, and lets the press go (seen in the built
+ * app, where that redraw is not in step with the press). So the press that
+ * meets a hint stops here, the hint goes, and the same key is handed on a
+ * moment later, when the sheet knows it is on top.
+ */
+function listen() {
+    if (listening || typeof window === "undefined") return;
+    listening = true;
+    window.addEventListener(
+        "keydown",
+        (event) => {
+            if (event.key !== "Escape" || showing.size === 0) return;
+            const hints = Array.from(showing);
+            showing.clear();
+            event.stopImmediatePropagation();
+            for (const drop of hints) drop();
+            const target = event.target;
+            afterRedraw(() => {
+                // Only to the control the key was pressed in, and only if
+                // it is still on the page. A sheet or dialog holds the
+                // keyboard inside itself, so a press on the page's body
+                // had nothing of that kind to close, and handed on there
+                // it closed whatever had opened in the meantime.
+                if (
+                    !(target instanceof Element) ||
+                    !target.isConnected ||
+                    target === document.body ||
+                    target === document.documentElement
+                ) {
+                    return;
+                }
+                target.dispatchEvent(
+                    new KeyboardEvent("keydown", {
+                        key: "Escape",
+                        code: "Escape",
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true,
+                    }),
+                );
+            });
+        },
+        true,
+    );
+}
+
+function Hint({
+    label,
+    children,
+    side,
+    align,
+    handed,
+}: Pick<TipProps, "label" | "children" | "side" | "align"> & {
+    handed: Omit<TipProps, "label" | "children" | "side" | "align">;
+}) {
+    const [open, setOpen] = React.useState(false);
+    const [dropped, setDropped] = React.useState(false);
+    // Radix gives Escape to the topmost layer alone, and a hint that is
+    // showing is one: with the keyboard on a control that has a hint, the
+    // first Escape closed the hint and the sheet stayed open. So the hint
+    // is taken off the page before Radix looks (the window hears a key
+    // before the document does), outright rather than through its fade,
+    // which would keep it the topmost layer until it finished.
+    //
+    // It is listed the moment it opens (`showing`), not in an effect: an
+    // effect runs after the paint, and an Escape pressed straight after
+    // the Tab that showed the hint arrived before it.
+    const drop = React.useCallback(() => {
+        flushSync(() => {
+            setDropped(true);
+            setOpen(false);
+        });
+    }, []);
+    const gone = React.useRef<number | undefined>(undefined);
+    React.useEffect(
+        () => () => {
+            window.clearTimeout(gone.current);
+            showing.delete(drop);
+        },
+        [drop],
+    );
+    // A hint that has closed is still on the page while it fades, and
+    // still the topmost layer: it took Escape then too (and in the built
+    // app, on a phone, it was found there long after it closed). So it is
+    // listed for as long as its content is on the page, not only while it
+    // is open.
+    const onContent = React.useCallback(
+        (node: HTMLDivElement | null) => {
+            if (node) {
+                listen();
+                showing.add(drop);
+            } else {
+                showing.delete(drop);
+            }
+        },
+        [drop],
+    );
+    return (
+        <TooltipProvider delayDuration={350} skipDelayDuration={150}>
+            <Tooltip
+                open={open}
+                onOpenChange={(next) => {
+                    if (next) {
+                        setDropped(false);
+                        listen();
+                        showing.add(drop);
+                        window.clearTimeout(gone.current);
+                    } else {
+                        // It fades out (the design system's exit, faster
+                        // than its entry), and is taken off the page for
+                        // certain once that is over: a hint whose fade
+                        // never reported its end stayed on the page as a
+                        // layer above the sheet (seen in the built app on
+                        // a phone).
+                        window.clearTimeout(gone.current);
+                        gone.current = window.setTimeout(
+                            () => setDropped(true),
+                            FADED_BY_MS,
+                        );
+                    }
+                    setOpen(next);
+                }}
+            >
+                {/* The hint is the control's description too, so a screen
+                    reader hears it without a hover, and a test can read it. */}
+                <TooltipTrigger
+                    asChild
+                    aria-description={
+                        typeof label === "string" ? label : undefined
+                    }
+                    {...handed}
+                >
+                    {children}
+                </TooltipTrigger>
+                {dropped ? null : (
+                    <TooltipContent ref={onContent} side={side} align={align}>
+                        {label}
+                    </TooltipContent>
+                )}
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

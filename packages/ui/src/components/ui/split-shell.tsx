@@ -1,5 +1,7 @@
 import * as React from "react";
 
+import type { SarohLink } from "../../lib/saroh-links";
+import { sarohFooterLinks } from "../../lib/saroh-links";
 import { cn } from "../../lib/utils";
 import { Wordmark } from "./wordmark";
 
@@ -14,6 +16,11 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
     panel?: React.ReactNode;
     /** The form, the step, whatever this page is for. */
     children: React.ReactNode;
+    /**
+     * The quiet line under the form. Defaults to {@link SplitFooter}: Privacy,
+     * Terms and Help. Pass `null` only for a screen that must not link out.
+     */
+    footer?: React.ReactNode;
 }
 
 /**
@@ -60,6 +67,7 @@ export interface SplitShellProps extends React.HTMLAttributes<HTMLDivElement> {
 export function SplitShell({
     panel,
     children,
+    footer = <SplitFooter />,
     className,
     ...props
 }: SplitShellProps) {
@@ -72,17 +80,28 @@ export function SplitShell({
                 372px wide wherever that lands — a field stretched across a
                 1400px monitor is not a field, it is a horizon. The mark sits
                 in the same column so it lines up with what it introduces. */}
-            <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-10">
-                <div className="mx-auto w-full max-w-[372px]">
-                    {/* The mark, and then the page. There was a theme pill
-                        opposite it; it is gone, along with the slot that held
-                        it, because a slot nothing fills is an invitation to
-                        put something there. See the theme note below. */}
-                    <div className="mb-8">
-                        <Wordmark style={{ fontSize: "1rem" }} />
+            <div className="flex flex-1 flex-col px-6 sm:px-10">
+                <div className="flex flex-1 flex-col justify-center py-12">
+                    <div className="mx-auto w-full max-w-[372px]">
+                        {/* The mark, and then the page. There was a theme
+                            pill opposite it; it is gone, along with the slot
+                            that held it, because a slot nothing fills is an
+                            invitation to put something there. See the theme
+                            note below. */}
+                        <div className="mb-8">
+                            <Wordmark style={{ fontSize: "1rem" }} />
+                        </div>
+                        {children}
                     </div>
-                    {children}
                 </div>
+                {/* In the form's column, not the panel's: the panel is gone
+                    below 760px, and Privacy, Terms and Help have to be
+                    reachable on a phone too. */}
+                {footer ? (
+                    <div className="mx-auto w-full max-w-[372px] pb-6">
+                        {footer}
+                    </div>
+                ) : null}
             </div>
 
             {panel ? (
@@ -93,12 +112,60 @@ export function SplitShell({
                        which takes it away from assistive technology too;
                        `sr-only` or an opacity treatment would leave it being
                        read out to exactly the people who cannot see it. */
-                    className="hidden w-[38%] min-w-[320px] max-w-[560px] flex-col justify-center bg-primary px-10 py-12 text-primary-foreground dark:bg-background dark:text-foreground min-[760px]:flex"
+                    className="hidden w-[38%] min-w-[320px] max-w-[560px] bg-primary px-10 text-primary-foreground dark:bg-background dark:text-foreground min-[760px]:block"
                 >
-                    <div className="mx-auto w-full max-w-[392px]">{panel}</div>
+                    {/* Centred in the window, not in the page: beside a
+                        form longer than the screen (setup) it sat half way
+                        down the page, below the fold. It stays put while
+                        the form scrolls. */}
+                    <div className="sticky top-0 flex min-h-screen flex-col justify-center py-12">
+                        <div className="mx-auto w-full max-w-[392px]">
+                            {panel}
+                        </div>
+                    </div>
                 </aside>
             ) : null}
         </div>
+    );
+}
+
+/**
+ * Privacy · Terms · Help: the one quiet line under every screen from
+ * signing up to Home, which had no way to any of them (UX audit, 10 Oct).
+ * Each opens Saroh's own page (`lib/saroh-links.ts`), and only those that
+ * are published are drawn.
+ *
+ * Quiet in colour and size, not in reach: each link is a full-height target
+ * on a phone (`py-2.5`, with the gap between them).
+ */
+export function SplitFooter({
+    links = sarohFooterLinks(),
+    className,
+}: {
+    links?: SarohLink[];
+    className?: string;
+}) {
+    if (links.length === 0) return null;
+    return (
+        <nav
+            aria-label="Legal and help"
+            className={cn(
+                "flex flex-wrap items-center gap-x-1 text-[12px] text-muted-foreground",
+                className,
+            )}
+        >
+            {links.map((link, index) => (
+                <React.Fragment key={link.href}>
+                    {index > 0 ? <span aria-hidden>·</span> : null}
+                    <a
+                        href={link.href}
+                        className="rounded-sm px-1.5 py-2.5 underline-offset-4 transition-colors first:pl-0 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground"
+                    >
+                        {link.label}
+                    </a>
+                </React.Fragment>
+            ))}
+        </nav>
     );
 }
 
@@ -109,6 +176,14 @@ export interface SplitPanelProps {
     body?: React.ReactNode;
     /** Short reassurances, each with a Saffron tick. Three is the design's count. */
     points?: React.ReactNode[];
+    /**
+     * The plan, as numbered steps: what the person is doing now and what
+     * comes after. Drawn in place of ticks, because a tick beside a step
+     * still ahead says it is done.
+     */
+    steps?: React.ReactNode[];
+    /** Which of `steps` they are on, from 1. Earlier ones are ticked. */
+    currentStep?: number;
 }
 
 /**
@@ -120,11 +195,15 @@ export function SplitPanel({
     heading,
     body,
     points,
+    steps,
+    currentStep = 1,
 }: SplitPanelProps) {
     return (
         <>
             {eyebrow ? (
-                <p className="mb-[15px] text-[11px] font-semibold uppercase tracking-[0.1em] opacity-70">
+                // The panel's own colour: `.label` is muted Ink, which on
+                // the dark panel is dark on dark.
+                <p className="label mb-[15px] text-inherit opacity-70">
                     {eyebrow}
                 </p>
             ) : null}
@@ -136,24 +215,61 @@ export function SplitPanel({
                     {body}
                 </p>
             ) : null}
+            {steps?.length ? (
+                <ol className="mb-6 flex flex-col gap-[11px] last:mb-0">
+                    {steps.map((step, index) => {
+                        const number = index + 1;
+                        const done = number < currentStep;
+                        const current = number === currentStep;
+                        return (
+                            <li
+                                key={index}
+                                aria-current={current ? "step" : undefined}
+                                className="flex items-start gap-2.5"
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full border border-current text-[10.5px] font-semibold tabular-nums",
+                                        current ? "opacity-100" : "opacity-60",
+                                    )}
+                                >
+                                    {done ? (
+                                        <Tick className="size-3" />
+                                    ) : (
+                                        number
+                                    )}
+                                </span>
+                                <span
+                                    className={cn(
+                                        "text-pretty text-[12.5px] leading-[1.55]",
+                                        current
+                                            ? "font-semibold"
+                                            : "opacity-85",
+                                    )}
+                                >
+                                    {/* The badge is decoration to a screen
+                                        reader, so the place in the plan is
+                                        said here in words. */}
+                                    <span className="sr-only">
+                                        {done
+                                            ? "Done: "
+                                            : current
+                                              ? "Now: "
+                                              : "Next: "}
+                                    </span>
+                                    {step}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ol>
+            ) : null}
             {points?.length ? (
                 <ul className="flex flex-col gap-[11px]">
                     {points.map((point, index) => (
                         <li key={index} className="flex items-start gap-2.5">
-                            <svg
-                                aria-hidden
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                className="mt-0.5 size-[15px] shrink-0"
-                            >
-                                <path
-                                    d="M4 12.5 L9.5 18 L20 6.5"
-                                    stroke="hsl(var(--highlight))"
-                                    strokeWidth={2.4}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
+                            <Tick className="mt-0.5 size-[15px] shrink-0" />
                             <span className="text-pretty text-[12.5px] leading-[1.55] opacity-85">
                                 {point}
                             </span>
@@ -162,5 +278,20 @@ export function SplitPanel({
                 </ul>
             ) : null}
         </>
+    );
+}
+
+/** The Saffron tick beside a reassurance, and inside a finished step. */
+function Tick({ className }: { className?: string }) {
+    return (
+        <svg aria-hidden viewBox="0 0 24 24" fill="none" className={className}>
+            <path
+                d="M4 12.5 L9.5 18 L20 6.5"
+                stroke="hsl(var(--highlight))"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
     );
 }

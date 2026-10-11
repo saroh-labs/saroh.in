@@ -54,7 +54,10 @@ export function correlationIdMiddleware(
     correlated.correlationId = correlationId;
     correlated.startTime = Date.now();
     res.setHeader(RESPONSE_ID_HEADER, correlationId);
-    correlationStorage.run({ correlationId }, () => {
+    // The method and the path ride along for an error reported from outside
+    // Nest (Better Auth's handler, `common/auth/report-auth-error.ts`).
+    const path = (req.originalUrl || req.url || "").split("?")[0];
+    correlationStorage.run({ correlationId, method: req.method, path }, () => {
         next();
     });
 }

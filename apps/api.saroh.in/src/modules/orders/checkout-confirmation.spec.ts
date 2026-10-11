@@ -77,7 +77,7 @@ describe("confirmationView (P4)", () => {
             confirmationView(
                 row({ payOnHandover: true, paymentStatus: "UNPAID" }),
             ).toPay,
-        ).toBe("Pay when you collect");
+        ).toBe("Pay at pick-up");
         expect(
             confirmationView(
                 row({
@@ -192,7 +192,7 @@ describe("confirmationView (P4)", () => {
             }),
         );
         expect(view.fulfilment.pickup?.hours).toBe(
-            "Mon–Sat 10:00–19:00, Sun closed",
+            "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
         );
     });
 

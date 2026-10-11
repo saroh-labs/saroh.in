@@ -3,6 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { arrivalProps } from "@/components/shared/arrival-props";
 import { BusinessDate } from "@/components/shared/business-zone";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
@@ -16,7 +17,10 @@ import {
     rowProgress,
     rowSubline,
 } from "@/lib/orders/list-row";
+import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Tip } from "@saroh/ui/tooltip";
 import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /**
@@ -42,11 +46,11 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /** The desk grid: Order · Status · Placed · Total · the row menu (B5). */
 export const ORDER_GRID =
-    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[minmax(210px,1fr)_minmax(120px,210px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** The same grid with the design's 38px selection column first (B6). */
 export const ORDER_GRID_SELECT =
-    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(120px,210px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** A row's selection box (B6): checked, and what toggling it does. */
 export interface RowSelect {
@@ -69,9 +73,10 @@ export function OrderGridHead({
 }) {
     return (
         <div
+            data-list-head=""
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
-                "h-10 rounded-t-[11px] border-b border-border bg-muted text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                "label h-10 rounded-t-[11px] border-b border-border bg-muted",
             )}
         >
             {select ? (
@@ -96,25 +101,38 @@ export function OrderGridHead({
 }
 
 /**
- * The customer's initials; a returning customer's wears the design's
- * Saffron ring (a 1.5px gap in the row's colour, then 1.5px of Saffron).
- * Decoration, as the initials are: nothing the row needs rests on it.
+ * The customer's initials. A returning customer's wears a ring (a 1.5px
+ * gap in the row's colour, then 1.5px of Ink), on purpose: it is the one
+ * mark in the row for someone who has bought before. The initials are
+ * decoration, but the ring is a fact, so it is said in words too, for a
+ * screen reader and on hover.
  */
 function Avatar({ row }: { row: OrderRow }) {
     const returning = row.customer?.returning === true;
+    if (returning) {
+        return (
+            <Tip label="Returning customer">
+                <span
+                    role="img"
+                    aria-label="Returning customer"
+                    className={cn(AVATAR, RING)}
+                >
+                    <span aria-hidden>{rowInitials(row)}</span>
+                </span>
+            </Tip>
+        );
+    }
     return (
-        <span
-            aria-hidden
-            className={cn(
-                "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground",
-                returning &&
-                    "ring-[1.5px] ring-highlight ring-offset-[1.5px] ring-offset-card",
-            )}
-        >
+        <span aria-hidden className={AVATAR}>
             {rowInitials(row)}
         </span>
     );
 }
+
+const AVATAR =
+    "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground";
+const RING =
+    "ring-[1.5px] ring-foreground ring-offset-[1.5px] ring-offset-card";
 
 /** The row's words, worked out once for both layouts. */
 function rowView(row: OrderRow, showStore: boolean) {
@@ -127,25 +145,52 @@ function rowView(row: OrderRow, showStore: boolean) {
         age: rowAge(row),
         money: rowMoney(row),
         attention: rowAttention(row),
+        // "Payment failed — send a new pay link" (#122); a pay link is
+        // the money reader's, so the kitchen reads "not paid yet".
+        payment: onlinePaymentLine(row.onlinePayment, row.total !== undefined),
     };
+}
+
+/**
+ * Where its online payment stands (#122), in words: something to act on in
+ * the unpaid line's tone, a wait in the muted one.
+ */
+function OnlinePaymentText({
+    payment,
+    className,
+}: {
+    payment: ReturnType<typeof onlinePaymentLine>;
+    className?: string;
+}) {
+    if (!payment) return null;
+    return (
+        <div
+            data-online-payment
+            className={cn(
+                "text-pretty",
+                payment.tone === "act"
+                    ? "font-bold text-destructive-subtle-foreground"
+                    : "font-semibold text-muted-foreground",
+                className,
+            )}
+        >
+            {payment.text}
+        </div>
+    );
 }
 
 /** The design's Needs attention tag; words, never colour alone. */
 function AttentionTag({ attention }: { attention: RowAttention }) {
     if (attention.state === "none") return null;
     return (
-        <span
-            role="img"
-            aria-label={attention.name}
-            title={attention.state === "shown" ? attention.title : undefined}
-            className={cn(
-                "max-w-[180px] flex-none truncate rounded-full px-1.5 py-px text-[11px] font-bold",
-                attention.state === "shown"
-                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                    : "bg-muted text-muted-foreground",
-            )}
-        >
-            {attention.text}
+        <span role="img" aria-label={attention.name} className="min-w-0">
+            <StatusBadge
+                tone={attention.state === "shown" ? "error" : "neutral"}
+                hint={attention.state === "shown" ? attention.title : undefined}
+                className="max-w-[180px] [&]:shrink"
+            >
+                <span className="truncate">{attention.text}</span>
+            </StatusBadge>
         </span>
     );
 }
@@ -163,6 +208,8 @@ function PaidWord({ paid }: { paid: string | null }) {
     );
 }
 
+const NO_TOUCH = () => undefined;
+
 /** A link whose hit area is the whole (relative) row around it. */
 const ROW_LINK =
     "rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring";
@@ -174,9 +221,15 @@ export function OrderGridRow({
     onOpen,
     menu,
     select,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6); absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -187,13 +240,16 @@ export function OrderGridRow({
     menu?: ReactNode;
 }) {
     const v = rowView(row, showStore);
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "relative border-b border-border py-[11px] transition-colors duration-fast last:rounded-b-[11px] last:border-b-0 hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
                 (open === true || select?.checked === true) &&
-                    "bg-brand-subtle hover:bg-brand-subtle",
+                    "bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {select ? (
@@ -243,17 +299,28 @@ export function OrderGridRow({
                     </div>
                 </div>
             </div>
-            <div className="grid min-w-0 justify-items-start gap-1.5">
-                <StepPill progress={v.progress} />
-                {v.progress.index !== null || v.age ? (
-                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+            {/* Two lines at most, so rows keep one height: the pill with
+                its step dashes where the column has room, then how long
+                it has waited and what is owed on one line. */}
+            <div className="grid min-w-0 justify-items-start gap-1">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+                    <StepPill progress={v.progress} />
+                    {v.progress.index !== null ? (
                         <StepBar progress={v.progress} />
+                    ) : null}
+                </div>
+                {v.age || v.money.unpaid || v.payment ? (
+                    <div className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         {v.age ? <AgeText age={v.age} /> : null}
-                    </div>
-                ) : null}
-                {v.money.unpaid ? (
-                    <div className="text-[11.5px] font-bold text-destructive-subtle-foreground">
-                        {v.money.unpaid}
+                        {v.money.unpaid ? (
+                            <span className="text-[11.5px] font-bold text-destructive-subtle-foreground">
+                                {v.money.unpaid}
+                            </span>
+                        ) : null}
+                        <OnlinePaymentText
+                            payment={v.payment}
+                            className="text-[11.5px]"
+                        />
                     </div>
                 ) : null}
             </div>
@@ -284,7 +351,13 @@ export function OrderCardFrame({
     footer,
     lead,
     highlighted = false,
+    arrived = false,
+    onTouch,
 }: {
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     title: ReactNode;
     /** Where the card goes; ignored when `onOpen` is given. */
     href: string;
@@ -304,12 +377,14 @@ export function OrderCardFrame({
     // positioned here, the truncated link clips them. Left to the card,
     // their place past a long title widened the page on a phone.
     const words = <span className="relative">{title}</span>;
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                highlighted &&
-                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+                highlighted && "border-border-strong bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {lead}
@@ -350,9 +425,15 @@ export function OrderCard({
     select,
     open,
     onOpen,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6), the design's 24px one; absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -366,6 +447,8 @@ export function OrderCard({
             title={v.customer}
             href={v.href}
             onOpen={onOpen}
+            arrived={arrived}
+            onTouch={onTouch}
             highlighted={open === true || select?.checked === true}
             lead={
                 select ? (
@@ -399,10 +482,18 @@ export function OrderCard({
                 </>
             }
             footer={
-                v.money.unpaid ? (
-                    <div className="text-[12px] font-bold text-destructive-subtle-foreground">
-                        {v.money.unpaid}
-                    </div>
+                v.money.unpaid || v.payment ? (
+                    <>
+                        {v.money.unpaid ? (
+                            <div className="text-[12px] font-bold text-destructive-subtle-foreground">
+                                {v.money.unpaid}
+                            </div>
+                        ) : null}
+                        <OnlinePaymentText
+                            payment={v.payment}
+                            className="text-[12px]"
+                        />
+                    </>
                 ) : null
             }
         />

@@ -1,11 +1,17 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { EmptyState } from "@saroh/ui/data-state";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type {
     Optional,
     Plan,
@@ -16,23 +22,19 @@ import {
     chargeHref,
     chargeRow,
     collectionRows,
-    dayText,
     failWhy,
     initials,
     listTab,
     longPrice,
-    money,
     olderPrice,
     pausedText,
     sortCharges,
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
+import { Notice } from "@saroh/ui/notice";
 
-import { Pill } from "./pill";
-
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /** The steps a quick look offers, by where the subscription stands. */
 const EDITS = {
@@ -42,7 +44,7 @@ const EDITS = {
         ["Cancel", "cancel"],
     ],
     failed: [
-        ["Retry or fix payment", ""],
+        ["Try again or fix payment", ""],
         ["Pause instead", "pause"],
         ["Cancel", "cancel"],
     ],
@@ -103,10 +105,7 @@ export function SubscriptionQuickLook({
             subtitle={`${sub.plan.name} · ${price}`}
             description={`${sub.contact.name}'s subscription: ${sub.plan.name}, ${price}.`}
             footer={
-                <Button
-                    asChild
-                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                >
+                <Button asChild className="min-w-[160px] flex-1">
                     <Link href={`/billing/subscriptions/${sub.id}`}>
                         Open full details
                     </Link>
@@ -144,29 +143,32 @@ function Body({
     const next = sub.pendingPlan ?? sub;
     const nextBig =
         tab === "active" && sub.nextRenewalAt && !sub.endsAt
-            ? money(next.price, next.currency)
+            ? formatMoneyMajor(next.price, next.currency)
             : tab === "failed"
-              ? money(sub.failedCharge?.total ?? sub.price, sub.currency)
-              : "—";
+              ? formatMoneyMajor(
+                    sub.failedCharge?.total ?? sub.price,
+                    sub.currency,
+                )
+              : null;
     const nextLine =
         tab === "active"
             ? sub.endsAt
-                ? `Ends ${dayText(sub.endsAt, tz, now)} — what's paid for still happens. Nothing more is charged.`
+                ? `Ends ${formatDate(sub.endsAt, tz, { now })}. What's paid for still happens. Nothing more is charged.`
                 : sub.startsAt
-                  ? `Starts ${dayText(sub.startsAt, tz, now)}. Nothing is charged before then.`
+                  ? `Starts ${formatDate(sub.startsAt, tz, { now })}. Nothing is charged before then.`
                   : sub.nextRenewalAt
-                    ? `On ${dayText(sub.nextRenewalAt, tz, now)} · invoiced with a pay link`
+                    ? `On ${formatDate(sub.nextRenewalAt, tz, { now })} · invoiced with a pay link`
                     : "Nothing is due to renew."
             : tab === "failed"
               ? sub.failedCharge?.dueAt
                   ? Date.parse(sub.failedCharge.dueAt) > now.getTime()
                       ? // Autopay didn't collect it before its due date (D13).
-                        `Autopay didn't collect it · due ${dayText(sub.failedCharge.dueAt, tz, now)}`
-                      : `Was due ${dayText(sub.failedCharge.dueAt, tz, now)} · not paid yet`
+                        `Autopay didn't collect it · due ${formatDate(sub.failedCharge.dueAt, tz, { now })}`
+                      : `Was due ${formatDate(sub.failedCharge.dueAt, tz, { now })} · not paid yet`
                   : "Not paid yet"
               : tab === "paused"
                 ? `${pausedText(sub, now)}. Nothing is charged while paused.`
-                : `Ended${sub.cancelledAt ? ` ${dayText(sub.cancelledAt, tz, now)}` : ""}. Nothing more is charged.`;
+                : `Ended${sub.cancelledAt ? ` ${formatDate(sub.cancelledAt, tz, { now })}` : ""}. Nothing more is charged.`;
     const upcoming = collectionRows(sub, now).slice(0, 3);
     const mine = charges.state === "ok" ? (charges.data[sub.id] ?? []) : [];
     const last = sortCharges(mine)
@@ -177,45 +179,46 @@ function Body({
         <>
             <QuickLookCard className="py-3.5">
                 <div className="flex items-center gap-2">
-                    <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                    <StatusBadge tone={TAB_TONE[tab]}>
+                        {TAB_LABEL[tab]}
+                    </StatusBadge>
                     <span className="flex-1" />
                     <span className="text-[12px] text-muted-foreground">
-                        Since {dayText(sub.startedAt, tz, now)}
+                        Since {formatDate(sub.startedAt, tz, { now })}
                     </span>
                 </div>
                 <div className={cn(EYEBROW, "mt-3")}>Next charge</div>
                 <div className="mt-0.5 font-display text-[24px] font-semibold tabular-nums tracking-[-0.02em]">
-                    {nextBig}
+                    {nextBig ?? <AbsentValue says="None" />}
                 </div>
                 <p className="mt-0.5 text-pretty text-[12.5px] leading-[1.5] text-foreground/75">
                     {nextLine}
                 </p>
                 {older ? (
-                    <p className="mt-1.5 text-[12px] text-brand">
-                        Keeps {money(sub.price, sub.currency)} — the plan is{" "}
-                        {money(older.listPrice, sub.currency)} for new sign-ups
+                    <p className="mt-1.5 text-[12px] text-foreground">
+                        Keeps {formatMoneyMajor(sub.price, sub.currency)}. The
+                        plan is{" "}
+                        {formatMoneyMajor(older.listPrice, sub.currency)} for
+                        new sign-ups
                     </p>
                 ) : null}
                 {sub.pendingPlan && tab !== "cancelled" ? (
-                    <p className="mt-1.5 text-[12px] font-semibold text-brand">
+                    <p className="mt-1.5 text-[12px] font-semibold text-foreground">
                         Changes to {sub.pendingPlan.name} on{" "}
-                        {dayText(sub.pendingPlan.from, tz, now)}
+                        {formatDate(sub.pendingPlan.from, tz, { now })}
                     </p>
                 ) : null}
             </QuickLookCard>
             {tab === "failed" ? (
-                <div
-                    role="alert"
-                    className="rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px]"
-                >
+                <Notice tone="error">
                     <div className="text-[13px] font-bold text-destructive-subtle-foreground">
                         {failWhy(sub, now)}
                     </div>
                     <div className="mt-[3px] text-[12px] text-foreground/75">
-                        Saroh doesn&apos;t charge cards — open it to send a new
+                        Saroh doesn&apos;t charge cards. Open it to send a new
                         pay link, record a payment, pause or cancel.
                     </div>
-                </div>
+                </Notice>
             ) : null}
             {upcoming.length ? (
                 <QuickLookCard label="Next collections" className="pb-1.5 pt-3">
@@ -227,7 +230,7 @@ function Body({
                             <span className="flex-1 text-[13px] font-semibold">
                                 {u.label}
                             </span>
-                            <Pill tone={u.tone}>{u.state}</Pill>
+                            <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                         </div>
                     ))}
                 </QuickLookCard>
@@ -247,7 +250,9 @@ function Body({
                                 <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
                                     {c.date}
                                 </span>
-                                <Pill tone={c.tone}>{c.result}</Pill>
+                                <StatusBadge tone={c.tone}>
+                                    {c.result}
+                                </StatusBadge>
                                 <span className="flex-1" />
                                 <span className="font-semibold tabular-nums">
                                     {c.amount}
@@ -255,18 +260,27 @@ function Body({
                             </Link>
                         ))
                     ) : (
-                        <p className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground">
-                            Nothing charged yet.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="border-t border-border/70 py-2"
+                            title="No charges yet."
+                        />
                     )
+                ) : charges.state === "failed" ? (
+                    // The charges are the list page's read, handed down:
+                    // Try again reads the page again and they arrive here.
+                    <FailedRead
+                        className="border-t border-border/70 py-2"
+                        things="the charges"
+                        reassurance="The rest is up to date."
+                    />
                 ) : (
                     <p
-                        role={charges.state === "failed" ? "alert" : "note"}
+                        role="note"
                         className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground"
                     >
-                        {charges.state === "denied"
-                            ? "Your role can't see invoices, so charges aren't shown."
-                            : "Charges couldn't be loaded. The rest is up to date."}
+                        Your role can&apos;t see invoices, so charges
+                        aren&apos;t shown.
                     </p>
                 )}
             </QuickLookCard>
@@ -290,8 +304,8 @@ function Body({
                     </div>
                     <p className="mt-2 text-[11.5px] text-muted-foreground">
                         {tab === "cancelled"
-                            ? "Starts a new subscription at today's price — the old one keeps its history."
-                            : "Opens the subscription with that step ready — nothing changes until you confirm there."}
+                            ? "Starts a new subscription at today's price. The old one keeps its history."
+                            : "Opens the subscription with that step ready. Nothing changes until you confirm there."}
                     </p>
                 </QuickLookCard>
             ) : (

@@ -1,7 +1,9 @@
 "use client";
 
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
@@ -9,9 +11,21 @@ import Link from "next/link";
 import { useId } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { settingsEditHref } from "@/lib/sites/settings-edit";
 
 /** The lock's reason, said beside the controls it disables (G6). */
-export const FIXED_LOCK = "On every page — can't be removed or moved";
+export const FIXED_LOCK = "On every page. Can't be removed or moved";
+
+/**
+ * What follows the footer on the site. It names the plan only while plans
+ * are shown (DEC-136). Until plans are sold no business has a paid one,
+ * and a site without a paid plan carries the line (`onFree` in the API).
+ */
+export function madeWithNote(): string {
+    return plansShown()
+        ? "On the Free plan, “Made with Saroh” follows it on your site."
+        : "“Made with Saroh” follows it on your site.";
+}
 
 /** What the inspector edits about the header and footer (G6). */
 export interface FixedBlockText {
@@ -102,9 +116,14 @@ export function FixedBlockInspector({
             size="sm"
             className="justify-self-start"
         >
-            {/* A new tab, for the same reason as the Services link. */}
+            {/* A new tab, for the same reason as the Services link. It lands
+                on the row with its sheet open (`?edit=`): the menu from the
+                header, the footer from the footer. */}
             <Link
-                href={`/sites/${siteId}/settings`}
+                href={settingsEditHref(
+                    siteId,
+                    part === "header" ? "menu" : "footer",
+                )}
                 target="_blank"
                 rel="noopener"
             >
@@ -122,15 +141,10 @@ export function FixedBlockInspector({
                         className="size-4 shrink-0 text-muted-foreground"
                     />
                     {part === "header" ? "Header" : "Footer"}
-                    <Badge
-                        variant="neutral"
-                        className="uppercase tracking-[0.06em]"
-                    >
-                        Fixed
-                    </Badge>
+                    <Badge variant="neutral">Fixed</Badge>
                 </h2>
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
-                    On every page of this site. Its text is edited here; where
+                    On every page of this site. Its text is edited here. Where
                     it sits is not a per-page choice.
                 </p>
             </div>
@@ -168,8 +182,7 @@ export function FixedBlockInspector({
                 <div className="grid gap-2">
                     <p className="text-[0.8125rem] leading-relaxed">
                         Your footer is more than one line of plain text, so
-                        it&apos;s changed in Website settings. On the Free plan,
-                        “Made with Saroh” follows it on your site.
+                        it&apos;s changed in Website settings. {madeWithNote()}
                     </p>
                     {settings}
                 </div>
@@ -183,7 +196,7 @@ export function FixedBlockInspector({
                         note={
                             text.footerText.trim() === ""
                                 ? "Nothing is written at the foot of this site yet, so visitors see the site's name."
-                                : "On the Free plan, “Made with Saroh” follows it on your site."
+                                : madeWithNote()
                         }
                     />
                     <div className="grid gap-2 border-t pt-3">
@@ -197,28 +210,20 @@ export function FixedBlockInspector({
             )}
 
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t pt-3">
-                <Button
-                    type="button"
+                <IconButton
+                    label="Move up"
+                    icon={<span>↑</span>}
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
                     disabled
-                    aria-label="Move up"
                     aria-describedby="fixed-lock-reason"
-                >
-                    ↑
-                </Button>
-                <Button
-                    type="button"
+                />
+                <IconButton
+                    label="Move down"
+                    icon={<span>↓</span>}
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
                     disabled
-                    aria-label="Move down"
                     aria-describedby="fixed-lock-reason"
-                >
-                    ↓
-                </Button>
+                />
                 <p
                     id="fixed-lock-reason"
                     className="flex min-w-0 flex-1 items-center gap-1.5 text-xs leading-relaxed text-muted-foreground"
@@ -230,7 +235,7 @@ export function FixedBlockInspector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="ml-auto h-8 px-3 text-xs"
+                    className="ml-auto"
                     disabled
                     aria-describedby="fixed-lock-reason"
                 >

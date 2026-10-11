@@ -8,15 +8,15 @@ Dev port **3000** · package name `auth` (`pnpm --filter auth …`)
 
 ## What's here
 
-| Route              | Purpose                                                   |
-| ------------------ | --------------------------------------------------------- |
-| `/login`           | Email/password + GitHub and Google OAuth                  |
-| `/signup`          | Name, email, password                                     |
-| `/verify-email`    | Code-based verification (Better Auth `emailOTP` plugin)   |
-| `/forgot-password` | Request a reset link by email                             |
-| `/reset-password`  | Set a new password from the emailed token                 |
-| `/account`         | Profile, change email, change password, sessions, delete  |
-| `/apps`            | Chooser that hands a signed-in user off to the other apps |
+| Route              | Purpose                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| `/login`           | Email/password + GitHub and Google OAuth                     |
+| `/signup`          | Name, email, password                                        |
+| `/verify-email`    | Code-based verification (Better Auth `emailOTP` plugin)      |
+| `/forgot-password` | Request a reset link by email                                |
+| `/reset-password`  | Set a new password from the emailed token                    |
+| `/account`         | Profile, change email, change password, sessions, delete     |
+| `/apps`            | Saroh's own hosts, for Saroh staff only. Nothing links to it |
 
 `/account` acts on the **session user only**, never on an id from the URL. It
 lives here rather than in `app.saroh.in` because this app is the single identity
@@ -46,7 +46,7 @@ NEXT_PUBLIC_APP_URL=https://app.saroh.localhost            # where a verified us
 # Which first-party origins may be RETURNED TO after sign-in (#222), and are
 # trusted for CSRF. Unset falls back to the *.saroh.in list in @saroh/auth —
 # correct in production, wrong in development, where a `?redirect=` to
-# app.saroh.localhost would be refused and the visitor sent to the launcher.
+# app.saroh.localhost would be refused and the visitor sent to the app's front door.
 BETTER_AUTH_TRUSTED_ORIGINS=https://accounts.saroh.localhost,https://admin.saroh.localhost,https://app.saroh.localhost
 ```
 

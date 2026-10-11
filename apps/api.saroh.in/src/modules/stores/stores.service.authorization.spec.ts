@@ -79,7 +79,12 @@ function setupStore(opts: {
     });
 
     membershipFindUnique.mockResolvedValue(
-        opts.membershipRole ? { role: opts.membershipRole } : null,
+        opts.membershipRole
+            ? {
+                  role: opts.membershipRole,
+                  organization: { lifecycleStatus: "ACTIVE" },
+              }
+            : null,
     );
     storeOwnerFindUnique.mockResolvedValue(
         opts.legacyOwner ? { id: "o" } : null,

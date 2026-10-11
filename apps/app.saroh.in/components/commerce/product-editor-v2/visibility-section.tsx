@@ -15,12 +15,13 @@ import { useState } from "react";
 import { patchProduct } from "@/lib/products/actions";
 import type { ProductDetail, ProductStatus } from "@/lib/products/service";
 
+import { Notice } from "@saroh/ui/notice";
 import { useEditor, useSection } from "./editor-state";
 import { SectionCard } from "./section-card";
 
 const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
     { value: "DRAFT", label: "Draft", note: "Only the team can see it." },
-    { value: "PUBLISHED", label: "Published", note: "Customers can buy it." },
+    { value: "PUBLISHED", label: "Live", note: "Customers can buy it." },
     {
         value: "ARCHIVED",
         label: "Archived",
@@ -31,7 +32,7 @@ const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
 const DOT: Record<ProductStatus, string> = {
     PUBLISHED: "bg-success",
     DRAFT: "bg-muted-foreground/60",
-    ARCHIVED: "bg-brand",
+    ARCHIVED: "bg-foreground",
 };
 
 const label = (s: ProductStatus) =>
@@ -79,7 +80,7 @@ export function VisibilitySection({
               : "Saving publishes it for the first time. Nobody outside the team has seen it yet."
           : status === "DRAFT"
             ? "Saving takes it off the shop. Anyone who had the link finds nothing there."
-            : "Saving archives it — it stops being sold, and its address stops resolving.";
+            : "Saving archives it. It stops being sold, and its address stops resolving.";
 
     useSection(
         "visibility",
@@ -153,7 +154,6 @@ export function VisibilitySection({
                         <ChevronDown
                             aria-hidden
                             className="size-[13px] text-muted-foreground"
-                            strokeWidth={2}
                         />
                     </button>
                 </DropdownMenuTrigger>
@@ -190,11 +190,7 @@ export function VisibilitySection({
                                     </span>
                                 </span>
                                 {o.value === status ? (
-                                    <Check
-                                        aria-hidden
-                                        className="size-3.5"
-                                        strokeWidth={2.4}
-                                    />
+                                    <Check aria-hidden className="size-3.5" />
                                 ) : null}
                             </DropdownMenuRadioItem>
                         ))}
@@ -202,24 +198,13 @@ export function VisibilitySection({
                 </DropdownMenuContent>
             </DropdownMenu>
             {creating ? (
-                <div
-                    role="status"
-                    className={cn(
-                        "mt-2.5 flex items-start gap-[9px] rounded-[9px] px-3 py-2.5",
-                        status === "PUBLISHED"
-                            ? "bg-success-subtle text-success-subtle-foreground"
-                            : "bg-brand-subtle text-brand-subtle-foreground",
-                    )}
+                <Notice
+                    tone={status === "PUBLISHED" ? "success" : "info"}
+                    className="mt-2.5"
+                    icon={<Clock />}
                 >
-                    <Clock
-                        aria-hidden
-                        className="mt-px size-[15px] shrink-0"
-                        strokeWidth={1.9}
-                    />
-                    <span className="text-pretty text-[12px] leading-[1.5]">
-                        {pending}
-                    </span>
-                </div>
+                    {pending}
+                </Notice>
             ) : null}
         </SectionCard>
     );

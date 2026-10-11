@@ -27,16 +27,17 @@ import {
 } from "@/lib/businesses";
 
 export const metadata: Metadata = {
-    title: "Your businesses | Saroh",
+    title: "Your businesses · Saroh",
     description:
         "Choose a business to open, see your role in each, and manage your account.",
 };
 
 /**
  * Every business a person belongs to, the role they hold in each, and the way
- * into their own account. Parked for now (2026-09-23): nothing links here yet
- * and signing in still lands on `/apps`; the layout will be revisited before
- * it becomes the place a person chooses a business.
+ * into their own account. Parked for now (2026-09-23): nothing links here
+ * yet, and signing in lands on Saroh itself, which asks which business when
+ * there are several. The layout will be revisited before this becomes the
+ * place a person chooses a business.
  */
 export default async function BusinessesPage() {
     const result = await resolveServerSession(await headers());
@@ -177,7 +178,7 @@ function Group({
                                     business.paused
                                         ? PAUSED_DETAIL
                                         : business.roleLabel
-                                          ? `${business.roleLabel} — a role this business made`
+                                          ? `${business.roleLabel}, a role this business made`
                                           : `${ROLE_LABEL[business.role]} · ${ROLE_SHORT[business.role]}`
                                 }
                                 badge={state}

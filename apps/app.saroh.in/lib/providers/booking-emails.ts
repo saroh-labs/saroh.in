@@ -1,5 +1,6 @@
 import { upgradeHref } from "@/lib/billing/access";
-import { business } from "@/lib/settings/ready";
+import { formatNumber } from "@/lib/format/money";
+import { businessEditHref } from "@/lib/organizations/business-rows";
 
 import type { SarohEmailState } from "./service";
 
@@ -18,8 +19,8 @@ import type { SarohEmailState } from "./service";
 /** Where the block's main action goes: the first email provider to connect. */
 export const CONNECT_EMAIL_ANCHOR = "connect-email";
 
-/** Where a contact email is added: Business → Contact. */
-export const CONTACT_EMAIL_HREF = business("contact");
+/** Where a contact email is added: Business → Contact, its sheet open. */
+export const CONTACT_EMAIL_HREF = businessEditHref("contactEmail");
 
 /** Where the block sends a business that can't connect its own email yet. */
 export const SEE_PLANS_HREF = upgradeHref();
@@ -52,7 +53,7 @@ export type BookingEmails =
     | { kind: "block"; block: BookingEmailsBlock }
     | { kind: "unread"; text: string };
 
-const n = (v: number) => v.toLocaleString("en-IN");
+const n = formatNumber;
 
 /** The way out, by whether the business can connect its own email. */
 const OWN_SENTENCE = {
@@ -60,7 +61,7 @@ const OWN_SENTENCE = {
         "Connect your own email and they go through it, with no monthly limit.",
     upgrade:
         "A higher plan lets you connect your own email, and then they go through it with no monthly limit.",
-    unread: "We couldn't read whether your plan lets you connect your own email. Reload the page to try again.",
+    unread: "Couldn't load whether your plan lets you connect your own email.",
 } as const;
 
 /** The block for a state, or null when there is nothing new to say (OFF). */
@@ -71,7 +72,7 @@ export function bookingEmailsBlock(
     if (state.state === "UNREAD") {
         return {
             kind: "unread",
-            text: "Booking emails: we couldn't read whether Saroh is sending them for you, or how many are left this month. Reload the page to try again.",
+            text: "Couldn't load booking emails, so this doesn't say whether Saroh is sending them or how many are left this month.",
         };
     }
     const { used, cap, resetsOn } = state;

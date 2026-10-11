@@ -9,6 +9,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 import { assertMemberNotPaused } from "../organizations/member-paused";
+import { assertMembersMayOpen } from "../organizations/organization-lifecycle.gate";
 import type { OrgAction } from "../organizations/organization-policy";
 import {
     isBuiltInRole,
@@ -18,6 +19,7 @@ import {
 import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
+import type { LogoPatch } from "./location-logo";
 
 /**
  * Storefront roles allowed to change a store and take its orders (VIEWER is
@@ -25,6 +27,24 @@ import type { CreateStoreDto, UpdateStoreDto } from "./dto";
  * `moneyAllows`).
  */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
+
+/**
+ * What the caller may do at one location, as its read says it (UX audit,
+ * 10 Oct 2026). The app showed all four location roles the same read-only
+ * screens because it had no way to ask. Each answer is the guard's own
+ * (`StoresService.abilities`), so a screen never offers what the write
+ * would refuse, nor hides what it would take.
+ */
+export interface LocationAbilities {
+    /** Rename it, describe it, change its logo (`PUT stores/:id`). */
+    edit: boolean;
+    /** Take a new order here, with nothing paid yet. */
+    takeOrders: boolean;
+    /** Take the money with a new order: the permissions' alone (DEC-106). */
+    takePayments: boolean;
+    /** Change an order's status here, never its payment. */
+    changeOrders: boolean;
+}
 
 /**
  * Store data layer — the single place the DB is touched for stores. Every
@@ -206,6 +226,39 @@ export class StoresService {
     }
 
     /**
+     * What the caller may do at this location, for its read to say.
+     *
+     * Not a second policy: each answer is asked of the very function the
+     * write's guard asks (`canWrite` for `PUT stores/:id`,
+     * `orderWriteOrganization` for the store-scoped order writes, with
+     * `money` as `OrdersService.create` passes it). A rule changed there
+     * changes here in the same commit, and the two cannot disagree.
+     */
+    async abilities(
+        storeId: string,
+        userId: string,
+    ): Promise<LocationAbilities> {
+        const may = async (
+            action: OrgAction,
+            options?: { money?: boolean },
+        ): Promise<boolean> =>
+            (await this.orderWriteOrganization(
+                storeId,
+                userId,
+                action,
+                options,
+            )) !== null;
+        const [edit, takeOrders, takePayments, changeOrders] =
+            await Promise.all([
+                this.canWrite(storeId, userId),
+                may("order:create"),
+                may("order:create", { money: true }),
+                may("order:edit"),
+            ]);
+        return { edit, takeOrders, takePayments, changeOrders };
+    }
+
+    /**
      * Whether the caller's membership in the store's business permits an
      * action beyond the store's own read/write — `order:read` or
      * `product-review:read` on a product page that shows orders and reviews.
@@ -322,9 +375,17 @@ export class StoresService {
     ): Promise<boolean> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { id: true, role: true, extraActions: true },
+            select: {
+                id: true,
+                role: true,
+                extraActions: true,
+                organization: { select: { lifecycleStatus: true } },
+            },
         });
         if (!membership) return false;
+        // A deleted business is closed to its people (#921), as at the
+        // organization context.
+        assertMembersMayOpen(membership.organization.lifecycleStatus);
         await assertMemberNotPaused(organizationId, membership);
         // Resolved from the business's own role, not from the role's name. A
         // role the business invented maps to MEMBER by name, and MEMBER's floor
@@ -438,8 +499,17 @@ export class StoresService {
         return { id: store.id };
     }
 
-    /** Update a store's core fields — owner or a write-capable member. */
-    async updateForUser(userId: string, storeId: string, dto: UpdateStoreDto) {
+    /**
+     * Update a store's core fields — owner or a write-capable member. Its
+     * logo changes only with a `logo` patch, which `LocationLogoService`
+     * works out from the save (DEC-123); without one it stays as it is.
+     */
+    async updateForUser(
+        userId: string,
+        storeId: string,
+        dto: UpdateStoreDto,
+        logo: LogoPatch | null = null,
+    ) {
         if (!(await this.canWrite(storeId, userId))) {
             throw new NotFoundException("Location not found");
         }
@@ -451,7 +521,7 @@ export class StoresService {
             data: {
                 name: dto.name,
                 description: dto.description ?? null,
-                logo: dto.logo ?? null,
+                ...(logo ?? {}),
             },
         });
         return { id: storeId };

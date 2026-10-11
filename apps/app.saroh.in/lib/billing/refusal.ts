@@ -1,4 +1,7 @@
 import { formatInr } from "@saroh/pricing-catalog";
+import { planLabel } from "@saroh/ui/lib/state-copy";
+
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 import type { UpgradeTo } from "./access";
 
@@ -44,11 +47,15 @@ function text(v: unknown): string | null {
 /**
  * The refusal in an error's `details`, or null when it isn't one. `message`
  * is the envelope's, the title of a lock.
+ *
+ * Null while plans aren't shown (DEC-136): the failure is then said in the
+ * API's own words, as any other, with no notice and no way to a plan.
  */
 export function planRefusalOf(
     details: unknown,
     message: unknown,
 ): PlanRefusal | null {
+    if (!plansShown()) return null;
     if (!isRecord(details)) return null;
     const upgradeTo = upgradeOf(details.upgradeTo);
     if (details.code === "PLAN_LIMIT_REACHED") {
@@ -59,8 +66,7 @@ export function planRefusalOf(
             code: "PLAN_LIMIT_REACHED",
             title,
             body: text(notice.body) ?? "",
-            cta:
-                text(notice.cta) ?? (upgradeTo ? "See plans" : "See your plan"),
+            cta: text(notice.cta) ?? planLabel(),
             upgradeTo,
             limit: typeof details.limit === "number" ? details.limit : null,
             used: typeof details.used === "number" ? details.used : null,
@@ -73,9 +79,9 @@ export function planRefusalOf(
             code: "MODULE_LOCKED",
             title,
             body: upgradeTo
-                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost; it's here when you upgrade.`
+                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost. It's here when you upgrade.`
                 : "Nothing you've made is lost.",
-            cta: upgradeTo ? `See ${upgradeTo.name}` : "See plans",
+            cta: planLabel(upgradeTo?.name),
             upgradeTo,
             limit: null,
             used: null,

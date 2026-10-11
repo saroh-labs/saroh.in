@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import type { ModuleView } from "./schema";
 
 /**
@@ -111,12 +112,12 @@ export function offImpact({
     const parts: string[] = [];
     if (dependents.length > 0) {
         parts.push(
-            `${listWords(dependents)} ${dependents.length === 1 ? "turns" : "turn"} off with it`,
+            `${listWords(dependents)} ${plural(dependents.length, "turns", "turn")} off with it`,
         );
     }
     if (rows.length > 0) {
         parts.push(
-            `${listWords(rows)} ${rows.length === 1 ? "leaves" : "leave"} the rail`,
+            `${listWords(rows)} ${plural(rows.length, "leaves", "leave")} the rail`,
         );
     }
     const said = parts.join(", and ");
@@ -134,7 +135,7 @@ export function offImpact({
  * can never produce a button that says the wrong thing.
  */
 const SETUP_ACTION: Record<string, string> = {
-    CRM_NO_PIPELINE: "Create a pipeline",
+    CRM_NO_PIPELINE: "Add a lead",
     WEBSITE_NO_SITE: "Create a site",
     WEBSITE_NO_PUBLICATION: "Publish your site",
     WEBSITE_SHOP_NOT_CHOSEN: "Choose location",

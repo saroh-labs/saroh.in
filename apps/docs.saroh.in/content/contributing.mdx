@@ -6,7 +6,7 @@ title: "Contributing"
 
 ## Before your first pull request
 
-Read [`CLA.md`](https://github.com/saroh-io/saroh.io/blob/main/CLA.md) and add
+Read [`CLA.md`](https://github.com/saroh-labs/saroh.in/blob/main/CLA.md) and add
 its one-line agreement to your pull request description. Once, not per PR.
 
 **You keep your copyright.** What it grants is permission to include your work
@@ -21,20 +21,22 @@ work done on your own time.**
 
 ## The checks
 
-Run these before opening a pull request. CI runs the same ones.
+Run the quick gate before opening a pull request. It is what CI runs:
+secrets, lint, types, every `check:*` script, and the unit tests.
+
+```bash
+pnpm prepush          # the quick gate; `git push` runs it too
+pnpm prepush --all    # adds the API integration suite and the browser specs
+```
+
+The pieces it runs, if you want one on its own:
 
 ```bash
 pnpm lint          # ESLint across every workspace
 pnpm typecheck     # tsc --noEmit
-pnpm build         # turbo build
 pnpm check:routes  # every emitted href resolves to a real page
 pnpm check:cycles  # no circular imports
-```
-
-API tests:
-
-```bash
-pnpm --filter @saroh/api test
+pnpm --filter @saroh/api test:unit
 ```
 
 ### `testMatch` is an allowlist

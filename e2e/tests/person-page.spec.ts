@@ -149,7 +149,7 @@ test.describe("the person page", () => {
         );
         await expect(confirm).toContainText("This cannot be undone.");
         // Nothing is deleted here.
-        await confirm.getByRole("button", { name: "Keep them" }).click();
+        await confirm.getByRole("button", { name: "Keep record" }).click();
         await expect(confirm).toBeHidden();
         await expect(
             page.getByRole("heading", { level: 1, name: who.name }),
@@ -183,7 +183,7 @@ test.describe("the person page", () => {
         await expect(dialog).toContainText(who.name);
         await dialog.getByRole("combobox", { name: "How it was paid" }).click();
         await page.getByRole("option", { name: "Cash" }).click();
-        await dialog.getByRole("button", { name: "Mark it paid" }).click();
+        await dialog.getByRole("button", { name: "Record payment" }).click();
         await expect(dialog).toBeHidden();
         await expect
             .poll(

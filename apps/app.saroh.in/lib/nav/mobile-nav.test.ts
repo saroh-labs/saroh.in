@@ -4,9 +4,9 @@ import { navFor } from "@/components/shared/nav-items";
 
 import {
     buildMobileNav,
+    MANAGE_HEADING,
     seatPreference,
     TAB_SEATS,
-    WORKSPACE_HEADING,
 } from "./mobile-nav";
 
 /**
@@ -166,13 +166,13 @@ describe("seats", () => {
 });
 
 describe("the sheet", () => {
-    it("lists every section, seated or not, then Workspace", () => {
+    it("lists every section, seated or not, then Manage", () => {
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(nav.groups.map((g) => g.label)).toEqual([
             "Sell",
             "Bookings",
             "Payments",
-            WORKSPACE_HEADING,
+            MANAGE_HEADING,
         ]);
         const sell = nav.groups.find((g) => g.label === "Sell");
         expect(sell?.rows.map((r) => r.href)).toContain("/commerce/orders");
@@ -197,11 +197,11 @@ describe("the sheet", () => {
         }
     });
 
-    it("puts under Workspace only the plain rows without a seat, each with its own icon", () => {
+    it("puts under Manage only the plain rows without a seat, each with its own icon", () => {
         const groups = ownerNav();
         const nav = buildMobileNav({ groups, pathname: "/" });
-        const workspace = nav.groups.find((g) => g.label === WORKSPACE_HEADING);
-        const rowLabels = workspace?.rows.map((r) => r.label) ?? [];
+        const manage = nav.groups.find((g) => g.label === MANAGE_HEADING);
+        const rowLabels = manage?.rows.map((r) => r.label) ?? [];
         expect(rowLabels).toContain("Website");
         expect(rowLabels).toContain("Settings");
         for (const seated of labels(nav.tabs)) {
@@ -210,7 +210,7 @@ describe("the sheet", () => {
         const settings = groups
             .flatMap((g) => g.items)
             .find((i) => i.label === "Settings");
-        expect(workspace?.rows.find((r) => r.label === "Settings")?.icon).toBe(
+        expect(manage?.rows.find((r) => r.label === "Settings")?.icon).toBe(
             settings?.icon,
         );
     });

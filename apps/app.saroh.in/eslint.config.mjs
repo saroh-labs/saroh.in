@@ -1,4 +1,5 @@
 import baseConfig, { restrictEnvAccess } from "@saroh/eslint-config/base";
+import controlsConfig from "@saroh/eslint-config/controls";
 import nextjsConfig from "@saroh/eslint-config/nextjs";
 import reactConfig from "@saroh/eslint-config/react";
 
@@ -14,4 +15,7 @@ export default [
     ...reactConfig,
     ...nextjsConfig,
     ...restrictEnvAccess,
+    // One Button, one Input, one Field: no hand-made controls, no disabled
+    // fade, no focus ring for the mouse (tooling/eslint-config-custom/controls.js).
+    ...controlsConfig,
 ];

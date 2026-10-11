@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
@@ -8,7 +8,11 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
-import { FIELD, FOCUS, StepCard } from "./parts";
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
+import { Tip } from "@saroh/ui/tooltip";
+import { FIELD, StepCard } from "./parts";
 
 /**
  * How it is paid (B13): cash (what was given, and the change), UPI at the
@@ -27,6 +31,7 @@ export function PayStep({
     total,
     note,
     format,
+    currency,
     discount,
     onDiscount,
     handedOver = null,
@@ -41,6 +46,8 @@ export function PayStep({
     total: string;
     note: string;
     format: (cents: number) => string;
+    /** The location's currency, for the cash box; null before it is read. */
+    currency: string | null;
     /** A code or an amount off, as typed. */
     discount: string;
     onDiscount: (discount: string) => void;
@@ -51,8 +58,6 @@ export function PayStep({
     handedOver?: boolean | null;
     onHandedOver?: (on: boolean) => void;
 }) {
-    const givenId = useId();
-    const handedId = useId();
     const discountId = useId();
     const [discounting, setDiscounting] = useState(discount !== "");
     return (
@@ -63,36 +68,41 @@ export function PayStep({
                 className="flex flex-wrap gap-1.5"
             >
                 {options.map((o) => (
-                    <Chip
-                        key={o.key}
-                        on={pay === o.key}
-                        disabled={o.off !== null}
-                        title={o.off ?? undefined}
-                        onClick={() => onPay(o.key)}
-                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                    >
-                        {o.label}
-                    </Chip>
+                    <Tip key={o.key} label={o.off ?? undefined}>
+                        <Chip
+                            on={pay === o.key}
+                            disabled={o.off !== null}
+                            onClick={() => onPay(o.key)}
+                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                        >
+                            {o.label}
+                        </Chip>
+                    </Tip>
                 ))}
             </div>
             {pay === "CASH" ? (
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label
-                        htmlFor={givenId}
-                        className="flex-[1_1_140px] text-[12px] font-medium"
-                    >
-                        Cash given
-                        <Input
-                            id={givenId}
-                            type="text"
-                            inputMode="decimal"
-                            value={given}
-                            onChange={(e) => onGiven(e.target.value)}
-                            placeholder={total}
-                            autoComplete="off"
-                            className={cn(FIELD, "mt-[5px]")}
-                        />
-                    </label>
+                    <Field label="Cash given" className="flex-[1_1_140px]">
+                        {currency ? (
+                            <MoneyInput
+                                currency={currency}
+                                value={given}
+                                onValueChange={onGiven}
+                                placeholder={total}
+                                className="bg-card"
+                            />
+                        ) : (
+                            <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={given}
+                                onChange={(e) => onGiven(e.target.value)}
+                                placeholder={total}
+                                autoComplete="off"
+                                className="bg-card"
+                            />
+                        )}
+                    </Field>
                     <div
                         aria-live="polite"
                         className={cn(
@@ -114,35 +124,25 @@ export function PayStep({
                 {note}
             </p>
             {handedOver !== null ? (
-                <label
-                    htmlFor={handedId}
-                    className="mt-2.5 flex cursor-pointer items-start gap-2.5 text-[13px] coarse:min-h-11"
+                <CheckRow
+                    checked={handedOver}
+                    onChange={(on) => onHandedOver?.(on)}
+                    className="mt-2.5 items-start gap-2.5"
+                    boxClassName="mt-0.5"
                 >
-                    <Checkbox
-                        id={handedId}
-                        checked={handedOver}
-                        onCheckedChange={(v) => onHandedOver?.(v === true)}
-                        className="mt-0.5"
-                    />
                     <span>
                         <span className="font-semibold">Handed over now</span>
                         <span className="block text-[12px] text-muted-foreground">
                             {handedOver
-                                ? "It's made Collected — nothing more to do."
+                                ? "It's made Collected. Nothing more to do."
                                 : "It starts as New, to prepare and hand over later."}
                         </span>
                     </span>
-                </label>
+                </CheckRow>
             ) : null}
             {discounting ? (
-                <div className="mt-2.5">
-                    <label
-                        htmlFor={discountId}
-                        className="text-[12px] font-medium"
-                    >
-                        Discount
-                    </label>
-                    <div className="mt-[5px] flex gap-2">
+                <Field label="Discount" htmlFor={discountId} className="mt-2.5">
+                    <div className="flex gap-2">
                         <Input
                             id={discountId}
                             value={discount}
@@ -151,32 +151,30 @@ export function PayStep({
                             autoComplete="off"
                             className={FIELD}
                         />
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="xs"
                             type="button"
                             onClick={() => {
                                 onDiscount("");
                                 setDiscounting(false);
                             }}
-                            className={cn(
-                                FOCUS,
-                                "shrink-0 cursor-pointer rounded-lg px-2.5 text-[12.5px] font-semibold text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70",
-                            )}
+                            className="shrink-0 text-muted-foreground"
                         >
                             Remove
-                        </button>
+                        </Button>
                     </div>
-                </div>
+                </Field>
             ) : (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => setDiscounting(true)}
-                    className={cn(
-                        FOCUS,
-                        "mt-1.5 cursor-pointer rounded-md px-0 py-1 text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground active:opacity-80",
-                    )}
+                    className="mt-1.5 cursor-pointer px-0 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-80"
                 >
                     + Add a discount
-                </button>
+                </Button>
             )}
         </StepCard>
     );

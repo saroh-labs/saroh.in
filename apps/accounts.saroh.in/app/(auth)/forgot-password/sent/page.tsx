@@ -5,7 +5,7 @@ import Link from "next/link";
 import { SENT_PANEL } from "@/components/auth/panel-copy";
 
 export const metadata: Metadata = {
-    title: "Check your email | Saroh",
+    title: "Check your email · Saroh",
     description: "A reset link is on its way.",
 };
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * The confirmation, as a page rather than a state.
  *
  * It is reached whenever the REQUEST succeeded, which it does for an address
- * with no account too — so every word here has to read the same either way.
+ * with no account too, so every word here has to read the same either way.
  * "If an account exists" is doing real work: it is the difference between a
  * page that reassures and a page that can be used to find out who is
  * registered with Saroh.
@@ -56,7 +56,7 @@ export default async function ResetLinkSentPage({
                     href="/login"
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
-                    Back to log in
+                    Back to sign in
                 </Link>
             </p>
         </SplitShell>

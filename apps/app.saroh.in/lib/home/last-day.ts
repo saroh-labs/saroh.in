@@ -1,4 +1,6 @@
+import { formatDay } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { kindOf } from "@/lib/organizations/kind";
 
 import type { HomeLastDay, HomeSinceItem } from "./service";
@@ -52,48 +54,59 @@ export function dateLine(
     businessName: string,
     only: string | null = null,
     kind: unknown = "BUSINESS",
+    /** What "Finish setup" is about on this Home, when it shows one. */
+    subject: "money" | "site" | "setup" | null = null,
 ): string {
     const where = only ? `${businessName} · ${only}` : businessName;
     if (!lastDay) return where;
-    if (lastDay.fresh) return firstRunLine(businessName, kind);
+    if (lastDay.fresh) return firstRunLine(businessName, kind, subject);
     // The date is already the business's; read it as a calendar day.
-    const day = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "UTC",
+    const day = formatDay(lastDay.date, {
         weekday: "long",
-        day: "numeric",
         month: "long",
-    })
-        .format(new Date(`${lastDay.date}T00:00:00Z`))
-        // en-GB writes "Friday 18 September" or, in some ICU builds,
-        // "Friday, 18 September"; the design has no comma.
-        .replace(",", "");
+        year: "never",
+    });
     return `${day} · ${where}`;
 }
 
-/** What a new business, person or site is getting ready for. */
-function firstRunLine(name: string, kind: unknown): string {
-    switch (kindOf(kind)) {
+/**
+ * What a new business, person or site is getting ready for. It follows
+ * what "Finish setup" is actually about (UX audit, 10 Oct): a business
+ * with only a website to publish was told "ready to take money" above a
+ * checklist about its site. With no checklist to follow (nothing is on
+ * yet), it promises only what is true of every kind.
+ */
+function firstRunLine(
+    name: string,
+    kind: unknown,
+    subject: "money" | "site" | "setup" | null,
+): string {
+    if (subject === "site") return `Let's get ${name} online.`;
+    const of = kindOf(kind);
+    if (subject === "money") {
+        return of === "SOLO"
+            ? `Let's get ${name} ready for clients.`
+            : `Let's get ${name} ready to take money.`;
+    }
+    switch (of) {
         case "WORK":
             return `Let's get ${name} online.`;
         case "SOLO":
             return `Let's get ${name} ready for clients.`;
         default:
-            return `Let's get ${name} ready to take money.`;
+            return `Let's get ${name} set up.`;
     }
 }
-
-const plural = (n: number, one: string, many: string) =>
-    `${n} ${n === 1 ? one : many}`;
 
 /** What one figure says: "3 new orders", "₹12,400 taken". */
 export function sinceLabel(item: HomeSinceItem): string {
     switch (item.kind) {
         case "ORDERS":
-            return plural(item.count, "new order", "new orders");
+            return count(item.count, "new order", "new orders");
         case "BOOKINGS":
-            return plural(item.count, "new booking", "new bookings");
+            return count(item.count, "new booking", "new bookings");
         case "REVIEWS":
-            return plural(item.count, "review", "reviews");
+            return count(item.count, "review", "reviews");
         case "PAYMENTS":
             return `${formatMoney(item.amountMinor, item.currency) ?? item.count} taken`;
     }

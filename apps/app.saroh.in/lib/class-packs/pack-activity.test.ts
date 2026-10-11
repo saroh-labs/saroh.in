@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     activityRow,
     activityText,
@@ -13,6 +14,8 @@ import type {
     PackUse,
 } from "./pack-detail-data";
 import { priceHistory, saleRow, salesByMonth } from "./pack-sales";
+
+pinClock();
 
 /**
  * Pack Detail's Used this week, Sales and Activity in words (round-2 E17).
@@ -87,9 +90,9 @@ describe("Used this week", () => {
             ZONE,
         );
         expect(rows.map((r) => r.when)).toEqual([
-            "Thu 1 Oct 18:00",
-            "Tue 29 Sep 07:00",
-            "Tue 29 Sep 07:00",
+            "Thu 1 Oct, 6:00 pm",
+            "Tue 29 Sep, 7:00 am",
+            "Tue 29 Sep, 7:00 am",
         ]);
         expect(rows[0]).toMatchObject({
             what: "HIIT",
@@ -223,11 +226,11 @@ describe("Price history", () => {
             { t: "₹1,500 now", sub: "Since 1 Sep · 1 bought at this price" },
             {
                 t: "₹1,200",
-                sub: "Until 1 Sep · 2 bought at it — they keep it",
+                sub: "Until 1 Sep · 2 bought at it, and they keep it",
             },
             {
                 t: "₹1,000",
-                sub: "Until 1 Aug · 0 bought at it — they keep it",
+                sub: "Until 1 Aug · 0 bought at it, and they keep it",
             },
         ]);
         expect(h.about).toBe("₹1,000 until 1 Aug · ₹1,200 until 1 Sep");
@@ -350,9 +353,9 @@ describe("Activity", () => {
         const say = (e: Partial<PackEvent>) =>
             activityText(event(e), PACK, "CLASSES");
         expect(say({ kind: "CREATED" })).toBe("Created");
-        expect(say({ kind: "PUBLISHED" })).toBe("Published — on sale");
+        expect(say({ kind: "PUBLISHED" })).toBe("Published and on sale");
         expect(say({ kind: "ARCHIVED" })).toBe(
-            "Archived — nobody new can buy it",
+            "Archived. Nobody new can buy it",
         );
         expect(say({ kind: "RESTORED" })).toBe("Back on sale");
         expect(
@@ -380,7 +383,7 @@ describe("Activity", () => {
                 holder: { purchaseId: "pp_1", contactId: "c_1", name: "Asha" },
                 details: { days: 1, reason: "Fever", expiresAt: ["a", "b"] },
             }),
-        ).toBe("Asha's pack extended 1 day — Fever");
+        ).toBe("Asha's pack extended 1 day: Fever");
     });
 
     it("names what changed, before and after", () => {
@@ -400,7 +403,7 @@ describe("Activity", () => {
                 "CLASSES",
             ),
         ).toBe(
-            "Price ₹1,500, was ₹1,200; 10 classes, was 8; use within 60 days, was 30; classes it covers changed; now for a first pack only",
+            "Price ₹1,500, was ₹1,200 · 10 classes, was 8 · use within 60 days, was 30 · classes it covers changed · now for a first pack only",
         );
         expect(
             activityText(
@@ -415,7 +418,7 @@ describe("Activity", () => {
                 "ONE_TO_ONE",
             ),
         ).toBe(
-            "Renamed to “Ten classes”, was “Ten”; now for one-to-one sessions",
+            "Renamed to “Ten classes”, was “Ten” · now for one-to-one sessions",
         );
         expect(
             activityText(

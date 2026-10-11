@@ -1,3 +1,7 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import type {
     Interval,
     Plan,
@@ -9,10 +13,8 @@ import type {
 import type { Tone } from "./view";
 import {
     classesText,
-    dayText,
     listTab,
     longPrice,
-    money,
     olderPrice,
     TAB_LABEL,
     TAB_TONE,
@@ -81,16 +83,16 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
     const archived = plan.status === "ARCHIVED";
     const n = plan.subscriberCount;
     const parts = [
-        `${money(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
+        `${formatMoneyMajor(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
         ...(withClasses ? [lower(classesText(plan.classesPerMonth))] : []),
-        n === 1 ? "1 person on it" : `${n} people on it`,
+        count(n, "person on it", "people on it"),
     ];
     return {
         state: draft
             ? { label: "Draft", tone: "off" }
             : archived
               ? { label: "Archived", tone: "off" }
-              : { label: "Open", tone: "ok" },
+              : { label: "Live", tone: "ok" },
         subline: parts.join(" · "),
         archiveLabel: draft
             ? "Finish draft"
@@ -98,9 +100,9 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
               ? "Open to sign-ups"
               : "Archive",
         banner: draft
-            ? "This is a draft — nobody can join it until you publish it."
+            ? "This is a draft. Nobody can join it until you publish it."
             : archived
-              ? "Archived — nobody new can join. Everyone already on it carries on as before."
+              ? "Archived. Nobody new can join. Everyone already on it carries on as before."
               : null,
         unpublished: !draft && Boolean(plan.pendingChangedAt),
     };
@@ -122,7 +124,7 @@ export function includedText(
         classes: !withClasses
             ? null
             : n
-              ? `${n} ${n === 1 ? "class" : "classes"} each month. Unused ones don't carry over.`
+              ? `${count(n, "class", "classes")} each month. Unused ones don't carry over.`
               : "Unlimited classes.",
     };
 }
@@ -148,7 +150,7 @@ function priceSide(
     if (price === null) return "no price";
     return interval
         ? longPrice(price, currency, interval)
-        : money(price, currency);
+        : formatMoneyMajor(price, currency);
 }
 
 /**
@@ -174,7 +176,7 @@ function pricePhrase(changes: Changes, currency: string): string | null {
     if (every) {
         const from = str(every[0]) as Interval | null;
         const to = str(every[1]) as Interval | null;
-        return `changed billing from every ${from ? EVERY[from] : "—"} to every ${to ? EVERY[to] : "—"}`;
+        return `changed billing from every ${from ? EVERY[from] : "unknown period"} to every ${to ? EVERY[to] : "unknown period"}`;
     }
     return null;
 }
@@ -228,7 +230,7 @@ export function eventWhat(event: PlanEvent, currency: string): string {
                 : "Created";
         }
         case "ARCHIVED":
-            return "Archived — closed to new sign-ups";
+            return "Archived, closed to new sign-ups";
         case "RESTORED":
             return "Opened to new sign-ups again";
         case "PUBLISHED":
@@ -237,7 +239,7 @@ export function eventWhat(event: PlanEvent, currency: string): string {
             return "Discarded unpublished changes";
         default: {
             const phrases = editPhrases(c, currency);
-            return phrases.length ? upper(phrases.join("; ")) : "Changed";
+            return phrases.length ? upper(phrases.join(", ")) : "Changed";
         }
     }
 }
@@ -269,7 +271,7 @@ export function historyRows(
 ): HistoryRow[] {
     const rows: HistoryRow[] = events.map((e) => ({
         id: e.id,
-        date: dayText(e.createdAt, timeZone, now),
+        date: formatDate(e.createdAt, timeZone, { now }),
         what: eventWhat(e, currency),
         who: eventWho(e),
     }));
@@ -298,7 +300,7 @@ export function historyRows(
  * with more pages says "at least".
  */
 export function priceChangesText(page: PlanEventsPage | null): string {
-    if (!page) return "—";
+    if (!page) return absentText();
     const n = page.events.filter(
         (e) => e.kind !== "CREATED" && touchesPrice(e.changes),
     ).length;
@@ -318,7 +320,10 @@ export function glanceRows(
         { label: "On it now", value: String(plan.subscriberCount) },
         {
             label: "Coming in a month",
-            value: monthly > 0 ? money(monthly, plan.currency) : "—",
+            value:
+                monthly > 0
+                    ? formatMoneyMajor(monthly, plan.currency)
+                    : absentText(),
         },
         { label: "Price changes", value: priceChangesText(events) },
     ];
@@ -352,7 +357,7 @@ export function subscriberRows(
         .sort((a, b) => ORDER[listTab(a)] - ORDER[listTab(b)])
         .map((s) => {
             const tab = listTab(s);
-            const d = (at: string) => dayText(at, s.timezone, now);
+            const d = (at: string) => formatDate(at, s.timezone, { now });
             const when =
                 tab === "cancelled"
                     ? s.cancelledAt

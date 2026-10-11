@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import type { MobileSheetGroup, MobileSheetRow } from "@/lib/nav/mobile-nav";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
  * "Everything else": the More tab's bottom sheet (the "Saroh Tab Bar"
@@ -14,7 +15,7 @@ import type { MobileSheetGroup, MobileSheetRow } from "@/lib/nav/mobile-nav";
  *
  * Every section the actor reaches, with all of its pages — including a
  * seated section's, since its tab can only open one of them — then the rows
- * that belong to no section, under Workspace. What the bar does not hold is
+ * that belong to no section, under Manage. What the bar does not hold is
  * here, so the phone reaches exactly what the rail does.
  *
  * A modal dialog: focus goes to Close when it opens (not the first row, so a
@@ -48,6 +49,9 @@ export function TabBarSheet({
                 />
                 <Dialog.Content
                     aria-modal="true"
+                    // The rest of the navigation: Saroh's own words, which
+                    // a session recording may read.
+                    data-ph-unmask=""
                     aria-describedby={undefined}
                     onOpenAutoFocus={(event) => {
                         event.preventDefault();
@@ -68,7 +72,7 @@ export function TabBarSheet({
                             aria-label="Close"
                             className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border-0 bg-muted text-foreground/75 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card coarse:size-11"
                         >
-                            <X aria-hidden className="size-4" strokeWidth={2} />
+                            <X aria-hidden className="size-4" />
                         </Dialog.Close>
                     </div>
                     <div className="px-2.5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-2">
@@ -99,10 +103,7 @@ function SheetGroup({
     const headingId = useId();
     return (
         <div role="group" aria-labelledby={headingId}>
-            <p
-                id={headingId}
-                className="px-2.5 pb-[5px] pt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-            >
+            <p id={headingId} className="label px-2.5 pb-[5px] pt-3">
                 {group.label}
             </p>
             {group.rows.map((row) => (
@@ -130,19 +131,18 @@ function SheetRow({ row, onGo }: { row: MobileSheetRow; onGo: () => void }) {
             <Icon
                 aria-hidden
                 className="size-[19px] shrink-0"
-                strokeWidth={1.9}
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
             <span className="min-w-0 flex-1 truncate">{row.label}</span>
             {row.count > 0 ? (
                 // The rail's waiting count: a Saffron-tinted pill.
-                <span
+                <CountBadge
+                    count={row.count}
+                    tone="strong"
                     aria-label={`${row.count} waiting`}
-                    className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-subtle px-1.5 text-[11px] font-semibold tabular-nums text-brand-subtle-foreground"
-                >
-                    {row.count}
-                </span>
+                    className="shrink-0"
+                />
             ) : null}
         </Link>
     );

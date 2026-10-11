@@ -311,6 +311,7 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
             switched("themes", "Looks", "hidden", "pro"),
             switched("review", "Second look", "locked", "grow"),
             switched("site-trackers", "Own tracking", "locked", "grow"),
+            switched("qr-branding", "Own-style codes", "locked", "grow"),
         ],
         yearly: { on: false, paid: 10 },
         gst: { show: "excl" },

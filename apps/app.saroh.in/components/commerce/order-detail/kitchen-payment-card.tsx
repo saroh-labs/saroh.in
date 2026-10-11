@@ -1,7 +1,8 @@
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
 
-import { Panel, PanelTitle, StatusPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Panel, PanelTitle } from "./parts";
 
 /**
  * The money column for someone without the money read (UX-010): whether
@@ -24,14 +25,16 @@ export function KitchenPaymentCard({
                 <PanelTitle id="kitchen-payment-title" className="flex-1">
                     Payment
                 </PanelTitle>
-                <StatusPill tone={state.tone}>{state.label}</StatusPill>
+                <StatusBadge size="default" tone={state.tone}>
+                    {state.label}
+                </StatusBadge>
             </div>
             {state.body ? (
                 <p className="mt-1.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                     {state.body}
                     {canRecord
                         ? ""
-                        : " Your role can't record payments — ask the owner or an admin to mark it paid."}
+                        : " Your role can't record payments. Ask the owner or an admin to mark it paid."}
                 </p>
             ) : null}
         </Panel>

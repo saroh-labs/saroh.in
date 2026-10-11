@@ -66,7 +66,7 @@ export function parsePostsPrefix(
     if (!PREFIX_RE.test(value)) {
         throw new BadRequestException({
             message:
-                "Use lowercase letters, numbers and hyphens — no slashes or spaces.",
+                "Use lowercase letters, numbers and hyphens, with no slashes or spaces.",
             field: "postsPrefix",
         });
     }

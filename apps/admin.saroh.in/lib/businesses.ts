@@ -12,13 +12,25 @@ import type { EffectivePlan, UsageNote } from "./plan-words";
 export type LifecycleStatus =
     "ACTIVE" | "SUSPENDED" | "PENDING_DELETION" | "DELETED_RETAINED";
 
-export type AttentionReason = "PAST_DUE" | "FAILED_JOBS" | "FAILED_WEBHOOKS";
+export type AttentionReason =
+    | "PAST_DUE"
+    | "FAILED_JOBS"
+    | "FAILED_WEBHOOKS"
+    /** A deleted business whose clean-up has failed and isn't done (#921). */
+    | "DELETION_CLEANUP"
+    /** Past its deletion window, held back by refunds owed (#921). */
+    | "DELETION_WAITING_REFUNDS";
 
 export interface BusinessRow {
     id: string;
     name: string;
     slug: string;
     lifecycleStatus: LifecycleStatus;
+    /**
+     * On legal hold (DEC-122): its data is kept whatever is asked. Absent
+     * from an older API.
+     */
+    legalHold?: boolean;
     createdAt: string;
     members: number;
     enabledModules: string[];
@@ -45,6 +57,8 @@ export interface BusinessQuery {
     plan?: string;
     module?: string;
     health?: string;
+    /** `on`: only businesses on legal hold. */
+    legalHold?: string;
     cursor?: string;
 }
 
@@ -150,6 +164,14 @@ export interface BusinessView {
         suspensionReason: string | null;
         deletionScheduledAt: string | null;
         deletionReason: string | null;
+        /** Its legal hold (DEC-122): when, why and who; null when none. */
+        legalHold?: LegalHoldFacts | null;
+        /** When its deletion window ended and access was shut off. */
+        deletedRetainedAt?: string | null;
+        /** The day its files and personal data are erased (180 days on). */
+        dataKeptUntil?: string | null;
+        /** When the retention eraser finished with it. */
+        retentionErasedAt?: string | null;
         timezone: string | null;
         country: string | null;
         counts: {
@@ -223,6 +245,54 @@ export interface BusinessView {
     sites?: Panel<SiteTrackersRow[]>;
     /** Where its sites are live, and payments yes or no. Absent from an older API. */
     presence?: Panel<BusinessPresence>;
+    /** Every deletion step on the admin ledger (#921). Absent from an older API. */
+    deletionTrail?: Panel<DeletionTrailRow[]>;
+    /** Refunds a closing business still owes (#921). Absent from an older API. */
+    deletionRefunds?: Panel<DeletionRefundRow[]>;
+}
+
+/** A business's legal hold, as its page shows it (DEC-122). */
+export interface LegalHoldFacts {
+    at: string;
+    reason: string | null;
+    byUserId: string | null;
+    /** A name; an email only to an operator who may read personal data. */
+    by: string | null;
+}
+
+/** One step of a business's way out, from the admin ledger (#921). */
+export interface DeletionTrailRow {
+    id: string;
+    action: string;
+    outcome: string;
+    reason: string | null;
+    actorUserId: string;
+    actor: string | null;
+    createdAt: string;
+    /** A run that waited on refunds: how many, and what is owed. */
+    refunds: {
+        count: number;
+        owedMinorByCurrency: Record<string, number>;
+    } | null;
+    /** A clean-up or an erase run: each step and how it went. */
+    steps: { step: string; result: string }[] | null;
+    /** An erase run that isn't finished: `more`, `failed` or `held`. */
+    state?: string | null;
+}
+
+/** A refund a deletion waits on (#921). */
+export interface DeletionRefundRow {
+    key: string;
+    stage: "OWED" | "FAILED" | "SENDING" | "CONFIRMING";
+    amountMinor: number | null;
+    currency: string | null;
+    /** Null unless the operator may read personal data. */
+    customer: string | null;
+    /** The order or invoice number. */
+    paper: string | null;
+    provider: string | null;
+    providerRef: string | null;
+    since: string;
 }
 
 /** One web address a site is live on (the API's `PresenceAddress`). */

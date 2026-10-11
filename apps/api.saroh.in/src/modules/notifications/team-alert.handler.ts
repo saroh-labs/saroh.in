@@ -5,29 +5,38 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { appBase } from "../../common/app-url";
 import type { TeamAlertMail } from "../../common/email";
 import { sendTeamAlertEmail } from "../../common/email";
-import { fromMinor } from "../../common/money";
-import { formatMoney } from "../invoices/invoice-send.service";
+import { moneyWords, moneyWordsMinor } from "../../common/words-format";
 import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
+import { wordDomain } from "./domain-alerts";
+import { noticeHeadOf, noticeOf } from "./notice-target";
+import { wordProvider } from "./provider-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
+export {
+    DOMAIN_BACK_NOTIFICATION_TYPE,
+    DOMAIN_DOWN_NOTIFICATION_TYPE,
+} from "./domain-alerts";
+export {
+    PROVIDER_ATTENTION_NOTIFICATION_TYPE,
+    PROVIDER_BACK_NOTIFICATION_TYPE,
+} from "./provider-alerts";
 export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
 /** The inbox notice types F14's alerts write (see `ALERT_NOTIFICATION_TYPES`). */
-export const ORDER_NEW_NOTIFICATION_TYPE = "order.new";
-export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
-export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
-export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
-export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
-export const PROVIDER_ATTENTION_NOTIFICATION_TYPE = "provider.attention";
+export const ORDER_NEW_NOTIFICATION_TYPE = "order.new" as const;
+export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed" as const;
+export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined" as const;
+export const SITE_LIVE_NOTIFICATION_TYPE = "site.live" as const;
+export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live" as const;
 
 type Tx = Prisma.TransactionClient;
 
@@ -70,9 +79,10 @@ export interface AlertEmail {
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
  * payment, someone joining, a scheduled go-live of the website that ran
- * (DEC-071, T10), or a website order to pay on handover nobody came for in
- * three days (R34, on the New order row), as each person chose in
- * Settings › Your profile.
+ * (DEC-071, T10), a website order to pay on handover nobody came for in
+ * three days (R34, on the New order row), or a live custom domain that
+ * stopped reaching the site and came back (#917, on the Your website
+ * row), as each person chose in Settings › Your profile.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -165,7 +175,9 @@ export async function tellTeam(
         const notification = await tx.notification.create({
             data: {
                 organizationId,
-                type: alert.type,
+                // The type with what it opens; throws for a notice that
+                // would open nothing.
+                ...noticeHeadOf(alert),
                 title: alert.title,
                 body: alert.body,
             },
@@ -349,6 +361,8 @@ export async function wordAlert(
             return wordProvider(tx, organizationId, payload);
         case "review":
             return wordReview(tx, organizationId, payload);
+        case "domain":
+            return wordDomain(tx, organizationId, payload);
     }
 }
 
@@ -384,17 +398,16 @@ async function wordOrder(
         event: "order",
         eventKey: `team:order:${order.id}`,
         notificationId: null,
-        type: ORDER_NEW_NOTIFICATION_TYPE,
+        ...noticeOf(ORDER_NEW_NOTIFICATION_TYPE, { orderId: order.id }),
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
-        body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+        body: `${moneyWords(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         // Not who it's from: a customer typed that.
         mail: {
             heading: `New order ${order.orderId}`,
-            body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+            body: `${moneyWords(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         },
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
-        orderId: order.id,
         // Taken by someone on the team (the counter, New order): no bell
         // notice (#874). The bell is one notice for everyone, so it rang
         // for the person who just made the sale; whoever chose email for
@@ -445,21 +458,23 @@ async function wordFailed(
     // `||`, not `??`: an empty name falls through too.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const who = invoice.billToName?.trim() || contact || "The customer";
-    const amount = formatMoney(fromMinor(intent.amountCents), intent.currency);
+    const amount = moneyWordsMinor(intent.amountCents, intent.currency);
     return {
         event: "failed",
         eventKey: `team:failed:${p.paymentIntentId}`,
         notificationId: null,
-        type: PAYMENT_FAILED_NOTIFICATION_TYPE,
+        ...noticeOf(PAYMENT_FAILED_NOTIFICATION_TYPE, {
+            invoiceId: invoice.id,
+        }),
         title: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
         // An autopay charge (D13) has no link they tried: the merchant retries.
         body: intent.viaMandateId
-            ? `${who}'s autopay charge of ${amount} didn't go through. Retry it, or send them a pay link.`
+            ? `${who}'s autopay charge of ${amount} didn't go through. Try it again, or send them a pay link.`
             : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
         mail: {
             heading: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
             body: intent.viaMandateId
-                ? `An autopay charge of ${amount} didn't go through. Retry it, or send the customer a pay link.`
+                ? `An autopay charge of ${amount} didn't go through. Try it again, or send the customer a pay link.`
                 : `A payment of ${amount} didn't go through. The customer can try again from the same link.`,
         },
         path: `/billing/invoices/${invoice.id}`,
@@ -491,7 +506,7 @@ async function wordJoined(
         event: "team",
         eventKey: `team:joined:${p.invitationId}`,
         notificationId: null,
-        type: TEAM_JOINED_NOTIFICATION_TYPE,
+        ...noticeOf(TEAM_JOINED_NOTIFICATION_TYPE, {}),
         title: `${who} joined the team`,
         body: `They accepted your invitation, as ${label}.`,
         mail: {
@@ -562,7 +577,9 @@ async function wordSite(
         if (!release.wentLiveAt) return null;
         return {
             ...base,
-            type: SITE_LIVE_NOTIFICATION_TYPE,
+            ...noticeOf(SITE_LIVE_NOTIFICATION_TYPE, {
+                siteId: release.siteId,
+            }),
             title: `${release.name} is live on ${release.site.name}`,
             body: "It went live at the time it was scheduled for.",
             mail: {
@@ -574,7 +591,9 @@ async function wordSite(
     }
     return {
         ...base,
-        type: SITE_NOT_LIVE_NOTIFICATION_TYPE,
+        ...noticeOf(SITE_NOT_LIVE_NOTIFICATION_TYPE, {
+            siteId: release.siteId,
+        }),
         title: `${release.name} didn't go live on ${release.site.name}`,
         body: p.reason ?? "Go live now, or schedule it again.",
         mail: {
@@ -584,66 +603,6 @@ async function wordSite(
         path: `/sites/${release.siteId}/pages`,
     };
 }
-
-/**
- * A provider that refused the business's keys (UX-012), told while it
- * still needs attention: keys entered again since, or a disconnect, and
- * there is nothing to say. Names the provider, never a key.
- */
-async function wordProvider(
-    tx: Tx,
-    organizationId: string,
-    p: Extract<TeamAlertPayload, { event: "provider" }>,
-): Promise<WordedAlert | null> {
-    const where = { id: p.providerId, organizationId };
-    const select = {
-        provider: true,
-        status: true,
-        attentionAt: true,
-    } as const;
-    const row =
-        p.channel === "PAYMENTS"
-            ? await tx.merchantPaymentProvider.findFirst({ where, select })
-            : await tx.communicationProvider.findFirst({ where, select });
-    if (row?.status !== "CONNECTED" || !row.attentionAt) return null;
-    if (row.attentionAt.toISOString() !== p.since) return null;
-    const name = PROVIDER_NAMES[row.provider] ?? row.provider;
-    const base = {
-        event: "failed" as const,
-        eventKey: `team:provider:${p.providerId}:${p.since}`,
-        notificationId: null,
-        type: PROVIDER_ATTENTION_NOTIFICATION_TYPE,
-        path: "/settings/providers",
-        skipUserId: null,
-    };
-    // Saroh sends the email, not the provider whose keys were refused
-    // (DEC-011 amended), so an email provider's alert is emailed too.
-    if (p.channel === "PAYMENTS") {
-        const body = `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`;
-        return {
-            ...base,
-            title: `${name} refused your keys`,
-            body,
-            mail: { heading: `${name} refused your keys`, body },
-        };
-    }
-    const body = `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`;
-    return {
-        ...base,
-        title: `${name} refused your email keys`,
-        body,
-        mail: { heading: `${name} refused your email keys`, body },
-    };
-}
-
-/** How a provider is named in an alert. */
-const PROVIDER_NAMES: Partial<Record<string, string>> = {
-    RAZORPAY: "Razorpay",
-    CASHFREE: "Cashfree",
-    RESEND: "Resend",
-    SENDGRID: "SendGrid",
-    SMTP: "SMTP relay",
-};
 
 /** A booking's email words, by the notice's type: fixed, naming nobody. */
 const NEW_BOOKING_MAIL: WordedAlert["mail"] = {
@@ -684,13 +643,22 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
         case "provider":
             return str("providerId") &&
                 str("since") &&
-                (p.channel === "PAYMENTS" || p.channel === "EMAIL")
+                (p.channel === "PAYMENTS" || p.channel === "EMAIL") &&
+                (p.change === undefined ||
+                    p.change === "down" ||
+                    p.change === "back")
                 ? (p as TeamAlertPayload)
                 : null;
         case "review":
             return (p.about === "approval" && str("approvalId")) ||
                 (p.about === "note" && str("commentId")) ||
                 (p.about === "release" && str("testReleaseId"))
+                ? (p as TeamAlertPayload)
+                : null;
+        case "domain":
+            return str("domainId") &&
+                str("at") &&
+                (p.change === "down" || p.change === "back")
                 ? (p as TeamAlertPayload)
                 : null;
         case "site":

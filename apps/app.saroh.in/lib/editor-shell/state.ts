@@ -237,14 +237,14 @@ export function statusLine(input: {
     });
     if (save.phase === "conflict") {
         return {
-            text: `${conflictText(save.conflict, copy.noun)} — reload to see it. Your edits here aren't saved.`,
+            text: `${conflictText(save.conflict, copy.noun)}. Reload to see it. Your edits here aren't saved.`,
             tone: "danger",
             action: "reload",
         };
     }
     if (save.phase === "failed") {
         return {
-            text: "Not saved — your changes are still here.",
+            text: "Not saved. Your changes are still here.",
             tone: "danger",
             action: "retry",
         };
@@ -295,17 +295,17 @@ export function shellActions(input: {
     if (save.phase === "conflict") {
         why = "Reload to see their changes before you publish.";
     } else if (save.phase === "failed") {
-        why = "Your last change isn't saved — try again before you publish.";
+        why = "Your last change isn't saved. Try again before you publish.";
     } else if (problems.length > 0) {
         // Not before anything is typed: a new, empty record isn't wrong yet.
         if (record || typed) {
             why =
                 problems.length === 1
-                    ? `1 thing to fix before publishing — ${lowerFirst(problems[0].message)}.`
-                    : `${problems.length} things to fix before publishing — they're marked below.`;
+                    ? `1 thing to fix before publishing: ${lowerFirst(problems[0].message)}.`
+                    : `${problems.length} things to fix before publishing. They're marked below.`;
         }
     } else if (p === "live" && !unsaved) {
-        why = "Nothing to publish yet — edits appear here as a draft first.";
+        why = "Nothing to publish yet. Edits appear here as a draft first.";
     }
     const blocked =
         save.phase === "conflict" ||
@@ -348,31 +348,25 @@ export function joinAnd(items: string[]): string {
     return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** The leave dialog's words, naming what would be lost. */
+/**
+ * What "Leave without saving?" says would be lost, in one sentence
+ * (`components/shared/use-leave-guard.tsx` asks the question).
+ */
 export function leaveCopy(input: {
     save: SaveState;
     fields: string[];
     created: boolean;
     noun: string;
-}): { title: string; body: string } {
+}): string {
     const { save, fields, created, noun } = input;
     const what = fields.length
         ? `Your changes to ${joinAnd(fields)} aren't saved`
         : "Your latest changes aren't saved";
     if (!created) {
-        return {
-            title: "Leave without saving it?",
-            body: `Nothing you've entered is kept — the ${noun} saves as a draft once it has a name.`,
-        };
+        return `Nothing you've entered is kept, because the ${noun} saves as a draft once it has a name.`;
     }
     if (save.phase === "conflict") {
-        return {
-            title: "Leave with unsaved changes?",
-            body: `${conflictText(save.conflict, noun)}, so ${lowerFirst(what)} and will be lost.`,
-        };
+        return `${conflictText(save.conflict, noun)}, so ${lowerFirst(what)} and will be lost.`;
     }
-    return {
-        title: "Leave with unsaved changes?",
-        body: `${what}, and will be lost if you leave now.`,
-    };
+    return `${what}, and will be lost if you leave now.`;
 }

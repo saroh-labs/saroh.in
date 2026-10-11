@@ -148,8 +148,8 @@ describe("sourceLabel", () => {
     });
 });
 
-describe("forWhat and invoiceMoney", async () => {
-    const { forWhat, invoiceMoney } = await import("./money");
+describe("forWhat", async () => {
+    const { forWhat } = await import("./money");
 
     it("says what an invoice is for from its first line", () => {
         expect(
@@ -167,11 +167,6 @@ describe("forWhat and invoiceMoney", async () => {
             }),
         ).toBe("Personal training + 2 more");
         expect(forWhat(null)).toBe("No lines yet");
-    });
-
-    it("always shows two decimals", () => {
-        expect(invoiceMoney("2400", "INR")).toBe("₹2,400.00");
-        expect(invoiceMoney("396.5", "INR")).toBe("₹396.50");
     });
 });
 
@@ -220,7 +215,7 @@ function inv(over: Partial<Invoice> = {}): Invoice {
 
 describe("the Invoices design's words", () => {
     it("says Due for an issued invoice and Overdue once past its date", () => {
-        expect(invoicePill(inv())).toEqual({ label: "Due", variant: "draft" });
+        expect(invoicePill(inv())).toEqual({ label: "Due", variant: "active" });
         expect(invoicePill(inv({ standing: "OVERDUE" }))).toEqual({
             label: "Overdue",
             variant: "error",
@@ -256,7 +251,7 @@ describe("the Invoices design's words", () => {
         ).toMatchObject({ before: "3 days late", late: true });
         expect(
             whenLine(inv({ standing: "DRAFT", number: null }), NOW).before,
-        ).toBe("Not issued — no number yet");
+        ).toBe("Not issued, no number yet");
     });
 
     it("says how a paid invoice was paid", () => {

@@ -13,6 +13,21 @@
  */
 const INDIA = /^\+91(\d{5})(\d{5})$/;
 
+/**
+ * A phone a customer types (the bag's delivery address, the booking page):
+ * digits with the spaces, brackets and dashes people write them with, an
+ * optional leading +, and six digits at least. The API's rule, word for
+ * word (`common/customer-phone.ts`), so the page never lets through what
+ * the server then refuses.
+ */
+export function phoneOk(value: string): boolean {
+    const phone = value.trim();
+    return (
+        /^\+?[\d\s()-]{6,24}$/.test(phone) &&
+        phone.replace(/\D/g, "").length >= 6
+    );
+}
+
 export function phoneText(phone: string): string {
     const india = INDIA.exec(phone);
     return india ? `+91 ${india[1]} ${india[2]}` : phone;

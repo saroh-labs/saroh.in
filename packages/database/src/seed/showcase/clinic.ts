@@ -4,6 +4,7 @@ import { ensureCalendarOnlyRole } from "../../calendar-only-role";
 import type { Db } from "../helpers";
 import { writeSite } from "../helpers";
 import { seedPlanId } from "../pricing";
+import { seedStandInPaymentProvider } from "../stand-in-providers";
 import {
     KAVI,
     KAVI_ADDRESS,
@@ -156,24 +157,12 @@ export async function seedClinic(
         },
     });
     // Online payment on the booking page (E11 is checked here).
-    await prisma.merchantPaymentProvider.upsert({
-        where: {
-            organizationId_provider: {
-                organizationId: orgId,
-                provider: "RAZORPAY",
-            },
-        },
-        update: { status: "CONNECTED" },
-        create: {
-            id: kaviId("payments", "razorpay"),
-            organizationId: orgId,
-            provider: "RAZORPAY",
-            status: "CONNECTED",
-            // Placeholders: the seed never fabricates a usable credential.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    // On this machine's database only: its keys are placeholders, so on a
+    // shared database the seed writes no connection (`stand-in-providers.ts`).
+    await seedStandInPaymentProvider(prisma, {
+        id: kaviId("payments", "razorpay"),
+        organizationId: orgId,
+        provider: "RAZORPAY",
     });
     await writeStorefront(prisma, { orgId, createdAt, demoUserId });
 

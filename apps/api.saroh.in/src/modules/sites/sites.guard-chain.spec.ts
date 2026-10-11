@@ -201,8 +201,13 @@ async function throughChain<T>(
 
 /** The membership row the OrganizationGuard will read for this test. */
 function signedInAs(role: OrgRole | null) {
-    membershipFindUnique.mockResolvedValue(role ? { role } : null);
-    organizationFindUnique.mockResolvedValue({ id: ORG });
+    membershipFindUnique.mockResolvedValue(
+        role ? { role, organization: { lifecycleStatus: "ACTIVE" } } : null,
+    );
+    organizationFindUnique.mockResolvedValue({
+        id: ORG,
+        lifecycleStatus: "ACTIVE",
+    });
 }
 
 /**

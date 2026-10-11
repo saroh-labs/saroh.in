@@ -1281,6 +1281,22 @@ describe("the footer still in its template's words (round 2)", () => {
         }
     });
 
+    it("still knows a line the template has since reworded, and only that line", () => {
+        const OLD = "Your area and town — and when the studio is open";
+        const NEW = "Your area and town · when you are open";
+        const flagged = (value: string) =>
+            checkSite(
+                site({
+                    footer: { format: "markdown", value },
+                    templateFooterLine: NEW,
+                    formerTemplateFooterLines: [OLD],
+                }),
+            ).some((f) => f.field === "footer");
+        expect(flagged(OLD)).toBe(true);
+        expect(flagged(NEW)).toBe(true);
+        expect(flagged("Koregaon Park, Pune · Open Saturdays")).toBe(false);
+    });
+
     it("finds every gallery template's own line, as a new site starts with it", () => {
         for (const template of listTemplates()) {
             const line = template.footer?.line;

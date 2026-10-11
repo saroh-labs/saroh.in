@@ -16,6 +16,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { STOCK_PAGE_SIZES } from "./stock-paging";
+
 /**
  * The Stock API's bodies and queries (#514). Every write takes an optional
  * `idempotencyKey`: the screen sends one per tap, so a retried save applies
@@ -193,8 +195,28 @@ export class ReverseStockDto extends StockWriteDto {
 
 export class ResolveCheckDto extends StockWriteDto {}
 
+/**
+ * A list read by its page number: what the three stock lists share. A
+ * query string is text, so both convert before they are checked.
+ */
+class StockPageQueryDto {
+    /** The page by its number, from 1 (a list with numbered pages). */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt({ message: "page must be a whole number" })
+    @Min(1)
+    @Max(100_000)
+    page?: number;
+
+    /** Rows per page: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn(STOCK_PAGE_SIZES, { message: "size is 10, 25, 50 or 100" })
+    size?: number;
+}
+
 /** `GET …/stock` */
-export class StockLevelsQueryDto {
+export class StockLevelsQueryDto extends StockPageQueryDto {
     /** Narrow the columns to one storefront. */
     @IsOptional()
     @IsString()
@@ -226,7 +248,10 @@ export class StockLevelsQueryDto {
     @IsString()
     cursor?: string;
 
-    /** Products a page. Left out, every row comes back. */
+    /**
+     * Products a page, for a read by `cursor`. With no `limit`, `size` or
+     * `page`, every row comes back.
+     */
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -236,14 +261,17 @@ export class StockLevelsQueryDto {
 }
 
 /** `GET …/stock/checks` */
-export class StockChecksQueryDto {
+export class StockChecksQueryDto extends StockPageQueryDto {
     /** The last check of the page before (its key). */
     @IsOptional()
     @IsString()
     @MaxLength(200)
     cursor?: string;
 
-    /** Checks a page. Left out, every open check comes back. */
+    /**
+     * Checks a page, for a read by `cursor`. With no `limit`, `size` or
+     * `page`, every open check comes back.
+     */
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -253,7 +281,7 @@ export class StockChecksQueryDto {
 }
 
 /** `GET …/stock/log` */
-export class StockLogQueryDto {
+export class StockLogQueryDto extends StockPageQueryDto {
     /** One kind, or several comma-separated ("WASTED,COUNTED"). */
     @IsOptional()
     @Transform(({ value }: { value: unknown }) =>
@@ -287,6 +315,7 @@ export class StockLogQueryDto {
     @IsString()
     cursor?: string;
 
+    /** Entries a page, for a read by `cursor`. Left out, 50. */
     @IsOptional()
     @Type(() => Number)
     @IsInt()

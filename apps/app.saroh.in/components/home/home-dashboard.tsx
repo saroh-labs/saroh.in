@@ -1,5 +1,6 @@
+import { PartialRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
-import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
+import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
 
@@ -16,15 +17,18 @@ import type { HomeModel } from "@/lib/home/service";
 import { showsWeek, weekRows } from "@/lib/home/week";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
+import { PlanLockedCard } from "@/components/billing/plan-way";
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
 import { TakeMoneyChecklist } from "./take-money-checklist";
 import { ThisWeek } from "./this-week";
 import { Today } from "./today";
 
-/** "Get ready to take money", for someone who may change the business. */
+/** "Finish setup", for someone who may change the business. */
 export interface HomeSetup {
     list: ReadyChecklist;
     businessId: string;
@@ -104,10 +108,12 @@ export function HomeDashboard({
                 "something went wrong" would not tell them whether the thing
                 they came to check is the thing that is missing. */}
             {home.unavailable.length > 0 ? (
-                <PartialNotice>
-                    {formatList(home.unavailable.map((part) => part.label))}{" "}
-                    could not be loaded, so this is not the whole picture.
-                </PartialNotice>
+                <PartialRead
+                    things={formatList(
+                        home.unavailable.map((part) => part.label),
+                    )}
+                    so="This is not the whole picture."
+                />
             ) : null}
 
             {/* The design's row: the work column, and beside it This week
@@ -118,7 +124,7 @@ export function HomeDashboard({
                     its content's min-content width and pushed the whole page
                     into a horizontal scroll at 320px (#178, §18). */}
                 <div className="grid min-w-0 flex-[1_1_520px] content-start gap-5">
-                    {/* "Get ready to take money" leads while fewer than half
+                    {/* "Finish setup" leads while fewer than half
                         its steps are done, and moves to the foot of the
                         column once more are; each slot draws only when it's
                         the checklist's place (F8). */}
@@ -154,6 +160,11 @@ export function HomeDashboard({
  * which to turn on; offering a choice they cannot act on is the dead-end
  * pattern in another costume. Everyone else is told who makes it, so an empty
  * Home never reads as a broken one.
+ *
+ * Each state says `data-ph-unmask`: this is setup, before the business has
+ * anything of a customer's, and a session recording reads it in full
+ * (DEC-125, 10 Oct). The one thing in it that isn't Saroh's own words is
+ * the business's own name.
  */
 function FirstRun({
     modules,
@@ -176,6 +187,7 @@ function FirstRun({
     ) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="Nothing is turned on yet"
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
@@ -195,10 +207,11 @@ function FirstRun({
     // nothing would be false.
     if (onButNotOpen(modules)) {
         return (
-            <EmptyState
-                icon={<Home aria-hidden />}
+            <PermissionDeniedState
+                data-ph-unmask=""
                 title="Nothing here is open to you yet"
-                description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. An owner or admin can change what you can reach, in Team.`}
+                description={`${businessName} runs on Saroh, but your role doesn't include any of it yet.`}
+                note={WHO_CAN_CHANGE}
             />
         );
     }
@@ -207,24 +220,14 @@ function FirstRun({
 
     // Turned on, but the plan holds it (#837): the business did pick, so
     // "has not picked" would be false. The owner gets the way to a plan
-    // that has it; anyone else, who changes it.
-    if (heldByPlan(modules)) {
+    // that has it; anyone else, who changes it. Not while plans aren't
+    // shown (DEC-136): Home then says what is true without naming one.
+    if (plansShown() && heldByPlan(modules)) {
         return (
-            <EmptyState
-                icon={<Home aria-hidden />}
+            <PlanLockedCard
+                name="What's turned on"
                 title="What's turned on isn't in your plan"
-                description={
-                    manages
-                        ? `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. Nothing is lost; it's all here when the plan does.`
-                        : `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. The owner can change the plan in Settings › Plan and billing.`
-                }
-                action={
-                    manages ? (
-                        <Button asChild variant="brand">
-                            <Link href={upgradeHref()}>See plans</Link>
-                        </Button>
-                    ) : undefined
-                }
+                href={upgradeHref()}
             />
         );
     }
@@ -234,6 +237,7 @@ function FirstRun({
     if (manages) {
         return (
             <EmptyState
+                data-ph-unmask=""
                 icon={<Home aria-hidden />}
                 title="Nothing is turned on yet"
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
@@ -250,6 +254,7 @@ function FirstRun({
 
     return (
         <EmptyState
+            data-ph-unmask=""
             icon={<Home aria-hidden />}
             title="Nothing is turned on yet"
             description={`${businessName} has not picked what Saroh does for it. Once someone who manages it does, the work shows up here and in the sidebar.`}

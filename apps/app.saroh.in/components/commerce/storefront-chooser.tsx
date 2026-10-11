@@ -1,4 +1,5 @@
 import { newStorefrontHref } from "@/lib/stores/links";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronRight, Store as StoreIcon } from "lucide-react";
@@ -32,6 +33,7 @@ export function StorefrontChooser({
     return (
         <>
             <PageHeader
+                holdsData={false}
                 breadcrumb={[
                     "Sell",
                     <Link
@@ -49,15 +51,12 @@ export function StorefrontChooser({
             {stores.length === 0 ? (
                 <EmptyState
                     icon={<StoreIcon />}
-                    title="No location yet"
+                    title="No locations yet"
                     description="Everything you sell is sold at a location, so the first one comes first."
                     action={
-                        <Link
-                            href={newStorefrontHref}
-                            className="font-medium underline-offset-4 hover:underline"
-                        >
-                            Make a location
-                        </Link>
+                        <Button asChild>
+                            <Link href={newStorefrontHref}>New location</Link>
+                        </Button>
                     }
                 />
             ) : (

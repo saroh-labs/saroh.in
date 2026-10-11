@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { SiteCredit } from "@saroh/site-blocks";
-import { madeWithSarohHref } from "@saroh/site-blocks";
+import type { SiteCredit, SiteSeller } from "@saroh/site-blocks";
+import { madeWithSarohHref, sellerLead, soldByLine } from "@saroh/site-blocks";
 
 import { serverApiUrl } from "./api-url";
 import { servedHost } from "./origin";
@@ -16,10 +16,67 @@ export interface FooterFacts {
     email: string | null;
     /** "Made with Saroh" on Free; null on a paid plan. */
     credit: SiteCredit | null;
+    /**
+     * Who a customer is buying from (DEC-121), from Settings › Business:
+     * each null when the business has set none.
+     */
+    seller: SellerFacts;
 }
 
-/** Nothing extra: no email, and no Saroh credit. */
-const NONE: FooterFacts = { email: null, credit: null };
+export interface SellerFacts {
+    legalName: string | null;
+    /** The registered address, on one line. */
+    address: string | null;
+    /** The business's public phone (DEC-053). */
+    phone: string | null;
+}
+
+const NO_SELLER: SellerFacts = { legalName: null, address: null, phone: null };
+
+/** Nothing extra: no email, no Saroh credit, and no details to name. */
+const NONE: FooterFacts = { email: null, credit: null, seller: NO_SELLER };
+
+const text = (value: unknown): string | null =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
+function sellerFacts(body: unknown): SellerFacts {
+    if (body === null || typeof body !== "object") return NO_SELLER;
+    const s = body as Record<string, unknown>;
+    return {
+        legalName: text(s.legalName),
+        address: text(s.address),
+        phone: text(s.phone),
+    };
+}
+
+/**
+ * The footer's "Sold by" block (DEC-121): the legal name, or the site's own
+ * name when the business has set none, then whatever else it has set. "Sold
+ * by" where the site's shop serves, "Run by" where it doesn't (bookings, a
+ * portfolio). With nothing read (`facts` null), the name alone.
+ */
+export function siteSeller(
+    facts: FooterFacts | null,
+    siteName: string,
+    sellsProducts: boolean,
+): SiteSeller {
+    return {
+        lead: sellerLead(sellsProducts),
+        name: facts?.seller.legalName ?? siteName,
+        address: facts?.seller.address ?? null,
+        email: facts?.email ?? null,
+        phone: facts?.seller.phone ?? null,
+    };
+}
+
+/** The one line a confirmation carries: "Sold by ‹legal name›". */
+export function soldByFor(
+    facts: FooterFacts | null,
+    siteName: string,
+    sellsProducts: boolean,
+): string | null {
+    return soldByLine(siteSeller(facts, siteName, sellsProducts));
+}
 
 /** An 8-character referral code, as the API gives them. */
 const REFERRAL_CODE = /^[a-hj-km-np-z2-9]{8}$/;
@@ -30,7 +87,11 @@ const REFERRAL_CODE = /^[a-hj-km-np-z2-9]{8}$/;
  */
 export function footerFacts(body: unknown): FooterFacts {
     if (body === null || typeof body !== "object") return NONE;
-    const { email, credit } = body as { email?: unknown; credit?: unknown };
+    const { email, credit, seller } = body as {
+        email?: unknown;
+        credit?: unknown;
+        seller?: unknown;
+    };
     const code =
         credit !== null && typeof credit === "object"
             ? (credit as { referralCode?: unknown }).referralCode
@@ -41,6 +102,7 @@ export function footerFacts(body: unknown): FooterFacts {
             typeof code === "string" && REFERRAL_CODE.test(code)
                 ? { href: madeWithSarohHref(code) }
                 : null,
+        seller: sellerFacts(seller),
     };
 }
 

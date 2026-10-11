@@ -6,8 +6,9 @@
  * names; a failed read draws Retry and no form; someone without
  * `site:update` sees the values and no controls.
  *
- * `react-dom/client` + `act`, as the other component tests do. The dialog
- * is drawn in place: a portal is not what is tested here.
+ * `react-dom/client` + `act`, as the other component tests do. The tracker
+ * dialog is drawn in place: a portal is not what is tested there. A code's
+ * and the privacy page's sheets are the real ones (read first, 10 Oct).
  */
 import type { ReactNode } from "react";
 import { act } from "react";
@@ -197,6 +198,37 @@ async function click(el: HTMLElement | undefined) {
     });
 }
 
+/** Lets a save's transition and its awaited action settle. */
+async function settle() {
+    await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+    });
+}
+
+/** The open side sheet (a portal), and the name a screen reader gives it. */
+const sheet = () =>
+    document.querySelector<HTMLElement>('body > [role="dialog"]');
+const sheetName = () => {
+    const id = sheet()?.getAttribute("aria-labelledby");
+    return id ? document.getElementById(id)?.textContent : undefined;
+};
+
+/** Opens a row's sheet by its button, and hands back the sheet's field. */
+async function openSheet(scope: HTMLElement, name: string) {
+    await click(buttonIn(scope, name));
+    const input = sheet()?.querySelector("input");
+    if (!input) throw new Error(`No sheet for ${name}`);
+    return input;
+}
+
+async function pressInSheet(name: string) {
+    await click(buttonIn(sheet() ?? document, name));
+    await settle();
+}
+
 function openSetup(kind: string) {
     act(() => buttonIn(within(`[data-tracker="${kind}"]`), "Set up")?.click());
     const area = host.querySelector<HTMLTextAreaElement>(
@@ -205,6 +237,77 @@ function openSetup(kind: string) {
     if (!area) throw new Error("No setup dialog");
     return area;
 }
+
+describe("one line per tool, codes folded (the settings audit)", () => {
+    it("keeps where to find the ID off the row, for Set up to say", () => {
+        render(ok(viewOf()));
+        const row = within('[data-tracker="ga4"]');
+        expect(row.textContent).toContain("Google Analytics");
+        expect(row.textContent).toContain("Not connected");
+        expect(row.querySelector("a")).toBe(null);
+        openSetup("ga4");
+        const dialog = document.querySelector('[role="dialog"]');
+        expect(
+            Array.from(dialog?.querySelectorAll("a") ?? []).some((a) =>
+                a.textContent.startsWith("Help"),
+            ),
+        ).toBe(true);
+    });
+
+    it("shows the common tools and folds the rest behind N more tools", () => {
+        render(
+            ok(
+                viewOf({
+                    trackers: [
+                        {
+                            kind: "plausible",
+                            trackerId: "example.com",
+                            region: null,
+                            enabled: true,
+                        },
+                    ],
+                }),
+            ),
+        );
+        const more = within("details[data-more-tools]");
+        expect(more.hasAttribute("open")).toBe(false);
+        expect(more.querySelector("summary")?.textContent).toContain(
+            "3 more tools",
+        );
+        const folded = Array.from(
+            more.querySelectorAll<HTMLElement>("[data-tracker]"),
+        ).map((el) => el.dataset.tracker);
+        expect(folded).toEqual(["posthog", "clarity", "umami"]);
+        // Connected, so never folded away.
+        expect(more.querySelector('[data-tracker="plausible"]')).toBe(null);
+        expect(host.querySelector('[data-tracker="plausible"]')).not.toBe(null);
+        expect(
+            more.querySelector(
+                '[data-tracker="ga4"], [data-tracker="meta-pixel"]',
+            ),
+        ).toBe(null);
+    });
+
+    it("folds the verification codes behind one row that says how many", () => {
+        render(
+            ok(
+                viewOf({
+                    verifications: {
+                        google: "abc",
+                        bing: null,
+                        meta: null,
+                        pinterest: null,
+                    },
+                }),
+            ),
+        );
+        const codes = within("[data-verification-codes] details");
+        expect(codes.hasAttribute("open")).toBe(false);
+        expect(codes.querySelector("summary")?.textContent).toContain(
+            "Prove the site is yours to Google and Bing. 1 added",
+        );
+    });
+});
 
 describe("connecting a tracker", () => {
     it("takes the ID out of a pasted gtag snippet and sends only the ID", async () => {
@@ -246,14 +349,16 @@ describe("connecting a tracker", () => {
         );
     });
 
-    it("says garbage is the wrong code and keeps Save off", () => {
+    it("says garbage is the wrong code and sends nothing", async () => {
         render(ok(viewOf()));
         typeInto(openSetup("ga4"), "hello there");
         const dialog = within('[role="dialog"]');
         expect(dialog.textContent).toContain(
             "This doesn't look like the right code for this tool.",
         );
-        expect(buttonIn(dialog, "Add to your site")?.disabled).toBe(true);
+        // The button is never off: pressed, nothing is sent.
+        await click(buttonIn(dialog, "Add to your site"));
+        expect(saveSearchTracking).not.toHaveBeenCalled();
     });
 
     it("refuses a secret on the spot and sends nothing", async () => {
@@ -264,7 +369,6 @@ describe("connecting a tracker", () => {
             "This looks like a private key. Never paste it here.",
         );
         const add = buttonIn(dialog, "Add to your site");
-        expect(add?.disabled).toBe(true);
         await click(add);
         expect(saveSearchTracking).not.toHaveBeenCalled();
     });
@@ -300,6 +404,17 @@ describe("connecting a tracker", () => {
 });
 
 describe("verification codes", () => {
+    it("reads first: the row says what is saved, and its field is in a sheet", async () => {
+        render(ok(viewOf()));
+        const row = within('[data-verification="google"]');
+        expect(row.textContent).toContain("Google Search Console");
+        expect(row.textContent).toContain("Not set");
+        expect(host.querySelector("[data-verification] input")).toBe(null);
+        await openSheet(row, "Add");
+        expect(sheetName()).toBe("Google Search Console");
+        expect(sheet()?.textContent).toContain("enter https://rye.saroh.app");
+    });
+
     it("takes the code out of a pasted meta tag and sends only the code", async () => {
         saveSearchTracking.mockResolvedValue({
             ok: true,
@@ -313,50 +428,104 @@ describe("verification codes", () => {
             }),
         });
         render(ok(viewOf()));
-        const field = within('[data-verification="google"]');
-        const input = field.querySelector("input");
-        if (!input) throw new Error("No Google field");
-        typeInto(input, GOOGLE_TAG);
-        expect(field.textContent).toContain(`Code found: ${GOOGLE_CODE}`);
+        const row = within('[data-verification="google"]');
+        typeInto(await openSheet(row, "Add"), GOOGLE_TAG);
+        expect(sheet()?.textContent).toContain(`Code found: ${GOOGLE_CODE}`);
+        expect(saveSearchTracking).not.toHaveBeenCalled();
 
-        await click(buttonIn(field, "Save"));
+        await pressInSheet("Save");
 
         expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
             verifications: { google: GOOGLE_CODE },
         });
-        expect(field.textContent).toContain(
+        expect(sheet()).toBe(null);
+        expect(row.textContent).toContain(GOOGLE_CODE);
+        expect(row.textContent).toContain(
             "Added to your live site. Go back to Search Console and press Verify.",
         );
         expect(
-            field.querySelector('a[href="https://rye.saroh.app"]')?.textContent,
-        ).toBe("View your live page");
-        expect(field.textContent).not.toMatch(/\bVerified\b/);
+            row.querySelector('a[href="https://rye.saroh.app"]')?.textContent,
+        ).toBe("View your live page (opens in a new tab)");
+        expect(row.textContent).not.toMatch(/\bVerified\b/);
+        expect(buttonIn(row, "Edit")).toBeDefined();
     });
 
     it("refuses a secret in a code field and sends nothing", async () => {
         render(ok(viewOf()));
-        const field = within('[data-verification="google"]');
-        const input = field.querySelector("input");
-        if (!input) throw new Error("No Google field");
-        typeInto(input, SECRET);
-        expect(field.textContent).toContain(
+        const row = within('[data-verification="google"]');
+        typeInto(await openSheet(row, "Add"), SECRET);
+        expect(sheet()?.textContent).toContain(
             "This looks like a private key. Never paste it here.",
         );
-        expect(buttonIn(field, "Save")?.disabled).toBe(true);
-        await click(buttonIn(field, "Save"));
+        await pressInSheet("Save");
         expect(saveSearchTracking).not.toHaveBeenCalled();
+        // Still open, for the right code to be pasted over it.
+        expect(sheetName()).toBe("Google Search Console");
     });
 
-    it("uses the custom domain for Search Console and the sitemap", () => {
+    it("Cancel saves nothing, and a refusal keeps the sheet with what was typed", async () => {
+        saveSearchTracking.mockResolvedValue({
+            ok: false,
+            error: "That code is already used by another site.",
+            field: "verifications.google",
+        });
+        render(ok(viewOf()));
+        const row = within('[data-verification="google"]');
+        typeInto(await openSheet(row, "Add"), GOOGLE_CODE);
+        await pressInSheet("Cancel");
+        expect(saveSearchTracking).not.toHaveBeenCalled();
+        expect(sheet()).toBe(null);
+        expect(row.textContent).toContain("Not set");
+
+        // A fresh draft each time it opens.
+        const again = await openSheet(row, "Add");
+        expect(again.value).toBe("");
+        typeInto(again, GOOGLE_CODE);
+        await pressInSheet("Save");
+        expect(sheetName()).toBe("Google Search Console");
+        expect(sheet()?.querySelector("input")?.value).toBe(GOOGLE_CODE);
+        expect(sheet()?.textContent).toContain(
+            "That code is already used by another site.",
+        );
+        expect(row.textContent).toContain("Not set");
+    });
+
+    it("clearing a saved code takes it off the live site", async () => {
+        const saved = viewOf({
+            verifications: {
+                google: GOOGLE_CODE,
+                bing: null,
+                meta: null,
+                pinterest: null,
+            },
+        });
+        saveSearchTracking.mockResolvedValue({ ok: true, data: viewOf() });
+        render(ok(saved));
+        const row = within('[data-verification="google"]');
+        const input = await openSheet(row, "Edit");
+        expect(input.value).toBe(GOOGLE_CODE);
+        expect(sheet()?.textContent).toContain("Clear the box to remove it.");
+        typeInto(input, "");
+        await pressInSheet("Save");
+        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
+            verifications: { google: null },
+        });
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Google Search Console code removed from your live site.",
+        );
+        expect(row.textContent).toContain("Not set");
+    });
+
+    it("uses the custom domain for Search Console and the sitemap", async () => {
         render(ok(viewOf()), { address: ownDomain });
+        await openSheet(within('[data-verification="google"]'), "Add");
+        expect(sheet()?.textContent).toContain("enter https://shop.rye.in");
+        await pressInSheet("Cancel");
         expect(within("[data-live-address]").textContent).toBe(
             "https://shop.rye.in",
         );
         expect(within("[data-sitemap]").textContent).toBe(
             "https://shop.rye.in/sitemap.xml",
-        );
-        expect(within('[data-verification="google"]').textContent).toContain(
-            "enter https://shop.rye.in",
         );
         expect(text()).toContain(
             "Your site also opens at rye.saroh.app. Verify shop.rye.in",
@@ -383,6 +552,61 @@ describe("verification codes", () => {
     });
 });
 
+describe("the privacy page", () => {
+    const PAGE = "https://rye.example.com/privacy";
+
+    it("reads first, and saves from its sheet", async () => {
+        saveSearchTracking.mockResolvedValue({
+            ok: true,
+            data: viewOf({ privacyUrl: PAGE }),
+        });
+        render(ok(viewOf()));
+        const row = within("[data-privacy-page]");
+        expect(row.textContent).toContain(
+            "Not set. Without one, visitors see a short notice we write listing your tools.",
+        );
+        expect(row.querySelector("input")).toBe(null);
+        const input = await openSheet(row, "Add");
+        expect(sheetName()).toBe("Your privacy page");
+        typeInto(input, "rye.example.com/privacy");
+        expect(sheet()?.textContent).toContain(
+            "Use the full address of your privacy page, starting https://",
+        );
+        await pressInSheet("Save");
+        expect(saveSearchTracking).not.toHaveBeenCalled();
+        expect(sheetName()).toBe("Your privacy page");
+
+        typeInto(input, PAGE);
+        await pressInSheet("Save");
+        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
+            privacyUrl: PAGE,
+        });
+        expect(sheet()).toBe(null);
+        expect(row.textContent).toContain(PAGE);
+        expect(buttonIn(row, "Edit")).toBeDefined();
+    });
+
+    it("clearing it removes it, and Cancel leaves it", async () => {
+        saveSearchTracking.mockResolvedValue({ ok: true, data: viewOf() });
+        render(ok(viewOf({ privacyUrl: PAGE })));
+        const row = within("[data-privacy-page]");
+        typeInto(await openSheet(row, "Edit"), "");
+        await pressInSheet("Cancel");
+        expect(saveSearchTracking).not.toHaveBeenCalled();
+        expect(row.textContent).toContain(PAGE);
+
+        typeInto(await openSheet(row, "Edit"), "");
+        await pressInSheet("Save");
+        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
+            privacyUrl: null,
+        });
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Privacy page removed. Visitors see the notice we write.",
+        );
+        expect(row.textContent).toContain("Not set.");
+    });
+});
+
 describe("on a plan without trackers", () => {
     it("locks the trackers with the way up, and keeps verification editable", () => {
         render(ok(viewOf()), { lock: LOCK });
@@ -393,8 +617,8 @@ describe("on a plan without trackers", () => {
         ).toBe("See Plan B");
         expect(buttonIn(host, "Set up")).toBeUndefined();
         expect(
-            within('[data-verification="google"]').querySelector("input"),
-        ).not.toBe(null);
+            buttonIn(within('[data-verification="google"]'), "Add"),
+        ).toBeDefined();
     });
 
     it("says a tracker saved before is kept and not running", () => {
@@ -472,12 +696,12 @@ describe("switched off by Saroh", () => {
 });
 
 describe("states", () => {
-    it("draws a failed read as a failure with Retry, never an empty form", async () => {
+    it("draws a failed read as a failure with Try again, never an empty form", async () => {
         render({ ok: false });
         expect(host.querySelector('[role="alert"]')).not.toBe(null);
-        expect(text()).toContain("Search and tracking couldn't be loaded");
+        expect(text()).toContain("Couldn't load tracking");
         expect(host.querySelector("input, textarea")).toBe(null);
-        await click(buttonIn(host, "Retry"));
+        await click(buttonIn(host, "Try again"));
         expect(refresh).toHaveBeenCalled();
     });
 

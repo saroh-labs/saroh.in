@@ -1,11 +1,16 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
-import { runInOrgContext } from "@saroh/database";
+import { prisma, runInOrgContext } from "@saroh/database";
 
+import {
+    businessLeaving,
+    errorResult,
+    logDeletionProviderCall,
+} from "../organizations/deletion-provider-log";
 import { PaymentsService } from "./payments.service";
+import { SEND_REFUND_TYPE } from "./send-refund-type";
 
-/** The job that sends one automatic refund (round-2 G13, DEC-032). */
-export const SEND_REFUND_TYPE = "payments.send-refund";
+export { SEND_REFUND_TYPE };
 
 /**
  * Tries before the job gives up: the worker backs off from a second to
@@ -62,9 +67,32 @@ export class SendRefundHandler {
             return;
         }
         const organizationId = job.organizationId;
-        const outcome = await runInOrgContext(organizationId, () =>
-            this.payments.sendQueuedRefund(organizationId, refundId),
+        // A closing or deleted business (#921): the send is on its deletion
+        // trail, in the one line an operator follows it by.
+        const leaving = await businessLeaving(organizationId).catch(
+            () => false,
         );
+        let outcome: Awaited<ReturnType<PaymentsService["sendQueuedRefund"]>>;
+        try {
+            outcome = await runInOrgContext(organizationId, () =>
+                this.payments.sendQueuedRefund(organizationId, refundId),
+            );
+        } catch (error) {
+            if (leaving) {
+                await this.trail(organizationId, refundId, errorResult(error));
+            }
+            throw error;
+        }
+        if (leaving) {
+            // ACCEPTED (taken) and DONE (already settled) both worked.
+            await this.trail(
+                organizationId,
+                refundId,
+                outcome === "ACCEPTED" || outcome === "DONE"
+                    ? "ok"
+                    : outcome.toLowerCase(),
+            );
+        }
         if (outcome === "UNKNOWN") {
             throw new Error(
                 `Refund ${refundId}: no answer from the provider yet`,
@@ -76,6 +104,30 @@ export class SendRefundHandler {
             );
         }
     };
+
+    /** One `deletion_provider_call` line for this send; never throws. */
+    private async trail(
+        organizationId: string,
+        refundId: string,
+        result: string,
+    ): Promise<void> {
+        const refund = await prisma.paymentRefund
+            .findFirst({
+                where: { id: refundId, organizationId },
+                select: {
+                    providerRefundId: true,
+                    paymentIntent: { select: { provider: true } },
+                },
+            })
+            .catch(() => null);
+        logDeletionProviderCall(this.logger, {
+            organizationId,
+            provider: refund?.paymentIntent.provider ?? "unknown",
+            call: "refund.send",
+            result,
+            ref: refund?.providerRefundId ?? refundId,
+        });
+    }
 }
 
 function refundIdOf(payload: unknown): string | null {

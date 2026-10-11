@@ -55,6 +55,12 @@ vi.mock("@/lib/sites/actions", () => actions);
  * A plain popover: Radix's, once opened in the bar, never let an async
  * `act` settle under jsdom (the Share menu, UX-068). What is tested is what
  * the menus offer, not how they float.
+ *
+ * It also keeps this file fast. With the real one, every test after a menu
+ * was opened in the bar (More, Status) took 2–12 s of jsdom selector
+ * matching instead of ~20 ms, and the phone suite's "opens the rail from the
+ * foot" crossed vitest's 5 s timeout in a loaded gate (#854). Don't raise
+ * the timeout; don't put the real popover back.
  */
 vi.mock("@saroh/ui/popover", async () => {
     const React = await import("react");
@@ -359,7 +365,7 @@ function type(input: HTMLInputElement, value: string) {
 }
 
 /** The site's header link and footer on the canvas: what G17 draws. */
-const canvasHome = () => $("header a[aria-label$='— home']");
+const canvasHome = () => $("header a[aria-label$=', home']");
 const canvasFooter = () => $("footer");
 
 beforeEach(() => {
@@ -452,7 +458,7 @@ describe("SiteEditor shell", () => {
         click(button("Share"));
         // Nothing waiting, and it still publishes: that makes a new version.
         expect(button("Publish").disabled).toBe(false);
-        expect(button("Publish").title).toBe(
+        expect(button("Publish").getAttribute("aria-description")).toBe(
             "Nothing has changed since the last publish",
         );
 
@@ -499,7 +505,9 @@ describe("SiteEditor shell", () => {
             address: null,
         });
         // G2: the design's one word; the title says what it does.
-        expect(button("Publish").title).toBe("Put this site live");
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put this site live",
+        );
         expect($("[role=status]")?.textContent).toBe("Not published yet");
         expect(host.textContent).toContain("Nothing’s live yet");
         expect(host.textContent).toContain("Not published yet");
@@ -515,8 +523,12 @@ describe("SiteEditor shell", () => {
             "Not published · 2 blocks, footer",
         );
         // The pill says it, so the line beside it does not say it twice.
-        expect($("nav[aria-label=Breadcrumb] span[title]")).toBeNull();
-        expect(button("Publish").title).toBe("Put live: 2 blocks, footer");
+        expect(
+            $("nav[aria-label=Breadcrumb] span[title]:not([role=status])"),
+        ).toBeNull();
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put live: 2 blocks, footer",
+        );
     });
 
     it("never says Published when the count of what's changed is missing", () => {
@@ -527,7 +539,9 @@ describe("SiteEditor shell", () => {
         expect($("[role=status]")?.textContent).toBe(
             "Couldn't check what's changed",
         );
-        expect(button("Publish").title).toBe("Put this site live as it is now");
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put this site live as it is now",
+        );
     });
 
     it("says what a save counted, and says so when a save comes back without a count", async () => {
@@ -569,7 +583,9 @@ describe("SiteEditor shell", () => {
         });
         // The design's pill for an approval that still covers the draft.
         expect($("[role=status]")?.textContent).toBe("Approved");
-        const line = $("nav[aria-label=Breadcrumb] span[title]");
+        const line = $(
+            "nav[aria-label=Breadcrumb] span[title]:not([role=status])",
+        );
         expect(line?.textContent).toMatch(
             /^2 sections and .+ changed · Approved by Asha · 3 open notes$/,
         );
@@ -641,7 +657,7 @@ describe("SiteEditor shell", () => {
 
         expect(button("Move up").disabled).toBe(true);
         expect(host.textContent).toContain(
-            "On every page — can't be removed or moved",
+            "On every page. Can't be removed or moved",
         );
     });
 
@@ -718,7 +734,7 @@ describe("SiteEditor shell", () => {
         expect(button("Editing").getAttribute("aria-pressed")).toBe("true");
         expect(button("Publish")).toBeTruthy();
         expect(host.textContent).toContain(
-            "This is your site with the draft. Try it; nothing is live until you publish.",
+            "This is your site with the draft. Try it. Nothing is live until you publish.",
         );
         // No window bar round the site.
         expect(host.textContent).not.toContain("flour.saroh.app/");
@@ -1078,7 +1094,8 @@ describe("SiteEditor shell", () => {
         expect($("[role=status]")?.textContent).toBe("In review");
         // The pill says In review, so the line says what would go live.
         expect(
-            $("nav[aria-label=Breadcrumb] span[title]")?.textContent,
+            $("nav[aria-label=Breadcrumb] span[title]:not([role=status])")
+                ?.textContent,
         ).toContain("1 section changed");
         expect(button("Publish").disabled).toBe(false);
         await press(button("Publish"));
@@ -1108,6 +1125,29 @@ describe("SiteEditor shell", () => {
             "Flour & Ferment is live at flour.saroh.app.",
         );
         expect(actions.getReviewState).toHaveBeenCalled();
+    });
+
+    it("keeps the check open on where the site is, the first time it goes live", async () => {
+        render({
+            neverPublished: true,
+            initialPendingChanges: null,
+            initialPendingSiteChanges: null,
+        });
+        await press(button("Publish"));
+        await press(button("Publish site"));
+        expect(actions.publishSite).toHaveBeenCalledTimes(1);
+        // The finished state says it, with the address as a link: no toast.
+        expect(toast.showSuccess).not.toHaveBeenCalled();
+        expect(document.body.textContent).toContain("Flour & Ferment is live.");
+        const address = document.querySelector<HTMLAnchorElement>(
+            'a[href="https://flour.saroh.app"]',
+        );
+        expect(address?.textContent).toContain("flour.saroh.app");
+        // And it leaves like the check does.
+        await press(button("Back to editing"));
+        expect(document.body.textContent).not.toContain(
+            "Flour & Ferment is live.",
+        );
     });
 
     it("closes the Undo when the check opens, so Publish never misses a restored block (review G-1)", async () => {
@@ -1227,7 +1267,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         type(field("Site name"), "Rye & Co.");
 
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Rye & Co. — home",
+            "Rye & Co., home",
         );
         expect($("nav[aria-label=Breadcrumb]")?.textContent).toContain(
             "Rye & Co.",
@@ -1265,7 +1305,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(field("Site name").getAttribute("aria-invalid")).toBe("true");
         // The canvas keeps the last name that could be saved.
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Flour & Ferment — home",
+            "Flour & Ferment, home",
         );
         await wait(1500);
         expect(actions.updateSiteSettings).not.toHaveBeenCalled();
@@ -1322,9 +1362,12 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(host.textContent).toContain(
             "Your footer is more than one line of plain text",
         );
-        expect($(`a[href='/sites/${siteId}/settings']`)?.textContent).toBe(
-            "Open Website settings",
-        );
+        // The link lands on the Footer row with its sheet open.
+        expect(
+            $(
+                `a[href='/sites/${siteId}/settings?section=menu-and-footer&edit=footer']`,
+            )?.textContent,
+        ).toBe("Open Website settings");
     });
 
     it("shows both read-only, with who can change them, without site:update", async () => {
@@ -1335,7 +1378,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         click(button("Header"));
         expect(field("Site name").disabled).toBe(true);
         expect(host.textContent).toContain(
-            "Your role can change this page's blocks but not the site's name or footer. An owner or admin can change what your role reaches in Team.",
+            "Your role can change this page's blocks but not the site's name or footer. An owner or admin can change this in Settings › Team.",
         );
         click(button("Footer"));
         expect(field("Footer line").disabled).toBe(true);
@@ -1348,7 +1391,7 @@ describe("SiteEditor header and footer text (G6)", () => {
     it("says Not saved when the footer does not save, and tries again after a pause (review G-4)", async () => {
         actions.updateSiteFooter.mockResolvedValue({
             ok: false,
-            error: "Could not save the footer.",
+            error: "Couldn't save the footer.",
         });
         render();
         click(button("Footer"));
@@ -1356,7 +1399,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         await wait(700);
         await wait(0);
         expect(toast.showError).toHaveBeenCalledWith(
-            "Could not save the footer.",
+            "Couldn't save the footer.",
         );
         // Not every pause: the same value waits before it goes again.
         await wait(1500);
@@ -1364,8 +1407,8 @@ describe("SiteEditor header and footer text (G6)", () => {
         // Still unsaved, so Publish still waits — and says why, not "in a
         // moment", and the pill says Not saved.
         expect(button("Publish").disabled).toBe(true);
-        expect(button("Publish").title).toBe(
-            "Not saved — publish waits until your changes save",
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Not saved. Publish waits until your changes save",
         );
         expect($("[role=status]")?.textContent).toBe("Not saved");
 
@@ -1565,11 +1608,11 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Header"));
         expect(sheet()?.textContent).toContain(
-            "On every page — can't be removed or moved",
+            "On every page. Can't be removed or moved",
         );
         type(field("Site name"), "Rye & Co.");
         expect(canvasHome()?.getAttribute("aria-label")).toBe(
-            "Rye & Co. — home",
+            "Rye & Co., home",
         );
     });
 

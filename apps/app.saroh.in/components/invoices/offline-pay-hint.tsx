@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PlanWay } from "@/components/billing/plan-way";
+import { isPlanHref } from "@/lib/billing/plan-access";
 import { offlinePayHint } from "@/lib/invoices/offline-hint";
 import type { OnlineBlocker } from "@/lib/staff/types";
 
@@ -27,9 +29,14 @@ export function OfflinePayHint(props: {
             {hint.fix && props.canWrite ? (
                 <>
                     {" "}
-                    <Link href={hint.fix.href} className={LINK}>
-                        {hint.fix.label}
-                    </Link>
+                    <PlanWay
+                        when={isPlanHref(hint.fix.href)}
+                        className="text-[length:inherit]"
+                    >
+                        <Link href={hint.fix.href} className={LINK}>
+                            {hint.fix.label}
+                        </Link>
+                    </PlanWay>
                 </>
             ) : null}
         </p>

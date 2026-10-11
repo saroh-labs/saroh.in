@@ -21,7 +21,7 @@ export function PausedDiary({
             className="space-y-2 rounded-xl border border-border px-4 py-3"
         >
             <p className="text-[12.5px] font-semibold">
-                On the diary, no login
+                On the diary, no sign-in
             </p>
             <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
                 {people.map((p) => (

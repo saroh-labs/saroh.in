@@ -22,6 +22,13 @@ export type BillingEmailPayload =
           endsAt: string;
       }
     | {
+          kind: "RENEWAL";
+          organizationId: string;
+          subscriptionId: string;
+          /** The period end it renews at, ISO: one email per renewal. */
+          renewsAt: string;
+      }
+    | {
           kind: "PLAN_ENDING";
           organizationId: string;
           /** The `plan` override that ends. */
@@ -101,6 +108,13 @@ export function parseBillingEmailPayload(
         p.kind === "TRIAL_ENDING" &&
         typeof p.subscriptionId === "string" &&
         typeof p.endsAt === "string"
+    ) {
+        return p as unknown as BillingEmailPayload;
+    }
+    if (
+        p.kind === "RENEWAL" &&
+        typeof p.subscriptionId === "string" &&
+        typeof p.renewsAt === "string"
     ) {
         return p as unknown as BillingEmailPayload;
     }

@@ -2,7 +2,7 @@ import {
     ensureStorefrontTeamRole,
     STOREFRONT_TEAM_ROLE_KEY,
 } from "../backfill/store-members-to-memberships";
-import { STOREFRONT_TEAM_EMAIL, STOREFRONT_TEAM_PASSWORD } from "./data";
+import { seedPassword, STOREFRONT_TEAM_EMAIL } from "./data";
 import type { Db } from "./helpers";
 import { hashPassword, id } from "./helpers";
 
@@ -33,13 +33,13 @@ export async function seedStorefrontTeammate(
     // better-auth's own hasher, as for the owner and the reviewer.
     await prisma.account.upsert({
         where: { id: id("account", "storefront") },
-        update: { password: await hashPassword(STOREFRONT_TEAM_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "storefront"),
             accountId: farah.id,
             providerId: "credential",
             userId: farah.id,
-            password: await hashPassword(STOREFRONT_TEAM_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
 

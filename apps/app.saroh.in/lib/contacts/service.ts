@@ -103,7 +103,7 @@ export function updateContact(
         `/contacts/${contactId}`,
         "PATCH",
         input,
-        "Could not update the contact",
+        "Couldn't update the contact.",
     );
 }
 
@@ -123,7 +123,7 @@ export function createContact(
         "/contacts",
         "POST",
         input,
-        "Could not add the contact",
+        "Couldn't add the contact.",
     );
 }
 
@@ -146,12 +146,14 @@ export interface ContactRemoval {
 export function deleteContact(
     contactId: string,
 ): Promise<CrmResult<ContactRemoval>> {
-    return destroy(`/contacts/${contactId}`, "Could not delete the contact");
+    return destroy(`/contacts/${contactId}`, "Couldn't delete the contact.");
 }
 
 /** Why a privacy removal can't go ahead yet (the API's `RemovalRefusal`). */
 export interface RemovalRefusal {
-    reason: "open-order" | "live-subscription" | "autopay";
+    // `legal-hold` (DEC-122): the business's data is on hold; the message
+    // says to write to Saroh.
+    reason: "open-order" | "live-subscription" | "autopay" | "legal-hold";
     message: string;
 }
 

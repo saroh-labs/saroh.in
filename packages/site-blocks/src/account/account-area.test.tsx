@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountEntry } from "./account-entry";
@@ -78,14 +84,14 @@ describe("the account's words", () => {
         expect(accountMoney("2500.00", "INR")).toBe("₹2,500");
         expect(accountMoney("12.50", "INR")).toBe("₹12.50");
         expect(bookingWhen("2026-10-05T04:30:00.000Z", "Asia/Kolkata")).toBe(
-            "Mon 5 Oct, 10:00",
+            "Mon 5 Oct, 10:00 am",
         );
     });
 
     it("a plan says when it renews, pauses or ends", () => {
         expect(planLine(PLAN)).toBe("Next payment 18 Oct 2026");
         expect(planLine({ ...PLAN, status: "PAUSED", renewsAt: null })).toBe(
-            "Paused — nothing is charged until you resume",
+            "Paused. Nothing is charged until you resume",
         );
         expect(
             planLine({ ...PLAN, renewsAt: null, endsAt: PLAN.renewsAt }),
@@ -169,7 +175,7 @@ describe("Home", () => {
             screen.getByRole("heading", { name: "Next booking" }),
         ).toBeInTheDocument();
         expect(
-            screen.getByText("Check-up · Mon 5 Oct, 10:00"),
+            screen.getByText("Check-up · Mon 5 Oct, 10:00 am"),
         ).toBeInTheDocument();
         expect(screen.getByText("With Dr. Rao")).toBeInTheDocument();
         expect(
@@ -429,8 +435,10 @@ describe("Me", () => {
         fireEvent.change(screen.getByLabelText("Code"), {
             target: { value: "123456" },
         });
-        await click(screen.getByRole("button", { name: "Confirm new email" }));
-        expect(verifyCode).toHaveBeenCalledWith("new@example.in", "123456");
+        // The sixth digit sends the code.
+        await waitFor(() =>
+            expect(verifyCode).toHaveBeenCalledWith("new@example.in", "123456"),
+        );
         expect(
             await screen.findByText(/Use that email to sign in from now on/),
         ).toBeInTheDocument();
@@ -559,12 +567,8 @@ describe("the header's account entry", () => {
         fireEvent.change(screen.getByLabelText("Code"), {
             target: { value: "123456" },
         });
-        const dialog = screen.getByRole("dialog");
-        await click(
-            Array.from(dialog.querySelectorAll("button")).find(
-                (b) => b.textContent === "Sign in",
-            ) as HTMLElement,
-        );
+        // The sixth digit sends the code; signed in, the sheet closes.
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBe(null));
     }
 
     it("the account's own prompt keeps the page that asked (UX-052)", async () => {
@@ -597,7 +601,7 @@ describe("the header's account entry", () => {
         fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
         // Open before the read answers, with the field ready for typing.
         expect(
-            screen.getByRole("heading", { name: "Sign in — Kavi Dental" }),
+            screen.getByRole("heading", { name: "Sign in to Kavi Dental" }),
         ).toBeInTheDocument();
         expect(screen.getByLabelText("Email")).toHaveFocus();
         expect(loadOptions).toHaveBeenCalledTimes(1);

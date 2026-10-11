@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import type { CustomerDetail, DetailPack } from "./detail";
 import {
     heldPacks,
@@ -9,6 +10,8 @@ import {
     packTabRows,
     pageMissing,
 } from "./packs";
+
+pinClock();
 
 /**
  * Customer Detail's class packs in words (round-2 C7): each purchase as
@@ -80,7 +83,7 @@ describe("a pack on the Packs tab", () => {
         );
         expect(row.bar).toBe("soon");
         expect(row.whenTone).toBe("soon");
-        expect(row.when).toBe("Use by 3 Oct — 5 days left");
+        expect(row.when).toBe("Use by 3 Oct, 5 days left");
         expect(row.extNote).toBe("+14 days on 20 Sep: Knee injury");
     });
 
@@ -161,8 +164,8 @@ describe("a pack on the Packs tab", () => {
                 state: { label: "Credit back", tone: "off" },
             },
         ]);
-        expect(row.uses[0].when).toMatch(/30 Sep 07:00$/);
-        expect(row.uses[1].when).toMatch(/22 Sep 07:00$/);
+        expect(row.uses[0].when).toMatch(/30 Sep, 7:00 am$/);
+        expect(row.uses[1].when).toMatch(/22 Sep, 7:00 am$/);
     });
 
     it("says sessions for a one-to-one pack", () => {

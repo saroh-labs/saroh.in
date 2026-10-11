@@ -25,7 +25,7 @@ export function EnquiryCard({
         >
             <h2
                 id="enquiry-heading"
-                className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
+                className="label border-b border-muted px-4 py-[13px]"
             >
                 {enquiries.length === 1
                     ? "What they wrote"

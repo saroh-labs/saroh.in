@@ -11,9 +11,11 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { notTakingOrders } from "../billing/paused-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
-import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { takingNewActivity } from "../orders/checkout-paused";
+import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
 import {
@@ -59,6 +61,7 @@ import type {
     PublicBooking,
     PublicBookingPage,
     PublicDays,
+    PublicDaysAsk,
     PublicService,
 } from "./public-booking-page";
 import {
@@ -94,6 +97,11 @@ export interface SignedInCustomer {
     organizationId: string;
     accountId: string;
     contactId: string;
+    /**
+     * The site they are signed in on, when the caller has it: where a QR
+     * code a booking names is looked up (`sites/qr-source.ts`).
+     */
+    siteId?: string;
 }
 
 /** Who takes a service, as the booking page may show them: a name and an id. */
@@ -196,9 +204,13 @@ export class PublicBookingsService {
         }));
     }
 
-    /** The booking page's next two weeks for one service — see {@link publicDays}. */
-    publicDays(serviceId: string, now: Date = new Date()): Promise<PublicDays> {
-        return publicDays(serviceId, now);
+    /** The booking page's two weeks of one service — see {@link publicDays}. */
+    publicDays(
+        serviceId: string,
+        now: Date = new Date(),
+        ask: PublicDaysAsk = {},
+    ): Promise<PublicDays> {
+        return publicDays(serviceId, now, undefined, ask);
     }
 
     /** What a site's booking page opens with — see {@link publicBookingPage}. */
@@ -347,7 +359,11 @@ export class PublicBookingsService {
         if (signedIn && service.organizationId !== signedIn.organizationId) {
             throw new NotFoundException("Service not found");
         }
-        await assertOrganizationOpen(service.organizationId);
+        // A business suspended or closing takes no new booking (DEC-120),
+        // and its booker hears what a paused site says (#800), never why.
+        if (!(await takingNewActivity(service.organizationId))) {
+            throw notTakingOrders("bookings");
+        }
         // The booker is the account's, never the page's (A9): its verified
         // email, and its contact's name and phone. A name typed on the page
         // is used only when the contact has none yet.
@@ -424,7 +440,7 @@ export class PublicBookingsService {
             !isValidSlotStart(availService, rules, startAt)
         ) {
             throw new BadRequestException(
-                "startAt is not a bookable slot for this service",
+                "That isn't a time this service can be booked.",
             );
         }
         const refusal = bookingWindowRefusal(startAt, now, bookingRules);
@@ -446,7 +462,7 @@ export class PublicBookingsService {
             const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
-                    "Too many booking attempts — please slow down and try again shortly",
+                    "Too many booking attempts. Please slow down and try again shortly",
                     429,
                 );
             }
@@ -536,7 +552,7 @@ export class PublicBookingsService {
             // next order number (P3): tried again, it books.
             onRace: credit
                 ? "That changed while you were booking. Try again."
-                : "This slot is fully booked",
+                : "That time is fully booked.",
             retryOnce: credit !== null || treatmentStore !== null,
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
@@ -598,6 +614,18 @@ export class PublicBookingsService {
             },
         };
         if (price) person.holdUntil = holdExpiry(now);
+        // The QR code whose scan opened the page, if its address still
+        // carried the tag: looked up on the customer's own site, outside
+        // the reservation, and never a reason to refuse the booking.
+        const sourceCode = signedIn?.siteId
+            ? await qrSourceFor(
+                  {
+                      siteId: signedIn.siteId,
+                      organizationId: service.organizationId,
+                  },
+                  input.sourceTag,
+              )
+            : null;
         let booking: Booking;
         try {
             booking = await reserve(
@@ -610,6 +638,7 @@ export class PublicBookingsService {
                     source: `booking:service:${serviceId}`,
                     actorUserId: null,
                     account,
+                    sourceCode,
                 },
                 also,
                 person,

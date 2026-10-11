@@ -55,10 +55,13 @@ const onBooking = new BookingClassPackController(
 
 beforeEach(() => jest.clearAllMocks());
 
+// ClassPacksController is gated per handler (#117): its history reads stay
+// open with Class packs off, so the class carries no module, and
+// `history-reads.gate.spec.ts` names which handlers are gated.
 describe.each([
-    ["ClassPacksController", ClassPacksController],
-    ["BookingClassPackController", BookingClassPackController],
-])("%s", (_name, controller) => {
+    ["ClassPacksController", ClassPacksController, undefined],
+    ["BookingClassPackController", BookingClassPackController, "CLASS_PACKS"],
+])("%s", (_name, controller, classModule) => {
     it("runs sign-in, organization and module guards, under Class packs", () => {
         const guards = (
             Reflect.getMetadata(GUARDS_METADATA, controller) as {
@@ -71,7 +74,7 @@ describe.each([
             "ModuleEnforcementGuard",
         ]);
         expect(Reflect.getMetadata(REQUIRE_MODULE_KEY, controller)).toBe(
-            "CLASS_PACKS",
+            classModule,
         );
         expect(Reflect.getMetadata(PATH_METADATA, controller)).toMatch(
             /^organizations\/:organizationId\//,

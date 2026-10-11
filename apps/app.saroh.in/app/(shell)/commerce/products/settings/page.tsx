@@ -1,7 +1,5 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { AllergensTab } from "@/components/commerce/product-settings/allergens-tab";
 import { CategoriesTab } from "@/components/commerce/product-settings/categories-tab";
@@ -22,6 +20,8 @@ import {
     listFields,
 } from "@/lib/products/settings";
 import { requireSession } from "@/lib/session";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { TextLink } from "@saroh/ui/text-link";
 
 export const metadata = { title: "Product settings" };
 
@@ -71,12 +71,12 @@ export default async function ProductSettingsPage({
                 )}
                 title="Product settings"
                 actions={
-                    <Link
+                    <TextLink
                         href="/commerce/products"
-                        className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                        className="text-[12.5px]"
                     >
                         Back to products
-                    </Link>
+                    </TextLink>
                 }
             />
             {catalogue ? (
@@ -126,15 +126,8 @@ export default async function ProductSettingsPage({
                 </ProductSettings>
             ) : (
                 <FailedState
-                    title="Couldn't load product settings"
-                    description="Nothing has been changed. Try again in a moment."
-                    action={
-                        <Button asChild variant="outline">
-                            <Link href={productSettingsHref(tab)}>
-                                Try again
-                            </Link>
-                        </Button>
-                    }
+                    title={couldntLoad("product settings")}
+                    retryHref={productSettingsHref(tab)}
                 />
             )}
         </PageContainer>

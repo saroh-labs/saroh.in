@@ -5,6 +5,10 @@ import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import {
+    readLocationDetails,
+    readLocationPeople,
+} from "@/lib/stores/location-reads";
 import { readSiteSelling } from "@/lib/stores/location-selling";
 import { locationsWord } from "@/lib/stores/pick";
 import {
@@ -22,6 +26,8 @@ import {
  * it, and read here rather than in the screen for the reason Orders gives:
  * `useSearchParams` would put the whole screen behind Suspense for a value
  * needed once. An unknown id falls back to the first, not to an error.
+ * The open tab (`?section=`) is the screen's own, as Settings › Business
+ * keeps its tab (`useTabParam`): this page is dynamic, so nothing waits on it.
  */
 export async function generateMetadata() {
     // Named by the count, as the rail names it: "Location" for one.
@@ -34,7 +40,7 @@ export default async function StorefrontsPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    await requireSession();
+    const session = await requireSession();
     const [
         organization,
         storefronts,
@@ -58,9 +64,16 @@ export default async function StorefrontsPage({
 
     const chosen =
         storefronts.find((s) => s.id === storefront) ?? storefronts.at(0);
-    const selected = chosen
-        ? await getStorefront(chosen.id).catch(() => null)
-        : null;
+    // The chosen location's settings, and beside them (never after) its
+    // description and logo for The place and its roster for People. Those
+    // two fail on their own: a missing row, and the tab's own failed state.
+    const [selected, details, people] = chosen
+        ? await Promise.all([
+              getStorefront(chosen.id).catch(() => null),
+              readLocationDetails(chosen.id),
+              readLocationPeople(chosen.id, session.user.id, organization),
+          ])
+        : [null, undefined, null];
 
     // From what the API resolved this person may do, as Team does; the role's
     // name is only the fallback for a response that predates permissions.
@@ -75,6 +88,9 @@ export default async function StorefrontsPage({
                 businessName={organization?.name ?? "This business"}
                 storefronts={storefronts}
                 selected={selected}
+                details={details}
+                people={people}
+                chosenId={chosen?.id}
                 site={siteSelling.known ? siteSelling.site : undefined}
                 canCreate={
                     may("store:create") &&
@@ -87,6 +103,7 @@ export default async function StorefrontsPage({
                     )
                 }
                 canEdit={may("store:write")}
+                canUploadLogo={may("media:write")}
                 canClose={may("store:delete")}
                 // How customers who share an email are linked is a
                 // customer-record call too (C15): the API asks for both.

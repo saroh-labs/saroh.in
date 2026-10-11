@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
 
-import {
-    BARE,
-    BookingsLocked,
-    BookingsTopBar,
-} from "@/components/bookings/calendar/parts";
+import { PageHeader } from "@saroh/ui/page-header";
+
+import { BookingsLocked } from "@/components/bookings/calendar/parts";
 import { ModuleGate } from "@/components/modules/module-gate";
 import { PageContainer } from "@/components/shared/page-container";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canReadBookings } from "@/lib/services/access";
 
@@ -27,11 +26,11 @@ export default async function Layout({ children }: { children: ReactNode }) {
     const organization = await resolveActiveOrganization().catch(() => null);
     if (organization && !canReadBookings(organization)) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar />
+            <PageContainer width="full">
+                <PageHeader breadcrumb={["Bookings"]} title="Bookings" />
                 <BookingsLocked
-                    role={organization.role}
-                    roleLabel={organization.roleLabel ?? null}
+                    business={organization.name}
+                    role={knownRoleName(organization)}
                 />
             </PageContainer>
         );

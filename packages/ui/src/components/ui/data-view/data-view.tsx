@@ -1,21 +1,17 @@
 "use client";
 
-import {
-    ArrowDown,
-    ArrowUp,
-    LayoutGrid,
-    List,
-    Search,
-    Table2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useDebouncedCallback } from "use-debounce";
 import { cn } from "../../../lib/utils";
-import { Button } from "../button";
 import { Checkbox } from "../checkbox";
-import { Input } from "../input";
+import { EmptyState } from "../data-state";
+import { ListSearch } from "../list-search";
+import { listTable } from "../list-table";
+import { ListFilter, ListPaging, ListToolbar, pagesOf } from "../list-toolbar";
+import { usePageSize } from "../page-sizes";
 import { ScrollX } from "../scroll-x";
+import { Segmented } from "../segmented";
 import { Skeleton } from "../skeleton";
 
 import type {
@@ -25,15 +21,6 @@ import type {
     DataViewProps,
 } from "./types";
 import { useViewMode } from "./use-view-mode";
-
-/**
- * How long the table waits before re-filtering.
- *
- * The same 180ms the command palette uses for its search, so the product has
- * one answer to "how long after I stop typing". Short enough to read as
- * instant, long enough that a burst of keystrokes costs one render.
- */
-const SEARCH_DEBOUNCE_MS = 180;
 
 const MODE_META: Record<DataViewMode, { label: string; icon: typeof Table2 }> =
     {
@@ -69,19 +56,26 @@ export function DataView<TRow>({
     empty,
     searchableColumnIds,
     filters,
+    filterLabel = "Show",
     initialFilterId,
-    filterStyle = "tabs",
     isLoading = false,
     error = null,
-    noun = { one: "row", other: "rows" },
-    searchPlaceholder = "Search…",
+    noun,
+    showTotal = true,
+    searchPlaceholder,
+    toolbarSearch,
     toolbarExtra,
+    toolbarEnd,
+    toolbarAttention,
+    toolbarMore,
+    onClearFilters,
     countLabel,
     hideModeToggle = false,
     onRowClick,
     selectable = false,
     bulkActions,
     emptyState,
+    paging,
 }: DataViewProps<TRow>) {
     const { mode, wide, deskMode, phoneMode, choose } = useViewMode(
         viewId,
@@ -92,7 +86,7 @@ export function DataView<TRow>({
     /*
      * The parent holds only the SETTLED term.
      *
-     * The keystroke never reaches this component: `SearchField` below owns the
+     * The keystroke never reaches this component: `ListSearch` owns the
      * text it shows and hands the term up once typing pauses. That is the
      * whole point — `DataView` renders every row, so a re-render here costs
      * ~31ms over 600 rows, and debouncing the FILTER alone would have saved
@@ -129,6 +123,7 @@ export function DataView<TRow>({
 
     const chooseFilter = (next: string) => {
         setFilterId(next);
+        setPage(1);
         /*
          * The URL is updated but NOT navigated: `history.replaceState` keeps the
          * address shareable and the back button honest without a server round
@@ -185,8 +180,30 @@ export function DataView<TRow>({
         return out;
     }, [rows, columns, search, searchableColumnIds, sort, activeFilter]);
 
+    /*
+     * The rows on screen: one page of what matched. The size is the one
+     * this list was last shown at (`usePageSize`, kept between visits). A
+     * page past the end (a search just narrowed the list) is the last one,
+     * and anything that lists something else starts again at page 1.
+     *
+     * With `paging` the server has cut the page already: every row given
+     * is on screen, and the footer is drawn from the screen's numbers.
+     */
+    const [size, setSize] = usePageSize(viewId);
+    const [pageAsked, setPage] = useState(1);
+    const page = Math.min(pageAsked, pagesOf(visible.length, size));
+    const serverPaged = paging !== undefined;
+    const paged = useMemo(
+        () =>
+            serverPaged
+                ? visible
+                : visible.slice((page - 1) * size, page * size),
+        [visible, page, size, serverPaged],
+    );
+
     const toggleSort = (col: DataColumn<TRow>) => {
         if (!col.sortValue) return;
+        setPage(1);
         setSort((prev) =>
             prev?.id === col.id
                 ? prev.desc
@@ -199,7 +216,8 @@ export function DataView<TRow>({
     // A selection only ever holds rows that still exist: a row deleted or
     // filtered away by a refresh must not stay counted in the bulk bar.
     const selectedRows = rows.filter((r) => selected.has(rowKey(r)));
-    const visibleKeys = visible.map(rowKey);
+    // Select-all takes the rows on screen, never a page nobody is looking at.
+    const visibleKeys = paged.map(rowKey);
     const selectedInView = visibleKeys.filter((k) => selected.has(k)).length;
     const allInView =
         visibleKeys.length > 0 && selectedInView === visibleKeys.length;
@@ -228,9 +246,17 @@ export function DataView<TRow>({
     // One filter is not a filter — a lone chip nobody can switch away from is
     // chrome that costs a row of height and answers nothing.
     const hasFilters = (filters?.length ?? 0) > 1;
-    const segmented = hasFilters && filterStyle === "segmented";
     const countOf = (f: DataFilter<TRow>) =>
         f.predicate ? rows.filter(f.predicate).length : rows.length;
+    // The row that holds search, filters and the count is drawn at all.
+    const hasToolbar =
+        searchable.length > 0 ||
+        Boolean(toolbarSearch) ||
+        showModes ||
+        Boolean(toolbarExtra) ||
+        Boolean(toolbarAttention) ||
+        Boolean(toolbarEnd) ||
+        hasFilters;
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
@@ -243,15 +269,18 @@ export function DataView<TRow>({
         m === "table" ? (
             // Horizontal scroll is on the wrapper, never the page: a table
             // that widens the document breaks every other element on it.
-            <ScrollX
-                label={regionLabel}
-                className="rounded-[11px] border border-border bg-card"
-            >
-                <table className="w-full border-collapse text-[13.5px]">
-                    <thead>
+            <ScrollX label={regionLabel} className={listTable.frame}>
+                <table
+                    data-list-table=""
+                    className="w-full border-collapse text-[13.5px]"
+                >
+                    {/* Column names are Saroh's own words, and a recording
+                        may read them; every row below is a record's data
+                        and is masked whatever a cell draws. */}
+                    <thead data-ph-unmask="">
                         {/* A faint head fill and a stronger rule, as the
                                 applied Products screen draws it. */}
-                        <tr className="h-10 border-b border-border bg-foreground/[0.03]">
+                        <tr className={listTable.headRow}>
                             {selectable ? (
                                 <th
                                     scope="col"
@@ -299,7 +328,7 @@ export function DataView<TRow>({
                                                 : undefined
                                         }
                                         className={cn(
-                                            "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                                            listTable.th,
                                             col.numeric && "text-right",
                                         )}
                                     >
@@ -316,7 +345,7 @@ export function DataView<TRow>({
                                                     // harness found these;
                                                     // reading the filter row
                                                     // by hand did not.
-                                                    "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
+                                                    "inline-flex items-center gap-1 rounded-sm [font:inherit] [letter-spacing:inherit] [text-transform:inherit] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
                                                     active && "text-foreground",
                                                 )}
                                             >
@@ -342,13 +371,13 @@ export function DataView<TRow>({
                             ) : null}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-ph-mask="">
                         {/* `wk-item` staggers rows in (workspace.css caps
                                 it at six items, so no row waits). Hover is
                                 the translucent Ink wash (brand file §22), and
                                 transitions stay on colour only — a table that
                                 moves on hover is unreadable while scanning. */}
-                        {visible.map((row, rowIndex) => {
+                        {paged.map((row, rowIndex) => {
                             const key = rowKey(row);
                             const isSelected = selected.has(key);
                             return (
@@ -371,7 +400,8 @@ export function DataView<TRow>({
                                             : undefined
                                     }
                                     className={cn(
-                                        "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
+                                        "wk-item data-[state=selected]:bg-muted",
+                                        listTable.tr,
                                         onRowClick &&
                                             "cursor-pointer active:bg-foreground/[0.07]",
                                     )}
@@ -396,9 +426,9 @@ export function DataView<TRow>({
                                             <td
                                                 key={col.id}
                                                 className={cn(
-                                                    "px-[14px] py-[11px] align-middle",
+                                                    listTable.td,
                                                     col.numeric &&
-                                                        "text-right tabular-nums",
+                                                        listTable.numeric,
                                                     // Money is the figure people
                                                     // scan for: Space Grotesk.
                                                     col.money &&
@@ -475,7 +505,7 @@ export function DataView<TRow>({
             // ends up ragged. Enforced here rather than asked of every
             // caller, because it is a property of the grid, not the card.
             <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {visible.map((row) => (
+                {paged.map((row) => (
                     <div key={rowKey(row)} className="[&>*]:h-full">
                         {renderCard(row)}
                     </div>
@@ -485,8 +515,9 @@ export function DataView<TRow>({
             // List: the whole row is the target, which is what one-handed
             // and gloved use needs. Detail columns are dropped, not hidden
             // behind a disclosure nobody taps.
-            <ul className="divide-y rounded-xl border border-border bg-card">
-                {visible.map((row, rowIndex) => {
+            // Every row is a record's data: masked in a recording.
+            <ul data-ph-mask="" data-list-table="" className={listTable.card}>
+                {paged.map((row, rowIndex) => {
                     // `.at()` rather than a destructure: a caller could
                     // declare only `detail` columns, leaving this empty,
                     // and index access would type as always-present.
@@ -494,7 +525,7 @@ export function DataView<TRow>({
                     const rest = listColumns.slice(1);
                     const href = rowHref?.(row);
                     const body = (
-                        <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
+                        <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 py-[11px] pl-[14px]">
                             <div className="min-w-0 space-y-1">
                                 <div className="truncate font-medium">
                                     {!href && onRowClick ? (
@@ -541,7 +572,11 @@ export function DataView<TRow>({
                                     "--wk-i": rowIndex,
                                 } as React.CSSProperties
                             }
-                            className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50 active:bg-accent"
+                            className={cn(
+                                "wk-item relative flex items-center gap-2 border-b border-border pr-[14px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
+                                (href ?? onRowClick) &&
+                                    "active:bg-foreground/[0.07]",
+                            )}
                         >
                             {/*
                              * An OVERLAY link, not a wrapper.
@@ -619,172 +654,123 @@ export function DataView<TRow>({
         mode === null ? (unsplit ? null : phoneMode) : inDesk ? null : mode;
     const regionLabel =
         noun.other.charAt(0).toUpperCase() + noun.other.slice(1);
+    // How many are showing, on the toolbar's right: the total (unless the
+    // page header already says it), or "3 of 12 codes" once narrowed.
+    const narrowedCount = countLabel
+        ? countLabel(visible.length, rows.length)
+        : `${visible.length} of ${count(rows.length)}`;
+    const wholeCount = countLabel
+        ? countLabel(visible.length, rows.length)
+        : count(rows.length);
+    const toolbarCount = !hasToolbar
+        ? null
+        : visible.length !== rows.length
+          ? narrowedCount
+          : showTotal
+            ? wholeCount
+            : null;
 
     return (
-        // 14px between tabs, toolbar and table, as the applied screens space them.
+        // 14px between toolbar and table, as the applied screens space them.
         <div className="space-y-[14px]">
             {/*
-             * Header tabs, when they filter (brand file §13): sub-views of the
-             * same rows — All, Unfulfilled, Refunds — each with its count.
-             * They filter the list, they never navigate, so they carry
-             * `aria-pressed`, not `aria-current`; the page marker belongs to
-             * the rail and appears once per screen.
+             * The one list toolbar, in ONE row: search first, then every
+             * filter as a dropdown, then (to the right) the density switch
+             * and how many rows are showing.
+             *
+             * Named subsets of the same rows (All, Live, Ended) are a
+             * dropdown, never tabs (tabs are a screen's views) and never a
+             * row of chips. Each option shows its count, so nobody picks
+             * an empty one.
              */}
-            {hasFilters && !segmented ? (
-                <div
-                    role="group"
-                    aria-label="Filter"
-                    className="-mt-2 flex flex-wrap gap-0.5 border-b border-border"
-                >
-                    {filters?.map((f) => {
-                        const on = f.id === filterId;
-                        const n = countOf(f);
-                        return (
-                            <button
-                                key={f.id}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => chooseFilter(f.id)}
-                                className={cn(
-                                    "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:min-h-11",
-                                    on
-                                        ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                        : "font-medium text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {f.label}
-                                <span
-                                    className={cn(
-                                        "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                        on
-                                            ? "bg-muted text-foreground"
-                                            : "bg-foreground/[0.04] text-muted-foreground",
-                                    )}
-                                >
-                                    {n}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            ) : null}
-
-            {/* The toolbar: search, density, and how many rows are showing. */}
-            {searchable.length > 0 || showModes || toolbarExtra || segmented ? (
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {/*
-                     * Segmented filters: the same sub-views, drawn as one
-                     * control in the toolbar — the page's own tabs keep the
-                     * underline, so there is one row that navigates and one
-                     * that narrows the list. Each count is visible before the
-                     * choice, so nobody clicks into an empty view.
-                     */}
-                    {segmented ? (
-                        <div
-                            role="group"
-                            aria-label="Filter"
-                            className="flex max-w-full items-center overflow-x-auto rounded-md border border-border p-0.5"
-                        >
-                            {filters?.map((f) => {
-                                const on = f.id === filterId;
-                                return (
-                                    <button
-                                        key={f.id}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => chooseFilter(f.id)}
-                                        className={cn(
-                                            "flex h-[32px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:h-11 coarse:px-3.5",
-                                            on
-                                                ? "bg-accent font-semibold text-accent-foreground"
-                                                : "font-medium text-muted-foreground hover:text-foreground",
-                                        )}
-                                    >
-                                        {f.label}
-                                        <span
-                                            className={cn(
-                                                "text-[11.5px] tabular-nums",
-                                                f.attention && countOf(f) > 0
-                                                    ? "font-semibold text-brand-subtle-foreground"
-                                                    : on
-                                                      ? "text-accent-foreground/70"
-                                                      : "text-muted-foreground/80",
-                                            )}
-                                        >
-                                            {countOf(f)}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ) : null}
-
-                    {searchable.length > 0 ? (
-                        <div className="relative min-w-[200px] max-w-[320px] flex-1">
-                            <Search
-                                aria-hidden
-                                className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                            />
-                            <SearchField
-                                key={clearNonce}
-                                onSettled={setSearch}
-                                placeholder={searchPlaceholder}
-                                aria-label={searchPlaceholder.replace(/…$/, "")}
-                                className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
-                            />
-                        </div>
-                    ) : null}
-
-                    {toolbarExtra}
-
-                    {showModes ? (
-                        <div
-                            role="group"
-                            aria-label="View density"
-                            // A desk's choice only (T8): below the table
-                            // boundary the phone always draws the list, so
-                            // a toggle there would change nothing.
-                            className="hidden items-center rounded-md border border-border p-0.5 min-[760px]:flex"
-                        >
-                            {modes.map((m) => {
-                                const Icon = MODE_META[m].icon;
-                                const on = m === (mode ?? deskMode);
-                                return (
-                                    <Button
-                                        key={m}
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        aria-pressed={on}
-                                        onClick={() => choose(m)}
-                                        className={cn(
-                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium coarse:h-11 coarse:px-3.5",
-                                            on &&
-                                                "bg-accent text-accent-foreground",
-                                        )}
-                                    >
-                                        <Icon className="size-3.5" />
-                                        <span className="hidden sm:inline">
-                                            {MODE_META[m].label}
-                                        </span>
-                                    </Button>
-                                );
-                            })}
-                        </div>
-                    ) : null}
-
-                    <p
-                        className="ml-auto text-xs text-muted-foreground"
-                        aria-live="polite"
-                    >
-                        {countLabel
-                            ? countLabel(visible.length, rows.length)
-                            : visible.length === rows.length
-                              ? count(rows.length)
-                              : `${visible.length} of ${count(rows.length)}`}
-                    </p>
-                </div>
-            ) : null}
+            <ListToolbar
+                search={
+                    toolbarSearch ??
+                    (searchable.length > 0 ? (
+                        <ListSearch
+                            key={clearNonce}
+                            onSearch={(term) => {
+                                setSearch(term);
+                                setPage(1);
+                            }}
+                            placeholder={
+                                searchPlaceholder ?? `Search ${noun.other}`
+                            }
+                        />
+                    ) : null)
+                }
+                filters={
+                    hasFilters || toolbarExtra ? (
+                        <>
+                            {/* The named subsets of the rows (All, Live,
+                                Ended) are one more dropdown in the row,
+                                each with its count. `?view=` keeps the
+                                choice in the address. */}
+                            {hasFilters ? (
+                                <ListFilter
+                                    label={filterLabel}
+                                    value={filterId ?? ""}
+                                    onValueChange={chooseFilter}
+                                    options={(filters ?? []).map((f, i) => ({
+                                        value: f.id,
+                                        // The unnarrowed choice says what
+                                        // the list holds: "All codes".
+                                        label:
+                                            i === 0 && f.label === "All"
+                                                ? `All ${noun.other}`
+                                                : f.label,
+                                        count: countOf(f),
+                                    }))}
+                                />
+                            ) : null}
+                            {toolbarExtra}
+                        </>
+                    ) : null
+                }
+                attention={toolbarAttention}
+                more={toolbarMore}
+                onClear={
+                    // The list's own search and subset, and whatever the
+                    // screen says it has narrowed itself.
+                    search.trim() ||
+                    (hasFilters && filterId !== firstFilter?.id) ||
+                    onClearFilters
+                        ? () => {
+                              clearSearch();
+                              if (firstFilter) chooseFilter(firstFilter.id);
+                              onClearFilters?.();
+                          }
+                        : undefined
+                }
+                end={
+                    toolbarEnd || showModes ? (
+                        <>
+                            {toolbarEnd}
+                            {showModes ? (
+                                // A desk's choice only (T8): below the
+                                // table boundary the phone always draws
+                                // the list, so a switch there would
+                                // change nothing.
+                                <Segmented
+                                    label="View density"
+                                    className="hidden min-[760px]:inline-flex"
+                                    value={mode ?? deskMode}
+                                    onValueChange={choose}
+                                    options={modes.map((m) => {
+                                        const Icon = MODE_META[m].icon;
+                                        return {
+                                            value: m,
+                                            label: MODE_META[m].label,
+                                            icon: <Icon />,
+                                        };
+                                    })}
+                                />
+                            ) : null}
+                        </>
+                    ) : null
+                }
+                count={toolbarCount}
+            />
 
             {error ? (
                 <p
@@ -814,48 +800,40 @@ export function DataView<TRow>({
                    value would announce "No products match zzz" while the
                    previous results were still sitting underneath it. */
                 search.trim() ? (
-                    <EmptyPanel
-                        icon={<Search />}
-                        title={`No ${noun.other} match “${search.trim()}”`}
-                        note="Clear the search to see everything in this view."
-                        action={
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={clearSearch}
-                            >
-                                Clear search
-                            </Button>
-                        }
+                    <EmptyState
+                        kind="no-results"
+                        things={noun.other}
+                        cause="search"
+                        query={search}
+                        onClear={clearSearch}
                     />
                 ) : activeFilter?.predicate && rows.length > 0 ? (
-                    <EmptyPanel
-                        title={`Nothing in “${activeFilter.label}”`}
-                        note={`${count(rows.length)} in total.`}
-                        action={
-                            firstFilter ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => chooseFilter(firstFilter.id)}
-                                >
-                                    Show {firstFilter.label.toLowerCase()}
-                                </Button>
-                            ) : null
+                    <EmptyState
+                        kind="no-results"
+                        things={noun.other}
+                        cause="view"
+                        title={`No ${noun.other} in “${activeFilter.label}”`}
+                        description={`${count(rows.length)} in total.`}
+                        onClear={
+                            firstFilter
+                                ? () => chooseFilter(firstFilter.id)
+                                : undefined
                         }
                     />
                 ) : emptyState ? (
-                    <EmptyPanel {...emptyState} />
+                    <EmptyState
+                        icon={emptyState.icon}
+                        title={emptyState.title}
+                        description={emptyState.note}
+                        action={emptyState.action}
+                    />
+                ) : typeof empty === "string" || empty == null ? (
+                    <EmptyState
+                        size="panel"
+                        title={empty ?? `No ${noun.other} yet`}
+                    />
                 ) : (
-                    <EmptyPanel
-                        title={
-                            typeof empty === "string"
-                                ? empty
-                                : "Nothing here yet."
-                        }
-                    >
-                        {typeof empty === "string" ? null : empty}
-                    </EmptyPanel>
+                    <>{empty}</>
                 )
             ) : (
                 <div>
@@ -873,6 +851,28 @@ export function DataView<TRow>({
                     >
                         {phoneSlot ? renderMode(phoneSlot) : null}
                     </div>
+                    {paging ? (
+                        <ListPaging
+                            label={`Pages of ${noun.other}`}
+                            page={paging.page}
+                            total={paging.total}
+                            size={paging.size}
+                            to={paging.to}
+                            onSize={paging.onSize}
+                        />
+                    ) : (
+                        <ListPaging
+                            label={`Pages of ${noun.other}`}
+                            page={page}
+                            total={visible.length}
+                            size={size}
+                            to={(n) => ({ onClick: () => setPage(n) })}
+                            onSize={(next) => {
+                                setSize(next);
+                                setPage(1);
+                            }}
+                        />
+                    )}
                 </div>
             )}
 
@@ -904,7 +904,7 @@ export function DataView<TRow>({
                                     action.run(selectedRows, clearSelection)
                                 }
                                 className={cn(
-                                    "h-8 rounded-lg px-3 text-[12.5px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground",
+                                    "h-8 cursor-pointer rounded-md px-3 text-[0.8125rem] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground coarse:h-11 coarse:px-4 coarse:text-sm",
                                     action.tone === "destructive"
                                         ? "bg-[#B3261E] text-white hover:bg-[#8F1E18] active:bg-[#741812]"
                                         : "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/20",
@@ -916,7 +916,7 @@ export function DataView<TRow>({
                         <button
                             type="button"
                             onClick={clearSelection}
-                            className="h-8 rounded-lg px-2.5 text-[12.5px] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground active:bg-primary-foreground/10 active:opacity-100"
+                            className="h-8 cursor-pointer rounded-md px-2.5 text-[0.8125rem] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground active:bg-primary-foreground/10 active:opacity-100 coarse:h-11 coarse:px-4 coarse:text-sm"
                         >
                             Clear
                         </button>
@@ -926,102 +926,11 @@ export function DataView<TRow>({
 
             {/* Shown when neither search nor density is on offer, so a list
                 still says how much it holds. */}
-            {searchable.length === 0 &&
-            !showModes &&
-            !toolbarExtra &&
-            visible.length > 0 ? (
+            {showTotal && !hasToolbar && visible.length > 0 ? (
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                     {count(rows.length)}
                 </p>
             ) : null}
         </div>
-    );
-}
-
-/**
- * An empty, no-match or failed region, drawn as the brand file draws it
- * (§14): a dashed Ink 300 edge, an icon, the title in Space Grotesk, one line
- * saying what to do, and the action that does it.
- */
-function EmptyPanel({
-    icon,
-    title,
-    note,
-    action,
-    children,
-}: {
-    icon?: React.ReactNode;
-    title: string;
-    note?: string;
-    action?: React.ReactNode;
-    children?: React.ReactNode;
-}) {
-    return (
-        <div className="flex flex-col items-center gap-[9px] rounded-[11px] border border-dashed border-border-strong px-6 py-12 text-center">
-            {icon ? (
-                <div
-                    aria-hidden
-                    className="text-muted-foreground [&_svg]:size-8 [&_svg]:stroke-[1.7]"
-                >
-                    {icon}
-                </div>
-            ) : null}
-            <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                {title}
-            </p>
-            {note ? (
-                <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                    {note}
-                </p>
-            ) : null}
-            {children}
-            {action ? <div className="mt-1">{action}</div> : null}
-        </div>
-    );
-}
-
-/**
- * The search box, deliberately cut off from the table.
- *
- * It owns the text it displays, so typing re-renders THIS — one input — and
- * nothing else. The term reaches `DataView` only once typing pauses, and only
- * then does the table do its work.
- *
- * That separation is the fix, not the timer. Debouncing while the input still
- * lived in `DataView` moved the cheap half (filtering, 0.038ms over 600 rows)
- * off the keystroke and left the expensive half (rendering 600 rows, ~31ms) on
- * it — so every character still dropped two frames, and the results lagged as
- * well. Measured both ways before this shape was settled on.
- */
-function SearchField({
-    onSettled,
-    placeholder,
-    className,
-    "aria-label": ariaLabel,
-}: {
-    /** Called with the term once typing has paused. */
-    onSettled: (value: string) => void;
-    placeholder: string;
-    className?: string;
-    "aria-label": string;
-}) {
-    const [text, setText] = useState("");
-    const settle = useDebouncedCallback(onSettled, SEARCH_DEBOUNCE_MS);
-
-    return (
-        <Input
-            value={text}
-            onChange={(e) => {
-                setText(e.target.value);
-                settle(e.target.value);
-            }}
-            // A pause is what the timer waits for, and leaving the field is a
-            // longer pause than any timer. Without this, tabbing straight to
-            // the next control leaves the table showing the previous term.
-            onBlur={() => settle.flush()}
-            placeholder={placeholder}
-            aria-label={ariaLabel}
-            className={className}
-        />
     );
 }

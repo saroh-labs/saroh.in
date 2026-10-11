@@ -36,7 +36,7 @@ const TIMES_DAYS = 14;
 const TIMES_MAX = 500;
 
 /** What a customer hears when the time went while they chose. */
-export const TIME_WENT = "That time just went. Pick another one.";
+export const TIME_WENT = "That time has gone. Pick another one.";
 
 const DAY = 86_400_000;
 

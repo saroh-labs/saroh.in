@@ -19,7 +19,7 @@ const ROW =
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
  * button that opens a full-screen sheet with Features, Solutions and (when
- * any page is live) Resources as accordions — the section the page is in
+ * any page is live) Resources and Tools as accordions — the section the page is in
  * starts open — then Pricing and Sign in (once the launch switch is open)
  * and the start button. Esc or × closes it and returns focus to Menu; while
  * it is open, focus stays inside.
@@ -28,11 +28,13 @@ export function MobileMenu({
     section,
     pathname,
     resources = [],
+    tools = [],
     className,
 }: {
     section: NavSection;
     pathname: string;
     resources?: NavItem[];
+    tools?: NavItem[];
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -84,6 +86,7 @@ export function MobileMenu({
                     section={section}
                     pathname={pathname}
                     resources={resources}
+                    tools={tools}
                     onClose={close}
                 />
             ) : null}
@@ -95,11 +98,13 @@ function Sheet({
     section,
     pathname,
     resources,
+    tools,
     onClose,
 }: {
     section: NavSection;
     pathname: string;
     resources: NavItem[];
+    tools: NavItem[];
     onClose: () => void;
 }) {
     const root = useRef<HTMLDivElement>(null);
@@ -107,6 +112,7 @@ function Sheet({
     const [features, setFeatures] = useState(section === "features");
     const [solutions, setSolutions] = useState(section === "solutions");
     const [resourcesOpen, setResourcesOpen] = useState(section === "resources");
+    const [toolsOpen, setToolsOpen] = useState(section === "tools");
 
     return (
         <div
@@ -155,6 +161,16 @@ function Sheet({
                     pathname={pathname}
                     open={resourcesOpen}
                     onToggle={() => setResourcesOpen(!resourcesOpen)}
+                />
+            ) : null}
+            {tools.length > 0 ? (
+                <Accordion
+                    id="tools"
+                    label="Tools"
+                    items={tools}
+                    pathname={pathname}
+                    open={toolsOpen}
+                    onToggle={() => setToolsOpen(!toolsOpen)}
                 />
             ) : null}
             {LAUNCH_MODE === "open" ? (

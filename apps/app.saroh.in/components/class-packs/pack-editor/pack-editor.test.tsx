@@ -199,7 +199,7 @@ const ok = <T,>(data: T): EditorResult<T> => ({ ok: true, data });
 describe("the Pack Editor", () => {
     it("a new pack autosaves as a draft, then Publish puts it on sale", async () => {
         render(null);
-        expect(text()).toContain("Not saved yet — start with a name");
+        expect(text()).toContain("Not saved yet. Start with a name");
         expect(host.querySelector("h1")?.textContent).toBe("New pack");
 
         type(input("Name"), "Ten classes");
@@ -221,10 +221,10 @@ describe("the Pack Editor", () => {
             firstPackOnly: false,
         });
         expect(window.location.pathname).toBe("/class-packs/pk-1/edit");
-        expect(text()).toContain("Saved as a draft — not on sale");
+        expect(text()).toContain("Saved as a draft. Not on sale");
         expect(button("Publish").disabled).toBe(true);
         expect(text()).toContain(
-            "1 thing to fix before publishing — add the price.",
+            "1 thing to fix before publishing: add the price.",
         );
         // A draft isn't on sale, so there is no pack page to view.
         expect(text()).not.toContain("View pack");
@@ -248,7 +248,7 @@ describe("the Pack Editor", () => {
         await wait();
         expect(actions.publishPack).toHaveBeenCalledWith("pk-1", 2);
         expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Ten classes is published — you can sell it now.",
+            "Ten classes is published. You can sell it now.",
         );
         expect(text()).toContain("On sale");
         // Live now, it has a page of its own (E16).
@@ -264,7 +264,7 @@ describe("the Pack Editor", () => {
         expect(other.disabled).toBe(true);
         expect(button("Classes").getAttribute("aria-checked")).toBe("true");
         expect(text()).toContain(
-            "Locked — 3 already sold. Class and one-to-one credits never mix.",
+            "Locked. 3 already sold. Class and one-to-one credits never mix.",
         );
         // Live and clean: nothing to publish, and it says so.
         expect(button("Publish changes").disabled).toBe(true);

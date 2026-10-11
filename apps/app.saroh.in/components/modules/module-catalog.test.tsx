@@ -138,7 +138,7 @@ describe("Settings › Modules (DEC-057)", () => {
                 />,
             ),
         );
-        expect(document.body.textContent).toMatch(/No modules to show/);
+        expect(document.body.textContent).toMatch(/No modules yet/);
         expect(document.body.textContent).not.toMatch(/ROLLOUT_DISABLED/);
     });
 

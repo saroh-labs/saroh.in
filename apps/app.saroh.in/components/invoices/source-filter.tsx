@@ -1,16 +1,14 @@
-import Link from "next/link";
-
-import { Chip } from "@/components/shared/chip";
+import { ListFilter } from "@/components/shared/list-toolbar";
 import type { SourceChip } from "@/lib/invoices/sources";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
- * What the Invoices list is narrowed to by what each paper was for (D18).
- *
- * The chips: All, then each source the business has — Orders, Bookings,
- * Subscriptions, Packs, Courses, By hand. A radio group, as every chip row
- * is (`Chip`): one choice at a time.
+ * What the Invoices list is narrowed to by what each paper was for (D18):
+ * every kind, then each source the business has (Orders, Bookings,
+ * Subscriptions, Packs, Courses, By hand): one of the list toolbar's
+ * dropdown filters, beside the invoice's status.
  */
-export function SourceChips({
+export function SourceFilter({
     chips,
     chosen,
     onPick,
@@ -21,21 +19,15 @@ export function SourceChips({
 }) {
     if (chips.length === 0) return null;
     return (
-        <div
-            role="radiogroup"
-            aria-label="What it was for"
-            className="mb-3 flex flex-wrap gap-2"
-        >
-            {chips.map((c) => (
-                <Chip
-                    key={c.id}
-                    on={c.id === chosen}
-                    onClick={() => onPick(c.id)}
-                >
-                    {c.label}
-                </Chip>
-            ))}
-        </div>
+        <ListFilter<SourceChip>
+            label="What it was for"
+            value={chosen}
+            onValueChange={onPick}
+            options={chips.map((c) => ({
+                value: c.id,
+                label: c.id === "all" ? "All sources" : c.label,
+            }))}
+        />
     );
 }
 
@@ -52,19 +44,19 @@ export function ScopeNotice({
     clearHref: string;
 }) {
     return (
-        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
             <span
                 role="status"
-                className="inline-flex h-8 items-center gap-2 rounded-full bg-brand-subtle px-3 text-[13px] font-semibold text-brand-subtle-foreground"
+                className="inline-flex h-8 items-center gap-2 rounded-full bg-muted px-3 text-[13px] font-semibold text-foreground"
             >
                 {line}
             </span>
-            <Link
+            <TextLink
                 href={clearHref}
-                className="rounded-sm text-[13px] font-semibold text-brand underline-offset-4 transition-opacity duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70 coarse:inline-flex coarse:min-h-11 coarse:items-center"
+                className="text-[13px] transition-opacity duration-fast coarse:inline-flex coarse:min-h-11 coarse:items-center"
             >
                 Show all invoices
-            </Link>
+            </TextLink>
         </div>
     );
 }

@@ -49,6 +49,8 @@ export class PostsService {
                 image: true,
                 publishedAt: true,
                 createdAt: true,
+                // The Posts tab dates a row by its last change (#908).
+                updatedAt: true,
                 currentPublicationId: true,
                 category: { select: { id: true, name: true } },
                 author: { select: { name: true } },
@@ -105,7 +107,8 @@ export class PostsService {
         const slug = slugify(dto.slug ?? dto.title);
         if (!slug) {
             throw new BadRequestException({
-                message: "Could not derive a slug from the title",
+                message:
+                    "That title has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }

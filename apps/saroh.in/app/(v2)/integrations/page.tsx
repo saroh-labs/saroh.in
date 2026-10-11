@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Arrow } from "@/components/v2/arrow";
 import { Container } from "@/components/v2/container";
+import { byComingGroup } from "@/content/coming";
 import {
     integrationHref,
     INTEGRATIONS_PATH,
@@ -14,7 +15,9 @@ import { pageMetadata } from "@/lib/seo";
 /**
  * Integrations (Resources plan U3, design "Saroh Resources - Integrations"):
  * what connects today as cards, each one link to its page, then what is
- * planned as dashed rows that never link (R2), then the ask.
+ * planned as dashed rows that never link (R2), then the ask. The planned
+ * rows sit under the group that says roughly when, its label drawn once
+ * (owner, 10 Oct 2026), where the design set a period on every row.
  *
  * The design draws a letter tile beside each name; until official partner
  * marks are in hand the name is set in type alone (R21). The card has one
@@ -96,27 +99,40 @@ export default function IntegrationsPage() {
                 <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
                     {page.plannedIntro}
                 </p>
-                <ul className="m-0 list-none p-0">
-                    {plannedIntegrations.map((item) => (
-                        <li
-                            key={item.name}
-                            className="flex flex-wrap items-baseline gap-x-7 gap-y-2 border-t border-dashed border-border-strong py-5 text-muted-foreground"
+                {byComingGroup(plannedIntegrations).map((group) => (
+                    <div
+                        key={group.key}
+                        className="grid pt-4 first-of-type:pt-0"
+                    >
+                        <h3
+                            id={`planned-${group.key}`}
+                            className="m-0 pb-2.5 font-mono text-[12.5px] font-normal text-muted-foreground"
                         >
-                            <span className="flex-[0_0_200px] text-[18px] font-semibold text-mk-copy">
-                                {item.name}
-                            </span>
-                            <span className="flex-[1_1_340px] text-[15px] leading-[1.55]">
-                                {item.line}
-                            </span>
-                            <span className="font-mono text-[12.5px]">
-                                {item.when}
-                            </span>
-                            <span className="rounded-full border border-border-strong px-[9px] py-[3px] text-[12.5px] font-semibold">
-                                Not yet
-                            </span>
-                        </li>
-                    ))}
-                </ul>
+                            {group.label}
+                        </h3>
+                        <ul
+                            aria-labelledby={`planned-${group.key}`}
+                            className="m-0 list-none p-0"
+                        >
+                            {group.rows.map((item) => (
+                                <li
+                                    key={item.name}
+                                    className="flex flex-wrap items-baseline gap-x-7 gap-y-2 border-t border-dashed border-border-strong py-5 text-muted-foreground"
+                                >
+                                    <span className="flex-[0_0_200px] text-[18px] font-semibold text-mk-copy">
+                                        {item.name}
+                                    </span>
+                                    <span className="flex-[1_1_340px] text-[15px] leading-[1.55]">
+                                        {item.line}
+                                    </span>
+                                    <span className="rounded-full border border-border-strong px-[9px] py-[3px] text-[12.5px] font-semibold">
+                                        {page.notYet}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
             </Container>
 
             <Container className="pt-14">

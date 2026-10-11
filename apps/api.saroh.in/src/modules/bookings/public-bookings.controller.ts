@@ -9,10 +9,12 @@ import {
     Param,
     Post,
     Query,
+    UseGuards,
 } from "@nestjs/common";
 import type { Booking } from "@saroh/database";
 
 import { hashClientIp } from "../../common/client-ip";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -22,7 +24,7 @@ import type {
     PublicDays,
     PublicService,
 } from "./public-booking-page";
-import { toPublicBooking } from "./public-booking-page";
+import { MAX_DAYS_SKIP, toPublicBooking } from "./public-booking-page";
 import type { PublicHold, PublicStaff } from "./public-bookings.service";
 import { PublicBookingsService } from "./public-bookings.service";
 import type { PublicTimetable } from "./public-timetable";
@@ -94,11 +96,27 @@ export class PublicBookingsController {
      * The booking page's next two weeks for a service (U19): each day open or
      * not, with its free starts — or, for a class, every session with its
      * places left. People by display name and opaque id only.
+     *
+     * `?skip=14` is the two weeks after ("Show later dates"), up to
+     * {@link MAX_DAYS_SKIP} days on; `?staffId=` keeps to one of the people
+     * who take it ("With: Asha"). Anything else in either reads as not
+     * asked: the next two weeks, with whoever is free.
      */
     @Get(":serviceId/days")
     @Header("Cache-Control", "no-store")
-    days(@Param("serviceId") serviceId: string): Promise<PublicDays> {
-        return this.bookings.publicDays(serviceId);
+    days(
+        @Param("serviceId") serviceId: string,
+        @Query("skip") skip?: string,
+        @Query("staffId") staffId?: string,
+    ): Promise<PublicDays> {
+        return this.bookings.publicDays(serviceId, new Date(), {
+            skip: daysSkipOf(skip),
+            staffId:
+                typeof staffId === "string" &&
+                /^[A-Za-z0-9_-]{1,64}$/.test(staffId)
+                    ? staffId
+                    : null,
+        });
     }
 
     /**
@@ -197,6 +215,7 @@ export type PublicBookingResult = PublicBooking & {
  * the services it offers, who takes them by name, the booking rules.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicBookingPageController {
     constructor(
         private readonly bookings: PublicBookingsService,
@@ -245,4 +264,10 @@ export class PublicBookingPageController {
             hashClientIp(ip),
         );
     }
+}
+
+/** `?skip=` as whole days from today, 0 to {@link MAX_DAYS_SKIP}; else 0. */
+export function daysSkipOf(value: unknown): number {
+    if (typeof value !== "string" || !/^\d{1,3}$/.test(value)) return 0;
+    return Math.min(MAX_DAYS_SKIP, Number(value));
 }

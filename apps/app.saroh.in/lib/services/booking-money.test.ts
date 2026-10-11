@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import type { BookingMoney } from "./booking-money";
 import {
     cancelledMessage,
@@ -13,6 +14,8 @@ import {
     refundPolicyLine,
     TREATMENT_REFUNDED_FROM_ORDER,
 } from "./booking-money";
+
+pinClock();
 
 const money = (over: Partial<BookingMoney> = {}): BookingMoney => ({
     priceCents: 80_000,
@@ -108,9 +111,9 @@ describe("cancelPlan (DEC-051)", () => {
             canRefund: false,
         });
         expect(desk).toMatchObject({ late: true, canOverride: false });
-        expect(deadlineText(DEADLINE, ZONE)).toBe("Sat 19 Sep, 10:00");
+        expect(deadlineText(DEADLINE, ZONE)).toBe("Sat 19 Sep, 10:00 am");
         expect(desk?.body).toBe(
-            "It's past the free-cancel time (Sat 19 Sep, 10:00), so the ₹400 deposit is kept. Only someone who can refund payments can give it back.",
+            "It's past the free-cancel time (Sat 19 Sep, 10:00 am), so the ₹400 deposit is kept. Only someone who can refund payments can give it back.",
         );
         const owner = cancelPlan({
             money: money(),

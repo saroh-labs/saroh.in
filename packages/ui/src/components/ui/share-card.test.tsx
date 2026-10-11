@@ -132,6 +132,24 @@ describe("ShareCards (the site settings)", () => {
         ).toBeInTheDocument();
     });
 
+    it("folds all but WhatsApp behind See 6 more apps, when asked", () => {
+        const { container } = render(
+            <ShareCards {...BASE} image={PICTURE} liveUrl={null} fold />,
+        );
+        const more = container.querySelector("details[data-more-apps]");
+        if (!more) throw new Error("expected the fold");
+        expect(more).not.toHaveAttribute("open");
+        expect(more.querySelector("summary")).toHaveTextContent(
+            "See 6 more apps",
+        );
+        // WhatsApp is outside the fold; the rest, Instagram too, inside it.
+        const outside = Array.from(
+            container.querySelectorAll("figcaption span"),
+        ).filter((el) => !more.contains(el));
+        expect(outside.map((el) => el.textContent)).toEqual(["WhatsApp"]);
+        expect(more).toHaveTextContent(/Instagram shows the link as text/);
+    });
+
     it("offers the inspectors once the site is live", () => {
         render(
             <ShareCards

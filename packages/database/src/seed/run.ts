@@ -1,6 +1,7 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import { alignOrderNumberSequence } from "../order-number";
+import { seedCalendarOnlyTeammate } from "./calendar-only-teammate";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -19,14 +20,14 @@ import {
     ORG_NAME,
     ORG_SLUG,
     OWNER_EMAIL,
-    OWNER_PASSWORD,
+    passwordHint,
     PIPELINE_STAGES,
     POSTS,
     PRODUCTS,
     REVIEWER_EMAIL,
-    REVIEWER_PASSWORD,
     SEED_PREFIX,
     SEEDED_FOOTER,
+    seedPassword,
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
@@ -54,6 +55,11 @@ import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
 import { seedSarohEmailBusinesses } from "./saroh-email";
+import {
+    PLACEHOLDER_CREDENTIALS,
+    seedStandInCommunicationProvider,
+    seedStandInPaymentProvider,
+} from "./stand-in-providers";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -71,6 +77,8 @@ import { seedStorefrontTeammate } from "./storefront-teammate";
 export async function seed(): Promise<void> {
     const target = assertDatabaseTarget();
     console.log(`[seed] target: ${target.database} on ${target.host}`);
+    // Before any write: a shared database needs its own password.
+    seedPassword();
 
     // Imported after the guard so nothing connects to a database we refuse.
     const { prisma } = await import("../client");
@@ -96,13 +104,13 @@ export async function seed(): Promise<void> {
     // source of truth that silently rots when better-auth changes it.
     await prisma.account.upsert({
         where: { id: id("account", "owner") },
-        update: { password: await hashPassword(OWNER_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "owner"),
             accountId: user.id,
             providerId: "credential",
             userId: user.id,
-            password: await hashPassword(OWNER_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
 
@@ -296,10 +304,9 @@ export async function seed(): Promise<void> {
             provider: "RAZORPAY",
             status: "DISABLED",
             // Placeholders: nothing here is a real credential, and the seed
-            // must never fabricate one that looks usable.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
+            // must never fabricate one that looks usable. DISABLED, so
+            // nothing ever opens them.
+            ...PLACEHOLDER_CREDENTIALS,
         },
     });
 
@@ -316,6 +323,9 @@ export async function seed(): Promise<void> {
     // An old address of Northwind's that still forwards to its site (L3).
     await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
+    // Tara, Calendar only, with one booking of her own on a seeded
+    // service (#868; `role-calendar-only.spec.ts`).
+    await seedCalendarOnlyTeammate(prisma, org.id, id("service", 2), now);
     const founderId = await seedFounder(prisma);
     // Two of Asha's that Saroh sends booking emails for, flags on for them
     // alone (DEC-086; `providers-saroh-email.spec.ts`).
@@ -1160,13 +1170,13 @@ async function seedReviewer(
     // credential built any other way is a second source of truth.
     await prisma.account.upsert({
         where: { id: id("account", "reviewer") },
-        update: { password: await hashPassword(REVIEWER_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "reviewer"),
             accountId: reviewer.id,
             providerId: "credential",
             userId: reviewer.id,
-            password: await hashPassword(REVIEWER_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
 
@@ -1284,49 +1294,24 @@ async function seedProviders(
     siteIds: string[],
     now: Date,
 ) {
-    await prisma.merchantPaymentProvider.upsert({
-        where: {
-            organizationId_provider: {
-                organizationId: orgId,
-                provider: LIVE_PAYMENT_PROVIDER.provider,
-            },
-        },
-        update: { status: LIVE_PAYMENT_PROVIDER.status },
-        create: {
-            id: id("payments", "cashfree"),
-            organizationId: orgId,
-            provider: LIVE_PAYMENT_PROVIDER.provider,
-            status: LIVE_PAYMENT_PROVIDER.status,
-            // Placeholders, as above: the seed must never fabricate a
-            // credential that looks usable.
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    // Stand-ins: CONNECTED on a throwaway database, where the browser specs
+    // need them; never written on a shared one (`stand-in-providers.ts`).
+    const standIns = await seedStandInPaymentProvider(prisma, {
+        id: id("payments", "cashfree"),
+        organizationId: orgId,
+        provider: LIVE_PAYMENT_PROVIDER.provider,
     });
-
-    await prisma.communicationProvider.upsert({
-        where: {
-            organizationId_channel: {
-                organizationId: orgId,
-                channel: COMMUNICATION_PROVIDER.channel,
-            },
-        },
-        update: {
-            status: COMMUNICATION_PROVIDER.status,
-            fromAddress: COMMUNICATION_PROVIDER.fromAddress,
-        },
-        create: {
-            id: id("comms", "email"),
-            organizationId: orgId,
-            channel: COMMUNICATION_PROVIDER.channel,
-            provider: COMMUNICATION_PROVIDER.provider,
-            status: COMMUNICATION_PROVIDER.status,
-            fromAddress: COMMUNICATION_PROVIDER.fromAddress,
-            encryptedCredentials: "seed-not-a-real-credential",
-            credentialsIv: "seed-iv",
-            credentialsAuthTag: "seed-tag",
-        },
+    if (!standIns) {
+        console.log(
+            "[seed] not this machine's database: no stand-in provider connections (connect real test keys in Settings › Providers)",
+        );
+    }
+    await seedStandInCommunicationProvider(prisma, {
+        id: id("comms", "email"),
+        organizationId: orgId,
+        channel: COMMUNICATION_PROVIDER.channel,
+        provider: COMMUNICATION_PROVIDER.provider,
+        fromAddress: COMMUNICATION_PROVIDER.fromAddress,
     });
 
     const siteId = siteIds.at(DOMAIN.site);
@@ -1684,9 +1669,11 @@ async function report(prisma: Db, organizationId: string) {
             `analytics-aggregates:${aggregates} providers: payment:${providers[0]} ` +
             `comms:${providers[1]} domains:${providers[2]}`,
     );
-    console.log(`[seed] sign in: ${OWNER_EMAIL} / ${OWNER_PASSWORD}`);
+    console.log(
+        `[seed] sign in: ${OWNER_EMAIL} / ${passwordHint(seedPassword())}`,
+    );
     // Printed because a role nobody can sign in as is a role nobody looks at.
     console.log(
-        `[seed] or as a reviewer of the first site: ${REVIEWER_EMAIL} / ${REVIEWER_PASSWORD}`,
+        `[seed] or as a reviewer of the first site: ${REVIEWER_EMAIL} / ${passwordHint(seedPassword())}`,
     );
 }

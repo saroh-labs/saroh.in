@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 /**
  * What is waiting to go live, in words (#282).
  *
@@ -14,6 +15,7 @@ export const SITE_CHANGE_KINDS = [
     "name",
     "search",
     "shareImage",
+    "icon",
     "posts",
     "style",
     "footer",
@@ -26,6 +28,7 @@ const LABELS: Record<SiteChangeKind, string> = {
     name: "the site name",
     search: "search settings",
     shareImage: "the share image",
+    icon: "the site icon",
     posts: "the blog address",
     style: "the style",
     footer: "the footer",
@@ -55,7 +58,7 @@ export function describePendingChanges(
 ): string | null {
     const parts: string[] = [];
     if (sections && sections > 0) {
-        parts.push(sections === 1 ? "1 section" : `${sections} sections`);
+        parts.push(count(sections, "section"));
     }
     for (const kind of site ?? []) {
         if (isKind(kind)) parts.push(LABELS[kind]);
@@ -68,6 +71,7 @@ const SHORT_LABELS: Record<SiteChangeKind, string> = {
     name: "site name",
     search: "search",
     shareImage: "share image",
+    icon: "site icon",
     posts: "blog address",
     // The style is edited in the rail's Brand tab (G2), so the pill uses the
     // word on that tab.
@@ -89,7 +93,7 @@ export function shortPendingChanges(
 ): string | null {
     const parts: string[] = [];
     if (sections && sections > 0) {
-        parts.push(sections === 1 ? "1 block" : `${sections} blocks`);
+        parts.push(count(sections, "block"));
     }
     for (const kind of site ?? []) {
         if (isKind(kind)) parts.push(SHORT_LABELS[kind]);

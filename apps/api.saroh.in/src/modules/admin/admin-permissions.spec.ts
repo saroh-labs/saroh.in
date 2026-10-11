@@ -77,6 +77,33 @@ describe("admin permission policy", () => {
         );
     });
 
+    it("lets Support and Platform Owner mark a customer's report done, and Support never suspend", () => {
+        const holders = Object.values(AdminRole)
+            .filter((role) =>
+                permissionsFor([role]).includes(AdminPermission.ReportsResolve),
+            )
+            .sort();
+        expect(holders).toEqual(
+            [AdminRole.PlatformOwner, AdminRole.Support].sort(),
+        );
+        expect(permissionsFor([AdminRole.Support])).not.toContain(
+            AdminPermission.OrganizationLifecycleWrite,
+        );
+    });
+
+    it("lets only a Platform Owner lift a legal hold, while placing one needs the lifecycle write (DEC-122)", () => {
+        const holders = (permission: AdminPermission) =>
+            Object.values(AdminRole)
+                .filter((role) => permissionsFor([role]).includes(permission))
+                .sort();
+        expect(holders(AdminPermission.OrganizationLegalHoldLift)).toEqual([
+            AdminRole.PlatformOwner,
+        ]);
+        expect(AdminPermission.OrganizationLegalHoldLift).toBe(
+            "organization:legal-hold:lift",
+        );
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,

@@ -13,6 +13,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -137,6 +138,7 @@ export class InvoicesController {
     }
 
     @Post(":invoiceId/void")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     voidInvoice(
         @OrgContext() ctx: OrganizationContext,
@@ -152,6 +154,7 @@ export class InvoicesController {
      * note.
      */
     @Post(":invoiceId/credit")
+    @LifecycleWrite("wind-down")
     @HttpCode(201)
     credit(
         @OrgContext() ctx: OrganizationContext,
@@ -177,6 +180,7 @@ export class InvoicesController {
      * is kept, so asking again makes a new link and retires the old one.
      */
     @Post(":invoiceId/pay-link")
+    @LifecycleWrite("wind-down")
     @RequireModule("PAYMENTS")
     @IgnoreModuleReadiness()
     @HttpCode(201)
@@ -202,6 +206,7 @@ export class InvoicesController {
      * it. Answered once, and it replaces any link out before it.
      */
     @Post(":invoiceId/view-link")
+    @LifecycleWrite("wind-down")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     async viewLink(
@@ -225,6 +230,7 @@ export class InvoicesController {
      * to the customer.
      */
     @Post(":invoiceId/send")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     send(
         @OrgContext() ctx: OrganizationContext,
@@ -235,6 +241,7 @@ export class InvoicesController {
 
     /** The same, in reminder words; one a day, or 429 with the next time. */
     @Post(":invoiceId/remind")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     remind(
         @OrgContext() ctx: OrganizationContext,
@@ -244,6 +251,7 @@ export class InvoicesController {
     }
 
     @Post(":invoiceId/payments")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     recordPayment(
         @OrgContext() ctx: OrganizationContext,

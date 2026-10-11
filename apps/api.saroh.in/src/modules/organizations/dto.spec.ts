@@ -185,6 +185,41 @@ describe("what is being set up (DEC-070)", () => {
     });
 });
 
+describe("what they chose to do first (UX audit, 10 Oct)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const refusal = async (metatype: new () => object, body: unknown) =>
+        pipe
+            .transform(body, { type: "body", metatype })
+            .then(() => null)
+            .catch((e: BadRequestException) => e.getResponse());
+
+    it.each(["COMMERCE", "APPOINTMENTS", "WEBSITE", "CRM", "INVOICE"])(
+        "takes %s",
+        async (goal) => {
+            expect(
+                await refusal(OnboardOrganizationDto, { name: "Asha", goal }),
+            ).toBeNull();
+        },
+    );
+
+    it("takes none, for someone who will decide later", async () => {
+        expect(
+            await refusal(OnboardOrganizationDto, { name: "Asha" }),
+        ).toBeNull();
+    });
+
+    it("refuses one Saroh does not offer", async () => {
+        const response = await refusal(OnboardOrganizationDto, {
+            name: "Asha",
+            goal: "PAYMENTS",
+        });
+        expect(response).toMatchObject({ statusCode: 400 });
+        expect(JSON.stringify(response)).toContain(
+            "goal is not one Saroh offers",
+        );
+    });
+});
+
 describe('setup\'s "Is it registered?" (prelaunch)', () => {
     const errors = async (body: unknown) =>
         (await validate(plainToInstance(OnboardingProfileDto, body))).map(
@@ -218,6 +253,61 @@ describe('setup\'s "Is it registered?" (prelaunch)', () => {
             await through(UpdateOrganizationDto, {
                 profile: { registered: true },
             }),
+        ).toMatchObject({ statusCode: 400 });
+    });
+});
+
+describe("social links and the registered address choice (DEC-128)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const through = (body: unknown) =>
+        pipe
+            .transform(body, { type: "body", metatype: UpdateOrganizationDto })
+            .then(() => null)
+            .catch((e: BadRequestException) => e.getResponse());
+
+    it("takes a handle or a link per network, and an empty one to clear it", async () => {
+        expect(
+            await through({
+                socialLinks: {
+                    instagram: "@rye",
+                    whatsapp: "+91 98450 12345",
+                    telegram: "",
+                },
+            }),
+        ).toBeNull();
+    });
+
+    it("refuses a network that isn't on the list", async () => {
+        expect(
+            await through({
+                socialLinks: { myspace: "https://myspace.com/rye" },
+            }),
+        ).toMatchObject({ statusCode: 400 });
+        // Google Maps is a place's map, not a social link.
+        expect(
+            await through({ socialLinks: { googleMaps: "g.page/rye" } }),
+        ).toMatchObject({ statusCode: 400 });
+        expect(
+            await through({ registeredAddressMapUrl: "g.page/rye" }),
+        ).toBeNull();
+    });
+
+    it("refuses a value that isn't text, or runs too long", async () => {
+        expect(await through({ socialLinks: { instagram: 42 } })).toMatchObject(
+            {
+                statusCode: 400,
+            },
+        );
+        expect(
+            await through({ socialLinks: { instagram: "a".repeat(601) } }),
+        ).toMatchObject({ statusCode: 400 });
+    });
+
+    it("takes the registered address choice as a yes or a no only", async () => {
+        expect(await through({ siteShowsRegisteredAddress: true })).toBeNull();
+        expect(await through({ siteShowsRegisteredAddress: false })).toBeNull();
+        expect(
+            await through({ siteShowsRegisteredAddress: "false" }),
         ).toMatchObject({ statusCode: 400 });
     });
 });

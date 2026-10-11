@@ -263,7 +263,9 @@ test.describe("phone reflow: Customer Detail", () => {
         });
         await page.setViewportSize(WIDTHS[0]);
         await page.goto(`/customers/${who.id}`);
-        await expect(page.getByText("Possible match — link?")).toBeVisible();
+        await expect(
+            page.getByText("Possible match. Link them?"),
+        ).toBeVisible();
         await noSidewaysScroll(page, "Customer Detail with a long email");
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
@@ -306,8 +308,7 @@ test.describe("phone reflow: Customer Detail", () => {
             name: "Merge with a duplicate",
         });
         const merge = dialog.getByRole("button", {
-            name: "Merge",
-            exact: true,
+            name: "Merge records",
         });
         await expect(merge).toBeEnabled();
         await fitsAtPhoneWidths(
@@ -364,7 +365,7 @@ test.describe("phone reflow: Order Detail", () => {
         // A refund by line needs a payment taken through a provider, which
         // a dev stack has none of (as in order-detail.spec.ts): it runs when
         // E2E_REFUND_ORDER_ID names one. The cancel below refunds a
-        // hand-paid order's money in its own panel either way.
+        // hand-paid order's money in its own sheet either way.
         const id = refundOrder.id;
         test.skip(
             !id,
@@ -375,7 +376,9 @@ test.describe("phone reflow: Order Detail", () => {
         await page.setViewportSize(WIDTHS[0]);
         await page.goto(`/commerce/orders/${id}`);
         await page.getByRole("button", { name: "Refund…" }).click();
-        const refund = page.getByRole("region", { name: "Refund" });
+        const refund = page.getByRole("dialog", {
+            name: "What are you refunding?",
+        });
         await fitsAtPhoneWidths(
             page,
             refund,
@@ -386,6 +389,7 @@ test.describe("phone reflow: Order Detail", () => {
             "Refund",
         );
         await refund.getByRole("button", { name: "Cancel" }).click();
+        await expect(refund).toBeHidden();
     });
 
     test("Cancel (with its refund) and Edit fit a phone", async ({
@@ -405,7 +409,7 @@ test.describe("phone reflow: Order Detail", () => {
         await noSidewaysScroll(page, "Order Detail with a long name");
 
         await page.getByRole("button", { name: "Cancel order…" }).click();
-        const cancel = page.getByRole("region", { name: /^Cancel #/ });
+        const cancel = page.getByRole("dialog", { name: /^Cancel #/ });
         await fitsAtPhoneWidths(
             page,
             cancel,
@@ -413,19 +417,24 @@ test.describe("phone reflow: Order Detail", () => {
                 cancel.getByRole("button", {
                     name: /^(Refund |Cancel order$)/,
                 }),
-                cancel.getByRole("button", { name: "Cancel", exact: true }),
+                // Its way out says what it keeps, never "Cancel" beside
+                // the button that cancels.
+                cancel.getByRole("button", { name: "Keep order" }),
             ],
             "Cancel order",
         );
-        await cancel
-            .getByRole("button", { name: "Cancel", exact: true })
-            .click();
+        await expect(
+            cancel.getByRole("button", { name: "Cancel", exact: true }),
+        ).toHaveCount(0);
+        await cancel.getByRole("button", { name: "Keep order" }).click();
+        // One sheet at a time: the page is out of reach until it is gone.
+        await expect(cancel).toBeHidden();
 
         await page.setViewportSize(WIDTHS[0]);
         await page
             .getByRole("button", { name: "Edit items or address" })
             .click();
-        const edit = page.getByRole("region", { name: "Edit order" });
+        const edit = page.getByRole("dialog", { name: /^Edit #/ });
         await fitsAtPhoneWidths(
             page,
             edit,
@@ -504,7 +513,7 @@ test.describe("phone reflow: New order", () => {
 });
 
 test.describe("phone reflow: invoices", () => {
-    test("the send confirm keeps Send it and Not now on the screen with a long email", async ({
+    test("the send confirm keeps Issue and send and Keep draft on the screen with a long email", async ({
         page,
     }, testInfo) => {
         await signIn(page);
@@ -541,12 +550,12 @@ test.describe("phone reflow: invoices", () => {
                 page,
                 confirm,
                 [
-                    confirm.getByRole("button", { name: "Send it" }),
-                    confirm.getByRole("button", { name: "Not now" }),
+                    confirm.getByRole("button", { name: "Issue and send" }),
+                    confirm.getByRole("button", { name: "Keep draft" }),
                 ],
                 "Send invoice",
             );
-            await confirm.getByRole("button", { name: "Not now" }).click();
+            await confirm.getByRole("button", { name: "Keep draft" }).click();
             await expect(confirm).toHaveCount(0);
         } finally {
             // A draft has no number: deleting it leaves nothing behind.
@@ -596,8 +605,7 @@ test.describe("phone reflow: subscriptions", () => {
             const sheet = page.getByRole("dialog", { name: "Change plan" });
             await expect(sheet).toBeVisible();
             await sheet
-                .getByRole("radio")
-                .filter({ hasText: "Fortnightly celebration cakes" })
+                .getByRole("radio", { name: /Fortnightly celebration cakes/ })
                 .click();
             await fitsAtPhoneWidths(
                 page,

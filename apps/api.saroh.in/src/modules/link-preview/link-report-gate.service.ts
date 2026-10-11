@@ -4,6 +4,12 @@ import { prisma } from "@saroh/database";
 import { sendLinkReportEmail } from "../../common/email";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import {
+    claimToolEmail,
+    EMAILS_PER_DAY,
+    REPORT_EMAILS_PER_DAY,
+    utcDay,
+} from "../waitlist/tool-email-cap";
+import {
     LINK_PREVIEW_SOURCE,
     maskEmail,
     normaliseEmail,
@@ -27,15 +33,14 @@ import { REPORT_SUBJECT, reportText } from "./report-email";
  * 2026). `newsConsent` is false on the entries this makes and never set.
  *
  * The emailed copy is our own words only (`report-email.ts`). Both caps on
- * it are counted in the database, so a restart or a second API process
- * doesn't reset them: at most {@link EMAILS_PER_DAY} copies to one address
- * per UTC day, and at most {@link REPORT_EMAILS_PER_DAY} copies in all. Past
- * either, the page still unlocks and says no copy went.
+ * it are counted in the database (`waitlist/tool-email-cap.ts`, one budget
+ * shared with the QR code maker's gate), so a restart or a second API
+ * process doesn't reset them: at most {@link EMAILS_PER_DAY} tool emails to
+ * one address per UTC day, and at most {@link REPORT_EMAILS_PER_DAY} in
+ * all. Past either, the page still unlocks and says no copy went.
  */
 
-export const EMAILS_PER_DAY = 3;
-/** Every report email the tool sends in one UTC day, to anyone. */
-export const REPORT_EMAILS_PER_DAY = 300;
+export { EMAILS_PER_DAY, REPORT_EMAILS_PER_DAY, utcDay };
 
 /** The waitlist's own key for an entry with no business named. */
 const NO_BUSINESS = "";
@@ -62,13 +67,6 @@ export function storedLink(url: string): string {
     } catch {
         return url.split(/[?#]/)[0] ?? "";
     }
-}
-
-/** The UTC day `now` falls on, as a DATE column holds it. */
-export function utcDay(now: Date): Date {
-    return new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
 }
 
 @Injectable()
@@ -98,7 +96,7 @@ export class LinkReportGateService {
         });
 
         let emailed: "sent" | "limited" | "not-sent";
-        const claim = await this.claimEmail(id, utcDay(now));
+        const claim = await claimToolEmail(id, utcDay(now));
         if (claim === "address") {
             emailed = "limited";
         } else if (claim === "day") {
@@ -125,45 +123,6 @@ export class LinkReportGateService {
             fixes: check.report.fixes,
             suggestedTags: check.report.suggestedTags,
         };
-    }
-
-    /**
-     * Take one of today's copies for this entry: `ok`, or which cap is
-     * spent. The day's total is a sum, so two unlocks at the very edge may
-     * both pass it; the per-address count is a conditional update, so it
-     * never goes past {@link EMAILS_PER_DAY}.
-     */
-    private async claimEmail(
-        id: string,
-        day: Date,
-    ): Promise<"ok" | "address" | "day"> {
-        const total = await prisma.waitlistSignup.aggregate({
-            where: { reportEmailDay: day },
-            _sum: { reportEmailCount: true },
-        });
-        if ((total._sum.reportEmailCount ?? 0) >= REPORT_EMAILS_PER_DAY) {
-            return "day";
-        }
-        const sameDay = await prisma.waitlistSignup.updateMany({
-            where: {
-                id,
-                reportEmailDay: day,
-                reportEmailCount: { lt: EMAILS_PER_DAY },
-            },
-            data: { reportEmailCount: { increment: 1 } },
-        });
-        if (sameDay.count === 1) return "ok";
-        const newDay = await prisma.waitlistSignup.updateMany({
-            where: {
-                id,
-                OR: [
-                    { reportEmailDay: null },
-                    { reportEmailDay: { not: day } },
-                ],
-            },
-            data: { reportEmailDay: day, reportEmailCount: 1 },
-        });
-        return newDay.count === 1 ? "ok" : "address";
     }
 
     /** The entry for this address, made or updated; its id. */

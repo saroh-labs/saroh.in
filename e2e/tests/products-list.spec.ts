@@ -67,7 +67,7 @@ test.describe("Products list", () => {
             const look = page.getByRole("dialog", { name });
             await expect(look).toBeVisible();
             await expect(look.getByText("1 of 1")).toBeVisible();
-            await expect(look.getByText("Published")).toBeVisible();
+            await expect(look.getByText("Live", { exact: true })).toBeVisible();
 
             // J at the last product stays on it.
             await page.keyboard.press("j");
@@ -78,8 +78,18 @@ test.describe("Products list", () => {
             await expect(page.getByText(/Stopped selling/)).toBeVisible();
             await expect(look.getByText("Archived")).toBeVisible();
             await page.getByRole("button", { name: "Undo" }).click();
-            await expect(look.getByText("Published")).toBeVisible();
+            await expect(look.getByText("Live", { exact: true })).toBeVisible();
             await page.keyboard.press("Escape");
+
+            // On a phone the toasts sit over the foot of the list, where this
+            // one row is, and take the press meant for its menu. The pointer
+            // is still resting where Undo was pressed, inside the toast, and
+            // a toast under the pointer waits: move off it, then wait for the
+            // toasts to go, as someone would.
+            await page.mouse.move(1, 1);
+            await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, {
+                timeout: 20_000,
+            });
 
             // Duplicate opens a draft copy in the Editor.
             await page

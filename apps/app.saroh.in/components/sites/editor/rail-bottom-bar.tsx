@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { Layers, MessageSquare, Palette, Plus } from "lucide-react";
 
 import type { RailTab } from "@/components/sites/editor/editor-rail";
+import { CountBadge } from "@saroh/ui/count-badge";
 
 const TABS: readonly { key: RailTab; label: string; icon: LucideIcon }[] = [
     { key: "page", label: "Page", icon: Layers },
@@ -53,11 +54,7 @@ export function RailBottomBar({
                         onClick={() => onTab(key)}
                         className={tabClass(on)}
                     >
-                        <Icon
-                            aria-hidden
-                            className="size-[21px]"
-                            strokeWidth={1.9}
-                        />
+                        <Icon aria-hidden className="size-[21px]" />
                         {label}
                     </button>
                 );
@@ -72,18 +69,14 @@ export function RailBottomBar({
                 className={tabClass(feedbackOpen)}
             >
                 <span className="relative">
-                    <MessageSquare
-                        aria-hidden
-                        className="size-[21px]"
-                        strokeWidth={1.9}
-                    />
+                    <MessageSquare aria-hidden className="size-[21px]" />
                     {openNotes > 0 ? (
-                        <span
+                        <CountBadge
+                            count={openNotes}
+                            tone="strong"
                             aria-hidden
-                            className="absolute -top-[5px] left-3 h-4 min-w-4 rounded-full bg-highlight px-1 text-center text-[11px] font-semibold tabular-nums leading-4 text-highlight-foreground"
-                        >
-                            {openNotes}
-                        </span>
+                            className="absolute -top-[5px] left-3 min-w-[18px] px-1 py-px"
+                        />
                     ) : null}
                 </span>
                 Feedback
@@ -98,6 +91,6 @@ const tabClass = (on: boolean) =>
         "flex min-h-[52px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-[3px] px-0.5 py-1.5 text-[11px] leading-tight transition-colors duration-fast",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         on
-            ? "font-semibold text-foreground shadow-[inset_0_2px_0_hsl(var(--highlight))]"
+            ? "font-semibold text-foreground shadow-[inset_0_2px_0_hsl(var(--foreground))]"
             : "font-medium text-muted-foreground",
     );

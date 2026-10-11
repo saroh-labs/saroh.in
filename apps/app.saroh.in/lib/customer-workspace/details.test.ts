@@ -138,7 +138,7 @@ describe("the sheet's lines", () => {
     it("masks the email they sign in with", () => {
         expect(maskedEmail("ananya@gmail.com")).toBe("a•••@gmail.com");
         expect(signInNote("ananya@gmail.com")).toBe(
-            "They sign in with a•••@gmail.com; messages about their orders go there.",
+            "They sign in with a•••@gmail.com. Messages about their orders go there.",
         );
     });
 

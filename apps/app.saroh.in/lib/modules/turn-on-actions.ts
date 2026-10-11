@@ -31,7 +31,7 @@ export async function readSetupDefaultsAction(
  */
 export async function enableModuleAction(
     key: string,
-    setup: object,
+    setup: object | undefined,
 ): Promise<EnableResult> {
     const result = await enableModule(key, setup);
     if (result.ok) revalidatePath("/", "layout");

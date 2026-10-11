@@ -13,12 +13,16 @@ import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
+import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
+import { retentionEndsAt } from "../organizations/retention";
 import type { OrganizationPresence } from "./admin-presence";
 import { organizationPresence } from "./admin-presence";
 import type { SiteTrackersRow } from "./admin-site-trackers.service";
 import { siteTrackerStates } from "./admin-site-trackers.service";
 import type { UsageNote } from "./catalogue-usage";
 import { catalogueUsage, usageNote } from "./catalogue-usage";
+import type { DeletionRefundRow, DeletionTrailRow } from "./deletion-trail";
+import { deletionRefunds, deletionTrail } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
 
@@ -41,6 +45,26 @@ export interface OrganizationFacts {
     suspensionReason: string | null;
     deletionScheduledAt: Date | null;
     deletionReason: string | null;
+    /**
+     * Its legal hold (DEC-122), or null: when it was placed, the operator's
+     * reason, and who placed it (a name; an email only to a PII reader).
+     */
+    legalHold: {
+        at: Date;
+        reason: string | null;
+        byUserId: string | null;
+        by: string | null;
+    } | null;
+    /** When its deletion window ended and access was shut off. */
+    deletedRetainedAt: Date | null;
+    /**
+     * The day its files and personal data are erased: 180 days after it was
+     * deleted (`organizations/retention.ts`). Null unless it is deleted.
+     * While it is on legal hold nothing is erased on that day.
+     */
+    dataKeptUntil: Date | null;
+    /** When the retention eraser finished with it; null until then. */
+    retentionErasedAt: Date | null;
     timezone: string | null;
     country: string | null;
     counts: {
@@ -236,6 +260,17 @@ export interface OrganizationSupportView {
      * "What they see" (owner, 9 Oct). Never a key or credential.
      */
     presence: Panel<OrganizationPresence>;
+    /**
+     * Its way out (#921): every deletion step on the admin ledger, newest
+     * first, with who took it in words. Empty for a business never closed.
+     */
+    deletionTrail: Panel<(DeletionTrailRow & { actor: string | null })[]>;
+    /**
+     * The refunds a closing business still owes its customers, live: the
+     * sweep won't delete it while there are any. Empty unless
+     * `PENDING_DELETION`; a customer's name only to a PII reader.
+     */
+    deletionRefunds: Panel<DeletionRefundRow[]>;
 }
 
 /**
@@ -257,6 +292,11 @@ export interface OrganizationSupportView {
  * support conversation is about. People's email addresses are personal data
  * and come back only to a caller holding `organization:pii:read`.
  *
+ * One exception, for a business on its way out (#921, owner 9 Oct): while
+ * it is `PENDING_DELETION`, the refunds it still owes its customers —
+ * amount, order or invoice number, provider reference, and the customer's
+ * name only to a PII reader — because its deletion waits on them.
+ *
  * The two ledgers stay separate (plan D5): `activity` is what the business
  * did, `operatorActions` is what an operator did to it.
  */
@@ -273,7 +313,7 @@ export class AdminOrganizationViewService {
         organizationId: string,
         caller: { canReadPii: boolean },
     ): Promise<OrganizationSupportView> {
-        const facts = await this.facts(organizationId);
+        const facts = await this.facts(organizationId, caller);
 
         const [
             people,
@@ -284,6 +324,8 @@ export class AdminOrganizationViewService {
             notes,
             sites,
             presence,
+            trail,
+            refunds,
         ] = await Promise.all([
             this.panel("people", () =>
                 this.people(organizationId, caller.canReadPii),
@@ -325,6 +367,12 @@ export class AdminOrganizationViewService {
                 }));
             }),
             this.panel("presence", () => organizationPresence(organizationId)),
+            this.panel("deletionTrail", () =>
+                this.named(deletionTrail(organizationId), caller),
+            ),
+            this.panel("deletionRefunds", () =>
+                deletionRefunds(organizationId, facts.lifecycleStatus, caller),
+            ),
         ]);
 
         return {
@@ -337,6 +385,8 @@ export class AdminOrganizationViewService {
             notes,
             sites,
             presence,
+            deletionTrail: trail,
+            deletionRefunds: refunds,
         };
     }
 
@@ -395,7 +445,10 @@ export class AdminOrganizationViewService {
         }
     }
 
-    private async facts(organizationId: string): Promise<OrganizationFacts> {
+    private async facts(
+        organizationId: string,
+        caller: { canReadPii: boolean },
+    ): Promise<OrganizationFacts> {
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
             select: {
@@ -409,6 +462,11 @@ export class AdminOrganizationViewService {
                 suspensionReason: true,
                 deletionScheduledAt: true,
                 deletionReason: true,
+                legalHoldAt: true,
+                legalHoldReason: true,
+                legalHoldByUserId: true,
+                deletedRetainedAt: true,
+                retentionErasedAt: true,
                 businessProfile: { select: { timezone: true, country: true } },
             },
         });
@@ -432,9 +490,34 @@ export class AdminOrganizationViewService {
                 prisma.contact.count({ where }),
             ]);
 
-        const { businessProfile, ...rest } = organization;
+        const {
+            businessProfile,
+            legalHoldAt,
+            legalHoldReason,
+            legalHoldByUserId,
+            ...rest
+        } = organization;
+        const holders = legalHoldByUserId
+            ? await this.names([legalHoldByUserId], caller)
+            : new Map<string, string>();
         return {
             ...rest,
+            legalHold: legalHoldAt
+                ? {
+                      at: legalHoldAt,
+                      reason: legalHoldReason,
+                      byUserId: legalHoldByUserId,
+                      by: legalHoldByUserId
+                          ? (holders.get(legalHoldByUserId) ?? null)
+                          : null,
+                  }
+                : null,
+            dataKeptUntil:
+                organization.lifecycleStatus ===
+                    OrganizationLifecycleStatus.DeletedRetained &&
+                organization.deletedRetainedAt
+                    ? retentionEndsAt(organization.deletedRetainedAt)
+                    : null,
             timezone: businessProfile?.timezone ?? null,
             country: businessProfile?.country ?? null,
             counts: { members, sites, orders, openOrders, bookings, contacts },

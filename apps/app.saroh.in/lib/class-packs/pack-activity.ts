@@ -1,9 +1,10 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { PackKind } from "./pack-cards";
-import { money, unitWord } from "./pack-cards";
+import { unitWord } from "./pack-cards";
 import type { Tone } from "./pack-detail";
-import { count, day, dayWithWeekday } from "./pack-detail";
 import type {
     PackDetail,
     PackEvent,
@@ -40,17 +41,8 @@ export interface UseRow {
     state: { label: string; tone: Tone };
 }
 
-function time(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(iso));
-}
-
 /**
- * One use's when ("Mon 29 Sep 07:00") and what became of it — shared with
+ * One use's when ("Mon 29 Sep, 7:00 am") and what became of it — shared with
  * Customer Detail's Packs tab (C7), so both say it the same way.
  */
 export function useWords(
@@ -58,7 +50,7 @@ export function useWords(
     timeZone: string,
 ): { when: string; state: { label: string; tone: Tone } } {
     return {
-        when: `${dayWithWeekday(u.startAt, timeZone)} ${time(u.startAt, timeZone)}`,
+        when: formatDateTime(u.startAt, timeZone, { weekday: "short" }),
         state: USE_STATE[u.state],
     };
 }
@@ -108,9 +100,9 @@ function changeWords(
     switch (field) {
         case "price": {
             if (!isStr(now)) return null;
-            const to = money(now, pack.currency);
+            const to = formatMoneyMajor(now, pack.currency);
             return isStr(was)
-                ? `price ${to}, was ${money(was, pack.currency)}`
+                ? `price ${to}, was ${formatMoneyMajor(was, pack.currency)}`
                 : `price ${to}`;
         }
         case "credits": {
@@ -165,9 +157,9 @@ export function activityText(
         case "CREATED":
             return "Created";
         case "PUBLISHED":
-            return "Published — on sale";
+            return "Published and on sale";
         case "ARCHIVED":
-            return "Archived — nobody new can buy it";
+            return "Archived. Nobody new can buy it";
         case "RESTORED":
             return "Back on sale";
         case "CHANGED": {
@@ -175,13 +167,16 @@ export function activityText(
                 .map(([field, pair]) => changeWords(field, pair, pack, kind))
                 .filter((x): x is string => x !== null);
             return parts.length > 0
-                ? capital(parts.join("; "))
+                ? capital(parts.join(" · "))
                 : "Terms changed";
         }
         case "SOLD": {
             const to = e.holder ? `Sold to ${e.holder.name}` : "Sold";
             const price = isStr(d.price)
-                ? money(d.price, isStr(d.currency) ? d.currency : pack.currency)
+                ? formatMoneyMajor(
+                      d.price,
+                      isStr(d.currency) ? d.currency : pack.currency,
+                  )
                 : null;
             const paid = isStr(d.paidBy)
                 ? paidByLabel(d.paidBy as Parameters<typeof paidByLabel>[0])
@@ -191,7 +186,7 @@ export function activityText(
         case "EXTENDED": {
             const days = isNum(d.days) ? count(d.days, "day", "days") : null;
             const whose = e.holder ? `${e.holder.name}'s pack` : "A pack";
-            const why = isStr(d.reason) && d.reason ? ` — ${d.reason}` : "";
+            const why = isStr(d.reason) && d.reason ? `: ${d.reason}` : "";
             return days
                 ? `${whose} extended ${days}${why}`
                 : `${whose} extended${why}`;
@@ -209,7 +204,7 @@ export function activityRow(
 ): ActivityRow {
     return {
         id: e.id,
-        when: day(e.createdAt, timeZone),
+        when: formatDate(e.createdAt, timeZone),
         text: activityText(e, pack, kind),
         who: actorName(e.actor) ?? "",
     };

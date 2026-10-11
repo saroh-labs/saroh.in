@@ -3,13 +3,12 @@ import { describe, expect, it } from "vitest";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 
 import {
-    nextPageHref,
     orderListParams,
     ordersEmptyCopy,
     ordersHref,
-    pageNumber,
+    pageCount,
+    pageHref,
     pageRange,
-    previousPageHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
 
@@ -27,8 +26,8 @@ describe("readOrdersQuery", () => {
             storefront: "s1",
             since: null,
             ...NO_FILTERS,
-            cursor: null,
-            back: [],
+            page: 1,
+            size: 50,
         });
     });
 
@@ -42,11 +41,17 @@ describe("readOrdersQuery", () => {
         expect(readOrdersQuery({ view: "cancelled" }).tab).toBe("all");
     });
 
-    it("reads the pages before this one only past the first", () => {
-        expect(readOrdersQuery({ cursor: "c2", back: "c1" }).back).toEqual([
-            "c1",
-        ]);
-        expect(readOrdersQuery({ back: "c1" }).back).toEqual([]);
+    it("reads the page and the size, and anything else as the default", () => {
+        expect(readOrdersQuery({ page: "3", size: "25" })).toMatchObject({
+            page: 3,
+            size: 25,
+        });
+        expect(readOrdersQuery({ page: "0", size: "37" })).toMatchObject({
+            page: 1,
+            size: 50,
+        });
+        // An address from before, carrying the API's cursor: the first page.
+        expect(readOrdersQuery({ cursor: "c2", back: "c1" }).page).toBe(1);
     });
 });
 
@@ -57,13 +62,13 @@ describe("since (Home's Last 24 hours, F6)", () => {
         const q = readOrdersQuery({ since: at, tab: "open" });
         expect(q.since).toBe(at);
         expect(orderListParams(q).since).toBe(at);
-        expect(nextPageHref(q, "c1")).toBe(
-            `/commerce/orders?tab=open&since=${encodeURIComponent(at)}&cursor=c1`,
+        expect(pageHref(q, 2)).toBe(
+            `/commerce/orders?tab=open&since=${encodeURIComponent(at)}&page=2`,
         );
     });
 
     it("drops it, and the page, for Show all", () => {
-        const q = readOrdersQuery({ since: at, cursor: "c1", tab: "open" });
+        const q = readOrdersQuery({ since: at, page: "2", tab: "open" });
         expect(ordersHref(q, { since: null })).toBe(
             "/commerce/orders?tab=open",
         );
@@ -95,7 +100,7 @@ describe("ordersHref", () => {
     });
 
     it("starts again at the first page when what is listed changes", () => {
-        const page3 = readOrdersQuery({ cursor: "c2", back: "c1" });
+        const page3 = readOrdersQuery({ page: "3" });
         expect(ordersHref(page3, { tab: "refunded" })).toBe(
             "/commerce/orders?tab=refunded",
         );
@@ -107,32 +112,39 @@ describe("ordersHref", () => {
 });
 
 describe("paging", () => {
-    it("walks forward by the API's cursor and back again", () => {
-        const two = nextPageHref(first, "c1");
-        expect(two).toBe("/commerce/orders?cursor=c1");
-        const page2 = readOrdersQuery({ cursor: "c1" });
-        const three = nextPageHref(page2, "c2");
-        expect(three).toBe("/commerce/orders?cursor=c2&back=c1");
-        const page3 = readOrdersQuery({ cursor: "c2", back: "c1" });
-        expect(pageNumber(page3)).toBe(3);
-        expect(previousPageHref(page3)).toBe("/commerce/orders?cursor=c1");
-        expect(previousPageHref(page2)).toBe("/commerce/orders");
-        expect(previousPageHref(first)).toBeNull();
+    it("goes to any page by its number, and the first leaves the address", () => {
+        expect(pageHref(first, 2)).toBe("/commerce/orders?page=2");
+        const page3 = readOrdersQuery({ page: "3" });
+        expect(pageHref(page3, 7)).toBe("/commerce/orders?page=7");
+        expect(pageHref(page3, 1)).toBe("/commerce/orders");
+    });
+
+    it("keeps the size while paging, and another size starts at page one", () => {
+        const small = readOrdersQuery({ size: "10", page: "4" });
+        expect(pageHref(small, 5)).toBe("/commerce/orders?page=5&size=10");
+        expect(ordersHref(small, { size: 100 })).toBe(
+            "/commerce/orders?size=100",
+        );
+        expect(ordersHref(small, { size: 50 })).toBe("/commerce/orders");
+        expect(pageCount(small, 312)).toBe(32);
+        expect(pageCount(first, 312)).toBe(7);
     });
 
     it("keeps the tab and search while paging", () => {
         const open = readOrdersQuery({ tab: "open", q: "priya" });
-        expect(nextPageHref(open, "c1")).toBe(
-            "/commerce/orders?tab=open&q=priya&cursor=c1",
+        expect(pageHref(open, 2)).toBe(
+            "/commerce/orders?tab=open&q=priya&page=2",
         );
     });
 
     it("says where the page sits in the tab's count", () => {
-        expect(pageRange(first, 50, 312, true)).toBe("1–50 of 312");
-        const page2 = readOrdersQuery({ cursor: "c1" });
-        expect(pageRange(page2, 50, 312, true)).toBe("51–100 of 312");
+        expect(pageRange(first, 50, 312)).toBe("1 to 50 of 312");
+        const page2 = readOrdersQuery({ page: "2" });
+        expect(pageRange(page2, 50, 312)).toBe("51 to 100 of 312");
+        const tens = readOrdersQuery({ page: "3", size: "10" });
+        expect(pageRange(tens, 10, 312)).toBe("21 to 30 of 312");
         // One page says nothing: the tab's count already does.
-        expect(pageRange(first, 12, 12, false)).toBeNull();
+        expect(pageRange(first, 12, 12)).toBeNull();
     });
 });
 
@@ -143,7 +155,8 @@ describe("orderListParams", () => {
             q: undefined,
             storeId: undefined,
             since: undefined,
-            cursor: undefined,
+            page: undefined,
+            size: undefined,
         });
         expect(
             orderListParams(
@@ -151,7 +164,8 @@ describe("orderListParams", () => {
                     tab: "open",
                     q: "1042",
                     storefront: "s1",
-                    cursor: "c1",
+                    page: "2",
+                    size: "25",
                 }),
             ),
         ).toEqual({
@@ -159,7 +173,8 @@ describe("orderListParams", () => {
             q: "1042",
             storeId: "s1",
             since: undefined,
-            cursor: "c1",
+            page: 2,
+            size: 25,
         });
     });
 });
@@ -186,7 +201,7 @@ describe("ordersEmptyCopy", () => {
     it("says No orders yet only for an empty business", () => {
         expect(ordersEmptyCopy(first, "Hill Road")).toMatchObject({
             title: "No orders yet",
-            note: "The first order in Hill Road appears here the moment someone checks out.",
+            note: "Orders from your website and counter show here.",
             action: null,
         });
     });

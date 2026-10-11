@@ -2,6 +2,8 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
+import type { InvitationAccept } from "@/lib/invitations/outcome";
+import { LEAVE_FAILED } from "@/lib/organizations/leave-business";
 
 import type { OrganizationRole } from "./service";
 
@@ -149,7 +151,7 @@ export async function dismissStorefrontTeamNotice(): Promise<
         "/storefront-team-notice/dismiss",
         "POST",
         {},
-        "Could not dismiss that notice.",
+        "Couldn't dismiss that notice.",
     );
 }
 
@@ -164,14 +166,18 @@ export async function inviteMember(
     input: InviteMemberInput,
 ): Promise<ApiResult<OrganizationInvitation>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/invitations`, {
         method: "POST",
         body: JSON.stringify(input),
     });
     const data = (await res.json().catch(() => null)) as unknown;
     if (res.ok) return { ok: true, data: data as OrganizationInvitation };
-    return toFailure(data, "Could not send that invitation.");
+    return toFailure(data, "Couldn't send that invitation.");
 }
 
 export async function updateMemberRole(
@@ -182,7 +188,7 @@ export async function updateMemberRole(
         `/members/${userId}`,
         "PATCH",
         input,
-        "Could not change that role.",
+        "Couldn't change that role.",
     );
 }
 
@@ -199,14 +205,24 @@ export async function setMemberExtraActions(
         `/members/${userId}/extra-actions`,
         "PUT",
         { actions },
-        "Could not change those permissions.",
+        "Couldn't change those permissions.",
     );
 }
 
 export async function removeMember(
     userId: string,
 ): Promise<CrmResult<{ removed: boolean; revokedLinks: number }>> {
-    return destroy(`/members/${userId}`, "Could not remove that person.");
+    return destroy(`/members/${userId}`, "Couldn't remove that person.");
+}
+
+/**
+ * Leave the active business: the caller's own membership. Asks no
+ * permission; the API refuses only the last owner, in its own sentence.
+ */
+export async function leaveBusiness(): Promise<
+    CrmResult<{ left: boolean; revokedLinks: number; storefrontRoles: number }>
+> {
+    return mutate("/leave", "POST", {}, LEAVE_FAILED);
 }
 
 export async function revokeInvitation(
@@ -214,7 +230,7 @@ export async function revokeInvitation(
 ): Promise<CrmResult<{ revoked: boolean }>> {
     return destroy(
         `/invitations/${invitationId}`,
-        "Could not withdraw that invitation.",
+        "Couldn't withdraw that invitation.",
     );
 }
 
@@ -234,11 +250,18 @@ export interface AcceptedInvitation {
  */
 export async function acceptInvitation(
     token: string,
-): Promise<CrmResult<AcceptedInvitation>> {
-    const res = await apiFetch(
-        `/organization-invitations/${encodeURIComponent(token)}/accept`,
-        { method: "POST" },
-    );
+): Promise<InvitationAccept<AcceptedInvitation>> {
+    let res: Response;
+    try {
+        res = await apiFetch(
+            `/organization-invitations/${encodeURIComponent(token)}/accept`,
+            { method: "POST" },
+        );
+    } catch {
+        // The API never answered. That is not a verdict on the invitation,
+        // and the page says so (`lib/invitations/outcome.ts`).
+        return { ok: false, error: "", status: null };
+    }
     const data = (await res
         .json()
         .catch(() => null)) as AcceptedInvitation | null;
@@ -246,5 +269,24 @@ export async function acceptInvitation(
     return {
         ok: false,
         error: toFailure(data, "That invitation could not be accepted.").error,
+        status: res.status,
     };
+}
+
+/**
+ * The address a business's invitation was sent to, from the API's public
+ * preview: what the page names when someone is signed in as another person.
+ * Null whenever it cannot be read. The page then says "another email".
+ */
+export async function invitedEmail(token: string): Promise<string | null> {
+    try {
+        const res = await apiFetch(
+            `/public/organization-invitations/${encodeURIComponent(token)}`,
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as { email?: unknown };
+        return typeof data.email === "string" ? data.email : null;
+    } catch {
+        return null;
+    }
 }

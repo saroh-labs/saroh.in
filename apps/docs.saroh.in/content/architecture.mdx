@@ -33,20 +33,27 @@ contact id confirms the contact exists.
 An **Organization** is the tenant. Everything a merchant owns hangs off it, and
 membership carries a role:
 
-| Role     | Can                                                            |
-| -------- | -------------------------------------------------------------- |
-| `OWNER`  | Everything, including deleting the organization.               |
-| `ADMIN`  | Day-to-day operation and member management. Not org deletion.  |
-| `MEMBER` | A read-only floor: organization, members, stores, sites, media. |
+| Role       | Can                                                                       |
+| ---------- | ------------------------------------------------------------------------- |
+| `OWNER`    | Everything, including deleting the organization.                          |
+| `ADMIN`    | Day-to-day operation and member management. Not org deletion.             |
+| `MEMBER`   | A read-only floor: organization, members, stores, sites, media, contacts. |
+| `REVIEWER` | Website-only: sees the sites they were invited to and leaves notes.       |
 
-CRM data — contacts, leads, activities — is **not** in the member floor. Those
-rows are customer PII, so they are OWNER/ADMIN only.
+A business can also make its own roles from named permissions; anything that
+still reads a role name treats one as `MEMBER`, so it under-grants rather than
+over-grants.
+
+Leads, the pipeline and activities are **not** in the member floor. Those rows
+are customer PII and sales data, so they need a permission the floor does not
+carry. A member reads contacts only so the diary can say who is booked.
 
 ## Modular capabilities
 
 The workspace is not one product; it is a set of capabilities a merchant turns
-on. Each has a key: `CRM`, `COMMERCE`, `APPOINTMENTS`, `WEBSITE`, `INSIGHTS`,
-`PAYMENTS`, `COMMUNICATIONS`, `AUTOMATIONS`.
+on. Each has a key: `WEBSITE`, `CRM`, `APPOINTMENTS`, `COURSES`, `CLASS_PACKS`,
+`COMMERCE`, `PAYMENTS`, `COMMUNICATIONS`, `AUTOMATIONS`, `INSIGHTS`. The source
+of truth is `apps/api.saroh.in/src/modules/capabilities/module-registry.ts`.
 
 Availability is computed, not stored as a boolean. A module resolves to one of:
 
@@ -61,7 +68,7 @@ Two rules follow from that, and both are easy to get backwards:
 - **Actions require `ACTIVE`.** Pointing a merchant at a module that is not ready
   is sending them at a door that does not open.
 - **Read-only surfaces require only "not `DISABLED`".** Appointments with no
-  availability configured cannot take a *new* booking, but the bookings already
+  availability configured cannot take a _new_ booking, but the bookings already
   on the books are real appointments someone must turn up for. Hiding them
   because the module is `SETUP_REQUIRED` makes the workspace contradict itself.
 

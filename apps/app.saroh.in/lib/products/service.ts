@@ -323,7 +323,7 @@ async function mutate<T = { id: string }>(
     });
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return { ...failure, field: resultField(failure.field) };
 }
 
@@ -361,6 +361,10 @@ export interface CatalogueFilter {
     collection?: string;
     cursor?: string;
     limit?: number;
+    /** Or the page by its number, from 1 (the list's numbered pages). */
+    page?: number;
+    /** Rows a page for a numbered page: 10, 25, 50 or 100. */
+    size?: number;
 }
 
 /** A product someone should restock, and why (#519). */
@@ -387,6 +391,8 @@ export interface CataloguePage {
     items: CatalogueProduct[];
     nextCursor: string | null;
     total: number;
+    /** How many rows a page holds, as asked or the default. */
+    pageSize: number;
     counts: { all: number; collections: number; inventory: number };
     storefronts: {
         everywhere: number;
@@ -403,7 +409,8 @@ export async function listCataloguePage(
     if (!path) return null;
     const q = new URLSearchParams();
     const entries: [string, string | number | undefined][] = Object.entries({
-        limit: CATALOGUE_PAGE,
+        // A numbered page names its own size; `limit` is the cursor's.
+        ...(filter.size === undefined ? { limit: CATALOGUE_PAGE } : {}),
         ...filter,
     });
     for (const [key, value] of entries) {

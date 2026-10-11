@@ -1,11 +1,10 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 
 import { ChoiceField, SHOW_HIDE } from "@/components/sites/choice-field";
 import type { ListLayout } from "@/lib/sites/service";
-
-import { Field } from "./field";
 
 /** A switch that is on unless the merchant hid it. */
 interface Shown {
@@ -57,7 +56,7 @@ export function DisplayOptions({
                 options={LAYOUTS}
                 value={layout}
                 onChange={onLayout}
-                note="Cards sit side by side; a list is one per row with the photo on the left."
+                note="Cards sit side by side. A list is one per row with the photo on the left."
             />
             {photos ? (
                 <ChoiceField

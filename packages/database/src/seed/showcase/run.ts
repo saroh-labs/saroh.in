@@ -8,7 +8,9 @@ import {
     ANALYTICS_PATHS,
     CONTACTS as BASE_CONTACTS,
     OWNER_EMAIL,
+    passwordHint,
     SEED_PREFIX,
+    seedPassword,
 } from "../data";
 import type { Db } from "../helpers";
 import {
@@ -26,6 +28,7 @@ import {
 } from "../helpers";
 import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
+import { seedStandInPaymentProvider } from "../stand-in-providers";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
@@ -61,7 +64,6 @@ import {
     ROLE_ACCOUNTS,
     SHOWCASE_BUSINESSES,
     SHOWCASE_KEY,
-    SHOWCASE_PASSWORD,
     SHOWCASE_SEED,
     staffEmail,
     TIMEZONE,
@@ -129,6 +131,8 @@ export async function seedShowcase(
 ): Promise<void> {
     const target = assertDatabaseTarget();
     console.log(`[showcase] target: ${target.database} on ${target.host}`);
+    // Before any write: a shared database needs its own password.
+    seedPassword();
 
     const { prisma } = await import("../../client");
     // Rounded down to the half hour: a re-run inside it writes identical rows.
@@ -145,7 +149,7 @@ export async function seedShowcase(
     // One hash for every showcase login. better-auth salts each hash, so a
     // shared one verifies for all of them; hashing ~20 times would only cost
     // seconds of scrypt.
-    const password = await hashPassword(SHOWCASE_PASSWORD);
+    const password = await hashPassword(seedPassword());
     const demo = await prisma.user.findUniqueOrThrow({
         where: { email: OWNER_EMAIL },
         select: { id: true },
@@ -260,7 +264,7 @@ export async function seedShowcase(
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
-            `Every account's password: ${SHOWCASE_PASSWORD}`,
+            `Every account's password: ${passwordHint(seedPassword())}`,
     );
 }
 
@@ -1007,24 +1011,12 @@ async function seedBusiness(
     await subscribe(ctx, key, orgId);
 
     if (biz.paymentProvider) {
-        await prisma.merchantPaymentProvider.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: orgId,
-                    provider: biz.paymentProvider,
-                },
-            },
-            update: { status: "CONNECTED" },
-            create: {
-                id: sid(key, "payments", biz.paymentProvider.toLowerCase()),
-                organizationId: orgId,
-                provider: biz.paymentProvider,
-                status: "CONNECTED",
-                // Placeholders: the seed never fabricates a usable credential.
-                encryptedCredentials: "seed-not-a-real-credential",
-                credentialsIv: "seed-iv",
-                credentialsAuthTag: "seed-tag",
-            },
+        // A stand-in on this machine's database only: its keys are
+        // placeholders (`stand-in-providers.ts`).
+        await seedStandInPaymentProvider(prisma, {
+            id: sid(key, "payments", biz.paymentProvider.toLowerCase()),
+            organizationId: orgId,
+            provider: biz.paymentProvider,
         });
     }
 

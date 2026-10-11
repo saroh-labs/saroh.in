@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 
 import { AllowOnTestRelease } from "../../common/decorators/allow-on-test-release.decorator";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { CurrentCustomer } from "../site-accounts/customer-context.decorator";
 import { CustomerSessionGuard } from "../site-accounts/customer-session.guard";
@@ -57,6 +58,7 @@ import { PublicCheckoutService } from "./public-checkout.service";
  * is on (`commerceOpen`) before it starts one.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicCheckoutController {
     constructor(private readonly checkout: PublicCheckoutService) {}
 

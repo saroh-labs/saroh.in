@@ -1,15 +1,15 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
     FailedState,
-    PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
+import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Skeleton } from "@saroh/ui/skeleton";
+
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -18,10 +18,8 @@ import { ShareLinkButton } from "@/components/sites/share-link-button";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
-import { ORDERS_TABS, ordersEmptyCopy } from "@/lib/orders/list-query";
+import { ordersEmptyCopy } from "@/lib/orders/list-query";
 import type { ShareLink } from "@/lib/sites/share-links";
-
-import { ORDER_GRID } from "./order-row";
 
 /**
  * Every state the Orders list and Order Detail draw besides their rows, after
@@ -40,101 +38,22 @@ import { ORDER_GRID } from "./order-row";
  */
 
 /** The page's heading, which every state keeps so no one wonders where they are. */
-export function OrdersHeading({ actions }: { actions?: ReactNode }) {
+export function OrdersHeading({
+    actions,
+    count,
+}: {
+    actions?: ReactNode;
+    /** "12 orders", every order the business has; nothing at none. */
+    count?: string;
+}) {
     return (
         <PageHeader
             breadcrumb={["Sell", "Orders"]}
             title="Orders"
+            count={count}
             className="mb-3"
             actions={actions}
         />
-    );
-}
-
-/**
- * The rows while they arrive: the design's grid at the desk (a head bar,
- * then an avatar and two lines, the status, when and the total), cards on a
- * phone. Only the first line of each row sweeps; the rest wait still.
- */
-export function OrdersLoadingRows({ rows = 4 }: { rows?: number }) {
-    const each = Array.from({ length: rows }, (_, i) => i);
-    return (
-        <div aria-busy="true" aria-live="polite">
-            <span className="sr-only">Loading orders</span>
-            <div
-                aria-hidden
-                className="overflow-hidden rounded-[11px] border border-border bg-card max-[759px]:hidden"
-            >
-                <div className="h-10 border-b border-border bg-muted" />
-                {each.map((i) => (
-                    <div
-                        key={i}
-                        className={cn(
-                            ORDER_GRID,
-                            "border-b border-border py-[11px] last:border-b-0",
-                        )}
-                    >
-                        <div className="flex min-w-0 items-center gap-[11px] pr-3.5">
-                            <Skeleton className="size-[30px] flex-none rounded-full" />
-                            <div className="min-w-0 flex-1">
-                                <Skeleton className="h-2.5 w-[68%] rounded-[4px]" />
-                                <div className="mt-1.5 h-2.5 w-[40%] rounded-[4px] bg-muted/70" />
-                            </div>
-                        </div>
-                        <div className="h-2.5 w-[62px] rounded-[4px] bg-muted/70" />
-                        <div className="h-2.5 w-[74px] rounded-[4px] bg-muted/70" />
-                        <div className="flex justify-end">
-                            <div className="h-2.5 w-[54px] rounded-[4px] bg-muted/70" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <div aria-hidden className="flex flex-col gap-2 min-[760px]:hidden">
-                {each.map((i) => (
-                    <div
-                        key={i}
-                        className="flex flex-col gap-2 rounded-[11px] border border-border bg-card p-3"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Skeleton className="h-3 w-[55%] rounded-[4px]" />
-                            <div className="ml-auto h-3 w-14 rounded-[4px] bg-muted/70" />
-                        </div>
-                        <div className="h-2.5 w-[70%] rounded-[4px] bg-muted/70" />
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-/**
- * The whole page while it loads: the heading, the tabs without their counts
- * (an unknown count is left out, never shown as 0), the search, the rows.
- */
-export function OrdersLoading() {
-    return (
-        <>
-            <OrdersHeading />
-            <div
-                aria-hidden
-                className="flex flex-wrap gap-0.5 border-b border-border"
-            >
-                {ORDERS_TABS.map((tab) => (
-                    <span
-                        key={tab.id}
-                        className="px-[13px] py-[9px] text-[13.5px] font-medium text-muted-foreground"
-                    >
-                        {tab.label}
-                    </span>
-                ))}
-            </div>
-            <div aria-hidden className="pt-3.5">
-                <Skeleton className="h-[38px] w-full max-w-[320px] rounded-[9px] coarse:h-11" />
-            </div>
-            <div className="pt-3.5">
-                <OrdersLoadingRows />
-            </div>
-        </>
     );
 }
 
@@ -156,28 +75,16 @@ export function OrdersFailed({
             <OrdersHeading />
             <FailedState
                 className="my-6"
-                title="Couldn't load orders"
-                description="Something went wrong on our side, so this is not the whole picture. Orders that were placed are still there and nothing has been changed — this screen simply could not read them."
+                title={couldntLoad("orders")}
+                description={nothingChanged(
+                    "Orders that were placed are still there.",
+                )}
+                onRetry={onRetry}
+                reference={reference}
                 action={
-                    <div className="mt-1.5 flex flex-col items-center gap-3">
-                        <div className="flex flex-wrap justify-center gap-2">
-                            <Button onClick={onRetry} className="wk-press">
-                                Try again
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="wk-press"
-                            >
-                                <Link href="/">Back to Home</Link>
-                            </Button>
-                        </div>
-                        {reference ? (
-                            <p className="font-mono text-xs text-muted-foreground">
-                                Reference: {reference}
-                            </p>
-                        ) : null}
-                    </div>
+                    <Button asChild variant="ghost" className="wk-press">
+                        <Link href="/">{backTo("Home")}</Link>
+                    </Button>
                 }
             />
         </>
@@ -192,24 +99,12 @@ export function OrdersFailed({
  */
 export function OrdersAttentionPartial({ onRetry }: { onRetry: () => void }) {
     return (
-        <PartialNotice
+        <PartialRead
             className="mb-3.5"
-            action={
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onRetry}
-                    className="wk-press h-[30px] flex-none rounded-lg border-brand/50 bg-card px-3 text-[12.5px] font-semibold text-brand-subtle-foreground coarse:h-11"
-                >
-                    Try again
-                </Button>
-            }
-        >
-            Needs attention couldn&apos;t be read, so allergies and other notes
-            show as &ldquo;Not available&rdquo;. The orders below arrived
-            normally. Check with the customer before an order goes out.
-        </PartialNotice>
+            things="what needs attention"
+            so="Allergies and other notes show as “Not available”. The orders below arrived normally. Check with the customer before an order goes out."
+            onRetry={onRetry}
+        />
     );
 }
 
@@ -230,6 +125,7 @@ export function OrdersLocked({
             <OrdersHeading />
             <PermissionDeniedState
                 className="rounded-[11px] border-border-strong"
+                title="You can't open Orders"
                 description={description}
                 note={note}
             />
@@ -246,7 +142,7 @@ export function OrderLocked({ text }: { text: string }) {
         <div className="px-4 py-[60px] sm:px-[22px]">
             <PermissionDeniedState
                 className="gap-[9px] border-border-strong py-9 sm:py-9"
-                title="You can't open orders"
+                title="You can't open Orders"
                 description={text}
                 action={
                     <Button asChild variant="outline" className="wk-press mt-1">
@@ -269,6 +165,7 @@ export function OrdersEmpty({
     options = null,
     go,
     share = null,
+    onNew,
 }: {
     query: OrdersQuery;
     storeName: string | null;
@@ -282,6 +179,12 @@ export function OrdersEmpty({
      * there is nothing to share yet.
      */
     share?: ShareLink | null;
+    /**
+     * Opens New order, for someone who may take one: the header's own
+     * action, under the same label. Left out for anyone else, and the
+     * sentence promises nothing.
+     */
+    onNew?: () => void;
 }) {
     const copy = ordersEmptyCopy(query, storeName, options);
     const offer = copy.kind === "first-run" ? share : null;
@@ -306,10 +209,11 @@ export function OrdersEmpty({
               : copy.action === "clear-since"
                 ? { label: "Show all orders", patch: { since: null } }
                 : copy.action === "show-all"
-                  ? { label: "View all orders", patch: { tab: "all" as const } }
+                  ? { label: "Show all orders", patch: { tab: "all" as const } }
                   : null;
     return (
         <EmptyState
+            data-ph-mask=""
             className="gap-[9px] rounded-[11px] border-border-strong"
             icon={<Icon />}
             title={copy.title}
@@ -323,8 +227,15 @@ export function OrdersEmpty({
                     >
                         {action.label}
                     </Button>
-                ) : offer ? (
-                    <ShareLinkButton link={offer} />
+                ) : copy.kind === "first-run" && (onNew || offer) ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {onNew ? (
+                            <Button type="button" onClick={onNew}>
+                                New order
+                            </Button>
+                        ) : null}
+                        {offer ? <ShareLinkButton link={offer} /> : null}
+                    </div>
                 ) : undefined
             }
         />

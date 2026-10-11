@@ -196,7 +196,7 @@ describe("the canvas in Preview", () => {
     it("says what Preview is, and Back to editing leaves it", () => {
         const { setPreviewing } = render();
         expect($("[role=status]")?.textContent).toBe(
-            "This is your site with the draft. Try it; nothing is live until you publish.",
+            "This is your site with the draft. Try it. Nothing is live until you publish.",
         );
         const back = Array.from(host.querySelectorAll("button")).find((b) =>
             b.textContent.startsWith("Back to editing"),
@@ -235,12 +235,12 @@ describe("the canvas in Preview", () => {
         expect(frame?.style.transform).toBe("scale(0.75)");
     });
 
-    it("sends no form: it says 'Preview — not sent' instead, then goes back to its note", async () => {
+    it("sends no form: it says 'Preview, not sent' instead, then goes back to its note", async () => {
         render();
         submitForm();
         expect(fetch).not.toHaveBeenCalled();
         expect($("[role=status]")?.textContent).toBe(
-            "Preview — not sent. Forms send from your live site.",
+            "Preview, not sent. Forms send from your live site.",
         );
         expect(toast.showInfo).not.toHaveBeenCalled();
         await act(async () => {
@@ -257,7 +257,7 @@ describe("the canvas in Preview", () => {
         submitForm();
         expect(fetch).not.toHaveBeenCalled();
         expect(toast.showInfo).toHaveBeenCalledWith(
-            "Preview — not sent",
+            "Preview, not sent",
             "Forms send from your live site.",
         );
     });

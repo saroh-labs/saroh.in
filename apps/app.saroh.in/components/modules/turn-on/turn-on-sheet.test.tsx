@@ -30,6 +30,12 @@ vi.mock("@/lib/modules/turn-on-actions", () => ({
         enableModuleAction(key, setup),
 }));
 
+/** The template choice's switch (DEC-135); on, as local dev, by default. */
+let templateChoice = true;
+vi.mock("@/lib/sites/templates-switch", () => ({
+    templateChoiceOn: () => templateChoice,
+}));
+
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -151,6 +157,7 @@ beforeEach(() => {
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
+    templateChoice = true;
     websiteTemplate = null;
     locks = { payments: null, messaging: null };
     websiteTemplates = [];
@@ -269,7 +276,7 @@ describe("Bookings", () => {
         );
         expect(byLabel("First service").value).toBe("Consultation");
         expect(byLabel("Takes (minutes)").value).toBe("30");
-        expect(byLabel("Price (₹)").value).toBe("500.00");
+        expect(byLabel("Price").value).toBe("500.00");
         // Mon–Sat open, Sunday closed.
         const days = Array.from(
             sheet().querySelectorAll<HTMLButtonElement>('[role="checkbox"]'),
@@ -360,16 +367,13 @@ describe("Sell", () => {
         if (!delivery) throw new Error("No Delivery box");
         act(() => delivery.click());
         expect(text()).toContain(
-            "Your online shop goes on your website at northwind.saroh.app/shop — we'll set up the website for you.",
+            "Your online shop goes on your website at northwind.saroh.app/shop. We'll set up the website for you.",
         );
-        expect(byLabel("Web address").value).toBe("northwind");
-        // With the web address cleared, the note still names /shop, and
-        // never reads "your address.saroh.app" (DEC-069, L12).
-        typeInto(byLabel("Web address"), "");
+        // The web address was chosen at setup: said, never asked again.
+        expect(() => byLabel("Web address")).toThrow();
         expect(text()).toContain(
-            "Your online shop goes on your website at /shop on your web address — we'll set up the website for you.",
+            "Web addressnorthwind.saroh.appYou chose it when you set up.",
         );
-        typeInto(byLabel("Web address"), "northwind");
         await press(button(/^Turn on$/));
         expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
             "COMMERCE",
@@ -411,19 +415,29 @@ describe("Website", () => {
         });
     });
 
-    it("shows the address with its .saroh.app, and a taken one from the API beside it", async () => {
+    it("says the web address chosen at setup, and asks for it only when the API refuses it", async () => {
         enableModuleAction.mockResolvedValueOnce({
             ok: false,
             error: "Validation failed",
             fields: { address: "northwind is taken. Try another." },
         });
         await open(["WEBSITE"]);
-        expect(text()).toContain(".saroh.app");
-        expect(text()).toContain("Customers find you at northwind.saroh.app");
+        // A line to read, not a field (UX audit, 10 Oct).
+        expect(text()).toContain("northwind.saroh.app");
+        expect(text()).toContain(
+            "You chose it when you set up. It can be changed in Settings › Business.",
+        );
+        expect(() => byLabel("Web address")).toThrow();
+        expect(byLabel("Site name").value).toBe("Northwind");
+
         await press(button(/^Turn on$/));
+        // Refused: now it is a field, so it can be fixed, and it stays one.
         const field = byLabel("Web address");
+        expect(field.value).toBe("northwind");
         expect(field.getAttribute("aria-invalid")).toBe("true");
         expect(text()).toContain("northwind is taken. Try another.");
+        typeInto(field, "northwind-supply");
+        expect(byLabel("Web address").value).toBe("northwind-supply");
         // On the field, not a toast; the sheet stays open.
         expect(showError).not.toHaveBeenCalled();
         expect(push).not.toHaveBeenCalled();
@@ -495,6 +509,32 @@ describe("Website", () => {
         });
     });
 
+    it("with the template choice switched off, names and offers no template and sends none (DEC-135)", async () => {
+        templateChoice = false;
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            {
+                id: "bakery",
+                name: "Bakery",
+                kinds: ["food"],
+                uses: ["COMMERCE"],
+            },
+        ];
+        await open(["COMMERCE", "WEBSITE"]);
+        expect(text()).not.toContain("Starts from");
+        expect(text()).not.toMatch(/template/i);
+        expect(text()).not.toContain("Bakery");
+
+        await press(button(/^Turn on/));
+        // The API starts the site from the one for what is being set up.
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+        });
+    });
+
     it("keeps the sentence when only the kind's template suits", async () => {
         websiteTemplate = { id: "portfolio", name: "Portfolio" };
         websiteKind = "WORK";
@@ -523,29 +563,29 @@ describe("Website", () => {
 });
 
 describe("Payments and Communications", () => {
-    it("Connect now turns it on and goes to Providers", async () => {
+    it("Turn on and connect turns it on and goes to Providers", async () => {
         await open(["PAYMENTS"]);
         expect(text()).toContain(
             "Online payment stays off until you connect a provider.",
         );
-        await press(button(/^Connect now$/));
+        await press(button(/^Turn on and connect$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
         expect(push).toHaveBeenCalledWith("/settings/providers");
     });
 
-    it("Later turns it on with nothing connected", async () => {
+    it("Turn on turns it on with nothing connected", async () => {
         await open(["PAYMENTS"]);
-        await press(button(/^Later$/));
+        await press(button(/^Turn on$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
         expect(push).toHaveBeenCalledWith("/billing");
     });
 
-    it("Communications brings Contacts, and Later stays where it is", async () => {
+    it("Communications brings Contacts, and Turn on stays where it is", async () => {
         await open(["COMMUNICATIONS"]);
         expect(text()).toContain(
             "Messages go to your contacts, so Contacts comes with it.",
         );
-        await press(button(/^Later$/));
+        await press(button(/^Turn on$/));
         expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
             "CRM",
             "COMMUNICATIONS",
@@ -564,7 +604,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         full: false,
     };
 
-    it("Payments: no Connect now, the plan and How to pay us instead, and Turn on", async () => {
+    it("Payments: no Turn on and connect, the plan and How to pay us instead, and Turn on", async () => {
         locks = { payments: lock, messaging: lock };
         await open(["PAYMENTS"]);
         expect(text()).toContain(
@@ -573,7 +613,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         expect(text()).toContain(
             "How to pay us for customers who pay you directly.",
         );
-        expect(text()).not.toContain("Connect now");
+        expect(text()).not.toContain("Turn on and connect");
         expect(text()).not.toContain("Razorpay or Cashfree");
         expect(
             sheet().querySelector(
@@ -612,9 +652,9 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         );
     });
 
-    it("Grow: Connect now is offered as before", async () => {
+    it("Grow: Turn on and connect is offered", async () => {
         await open(["PAYMENTS"]);
-        expect(text()).toContain("Connect now");
+        expect(text()).toContain("Turn on and connect");
         expect(text()).not.toContain("comes with Grow");
     });
 });

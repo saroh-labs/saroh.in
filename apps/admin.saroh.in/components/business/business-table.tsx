@@ -9,7 +9,11 @@ import { formatRelative, plural } from "@/lib/format";
 import { moduleLabel } from "@/lib/modules";
 import { planNote } from "@/lib/plan-words";
 
-import { ATTENTION_LABEL, LifecycleBadge } from "./lifecycle-badge";
+import {
+    ATTENTION_LABEL,
+    LegalHoldBadge,
+    LifecycleBadge,
+} from "./lifecycle-badge";
 
 const COLUMNS: DataColumn<BusinessRow>[] = [
     {
@@ -33,6 +37,7 @@ const COLUMNS: DataColumn<BusinessRow>[] = [
         cell: (row) => (
             <div className="flex flex-wrap gap-1">
                 <LifecycleBadge status={row.lifecycleStatus} />
+                {row.legalHold && <LegalHoldBadge />}
                 {row.attention.map((reason) => (
                     <Badge key={reason} variant="warning">
                         {ATTENTION_LABEL[reason]}

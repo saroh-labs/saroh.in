@@ -124,12 +124,34 @@ function messageOf(status: number, body: unknown): string {
     return TROUBLE;
 }
 
+/** Which two weeks of a service, and with whom. */
+export interface DaysAsk {
+    /** Days from today the two weeks start: "Show later dates". */
+    skip?: number;
+    /** One of the people who take it; null or absent for whoever is free. */
+    staffId?: string | null;
+}
+
+/** The address of a service's days read, with what was asked. */
+export function daysUrl(
+    apiUrl: string,
+    serviceId: string,
+    ask: DaysAsk = {},
+): string {
+    const params = new URLSearchParams();
+    if (ask.skip && ask.skip > 0) params.set("skip", String(ask.skip));
+    if (ask.staffId) params.set("staffId", ask.staffId);
+    const query = params.toString();
+    return `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/days${query ? `?${query}` : ""}`;
+}
+
 export function fetchDays(
     apiUrl: string,
     serviceId: string,
+    ask: DaysAsk = {},
 ): Promise<Result<BookingDays>> {
     return call(
-        `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/days`,
+        daysUrl(apiUrl, serviceId, ask),
         { cache: "no-store" },
         isBookingDays,
     );
@@ -169,6 +191,12 @@ export interface SignedInBookRequest {
      * the payment window.
      */
     bookerPhone?: string;
+    /**
+     * The tag this page's address carried when a QR code's scan opened it
+     * (`qr-<code>`, `qr-source.ts`). The API looks the code up on this site
+     * and ignores anything else; it never refuses a booking over it.
+     */
+    source?: string;
 }
 
 /** Book it, signed in: the site's server action that does. */

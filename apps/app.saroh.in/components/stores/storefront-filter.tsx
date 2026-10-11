@@ -1,27 +1,24 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@saroh/ui/dropdown-menu";
-import { cn } from "@saroh/ui/lib/utils";
-import { Check, ChevronDown, Store } from "lucide-react";
+import { ListFilter } from "@/components/shared/list-toolbar";
+import { count } from "@/lib/format/plural";
+
+const ALL = "";
 
 /**
- * "A filter, not a scope": which storefront's view of a business-wide list to
+ * "A filter, not a scope": which location's view of a business-wide list to
  * show. Only offered where there is more than one to choose between.
  *
  * The distinction is the whole reason this control has a note at the bottom.
- * The catalogue and the customer list belong to the BUSINESS; a storefront
+ * The catalogue and the customer list belong to the BUSINESS; a location
  * decides what it sells and who has bought there. Picking one narrows what is
- * on screen and nothing else — it does not put the rest of the workspace into
- * that storefront, which is what a scope would do (the workspace design says
+ * on screen and nothing else. It does not put the rest of the workspace into
+ * that location, which is what a scope would do (the workspace design says
  * so in as many words).
+ *
+ * It is the toolbar's one dropdown (`ListFilter`), as every other filter
+ * is: each location's row says how many it holds, and the note sits under
+ * the list.
  */
 export function StorefrontFilter({
     stores,
@@ -30,79 +27,39 @@ export function StorefrontFilter({
     value,
     onChange,
     noun,
-    label,
     note,
 }: {
     stores: { id: string; name: string }[];
     /**
-     * How many rows a storefront holds, for the row's second line; null when
+     * How many rows a location holds, for the row's second line; null when
      * that couldn't be counted, and the line is left out rather than a 0.
      */
     countFor: (storeId: string) => number | null;
-    /** How many rows there are in all, for "All storefronts"; null likewise. */
+    /** How many rows there are in all, for "All locations"; null likewise. */
     total: number | null;
     value: string | null;
     onChange: (storeId: string | null) => void;
     noun: { one: string; other: string };
-    /** The menu's heading, e.g. "Show products sold at". */
-    label: string;
     /** Why this is a filter and not a scope, in this list's own words. */
     note: string;
 }) {
-    const current = stores.find((s) => s.id === value);
-    const choices = [
-        { id: null, name: "All locations", n: total },
-        ...stores.map((s) => ({ id: s.id, name: s.name, n: countFor(s.id) })),
-    ];
+    const held = (n: number | null) =>
+        n === null ? undefined : count(n, noun.one, noun.other);
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="outline"
-                    className={cn(
-                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
-                        current && "border-foreground",
-                    )}
-                    aria-label={`Location filter: ${current?.name ?? "all locations"}. Change it.`}
-                >
-                    <Store className="size-4" />
-                    {current?.name ?? "All locations"}
-                    <ChevronDown className="size-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[244px]">
-                <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {label}
-                </DropdownMenuLabel>
-                {choices.map((c) => {
-                    const on = c.id === value;
-                    return (
-                        <DropdownMenuItem
-                            key={c.id ?? "all"}
-                            onSelect={() => onChange(c.id)}
-                            className={cn(on && "bg-foreground/[0.03]")}
-                        >
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12.5px] font-medium">
-                                    {c.name}
-                                </span>
-                                {c.n === null ? null : (
-                                    <span className="block text-[11px] text-muted-foreground">
-                                        {c.n === 1
-                                            ? `1 ${noun.one}`
-                                            : `${c.n} ${noun.other}`}
-                                    </span>
-                                )}
-                            </span>
-                            {on ? <Check aria-hidden /> : null}
-                        </DropdownMenuItem>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                <p className="px-[9px] pb-1 pt-0.5 text-[11px] leading-[1.45] text-muted-foreground">
-                    {note}
-                </p>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <ListFilter
+            holdsData
+            label="Location"
+            value={value ?? ALL}
+            onValueChange={(v) => onChange(v === ALL ? null : v)}
+            options={[
+                { value: ALL, label: "All locations", hint: held(total) },
+                ...stores.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                    hint: held(countFor(s.id)),
+                })),
+            ]}
+            footer={note}
+        />
     );
 }

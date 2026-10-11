@@ -136,6 +136,7 @@ describe("where an old address forwards", () => {
             {} as PublicVisitService,
             {} as PublicFooterService,
             {} as PublicHeadService,
+            {} as never,
         );
         await expect(
             controller.moved(old, "203.0.113.9", undefined),

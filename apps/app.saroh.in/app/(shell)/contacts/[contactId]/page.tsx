@@ -1,3 +1,4 @@
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -11,11 +12,14 @@ import { CustomerDetailScreen } from "@/components/customers/detail/detail-scree
 import type { PackSale } from "@/components/customers/detail/packs-tab";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels, moduleOn, sellPacksOnly } from "@/lib/contacts/panels";
 import {
     crumbsToSell,
+    personNewActions,
+    personStarts,
     personTabActions,
     personTabGates,
 } from "@/lib/contacts/person";
@@ -45,6 +49,8 @@ import type {
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { sellsProducts } from "@/lib/orders/sells-products";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
@@ -96,8 +102,11 @@ export default async function PersonPage({
     if (organization?.actions && !may("contact:read")) {
         return (
             <AccessDenied
-                title="You can't open contacts"
-                description={`Your role in ${organization.name} can't see the people the business knows. An owner or admin can change that in Team.`}
+                {...whoCanChange({
+                    thing: "Contacts",
+                    business: organization.name,
+                    role: knownRoleName(organization),
+                })}
             />
         );
     }
@@ -115,6 +124,9 @@ export default async function PersonPage({
     const canRemove = may("customer:remove");
     const gates = personTabGates(organization, modules);
     const acts = personTabActions(organization, modules);
+    // New order and New booking for them (#247): the module on and the
+    // role allowed, each as its own flow's button asks.
+    const opens = personNewActions(organization, modules);
     // Courses and what Subscribe offers come from the contact's holdings;
     // the rest is in the detail read.
     const panels = contactPanels(organization, modules);
@@ -130,7 +142,7 @@ export default async function PersonPage({
     };
     const packsShown = detail.packs !== undefined;
 
-    const [suggestions, thread, reviews, packSale, crm, holdings] =
+    const [suggestions, thread, reviews, packSale, crm, holdings, products] =
         await Promise.all([
             // Only whoever may link or merge reads what they'd be offered.
             canWrite || canMerge
@@ -165,6 +177,8 @@ export default async function PersonPage({
                 ? getContact(contactId).catch((): ContactDetail | null => null)
                 : Promise.resolve(null),
             loadContactHoldings(contactId, holdingsPlan),
+            // New order is for a business that sells products (B13).
+            opens.newOrder ? sellsProducts() : Promise.resolve(false),
         ]);
 
     const name = detail.contact.name;
@@ -181,6 +195,8 @@ export default async function PersonPage({
         gates.leads && canWrite && !removed
             ? (await loadAddLead()).stages
             : null;
+    // What a lead is worth is in the business's currency (owner, 11 Oct).
+    const currency = gates.leads ? await readBusinessCurrency() : "";
 
     const extra: (Tab & { panel: ReactNode })[] = [];
     if (gates.leads) {
@@ -193,6 +209,7 @@ export default async function PersonPage({
                     person={person}
                     leads={crm ? crm.leads : null}
                     stages={stages}
+                    currency={currency}
                 />
             ),
         });
@@ -238,7 +255,7 @@ export default async function PersonPage({
     }
     if (acts.newInvoice && detail.invoices !== undefined && !removed) {
         actions.inv = (
-            <Button size="sm" variant="outline" className="coarse:h-11" asChild>
+            <Button size="sm" variant="outline" asChild>
                 <Link
                     href={`/billing/invoices/new?contactId=${encodeURIComponent(contactId)}`}
                 >
@@ -317,6 +334,10 @@ export default async function PersonPage({
                 actions={actions}
                 deleteWords={deleteWords}
                 canRecordPayment={acts.recordPayment}
+                starts={personStarts(contactId, opens, {
+                    removed,
+                    sellsProducts: products,
+                })}
                 overviewExtra={
                     removed ? null : (
                         <PersonFacts

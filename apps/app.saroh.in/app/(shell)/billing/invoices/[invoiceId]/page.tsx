@@ -93,7 +93,7 @@ export default async function InvoicePage({
             : null;
     const businessName = organization?.name ?? "This business";
     const who = billedTo(invoice);
-    const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, invoice.currency);
     const late = whenLine(invoice);
     // Its dates in the business's zone, as its paper prints them (#836).
     const zone = invoiceZone(business);
@@ -148,7 +148,7 @@ export default async function InvoicePage({
                 late={
                     invoice.standing === "OVERDUE" && invoice.dueAt ? (
                         <>
-                            {late.before} — due{" "}
+                            {late.before}, due{" "}
                             <ViewerDate
                                 iso={invoice.dueAt}
                                 variant="dayMonth"
@@ -191,7 +191,7 @@ export default async function InvoicePage({
 function payLine(i: Invoice, who: string, canWrite: boolean) {
     const first = who.split(" ")[0] ?? who;
     if (i.kind === "CREDIT_NOTE") {
-        return `A credit note — nothing is owed on it. It cancels ${i.related?.number ?? "an invoice"}.`;
+        return `A credit note. Nothing is owed on it. It cancels ${i.related?.number ?? "an invoice"}.`;
     }
     if (i.order) {
         return i.standing === "CREDITED"
@@ -212,9 +212,9 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
                 </>
             );
         case "CREDITED":
-            return "Cancelled by a credit note — nothing is owed.";
+            return "Cancelled by a credit note. Nothing is owed.";
         case "VOID":
-            return "Voided — nothing is owed.";
+            return "Voided. Nothing is owed.";
         case "DRAFT":
             return "Not issued yet. A draft has no number and can still change.";
         default:
@@ -225,10 +225,10 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
                     : `Not paid. Mark it paid when the money arrives.`;
             }
             if (canWrite && canSend(i.send)) {
-                return `Not paid. ${first} can pay by UPI or card from the pay link — send it to them, or mark it paid when the money arrives.`;
+                return `Not paid. ${first} can pay by UPI or card from the pay link. Send it to them, or mark it paid when the money arrives.`;
             }
             return i.online?.providerConnected
-                ? `Not paid. ${first} can pay online from the pay link — copy it and send it, or mark it paid when the money arrives.`
+                ? `Not paid. ${first} can pay online from the pay link. Copy it and send it, or mark it paid when the money arrives.`
                 : `Not paid. Mark it paid when the money arrives.`;
     }
 }

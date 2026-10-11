@@ -33,7 +33,7 @@ export function NeedsYou({
     return (
         <section
             aria-label="Needs you"
-            className="grid gap-2 rounded-[12px] border border-brand-300 bg-brand-subtle px-4 py-3 dark:border-brand-700"
+            className="grid gap-2 rounded-[12px] border border-border-strong bg-muted px-4 py-3"
         >
             <div className="flex flex-wrap items-center gap-2.5">
                 <h2 className="font-display text-[15px] font-semibold text-foreground">
@@ -65,12 +65,12 @@ export function NeedsYou({
                                 "size-[7px] shrink-0 rounded-full",
                                 n.tone === "danger"
                                     ? "bg-destructive"
-                                    : "bg-highlight",
+                                    : "bg-foreground",
                             )}
                         />
                         <span className="min-w-0 flex-[1_1_220px]">
-                            <strong className="font-semibold">{n.name}</strong>{" "}
-                            — {n.what}
+                            <strong className="font-semibold">{n.name}</strong>:{" "}
+                            {n.what}
                         </span>
                         <Button
                             asChild
@@ -90,7 +90,7 @@ export function NeedsYou({
             </ul>
             {more > 0 ? (
                 <p className="text-[12.5px] text-neutral-700 dark:text-muted-foreground">
-                    And {more} more — Show only these lists them all.
+                    And {more} more. Show only these lists them all.
                 </p>
             ) : null}
         </section>

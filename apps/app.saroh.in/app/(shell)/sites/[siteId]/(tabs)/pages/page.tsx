@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { requireSession } from "@/lib/session";
 import {
     describePendingChanges,
@@ -13,6 +14,8 @@ import {
 } from "@/lib/sites/pending";
 import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
+import { pageUpdatedIso } from "@/lib/sites/updated";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata = { title: "Pages · Website" };
 
@@ -72,37 +75,39 @@ export default async function SitePagesPage({
     return (
         <div className="flex flex-col gap-4">
             {waiting > 0 ? (
-                <p
-                    role="status"
-                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-border bg-muted/40 px-4 py-3 text-[13px]"
-                >
-                    <span className="min-w-0 flex-1 text-pretty">
-                        Waiting to be published:{" "}
-                        {describePendingChanges(
-                            site.pendingSectionChanges,
-                            site.pendingSiteChanges,
-                        ) ?? `${waiting} changes`}
-                        .{" "}
-                        {site.currentPublicationId
-                            ? "The public still sees the last published version."
-                            : "Nothing is public until the site is published."}
-                    </span>
-                    <Link
-                        href={editorHref}
-                        className="font-medium underline-offset-4 hover:underline"
-                    >
-                        Review and publish
-                    </Link>
-                </p>
+                <Notice role="status" align="center">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <span className="min-w-0 flex-1 text-pretty">
+                            Waiting to be published:{" "}
+                            {describePendingChanges(
+                                site.pendingSectionChanges,
+                                site.pendingSiteChanges,
+                            ) ?? `${waiting} changes`}
+                            .{" "}
+                            {site.currentPublicationId
+                                ? "The public still sees the last published version."
+                                : "Nothing is public until the site is published."}
+                        </span>
+                        <Link
+                            href={editorHref}
+                            className="font-medium underline-offset-4 hover:underline"
+                        >
+                            Review and publish
+                        </Link>
+                    </div>
+                </Notice>
             ) : null}
             <ListCard
                 main="Page"
+                paged={{ list: "site-pages", things: "pages" }}
+                middle="Updated"
                 end="On the site"
                 // Plain words (UX-081): where a page is removed, not why it isn't here.
                 note="To remove a page, open it in the editor and choose Delete page in its settings."
             >
                 {pages.map((page) => {
                     const state = pageState(page, site);
+                    const updated = pageUpdatedIso(page);
                     return (
                         <li
                             key={page.id}
@@ -123,9 +128,26 @@ export default async function SitePagesPage({
                                         ) : null
                                     }
                                     sub={
-                                        <span className="font-mono">
-                                            {page.path}
-                                        </span>
+                                        <>
+                                            <span className="font-mono">
+                                                {page.path}
+                                            </span>
+                                            {/* The Updated column is desk
+                                                only; a phone reads it here. */}
+                                            {updated ? (
+                                                <span className="sm:hidden">
+                                                    {" · Updated "}
+                                                    <ViewerDate iso={updated} />
+                                                </span>
+                                            ) : null}
+                                        </>
+                                    }
+                                    middle={
+                                        updated ? (
+                                            <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
+                                                <ViewerDate iso={updated} />
+                                            </span>
+                                        ) : null
                                     }
                                     end={
                                         <Badge variant={PILL[state.state]}>

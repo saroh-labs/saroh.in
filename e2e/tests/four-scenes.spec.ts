@@ -35,9 +35,9 @@ const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
     "/": (page) => page.getByRole("region", { name: "Needs you" }),
     "/bookings": (page) => page.getByRole("radiogroup", { name: "Layout" }),
-    // Sell lands on its location (or locations, with several).
-    "/commerce": (page) =>
-        page.getByRole("heading", { level: 1, name: /^Locations?$/ }),
+    // Sell lands on its location, titled with its own name; its first card
+    // is the same whatever it is called.
+    "/commerce": (page) => page.getByRole("region", { name: "The place" }),
     "/contacts": (page) =>
         page.getByRole("heading", { level: 1, name: "Contacts" }),
 };
@@ -389,9 +389,19 @@ test.describe("Home's Today (F5)", () => {
         const times = await rows.evaluateAll((items) =>
             items
                 .map((li) => (li.firstElementChild?.textContent ?? "").trim())
-                .filter((t) => /^\d\d:\d\d$/.test(t)),
+                .filter((t) => /^\d{1,2}:\d\d [ap]m$/.test(t)),
         );
-        expect(times).toEqual([...times].sort());
+        // "9:30 am" is on the 12-hour clock, so it is ordered by its minutes.
+        const minutes = (t: string) => {
+            const [clock = "", period] = t.split(" ");
+            const [h = "0", m = "0"] = clock.split(":");
+            return (
+                ((Number(h) % 12) + (period === "pm" ? 12 : 0)) * 60 + Number(m)
+            );
+        };
+        expect(times.map(minutes)).toEqual(
+            [...times].map(minutes).sort((a, b) => a - b),
+        );
 
         const short = await rows.evaluateAll((items) =>
             items

@@ -112,7 +112,7 @@ export function firstStorefront(
 ): Promise<{
     id: string;
     name: string;
-    settings: { fulfilmentTypes: string[] } | null;
+    settings: { fulfilmentTypes: string[]; kind: string | null } | null;
 } | null> {
     return db.store.findFirst({
         where: { organizationId, deletedAt: null },
@@ -120,9 +120,28 @@ export function firstStorefront(
         select: {
             id: true,
             name: true,
-            settings: { select: { fulfilmentTypes: true } },
+            settings: { select: { fulfilmentTypes: true, kind: true } },
         },
     });
+}
+
+/**
+ * The ways a location saves, in table order, with the two old toggles in
+ * step (B17's rule 3): collection is Pick-up, delivery any way that sends
+ * the order. Pick-up only for a place customers visit (UX-025): a location
+ * with no counter never starts with it on, since nobody could collect.
+ */
+function waysFor(chosen: readonly string[], counter: boolean) {
+    const fulfilmentTypes = STOREFRONT_FULFILMENT_TYPES.filter(
+        (t) => chosen.includes(t) && (counter || t !== "PICKUP"),
+    );
+    return {
+        fulfilmentTypes,
+        collectionEnabled: fulfilmentTypes.includes("PICKUP"),
+        shippingEnabled:
+            fulfilmentTypes.includes("LOCAL_DELIVERY") ||
+            fulfilmentTypes.includes("SHIPPING"),
+    };
 }
 
 async function prepareCommerce(
@@ -148,24 +167,17 @@ async function writeCommerce(
     setup: CommerceSetupDto,
     entitlements: Entitlements,
 ): Promise<SetupCreated> {
-    // In table order, with the two old toggles in step (B17's rule 3):
-    // collection is Pick-up, delivery any way that sends the order.
-    const fulfilmentTypes = STOREFRONT_FULFILMENT_TYPES.filter((t) =>
-        setup.fulfilment.includes(t),
-    );
-    const ways = {
-        fulfilmentTypes,
-        collectionEnabled: fulfilmentTypes.includes("PICKUP"),
-        shippingEnabled:
-            fulfilmentTypes.includes("LOCAL_DELIVERY") ||
-            fulfilmentTypes.includes("SHIPPING"),
-    };
     // A business sells in one currency (DEC-030).
     const currency =
         (await businessCurrency(tx, ctx.organizationId)) ?? DEFAULT_CURRENCY;
 
     const existing = await firstStorefront(tx, ctx.organizationId);
     if (existing) {
+        // Its kind stays as it is; Pick-up only if customers visit it.
+        const ways = waysFor(
+            setup.fulfilment,
+            existing.settings?.kind === "SHOP",
+        );
         await tx.store.update({
             where: { id: existing.id },
             data: { name: setup.storefrontName },
@@ -175,15 +187,19 @@ async function writeCommerce(
             create: { storeId: existing.id, currency, ...ways },
             update: ways,
         });
-        await shopForSell(tx, ctx, existing.id, fulfilmentTypes);
+        await shopForSell(tx, ctx, existing.id, ways.fulfilmentTypes);
         return { storefrontId: existing.id };
     }
 
     // Pick-up needs a place customers visit, with its address (UX-025):
-    // a business that gave its registered address starts from it.
-    const place = fulfilmentTypes.includes("PICKUP")
+    // a business that gave its registered address starts from it. Without
+    // one (or with no room on the plan) it starts with no counter, and so
+    // without Pick-up, rather than with a Pick-up nobody can use.
+    const place = setup.fulfilment.includes("PICKUP")
         ? await seededPlace(tx, ctx.organizationId, entitlements)
         : null;
+    const ways = waysFor(setup.fulfilment, place !== null);
+    const fulfilmentTypes = ways.fulfilmentTypes;
     const store = await tx.store.create({
         data: {
             name: setup.storefrontName,

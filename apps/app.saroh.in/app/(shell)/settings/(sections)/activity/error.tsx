@@ -5,7 +5,6 @@ import { SettingsSectionError } from "@/components/settings/settings-section-err
 /** This tab could not be read: said here, with the other tabs still in reach (F12). */
 export default function Error(props: {
     error: Error & { digest?: string };
-    reset: () => void;
     retry: () => void;
 }) {
     return <SettingsSectionError section="activity" {...props} />;

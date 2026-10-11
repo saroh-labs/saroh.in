@@ -159,7 +159,7 @@ export function inviteReviews(orderIds: string[]) {
         "/invitations",
         "POST",
         { orderIds },
-        "Could not send the invitations.",
+        "Couldn't send the invitations.",
     );
 }
 
@@ -168,7 +168,7 @@ export function replyToReview(id: string, reply: string) {
         `/${encodeURIComponent(id)}/reply`,
         "PATCH",
         { reply },
-        "Could not save the reply.",
+        "Couldn't save the reply.",
     );
 }
 
@@ -177,6 +177,6 @@ export function setReviewHidden(id: string, hidden: boolean) {
         `/${encodeURIComponent(id)}/${hidden ? "hide" : "unhide"}`,
         "POST",
         {},
-        hidden ? "Could not hide the review." : "Could not show the review.",
+        hidden ? "Couldn't hide the review." : "Couldn't show the review.",
     );
 }

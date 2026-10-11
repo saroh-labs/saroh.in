@@ -17,6 +17,8 @@ describe("builtRoutes (next.config.js → SAROH_BUILT_ROUTES)", () => {
         expect(routes).toContain("/changelog");
         expect(routes).toContain("/changelog/[slug]");
         expect(routes).toContain("/privacy");
+        expect(routes).toContain("/tools/link-preview");
+        expect(routes).toContain("/tools/qr-code-maker");
         expect(routes.some((r) => r.includes("("))).toBe(false);
         expect(routes.some((r) => r.startsWith("/api"))).toBe(false);
     });

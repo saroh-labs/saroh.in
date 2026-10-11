@@ -1,10 +1,12 @@
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import type {
     AutopayCancelled,
     AutopayMethod,
     AutopayOffer,
     Subscription,
 } from "./service";
-import { autopayLine, chargingText, dayText, money } from "./view";
+import { autopayLine, chargingText } from "./view";
 
 /**
  * Autopay on Subscription Detail for staff (round-2 D14), in words: the
@@ -67,13 +69,13 @@ export function autopayPanel(
     let line = autopayLine(autopay) ?? fallback;
     let notice: AutopayPanel["notice"] = null;
     if (!autopay && card?.ended) {
-        const day = dayText(card.ended.at, tz, now);
+        const day = formatDate(card.ended.at, tz, { now });
         line = card.ended.confirmed
-            ? `Autopay cancelled ${day} — renewals are invoiced with a pay link`
-            : `Autopay cancelled ${day} — being confirmed with ${provider}`;
+            ? `Autopay cancelled ${day}. Renewals are invoiced with a pay link`
+            : `Autopay cancelled ${day}, being confirmed with ${provider}`;
         if (!card.ended.confirmed) {
             notice = {
-                text: `Nothing more is charged. ${provider} hasn't confirmed the cancel yet — Saroh keeps asking.`,
+                text: `Nothing more is charged. ${provider} hasn't confirmed the cancel yet. Saroh keeps asking.`,
                 tone: "info",
             };
         }
@@ -83,8 +85,8 @@ export function autopayPanel(
     if (limitLow && (autopay?.state === "ON" || autopay?.state === "PAUSED")) {
         notice = {
             text: limitLow.limit
-                ? `Autopay limit too low — covers up to ${money(limitLow.limit, limitLow.currency)}, this renewal is ${money(limitLow.amount, limitLow.currency)}`
-                : `Autopay limit too low — this renewal of ${money(limitLow.amount, limitLow.currency)} is more than it covers`,
+                ? `Autopay limit too low. It covers up to ${formatMoneyMajor(limitLow.limit, limitLow.currency)}, and this renewal is ${formatMoneyMajor(limitLow.amount, limitLow.currency)}`
+                : `Autopay limit too low. This renewal of ${formatMoneyMajor(limitLow.amount, limitLow.currency)} is more than it covers`,
             tone: "warn",
         };
     } else if (sub.autopayCharge) {
@@ -95,7 +97,7 @@ export function autopayPanel(
     let detail: string | null = null;
     const setUp = card?.setUp ?? null;
     if (autopay && setUp) {
-        const day = dayText(setUp.at, tz, now);
+        const day = formatDate(setUp.at, tz, { now });
         if (autopay.state === "ON" || autopay.state === "PAUSED") {
             const from = setUp.source ? FROM[setUp.source] : undefined;
             const sent =
@@ -157,7 +159,7 @@ export function methodNote(
         EMANDATE: "They approve it with their bank",
     };
     return check
-        ? `${base[method]} · a ${money(check.amount, check.currency)} check, refunded straight away`
+        ? `${base[method]} · a ${formatMoneyMajor(check.amount, check.currency)} check, refunded straight away`
         : base[method];
 }
 
@@ -182,14 +184,14 @@ export function cancelledText(
             };
         case "CONFIRMING":
             return {
-                title: "Autopay is off — nothing more is charged.",
+                title: "Autopay is off. Nothing more is charged.",
                 detail: withTold(
-                    `${provider} hasn't confirmed yet; Saroh keeps asking.`,
+                    `${provider} hasn't confirmed yet. Saroh keeps asking.`,
                 ),
             };
         case "REFUSED":
             return {
-                title: "Autopay is off in Saroh — nothing more is charged.",
+                title: "Autopay is off in Saroh. Nothing more is charged.",
                 detail: withTold(
                     `${provider} didn't confirm it. Check it's cancelled in your ${provider} dashboard.`,
                 ),
@@ -239,7 +241,7 @@ export function renewalWords(offered: boolean): {
                   "It renews with an invoice each period, paid with a pay link until they turn on autopay. Nobody is contacted.",
           }
         : {
-              plan: "What you sell on repeat. It renews with an invoice each period; nothing is charged.",
+              plan: "What you sell on repeat. It renews with an invoice each period. Nothing is charged.",
               subscribe:
                   "It renews with an invoice each period. Nothing is charged and nobody is contacted.",
           };

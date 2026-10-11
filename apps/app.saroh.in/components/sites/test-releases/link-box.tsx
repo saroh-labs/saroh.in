@@ -1,18 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, ExternalLink } from "lucide-react";
 
 /** Copy a link; false when the browser refused. */
-export async function copyLink(url: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(url);
-        return true;
-    } catch {
-        return false;
-    }
-}
+export const copyLink = copyText;
 
 /**
  * A test release link, shown the one time its address exists (#284): the API
@@ -23,9 +17,7 @@ export async function copyLink(url: string): Promise<boolean> {
 export function LinkBox({ url, label }: { url: string; label: string }) {
     return (
         <div className="grid gap-2 rounded-lg border bg-muted px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label">{label}</p>
             <code
                 data-release-link=""
                 className="font-mono text-[12px] leading-relaxed [overflow-wrap:anywhere]"
@@ -42,9 +34,7 @@ export function LinkBox({ url, label }: { url: string; label: string }) {
                         void copyLink(url).then((ok) =>
                             ok
                                 ? showSuccess("Link copied.")
-                                : showError(
-                                      "Couldn't copy. Select the link and copy it yourself.",
-                                  ),
+                                : showError(copyFailedMessage()),
                         )
                     }
                 >

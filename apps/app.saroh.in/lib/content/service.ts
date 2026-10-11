@@ -29,6 +29,11 @@ export interface Post {
     image: string | null;
     publishedAt: string | null;
     createdAt: string;
+    /**
+     * When the post was last changed (#908). Absent from an API older than
+     * #908; `postUpdatedIso` falls back to `createdAt`.
+     */
+    updatedAt?: string;
     category: { id: string; name: string } | null;
     author: string | null;
     /**
@@ -97,7 +102,10 @@ export type Result<T = { id: string }> =
 
 /** No active organization: the same shape a failed write returns. */
 function noOrg<T = { id: string }>(): Result<T> {
-    return { ok: false, error: "No active organization." };
+    return {
+        ok: false,
+        error: "No business is open. Choose one and try again.",
+    };
 }
 
 async function mutate<T = { id: string }>(
@@ -111,7 +119,7 @@ async function mutate<T = { id: string }>(
     });
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ...failure,
         field: RESULT_FIELDS.find((f) => f === failure.field),

@@ -34,12 +34,13 @@ const VERDICT: Record<
 
 const VERB: Record<OperationKind, string> = {
     "jobs.retry": "Retry",
+    "jobs.cancel": "Cancel",
     "webhooks.replay": "Replay",
     "waitlist.invite": "Invite",
 };
 
 /**
- * A bulk retry, replay or invite: always a dry run first. Opening the dialog asks
+ * A bulk retry, cancel, replay or invite: always a dry run first. Opening the dialog asks
  * the API what would happen to every target and shows it — what runs, what
  * has nothing to do, what is refused and why — before anything changes.
  * Running it starts a durable operation and opens its progress.
@@ -190,7 +191,8 @@ export function BulkAction({
                         variant="ghost"
                         onClick={() => setOpen(false)}
                     >
-                        Cancel
+                        {/* "Cancel" beside "Cancel 2 jobs" would read as the action. */}
+                        {kind === "jobs.cancel" ? "Keep them" : "Cancel"}
                     </Button>
                     <Button
                         type="button"

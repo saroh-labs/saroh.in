@@ -1,12 +1,12 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { LimitReachedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Store } from "lucide-react";
 import Link from "next/link";
 
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateStoreForm } from "@/components/stores/create-store-form";
+import { requireCan } from "@/lib/access/require-can";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { requireSession } from "@/lib/session";
 import { locationsWord } from "@/lib/stores/pick";
@@ -29,6 +29,17 @@ export const metadata = { title: "New location" };
  */
 export default async function NewStorefrontPage() {
     await requireSession();
+    // Asked before the form is drawn: `store:create` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("store:create", {
+        thing: "New location",
+        back: {
+            href: "/commerce/locations",
+            label: "Back to Locations",
+            needs: "store:read",
+        },
+    });
+    if (access.denied) return access.denied;
     const [storefronts, allowance] = await Promise.all([
         listStorefronts(),
         getStorefrontAllowance().catch(() => null),
@@ -44,6 +55,7 @@ export default async function NewStorefrontPage() {
     return (
         <PageContainer width="form">
             <PageHeader
+                holdsData="description"
                 breadcrumb={sellCrumbs(
                     {
                         label: locationsWord(storefronts.length),
@@ -56,16 +68,15 @@ export default async function NewStorefrontPage() {
                     full !== null
                         ? undefined
                         : first
-                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} locations`} — it sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
-                          : "A place you sell from — a shop counter, a studio, a market stall. Its hours, checkout and payments are set up on the next screen."
+                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} locations`}. It sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
+                          : "A place you sell from: a shop counter, a studio, a market stall. Its hours, checkout and payments are set up on the next screen."
                 }
             />
             {full !== null ? (
-                <EmptyState
-                    icon={<Store />}
-                    title={`This business has ${full} locations, as many as Saroh allows`}
-                    description="Close one it no longer sells from to add another."
-                    action={
+                <LimitReachedState
+                    title={`You're at ${full} of ${full} locations`}
+                    description="Close one you no longer sell from to add another."
+                    secondary={
                         <Button asChild variant="outline">
                             <Link href="/commerce/locations">
                                 {storefronts.length === 1

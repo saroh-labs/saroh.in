@@ -1,6 +1,8 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { count, plural } from "@/lib/format/plural";
+import { pagesOf } from "@saroh/ui/lib/paging";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -28,6 +30,7 @@ import {
     catalogueFilter,
     emptyCopy,
     listHref,
+    pageHref,
 } from "@/lib/products/list-query";
 import { step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
@@ -35,12 +38,13 @@ import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
 import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
 import { CatalogueHeader } from "./catalogue/catalogue-header";
-import { CatalogueToolbar } from "./catalogue/catalogue-toolbar";
+import {
+    CatalogueFilters,
+    CatalogueMoreFilters,
+    catalogueNarrowed,
+    CatalogueSearch,
+} from "./catalogue/catalogue-toolbar";
 import { QuickLook } from "./catalogue/quick-look";
-
-/** The most rows one read brings back (the API's cap). */
-const MOST = 200;
-const PAGE = 50;
 
 /**
  * Sell → Products, after the "Saroh Products Screen" design (#519, #520).
@@ -50,6 +54,8 @@ const PAGE = 50;
  * one catalogue, not a scope. Everything that narrows the list lives in the
  * address and is answered by the API a page at a time — search, the chips,
  * Filter and "Needs you" cover the whole catalogue, not the rows on screen.
+ * So is the page: the list ends with the shared footer (rows per page,
+ * kept between visits, and the page numbers), each page read by the server.
  *
  * The row is the action: anywhere on it opens the quick look, and the
  * product's own page is one step further. Selection gives the bulk bar
@@ -74,7 +80,7 @@ export function CatalogueScreen({
     pausedCut = null,
 }: {
     query: ListQuery;
-    /** The first page, read on the server. */
+    /** The page the address asks for, read on the server. */
     page: CataloguePage;
     stores: { id: string; name: string }[];
     /** All · Collections · Inventory · Reviews, under Needs you. */
@@ -101,29 +107,23 @@ export function CatalogueScreen({
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
     const [data, setData] = useState(page);
-    const [extra, setExtra] = useState<CataloguePage["items"]>([]);
-    /** Where the rows loaded after the first page end. */
-    const [extraCursor, setExtraCursor] = useState<string | null>(null);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [openId, setOpenId] = useState<string | null>(null);
     const [pendingDelete, setPendingDelete] = useState<CatalogueRow[] | null>(
         null,
     );
 
-    // A new first page from the server (a new address, or a refresh) starts
-    // the list again.
+    // A new page from the server (a new address, or a refresh) replaces
+    // the one on screen.
     // (Adjusted while rendering, as React recommends, not in an effect.)
     const [seen, setSeen] = useState(page);
     if (seen !== page) {
         setSeen(page);
         setData(page);
-        setExtra([]);
-        setExtraCursor(null);
     }
 
     const rows = useMemo(
-        () => catalogueRows([...data.items, ...extra], pausedCut),
-        [data.items, extra, pausedCut],
+        () => catalogueRows(data.items, pausedCut),
+        [data.items, pausedCut],
     );
     const ratingById = useMemo(
         () => new Map(ratings.map((r) => [r.productId, r])),
@@ -142,36 +142,26 @@ export function CatalogueScreen({
         [query, router],
     );
 
-    /** Read the rows already on screen again, and the counts with them. */
+    /** Read the page on screen again, and the counts with it. */
     async function reload() {
-        const res = await loadCataloguePage({
-            ...filter,
-            limit: Math.min(MOST, Math.max(PAGE, rows.length)),
-        });
+        const res = await loadCataloguePage(filter);
         if (!res.ok) {
             showError("The list couldn't be refreshed.", res.error);
             return;
         }
-        setData(res.data);
-        setExtra([]);
-        setExtraCursor(null);
-    }
-
-    async function loadMore(): Promise<CatalogueRow[] | null> {
-        const cursor = extraCursor ?? data.nextCursor;
-        if (!cursor || loadingMore) return null;
-        setLoadingMore(true);
-        const res = await loadCataloguePage({ ...filter, cursor, limit: PAGE });
-        setLoadingMore(false);
-        if (!res.ok) {
-            showError("More products couldn't be loaded.", res.error);
-            return null;
+        // The page's last rows have gone (deleted, or out of this view):
+        // the last page that still holds some.
+        if (res.data.items.length === 0 && query.page > 1) {
+            go({
+                page: Math.min(
+                    query.page - 1,
+                    pagesOf(res.data.total, query.size),
+                ),
+            });
+            return;
         }
-        setExtra((had) => [...had, ...res.data.items]);
-        setExtraCursor(res.data.nextCursor);
-        return catalogueRows(res.data.items, pausedCut);
+        setData(res.data);
     }
-    const more = extra.length > 0 ? extraCursor : data.nextCursor;
 
     async function setStatus(
         targets: CatalogueRow[],
@@ -219,27 +209,35 @@ export function CatalogueScreen({
         const said =
             status === "ARCHIVED"
                 ? one
-                    ? `Stopped selling ${one.name} — it's hidden from ${many ? "every location" : "your location"} until you sell it again.`
+                    ? `Stopped selling ${one.name}. It's hidden from ${many ? "every location" : "your location"} until you sell it again.`
                     : `${targets.length} products archived.`
                 : one
                   ? `${one.name} is on sale.`
                   : `${targets.length} products published.`;
-        showUndo(said, () => {
-            void Promise.all(
+        showUndo(said, async () => {
+            const back = await Promise.all(
                 before.map((r) => setProductStatus(r.id, r.was)),
-            ).then(() => reload());
+            );
+            await reload();
+            return back.every((r) => r.ok);
         });
     }
 
+    /** From its confirm, which waits for it. */
     async function confirmDelete() {
         const targets = pendingDelete ?? [];
-        setPendingDelete(null);
         const results = await Promise.all(
             targets.map((r) => deleteProduct(r.id)),
         );
         const failed = results.filter((r) => !r.ok).length;
+        const gone = targets.length - failed;
         if (failed > 0) {
             showError(`${failed} of ${targets.length} could not be deleted.`);
+        }
+        if (gone > 0) {
+            showSuccess(
+                gone === 1 ? "Product deleted." : `${gone} products deleted.`,
+            );
         }
         setOpenId(null);
         await reload();
@@ -252,30 +250,20 @@ export function CatalogueScreen({
             else showError("It couldn't be duplicated.", res.error);
             return;
         }
-        showSuccess(`${res.data.name} is a draft — stock starts at 0.`);
+        showSuccess(`${res.data.name} is a draft. Stock starts at 0.`);
         router.push(productEditHref(res.data.storeId, res.data.id));
     }
 
     const openIndex = rows.findIndex((r) => r.id === openId);
     const open = openIndex >= 0 ? (rows[openIndex] ?? null) : null;
+    // J/K and the arrows move within the page on screen and stay put at
+    // its first and last rows: another page is the footer's to open.
     const onStep = useCallback(
         (by: 1 | -1) => {
             const next = step(openIndex, by, rows.length);
-            if (next !== openIndex) {
-                setOpenId(rows[next]?.id ?? null);
-                return;
-            }
-            // At the last loaded row with more to come: fetch, then move on.
-            if (by === 1 && more) {
-                void loadMore().then((added) => {
-                    const id = added?.at(0)?.id;
-                    if (id) setOpenId(id);
-                });
-            }
+            if (next !== openIndex) setOpenId(rows[next]?.id ?? null);
         },
-        // loadMore reads state it closes over; the index and rows are what move.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [openIndex, rows, more],
+        [openIndex, rows],
     );
 
     if (stores.length === 0 || !first) {
@@ -297,7 +285,7 @@ export function CatalogueScreen({
         collectionCount,
     );
     const countLabel =
-        `${data.total} ${data.total === 1 ? "product" : "products"}` +
+        count(data.total, "product") +
         (store
             ? ` sold at ${store.name}`
             : many
@@ -312,6 +300,7 @@ export function CatalogueScreen({
                 canWrite={canWrite}
                 meter={meter}
                 bannerShown={limitBannerShown}
+                count={data.total > 0 ? countLabel : undefined}
             />
             <NeedsYou
                 needs={data.needs}
@@ -343,15 +332,41 @@ export function CatalogueScreen({
                     modes={["table", "list"]}
                     hideModeToggle
                     noun={{ one: "product", other: "products" }}
+                    showTotal={false}
+                    toolbarSearch={
+                        <CatalogueSearch
+                            query={query}
+                            go={go}
+                            searching={navigating}
+                        />
+                    }
                     toolbarExtra={
-                        <CatalogueToolbar
+                        <CatalogueFilters
                             query={query}
                             go={go}
                             storefronts={data.storefronts}
                             choices={choices}
                         />
                     }
-                    countLabel={() => countLabel}
+                    toolbarMore={
+                        <CatalogueMoreFilters
+                            query={query}
+                            go={go}
+                            choices={choices}
+                        />
+                    }
+                    onClearFilters={
+                        catalogueNarrowed(query)
+                            ? () =>
+                                  go({
+                                      q: "",
+                                      status: null,
+                                      category: null,
+                                      collection: null,
+                                      storefront: null,
+                                  })
+                            : undefined
+                    }
                     onRowClick={(r) => setOpenId(r.id)}
                     selectable={canWrite}
                     bulkActions={[
@@ -395,26 +410,29 @@ export function CatalogueScreen({
                         canWrite,
                         storeId: (store ?? first).id,
                     })}
+                    // The server cuts the pages: the view draws the page it
+                    // is given and its footer from the catalogue's numbers.
+                    paging={{
+                        page: query.page,
+                        total: data.total,
+                        size: query.size,
+                        to: (n) => ({ href: pageHref(query, n) }),
+                        onSize: (size) => {
+                            rememberPageSize("catalogue", size);
+                            go({ size });
+                        },
+                    }}
                 />
             </div>
-            {more && rows.length > 0 ? (
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                    <span className="text-xs text-muted-foreground">
-                        Showing {rows.length} of {data.total}
-                    </span>
-                    <Button
-                        variant="outline"
-                        onClick={() => void loadMore()}
-                        disabled={loadingMore}
-                    >
-                        {loadingMore ? "Loading…" : "Show more"}
-                    </Button>
-                </div>
-            ) : null}
 
             <QuickLook
                 row={open}
-                index={openIndex}
+                // Where it sits in the whole list, not only on this page.
+                index={
+                    openIndex < 0
+                        ? openIndex
+                        : (query.page - 1) * query.size + openIndex
+                }
                 total={data.total}
                 storeId={query.storefront}
                 canWrite={canWrite}
@@ -432,16 +450,21 @@ export function CatalogueScreen({
                 }}
                 title={
                     pendingDelete?.length === 1
-                        ? `Delete “${pendingDelete[0]?.name ?? "this product"}”?`
+                        ? `Delete ${pendingDelete[0]?.name ?? "this product"}?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
-                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
+                description={`${plural(pendingDelete?.length ?? 0, "It is", "They are")} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
                 confirmLabel={
                     pendingDelete?.length === 1
                         ? "Delete product"
                         : `Delete ${pendingDelete?.length ?? 0} products`
                 }
-                onConfirm={() => void confirmDelete()}
+                keepLabel={
+                    pendingDelete?.length === 1
+                        ? "Keep product"
+                        : "Keep products"
+                }
+                onConfirm={confirmDelete}
             />
         </div>
     );

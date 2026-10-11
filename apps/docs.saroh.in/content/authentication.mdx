@@ -16,8 +16,11 @@ One identity system for the whole suite, powered by
 ## Sessions across subdomains
 
 Every app validates the same session, so `BETTER_AUTH_SECRET` must be identical
-everywhere one is checked. Cookies are host-scoped, which is why the whole thing
-works on bare `localhost` across different ports in development.
+everywhere one is checked. The session cookie is scoped to the shared parent
+domain — `saroh.in` in production, `saroh.localhost` locally — which is why
+every app runs under portless at a `.localhost` hostname. Apps on different
+ports of bare `localhost` do not share a session, and the workspace bounces
+back to sign-in forever.
 
 ## Two things that will trip you up locally
 
@@ -30,22 +33,23 @@ throws before it can explain itself. Source the environment first — see
 
 ### Trusted origins exclude localhost
 
-Better Auth rejects mutating requests whose `Origin` is not trusted, and that
-includes same-origin Next.js **server actions**. The default list is
-`*.saroh.in`, so on localhost every write returns 403 while every read works —
-which looks like a permissions bug and is not.
+Mutating requests whose `Origin` is not trusted are refused, and that includes
+same-origin Next.js **server actions**. The default list is `*.saroh.in`, so on
+`.localhost` every write returns 403 while every read works — which looks like
+a permissions bug and is not — and sign-in lands on the app launcher instead of
+the page you asked for.
 
 Set `BETTER_AUTH_TRUSTED_ORIGINS` in the API's `.env` and in each frontend you
-run. Production does not need it.
+run; the root `.env.example` has the value. Production does not need it.
 
 ## Verification and invitation emails
 
-With SMTP unset, links are **logged to the API console** rather than sent. That
-is deliberate for local development: sign up, read the link out of the log, and
-carry on without wiring a mail provider.
+With SMTP unset, links and sign-in codes are **logged to the API console**
+rather than sent. That is deliberate for local development: read the link or
+code out of the log, and carry on without wiring a mail provider.
 
 ## Roles
 
-Authentication answers *who*; the organization policy answers *what they may
-do*. See [Architecture](/architecture#tenancy) for the role table, and note that
+Authentication answers _who_; the organization policy answers _what they may
+do_. See [Architecture](/architecture#tenancy) for the role table, and note that
 CRM data is deliberately outside the read-only floor.

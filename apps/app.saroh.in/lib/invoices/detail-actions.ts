@@ -89,7 +89,7 @@ export function detailActions(s: DetailActionState): DetailAction[] {
         ? [
               {
                   id: "pdf",
-                  label: s.pdfBusy ? "Making the PDF…" : "Download PDF",
+                  label: s.pdfBusy ? "Making…" : "Download PDF",
                   disabled: s.pdfBusy,
               },
           ]
@@ -125,7 +125,7 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             actions.push({
                 id: "copyLink",
                 label: s.linkBusy
-                    ? "Making a link…"
+                    ? "Making…"
                     : s.linkUnseen
                       ? UNSEEN_LINK.action
                       : "Copy pay link",
@@ -137,7 +137,7 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             // invoice and how to pay, for the merchant to send themselves.
             actions.push({
                 id: "copyViewLink",
-                label: s.linkBusy ? "Making a link…" : "Copy view link",
+                label: s.linkBusy ? "Making…" : "Copy view link",
                 disabled: s.linkBusy,
             });
         }
@@ -173,7 +173,7 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             ? [
                   {
                       id: "copyViewLink",
-                      label: s.linkBusy ? "Making a link…" : "Copy view link",
+                      label: s.linkBusy ? "Making…" : "Copy view link",
                       disabled: s.linkBusy,
                   },
               ]

@@ -1,3 +1,4 @@
+import { formatDate, formatTime } from "@/lib/format/datetime";
 /**
  * A class's waitlist as the team reads it (round-2 A12): the row the API
  * answers, and the words the booking's Waitlist card says. Pure, so the
@@ -17,23 +18,12 @@ export interface ClassWaitlistRow {
 
 /** "Since 28 Sep", in the business's zone. */
 export function joinedText(iso: string, timeZone: string): string {
-    return `Since ${new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        timeZone,
-    })
-        .format(new Date(iso))
-        .replace("Sept", "Sep")}`;
+    return `Since ${formatDate(iso, timeZone)}`;
 }
 
-/** "Place held until 14:30" for an offer, in the business's zone. */
+/** "Place held until 2:30 pm" for an offer, in the business's zone. */
 export function heldText(iso: string, timeZone: string): string {
-    return `Place held until ${new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone,
-    }).format(new Date(iso))}`;
+    return `Place held until ${formatTime(iso, timeZone)}`;
 }
 
 /**

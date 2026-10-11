@@ -1,16 +1,17 @@
 "use client";
 
 import { Checkbox } from "@saroh/ui/checkbox";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { useId } from "react";
 
-import { currencySymbol } from "@/lib/format/money";
 import type { DayDraft, TurnOnDraft } from "@/lib/modules/turn-on";
 import { hoursErrorsByWeekday, WEEK } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
 
-import { Field, INPUT } from "./field";
+import { Label } from "@saroh/ui/label";
 import type { Update } from "./setup-fields";
 
 /**
@@ -62,7 +63,7 @@ export function BookingsFields({
                                 key={weekday}
                                 className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3 py-2"
                             >
-                                <label className="flex w-[74px] shrink-0 cursor-pointer items-center gap-2 text-[13px] font-medium coarse:min-h-11">
+                                <Label className="flex w-[74px] shrink-0 cursor-pointer items-center gap-2 text-[13px] font-medium leading-normal coarse:min-h-11">
                                     <Checkbox
                                         checked={day.on}
                                         aria-label={`Open on ${long}`}
@@ -71,7 +72,7 @@ export function BookingsFields({
                                         }
                                     />
                                     {short}
-                                </label>
+                                </Label>
                                 {day.on ? (
                                     <span className="flex min-w-0 items-center gap-1.5">
                                         <TimeSelect
@@ -89,7 +90,7 @@ export function BookingsFields({
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
-                                            –
+                                            to
                                         </span>
                                         <TimeSelect
                                             value={day.close}
@@ -129,10 +130,10 @@ export function BookingsFields({
             </fieldset>
 
             <Field
-                id={`${id}-service`}
+                htmlFor={`${id}-service`}
                 label="First service"
                 error={errors["service.name"]}
-                note="What people book, like “Haircut” or “Consultation”."
+                hint="What people book, like “Haircut” or “Consultation”."
             >
                 <Input
                     id={`${id}-service`}
@@ -142,12 +143,11 @@ export function BookingsFields({
                     aria-invalid={errors["service.name"] ? true : undefined}
                     aria-describedby={`${id}-service-note`}
                     onChange={(e) => setService({ name: e.target.value })}
-                    className={INPUT}
                 />
             </Field>
             <div className="grid min-w-0 grid-cols-2 gap-3">
                 <Field
-                    id={`${id}-minutes`}
+                    htmlFor={`${id}-minutes`}
                     label="Takes (minutes)"
                     error={errors["service.durationMinutes"]}
                 >
@@ -168,18 +168,17 @@ export function BookingsFields({
                         onChange={(e) =>
                             setService({ duration: e.target.value })
                         }
-                        className={INPUT}
                     />
                 </Field>
                 <Field
-                    id={`${id}-price`}
-                    label={`Price (${currencySymbol("INR")})`}
+                    htmlFor={`${id}-price`}
+                    label="Price"
                     error={errors["service.price"]}
                 >
-                    <Input
+                    <MoneyInput
                         id={`${id}-price`}
+                        currency="INR"
                         value={b.price}
-                        inputMode="decimal"
                         maxLength={10}
                         autoComplete="off"
                         aria-invalid={
@@ -190,8 +189,7 @@ export function BookingsFields({
                                 ? `${id}-price-note`
                                 : undefined
                         }
-                        onChange={(e) => setService({ price: e.target.value })}
-                        className={INPUT}
+                        onValueChange={(price) => setService({ price })}
                     />
                 </Field>
             </div>

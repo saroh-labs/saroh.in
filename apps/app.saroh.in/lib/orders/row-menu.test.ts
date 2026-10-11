@@ -254,7 +254,7 @@ describe("rowMenu", () => {
                     rowMenu(row(owed), { ...OWNER, payOnline: false }),
                     "pay-link",
                 )?.disabled,
-            ).toBe("Connect a payment provider first.");
+            ).toBe("No payment provider connected.");
         });
 
         it("isn't drawn on a plan without online payments, and is on one with them (R33)", () => {
@@ -539,6 +539,28 @@ describe("quickPayment", () => {
         ).toBe("Paid · ₹120 refunded");
         expect(quickPayment(read({ refundStanding: "REFUNDED" }), f)).toBe(
             "Refunded",
+        );
+    });
+
+    it("says where an online payment stands, with what is owed (#122)", () => {
+        const owing = (state: "FAILED" | "WAITING" | "NOT_FINISHED") =>
+            read({
+                paymentStatus: state === "FAILED" ? "FAILED" : "UNPAID",
+                onlinePayment: {
+                    state,
+                    provider: "RAZORPAY",
+                    since: "2026-10-09T10:00:00.000Z",
+                },
+                money: money && { ...money, due: "480.00" },
+            });
+        expect(quickPayment(owing("FAILED"), f)).toBe(
+            "Payment failed · ₹480 to collect",
+        );
+        expect(quickPayment(owing("WAITING"), f)).toBe(
+            "Waiting for Razorpay · ₹480 to collect",
+        );
+        expect(quickPayment(owing("NOT_FINISHED"), f)).toBe(
+            "Payment not finished · ₹480 to collect",
         );
     });
 });

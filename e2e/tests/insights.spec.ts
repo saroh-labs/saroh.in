@@ -64,7 +64,7 @@ test("a business that has sold reads its answers, then the figures behind them",
     ).toBeVisible();
     // Whatever it took, the sentence names its window.
     await expect(answers).toContainText(
-        /the last four weeks \(\d+ \w+ – \d+ \w+\)/,
+        /the last four weeks \(\d+ \w+ to \d+ \w+\)/,
     );
     // What the figures were counted from, and how, in the merchant's words.
     await expect(answers).toContainText(
@@ -122,9 +122,20 @@ test("a business that has sold reads its answers, then the figures behind them",
     await expect(
         page.getByRole("heading", { level: 2, name: "Your website" }),
     ).toBeVisible();
+    const website = page.getByRole("region", { name: "Your website" });
     await expect(
-        page.getByRole("link", { name: /^Enquiries/ }),
+        website.getByRole("link", { name: /^Enquiries/ }),
     ).toHaveAttribute("href", "/leads");
+    // Orders is back (#919): the range's paid orders, opening those days'.
+    await expect(
+        website.getByRole("link", { name: /^Orders\s*[\d,]+$/ }),
+    ).toHaveAttribute(
+        "href",
+        /^\/commerce\/orders\?date=custom&from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&payment=paid$/,
+    );
+    await expect(website).toContainText(
+        "visits, visitors, enquiries and paid orders",
+    );
     const visits = page.getByRole("group", { name: /^Visits each day/ });
     if ((await visits.count()) > 0) {
         await visits.getByRole("button").first().click();
@@ -143,7 +154,7 @@ test("a business that has never taken money is told so, not shown ₹0", async (
 
     // Said once, with what to do.
     await expect(
-        page.getByRole("heading", { name: "No money has come in yet" }),
+        page.getByRole("heading", { name: "No takings yet" }),
     ).toBeVisible();
     await expect(page.getByTestId("takings-answers")).toHaveCount(0);
     await expect(
@@ -157,5 +168,13 @@ test("a business that has never taken money is told so, not shown ₹0", async (
     await expect(
         page.getByRole("img", { name: /^Sales for the twelve weeks/ }),
     ).toHaveCount(0);
+    // The website's Orders says none were paid, never just a bare 0 (#919).
+    const website = page.getByRole("region", { name: "Your website" });
+    await expect(
+        website.getByRole("link", { name: /^Orders\s*0$/ }),
+    ).toBeVisible();
+    await expect(website.getByTestId("website-orders-note")).toContainText(
+        /^No paid orders (recorded )?in the last 30 days\./,
+    );
     await expectNoSidewaysScroll(page);
 });

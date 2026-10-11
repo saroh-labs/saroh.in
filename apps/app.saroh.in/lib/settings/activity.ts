@@ -1,10 +1,12 @@
+import { formatNumber } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { storefrontHref } from "@/lib/stores/links";
 
 import type { BusinessTab } from "./activity-changes";
 import {
-    counted,
     countOf,
     fieldsOf,
     moduleName,
@@ -205,11 +207,11 @@ function trackingTail(on: boolean, meta: Record<string, unknown>): string {
     if (on) {
         const cleared = countOf(meta.soldOutCleared) ?? 0;
         return cleared > 0
-            ? ` — cleared Sold out at ${counted(cleared, "location")}`
+            ? `, cleared Sold out at ${count(cleared, "location")}`
             : "";
     }
     const units = countOf(meta.unitsZeroed) ?? 0;
-    return units > 0 ? ` — ${units.toLocaleString("en-IN")} set to 0` : "";
+    return units > 0 ? `, ${formatNumber(units)} set to 0` : "";
 }
 
 /**
@@ -293,6 +295,9 @@ export function activityLine(
                 MODULES,
             );
         case "organization.plan.changed": {
+            // Plans aren't shown (DEC-136): no plan is named, and the page
+            // the line opens isn't there.
+            if (!plansShown()) return null;
             const from = text(meta.from);
             const to = text(meta.to);
             if (from && to)
@@ -338,6 +343,9 @@ export function activityLine(
             // A person's extra permissions (F17), in the owner's words.
             return line(extrasWhat(target ?? "someone", meta), TEAM());
         case "membership.remove":
+            // Someone who left did it themselves (`leave`): nobody removed
+            // them, and the line says so.
+            if (meta.left === true) return line("left the team", TEAM());
             return line(`removed ${target ?? "someone"} from the team`, TEAM());
         case "product.sold-out.mark":
         case "product.sold-out.clear": {

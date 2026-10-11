@@ -24,6 +24,12 @@ export interface UpdateOrderInput {
     paidHow?: PaymentMethod;
     /** Recorded as refunded by hand: how it went back (UX-061). */
     refundedHow?: PaymentMethod;
+    /**
+     * Recorded as refunded by hand, another amount (#865): what went back,
+     * as money ("49.50"). Absent: the full amount left. Less than is left
+     * keeps the order paid.
+     */
+    refundAmount?: string;
 }
 
 export type OrderResult =
@@ -40,8 +46,8 @@ async function mutate(
     const id = (data as { id?: unknown } | null)?.id;
     if (res.ok && typeof id === "string") return { ok: true, data: { id } };
     // The API's envelope is `{ error: { message, details } }`; reading only a
-    // top-level `message` turned every refusal into "Something went wrong".
-    return toFailure(data, "Something went wrong");
+    // top-level `message` turned every refusal into "That didn't go through. Try again.".
+    return toFailure(data, "That didn't go through. Try again.");
 }
 
 export function updateOrder(

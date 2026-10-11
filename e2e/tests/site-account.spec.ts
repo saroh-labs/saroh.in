@@ -2,7 +2,12 @@
 import { expect, test } from "@playwright/test";
 
 import { urls } from "../playwright.config";
-import { asNewVisitor, readSiteCode, signInOnSheet } from "./site-codes";
+import {
+    asNewVisitor,
+    nameThenBook,
+    readSiteCode,
+    signInOnSheet,
+} from "./site-codes";
 
 /**
  * The customer account area on a merchant's site (round-2 plan A, A5),
@@ -108,8 +113,8 @@ test.describe("the account area (A5)", () => {
         await sheet.getByLabel("New email").fill(next);
         await sheet.getByRole("button", { name: "Send code" }).click();
         const code = await readSiteCode(next);
+        // The sixth digit sends the code: no button to press.
         await sheet.getByLabel("Code").fill(code);
-        await sheet.getByRole("button", { name: "Confirm new email" }).click();
         await expect(
             page.getByText(/Use that email to sign in from now on/),
         ).toBeVisible();
@@ -132,17 +137,18 @@ test.describe("the account area (A5)", () => {
         await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
         await openDays.nth((await openDays.count()) - 1).click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-            hasText: /^\d{2}:\d{2}$/,
+            hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
         await times.first().click();
-        await page.getByLabel("Name").fill("Asha Rao");
         await page.getByRole("radio", { name: /Pay at the desk/ }).click();
         await page
             .getByRole("button", { name: "Continue to sign in" })
             .first()
             .click();
         await signInOnSheet(page, email);
+        // A new account: its name is asked once signed in.
+        await nameThenBook(page, "Asha Rao");
         await expect(
             page.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });

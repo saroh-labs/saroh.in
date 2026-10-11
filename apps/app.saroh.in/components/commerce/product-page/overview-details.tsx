@@ -54,10 +54,10 @@ export function ProductDetailsCard({
                 <Group label="How it's sold">
                     <DetailRow label="Visibility">
                         {product.status === "PUBLISHED"
-                            ? "On the shop — customers can buy it"
+                            ? "On the shop. Customers can buy it"
                             : product.status === "DRAFT"
-                              ? "Draft — only the team can see it"
-                              : "Archived — not sold, its page does not open"}
+                              ? "Draft. Only the team can see it"
+                              : "Archived. Not sold, and its page does not open"}
                     </DetailRow>
                     <DetailRow label="Sold at" muted={places.length === 0}>
                         {places.length ? places.join(", ") : "Nowhere yet"}
@@ -144,9 +144,7 @@ function Group({
 }) {
     return (
         <section aria-label={label}>
-            <h3 className="pb-1.5 pt-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {label}
-            </h3>
+            <h3 className="label pb-1.5 pt-2.5">{label}</h3>
             <dl>{children}</dl>
         </section>
     );

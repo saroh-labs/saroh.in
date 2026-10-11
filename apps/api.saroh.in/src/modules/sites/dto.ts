@@ -28,7 +28,7 @@ const trim = ({ value }: { value: unknown }) =>
 // verification/reservation is deferred to S2-007; we only pin the shape here.
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const SUBDOMAIN_MSG =
-    "Subdomain must be a lowercase DNS label (letters, numbers, hyphens; not starting or ending with a hyphen)";
+    "Use lowercase letters, numbers and hyphens for the web address. It can't start or end with a hyphen.";
 
 /**
  * Request to create a draft {@link Site} from a template (S2-003).
@@ -379,6 +379,19 @@ export class CreateApprovalDto {
     @MinLength(1, { message: "testReleaseId must be an id" })
     @MaxLength(64)
     testReleaseId?: string;
+}
+
+/**
+ * Set a site's icon to an image the business uploaded to its library
+ * (`POST /organizations/:id/media/upload-url`, then `/complete`), as the
+ * business logo is set (DEC-124).
+ */
+export class SetSiteIconDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "mediaId is required" })
+    @MaxLength(64)
+    mediaId!: string;
 }
 
 /**

@@ -6,7 +6,9 @@ import { PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import { productEditHref, productHref } from "@/lib/products/links";
 import {
@@ -40,7 +42,10 @@ export function StartTrackingButton({
 
     function turnOn() {
         start(async () => {
-            const res = await setProductStockTracking(productId, true);
+            const res = await runAction(() =>
+                setProductStockTracking(productId, true),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -57,7 +62,7 @@ export function StartTrackingButton({
             disabled={pending}
             aria-busy={pending}
             className={cn(
-                "rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11",
+                "rounded-sm text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11",
                 className,
             )}
         >
@@ -79,23 +84,19 @@ export function StopTrackingButton({
 }) {
     const router = useRouter();
     const [asking, setAsking] = useState(false);
-    const [pending, start] = useTransition();
     const confirm = stopTrackingConfirm(productName);
 
-    function turnOff() {
-        setAsking(false);
-        start(async () => {
-            const res = await setProductStockTracking(productId, false);
-            if (!res.ok) {
-                // "3 are promised to open orders — fulfil or cancel them
-                // first." — the API counts every storefront.
-                showError(TRACKING_STILL_ON, res.error);
-                return;
-            }
-            showSuccess(TRACKING_OFF_SAID);
-            // Untracked, the product has no stock view: back to Overview.
-            router.push(productHref(storeId, productId));
-        });
+    /** A refusal stays in the confirm, with the reason. */
+    async function turnOff(): Promise<ConfirmResult> {
+        const res = await setProductStockTracking(productId, false);
+        if (!res.ok) {
+            // "3 are promised to open orders. Fulfil or cancel them
+            // first." The API counts every storefront.
+            return { ok: false, error: `${TRACKING_STILL_ON}. ${res.error}` };
+        }
+        showSuccess(TRACKING_OFF_SAID);
+        // Untracked, the product has no stock view: back to Overview.
+        router.push(productHref(storeId, productId));
     }
 
     return (
@@ -103,14 +104,12 @@ export function StopTrackingButton({
             <button
                 type="button"
                 onClick={() => setAsking(true)}
-                disabled={pending}
-                aria-busy={pending}
                 className={cn(
-                    "rounded-sm px-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11",
+                    "rounded-sm px-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11",
                     className,
                 )}
             >
-                {pending ? "Stopping…" : "Stop tracking"}
+                Stop tracking
             </button>
             <ConfirmDialog
                 open={asking}
@@ -119,6 +118,7 @@ export function StopTrackingButton({
                 title={confirm.title}
                 description={confirm.description}
                 confirmLabel={confirm.confirmLabel}
+                keepLabel={confirm.keepLabel}
                 onConfirm={turnOff}
             />
         </>

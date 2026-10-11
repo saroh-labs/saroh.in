@@ -85,13 +85,13 @@ test.describe("first run follows the kind (DEC-070)", () => {
             page.getByRole("heading", { name: "What do you need to do?" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("checkbox", { name: "Show up online" }),
+            page.getByRole("checkbox", { name: "Put up a website" }),
         ).toBeChecked();
         await expect(
-            page.getByRole("checkbox", { name: "Sell products" }),
+            page.getByRole("checkbox", { name: "Sell things" }),
         ).not.toBeChecked();
         await expect(
-            page.getByText("Manage readers & leads", { exact: true }),
+            page.getByText("Hear from readers", { exact: true }),
         ).toBeVisible();
     });
 
@@ -141,7 +141,7 @@ test.describe("first run follows the kind (DEC-070)", () => {
             ]);
         await page.goto("/onboarding/modules");
         await expect(
-            page.getByRole("checkbox", { name: "Sell products" }),
+            page.getByRole("checkbox", { name: "Sell things" }),
         ).toBeChecked();
     });
 });

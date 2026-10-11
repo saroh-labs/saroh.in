@@ -12,7 +12,8 @@ import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
-import { actionClass, FOCUS, Panel, PanelTitle } from "./parts";
+import { Notice } from "@saroh/ui/notice";
+import { FOCUS, Panel, PanelTitle } from "./parts";
 import { RecordPayment } from "./record-payment";
 
 const KIND_LABEL: Record<string, string> = {
@@ -117,7 +118,21 @@ export function MoneyCard({
     const refund = refundLines(money, refundStanding, format);
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);
     if (n(money.refunded) > 0) {
-        pay.push(["Refunded", format(n(money.refunded))]);
+        // Refunded so far; "· by hand" when all of it went back outside
+        // Saroh (#865).
+        const byHand = n(money.refundedByHand ?? "0");
+        pay.push([
+            "Refunded",
+            byHand > 0 && byHand >= n(money.refunded)
+                ? `${format(n(money.refunded))} · by hand`
+                : format(n(money.refunded)),
+        ]);
+        // In part: what a refund can still hand back (#865).
+        const left =
+            money.leftToRefund === undefined ? 0 : n(money.leftToRefund);
+        if (paymentStatus === "PAID" && left > 0) {
+            pay.push(["Left to refund", format(left)]);
+        }
     } else if (paymentStatus === "REFUNDED" && n(money.paid) > 0) {
         // Recorded as refunded by hand (UX-061): what was taken went back
         // outside Saroh, so it reads as refunded, not still taken.
@@ -134,7 +149,7 @@ export function MoneyCard({
         pay.push([
             "Lands",
             money.recordedByHand
-                ? "Taken outside Saroh — cash or a transfer, not paid out by it"
+                ? "Taken outside Saroh: cash or a transfer, not paid out by it"
                 : `Your ${provider ? providerName(provider) : "provider"} account, on its payout schedule`,
         ]);
     }
@@ -176,11 +191,7 @@ export function MoneyCard({
                 </div>
             ) : null}
             {money.refundsBeingConfirmed.map((r) => (
-                <div
-                    key={r.id}
-                    role="status"
-                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
-                >
+                <Notice role="status" className="mt-2" key={r.id}>
                     <p className="text-pretty">
                         <span className="font-semibold">
                             {format(n(r.amount))} refund not confirmed yet.
@@ -194,21 +205,17 @@ export function MoneyCard({
                         <Button
                             type="button"
                             variant="outline"
-                            className={cn(actionClass("ghost"), "mt-2")}
+                            className="mt-2"
                             disabled={busy}
                             onClick={() => onRetryRefund(r.id)}
                         >
                             Try again
                         </Button>
                     ) : null}
-                </div>
+                </Notice>
             ))}
             {(money.owedBack ?? []).map((p) => (
-                <div
-                    key={p.id}
-                    role="status"
-                    className="mt-2 rounded-lg border border-border px-2.5 py-2 text-[12.5px]"
-                >
+                <Notice role="status" className="mt-2" key={p.id}>
                     <p className="text-pretty">
                         <span className="font-semibold">
                             {format(n(p.amount))} owed back to the customer.
@@ -218,11 +225,11 @@ export function MoneyCard({
                             later edit replaced, so it isn&apos;t counted as
                             paid. Refund it from your{" "}
                             {provider ? providerName(provider) : "provider"}{" "}
-                            dashboard; this clears once the refund comes
+                            dashboard. This clears once the refund comes
                             through.
                         </span>
                     </p>
-                </div>
+                </Notice>
             ))}
             {!invoice && taxed ? (
                 <div className="pt-[3px] text-[12.5px] text-muted-foreground">

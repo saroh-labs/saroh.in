@@ -12,6 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -68,10 +69,18 @@ function listAccess(ctx: OrganizationContext): boolean {
  * Detail renders, stage moves, undo and edits — for the same reason: it is
  * scoped by the organization, and a Member at the counter reaches it with
  * `order:stage` alone. The services authorize; see OrderKitchenService.
+ *
+ * Commerce is required per handler, not on the class (#117): every route
+ * that takes, moves, changes or charges an order carries
+ * `@RequireModule("COMMERCE")`. The reads of orders already taken — the
+ * list (and its export), its filters, its product search and one order —
+ * are history, and stay readable when a business switches Commerce off
+ * (`MODULE_ROLLOUT.md`). Cancelling an order already taken is winding
+ * down, not selling, and stays open too, as do refunds on
+ * `payments/orders/:orderId/refund`.
  */
 @Controller("organizations/:organizationId/orders")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("COMMERCE")
 export class OrganizationOrdersController {
     constructor(
         private readonly orders: OrdersService,
@@ -167,6 +176,8 @@ export class OrganizationOrdersController {
      * as an order id.
      */
     @Post("stage/batches")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     createBatch(
         @OrgContext() ctx: OrganizationContext,
@@ -176,6 +187,7 @@ export class OrganizationOrdersController {
     }
 
     @Get("stage/batches/:batchId")
+    @RequireModule("COMMERCE")
     readBatch(
         @OrgContext() ctx: OrganizationContext,
         @Param("batchId") batchId: string,
@@ -184,6 +196,8 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/commit")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     commitBatch(
         @OrgContext() ctx: OrganizationContext,
@@ -193,6 +207,8 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/cancel")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     cancelBatch(
         @OrgContext() ctx: OrganizationContext,
@@ -202,6 +218,8 @@ export class OrganizationOrdersController {
     }
 
     @Post("stage/batches/:batchId/undo")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     undoBatch(
         @OrgContext() ctx: OrganizationContext,
@@ -232,6 +250,8 @@ export class OrganizationOrdersController {
 
     /** Move to the next kitchen stage (`order:stage`). */
     @Post(":orderId/stage")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     moveStage(
         @OrgContext() ctx: OrganizationContext,
@@ -246,6 +266,8 @@ export class OrganizationOrdersController {
      * once the visit has started. The last visit attended fulfils the order.
      */
     @Post(":orderId/visits/:visitNumber/attended")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     markVisitAttended(
         @OrgContext() ctx: OrganizationContext,
@@ -257,6 +279,8 @@ export class OrganizationOrdersController {
 
     /** Undo the last kitchen step (`order:stage`). */
     @Post(":orderId/stage/undo")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     undoStage(
         @OrgContext() ctx: OrganizationContext,
@@ -272,6 +296,8 @@ export class OrganizationOrdersController {
      * (B11). `order:create` or `order:edit` (B16; see OrderPayLinkService).
      */
     @Post(":orderId/pay-link")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     async payLink(
@@ -294,6 +320,8 @@ export class OrganizationOrdersController {
      * counter. `order:edit`, as any payment recorded by hand (B16).
      */
     @Post(":orderId/record-payment")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     recordDifference(
         @OrgContext() ctx: OrganizationContext,
@@ -310,6 +338,8 @@ export class OrganizationOrdersController {
      * `order:refund` when a paid order's money moves, B16).
      */
     @Post(":orderId/fulfilment")
+    @LifecycleWrite("wind-down")
+    @RequireModule("COMMERCE")
     @HttpCode(200)
     changeFulfilment(
         @OrgContext() ctx: OrganizationContext,
@@ -323,8 +353,13 @@ export class OrganizationOrdersController {
      * "Cancel order…" (B9): a refund in full, and the order kept as
      * cancelled. Refused from its handover on. `order:refund` (B16): a
      * cancel is a refund in full.
+     *
+     * Not gated on Commerce (#117, owner 9 Oct): a business that switched
+     * Commerce off can still call off an order it already took, refund
+     * included. Winding down is not selling; `order:refund` still applies.
      */
     @Post(":orderId/cancel")
+    @LifecycleWrite("wind-down")
     @HttpCode(200)
     cancel(
         @OrgContext() ctx: OrganizationContext,
@@ -340,6 +375,7 @@ export class OrganizationOrdersController {
      * also takes `order:refund`, B16).
      */
     @Patch(":orderId")
+    @RequireModule("COMMERCE")
     edit(
         @OrgContext() ctx: OrganizationContext,
         @Param("orderId") orderId: string,

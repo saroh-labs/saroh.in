@@ -35,7 +35,10 @@ import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
  *
  * Prices, plan lines and the free-plan line come from the published pricing
  * catalogue, read when the site is built (a publish starts a build, KTD-10);
- * with none, the "announced at launch" placeholders.
+ * with none, the "announced at launch" placeholders. Before the launch
+ * switch opens the catalogue isn't read at all (DEC-136), as on a feature
+ * page: one published ahead of launch must not put a plan's name or price
+ * in the answers below or in the page's structured data.
  */
 
 export const metadata: Metadata = pageMetadata({
@@ -46,7 +49,7 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default async function HomePage() {
-    const catalog = await readLivePricing();
+    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
     const faq = faqItems(HOME_FAQ).map((item, i) =>
         HOME_FAQ[i] === "start-free" ? startFreeFaq(catalog, item) : item,
     );

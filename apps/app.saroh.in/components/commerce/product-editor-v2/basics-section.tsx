@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Input } from "@saroh/ui/input";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
@@ -22,11 +22,14 @@ import {
     slugify,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import type { CategoryChoice } from "./category-picker";
 import { CategoryPicker } from "./category-picker";
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, Count, FieldHelp, FieldLabel, MoneyBox } from "./fields";
+import { Count, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: BasicsValues = {
@@ -65,7 +68,7 @@ export function BasicsSection({
     product,
     storeId,
     currency,
-    symbol,
+    gstRegistered,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -73,7 +76,8 @@ export function BasicsSection({
     product: ProductDetail | null;
     storeId: string;
     currency: string;
-    symbol: string;
+    /** Only a GST-registered business sets a rate and an HSN code. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -88,7 +92,14 @@ export function BasicsSection({
         values: baseline,
         mode: "onChange",
     });
-    const { errors, isDirty } = form.formState;
+    const { errors, isDirty, touchedFields, dirtyFields } = form.formState;
+    // A field says what is wrong once it has been left, not while its
+    // first characters are typed. What was loaded wrong says so at once,
+    // and after that first leave it clears as it is fixed.
+    const seen = (name: (typeof FIELDS)[number]) =>
+        touchedFields[name] === true || dirtyFields[name] !== true;
+    const priceBox = form.register("price");
+    const mrpBox = form.register("mrp");
     const v = form.watch();
     const problem = basicsProblem(v, creating);
     const ro = !canWrite;
@@ -160,18 +171,13 @@ export function BasicsSection({
 
     return (
         <SectionCard k="basics" title="Basics">
-            <FieldLabel htmlFor="pe-name" required={creating}>
-                Name
-            </FieldLabel>
-            <input
+            <FieldLabel htmlFor="pe-name">Name</FieldLabel>
+            <Input
                 id="pe-name"
                 {...form.register("name")}
                 disabled={ro}
                 placeholder="Vitamin C brightening serum"
                 aria-invalid={nameEmpty || nameLong || !!errors.name}
-                className={boxClass({
-                    bad: nameEmpty || nameLong || !!errors.name,
-                })}
             />
             <div className="mb-4 mt-1.5 flex items-baseline gap-2.5">
                 <FieldHelp
@@ -217,16 +223,13 @@ export function BasicsSection({
                         <span className="font-mono text-[12px] text-muted-foreground">
                             /products/
                         </span>
-                        <input
+                        <Input
+                            dense
                             id="pe-slug"
                             {...form.register("slug")}
                             disabled={ro}
                             aria-invalid={!slugOk || !!errors.slug}
-                            className={`${boxClass({
-                                bad: !slugOk || !v.slug || !!errors.slug,
-                                mono: true,
-                                small: true,
-                            })} min-w-0 flex-[1_1_150px] rounded-[7px] px-[9px]`}
+                            className="min-w-0 flex-[1_1_150px] font-mono"
                         />
                         <Count value={v.slug.length} max={LIMITS.slug} />
                     </div>
@@ -241,7 +244,7 @@ export function BasicsSection({
                         }
                     >
                         {!v.slug.trim()
-                            ? "A product needs an address — it is what the link is made of."
+                            ? "A product needs an address. It is what the link is made of."
                             : v.slug.length > LIMITS.slug
                               ? "Longer than the 150 characters an address can be."
                               : !slugOk
@@ -255,63 +258,84 @@ export function BasicsSection({
             )}
 
             <div className="flex flex-wrap gap-3.5">
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-price" required={creating}>
-                        Price
-                    </FieldLabel>
-                    <MoneyBox symbol={symbol}>
-                        <input
-                            id="pe-price"
-                            {...form.register("price")}
-                            inputMode="decimal"
-                            disabled={ro}
-                            placeholder="549"
-                            aria-invalid={priceBad || !!errors.price}
-                            className={`${boxClass({ bad: priceBad || !!errors.price })} pl-6`}
-                        />
-                    </MoneyBox>
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={priceBad || errors.price ? "bad" : "quiet"}
-                    >
-                        {errors.price?.message && !priceBad
-                            ? errors.price.message
-                            : priceBad
-                              ? "A number with at most two decimal places."
-                              : creating && !v.price
-                                ? "What it sells for. Variants can set their own."
-                                : `In ${CURRENCY_WORD[currency] ?? currency}, the business's currency.`}
-                    </FieldHelp>
-                </div>
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-mrp">MRP</FieldLabel>
-                    <MoneyBox symbol={symbol}>
-                        <input
-                            id="pe-mrp"
-                            {...form.register("mrp")}
-                            inputMode="decimal"
-                            disabled={ro}
-                            placeholder={v.price || "699"}
-                            aria-invalid={mrpBad || !!errors.mrp}
-                            className={`${boxClass({ bad: mrpBad || !!errors.mrp })} pl-6`}
-                        />
-                    </MoneyBox>
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={mrpBad || errors.mrp ? "bad" : "quiet"}
-                    >
-                        {mrpBad
-                            ? isMoney(v.mrp)
-                                ? "MRP can't be lower than the price it sells for."
-                                : "A number with at most two decimal places."
-                            : (errors.mrp?.message ??
-                              "The printed price, shown struck through. Leave it empty if it sells at MRP.")}
-                    </FieldHelp>
-                </div>
+                <Field
+                    holdsData={false}
+                    label="Price"
+                    className="flex-[1_1_150px]"
+                    error={
+                        seen("price")
+                            ? errors.price?.message && !priceBad
+                                ? errors.price.message
+                                : priceBad
+                                  ? "A number with at most two decimal places."
+                                  : null
+                            : null
+                    }
+                    hint={
+                        creating && !v.price
+                            ? "What it sells for. Variants can set their own."
+                            : `In ${CURRENCY_WORD[currency] ?? currency}, the business's currency.`
+                    }
+                >
+                    <MoneyInput
+                        id="pe-price"
+                        ref={priceBox.ref}
+                        name={priceBox.name}
+                        onBlur={priceBox.onBlur}
+                        currency={currency}
+                        value={v.price}
+                        onValueChange={(price) =>
+                            form.setValue("price", price, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            })
+                        }
+                        disabled={ro}
+                        placeholder="549"
+                    />
+                </Field>
+                <Field
+                    label="MRP"
+                    className="flex-[1_1_150px]"
+                    error={
+                        seen("mrp")
+                            ? mrpBad
+                                ? isMoney(v.mrp)
+                                    ? "MRP can't be lower than the price it sells for."
+                                    : "A number with at most two decimal places."
+                                : errors.mrp?.message
+                            : null
+                    }
+                    hint="The printed price, shown struck through. Leave it empty if it sells at MRP."
+                >
+                    <MoneyInput
+                        id="pe-mrp"
+                        ref={mrpBox.ref}
+                        name={mrpBox.name}
+                        onBlur={mrpBox.onBlur}
+                        currency={currency}
+                        value={v.mrp}
+                        onValueChange={(mrp) =>
+                            form.setValue("mrp", mrp, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                            })
+                        }
+                        disabled={ro}
+                        placeholder={v.price || "699"}
+                    />
+                </Field>
             </div>
 
-            <div className="mt-4">
-                <FieldLabel htmlFor="pe-category">Category</FieldLabel>
+            <Field
+                label="Category"
+                className="mt-4"
+                hint={
+                    v.categoryId === ""
+                        ? "Uncategorized is a real choice. It clears the category rather than leaving it alone."
+                        : "A product sits in one category. Choosing Uncategorized clears it."
+                }
+            >
                 <CategoryPicker
                     id="pe-category"
                     value={v.categoryId}
@@ -327,62 +351,55 @@ export function BasicsSection({
                     manageHref={manageCategoriesHref}
                     disabled={ro}
                 />
-                <FieldHelp className="mt-1.5">
-                    {v.categoryId === ""
-                        ? "Uncategorized is a real choice — it clears the category rather than leaving it alone."
-                        : "A product sits in one category. Choosing Uncategorized clears it."}
-                </FieldHelp>
-            </div>
+            </Field>
 
-            {/* GST (ADR-008): printed on a registered business's tax invoice. */}
-            <div className="mt-4 flex flex-wrap gap-3.5">
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-gst">GST rate</FieldLabel>
-                    <OptionSelect
-                        id="pe-gst"
-                        value={v.gstRate as GstRateValue}
-                        onValueChange={(rate) =>
-                            form.setValue("gstRate", rate, {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                            })
+            {/* GST (ADR-008): printed on a registered business's tax invoice,
+                so only a registered business is asked. A rate or a code
+                already saved stays in view either way. */}
+            {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
+                <div className="mt-4 flex flex-wrap gap-3.5">
+                    <Field
+                        label="GST rate"
+                        className="flex-[1_1_150px]"
+                        error={errors.gstRate?.message}
+                        hint="Included in the price. Bread and other nil-rated goods are 0%."
+                    >
+                        <OptionSelect
+                            id="pe-gst"
+                            value={v.gstRate as GstRateValue}
+                            onValueChange={(rate) =>
+                                form.setValue("gstRate", rate, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                })
+                            }
+                            options={GST_RATE_OPTIONS}
+                            disabled={ro}
+                        />
+                    </Field>
+                    <Field
+                        label="HSN code"
+                        className="flex-[1_1_150px]"
+                        error={
+                            seen("hsnCode")
+                                ? hsnBad
+                                    ? "An HSN code is 4 to 8 digits."
+                                    : errors.hsnCode?.message
+                                : null
                         }
-                        options={GST_RATE_OPTIONS}
-                        disabled={ro}
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={errors.gstRate ? "bad" : "quiet"}
+                        hint="Team only. Printed on tax invoices."
                     >
-                        {errors.gstRate?.message ??
-                            "Included in the price. Bread and other nil-rated goods are 0%."}
-                    </FieldHelp>
+                        <Input
+                            id="pe-hsn"
+                            {...form.register("hsnCode")}
+                            inputMode="numeric"
+                            disabled={ro}
+                            placeholder="1905 90 10"
+                            className="font-mono"
+                        />
+                    </Field>
                 </div>
-                <div className="min-w-0 flex-[1_1_150px]">
-                    <FieldLabel htmlFor="pe-hsn">HSN code</FieldLabel>
-                    <input
-                        id="pe-hsn"
-                        {...form.register("hsnCode")}
-                        inputMode="numeric"
-                        disabled={ro}
-                        placeholder="1905 90 10"
-                        aria-invalid={hsnBad || !!errors.hsnCode}
-                        className={boxClass({
-                            bad: hsnBad || !!errors.hsnCode,
-                            mono: true,
-                        })}
-                    />
-                    <FieldHelp
-                        className="mt-1.5"
-                        tone={hsnBad || errors.hsnCode ? "bad" : "quiet"}
-                    >
-                        {hsnBad
-                            ? "An HSN code is 4 to 8 digits."
-                            : (errors.hsnCode?.message ??
-                              "Team only. Printed on tax invoices.")}
-                    </FieldHelp>
-                </div>
-            </div>
+            ) : null}
         </SectionCard>
     );
 }

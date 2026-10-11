@@ -35,7 +35,7 @@ export const HOSTNAME_RE =
     /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 const HOSTNAME_MSG =
-    "Enter just the domain, like www.yourshop.in — no https:// or slashes.";
+    "Enter the domain only, like www.yourshop.in, with no https:// or slashes.";
 
 /**
  * A hostname kept for test releases (DEC-071, KTD-12): one whose first label

@@ -26,6 +26,7 @@ export function DeleteCustomerMenu({
         <DeleteMenu
             name={name}
             verb="Delete customer"
+            keep="Keep customer"
             title={`Delete ${name}?`}
             description={`They are removed from ${storeName}'s customers. The same person in your contacts is kept. This cannot be undone.`}
             onDelete={() => deleteCustomer(storeId, customerId)}

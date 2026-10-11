@@ -1,4 +1,5 @@
-import { apiFetch, orgBase } from "@/lib/api/http";
+import type { CrmResult } from "@/lib/api/http";
+import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * Org-scoped payments data access for app.saroh.in (S5-004). Reads the owner
@@ -60,4 +61,29 @@ export async function getOrderPayments(
     const res = await apiFetch(`${base}/orders/${orderId}/payments`);
     if (!res.ok) return null;
     return (await res.json()) as OrderPaymentsSummary;
+}
+
+/** A refund the API made or found, as the app reads it. */
+export interface MismatchRefund {
+    refundId: string;
+    amountCents: number;
+    currency: string;
+    status: string;
+}
+
+/**
+ * Refund a payment the provider took at a different amount than asked
+ * (PAY-06): exactly what it took goes back, through the business's
+ * provider (`POST …/payment-attempts/:attemptId/refund`, `order:refund`).
+ * The order or invoice it was for is left as it is. Server-only.
+ */
+export function refundPaymentAttempt(
+    attemptId: string,
+): Promise<CrmResult<MismatchRefund>> {
+    return mutate<MismatchRefund>(
+        `/payment-attempts/${encodeURIComponent(attemptId)}/refund`,
+        "POST",
+        {},
+        "The refund couldn't be sent.",
+    );
 }

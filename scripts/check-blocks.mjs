@@ -144,13 +144,13 @@ for await (const file of walk(BLOCKS)) {
  */
 const SITE_LAYER_ALLOWED = new Set([
     // Saroh surfaces on a merchant's page, in the merchant's palette.
-    "apps/saroh.app/components/checkout.tsx",
     // The review page a customer reaches from an invitation email.
     "apps/saroh.app/components/review-form.tsx",
     "apps/saroh.app/app/review/[token]/page.tsx",
-    // The invoice pay page a customer reaches from a pay link (ADR-007, U13),
-    // and the provider handoff it shares with checkout. Same category as the
-    // review page: a Saroh surface in the business's palette, drawing no block.
+    // The invoice pay page a customer reaches from a pay link (ADR-007, U13).
+    // Same category as the review page: a Saroh surface in the business's
+    // palette, drawing no block. Its Pay and payment states are the
+    // package's own (`PayLinkPay`).
     "apps/saroh.app/app/pay/[token]/page.tsx",
     "apps/saroh.app/components/invoice-pay.tsx",
     // Its "Pay and turn on autopay" (D12): part of the same pay page, whose
@@ -164,7 +164,6 @@ const SITE_LAYER_ALLOWED = new Set([
     // page's paper for their own paid invoice, with a way back to Me. The
     // same category, drawing no block.
     "apps/saroh.app/app/[domain]/account/receipts/[invoiceId]/page.tsx",
-    "apps/saroh.app/components/provider-handoff.tsx",
     "apps/saroh.app/components/post-view.tsx",
     // The 404s: a page that isn't on a live site, drawn inside
     // its chrome, and the root's "no website at this address" on the neutral

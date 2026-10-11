@@ -1,4 +1,5 @@
 import { formatAmount } from "../lib/money";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { ShopListingCard } from "../product/shop-listing";
 import type { LeadShow } from "./product-grid-lead";
@@ -100,7 +101,7 @@ function Plate({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    loading={lead ? "eager" : "lazy"}
+                    {...siteImage(lead ? "above" : "below")}
                     className="absolute inset-0 h-full w-full object-cover"
                 />
             ) : null}

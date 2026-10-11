@@ -85,15 +85,13 @@ test.describe("Customer Detail — merge", () => {
         await expect(
             dialog.getByRole("radio", { name: "Keep this record" }),
         ).toHaveAttribute("aria-checked", "true");
-        await expect(dialog).toContainText("This can't be undone.");
+        await expect(dialog).toContainText("This cannot be undone.");
         // Take the other record's email.
         await dialog
             .getByRole("radiogroup", { name: "Email" })
             .getByRole("radio", { name: `merge-b-${stamp}@example.test` })
             .click();
-        await dialog
-            .getByRole("button", { name: "Merge", exact: true })
-            .click();
+        await dialog.getByRole("button", { name: "Merge records" }).click();
 
         await expect(page.getByText(/^Merged\. All of /)).toBeVisible();
         await expect(page).toHaveURL(new RegExp(`/contacts/${kept}`));
@@ -135,10 +133,10 @@ test.describe("Customer Detail — merge", () => {
         });
         await expect(dialog.getByLabel("Find the other record")).toBeFocused();
         await dialog.getByLabel("Find the other record").fill("zzzz-nobody");
-        await expect(dialog).toContainText("No other customer matches");
+        await expect(dialog).toContainText("No other customers match");
         // Nothing is merged without a record picked.
         await expect(
-            dialog.getByRole("button", { name: "Merge", exact: true }),
+            dialog.getByRole("button", { name: "Merge records" }),
         ).toHaveCount(0);
         await dialog.getByRole("button", { name: "Cancel" }).click();
         await expect(dialog).toBeHidden();

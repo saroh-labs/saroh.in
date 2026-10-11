@@ -14,7 +14,7 @@ const wire = {
                 moduleKey: "APPOINTMENTS",
                 count: 3,
                 message:
-                    "3 upcoming bookings stay booked; the booking page stops taking new ones.",
+                    "3 upcoming bookings stay booked. The booking page stops taking new ones.",
             },
             {
                 code: "CLASS_PACKS_CREDITS_LEFT",

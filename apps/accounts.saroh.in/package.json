@@ -8,6 +8,7 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
+        "test": "vitest run",
         "typecheck": "tsc --noEmit",
         "cf:build": "opennextjs-cloudflare build",
         "cf:preview": "opennextjs-cloudflare preview",
@@ -16,11 +17,13 @@
     "portless": "accounts.saroh",
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/error-tracking": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "better-auth": "^1.6.26",
         "lucide-react": "catalog:",
         "next": "catalog:next16",
+        "posthog-js": "1.435.9",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "react-icons": "catalog:",
@@ -39,6 +42,7 @@
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
         "typescript": "catalog:",
+        "vitest": "^4.1.11",
         "wrangler": "4.148.0"
     }
 }

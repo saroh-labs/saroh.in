@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import type { SectionKey } from "@/lib/products/editor-sections";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { useEditor } from "./editor-state";
 
 /** What each section's bar says it will save, when nothing needs a fix. */
@@ -59,15 +60,7 @@ export function SectionCard({
     const creating = mode === "create";
     const dirty = !creating && (state?.dirty ?? false);
     const problem = state?.problem ?? "";
-    const chip = creating
-        ? k === "basics" || k === "visibility"
-            ? null
-            : "optional"
-        : dirty
-          ? problem
-              ? "bad"
-              : "unsaved"
-          : null;
+    const chip = creating ? null : dirty ? (problem ? "bad" : "unsaved") : null;
     const busy = saving.includes(k);
     const note = problem || (state?.note ?? SAVES[k]);
     const noteBad = !!problem || !!state?.noteIsError;
@@ -76,11 +69,11 @@ export function SectionCard({
         <section
             aria-labelledby={`sec-${k}`}
             className={cn(
-                "scroll-mt-[176px] rounded-[12px] border bg-card max-[760px]:scroll-mt-[230px]",
+                "scroll-mt-[176px] rounded-[12px] border bg-card max-desk:scroll-mt-[230px]",
                 dirty
                     ? problem
                         ? "border-destructive"
-                        : "border-highlight"
+                        : "border-border-strong"
                     : "border-border",
                 className,
             )}
@@ -89,7 +82,7 @@ export function SectionCard({
                 <h2
                     id={`sec-${k}`}
                     // The jumps land on the heading; clear the sticky header.
-                    className="scroll-mt-[190px] font-display text-[15px] font-semibold tracking-[-0.015em] max-[760px]:scroll-mt-[250px]"
+                    className="scroll-mt-[190px] font-display text-[15px] font-semibold tracking-[-0.015em] max-desk:scroll-mt-[250px]"
                 >
                     {title}
                 </h2>
@@ -116,21 +109,24 @@ export function SectionCard({
                         {note}
                     </span>
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         disabled={busy}
                         onClick={() => discard(k)}
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-foreground/75"
+                        className="text-foreground/75"
                     >
                         {state?.discardLabel ?? "Discard"}
                     </Button>
                     <Button
+                        size="sm"
                         type="button"
-                        disabled={busy || !!problem}
+                        disabled={!!problem}
                         onClick={() => void saveSections([k])}
-                        className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : (state?.saveLabel ?? SAVE_LABEL[k])}
+                        {state?.saveLabel ?? SAVE_LABEL[k]}
                     </Button>
                 </div>
             ) : null}
@@ -138,28 +134,10 @@ export function SectionCard({
     );
 }
 
-export function SectionChip({
-    kind,
-}: {
-    kind: "unsaved" | "bad" | "optional";
-}) {
+export function SectionChip({ kind }: { kind: "unsaved" | "bad" }) {
     return (
-        <span
-            className={cn(
-                "shrink-0 rounded-full px-[7px] py-0.5 text-[11px]",
-                kind === "optional"
-                    ? "border border-dashed border-border-strong font-medium text-muted-foreground"
-                    : "font-semibold uppercase tracking-[0.04em]",
-                kind === "unsaved" &&
-                    "bg-brand-subtle text-brand-subtle-foreground",
-                kind === "bad" && "bg-destructive-subtle text-destructive",
-            )}
-        >
-            {kind === "optional"
-                ? "Optional"
-                : kind === "bad"
-                  ? "Needs a fix"
-                  : "Unsaved"}
-        </span>
+        <StatusBadge tone={kind === "bad" ? "error" : "active"}>
+            {kind === "bad" ? "Needs a fix" : "Unsaved"}
+        </StatusBadge>
     );
 }

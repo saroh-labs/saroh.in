@@ -102,7 +102,13 @@ function caller(
         Promise.resolve(args.where.OR && !owner ? null : row),
     );
     db.membership.findUnique.mockResolvedValue(
-        role ? { role, extraActions: [] } : null,
+        role
+            ? {
+                  role,
+                  extraActions: [],
+                  organization: { lifecycleStatus: "ACTIVE" },
+              }
+            : null,
     );
     db.organizationRole.findUnique.mockResolvedValue({ actions });
     db.storeOwner.findUnique.mockResolvedValue(owner ? { id: "so" } : null);

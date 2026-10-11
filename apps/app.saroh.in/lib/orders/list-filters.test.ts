@@ -12,10 +12,10 @@ import {
     stepOptions,
 } from "@/lib/orders/list-filters";
 import {
-    nextPageHref,
     orderListParams,
     ordersEmptyCopy,
     ordersHref,
+    pageHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
 
@@ -115,12 +115,9 @@ describe("the filters in the address", () => {
     it("stay while paging, and a change of filter starts at page one", () => {
         const q = readOrdersQuery({
             payment: "paid",
-            cursor: "c2",
-            back: "c1",
+            page: "2",
         });
-        expect(nextPageHref(q, "c3")).toBe(
-            "/commerce/orders?payment=paid&cursor=c3&back=c1%2Cc2",
-        );
+        expect(pageHref(q, 3)).toBe("/commerce/orders?payment=paid&page=3");
         expect(ordersHref(q, { late: true })).toBe(
             "/commerce/orders?payment=paid&late=true",
         );

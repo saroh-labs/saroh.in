@@ -68,6 +68,11 @@ export interface StorefrontSettings extends StorefrontSummary {
      */
     stock?: { onHand: number; promised: number };
     address: string | null;
+    /**
+     * Its place on Google Maps (DEC-128), which Get directions opens on
+     * the website; null when none is set. Absent from an older API.
+     */
+    mapUrl?: string | null;
     openingHours: OpeningHoursDay[] | null;
     collectionEnabled: boolean;
     /**
@@ -123,6 +128,7 @@ export type StorefrontInput = Partial<
         | "freeShippingThreshold"
         | "kind"
         | "address"
+        | "mapUrl"
         | "openingHours"
         | "collectionEnabled"
         | "tipsEnabled"
@@ -173,7 +179,7 @@ export async function dismissLateRuleNotice(
         `/storefronts/${encodeURIComponent(storeId)}/late-rule-notice/dismiss`,
         "POST",
         {},
-        "Could not put that notice away.",
+        "Couldn't put that notice away.",
     );
 }
 
@@ -270,6 +276,60 @@ export async function listVisitPlaces(): Promise<VisitPlacesRead> {
     }
 }
 
+/** A location customers visit, with where it is (DEC-128). */
+export interface VisitedLocation {
+    id: string;
+    name: string;
+    address: string | null;
+    mapUrl: string | null;
+}
+
+/**
+ * The locations customers visit and their addresses, for Website settings'
+ * Address sheet, or why there are none to read: Sell switched off (the
+ * storefront routes answer 404), or a person the API won't show them to
+ * and a failed read alike (`unavailable`), when the sheet shows what the
+ * website shows and offers no edit.
+ */
+export type VisitedLocationsRead =
+    | { state: "ok"; locations: VisitedLocation[] }
+    | { state: "sell-off" }
+    | { state: "unavailable" };
+
+/** Every open location that is a place customers visit, with its address. */
+export async function listVisitedLocations(): Promise<VisitedLocationsRead> {
+    const base = await orgBase();
+    if (!base) return { state: "unavailable" };
+    try {
+        const res = await apiFetch(`${base}/storefronts`);
+        if (res.status === 404) return { state: "sell-off" };
+        if (!res.ok) return { state: "unavailable" };
+        const stores = (await res.json()) as StorefrontSummary[];
+        const places = await Promise.all(
+            stores
+                .filter((s) => s.kind === "SHOP")
+                .map(async (s): Promise<VisitedLocation | null> => {
+                    const one = await apiFetch(
+                        `${base}/storefronts/${encodeURIComponent(s.id)}`,
+                    );
+                    if (!one.ok) return null;
+                    const body = (await one.json()) as StorefrontSettings;
+                    return {
+                        id: body.id,
+                        name: body.name,
+                        address: body.address,
+                        mapUrl: body.mapUrl ?? null,
+                    };
+                }),
+        );
+        // One that couldn't be read would be edited blind.
+        if (places.some((p) => p === null)) return { state: "unavailable" };
+        return { state: "ok", locations: places.filter((p) => p !== null) };
+    } catch {
+        return { state: "unavailable" };
+    }
+}
+
 /** A storefront's week, for Business → Hours. */
 export interface StorefrontHours {
     id: string;
@@ -346,7 +406,7 @@ export async function updateStorefront(
         `/storefronts/${encodeURIComponent(storeId)}`,
         "PATCH",
         input,
-        "Could not save that.",
+        "Couldn't save that.",
     );
 }
 
@@ -355,6 +415,6 @@ export async function closeStorefront(
 ): Promise<CrmResult<object>> {
     return destroy(
         `/storefronts/${encodeURIComponent(storeId)}`,
-        "Could not close that location.",
+        "Couldn't close that location.",
     );
 }

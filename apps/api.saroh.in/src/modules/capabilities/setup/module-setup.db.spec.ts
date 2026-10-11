@@ -156,8 +156,11 @@ describe("Sell (COMMERCE)", () => {
         });
         expect(store.settings).toMatchObject({
             // Table order, the old toggles in step, the business's currency.
-            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
-            collectionEnabled: true,
+            // No registered address, so no counter: Pick-up isn't started
+            // on a location nobody could collect from (UX-025).
+            kind: "ONLINE",
+            fulfilmentTypes: ["LOCAL_DELIVERY"],
+            collectionEnabled: false,
             shippingEnabled: true,
             currency: "INR",
         });
@@ -189,6 +192,8 @@ describe("Sell (COMMERCE)", () => {
         expect(settings).toMatchObject({
             kind: "SHOP",
             address: "12 Hill Road, Mumbai 400050",
+            fulfilmentTypes: ["PICKUP"],
+            collectionEnabled: true,
         });
     });
 
@@ -229,6 +234,9 @@ describe("Sell (COMMERCE)", () => {
         });
         expect(settings.kind).toBe("ONLINE");
         expect(settings.address).toBeNull();
+        // And so no Pick-up: nobody could collect from it.
+        expect(settings.fulfilmentTypes).toEqual([]);
+        expect(settings.collectionEnabled).toBe(false);
     });
 
     it("renames the first storefront there is and sets its ways; none added", async () => {
@@ -239,7 +247,11 @@ describe("Sell (COMMERCE)", () => {
                 slug: `m1-old-${tag}-${seq}`,
                 organizationId: ctx.organizationId,
                 settings: {
-                    create: { currency: "INR", fulfilmentTypes: ["SHIPPING"] },
+                    create: {
+                        currency: "INR",
+                        kind: "SHOP",
+                        fulfilmentTypes: ["SHIPPING"],
+                    },
                 },
             },
         });
@@ -258,6 +270,33 @@ describe("Sell (COMMERCE)", () => {
             fulfilmentTypes: ["PICKUP"],
             collectionEnabled: true,
             shippingEnabled: false,
+        });
+    });
+
+    it("gives a first storefront with no counter no Pick-up, and keeps its kind", async () => {
+        const ctx = await business();
+        const first = await prisma.store.create({
+            data: {
+                name: "Old name",
+                slug: `m1-online-${tag}-${seq}`,
+                organizationId: ctx.organizationId,
+                settings: {
+                    create: { currency: "INR", fulfilmentTypes: ["SHIPPING"] },
+                },
+            },
+        });
+        await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Rye Online",
+            fulfilment: ["PICKUP", "SHIPPING"],
+        });
+        const settings = await prisma.storeSettings.findUniqueOrThrow({
+            where: { storeId: first.id },
+        });
+        expect(settings).toMatchObject({
+            kind: "ONLINE",
+            fulfilmentTypes: ["SHIPPING"],
+            collectionEnabled: false,
+            shippingEnabled: true,
         });
     });
 

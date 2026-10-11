@@ -12,6 +12,7 @@ import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { publicSiteOnlineFor } from "../organizations/organization-lifecycle.gate";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { guarded, guardMinutes } from "./availability";
@@ -62,6 +63,13 @@ export interface BookInput {
      * its snapshot, its job payload or a log.
      */
     intakeNote?: string;
+    /**
+     * The tag the booking page's address carried when a QR code's scan
+     * opened it (`qr-<code>`), as the page sent it. Only ever read by
+     * `qrSourceFor`, which turns it into {@link ReserveBy.sourceCode} or
+     * nothing; never stored as it is.
+     */
+    sourceTag?: string;
 }
 
 /** The pack or the membership a class credit comes out of (A10). */
@@ -99,6 +107,12 @@ export interface ReserveBy {
      * its contact) can't hold the same session twice.
      */
     account?: SignedInBooker;
+    /**
+     * The QR code whose scan opened the page it was booked from
+     * (`Booking.sourceCode`), already resolved on the customer's own site
+     * (`sites/qr-source.ts`). Absent for every booking the team makes.
+     */
+    sourceCode?: string | null;
 }
 
 /** A signed-in customer booking for themselves (A9). */
@@ -210,6 +224,10 @@ export async function loadBookableService(
     }
     if (bookingPage && !service.showOnBookingPage) {
         throw new GoneException("This service isn't booked online");
+    }
+    // A deleted business's booking page is offline with its site (#921).
+    if (bookingPage && !(await publicSiteOnlineFor(service.organizationId))) {
+        throw new NotFoundException("Service not found");
     }
     if (!(await appointmentsOpen(service.organizationId))) {
         throw new GoneException(
@@ -356,7 +374,7 @@ async function reserveOnce(
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
         if (code === "P2034") {
-            throw new RaceLost(also?.onRace ?? "This slot is fully booked");
+            throw new RaceLost(also?.onRace ?? "That time is fully booked.");
         }
         throw err;
     }
@@ -462,7 +480,7 @@ export async function reserveInTx(
             },
         );
         if (confirmed + held >= service.capacity) {
-            throw new ConflictException("This slot is fully booked");
+            throw new ConflictException("That time is fully booked.");
         }
     }
     if (person) {
@@ -533,6 +551,7 @@ export async function reserveInTx(
             intakeNote: intakeNoteOf(input.intakeNote),
             customerAccountId: by.account?.accountId ?? null,
             bookedOnline,
+            sourceCode: by.sourceCode ?? null,
             freeCancelUntil,
             ...(person
                 ? {

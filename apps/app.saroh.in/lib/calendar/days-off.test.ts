@@ -198,7 +198,7 @@ describe("dayOffLine", () => {
 
     it("names a few hours off by their hours", () => {
         expect(dayOffLine(month([pillaiOff, raoAfternoon]), "2026-09-23")).toBe(
-            "Dr. Arun Pillai off · At a dental conference in Chennai · Dr. Meenakshi Rao off 14:00–18:00 · School run",
+            "Dr. Arun Pillai off · At a dental conference in Chennai · Dr. Meenakshi Rao off 2:00 to 6:00 pm · School run",
         );
     });
 
@@ -212,7 +212,7 @@ describe("dayOffLine", () => {
             reason: null,
         };
         expect(dayOffLine(month([early]), "2026-09-24")).toBe(
-            "Closed 16:00–24:00",
+            "Closed 4:00 pm to 12:00 am",
         );
     });
 

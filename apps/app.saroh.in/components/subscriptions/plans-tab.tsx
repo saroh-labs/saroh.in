@@ -13,6 +13,7 @@ import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { reportFailure } from "@/components/billing/plan-refusal";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { setPlanArchived } from "@/lib/subscriptions/actions";
 import type { PlanCardView } from "@/lib/subscriptions/plan-cards";
@@ -20,12 +21,10 @@ import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
 import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
-import { Pill } from "./pill";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 const NEW_PLAN_HREF = "/billing/plans/new";
 
 /**
@@ -72,8 +71,11 @@ export function PlansTab({
     function setArchived(plan: Plan, archived: boolean) {
         setBusyId(plan.id);
         start(async () => {
-            const res = await setPlanArchived(plan.id, archived);
+            const res = await runAction(() =>
+                setPlanArchived(plan.id, archived),
+            );
             setBusyId(null);
+            if (!res) return;
             if (!res.ok) {
                 // A plan without memberships refuses Sell again: its notice.
                 reportFailure(res);
@@ -93,7 +95,10 @@ export function PlansTab({
                 archiveToast(plan, archived),
                 () =>
                     start(async () => {
-                        const back = await setPlanArchived(plan.id, !archived);
+                        const back = await runAction(() =>
+                            setPlanArchived(plan.id, !archived),
+                        );
+                        if (!back) return;
                         if (!back.ok) reportFailure(back);
                         router.refresh();
                     }),
@@ -105,13 +110,11 @@ export function PlansTab({
     if (!plans) {
         return (
             <FailedState
-                title="Plans could not be loaded"
-                description="This tab couldn't read them. Nothing has changed — every plan is still on sale, and subscriptions still renew."
-                action={
-                    <Button variant="outline" onClick={() => router.refresh()}>
-                        Try again
-                    </Button>
-                }
+                title={couldntLoad("plans")}
+                description={nothingChanged(
+                    "Every plan is still on sale, and subscriptions still renew.",
+                )}
+                onRetry={() => router.refresh()}
             />
         );
     }
@@ -137,7 +140,7 @@ export function PlansTab({
                     Everyone already on a plan keeps what they agreed to.
                 </p>
                 {canWrite && !locked ? (
-                    <Button asChild className={BUTTON}>
+                    <Button asChild>
                         <Link href={NEW_PLAN_HREF}>New plan</Link>
                     </Button>
                 ) : null}
@@ -157,11 +160,11 @@ export function PlansTab({
                 <EmptyState
                     icon={<Repeat />}
                     title="No plans yet"
-                    description="A plan is what you sell on repeat — a monthly membership, a weekly loaf. Make one, then put people on it."
+                    description="A plan is what you sell on repeat, like a monthly membership or a weekly loaf."
                     action={
                         canWrite && !locked ? (
                             <Button asChild>
-                                <Link href={NEW_PLAN_HREF}>Make a plan</Link>
+                                <Link href={NEW_PLAN_HREF}>New plan</Link>
                             </Button>
                         ) : undefined
                     }
@@ -212,14 +215,18 @@ function PlanCard({
             <div className="flex items-baseline gap-2">
                 <Link
                     href={`/billing/plans/${encodeURIComponent(card.id)}`}
-                    className="min-w-0 flex-1 text-[15px] font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="min-w-0 flex-1 text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                     {card.name}
                 </Link>
-                {card.archived ? <Pill tone="off">Archived</Pill> : null}
-                {card.draft ? <Pill tone="off">Draft</Pill> : null}
+                {card.archived ? (
+                    <StatusBadge tone="off">Archived</StatusBadge>
+                ) : null}
+                {card.draft ? (
+                    <StatusBadge tone="off">Draft</StatusBadge>
+                ) : null}
                 {card.unpublished ? (
-                    <Pill tone="accent">Unpublished changes</Pill>
+                    <StatusBadge tone="accent">Unpublished changes</StatusBadge>
                 ) : null}
             </div>
             <p className="mt-[3px] min-h-9 text-[12.5px] text-muted-foreground">
@@ -237,17 +244,13 @@ function PlanCard({
                 {card.subscribers}
             </p>
             {card.olderPrices.map((t) => (
-                <p key={t} className="mt-0.5 text-[12px] text-brand">
+                <p key={t} className="mt-0.5 text-[12px] text-foreground">
                     {t}
                 </p>
             ))}
             {canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                        asChild
-                        variant="outline"
-                        className={cn(BUTTON, "coarse:h-11")}
-                    >
+                    <Button asChild variant="outline">
                         <Link
                             href={editHref(card.id)}
                             aria-label={`Edit ${card.name}`}
@@ -258,7 +261,6 @@ function PlanCard({
                     {card.canArchive && (sellsAgain || !card.archived) ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={busy}
                             onClick={onArchive}
                         >

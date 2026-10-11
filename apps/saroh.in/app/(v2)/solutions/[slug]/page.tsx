@@ -59,7 +59,9 @@ export default async function SolutionPage({ params }: Props) {
     if (!isSolutionSlug(slug)) notFound();
     const s = solutions[slug];
     const segments = segmentViews(s.segments, (f) => features[f].name);
-    const catalog = await readLivePricing();
+    // Not read before the launch switch opens (DEC-136), as on a feature
+    // page: the line under the hero then names no plan's contents.
+    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
 
     return (
         <>

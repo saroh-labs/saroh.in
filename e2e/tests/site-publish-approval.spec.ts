@@ -63,14 +63,17 @@ test(
         await setOn(page.request, siteId, false);
 
         try {
-            await page.goto(`${urls.APP_URL}/sites/${siteId}/settings`);
+            // Approval is under Advanced (Website › Settings tabs).
+            await page.goto(
+                `${urls.APP_URL}/sites/${siteId}/settings?section=advanced`,
+            );
             const toggle = approvalSwitch(page);
             await expect(toggle).toHaveCount(1);
             await expect(toggle).toHaveAttribute("aria-checked", "false");
             await expect(
                 page
                     .getByText(
-                        "Only an approved test release can go live. You can still go live without approval; it's recorded.",
+                        "Only an approved test release can go live. You can still go live without approval, and it's recorded.",
                     )
                     .filter({ visible: true }),
             ).toHaveCount(1);
@@ -113,7 +116,10 @@ test(
                     visible: true,
                 }),
             ).toHaveCount(0);
-            await page.goto(`${urls.APP_URL}/sites/${siteId}/settings`);
+            // Approval is under Advanced (Website › Settings tabs).
+            await page.goto(
+                `${urls.APP_URL}/sites/${siteId}/settings?section=advanced`,
+            );
 
             // A direct publish is now refused, and nothing is written.
             const refused = await page.request.post(

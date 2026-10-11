@@ -1,14 +1,19 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { NameDialog } from "@/components/shared/name-dialog";
 
 /**
  * One category in a list you manage: its name, a line about it, and the two
- * things done to it — rename in place, and delete.
+ * things done to it — rename, and delete.
+ *
+ * The row is always read: Rename opens the one-field dialog (`NameDialog`)
+ * rather than turning the row into a form, so the list never changes shape
+ * under the person reading it.
  *
  * Deleting asks first. The API moves everything in the category to
  * Uncategorized and then removes it, so re-creating it afterwards would not
@@ -18,6 +23,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 export function CategoryRow({
     name,
     meta,
+    renameNote,
     deleteTitle,
     deleteBody,
     onRename,
@@ -25,58 +31,16 @@ export function CategoryRow({
 }: {
     name: string;
     meta?: string;
+    /** What a rename leaves alone, said under the dialog's title. */
+    renameNote: string;
     deleteTitle: string;
     deleteBody: string;
     /** Resolves true when the new name was saved. */
     onRename: (name: string) => Promise<boolean>;
-    onDelete: () => Promise<void>;
+    /** Waited for by the confirm; a refusal stays in it. */
+    onDelete: () => Promise<ConfirmResult>;
 }) {
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState(name);
-    const [busy, setBusy] = useState(false);
     const [confirming, setConfirming] = useState(false);
-
-    if (editing) {
-        return (
-            <form
-                className="flex flex-wrap items-center gap-2 p-3"
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!draft.trim() || draft.trim() === name) {
-                        setEditing(false);
-                        return;
-                    }
-                    setBusy(true);
-                    void onRename(draft.trim()).then((ok) => {
-                        setBusy(false);
-                        if (ok) setEditing(false);
-                    });
-                }}
-            >
-                <Input
-                    aria-label={`New name for ${name}`}
-                    value={draft}
-                    autoFocus
-                    className="h-8 min-w-[160px] flex-1"
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") setEditing(false);
-                    }}
-                />
-                <Button type="submit" size="sm" disabled={busy}>
-                    {busy ? "Saving…" : "Save"}
-                </Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditing(false)}
-                >
-                    Cancel
-                </Button>
-            </form>
-        );
-    }
 
     return (
         <div className="flex items-center justify-between gap-3 p-3">
@@ -89,25 +53,31 @@ export function CategoryRow({
                 ) : null}
             </div>
             <div className="flex shrink-0 gap-1">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Rename ${name}`}
-                    onClick={() => {
-                        setDraft(name);
-                        setEditing(true);
-                    }}
-                >
-                    Rename
-                </Button>
+                <NameDialog
+                    trigger={
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Rename ${name}`}
+                        >
+                            Rename
+                        </Button>
+                    }
+                    title="Rename category"
+                    note={renameNote}
+                    label="Name"
+                    initial={name}
+                    submitLabel="Save"
+                    problem={(next) => (next ? "" : "A category needs a name.")}
+                    onSubmit={onRename}
+                />
                 <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     aria-label={`Delete ${name}`}
                     className="text-destructive hover:text-destructive"
-                    disabled={busy}
                     onClick={() => setConfirming(true)}
                 >
                     Delete
@@ -119,10 +89,8 @@ export function CategoryRow({
                 title={deleteTitle}
                 description={deleteBody}
                 confirmLabel="Delete category"
-                onConfirm={() => {
-                    setBusy(true);
-                    void onDelete().finally(() => setBusy(false));
-                }}
+                keepLabel="Keep category"
+                onConfirm={onDelete}
             />
         </div>
     );

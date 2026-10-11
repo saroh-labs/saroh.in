@@ -44,7 +44,7 @@ describe("messageMeta", () => {
                 now,
                 "UTC",
             ),
-        ).toBe("You · 09:05");
+        ).toBe("You · 9:05 am");
         expect(messageMeta(FROM_THEM, "Kavi Dental", now, "UTC")).toBe(
             "Kavi Dental · Yesterday",
         );

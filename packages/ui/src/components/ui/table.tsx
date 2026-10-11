@@ -72,7 +72,7 @@ const TableRow = React.forwardRef<
              * which would shift the row by a pixel. `data-attention` marks a
              * row that needs someone, in the Destructive tint.
              */
-            "border-b transition-colors duration-fast hover:bg-foreground/[0.035] data-[attention=true]:bg-destructive-subtle data-[state=selected]:bg-brand-subtle data-[state=selected]:shadow-[inset_3px_0_0_hsl(var(--highlight))]",
+            "border-b transition-colors duration-fast hover:bg-foreground/[0.035] data-[attention=true]:bg-destructive-subtle data-[state=selected]:bg-muted data-[state=selected]:shadow-[inset_3px_0_0_hsl(var(--highlight))]",
             className,
         )}
         {...props}
@@ -86,9 +86,11 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <th
         ref={ref}
+        // A column's name is Saroh's own words: a recording may read it.
+        data-ph-unmask=""
         className={cn(
             // Labels stop at 11px: Geist 600, uppercase, at 0.1em (brand file §3).
-            "h-10 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+            "label h-10 px-4 text-left align-middle [&:has([role=checkbox])]:pr-0",
             className,
         )}
         {...props}
@@ -102,6 +104,9 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <td
         ref={ref}
+        // A cell holds a record's data: always masked in a recording,
+        // whatever stands above it or inside it.
+        data-ph-mask=""
         className={cn(
             // 10px rows by default; density comes from space, never from
             // smaller type.

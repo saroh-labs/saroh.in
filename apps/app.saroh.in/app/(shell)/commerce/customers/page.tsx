@@ -1,3 +1,4 @@
+import { rememberedPageSize } from "@/lib/paging/remembered";
 import { redirect } from "next/navigation";
 
 import { CustomersList } from "@/components/customers/list/customers-list";
@@ -40,14 +41,17 @@ export default async function CustomersPage({
     if (!may("contact:read")) {
         return (
             <PageContainer width="full">
-                <div className="max-w-[1100px]">
+                <div>
                     <ListLocked />
                 </div>
             </PageContainer>
         );
     }
 
-    const query = allowedQuery(readListQuery(params), may);
+    const query = allowedQuery(
+        readListQuery(params, await rememberedPageSize("customers")),
+        may,
+    );
     const [page, stores] = await Promise.all([
         getCustomersPage(query),
         // Only for Add customer and Import; without it they are left out.

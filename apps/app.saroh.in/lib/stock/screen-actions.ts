@@ -2,13 +2,10 @@
 
 import type { ApiResult } from "@/lib/api/failure";
 
-import type { StockEntryKind } from "./levels";
-import type { StockChecks, StockLevels, StockLog } from "./service";
+import type { StockLevels } from "./service";
 import {
     countStock as countStockApi,
-    getStockChecks,
     getStockLevels,
-    getStockLog,
     moveStock as moveStockApi,
     recordStockEntry as recordStockEntryApi,
     resolveStockCheck as resolveStockCheckApi,
@@ -17,59 +14,27 @@ import {
 } from "./service";
 
 /**
- * Server Actions for the Stock screen (#527, #521): the next page of the
- * levels, the log and the checks, and every write the screen makes. Thin
- * wrappers over `service.ts`; the API decides who may. Each write takes the
- * idempotency key the tap made, so a retried save applies once.
+ * Server Actions for the Stock screen (#527, #521): the shelves a sheet
+ * offers to pick from, and every write the screen makes. The lists' pages
+ * are the screen's own address, read by the page. Thin wrappers over
+ * `service.ts`; the API decides who may. Each write takes the idempotency
+ * key the tap made, so a retried save applies once.
  */
 
-const COULDNT_LOAD = "More couldn't be loaded. Try again.";
-
-/** A read for "Show more": the page, or a sentence to show instead. */
-async function page<T>(read: () => Promise<T | null>): Promise<ApiResult<T>> {
-    try {
-        const data = await read();
-        return data ? { ok: true, data } : { ok: false, error: COULDNT_LOAD };
-    } catch {
-        // A refusal or a failure alike: the screen keeps what it has and
-        // says the next page didn't come.
-        return { ok: false, error: COULDNT_LOAD };
-    }
-}
-
-export async function loadLevelsPage(filter: {
-    storefront?: string;
-    q?: string;
-    needs?: boolean;
-    cursor: string;
-    limit: number;
-}): Promise<ApiResult<StockLevels>> {
-    return page(() => getStockLevels(filter));
-}
-
-export async function loadLogPage(filter: {
-    kind?: StockEntryKind[];
-    storefront?: string;
-    product?: string;
-    cursor: string;
-    limit: number;
-}): Promise<ApiResult<StockLog>> {
-    return page(() => getStockLog(filter));
-}
-
-export async function loadChecksPage(input: {
-    cursor: string;
-    limit: number;
-}): Promise<ApiResult<StockChecks>> {
-    return page(() => getStockChecks(input));
-}
+const COULDNT_LOAD = "Stock couldn't be loaded. Try again.";
 
 /**
  * Every shelf the business counts, unpaged — what Move stock and the
- * entries sheet offer to pick from, read when one opens.
+ * entries sheet offer to pick from, read when one opens. A refusal or a
+ * failure alike is a sentence to show, never an empty list.
  */
 export async function loadStockTargets(): Promise<ApiResult<StockLevels>> {
-    return page(() => getStockLevels());
+    try {
+        const data = await getStockLevels();
+        return data ? { ok: true, data } : { ok: false, error: COULDNT_LOAD };
+    } catch {
+        return { ok: false, error: COULDNT_LOAD };
+    }
 }
 
 export async function countStock(input: Parameters<typeof countStockApi>[0]) {

@@ -373,16 +373,11 @@ async function send<T>(
 const at = (id: string) => `/${encodeURIComponent(id)}`;
 
 export function createInvoice(input: InvoiceInput) {
-    return send<Invoice>("", "POST", input, "Could not save that invoice.");
+    return send<Invoice>("", "POST", input, "Couldn't save that invoice.");
 }
 
 export function updateInvoice(id: string, input: InvoiceInput) {
-    return send<Invoice>(
-        at(id),
-        "PATCH",
-        input,
-        "Could not save that invoice.",
-    );
+    return send<Invoice>(at(id), "PATCH", input, "Couldn't save that invoice.");
 }
 
 export function deleteInvoice(id: string) {
@@ -390,7 +385,7 @@ export function deleteInvoice(id: string) {
         at(id),
         "DELETE",
         undefined,
-        "Could not delete that draft.",
+        "Couldn't delete that draft.",
     );
 }
 
@@ -399,7 +394,7 @@ export function issueInvoice(id: string) {
         `${at(id)}/issue`,
         "POST",
         {},
-        "Could not issue that invoice.",
+        "Couldn't issue that invoice.",
     );
 }
 
@@ -413,7 +408,7 @@ export function creditInvoice(id: string, reason: string) {
         `${at(id)}/credit`,
         "POST",
         { reason },
-        "Could not cancel that invoice.",
+        "Couldn't cancel that invoice.",
     );
 }
 
@@ -422,7 +417,7 @@ export function voidInvoice(id: string, reason: string) {
         `${at(id)}/void`,
         "POST",
         { reason },
-        "Could not void that invoice.",
+        "Couldn't void that invoice.",
     );
 }
 
@@ -432,7 +427,7 @@ export function reissueInvoice(id: string, reason: string) {
         `${at(id)}/reissue`,
         "POST",
         { reason },
-        "Could not reissue that invoice.",
+        "Couldn't reissue that invoice.",
     );
 }
 
@@ -441,7 +436,7 @@ export function recordPayment(id: string, input: PaymentInput) {
         `${at(id)}/payments`,
         "POST",
         input,
-        "Could not record that payment.",
+        "Couldn't record that payment.",
     );
 }
 
@@ -455,7 +450,7 @@ export function createPayLink(id: string) {
         `${at(id)}/pay-link`,
         "POST",
         {},
-        "Could not make a pay link.",
+        "Couldn't make a pay link.",
     );
 }
 
@@ -469,7 +464,7 @@ export function createViewLink(id: string) {
         `${at(id)}/view-link`,
         "POST",
         {},
-        "Could not make a link to the invoice.",
+        "Couldn't make a link to the invoice.",
     );
 }
 
@@ -483,7 +478,7 @@ export function sendInvoice(id: string) {
         `${at(id)}/send`,
         "POST",
         {},
-        "Could not send that invoice.",
+        "Couldn't send that invoice.",
     );
 }
 
@@ -493,6 +488,6 @@ export function remindInvoice(id: string) {
         `${at(id)}/remind`,
         "POST",
         {},
-        "Could not send that reminder.",
+        "Couldn't send that reminder.",
     );
 }

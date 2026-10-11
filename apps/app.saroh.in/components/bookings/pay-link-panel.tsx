@@ -1,12 +1,21 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
+import { isRoleRefusal } from "@/lib/api/role-denied";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import { useId, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { createBookingPayLink } from "@/lib/services/actions";
+import { ShareLink } from "@saroh/ui/copy-button";
+import { Field } from "@saroh/ui/field";
+
+/** After why the link wasn't made: the booking stands, and what to do. */
+const LINK_FAILED =
+    "The booking is made. Try again, or they can pay at the session.";
+/** The same for a role that can't make one: trying again won't help. */
+const LINK_REFUSED = "The booking is made. They can pay at the session.";
 
 /**
  * The pay link a booking got, or why it couldn't. `plan`: the business's
@@ -57,78 +66,48 @@ export function PayLinkPanel({
     const [link, setLink] = useState(first);
     const [trying, setTrying] = useState(false);
 
-    async function copy(url: string) {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess("Pay link copied. Send it to them.");
-        } catch {
-            showError("Couldn't copy it — select the link and copy it.");
-        }
-    }
-
     return (
         <div className="grid gap-3">
             <p className="text-[13px] font-semibold">{booked}</p>
             {link.ok ? (
                 <>
-                    <div>
-                        <label
-                            htmlFor={id}
-                            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                        >
-                            Pay link
-                        </label>
+                    <Field label="Pay link">
                         <Input
                             id={id}
                             readOnly
                             value={link.url}
                             onFocus={(e) => e.currentTarget.select()}
-                            className="h-9 rounded-[9px] text-[12.5px]"
                         />
-                    </div>
+                    </Field>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                         Send it to them however you talk. The booking shows
-                        unpaid until they pay. Cancelling it stops the link; a
+                        unpaid until they pay. Cancelling it stops the link. A
                         payment they&apos;d already started shows on Home as one
                         to refund.
                     </p>
                 </>
             ) : link.plan ? (
                 <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
-                    No pay link — your plan doesn&apos;t take payment online.
-                    The booking is made; they can pay at the session.
+                    No pay link. Your plan doesn&apos;t take payment online. The
+                    booking is made, and they can pay at the session.
                 </p>
             ) : (
-                <p
-                    role="alert"
-                    className="text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                >
-                    {link.error} The booking is made — try again, or they can
-                    pay at the session.
-                </p>
+                <Refusal>{`${link.error} ${isRoleRefusal(link.error) ? LINK_REFUSED : LINK_FAILED}`}</Refusal>
             )}
             <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onDone}
-                >
+                <Button type="button" variant="outline" onClick={onDone}>
                     Done
                 </Button>
                 {link.ok ? (
-                    <Button
-                        type="button"
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                        onClick={() => void copy(link.url)}
-                    >
-                        Copy link
-                    </Button>
+                    <ShareLink
+                        value={link.url}
+                        text="Your link to pay for the booking"
+                        variant="default"
+                        size="default"
+                    />
                 ) : link.plan ? null : (
                     <Button
                         type="button"
-                        disabled={trying}
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
                         onClick={() => {
                             setTrying(true);
                             void makePayLink(bookingId).then((next) => {
@@ -136,8 +115,10 @@ export function PayLinkPanel({
                                 setTrying(false);
                             });
                         }}
+                        busy={trying}
+                        busyLabel="Trying again…"
                     >
-                        {trying ? "Trying…" : "Try again"}
+                        Try again
                     </Button>
                 )}
             </div>

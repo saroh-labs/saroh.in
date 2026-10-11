@@ -1,15 +1,19 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { ArrowDown, ArrowUp, Check, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ProductThumb } from "@/components/stores/catalogue/product-thumb";
 import type { PickableProduct } from "@/lib/collections/actions";
 import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
 
 /**
  * A hand-picked collection's products (#524): the ones picked, in the
@@ -89,10 +93,11 @@ export function ProductsPicker({
             </div>
 
             {picked.length === 0 ? (
-                <p className="rounded-[9px] border border-dashed border-border-strong px-3 py-3 text-[12.5px] text-muted-foreground">
-                    Nothing picked yet. Search below and tick the products it
-                    should hold.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="Nothing picked yet"
+                    description="Search below and tick the products it should hold."
+                />
             ) : (
                 <ol
                     aria-labelledby="collection-products-label"
@@ -159,8 +164,8 @@ export function ProductsPicker({
             {hiddenCount > 0 ? (
                 <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
                     It also keeps {hiddenCount} archived{" "}
-                    {hiddenCount === 1 ? "product" : "products"}. They
-                    aren&apos;t shown, and come back here when sold again.
+                    {plural(hiddenCount, "product")}. They aren&apos;t shown,
+                    and come back here when sold again.
                 </p>
             ) : null}
             {error ? (
@@ -171,27 +176,27 @@ export function ProductsPicker({
 
             {disabled ? null : (
                 <div className="space-y-2 pt-1">
-                    <label
+                    <Field
+                        label="Add products"
                         htmlFor="collection-product-search"
-                        className="block text-[12.5px] font-medium"
+                        className="space-y-2"
                     >
-                        Add products
-                    </label>
-                    <div className="relative">
-                        <Search
-                            aria-hidden
-                            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                        />
-                        <Input
-                            id="collection-product-search"
-                            type="search"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                            placeholder="Search names and SKUs"
-                            className="pl-8"
-                            autoComplete="off"
-                        />
-                    </div>
+                        <div className="relative">
+                            <Search
+                                aria-hidden
+                                className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                                id="collection-product-search"
+                                type="search"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                                placeholder="Search names and SKUs"
+                                className="pl-8"
+                                autoComplete="off"
+                            />
+                        </div>
+                    </Field>
                     <div aria-live="polite" aria-busy={searching}>
                         {searchError ? (
                             <p
@@ -205,52 +210,42 @@ export function ProductsPicker({
                                 Looking…
                             </p>
                         ) : found.items.length === 0 ? (
-                            <p className="text-[12px] text-muted-foreground">
-                                {q.trim()
-                                    ? `No products match “${q.trim()}”.`
-                                    : "No products yet."}
-                            </p>
+                            q.trim() ? (
+                                <EmptyState
+                                    size="inline"
+                                    kind="no-results"
+                                    things="products"
+                                    query={q}
+                                />
+                            ) : (
+                                <EmptyState
+                                    size="inline"
+                                    title="No products yet"
+                                />
+                            )
                         ) : (
                             <div className="flex flex-col gap-1.5">
                                 {found.items.map((p) => {
                                     const on = picked.includes(p.id);
                                     const off = !on && room.full;
                                     return (
-                                        <button
+                                        <CheckRow
                                             key={p.id}
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={on}
+                                            checked={on}
                                             disabled={off}
-                                            onClick={() => {
+                                            onChange={() => {
                                                 onKnow(p);
                                                 onChange(
                                                     togglePicked(picked, p.id),
                                                 );
                                             }}
                                             className={cn(
-                                                "flex w-full min-w-0 items-center gap-2.5 rounded-[9px] border border-border bg-card px-2.5 py-2 text-left text-[13px] coarse:min-h-11",
+                                                "w-full gap-2.5 rounded-[9px] border border-border bg-card px-2.5 py-2",
                                                 off
-                                                    ? "cursor-not-allowed bg-disabled text-muted-foreground"
+                                                    ? "bg-disabled text-muted-foreground"
                                                     : "hover:bg-muted",
                                             )}
                                         >
-                                            <span
-                                                aria-hidden
-                                                className={cn(
-                                                    "flex size-4 shrink-0 items-center justify-center rounded-[4px]",
-                                                    on
-                                                        ? "bg-foreground text-background"
-                                                        : "border-[1.5px] border-border-strong bg-card",
-                                                )}
-                                            >
-                                                {on ? (
-                                                    <Check
-                                                        className="size-3"
-                                                        strokeWidth={3}
-                                                    />
-                                                ) : null}
-                                            </span>
                                             <ProductThumb
                                                 name={p.name}
                                                 image={p.image}
@@ -265,12 +260,12 @@ export function ProductsPicker({
                                                         : "Archived"}
                                                 </span>
                                             ) : null}
-                                        </button>
+                                        </CheckRow>
                                     );
                                 })}
                                 {found.more ? (
                                     <p className="text-[11.5px] text-muted-foreground">
-                                        Showing the first 20 — type more of a
+                                        Showing the first 20. Type more of a
                                         name to narrow it.
                                     </p>
                                 ) : null}
@@ -298,11 +293,11 @@ function RowButton({
         <Button
             type="button"
             variant="ghost"
-            size="icon"
+            size="icon-xs"
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
-            className="h-7 w-7 shrink-0 rounded-[7px] disabled:bg-transparent [&_svg]:size-3.5"
+            className="shrink-0 disabled:bg-transparent [&_svg]:size-3.5"
         >
             {children}
         </Button>

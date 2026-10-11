@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import type { Domain } from "@saroh/database";
+import type { Domain, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type {
@@ -16,7 +16,8 @@ import { HostingCallError, hostingCnameTarget } from "./domain-hosting";
  * The rule: hosting never undoes verification. A failed call leaves the row
  * VERIFIED and records what failed in words (`hostingError`), with
  * `hostingStatus` REGISTER_FAILED when nothing is registered yet; the next
- * check (`DomainsService.verify` on a VERIFIED domain) runs this again.
+ * check (`DomainsService.check`: "Check now", or the background
+ * `domains.recheck` run, #860) runs this again.
  */
 
 /** What `Domain.hostingStatus` holds. */
@@ -48,7 +49,7 @@ export interface DomainHostingView {
 
 export const HOSTING_WORDS = {
     unreachable:
-        "We couldn't reach our hosting provider to connect this domain. We'll try again the next time you check.",
+        "We couldn't reach our hosting provider to connect this domain. We'll keep trying, or you can check again now.",
     refused:
         "Our hosting provider didn't accept this domain. Check it's spelled right, or contact support.",
     blocked:
@@ -56,7 +57,7 @@ export const HOSTING_WORDS = {
     certificate:
         "The secure certificate for this domain couldn't be issued. Check the CNAME record points to Saroh, then check again.",
     checkFailed:
-        "We couldn't check this domain with our hosting provider just now. We'll try again the next time you check.",
+        "We couldn't check this domain with our hosting provider. We'll keep trying, or you can check again now.",
 } as const;
 
 const PROBLEM_WORDS: Record<HostedProblem, string> = {
@@ -67,13 +68,28 @@ const PROBLEM_WORDS: Record<HostedProblem, string> = {
 const logger = new Logger("DomainHosting");
 
 /**
+ * Called on the same transaction as the write that moves a domain into or
+ * out of live (ACTIVE), with the row before and after it: how the team is
+ * told a live domain stopped working, and when it works again (#917).
+ */
+export type OnLiveChange = (
+    tx: Prisma.TransactionClient,
+    before: Domain,
+    after: Domain,
+) => Promise<unknown>;
+
+/**
  * Register a VERIFIED domain with the host, or refresh its standing when it
  * already is. Never throws for a host failure: the failure is written on the
- * row and returned. Returns the row as it now stands.
+ * row and returned. Returns the row as it now stands. A write that moves
+ * the domain into or out of live runs `onLiveChange` on its transaction,
+ * so the alert is queued with the state it is about (the outbox). Only a
+ * host answer moves it: a failed call keeps the last known standing.
  */
 export async function syncHosting(
     hosting: DomainHosting | null,
     domain: Domain,
+    onLiveChange?: OnLiveChange,
 ): Promise<Domain> {
     if (domain.status !== "VERIFIED") return domain;
     if (!hosting) {
@@ -99,7 +115,7 @@ export async function syncHosting(
                 `domain_hosting_registered domain=${domain.id} hostingId=${hosted.id}`,
             );
         }
-        return await prisma.domain.update({
+        const write = {
             where: { id: domain.id },
             data: {
                 hostingId: hosted.id,
@@ -109,7 +125,16 @@ export async function syncHosting(
                     : null,
                 hostingCheckedAt: checkedAt,
             },
-        });
+        };
+        const wasLive = domain.hostingStatus === "ACTIVE";
+        if (onLiveChange && wasLive !== (hosted.state === "ACTIVE")) {
+            return await prisma.$transaction(async (tx) => {
+                const saved = await tx.domain.update(write);
+                await onLiveChange(tx, domain, saved);
+                return saved;
+            });
+        }
+        return await prisma.domain.update(write);
     } catch (err) {
         if (!(err instanceof HostingCallError)) throw err;
         const registering = !domain.hostingId;

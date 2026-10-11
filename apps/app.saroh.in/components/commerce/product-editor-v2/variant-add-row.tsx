@@ -1,12 +1,15 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productSettingsHref } from "@/lib/products/links";
+import { OptionSelect } from "@saroh/ui/option-select";
 
-import { boxClass, MoneyBox } from "./fields";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { MoneyInput } from "@saroh/ui/money-input";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "Add a variant": a value, a SKU (the store's pattern suggests one) and a
@@ -23,7 +26,7 @@ export function VariantAddRow({
     sku,
     suggested,
     price,
-    symbol,
+    currency,
     productPrice,
     skuBad,
     priceBad,
@@ -43,7 +46,8 @@ export function VariantAddRow({
     sku: string;
     suggested: string;
     price: string;
-    symbol: string;
+    /** The business's currency, for the price box. */
+    currency: string;
     productPrice: string;
     skuBad: boolean;
     priceBad: boolean;
@@ -61,56 +65,51 @@ export function VariantAddRow({
             <p className="mb-2 text-[12px] font-semibold">Add a variant</p>
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-1.5">
                 <OptionSelect
+                    size="sm"
                     value={value}
                     onValueChange={onValue}
                     options={values.map((x) => ({
                         value: x.id,
                         label: takenIds.includes(x.id)
-                            ? `${x.value} — already a variant`
+                            ? `${x.value} (already a variant)`
                             : x.value,
                         disabled: takenIds.includes(x.id),
                     }))}
                     placeholder={`Pick a ${opt}`}
                     disabled={locked || values.length === 0}
                     aria-label={`New variant ${opt}`}
-                    className="h-8 rounded-[8px] text-[13px]"
                 />
-                <input
+                <Input
+                    dense
+                    aria-invalid={skuBad}
                     value={sku}
                     onChange={(e) => onSku(e.target.value)}
                     disabled={locked}
                     aria-label="New variant SKU"
                     placeholder={suggested || "SKU"}
-                    className={boxClass({
-                        small: true,
-                        mono: true,
-                        bad: skuBad,
-                    })}
+                    className="font-mono"
                 />
-                <MoneyBox symbol={symbol} small>
-                    <input
-                        value={price}
-                        onChange={(e) => onPrice(e.target.value)}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder={productPrice}
-                        aria-label="New variant price, blank uses the product's"
-                        className={cn(
-                            boxClass({ small: true, bad: priceBad }),
-                            "pl-[22px]",
-                        )}
-                    />
-                </MoneyBox>
+                <MoneyInput
+                    dense
+                    currency={currency}
+                    aria-invalid={priceBad}
+                    value={price}
+                    onValueChange={onPrice}
+                    disabled={locked}
+                    placeholder={productPrice}
+                    aria-label="New variant price, blank uses the product's"
+                />
             </div>
             <div className="mt-[9px] flex flex-wrap items-center gap-2.5">
-                <button
+                <Button
+                    size="sm"
                     type="button"
                     disabled={addOff}
                     onClick={onAdd}
-                    className="h-8 shrink-0 rounded-[8px] bg-foreground px-[13px] text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
+                    className="shrink-0"
                 >
                     Add to list
-                </button>
+                </Button>
                 <span
                     className={cn(
                         "min-w-0 flex-1 text-pretty text-[11.5px] leading-[1.45]",
@@ -143,41 +142,23 @@ export function OptionChoice({
     return (
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-medium">Customers choose by</span>
-            <div
-                role="radiogroup"
-                aria-label="Option name"
-                className="flex flex-wrap gap-[5px]"
-            >
-                {options.map((o) => {
-                    const on = o.id === optionId;
-                    return (
-                        <button
-                            key={o.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => {
-                                if (!on) onPick(o);
-                            }}
-                            className={cn(
-                                "h-7 rounded-full border px-2.5 text-[12px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
-                        >
-                            {o.name}
-                        </button>
-                    );
-                })}
-            </div>
-            <Link
+            <ChipGroup
+                label="Option name"
+                className="gap-[5px]"
+                value={optionId}
+                onChange={(id) => {
+                    const option = options.find((o) => o.id === id);
+                    if (option) onPick(option);
+                }}
+                disabled={locked}
+                choices={options.map((o) => ({ value: o.id, label: o.name }))}
+            />
+            <TextLink
                 href={productSettingsHref("options")}
-                className="text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                className="text-[12px]"
             >
                 Manage options
-            </Link>
+            </TextLink>
         </div>
     );
 }

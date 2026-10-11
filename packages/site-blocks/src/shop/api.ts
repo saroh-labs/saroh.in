@@ -28,6 +28,11 @@ export interface QuoteLine {
     amount: string;
     state: QuoteLineState;
     available: number | null;
+    /**
+     * The returns rule the product's page shows, repeated above the bag's
+     * button; null for none. Absent from an older API.
+     */
+    returns?: string | null;
 }
 
 /** A way the order can leave, with what it adds. */
@@ -40,7 +45,7 @@ export interface QuoteWay {
 
 /**
  * How an order is paid: online in the provider's window, or at the
- * handover — "Pay when you collect", "Pay on delivery".
+ * handover — "Pay at pick-up", "Pay on delivery".
  */
 export type ShopPayment = "ONLINE" | "ON_HANDOVER";
 
@@ -64,6 +69,13 @@ export interface CheckoutQuote {
      * from an API before site codes.
      */
     discount?: QuoteDiscount | null;
+    /**
+     * The location's "Free delivery over": the amount, and how much more the
+     * items (after any code) must come to before delivery is free — null
+     * once they reach it, when the delivery ways' fees read free. Null when
+     * there is no amount, or no way here has a fee; absent from an older API.
+     */
+    freeDelivery?: QuoteFreeDelivery | null;
     total: string;
     ready: boolean;
     /**
@@ -79,6 +91,14 @@ export interface CheckoutQuote {
     pickup?: PickupPlace | null;
 }
 
+/** Free delivery over an amount, as the bag shows it. */
+export interface QuoteFreeDelivery {
+    /** "999.00" */
+    over: string;
+    /** "120.00" more to go, or null once the items reach `over`. */
+    short: string | null;
+}
+
 /** A discount code as the bag shows it. */
 export type QuoteDiscount =
     | { code: string; applied: true; amount: string }
@@ -87,7 +107,7 @@ export type QuoteDiscount =
 /** A place customers visit, to collect a pick-up from. */
 export interface PickupPlace {
     address: string;
-    /** "Mon–Sat 10:00–19:00, Sun closed"; null when not set. */
+    /** "Mon to Sat 10:00 am to 7:00 pm, Sun closed"; null when not set. */
     hours: string | null;
 }
 
@@ -113,6 +133,13 @@ export interface StartCheckout {
     discountCode?: string;
     /** Stable for one checkout, so a double tap starts it once. */
     key: string;
+    /**
+     * The tag the page's address carried when a QR code's scan opened it
+     * (`qr-<code>`, `qr-source.ts`), added by the bag as it starts the
+     * checkout. The API looks the code up on this site and ignores anything
+     * else; it never refuses an order over it.
+     */
+    source?: string;
 }
 
 /**
@@ -151,12 +178,15 @@ export interface CheckoutStanding {
  * - bag-changed: price it again before paying.
  * - busy: a checkout is open already, or too many tries.
  * - cant-order: the shop isn't taking orders online now.
+ * - payments-down: the business's online payment failed just now; try
+ *   later, or pay them another way.
  */
 export type ShopProblem =
     | "signed-out"
     | "bag-changed"
     | "busy"
     | "cant-order"
+    | "payments-down"
     | "invalid"
     | "error"
     | "test-release";
@@ -173,11 +203,17 @@ export interface ShopCheckoutApi {
     }): Promise<ShopResult<CheckoutQuote>>;
     start(body: StartCheckout): Promise<ShopResult<CheckoutStarted>>;
     standing(orderId: string): Promise<ShopResult<CheckoutStanding>>;
+    /**
+     * Where the signed-in customer's last delivery went, or null when they
+     * have had none: the bag reads it out instead of asking again. Absent:
+     * the bag always asks.
+     */
+    savedAddress?: () => Promise<ShopResult<DeliveryAddress | null>>;
 }
 
 /** The sentence when the server can't be reached at all. */
 export const SHOP_OFFLINE =
-    "We couldn't reach the shop — check your connection and try again.";
+    "We couldn't reach the shop. Check your connection and try again.";
 
 /** A key for one checkout: letters, digits, - and _ only. */
 export function checkoutKey(): string {

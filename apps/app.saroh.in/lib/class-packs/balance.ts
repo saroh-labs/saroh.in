@@ -1,4 +1,4 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate } from "@/lib/format/datetime";
 
 /**
  * A class pack's balance, in words (ADR-007). Pure, so the New booking
@@ -61,19 +61,10 @@ export function usablePacks<T extends Balance>(
         .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
 }
 
-/** "12 Oct", in the zone given — the service's own, on a booking. */
-export function shortDay(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        day: "numeric",
-        month: "short",
-    }).format(new Date(iso));
-}
-
 /** "Morning pack · 7 left, expires 12 Oct" — a pack offered by name. */
 export function packOffer(
     p: Balance & { pack: { name: string } },
     timeZone: string,
 ): string {
-    return `${p.pack.name} · ${classesLeft(p)} left, expires ${shortDay(p.expiresAt, timeZone)}`;
+    return `${p.pack.name} · ${classesLeft(p)} left, expires ${formatDate(p.expiresAt, timeZone)}`;
 }

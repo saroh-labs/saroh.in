@@ -1,7 +1,10 @@
 import "@saroh/ui/globals.css";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+
+import { NIGHT, PAPER } from "@/lib/pwa/manifest";
+
 import { Providers } from "./providers";
 import "./workspace.css";
 
@@ -44,7 +47,23 @@ export const metadata: Metadata = {
     // and a description that uses a word the app never says is a small lie
     // search engines repeat. Named for what a merchant does, not for our nouns.
     description:
-        "Run your business from one place — sell, take bookings, follow up on enquiries, and keep your website in step.",
+        "Run your business from one place: sell, take bookings, follow up on enquiries, and keep your website in step.",
+    // On a phone's home screen (10 Oct 2026). The manifest itself is
+    // `app/manifest.ts`, which Next links from here; these are the tags
+    // iOS reads instead of it.
+    appleWebApp: {
+        capable: true,
+        title: "Saroh",
+        statusBarStyle: "default",
+    },
+};
+
+/** The browser's own chrome takes the page's ground, light and dark. */
+export const viewport: Viewport = {
+    themeColor: [
+        { media: "(prefers-color-scheme: light)", color: PAPER },
+        { media: "(prefers-color-scheme: dark)", color: NIGHT },
+    ],
 };
 
 /**

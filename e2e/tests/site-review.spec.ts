@@ -69,7 +69,7 @@ test.describe("a reviewer", () => {
          * The rail is not a permission boundary — every destination refuses on
          * its own, and it still does. It is a description of the workspace
          * someone has, and it was describing one they do not: Notifications,
-         * Organization and People answer "you do not have access to this",
+         * Organization and People answer "You can't open this",
          * Providers named the payment and messaging providers the business runs
          * on, and "New site" leads to a form that fails on submit (#313).
          */

@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 import { describe, expect, it } from "vitest";
 
 import { createMemoryStorage } from "./memory-adapter";
@@ -111,5 +113,30 @@ describe("createMemoryStorage", () => {
         expect(typeof storage.getPublicUrl).toBe("function");
         expect(typeof storage.deleteObject).toBe("function");
         expect(typeof storage.headObject).toBe("function");
+    });
+
+    it("keeps what the server writes and streams it back (DEC-120)", async () => {
+        const storage = createMemoryStorage();
+        const key = "org/o/data-export/e1.zip";
+        expect(await storage.readObject(key)).toBeNull();
+        await storage.putObject(
+            key,
+            Readable.from([Buffer.from("ab"), Buffer.from("c")]),
+            {
+                contentType: "application/zip",
+                contentLength: 3,
+            },
+        );
+        expect(storage.get(key)).toMatchObject({
+            contentType: "application/zip",
+            contentLength: 3,
+        });
+        const chunks: Uint8Array[] = [];
+        for await (const c of (await storage.readObject(key)) ?? []) {
+            chunks.push(c);
+        }
+        expect(Buffer.concat(chunks).toString()).toBe("abc");
+        await storage.deleteObject(key);
+        expect(await storage.readObject(key)).toBeNull();
     });
 });

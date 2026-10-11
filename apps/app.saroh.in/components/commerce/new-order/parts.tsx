@@ -11,12 +11,12 @@ export const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
 /** The sheet's inputs: 38px, 8px corners, 13.5px text. */
-export const FIELD = "h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]";
+export const FIELD = "bg-card";
 
 /** A small bordered button: "Change", "−", "+". */
 export const SMALL_BUTTON = cn(
     FOCUS,
-    "cursor-pointer rounded-lg border border-border bg-card font-semibold text-foreground transition-colors duration-fast hover:border-border-strong hover:bg-muted active:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50",
+    "cursor-pointer rounded-lg border border-border bg-card font-semibold text-foreground transition-colors duration-fast hover:border-border-strong hover:bg-muted active:bg-muted/70 disabled:cursor-not-allowed disabled:text-disabled-foreground",
 );
 
 export function StepCard({
@@ -40,9 +40,7 @@ export function StepCard({
             {...props}
         >
             <div className="mb-2 flex items-baseline">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </h3>
+                <h3 className="label flex-1">{title}</h3>
                 {aside ? (
                     <span className="text-[12px] text-muted-foreground">
                         {aside}

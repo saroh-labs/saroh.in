@@ -64,7 +64,7 @@ export function TestReleaseBar({
                 <strong className="font-semibold">Test release</strong>
                 {" · "}
                 <span data-test-release-name="">{name}</span>
-                {" — "}
+                {". "}
                 Nothing here takes a real order, booking or payment.
             </p>
             <details className="group">

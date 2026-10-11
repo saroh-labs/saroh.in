@@ -1,3 +1,5 @@
+import { count } from "@/lib/format/plural";
+import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { StepTone } from "@/lib/orders/list-row";
 import { rowProgress } from "@/lib/orders/list-row";
 import type {
@@ -82,8 +84,12 @@ export function canCancel(status: OrderStatus): boolean {
  * The API decides what may happen next (`next`); these only say it.
  * --------------------------------------------------------------------- */
 
-/** How long a Ready step or a refund is held before it is recorded. */
-export const HOLD_MS = 10_000;
+/**
+ * How long a Ready step or a refund is held before it is recorded: the
+ * app's one ten seconds (`lib/hold-undo.ts`), under the name this screen
+ * has always used.
+ */
+export const HOLD_MS = HOLD_UNDO_MS;
 
 export const STAGE_LABEL: Record<KitchenStage, string> = {
     NEW: "New",
@@ -170,7 +176,7 @@ export function durationWords(minutes: number): string {
         return `${Math.floor(minutes / 60)} h${m ? ` ${m} min` : ""}`;
     }
     const days = Math.floor(minutes / (24 * 60));
-    return days === 1 ? "1 day" : `${days} days`;
+    return count(days, "day");
 }
 
 /**
@@ -253,7 +259,7 @@ export function allergyCheck(
         for (const a of [...has, ...may]) hit.set(a.id, a);
         out.lines[line.id] = text;
         out.named.push(
-            `${line.name ?? "A product that no longer exists"} — ${text.toLowerCase()}`,
+            `${line.name ?? "A product that no longer exists"}: ${text.toLowerCase()}`,
         );
     }
     out.hits = Array.from(hit.values());
@@ -277,10 +283,10 @@ export function eventText(
                 e.toStage === "HANDED_TO_COURIER" && e.note
                     ? `Handed to ${e.note}`
                     : stage(e.toStage);
-            return e.undoneAt ? `${base} — undone` : base;
+            return e.undoneAt ? `${base}, undone` : base;
         }
         case "UNDO":
-            return `Undone — back to ${stage(e.toStage).toLowerCase()}`;
+            return `Undone, back to ${stage(e.toStage).toLowerCase()}`;
         case "EDIT":
             // A change of how it leaves (B9) says it whole: "Changed from
             // Pick-up to Local delivery".

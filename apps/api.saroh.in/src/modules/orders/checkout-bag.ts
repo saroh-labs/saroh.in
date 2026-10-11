@@ -8,6 +8,7 @@ import type {
 } from "../discounts/discounts.service";
 import type { OrderView } from "../discounts/redeem";
 import { customerRefusalMessage } from "../discounts/redeem";
+import { onTheShop } from "../products/public-catalogue.serialize";
 import { businessTracksStock } from "../stock/tracking";
 import type { PickupPlace } from "../stores/pickup-place";
 import { pickupPlaceOf, waysWithPlace } from "../stores/pickup-place";
@@ -64,6 +65,7 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
             shippingEnabled: true,
             localDeliveryFee: true,
             shippingFee: true,
+            freeShippingThreshold: true,
             kind: true,
             address: true,
             openingHours: true,
@@ -82,6 +84,7 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
         fees: {
             localDeliveryFee: row?.localDeliveryFee ?? null,
             shippingFee: row?.shippingFee ?? null,
+            freeOver: row?.freeShippingThreshold ?? null,
         },
     };
 }
@@ -140,6 +143,9 @@ export async function priceBag(
                               categoryId: true,
                               stockTracked: true,
                               fulfilmentTypes: true,
+                              shopFields: true,
+                              returnsMode: true,
+                              returnsText: true,
                               images: {
                                   orderBy: { position: "asc" },
                                   take: 1,
@@ -193,6 +199,13 @@ export async function priceBag(
                 variantIds: r.variants.map((v) => v.variantId),
                 product: {
                     ...r.product,
+                    // The product page's own rule for the line: its own
+                    // returns text, while Returns is shown on the shop.
+                    returns:
+                        onTheShop(r.product.shopFields, "returns") &&
+                        r.product.returnsMode === "OWN"
+                            ? r.product.returnsText
+                            : null,
                     cover: !cover
                         ? null
                         : cover.kind === "video"

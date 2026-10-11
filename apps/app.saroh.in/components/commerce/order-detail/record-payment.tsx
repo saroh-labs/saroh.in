@@ -1,12 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
 import type { CounterPayment } from "@/lib/orders/kitchen-service";
-
-import { actionClass } from "./parts";
 
 const WAYS: { kind: CounterPayment; label: string }[] = [
     { kind: "CASH", label: "Cash" },
@@ -37,7 +34,7 @@ export function RecordPayment({
             <Button
                 type="button"
                 variant="outline"
-                className={cn(actionClass("ghost"), "mt-2 w-full")}
+                className="mt-2 w-full"
                 disabled={busy}
                 onClick={() => setAsking(true)}
             >
@@ -60,7 +57,6 @@ export function RecordPayment({
                         key={w.kind}
                         type="button"
                         variant="outline"
-                        className={actionClass("ghost")}
                         disabled={busy}
                         onClick={() => {
                             onRecord(w.kind);
@@ -73,7 +69,6 @@ export function RecordPayment({
                 <Button
                     type="button"
                     variant="ghost"
-                    className={actionClass("ghost")}
                     disabled={busy}
                     onClick={() => setAsking(false)}
                 >

@@ -1,18 +1,16 @@
 "use client";
 
+import { count as countOf, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import {
-    dismissToasts,
-    showError,
-    showSuccess,
-    showUndo,
-} from "@saroh/ui/toast";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
+import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { countSaved } from "@/lib/stock/levels";
+import type { StockHref, StockPages } from "@/lib/stock/list-query";
+import { stockHref } from "@/lib/stock/list-query";
 import type { LogKindId } from "@/lib/stock/log";
 import {
     countDraft,
@@ -23,20 +21,25 @@ import {
 import { countStock, undoStock } from "@/lib/stock/screen-actions";
 import type { StockChecks, StockLevels, StockLog } from "@/lib/stock/service";
 
+import { Notice } from "@saroh/ui/notice";
+import { TabStrip } from "@saroh/ui/tabs";
 import { ChecksList } from "./checks-list";
 import { CountBar } from "./count-bar";
 import { EntrySheet } from "./entry-sheet";
 import { LevelsPanel } from "./levels-panel";
 import { LogList } from "./log-list";
 import { MoveDialog } from "./move-dialog";
-import { StockHeader } from "./stock-header";
+
+import { useCountMode } from "./use-count-mode";
 
 type Tab = "levels" | "log" | "checks";
 
 /**
  * Sell › Stock (#527, #521), after "Saroh Stock": the header with Move stock
- * and Count stock, the three tabs, and the count in progress. The tabs and
- * filters are addresses; the count is this screen's own state until saved.
+ * and Count stock, the three tabs, and the count in progress. The tabs,
+ * filters and pages are addresses; the count is this screen's own state
+ * until saved, so what was typed on one page of Levels is still there on
+ * the next.
  */
 export function StockScreen({
     business,
@@ -51,7 +54,7 @@ export function StockScreen({
     logFilter,
     products,
     canWrite,
-    pageSizes,
+    pages,
 }: {
     business: string | null;
     tab: Tab;
@@ -65,12 +68,10 @@ export function StockScreen({
     logFilter: { kind: LogKindId; store: string; product: string };
     products: { id: string; name: string }[];
     canWrite: boolean;
-    pageSizes: { levels: number; log: number; checks: number };
+    /** Each list's page and rows per page, as the address has them. */
+    pages: StockPages;
 }) {
     const router = useRouter();
-    const [counting, setCounting] = useState(false);
-    const [values, setValues] = useState<Record<string, string>>({});
-    const [logSays, setLogSays] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState(false);
     const [moving, setMoving] = useState(false);
     const [recording, setRecording] = useState(false);
@@ -78,40 +79,31 @@ export function StockScreen({
 
     /** This screen's address with some of its parts changed. */
     const { kind, store, product } = logFilter;
-    const href = useCallback(
-        (change: Record<string, string | undefined>) => {
-            const parts: Record<string, string | undefined> = {
-                tab: tab === "levels" ? undefined : tab,
-                show: show === "all" ? undefined : show,
-                q: q || undefined,
-                kind: kind === "all" ? undefined : kind,
-                store: store === "all" ? undefined : store,
-                product: product || undefined,
-                ...change,
-            };
-            const params = new URLSearchParams();
-            for (const [k, v] of Object.entries(parts)) {
-                if (v) params.set(k, v);
-            }
-            const s = params.toString();
-            return s ? `/commerce/stock?${s}` : "/commerce/stock";
-        },
-        [tab, show, q, kind, store, product],
+    const href = useCallback<StockHref>(
+        (change) =>
+            stockHref({ tab, show, q, kind, store, product, pages }, change),
+        [tab, show, q, kind, store, product, pages],
     );
 
+    // Cancel offers Undo, which puts the typed numbers back (`useCountMode`).
+    const count = useCountMode({
+        onBack: () => {
+            if (tab !== "levels") router.push(href({ tab: undefined }));
+        },
+    });
+    const { counting, values, logSays, onValue } = count;
     const draft = countDraft(values, logSays);
+    // The tabs, filters and pages are this screen at another address and
+    // keep the count; any other way out would lose it.
+    const guard = useLeaveGuard({
+        dirty: counting && count.typed > 0 && !saving,
+        lost: "The count isn't saved yet, so the numbers you've typed will be lost.",
+        keeps: (to) => to.pathname === "/commerce/stock",
+    });
 
     const startCount = () => {
-        setValues({});
-        setLogSays({});
         attempt.current = null;
-        setCounting(true);
-        if (tab !== "levels") router.push(href({ tab: undefined }));
-    };
-    const cancelCount = () => {
-        setCounting(false);
-        setValues({});
-        setLogSays({});
+        count.start();
     };
 
     const saveCount = async () => {
@@ -146,81 +138,81 @@ export function StockScreen({
         const short = results.filter((r) => r.shelf.short > 0);
         const notes = [
             short.length > 0
-                ? `${short.length} ${short.length === 1 ? "shelf is" : "shelves are"} now short for orders already placed.`
+                ? `${countOf(short.length, "shelf is", "shelves are")} now short for orders already placed.`
                 : null,
             mismatched > 0
-                ? `${mismatched} didn't match — the shelf moved while you counted. See Checks.`
+                ? `${mismatched} didn't match because the shelf moved while you counted. See Checks.`
                 : null,
         ].filter(Boolean);
-        cancelCount();
+        count.clear();
         attempt.current = null;
         dismissToasts();
         showUndo(
             countSaved(counted, changed),
-            () => {
-                void undoStock({
+            async () => {
+                const u = await undoStock({
                     entryIds,
                     idempotencyKey: crypto.randomUUID(),
-                }).then((u) => {
-                    if (!u.ok) {
-                        showError(u.error);
-                        return;
-                    }
-                    showSuccess("Count undone.");
-                    router.refresh();
                 });
+                router.refresh();
+                return u;
             },
             notes.length ? { description: notes.join(" ") } : {},
         );
         router.refresh();
     };
 
-    const onValue = useCallback((key: string, raw: string, said: number) => {
-        setValues((v) => ({ ...v, [key]: raw }));
-        setLogSays((l) => (l[key] === said ? l : { ...l, [key]: said }));
-    }, []);
-
     const checkCount =
         checks === "failed"
             ? null
             : Object.values(checks.counts).reduce((a, b) => a + b, 0);
+    // Both counts mean "this needs you now", so both wear the one
+    // attention tone (Ink) and say so in their name: how many lines are
+    // running low, how many checks are open. Checks that couldn't be read
+    // are a dash, never 0.
     const tabs: {
         id: Tab;
         label: string;
-        meta?: { text: string; tone: "plain" | "attention" | "danger" };
+        count?: number | null;
+        tone?: "strong";
+        says?: string;
     }[] = [
         {
             id: "levels",
             label: "Levels",
-            meta:
-                needsYou > 0
-                    ? { text: `${needsYou} need you`, tone: "attention" }
-                    : undefined,
+            count: needsYou > 0 ? needsYou : undefined,
+            tone: "strong",
+            says: plural(needsYou, "needs you", "need you"),
         },
         { id: "log", label: "Log" },
         {
             id: "checks",
             label: "Checks",
-            meta:
+            count:
                 checkCount === null
-                    ? { text: "Couldn't load", tone: "danger" }
+                    ? null
                     : checkCount > 0
-                      ? { text: String(checkCount), tone: "danger" }
+                      ? checkCount
                       : undefined,
+            tone: "strong",
+            says: plural(checkCount ?? 0, "check needs you", "checks need you"),
         },
     ];
 
     return (
         <div className="flex flex-col gap-5">
-            <StockHeader
-                subline={stockSubline(business, storefronts)}
+            <PageHeader
+                holdsData="description"
+                className="mb-0"
+                breadcrumb={["Sell", "Stock"]}
+                title="Stock"
+                description={stockSubline(business, storefronts) || undefined}
                 actions={
                     canWrite ? (
                         <>
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="rounded-[9px] px-3.5 text-[12.5px]"
                                 onClick={() => setRecording(true)}
                             >
                                 Record stock
@@ -229,7 +221,6 @@ export function StockScreen({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="rounded-[9px] px-3.5 text-[12.5px]"
                                     onClick={() => setMoving(true)}
                                 >
                                     Move stock
@@ -237,7 +228,6 @@ export function StockScreen({
                             ) : null}
                             <Button
                                 type="button"
-                                className="rounded-[9px] px-4 text-[12.5px]"
                                 disabled={counting}
                                 onClick={startCount}
                             >
@@ -248,64 +238,34 @@ export function StockScreen({
                 }
             />
 
-            <nav
-                aria-label="Stock views"
-                className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-border px-1"
-            >
-                {tabs.map((t) => {
-                    const on = t.id === tab;
-                    return (
-                        <Link
-                            key={t.id}
-                            href={href({
-                                tab: t.id === "levels" ? undefined : t.id,
-                            })}
-                            scroll={false}
-                            aria-current={on ? "page" : undefined}
-                            className={cn(
-                                "flex shrink-0 items-center gap-[7px] whitespace-nowrap rounded-t-md px-3 py-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {t.label}
-                            {t.meta ? (
-                                <span
-                                    className={cn(
-                                        "rounded-full px-[7px] py-px text-[11px] font-semibold tabular-nums",
-                                        t.meta.tone === "attention" &&
-                                            "bg-brand-subtle text-brand-subtle-foreground",
-                                        t.meta.tone === "danger" &&
-                                            "bg-destructive-subtle text-destructive-subtle-foreground",
-                                        t.meta.tone === "plain" &&
-                                            "bg-muted text-muted-foreground",
-                                    )}
-                                >
-                                    {t.meta.text}
-                                </span>
-                            ) : null}
-                        </Link>
-                    );
-                })}
-            </nav>
+            <TabStrip
+                label="Stock views"
+                value={tab}
+                tabs={tabs.map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                    href: href({ tab: t.id === "levels" ? undefined : t.id }),
+                    count: t.count,
+                    countTone: t.tone,
+                    countSays: t.says,
+                }))}
+            />
 
             <div className="flex flex-col gap-3.5">
                 {tab === "levels" ? (
                     <>
                         {counting ? (
-                            <div
-                                role="note"
-                                className="flex flex-wrap items-baseline gap-2.5 rounded-[10px] bg-brand-subtle px-3.5 py-[11px] text-[13px] leading-normal text-brand-subtle-foreground"
-                            >
-                                <strong>Counting.</strong>
-                                <span className="flex-[1_1_280px] text-pretty">
-                                    Type what&apos;s on the shelf. Leave a box
-                                    empty to skip it. Saroh records the gap
-                                    between what the log expected and what you
-                                    counted.
-                                </span>
-                            </div>
+                            <Notice tone="info" role="note">
+                                <div className="flex flex-wrap items-baseline gap-2.5">
+                                    <strong>Counting.</strong>
+                                    <span className="flex-[1_1_280px] text-pretty">
+                                        Type what&apos;s on the shelf. Leave a
+                                        box empty to skip it. Saroh records the
+                                        gap between what the log expected and
+                                        what you counted.
+                                    </span>
+                                </div>
+                            </Notice>
                         ) : null}
                         <LevelsPanel
                             levels={levels}
@@ -317,7 +277,7 @@ export function StockScreen({
                             counting={counting}
                             values={values}
                             onValue={onValue}
-                            pageSize={pageSizes.levels}
+                            paging={pages.levels}
                         />
                     </>
                 ) : null}
@@ -328,11 +288,15 @@ export function StockScreen({
                         storefronts={storefronts}
                         products={products}
                         href={href}
-                        pageSize={pageSizes.log}
+                        paging={pages.log}
                     />
                 ) : null}
                 {tab === "checks" ? (
-                    <ChecksList checks={checks} pageSize={pageSizes.checks} />
+                    <ChecksList
+                        checks={checks}
+                        href={href}
+                        paging={pages.checks}
+                    />
                 ) : null}
             </div>
 
@@ -341,10 +305,11 @@ export function StockScreen({
                     status={draft.status}
                     canSave={draft.entered.length > 0 && !draft.bad}
                     saving={saving}
-                    onCancel={cancelCount}
+                    onCancel={count.cancel}
                     onSave={() => void saveCount()}
                 />
             ) : null}
+            {guard.dialog}
 
             {canWrite ? (
                 <>

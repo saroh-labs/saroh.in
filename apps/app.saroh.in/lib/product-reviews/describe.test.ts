@@ -46,7 +46,7 @@ describe("labels", () => {
                 reviewed: 1,
                 lines: 3,
             }),
-        ).toBe("Invitation sent — 1 of 3 reviewed so far.");
+        ).toBe("Invitation sent. 1 of 3 reviewed so far.");
         expect(
             invitationSentence({
                 ...base,
@@ -71,7 +71,7 @@ describe("labels", () => {
                 lines: 3,
             }),
         ).toBe(
-            "Invitation sending — it shows as sent once your email provider accepts it.",
+            "Invitation sending. It shows as sent once your email provider accepts it.",
         );
         expect(
             invitationSentence({

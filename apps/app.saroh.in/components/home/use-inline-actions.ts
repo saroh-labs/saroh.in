@@ -10,6 +10,7 @@ import {
 } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { replyAction } from "@/lib/customer-workspace/actions";
 import type { HoldSlot, HoldState } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
@@ -27,6 +28,7 @@ import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
+import { refundMismatch } from "@/lib/payments/actions";
 import { replyToReview } from "@/lib/product-reviews/actions";
 import { retrySubscription } from "@/lib/subscriptions/actions";
 
@@ -107,11 +109,14 @@ export function useInlineActions() {
     }
 
     async function markSent(need: HomeNeed, inline: HomeInline) {
-        setBusy(need.id);
-        const res = await moveStage(inline.target, {
-            to: inline.stage as KitchenStage,
-        });
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                moveStage(inline.target, {
+                    to: inline.stage as KitchenStage,
+                }),
+            { setBusy: (on) => setBusy(on ? need.id : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
             return;
@@ -158,11 +163,8 @@ export function useInlineActions() {
             await takeBack();
             setDone(need.id, null);
             showSuccess(undoneText(inline, false));
-        } catch (error) {
-            showError(
-                "That couldn't be undone.",
-                error instanceof Error ? error.message : undefined,
-            );
+        } catch {
+            showError("That couldn't be undone.", "Try again.");
         }
     }
 
@@ -227,12 +229,11 @@ export function useInlineActions() {
     }
 
     async function retry(need: HomeNeed, inline: HomeInline) {
-        setBusy(need.id);
-        const res = await retrySubscription(
-            inline.target,
-            inline.via ?? "PAY_LINK",
+        const res = await runAction(
+            () => retrySubscription(inline.target, inline.via ?? "PAY_LINK"),
+            { setBusy: (on) => setBusy(on ? need.id : null) },
         );
-        setBusy(null);
+        if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
             return;
@@ -258,6 +259,27 @@ export function useInlineActions() {
         );
     }
 
+    /**
+     * Refund a payment taken at the wrong amount (PAY-06): exactly what it
+     * took goes back through the provider. The row leaves Home once the
+     * refund is on its way; the order or invoice stays as it was.
+     */
+    async function refund(need: HomeNeed, inline: HomeInline) {
+        const res = await runAction(() => refundMismatch(inline.target), {
+            setBusy: (on) => setBusy(on ? need.id : null),
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(failedText(inline), res.error);
+            return;
+        }
+        setDone(need.id, { text: inline.done });
+        showSuccess(
+            inline.done,
+            "Your payment provider sends it back. It can take a few days to reach them.",
+        );
+    }
+
     /** The confirm's button: run the row's action. */
     function confirm(need: HomeNeed) {
         const inline = need.inline;
@@ -273,7 +295,8 @@ export function useInlineActions() {
                 void markSent(need, inline);
                 return;
             case "once":
-                void retry(need, inline);
+                if (inline.kind === "REFUND") void refund(need, inline);
+                else void retry(need, inline);
                 return;
             case "held":
                 sendHeld(need, inline);

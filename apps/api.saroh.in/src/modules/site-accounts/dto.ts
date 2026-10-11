@@ -10,6 +10,7 @@ import {
     MinLength,
 } from "class-validator";
 
+import { CUSTOMER_PHONE } from "../../common/customer-phone";
 import type { AccountBookPay, BookingLocationType } from "../bookings/dto";
 import {
     ACCOUNT_BOOK_PAY,
@@ -17,6 +18,7 @@ import {
     INTAKE_NOTE_MESSAGE,
     MAX_INTAKE_NOTE,
 } from "../bookings/dto";
+import { qrSourceTagOf } from "../sites/qr-target";
 import type { PauseWeeks } from "../subscriptions/dto";
 import { PAUSE_WEEKS } from "../subscriptions/dto";
 import { MESSAGE_MAX } from "./thread-store";
@@ -132,10 +134,22 @@ export class AccountBookDto {
     @IsOptional()
     @Transform(trim)
     @IsString()
-    @Matches(/^\+?[\d\s()-]{6,24}$/, {
+    @Matches(CUSTOMER_PHONE, {
         message: "Check the phone number.",
     })
     bookerPhone?: string;
+
+    /**
+     * The tag the booking page's address carried when a QR code's scan
+     * opened it, `qr-<code>`. Never refuses a booking: anything that isn't
+     * a well-formed tag is dropped before validation (`qrSourceTagOf`),
+     * and the code is looked up on the customer's own site
+     * (`sites/qr-source.ts`).
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) => qrSourceTagOf(value))
+    @IsString()
+    source?: string;
 }
 
 /** The credit read (A10): what a customer could pay a class with, and when. */

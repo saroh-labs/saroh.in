@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { PageStep } from "../list-toolbar";
+
 /**
  * One primitive, three densities.
  *
@@ -109,8 +111,16 @@ export interface DataViewProps<TRow> {
     empty?: ReactNode;
     /** Free-text filter across these columns. Omit to hide the search field. */
     searchableColumnIds?: string[];
-    /** Named subsets, rendered as chips. The first is the default. */
+    /**
+     * Named subsets, drawn as ONE dropdown in the toolbar's row, each
+     * option with its count: the way a list is narrowed by status or kind.
+     * Never tabs (tabs are a screen's views) and never a row of chips. The
+     * first is the default, and a first one labelled "All" reads "All
+     * {noun}" in the box.
+     */
     filters?: DataFilter<TRow>[];
+    /** The dropdown's accessible name: what it narrows by. "Show". */
+    filterLabel?: string;
     /**
      * Which filter is active on first render, from the page's `?view=` param.
      * Read on the server and passed in rather than pulled from
@@ -118,18 +128,25 @@ export interface DataViewProps<TRow> {
      * boundary, and the value is only ever needed once.
      */
     initialFilterId?: string;
-    /**
-     * How the filters are drawn. `tabs` (default) is an underlined row above
-     * the toolbar. `segmented` puts them in the toolbar as one control beside
-     * search — for a page whose own tabs already sit above the list, so two
-     * underlined rows do not read as two levels of navigation.
-     */
-    filterStyle?: "tabs" | "segmented";
     isLoading?: boolean;
     error?: string | null;
-    /** What a row is, for counts and states: "3 products", "No products match…". */
-    noun?: { one: string; other: string };
-    /** Placeholder for the search field, e.g. "Search products". */
+    /**
+     * What a row is, in the thing's own word, for counts and states:
+     * "3 products", "No products match…". Required: a list that says
+     * "rows" is speaking the system's language, not the merchant's.
+     */
+    noun: { one: string; other: string };
+    /**
+     * Whether the list says how many it holds. A screen whose page header
+     * already carries the count ("12 bookings" beside the title) passes
+     * `false`: the total is then said once, and the list only speaks up
+     * when it is narrowed ("3 of 12 bookings").
+     */
+    showTotal?: boolean;
+    /**
+     * The search field's placeholder and name: "Search products". Without
+     * one it is "Search {noun}". Never "Search…".
+     */
     searchPlaceholder?: string;
     /**
      * Hide the Table/List switch. The viewport still decides — a table above
@@ -137,8 +154,32 @@ export interface DataViewProps<TRow> {
      * design want.
      */
     hideModeToggle?: boolean;
-    /** Extra toolbar controls beside the search — a storefront filter, say. */
+    /**
+     * The screen's own `ListSearch`, where the server searches (every
+     * record, not the page on screen). Takes the search slot in place of
+     * the built-in field.
+     */
+    toolbarSearch?: ReactNode;
+    /** Every filter past the three most used: one `MoreFilters` button. */
+    toolbarMore?: ReactNode;
+    /**
+     * Puts the screen's own filters back (the ones it drew in the toolbar's
+     * slots). Pass it only while one of them is narrowed: "Clear filters"
+     * then shows, and also clears the list's own search and subset.
+     */
+    onClearFilters?: () => void;
+    /**
+     * The list's one attention toggle (`AttentionToggle`), after the
+     * dropdowns.
+     */
+    toolbarAttention?: ReactNode;
+    /**
+     * Dropdown filters after the search (`ListFilter`): a location, a
+     * category.
+     */
     toolbarExtra?: ReactNode;
+    /** Pushed to the right, before the density switch: the sort. */
+    toolbarEnd?: ReactNode;
     /** Replaces the plain count at the toolbar's end, e.g. "4 products across 2 storefronts". */
     countLabel?: (visible: number, total: number) => string;
     /**
@@ -161,6 +202,28 @@ export interface DataViewProps<TRow> {
         note?: string;
         action?: ReactNode;
     };
+    /**
+     * For a list the server reads a page at a time: `rows` is then one
+     * page, already cut, and these are the whole list's numbers. The view
+     * draws every row it is given and its usual footer in its usual place,
+     * from these instead of its own count. Without it the view pages the
+     * rows it holds itself, at `viewId`'s remembered size.
+     */
+    paging?: DataPaging;
+}
+
+/** The footer's numbers, from a screen whose server cuts the pages. */
+export interface DataPaging {
+    /** The page on screen, from 1. */
+    page: number;
+    /** How many rows the whole list holds, under its filters. */
+    total: number;
+    /** Rows a page: one of `PAGE_SIZES`. */
+    size: number;
+    /** How to reach a page: an address, or what to do. */
+    to: (page: number) => PageStep;
+    /** A size was chosen. The screen starts again at page 1. */
+    onSize: (size: number) => void;
 }
 
 /**

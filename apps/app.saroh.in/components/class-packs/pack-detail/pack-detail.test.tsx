@@ -11,6 +11,10 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    openOptions,
+    pickOption,
+} from "@/components/shared/pick-option.test-kit";
 import type { PackDetailTab } from "@/lib/class-packs/pack-detail";
 import type {
     PackDetail,
@@ -46,7 +50,10 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/class-packs/actions", () => actions);
 
+import { pinClock } from "@/lib/format/test-clock";
 import { PackDetailScreen } from "./pack-detail";
+
+pinClock();
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-10-01T06:30:00.000Z");
@@ -214,7 +221,7 @@ function typeInto(el: HTMLInputElement, value: string) {
 
 /** The dialog's Extend: the last one on the page, after the row's. */
 function saveExtend(): HTMLButtonElement {
-    const hit = buttons("Extend").at(-1);
+    const hit = buttons("Extend pack").at(-1);
     if (!hit) throw new Error("No Extend in the dialog");
     return hit;
 }
@@ -236,7 +243,12 @@ async function flush() {
 describe("Pack Detail's Who has it", () => {
     it("extends a holder by 7 days: the new date, and a refresh", async () => {
         render({ state: "ok", data: [ASHA] });
-        expect(text()).toContain("Can still use · 1");
+        // Who has it is a dropdown; open, each choice says how many.
+        expect(openOptions("Who has it")).toEqual([
+            "Can still use 1",
+            "Used up or expired 0",
+        ]);
+        pickOption("Who has it", "Can still use");
         expect(text()).toContain("6 of 10");
         expect(text()).toContain("Use by 10 Nov");
         expect(text()).toContain("Bought 1 Sep · ₹1,500 · UPI");
@@ -245,9 +257,8 @@ describe("Pack Detail's Who has it", () => {
 
         click(button("Extend"));
         expect(text()).toContain("Extend Asha Rao's pack");
-        // Nothing saves without a reason.
-        const extend = buttons("Extend").at(-1);
-        expect(extend?.disabled).toBe(true);
+        // The button is never off: without a reason it says so.
+        expect(saveExtend().disabled).toBe(false);
 
         click(button("+7 days"));
         expect(text()).toContain("New use-by: Tue 17 Nov");
@@ -256,7 +267,6 @@ describe("Pack Detail's Who has it", () => {
             ok: true,
             data: { ...ASHA, expiresAt: inDays(47), extendedDays: 7 },
         });
-        expect(buttons("Extend").at(-1)?.disabled).toBe(false);
         click(saveExtend());
         await flush();
         expect(actions.extendHolder).toHaveBeenCalledWith(
@@ -292,14 +302,14 @@ describe("Pack Detail's Who has it", () => {
 
     it("a pack nobody holds offers Sell this pack", () => {
         render({ state: "ok", data: [] });
-        expect(text()).toContain("Nobody has this pack yet");
+        expect(text()).toContain("No one has this pack yet");
         click(button("Sell this pack"));
         expect(text()).toContain("Sell Ten classes");
     });
 
     it("a failed holders read is named in this tab, and the page stays", () => {
         render({ state: "failed" });
-        expect(text()).toContain("Who has it could not be loaded");
+        expect(text()).toContain("Couldn't load who has this pack");
         expect(button("Try again")).toBeTruthy();
         // The header and the tabs are still there.
         expect(document.querySelector("h1")?.textContent).toBe("Ten classes");
@@ -307,7 +317,7 @@ describe("Pack Detail's Who has it", () => {
         expect(refresh).toHaveBeenCalled();
         click(button("Overview"));
         expect(text()).toContain("Linked to this pack");
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
     });
 
     it("a role that can't change packs sees Extend off, with why", () => {
@@ -333,7 +343,7 @@ describe("Pack Detail's Who has it", () => {
                 },
             ],
         });
-        click(button(/^Used up or expired/));
+        pickOption("Who has it", "Used up or expired");
         expect(text()).toContain("All used");
         expect(button("Extend").disabled).toBe(true);
         expect(text()).toContain("Nothing left to extend");
@@ -434,7 +444,7 @@ describe("Pack Detail's Used this week (E17)", () => {
             },
         );
         expect(text()).toContain("Used this week");
-        expect(text()).toContain("Thu 1 Oct 07:00");
+        expect(text()).toContain("Thu 1 Oct, 7:00 am");
         expect(text()).toContain("HIIT");
         expect(text()).toContain("Asha Rao");
         expect(text()).toContain("Booked");
@@ -452,12 +462,12 @@ describe("Pack Detail's Used this week (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "used", used: { state: "failed" } },
         );
-        expect(text()).toContain("Used this week could not be loaded");
+        expect(text()).toContain("Couldn't load what this pack paid for");
         expect(tabCount("used")).toBeNull();
         click(button("Try again"));
         expect(refresh).toHaveBeenCalled();
         click(button(/^Who has it/));
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
         expect(text()).toContain("6 of 10");
     });
 });
@@ -526,7 +536,7 @@ describe("Pack Detail's Sales (E17)", () => {
         expect(text()).toContain("₹1,500 now");
         expect(text()).toContain("Since 20 Aug · 1 bought at this price");
         expect(text()).toContain(
-            "Until 20 Aug · 1 bought at it — they keep it",
+            "Until 20 Aug · 1 bought at it, and they keep it",
         );
     });
 
@@ -551,10 +561,10 @@ describe("Pack Detail's Sales (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "sales", sales: { state: "failed" } },
         );
-        expect(text()).toContain("Sales could not be loaded");
+        expect(text()).toContain("Couldn't load this pack's sales");
         click(button("Overview"));
         expect(text()).toContain("Linked to this pack");
-        expect(text()).not.toContain("could not be loaded");
+        expect(text()).not.toContain("Couldn't load");
     });
 
     it("puts the price history in Everything about it", () => {
@@ -619,7 +629,7 @@ describe("Pack Detail's Activity (E17)", () => {
         );
         expect(tabCount("activity")).toBe("2+");
         expect(text()).toContain(
-            "Asha Rao's pack extended 7 days — Knee injury",
+            "Asha Rao's pack extended 7 days: Knee injury",
         );
         expect(text()).toContain("Sold to Asha Rao · ₹1,500 · None");
         expect(text()).toContain("Saroh support");
@@ -668,7 +678,7 @@ describe("Pack Detail's Activity (E17)", () => {
             { state: "ok", data: [ASHA] },
             { tab: "activity", events: { state: "failed" } },
         );
-        expect(text()).toContain("Activity could not be loaded");
+        expect(text()).toContain("Couldn't load this pack's activity");
         expect(tabCount("activity")).toBeNull();
         // Everything about it leaves out a price history it couldn't read.
         click(button("Overview"));

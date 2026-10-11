@@ -4,9 +4,12 @@ import type { ReactNode } from "react";
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
 import { CookieChoicesButton } from "./consent-banner";
-import { phoneText } from "./lib/phone";
+import type { SiteContact } from "./site-footer-contact";
+import { FOOTER_LINK, FooterContact } from "./site-footer-contact";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
+import type { SiteSeller } from "./sold-by";
+import { SoldByBlock } from "./sold-by";
 import { trimTrailingSlashes } from "./url-path";
 
 /**
@@ -60,21 +63,7 @@ export function footerLine(
     return { kind: "html", value: inner };
 }
 
-/** A trimmed string, or null when there is nothing in it. */
-function nonBlank(value: string | null | undefined): string | null {
-    const trimmed = value?.trim() ?? "";
-    return trimmed === "" ? null : trimmed;
-}
-
-/**
- * The business's public phone and place (UX-038), and its contact email
- * when it has added one (DEC-101), for the footer.
- */
-export interface SiteContact {
-    phone: string | null;
-    address: string | null;
-    email?: string | null;
-}
+export type { SiteContact, SiteContactPlace } from "./site-footer-contact";
 
 /**
  * The Saroh credit a Free site's footer carries (DEC-102): "Made with
@@ -83,6 +72,12 @@ export interface SiteContact {
  */
 export interface SiteCredit {
     href: string;
+    /**
+     * "Report", beside the credit (DEC-121): where a customer reports the
+     * business to Saroh (`reportBusinessHref`). Free only, as the credit is:
+     * a paid site carries no Saroh link at all.
+     */
+    reportHref?: string | null;
 }
 
 /** Where "Made with Saroh" links: saroh.in with the business's code. */
@@ -103,7 +98,10 @@ export function madeWithSarohHref(referralCode: string): string {
  * read the Visit us block and the booking header show (`/visit`, G8, DEC-053),
  * where Settings › Business calls the number "Phone on your website". Its
  * `email` is the business's contact email, shown when the business has added
- * one (DEC-101); Settings › Business says the site shows it.
+ * one (DEC-101); Settings › Business says the site shows it. Its `places`
+ * and `social` are where customers come and the business's social links
+ * (DEC-128), from the public contact read; the group is `FooterContact`,
+ * drawn by both layouts, and nothing is drawn for what isn't set.
  *
  * The link is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -124,6 +122,7 @@ export function SiteFooter({
     contact = null,
     credit = null,
     cookieChoices = false,
+    seller = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
@@ -137,18 +136,38 @@ export function SiteFooter({
      * visitor (DEC-108). Off draws nothing.
      */
     cookieChoices?: boolean;
+    /**
+     * "Sold by ‹legal name›" with the registered address (DEC-121), on
+     * every plan, in the business's own details. The renderer passes it for
+     * a published site; null draws none (the editor's canvas, the catalog).
+     * Its email and phone are drawn only in the `left` layout, which has no
+     * contact row of its own.
+     */
+    seller?: SiteSeller | null;
 }) {
-    const phone = nonBlank(contact?.phone);
-    const email = nonBlank(contact?.email);
-    const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
+    const left = footer?.layout === "left";
+    const owner = seller ? (
+        <SoldByBlock
+            seller={
+                left
+                    ? seller
+                    : // The contact row above already shows these.
+                      { ...seller, email: null, phone: null }
+            }
+            className={left ? "mt-3 text-left" : "mt-2"}
+            linkClassName={FOOTER_LINK}
+        />
+    ) : null;
     if (footer?.layout === "left") {
         return (
             <LeftFooter
                 written={written}
                 name={name}
+                contact={contact}
                 credit={credit}
                 cookieChoices={cookieChoices}
+                owner={owner}
             />
         );
     }
@@ -177,26 +196,7 @@ export function SiteFooter({
                         </p>
                     )
                 ) : null}
-                {phone || email || address ? (
-                    <p className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]">
-                        {phone ? (
-                            <a
-                                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-                                className={FOOTER_LINK}
-                            >
-                                {/* "+91 98450 12345", as Visit us
-                                    writes it (DEC-053, #874). */}
-                                Call {phoneText(phone)}
-                            </a>
-                        ) : null}
-                        {email ? (
-                            <a href={`mailto:${email}`} className={FOOTER_LINK}>
-                                {email}
-                            </a>
-                        ) : null}
-                        {address ? <span>{address}</span> : null}
-                    </p>
-                ) : null}
+                <FooterContact contact={contact} align="centre" />
                 {hasLine || credit || cookieChoices ? (
                     <p>
                         {line && hasLine ? (
@@ -213,18 +213,21 @@ export function SiteFooter({
                         ) : null}
                         {hasLine && credit ? " · " : null}
                         {credit ? <MadeWithSaroh credit={credit} /> : null}
+                        {credit?.reportHref ? (
+                            <>
+                                {" · "}
+                                <ReportLink href={credit.reportHref} />
+                            </>
+                        ) : null}
                         {(hasLine || credit) && cookieChoices ? " · " : null}
                         {cookieChoices ? <CookieChoicesButton /> : null}
                     </p>
                 ) : null}
+                {owner}
             </div>
         </footer>
     );
 }
-
-/** A link in the footer, in the footer's own colours. */
-const FOOTER_LINK =
-    "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2";
 
 /**
  * "Made with Saroh" (DEC-102), in the footer's own colours and type, never
@@ -250,6 +253,24 @@ function MadeWithSaroh({
 }
 
 /**
+ * "Report" (DEC-121), beside the credit on Free: a customer's way to tell
+ * Saroh about the business. In the footer's own colours, as the credit is.
+ */
+function ReportLink({ href }: { href: string }) {
+    return (
+        <a
+            href={href}
+            target="_blank"
+            rel="noopener"
+            aria-label="Report this business to Saroh"
+            className={FOOTER_LINK}
+        >
+            Report
+        </a>
+    );
+}
+
+/**
  * The `left` footer — the designs' row (Bakery, Ceramics, Blogs): one row
  * on the page's column, its margins inside the column so it lines up with
  * the header and the sections, wrapping on a phone —
@@ -261,13 +282,18 @@ function MadeWithSaroh({
 function LeftFooter({
     written,
     name,
+    contact,
     credit,
     cookieChoices,
+    owner,
 }: {
     written: SiteFooterContent | null;
     name: string;
+    contact: SiteContact | null;
     credit: SiteCredit | null;
     cookieChoices: boolean;
+    /** "Sold by ‹legal name›", under the row (DEC-121); null draws none. */
+    owner: ReactNode;
 }) {
     const line = written ? footerLine(written) : null;
     return (
@@ -289,6 +315,7 @@ function LeftFooter({
                         </p>
                     )
                 ) : null}
+                <FooterContact contact={contact} align="left" />
                 <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[13.5px]">
                     <span className="font-site-heading text-base font-semibold tracking-[-0.02em]">
                         {name.trim()}
@@ -312,7 +339,11 @@ function LeftFooter({
                             className={cookieChoices ? "" : "ml-auto"}
                         />
                     ) : null}
+                    {credit?.reportHref ? (
+                        <ReportLink href={credit.reportHref} />
+                    ) : null}
                 </div>
+                {owner}
             </div>
         </footer>
     );
@@ -515,7 +546,7 @@ export function SiteHeader({
             <div className="max-w-site-content mx-auto flex min-h-11 items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
                 <Link
                     href={to("/")}
-                    aria-label={`${name} — home`}
+                    aria-label={`${name}, home`}
                     className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
                 >
                     <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">

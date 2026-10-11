@@ -1,19 +1,23 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
+import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { readInvoice } from "@/lib/invoices/actions";
 import { newPayLink } from "@/lib/invoices/link-actions";
@@ -38,6 +42,11 @@ import {
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
+import {
+    copyFailedMessage,
+    copyText as writeClipboard,
+} from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 
 type Read =
     | { state: "loading" }
@@ -119,7 +128,7 @@ export function InvoiceQuickLook({
         );
     }
 
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const pill = invoicePill(i);
     const who = billedTo(i);
     const late = whenLine(i);
@@ -157,24 +166,23 @@ export function InvoiceQuickLook({
         linkSight({ linkOut, held: remembered !== null }) === "unseen";
 
     async function copyText(url: string, made: boolean) {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess(
-                made
-                    ? `Pay link copied. Send it to ${who.name}.`
-                    : "Pay link copied.",
-            );
-        } catch {
-            showError("Couldn't copy it. Select the link below and copy it.");
+        if (!(await writeClipboard(url))) {
+            showError(copyFailedMessage());
+            return;
         }
+        // A toast only when the link was also just made: it says who to
+        // send it to. A plain copy is acknowledged by the button.
+        if (made) showSuccess(`Pay link copied. Send it to ${who.name}.`);
+        else showSuccess("Pay link copied.");
     }
 
     async function copyLink() {
         if (!i) return;
         if (shown) return copyText(shown, false);
-        setBusy(true);
-        const res = await newPayLink(i.id, full?.updatedAt);
-        setBusy(false);
+        const res = await runAction(() => newPayLink(i.id, full?.updatedAt), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return reportFailure(res);
         setShown(res.data.url);
         await copyText(res.data.url, true);
@@ -218,7 +226,7 @@ export function InvoiceQuickLook({
                     )}
                 </>
             }
-            status={<InvoicePill label={pill.label} variant={pill.variant} />}
+            status={<StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>}
             description={`${paperTitle(i)} for ${who.name}, ${money(i.total)}.`}
             footer={
                 <>
@@ -227,7 +235,6 @@ export function InvoiceQuickLook({
                             type="button"
                             variant="outline"
                             onClick={() => setShown(remembered)}
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             Show link again
                         </Button>
@@ -239,7 +246,6 @@ export function InvoiceQuickLook({
                             onClick={() =>
                                 unseen ? setConfirming(true) : void copyLink()
                             }
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             {copyLinkLabel({
                                 busy,
@@ -248,27 +254,21 @@ export function InvoiceQuickLook({
                             })}
                         </Button>
                     ) : null}
-                    <Button
-                        asChild
-                        className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                    >
+                    <Button asChild className="min-w-[160px] flex-1">
                         <Link href={invoiceHref(i.id)}>Open invoice</Link>
                     </Button>
                 </>
             }
         >
             {i.standing === "OVERDUE" && i.dueAt ? (
-                <div
-                    role="alert"
-                    className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
-                >
-                    {late.before} — due{" "}
+                <Notice tone="error">
+                    {late.before}, due{" "}
                     <ViewerDate
                         iso={i.dueAt}
                         variant="dayMonth"
                         timeZone={timeZone}
                     />
-                </div>
+                </Notice>
             ) : null}
 
             <QuickLookCard label="Billed to">
@@ -315,25 +315,14 @@ export function InvoiceQuickLook({
                 aria-busy={read.state === "loading"}
             >
                 {read.state === "failed" ? (
-                    <div
-                        role="alert"
-                        className="flex flex-wrap items-center gap-2 px-4 py-3 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        <span className="flex-1">
-                            The lines could not be loaded. {read.error}
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setRead({ state: "loading" });
-                                setAttempt((n) => n + 1);
-                            }}
-                        >
-                            Try again
-                        </Button>
-                    </div>
+                    <FailedRead
+                        className="px-4 py-3"
+                        things="the lines"
+                        onRetry={() => {
+                            setRead({ state: "loading" });
+                            setAttempt((n) => n + 1);
+                        }}
+                    />
                 ) : full?.lines ? (
                     full.lines.map((l) => (
                         <div
@@ -354,10 +343,14 @@ export function InvoiceQuickLook({
                         </div>
                     ))
                 ) : (
-                    <div className="grid gap-2 px-4 py-3" role="status">
+                    <div
+                        className="grid gap-2 px-4 py-3"
+                        role="status"
+                        aria-busy="true"
+                    >
                         <span className="sr-only">Loading the lines</span>
-                        <div className="h-4 w-3/4 rounded-[6px] bg-muted" />
-                        <div className="h-4 w-1/2 rounded-[6px] bg-muted" />
+                        <Skeleton aria-hidden className="h-4 w-3/4" />
+                        <Skeleton aria-hidden className="h-4 w-1/2" />
                     </div>
                 )}
                 <TaxRows
@@ -424,6 +417,16 @@ export function ShownLink({
                 >
                     <Copy aria-hidden className="size-4" />
                 </Button>
+                <QrButton
+                    compact="always"
+                    link={{
+                        mode: "instant",
+                        url,
+                        what: "this invoice's pay link",
+                        opens: "pay",
+                        fileName: "pay-link-qr",
+                    }}
+                />
             </div>
             <p className="text-[12px] leading-[1.45] text-muted-foreground">
                 Kept here until you close this tab. Copying it again
@@ -452,7 +455,7 @@ export function TaxRows({
         email: null,
     }).name;
     const rows: [string, string][] = isExemptPaper(i)
-        ? [["Exempt from GST — no tax is charged", ""]]
+        ? [["Exempt from GST. No tax is charged", ""]]
         : i.gst
           ? [
                 ["Taxable value", money(i.subtotal)],
@@ -465,7 +468,7 @@ export function TaxRows({
             ]
           : Number(i.tax) > 0
             ? [["Tax", money(i.tax)]]
-            : [[`No GST — ${seller} isn't registered`, ""]];
+            : [[`No GST. ${seller} isn't registered`, ""]];
     return (
         <div className="py-1">
             {rows.map(([k, v]) => (
@@ -489,7 +492,7 @@ function payLine(i: Invoice, money: (a: string) => string) {
     if (i.order && (i.standing === "PAID" || i.standing === "CREDITED")) {
         return i.standing === "CREDITED"
             ? "Refunded on the order. A credit note cancels it."
-            : "Paid with the order — its payments and refunds are made there.";
+            : "Paid with the order. Its payments and refunds are made there.";
     }
     switch (i.standing) {
         case "PAID":
@@ -506,9 +509,9 @@ function payLine(i: Invoice, money: (a: string) => string) {
                 </>
             );
         case "CREDITED":
-            return "Cancelled. A credit note cancels it — nothing is owed.";
+            return "Cancelled. A credit note cancels it. Nothing is owed.";
         case "VOID":
-            return "Voided — nothing is owed.";
+            return "Voided. Nothing is owed.";
         case "DRAFT":
             return "A draft has no number and can still change.";
         default:

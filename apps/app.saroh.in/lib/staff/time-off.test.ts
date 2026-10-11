@@ -45,7 +45,7 @@ describe("offLines", () => {
             closed: true,
         });
         expect(offLineLabel(line)).toBe(
-            "2 Nov – 6 Nov · 5 days · all day · business closed",
+            "2 Nov to 6 Nov · 5 days · all day · business closed",
         );
     });
 
@@ -62,7 +62,7 @@ describe("offLines", () => {
         expect(lines).toHaveLength(1);
         expect(lines[0].ids).toEqual(["a", "b", "c"]);
         expect(offLineLabel(lines[0])).toBe(
-            "2 Nov – 4 Nov · 3 days · 14:00–18:00",
+            "2 Nov to 4 Nov · 3 days · 2:00 to 6:00 pm",
         );
     });
 
@@ -77,7 +77,7 @@ describe("offLines", () => {
             false,
         );
         expect(lines.map((l) => l.ids)).toEqual([["a"], ["b"], ["c"]]);
-        expect(offLineLabel(lines[0])).toBe("Mon 2 Nov · 14:00–18:00");
+        expect(offLineLabel(lines[0])).toBe("Mon 2 Nov · 2:00 to 6:00 pm");
     });
 
     it("names a single all-day with its weekday", () => {
@@ -124,7 +124,7 @@ describe("the form's words", () => {
             tone: "danger",
         });
         expect(offNote({ refusal: null, taken: 3, closed: true })).toEqual({
-            text: "3 bookings fall in this time. They're kept — move or cancel them from the calendar.",
+            text: "3 bookings fall in this time. They're kept. Move or cancel them from the calendar.",
             tone: "warn",
         });
         expect(

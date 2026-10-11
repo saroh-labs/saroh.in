@@ -78,7 +78,7 @@ function askedFromUrl(): string | null {
 
 /** The site's words when the form couldn't be read. */
 export const ENQUIRY_FALLBACK_ERROR =
-    "Something went wrong — please check your details and try again.";
+    "Something went wrong. Please check your details and try again.";
 
 /**
  * What a refused enquiry says to the visitor (UX-066), from the API's error
@@ -100,7 +100,7 @@ export function enquiryErrorMessage(
         field?.label.trim() ? field.label : (field?.name ?? "")
     ).trim();
     if (details?.reason === "invalid_email") {
-        return "That email doesn't look right — check for a missing @ or a typo.";
+        return "That email doesn't look right. Check for a missing @ or a typo.";
     }
     if (details?.reason === "required") {
         return label
@@ -111,6 +111,20 @@ export function enquiryErrorMessage(
 }
 
 /** Map an enquiry field type to the native input type / control. */
+/**
+ * What the browser may fill a field with: an email or a phone by its type,
+ * a name by what the form calls it. Anything else is left to the browser.
+ */
+export function autoCompleteFor(field: {
+    type: RenderedEnquiry["fields"][number]["type"];
+    name: string;
+}): string | undefined {
+    if (field.type === "email") return "email";
+    if (field.type === "tel") return "tel";
+    if (field.type === "textarea") return undefined;
+    return /^(full[\s_-]?)?name$/i.test(field.name.trim()) ? "name" : undefined;
+}
+
 function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
     switch (type) {
         case "email":
@@ -227,7 +241,7 @@ function EnquiryForm({
                 setState({
                     kind: "error",
                     message:
-                        "You've sent this a few times — please wait a moment and try again.",
+                        "You've sent this a few times. Please wait a moment and try again.",
                 });
                 return;
             }
@@ -247,7 +261,7 @@ function EnquiryForm({
             setState({
                 kind: "error",
                 message:
-                    "We couldn't reach the server — please check your connection and try again.",
+                    "We couldn't reach the server. Please check your connection and try again.",
             });
         }
     }
@@ -258,7 +272,7 @@ function EnquiryForm({
                 <div className="border-site-border bg-site-surface rounded-[var(--site-radius)] border p-8 text-center">
                     <p className="text-site-fg text-lg font-medium">
                         {content.successMessage ??
-                            "Thanks — we'll be in touch soon."}
+                            "Thanks, we'll be in touch soon."}
                     </p>
                 </div>
             </section>
@@ -307,8 +321,10 @@ function EnquiryForm({
                                 [field.name]: e.target.value,
                             })),
                     };
+                    // `text-base`: under 16px, iOS Safari zooms the page
+                    // when a field takes focus.
                     const controlClasses =
-                        "w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
+                        "w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-base text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
                     return (
                         <div key={i} className="grid gap-1.5">
                             <label
@@ -336,6 +352,7 @@ function EnquiryForm({
                                 <input
                                     {...shared}
                                     type={inputTypeFor(field.type)}
+                                    autoComplete={autoCompleteFor(field)}
                                     className={controlClasses}
                                 />
                             )}
@@ -516,7 +533,7 @@ function ThreadForm({
                                 setState({ kind: "idle" });
                             }
                         }}
-                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 text-base outline-none focus:ring-2"
                     />
                 </div>
 

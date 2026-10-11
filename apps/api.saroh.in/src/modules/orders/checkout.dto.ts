@@ -14,6 +14,7 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { qrSourceTagOf } from "../sites/qr-target";
 import { MAX_BAG_LINES, MAX_LINE_QUANTITY } from "./checkout-quote";
 import type { CheckoutPayment } from "./checkout-readiness";
 import { DeliveryAddressInput } from "./dto";
@@ -106,7 +107,7 @@ export class CheckoutStartDto {
     /**
      * How it is paid: online in the provider's window (the default, and
      * what a site from before offline checkout sends by leaving it out), or
-     * on handover — "Pay when you collect", "Pay on delivery".
+     * on handover — "Pay at pick-up", "Pay on delivery".
      */
     @IsOptional()
     @IsIn(CHECKOUT_PAYMENTS, { message: "Choose how you'll pay" })
@@ -140,4 +141,16 @@ export class CheckoutStartDto {
         message: "A checkout key is 8 to 64 letters, digits, - or _",
     })
     key!: string;
+
+    /**
+     * The tag the page's address carried when a QR code's scan opened it,
+     * `qr-<code>`. Never refuses an order: anything that isn't a
+     * well-formed tag is dropped before validation (`qrSourceTagOf`), and
+     * the code is looked up on the customer's own site
+     * (`sites/qr-source.ts`).
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) => qrSourceTagOf(value))
+    @IsString()
+    source?: string;
 }

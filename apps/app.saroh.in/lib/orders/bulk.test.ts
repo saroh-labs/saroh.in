@@ -243,7 +243,7 @@ describe("commitSummary", () => {
             ],
         });
         expect(commitSummary(b, "handover")).toBe(
-            "0 orders done. 3 couldn't be: not paid yet; not found. 1 still going through",
+            "0 orders done. 3 couldn't be: not paid yet, not found. 1 still going through",
         );
         expect(anyMoved(b)).toBe(false);
     });

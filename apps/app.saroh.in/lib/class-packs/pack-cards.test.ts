@@ -81,7 +81,7 @@ describe("packCard", () => {
         expect(card.canArchive).toBe(false);
         expect(card.href).toBe("/class-packs/pk_1/edit");
         expect(card.openHref).toBeNull();
-        expect(card.why).toMatch(/^Draft — not on sale until you publish/);
+        expect(card.why).toMatch(/^Draft. Not on sale until you publish/);
     });
 
     it("a draft never says it has unpublished changes", () => {
@@ -211,7 +211,7 @@ describe("owedSummary", () => {
 describe("rulesNote", () => {
     it("names the free-cancel window", () => {
         expect(rulesNote(12)).toContain(
-            "Cancel 12 hours or more before and the class comes back; later, it's used.",
+            "Cancel 12 hours or more before and the class comes back. Later, it's used.",
         );
     });
 

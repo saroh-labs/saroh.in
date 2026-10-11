@@ -1,3 +1,5 @@
+import { AbsentOr } from "@saroh/ui/absent-value";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
@@ -59,9 +61,11 @@ export function PlanOverview({
                             </div>
                         ))
                     ) : (
-                        <p className="border-t border-border/70 pt-1.5 text-[13px] text-muted-foreground">
-                            Nobody&apos;s on this plan yet.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="border-t border-border/70 pt-1.5"
+                            title="No one is on this plan yet."
+                        />
                     )}
                 </section>
             </div>
@@ -77,7 +81,15 @@ export function PlanOverview({
                                     {g.label}
                                 </dt>
                                 <dd className="font-semibold tabular-nums">
-                                    {g.value}
+                                    <AbsentOr
+                                        says={
+                                            g.label === "Price changes"
+                                                ? "Not known"
+                                                : "None"
+                                        }
+                                    >
+                                        {g.value}
+                                    </AbsentOr>
                                 </dd>
                             </div>
                         ))}
@@ -86,8 +98,8 @@ export function PlanOverview({
                 {autopay}
                 <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                     Changing the price only affects people who join after the
-                    change. Archiving stops new sign-ups; everyone already on it
-                    carries on.
+                    change. Archiving stops new sign-ups, and everyone already
+                    on it carries on.
                 </p>
             </aside>
         </div>

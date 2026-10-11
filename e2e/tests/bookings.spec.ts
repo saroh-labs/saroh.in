@@ -243,7 +243,7 @@ test.describe("bookings calendar", () => {
         if (!found) return;
         const sheet = await openPeek(page, found);
         await expect(
-            sheet.getByText("No phone yet — add it on their page"),
+            sheet.getByText("No phone yet. Add it on their page"),
         ).toBeVisible();
     });
 
@@ -285,14 +285,14 @@ test.describe("bookings calendar", () => {
         await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
         await page.keyboard.press("Escape");
 
-        // Past the hold (use-held.ts, HOLD_MS 8s), the booking is still
+        // Past the hold (use-hold.ts, ten seconds), the booking is still
         // booked and nothing was sent. Running the page's clock on fires
         // whatever timer is still held, at once.
         const sent: string[] = [];
         page.on("request", (r) => {
             if (r.method() !== "GET") sent.push(r.url());
         });
-        await page.clock.runFor(9_000);
+        await page.clock.runFor(11_000);
         expect(sent).toEqual([]);
         const after = (await diaries(page.request, from, to))
             .flatMap((d) => d.bookings)
@@ -341,12 +341,12 @@ test.describe("bookings calendar", () => {
                     .click({ position: { x: 40, y: 300 } });
                 const dialog = page.getByRole("dialog");
                 await expect(dialog).toContainText(`Open ${person.name} from`);
-                const at = /from (\d\d:\d\d)/.exec(
+                const at = /from (\d{1,2}:\d\d [ap]m)/.exec(
                     (await dialog.getByRole("heading").first().innerText()) ||
                         "",
                 )?.[1];
                 const open = dialog.getByRole("button", {
-                    name: "Open for bookings",
+                    name: "Open time",
                 });
                 await expect(open).toBeEnabled();
                 await open.click();
@@ -356,8 +356,15 @@ test.describe("bookings calendar", () => {
 
                 // The new hours may join hours next to them: find the free gap
                 // that holds the time just opened.
-                const mins = (t: string) =>
-                    Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+                // "9:30 am": the 12-hour clock, read back as minutes.
+                const mins = (t: string) => {
+                    const [clock = "", period] = t.split(" ");
+                    const [h = "0", m = "0"] = clock.split(":");
+                    return (
+                        ((Number(h) % 12) + (period === "pm" ? 12 : 0)) * 60 +
+                        Number(m)
+                    );
+                };
                 const gaps = page.getByRole("button", {
                     name: new RegExp(`^Book ${person.name} at`),
                 });
@@ -369,8 +376,9 @@ test.describe("bookings calendar", () => {
                         )
                     ).findIndex((l) => {
                         const [, a = "", b = ""] =
-                            /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ??
-                            [];
+                            /at (\d{1,2}:\d\d [ap]m), free until (\d{1,2}:\d\d [ap]m)/.exec(
+                                l,
+                            ) ?? [];
                         return (
                             at !== undefined &&
                             mins(a) <= mins(at) &&
@@ -412,7 +420,9 @@ test.describe("bookings calendar", () => {
                 await book
                     .getByRole("radio", { name: "Pays at the session" })
                     .click();
-                await book.getByRole("button", { name: "Book it" }).click();
+                await book
+                    .getByRole("button", { name: "Create booking" })
+                    .click();
                 await expect(
                     page
                         .getByText(new RegExp(`^Booked ${customer} with`))
@@ -498,9 +508,8 @@ test.describe("New booking finds the customer (E4)", () => {
         await expect(chip).toBeVisible();
         await chip.click();
         await expect(chip).toBeChecked();
-        // Nothing is written until "Book it". The footer's Close and the
-        // corner's both read "Close"; the footer's comes first.
-        await book.getByRole("button", { name: "Close" }).first().click();
+        // Nothing is written until "Create booking": Cancel drops it.
+        await book.getByRole("button", { name: "Cancel" }).click();
         await expect(book).toBeHidden();
     });
 });
@@ -515,28 +524,55 @@ test.describe("availability and services", () => {
             page.getByRole("heading", { level: 1, name: "Availability" }),
         ).toBeVisible();
         const monday = page.getByRole("listitem").filter({ hasText: "Monday" });
-        const first = monday.getByText(/^\d\d:\d\d–\d\d:\d\d$/).first();
+        // A range reads "9:00 to 11:00 am", or "9:00 am to 6:00 pm".
+        const range = /^(\d{1,2}:\d\d)(?: ([ap]m))? to \d{1,2}:\d\d ([ap]m)$/;
+        const first = monday.getByText(range).first();
         test.skip(
             !(await first.count()),
             "The first person has no Monday hours",
         );
-        const [from = ""] = (await first.innerText()).split("–");
+        const [, start = "", own = "", shared = ""] =
+            range.exec((await first.innerText()).trim()) ?? [];
+        const from = `${start} ${own || shared}`;
+        // "+ Hours" adds in a small popover over the row, so no day moves.
         await monday.getByRole("button", { name: "+ Hours" }).click();
-        await monday.getByRole("combobox", { name: "From" }).click();
+        const adding = page.getByRole("dialog", {
+            name: "Add hours on Monday",
+        });
+        await adding.getByRole("combobox", { name: "From" }).click();
         await page.getByRole("option", { name: from, exact: true }).click();
-        await expect(monday.getByRole("alert")).toContainText(
+        await expect(adding.getByRole("alert")).toContainText(
             "That overlaps hours already set.",
         );
-        await monday.getByRole("button", { name: "Cancel" }).click();
+        await expect(
+            adding.getByRole("button", { name: "Add hours" }),
+        ).toBeDisabled();
+        await adding.getByRole("button", { name: "Cancel" }).click();
+        await expect(adding).toBeHidden();
+
+        // Time off is read first: the lines, then "Add time off", which
+        // opens a sheet. Its button adds to the page's draft, not saved
+        // until the Save bar's "Save".
+        const timeOff = page.getByRole("region", { name: "Time off" });
+        await expect(timeOff.getByRole("textbox")).toHaveCount(0);
+        await timeOff.getByRole("button", { name: "Add time off" }).click();
+        const sheet = page.getByRole("dialog", { name: "New time off" });
+        await expect(sheet).toBeVisible();
+        await sheet.getByLabel(/^Reason/).fill("E2E day off");
+        await sheet.getByRole("button", { name: "Add day off" }).click();
+        await expect(sheet).toBeHidden();
+        await expect(
+            timeOff.getByText("E2E day off · not saved yet"),
+        ).toBeVisible();
 
         await page
             .getByRole("button", { name: "Copy Monday to weekdays" })
             .click();
-        const bar = page.getByRole("button", { name: "Save hours" });
-        if (await bar.isVisible()) {
-            await page.getByRole("button", { name: "Discard" }).click();
-            await expect(bar).toBeHidden();
-        }
+        const bar = page.getByRole("button", { name: "Save", exact: true });
+        await expect(bar).toBeVisible();
+        await page.getByRole("button", { name: "Discard" }).click();
+        await expect(bar).toBeHidden();
+        await expect(timeOff.getByText("E2E day off")).toHaveCount(0);
     });
 
     test("a class under two places is refused, and leaving asks first (E2)", async ({
@@ -560,26 +596,43 @@ test.describe("availability and services", () => {
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("checkbox").first().click();
+            // With one person on the diary they are ticked already.
+            const first = who.getByRole("checkbox").first();
+            if ((await first.getAttribute("aria-checked")) !== "true") {
+                await first.click();
+            }
         }
+        // A field says what is wrong once it is left, and the button stays
+        // on: pressing it says the rest and goes to the first field.
         await page.getByLabel("Places").fill("1");
+        await page.getByLabel("Places").blur();
         await expect(page.getByRole("alert").first()).toHaveText(
             "A class needs at least 2 places.",
         );
         await expect(
             page.getByRole("button", { name: "Add service" }),
-        ).toBeDisabled();
+        ).toBeEnabled();
 
-        await page
+        // The app's one leave question, as every create and edit flow asks
+        // it: Stay keeps what was typed, Leave goes where the link pointed.
+        const crumb = page
             .getByRole("navigation", { name: "Breadcrumb" })
-            .getByRole("link", { name: "Services" })
-            .click();
-        await expect(
-            page.getByRole("alertdialog", {
-                name: "Leave without creating it?",
-            }),
-        ).toBeVisible();
-        await page.getByRole("link", { name: "Leave without saving" }).click();
+            .getByRole("link", { name: "Services" });
+        const ask = page.getByRole("alertdialog", {
+            name: "Leave without saving?",
+        });
+        await crumb.click();
+        await expect(ask).toBeVisible();
+        await expect(ask).toContainText(
+            "The service isn't created yet, so nothing you've entered will be kept.",
+        );
+        await expect(ask.getByRole("button", { name: "Stay" })).toBeFocused();
+        await ask.getByRole("button", { name: "Stay" }).click();
+        await expect(ask).toBeHidden();
+        await expect(page.getByLabel("Name")).toHaveValue("E2E class");
+
+        await crumb.click();
+        await ask.getByRole("button", { name: "Leave", exact: true }).click();
         await expect(
             page.getByRole("heading", { level: 1, name: "Services" }),
         ).toBeVisible();
@@ -610,14 +663,18 @@ test.describe("the Service Editor on Northwind (E2)", () => {
         test.skip(!opened, "Northwind doesn't take bookings");
         const name = `E2E either ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
-        await page.getByRole("radio", { name: "Either — they choose" }).click();
+        await page.getByRole("radio", { name: "Either, they choose" }).click();
         await page
             .getByLabel("Link to join")
             .fill("https://meet.example.com/e2e-either");
         await page.getByRole("textbox", { name: /^Price/ }).fill("500");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("checkbox").first().click();
+            // With one person on the diary they are ticked already.
+            const first = who.getByRole("checkbox").first();
+            if ((await first.getAttribute("aria-checked")) !== "true") {
+                await first.click();
+            }
         }
         await page.getByRole("button", { name: "Add service" }).click();
         await page.waitForURL(/\/services\/(?!new)[^/]+$/);
@@ -627,7 +684,8 @@ test.describe("the Service Editor on Northwind (E2)", () => {
                 page.getByRole("heading", { level: 1, name }),
             ).toBeVisible();
             await expect(
-                page.getByText("Taking bookings", { exact: true }),
+                // "Live", as every kind of thing says it.
+                page.getByText("Live", { exact: true }),
             ).toBeVisible();
 
             await page.goto("/services");

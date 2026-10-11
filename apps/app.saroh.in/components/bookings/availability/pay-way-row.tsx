@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-
-import { OptionSelect } from "@/components/shared/option-select";
 import { PAY_WAY, payWayHint } from "@/lib/services/availability-rules";
 import type { BookingPayment, OnlineBlocker } from "@/lib/staff/types";
+import { OptionSelect } from "@saroh/ui/option-select";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "How people pay when they book" on the Booking rules card (DEC-088):
@@ -30,12 +29,13 @@ export function PayWayRow({
             <div className="flex items-center gap-2 py-1.5">
                 <span className="flex-1 text-[13px]">{PAY_WAY.label}</span>
                 <OptionSelect
+                    size="sm"
                     aria-label={PAY_WAY.label}
                     aria-describedby="pay-way-hint"
                     disabled={disabled}
                     value={way}
                     onValueChange={(v) => onChange(v)}
-                    className="h-8 w-auto rounded-[8px] text-[12.5px]"
+                    className="w-auto"
                     options={[...PAY_WAY.options]}
                 />
             </div>
@@ -47,18 +47,17 @@ export function PayWayRow({
                 {needsFix ? (
                     <>
                         {" "}
-                        <Link
+                        <TextLink
                             href={
                                 blocker === "PAYMENTS_OFF"
                                     ? "/settings/modules"
                                     : "/settings/providers"
                             }
-                            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             {blocker === "PAYMENTS_OFF"
                                 ? "Turn on Payments"
                                 : "Connect a provider"}
-                        </Link>
+                        </TextLink>
                     </>
                 ) : null}
             </p>

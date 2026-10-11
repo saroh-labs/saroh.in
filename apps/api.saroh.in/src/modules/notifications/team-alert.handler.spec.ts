@@ -105,6 +105,7 @@ function makeTx() {
         },
         merchantPaymentProvider: { findFirst: jest.fn() },
         communicationProvider: { findFirst: jest.fn() },
+        $executeRaw: jest.fn().mockResolvedValue(0),
     };
 }
 type FakeTx = ReturnType<typeof makeTx>;
@@ -155,8 +156,10 @@ describe("a new order", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "order.new",
+            // The row opens the order.
+            orderId: "ord_1",
             title: "New order ORD-012 from Asha Rao",
-            body: "₹1,240.00, paid online.",
+            body: "₹1,240, paid online.",
         });
         expect(tx.customerNotice.update.mock.calls[0][0].data).toEqual({
             notificationId: "ntf_1",
@@ -211,7 +214,7 @@ describe("a new order", () => {
             mail: {
                 subject: "Rye & Co: New order ORD-012",
                 heading: "New order ORD-012",
-                body: "₹1,240.00, at the counter.",
+                body: "₹1,240, at the counter.",
                 url: "https://app.saroh.localhost/commerce/orders/ord_1",
                 footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",
             },
@@ -282,7 +285,7 @@ describe("a new order", () => {
         });
         expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
             title: "New order ORD-012 from Ravi",
-            body: "₹1,240.00, at the counter.",
+            body: "₹1,240, at the counter.",
         });
     });
 
@@ -325,14 +328,16 @@ describe("a failed payment", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "payment.failed",
+            // The row opens the invoice.
+            invoiceId: "inv_1",
             title: "Payment failed on invoice INV-0042",
-            body: "Meera Iyer's payment of ₹2,400.00 didn't go through. They can try again from the same link.",
+            body: "Meera Iyer's payment of ₹2,400 didn't go through. They can try again from the same link.",
         });
         expect(recipients(out)).toEqual(["u_owner", "u_admin"]);
         // The bell names the customer; Saroh's email doesn't.
         expect(out.emails[0].mail).toMatchObject({
             heading: "Payment failed on invoice INV-0042",
-            body: "A payment of ₹2,400.00 didn't go through. The customer can try again from the same link.",
+            body: "A payment of ₹2,400 didn't go through. The customer can try again from the same link.",
         });
     });
 
@@ -582,7 +587,7 @@ describe("a provider that refused the business's keys (UX-012)", () => {
         ).toEqual({ id: "mpp_1", organizationId: ORG });
         expect(
             tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
-        ).toBe(`team:provider:mpp_1:${SINCE}`);
+        ).toBe(`team:provider:mpp_1:down:${SINCE}`);
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "provider.attention",
@@ -638,6 +643,155 @@ describe("a provider that refused the business's keys (UX-012)", () => {
             expect(tx.notification.create).not.toHaveBeenCalled();
         }
     });
+
+    it("tells a refusal once per incident: not again while the last told is still 'stopped' (#555)", async () => {
+        const tx = makeTx();
+        tx.merchantPaymentProvider.findFirst.mockResolvedValue(
+            flagged("RAZORPAY"),
+        );
+        // Told of an earlier flag, never told it came back.
+        tx.customerNotice.findFirst.mockResolvedValue({
+            eventKey: "team:provider:mpp_1:down:2026-10-01T00:00:00.000Z",
+        });
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "provider",
+            change: "down",
+            channel: "PAYMENTS",
+            providerId: "mpp_1",
+            since: SINCE,
+        });
+        expect(out.told).toBe(false);
+        // The connection's alerts are told one at a time.
+        expect(tx.$executeRaw).toHaveBeenCalled();
+        expect(
+            tx.customerNotice.findFirst.mock.calls[0][0].where.eventKey,
+        ).toEqual({ startsWith: "team:provider:mpp_1:" });
+
+        // After "working again" was told, a new refusal is a new incident.
+        tx.customerNotice.findFirst.mockResolvedValue({
+            eventKey: "team:provider:mpp_1:back:2026-10-02T00:00:00.000Z",
+        });
+        const again = await tellTeam(asTx(tx), ORG, {
+            event: "provider",
+            change: "down",
+            channel: "PAYMENTS",
+            providerId: "mpp_1",
+            since: SINCE,
+        });
+        expect(again.told).toBe(true);
+        // The email says it will tell them when it works again.
+        expect(again.emails[0].mail.body).toContain(
+            "We'll tell you when it works again.",
+        );
+    });
+
+    describe("working again", () => {
+        const BACK_AT = "2026-10-08T10:00:00.000Z";
+        const working = (provider: string) => ({
+            provider,
+            status: "CONNECTED",
+            attentionAt: null,
+        });
+        const back = (
+            channel: "PAYMENTS" | "EMAIL",
+            actorUserId: string | null = null,
+        ) => ({
+            event: "provider" as const,
+            change: "back" as const,
+            channel,
+            providerId: channel === "PAYMENTS" ? "mpp_1" : "cp_1",
+            since: BACK_AT,
+            actorUserId,
+        });
+
+        it("says payments can be taken again, after a refusal was told, but not to whoever fixed it", async () => {
+            const tx = makeTx();
+            tx.merchantPaymentProvider.findFirst.mockResolvedValue(
+                working("CASHFREE"),
+            );
+            tx.customerNotice.findFirst.mockResolvedValue({
+                eventKey: `team:provider:mpp_1:down:${SINCE}`,
+            });
+
+            const out = await tellTeam(
+                asTx(tx),
+                ORG,
+                back("PAYMENTS", "u_admin"),
+            );
+
+            expect(out.told).toBe(true);
+            expect(
+                tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
+            ).toBe(`team:provider:mpp_1:back:${BACK_AT}`);
+            expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+                organizationId: ORG,
+                type: "provider.back",
+                title: "Cashfree is working again",
+                body: "Customers can pay online again through Cashfree.",
+            });
+            expect(recipients(out)).toEqual(["u_owner"]);
+            expect(out.emails[0].mail).toMatchObject({
+                subject: "Rye & Co: Cashfree is working again",
+                url: "https://app.saroh.localhost/settings/providers",
+            });
+        });
+
+        it("says emails are going out again", async () => {
+            const tx = makeTx();
+            tx.communicationProvider.findFirst.mockResolvedValue(
+                working("RESEND"),
+            );
+            // A refusal told before #555 named no change: it was one.
+            tx.customerNotice.findFirst.mockResolvedValue({
+                eventKey: `team:provider:cp_1:${SINCE}`,
+            });
+
+            const out = await tellTeam(asTx(tx), ORG, back("EMAIL"));
+
+            expect(out.told).toBe(true);
+            expect(out.emails[0].mail).toMatchObject({
+                heading: "Resend is working again",
+                body: "Emails to your customers are going out through Resend again.",
+            });
+        });
+
+        it("says nothing when the stop was never told, was told back already, or it failed again since", async () => {
+            const cases: [unknown, { eventKey: string } | null][] = [
+                [working("RAZORPAY"), null],
+                [
+                    working("RAZORPAY"),
+                    { eventKey: `team:provider:mpp_1:back:${SINCE}` },
+                ],
+                [
+                    flagged("RAZORPAY"),
+                    { eventKey: `team:provider:mpp_1:down:${SINCE}` },
+                ],
+                [
+                    { ...working("RAZORPAY"), status: "DISABLED" },
+                    { eventKey: `team:provider:mpp_1:down:${SINCE}` },
+                ],
+            ];
+            for (const [row, last] of cases) {
+                const tx = makeTx();
+                tx.merchantPaymentProvider.findFirst.mockResolvedValue(row);
+                tx.customerNotice.findFirst.mockResolvedValue(last);
+                const out = await tellTeam(asTx(tx), ORG, back("PAYMENTS"));
+                expect(out.told).toBe(false);
+                expect(tx.notification.create).not.toHaveBeenCalled();
+            }
+        });
+
+        it("skips a job whose change it doesn't know", async () => {
+            const handler = new TeamAlertHandler();
+            await handler.handle({
+                id: "job_x",
+                organizationId: ORG,
+                type: TEAM_ALERT_TYPE,
+                payload: { ...back("PAYMENTS"), change: "sideways" },
+            } as unknown as Job);
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+        });
+    });
 });
 
 describe("the email", () => {
@@ -647,7 +801,7 @@ describe("the email", () => {
                 event: "order",
                 mail: {
                     heading: "New order ORD-1",
-                    body: "₹10.00, paid online.",
+                    body: "₹10, paid online.",
                 },
                 path: "/commerce/orders/ord_1",
             },
@@ -656,7 +810,7 @@ describe("the email", () => {
         expect(mail).toEqual({
             subject: "Rye & Co: New order ORD-1",
             heading: "New order ORD-1",
-            body: "₹10.00, paid online.",
+            body: "₹10, paid online.",
             url: "https://app.saroh.localhost/commerce/orders/ord_1",
             footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",
         });
@@ -800,7 +954,7 @@ describe("a new website order (UX-042)", () => {
             mail: {
                 subject: "Rye & Co: New order ORD-012",
                 heading: "New order ORD-012",
-                body: "₹1,240.00, paid online.",
+                body: "₹1,240, paid online.",
                 url: "https://app.saroh.localhost/commerce/orders/ord_1",
                 cta: "Open the order",
                 footer: "You get this because email is on for “New order” in your alerts at Rye & Co. You can change it in Saroh, in Settings under Your profile.",
@@ -933,6 +1087,8 @@ describe("the website's review (UX-043)", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toEqual({
             organizationId: ORG,
             type: "site.review.approved",
+            // The row opens the website.
+            siteId: "site_1",
             title: "Rina Reviewer approved Rye & Co",
             body: "With 1 open note to look at before it goes live.",
         });

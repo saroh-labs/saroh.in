@@ -1,3 +1,4 @@
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -67,7 +68,7 @@ export function InvoicePaper({
     // Its dates in the business's zone, as the customer's copy prints them
     // (#836), never the viewer's.
     const zone = invoiceZone(business);
-    const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, i.currency);
     const who = billedTo(i);
     const gst = i.gst ?? null;
     // GST charged on it: a tax invoice's columns, which a bill of supply
@@ -153,9 +154,7 @@ export function InvoicePaper({
                     </p>
                 </div>
                 <div className="text-right">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        {title}
-                    </p>
+                    <p className="label">{title}</p>
                     <p className="mt-[3px] font-mono text-[15px]">
                         {i.number ?? "Draft"}
                     </p>
@@ -180,7 +179,7 @@ export function InvoicePaper({
                                 ) : null}
                             </>
                         ) : (
-                            "Draft — not numbered"
+                            "Draft, not numbered"
                         )}
                     </p>
                     {i.related ? (
@@ -196,9 +195,7 @@ export function InvoicePaper({
 
             <div className="flex flex-wrap gap-5 py-3.5">
                 <div className="min-w-0 flex-[1_1_200px]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Billed to
-                    </p>
+                    <p className="label">Billed to</p>
                     <p className="mt-1 text-[14px] font-semibold">{who.name}</p>
                     {address || who.email ? (
                         <p className="text-[12px] leading-[1.5] text-muted-foreground">
@@ -213,16 +210,16 @@ export function InvoicePaper({
                 </div>
                 {taxed ? (
                     <div className="min-w-0 flex-[0_1_200px]">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Place of supply
-                        </p>
+                        <p className="label">Place of supply</p>
                         <p className="mt-1 text-[13px]">
-                            {taxed.placeOfSupply
-                                ? `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
-                                : "—"}
+                            {taxed.placeOfSupply ? (
+                                `${taxed.placeOfSupply.name ?? "State"} (${taxed.placeOfSupply.code})`
+                            ) : (
+                                <AbsentValue says="Not set" />
+                            )}
                             {taxed.taxType === "INTER"
-                                ? " — IGST"
-                                : " — CGST + SGST"}
+                                ? " · IGST"
+                                : " · CGST + SGST"}
                         </p>
                     </div>
                 ) : null}
@@ -233,7 +230,7 @@ export function InvoicePaper({
                     className={cn(
                         COLS,
                         hsnColumn ? DESK_WITH_HSN : DESK,
-                        "border-b border-border py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+                        "label border-b border-border py-2",
                     )}
                 >
                     <span>Item</span>
@@ -359,9 +356,7 @@ export function InvoicePaper({
                     aria-label="How to pay us"
                     className="mt-[18px] break-inside-avoid"
                 >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        How to pay us
-                    </p>
+                    <p className="label">How to pay us</p>
                     {howToPay.map((line) => (
                         <p
                             key={line}

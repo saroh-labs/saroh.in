@@ -54,7 +54,7 @@ function draw(canEdit = true): string {
 describe("Availability with nobody on the diary (UX-022)", () => {
     it("still sets the business's booking rules: how people pay, cancellation, refunds", () => {
         const html = draw();
-        expect(html).toContain("Nobody takes bookings yet");
+        expect(html).toContain("No one takes bookings yet");
         expect(html).toMatch(/<h2[^>]*>Booking rules<\/h2>/);
         expect(html).toContain("How people pay when they book");
         expect(html).toContain(">Add someone<");
@@ -67,7 +67,7 @@ describe("Availability with nobody on the diary (UX-022)", () => {
         );
     });
 
-    it("saves a rule change as Save changes and says the rules were saved, never 'Hours saved'", () => {
+    it("saves a rule change with Save and says the rules were saved, never 'Hours saved.'", () => {
         const rules: SaveOp = { kind: "rules", rules: RULES, before: RULES };
         const hours = {
             kind: "hours",

@@ -1,21 +1,46 @@
+"use client";
+
 import { cn } from "@saroh/ui/lib/utils";
+import { ListTable, ListTableHead } from "@saroh/ui/list-table";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import type { ReactNode } from "react";
+import { Children } from "react";
+
+/*
+ * An optional column between the title and the right-hand edge (the Pages
+ * tab's Updated, #908). Fixed widths, the heading's and every row's alike, so
+ * the column lines up whatever the end holds. Desk only: below `sm` there is
+ * no room beside the title, and the page says the same thing in the row's
+ * sub line instead.
+ */
+const MIDDLE = "hidden w-[88px] shrink-0 text-right sm:block";
+const END_BESIDE_MIDDLE = "sm:w-[136px] sm:justify-end";
 
 /**
- * The workspace design's list: one bordered card, a row of column headings,
- * then a row per item with its title, a line under it, and whatever belongs
+ * The workspace design's list, in the one table look (`listTable`): one
+ * bordered card, the head band of column headings, then a row per item with its title, a line under it, and whatever belongs
  * on the right. Providers and Notifications draw it; the column headings are
  * what make the right-hand edge scannable as "status" or "when".
  */
 export function ListCard({
     main,
+    middle,
     end,
     note,
+    paged,
     children,
     className,
 }: {
+    /**
+     * Page the rows with the shared footer: the list's own id (its rows
+     * per page are kept under it) and what its rows are ("posts"). Left
+     * out for a card that is one of several on a screen, grouped by day.
+     */
+    paged?: { list: string; things: string };
     /** The left column's heading: "Provider", "Notification". */
     main: string;
+    /** A column's heading between the two: "Updated". Desk only. */
+    middle?: string;
     /** The right column's heading: "Status", "When". */
     end: string;
     /** A line under the card about what the list is. */
@@ -23,18 +48,28 @@ export function ListCard({
     children: ReactNode;
     className?: string;
 }) {
+    const all = Children.toArray(children);
+    const { rows, paging } = useLocalPages(paged?.list ?? "list-card", all, {
+        label: `Pages of ${paged?.things ?? "rows"}`,
+    });
     return (
         <div className={className}>
-            <div className="overflow-hidden rounded-[12px] border border-border">
-                <div
-                    aria-hidden
-                    className="flex items-center gap-3 border-b border-border bg-muted/40 px-[18px] py-[9px] text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-                >
+            <ListTable>
+                <ListTableHead className="flex gap-3">
                     <span className="min-w-0 flex-1">{main}</span>
-                    <span>{end}</span>
-                </div>
-                <ul>{children}</ul>
-            </div>
+                    {middle ? <span className={MIDDLE}>{middle}</span> : null}
+                    <span
+                        className={cn(
+                            middle && "text-right",
+                            middle && END_BESIDE_MIDDLE,
+                        )}
+                    >
+                        {end}
+                    </span>
+                </ListTableHead>
+                <ul>{paged ? rows : all}</ul>
+            </ListTable>
+            {paged ? paging : null}
             {note ? (
                 <p className="mt-2.5 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                     {note}
@@ -49,6 +84,7 @@ export function ListRow({
     title,
     sub,
     tag,
+    middle,
     end,
     muted,
     className,
@@ -57,6 +93,11 @@ export function ListRow({
     sub?: ReactNode;
     /** A pill beside the title: "Unread", a state. */
     tag?: ReactNode;
+    /**
+     * The cell under ListCard's `middle` heading. Desk only, so whatever it
+     * says must also be in `sub` for a phone.
+     */
+    middle?: ReactNode;
     /** The right-hand column. */
     end?: ReactNode;
     /** A read notification, a disabled provider: the title steps back. */
@@ -66,7 +107,7 @@ export function ListRow({
     return (
         <div
             className={cn(
-                "flex min-h-14 flex-wrap items-center gap-3 px-[18px] py-[13px]",
+                "flex min-h-14 flex-wrap items-center gap-3 px-[14px] py-[11px]",
                 className,
             )}
         >
@@ -88,8 +129,18 @@ export function ListRow({
                     </p>
                 ) : null}
             </div>
+            {middle !== undefined ? (
+                <div className={MIDDLE}>{middle}</div>
+            ) : null}
             {end ? (
-                <div className="flex shrink-0 items-center gap-2">{end}</div>
+                <div
+                    className={cn(
+                        "flex shrink-0 items-center gap-2",
+                        middle !== undefined && END_BESIDE_MIDDLE,
+                    )}
+                >
+                    {end}
+                </div>
             ) : null}
         </div>
     );

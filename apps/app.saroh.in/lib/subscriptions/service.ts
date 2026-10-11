@@ -678,7 +678,7 @@ export function subscribe(input: SubscribeInput) {
         "/subscriptions",
         "POST",
         input,
-        "Could not subscribe them.",
+        "Couldn't subscribe them.",
     );
 }
 /**
@@ -692,7 +692,7 @@ export function pauseSubscription(id: string, choice: PauseChoice) {
         `${sub(id)}/pause`,
         "POST",
         choice,
-        "Could not pause that.",
+        "Couldn't pause that.",
     );
 }
 export function resumeSubscription(id: string) {
@@ -700,7 +700,7 @@ export function resumeSubscription(id: string) {
         `${sub(id)}/resume`,
         "POST",
         {},
-        "Could not resume that.",
+        "Couldn't resume that.",
     );
 }
 export function cancelSubscription(id: string, when: "now" | "periodEnd") {
@@ -708,7 +708,7 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
         `${sub(id)}/cancel`,
         "POST",
         { when },
-        "Could not cancel that.",
+        "Couldn't cancel that.",
     );
 }
 /**
@@ -782,7 +782,7 @@ export function cancelAutopay(id: string) {
         `${sub(id)}/autopay/cancel`,
         "POST",
         {},
-        "Couldn't cancel autopay. Nothing changed — try again.",
+        "Couldn't cancel autopay. Nothing changed. Try again.",
     );
 }
 
@@ -791,7 +791,7 @@ export function keepSubscription(id: string) {
         `${sub(id)}/keep`,
         "POST",
         {},
-        "Could not keep that going.",
+        "Couldn't keep that going.",
     );
 }
 /** Skip one collection still to come; Undo is {@link unskipCollection}. */
@@ -800,7 +800,7 @@ export function skipCollection(id: string, date: string) {
         `${sub(id)}/skips`,
         "POST",
         { date },
-        "Could not skip that collection.",
+        "Couldn't skip that collection.",
     );
 }
 export function unskipCollection(id: string, date: string) {
@@ -808,7 +808,7 @@ export function unskipCollection(id: string, date: string) {
         `${sub(id)}/skips/${encodeURIComponent(date)}`,
         "DELETE",
         undefined,
-        "Could not bring that collection back.",
+        "Couldn't bring that collection back.",
     );
 }
 /** Move to another plan from the next renewal; Undo is {@link cancelPlanChange}. */
@@ -817,7 +817,7 @@ export function changePlan(id: string, planId: string) {
         `${sub(id)}/plan-change`,
         "POST",
         { planId },
-        "Could not change the plan.",
+        "Couldn't change the plan.",
     );
 }
 export function cancelPlanChange(id: string) {
@@ -825,7 +825,7 @@ export function cancelPlanChange(id: string) {
         `${sub(id)}/plan-change`,
         "DELETE",
         undefined,
-        "Could not keep the current plan.",
+        "Couldn't keep the current plan.",
     );
 }
 export function setPlanArchived(id: string, archived: boolean) {
@@ -834,7 +834,7 @@ export function setPlanArchived(id: string, archived: boolean) {
         "POST",
         {},
         archived
-            ? "Could not archive that plan."
-            : "Could not restore that plan.",
+            ? "Couldn't archive that plan."
+            : "Couldn't restore that plan.",
     );
 }

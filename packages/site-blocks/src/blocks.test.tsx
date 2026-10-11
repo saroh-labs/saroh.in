@@ -70,26 +70,33 @@ import { SITE_FONT_STACK, siteFontFamily } from "./tailwind-preset";
  */
 describe("block rendering", () => {
     /*
-     * The booking block asks for availability on mount now that its fixture
-     * names a Service. Stubbed rather than left to hit the network: a snapshot
-     * suite that depends on an API being up is a suite that fails for reasons
-     * that have nothing to do with the markup.
+     * The booking block asks for its service's days on mount now that its
+     * fixture names a Service. Stubbed rather than left to hit the network:
+     * a snapshot suite that depends on an API being up is a suite that fails
+     * for reasons that have nothing to do with the markup.
      *
-     * It resolves to no slots, which is the state the catalog shows too — the
-     * fixture's Service id belongs to no Service.
+     * It resolves to two weeks with nothing free, which is the state the
+     * catalog shows too — the fixture's Service id belongs to no Service.
      */
     const realFetch = globalThis.fetch;
     beforeAll(() => {
         globalThis.fetch = vi.fn(() =>
             Promise.resolve(
-                // A BARE ARRAY: that is what the availability endpoint
-                // returns. The first version of this stub sent
-                // `{ slots: [] }` and the component crashed with "slots is not
-                // iterable" — see #264, which is that crash, not this stub.
-                new Response(JSON.stringify([]), {
-                    status: 200,
-                    headers: { "content-type": "application/json" },
-                }),
+                // The days read's own shape. A body in any other shape lands
+                // in the block's error state — see #264, when one crashed it.
+                new Response(
+                    JSON.stringify({
+                        timezone: "Asia/Kolkata",
+                        kind: "one",
+                        capacity: 1,
+                        days: [],
+                        staff: [],
+                    }),
+                    {
+                        status: 200,
+                        headers: { "content-type": "application/json" },
+                    },
+                ),
             ),
         );
     });

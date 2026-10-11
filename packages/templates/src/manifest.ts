@@ -262,6 +262,13 @@ export interface TemplateFooter {
     line?: string;
     /** `left` for the designs' row; absent or `centre` for today's line. */
     layout?: "centre" | "left";
+    /**
+     * Lines this version started sites with before `line` was reworded (a
+     * copy fix, not a new design). Never written to a new site; kept so the
+     * pre-publish check still knows a footer nobody changed from one of
+     * them is the template's words, not the owner's.
+     */
+    formerLines?: readonly string[];
 }
 
 /**

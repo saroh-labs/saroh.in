@@ -4,12 +4,12 @@
  * and say them.
  */
 
-import { localDateKey } from "@/lib/format/datetime";
+import { formatDate, localDateKey } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 import type { StockEntryKind } from "./levels";
 import { signed } from "./levels";
 import type { Tone } from "./screen";
-import { dayWords, timeWords } from "./screen";
 
 // ---- Filters ----
 
@@ -102,7 +102,7 @@ export function entryNote(
     if (e.kind === "COUNTED") {
         if (e.mismatch && e.expected !== null) {
             parts.push(
-                `Counted ${e.after} against ${e.expected} shown; the log said ${e.before}`,
+                `Counted ${e.after} against ${e.expected} shown, and the log said ${e.before}`,
             );
         } else {
             parts.push(
@@ -152,7 +152,10 @@ export function groupByDay<T extends { createdAt: string }>(
         const key = localDateKey(e.createdAt, timeZone);
         let day = days.find((d) => d.key === key);
         if (!day) {
-            const words = dayWords(e.createdAt, timeZone, now);
+            const words = formatDate(e.createdAt, timeZone, {
+                now,
+                relative: "lower",
+            });
             day = {
                 key,
                 label: words.charAt(0).toUpperCase() + words.slice(1),
@@ -165,13 +168,9 @@ export function groupByDay<T extends { createdAt: string }>(
     return days;
 }
 
-/** "07:12". */
-export const entryTime = timeWords;
-
-/** "N entries", with "so far" while more pages wait. */
-export function logCountWords(n: number, more: boolean): string {
-    const words = `${n} ${n === 1 ? "entry" : "entries"}`;
-    return more ? `${words} so far` : words;
+/** "N entries": every entry under the filters, across its pages. */
+export function logCountWords(n: number): string {
+    return count(n, "entry", "entries");
 }
 
 // ---- Checks ----
@@ -227,19 +226,4 @@ export function checkWords(c: CheckLike): { title: string; body: string } {
                 body: c.detail,
             };
     }
-}
-
-/**
- * The checks list after "Show more": the next page added to what is shown —
- * or, when the API started again because the check the last page ended on
- * has closed (`restarted`), the first page in its place. A check already
- * shown is never shown twice.
- */
-export function moreChecks<T extends { key: string }>(
-    shown: readonly T[],
-    next: { checks: readonly T[]; restarted?: boolean },
-): T[] {
-    if (next.restarted) return [...next.checks];
-    const have = new Set(shown.map((c) => c.key));
-    return [...shown, ...next.checks.filter((c) => !have.has(c.key))];
 }

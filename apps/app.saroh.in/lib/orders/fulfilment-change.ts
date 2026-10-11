@@ -26,7 +26,7 @@ export function changeAccess(
                   cancel: !can.refund
                       ? "Your role can't refund or cancel orders"
                       : cancel.pending
-                        ? "Cancelling — waiting for the refund to be confirmed"
+                        ? "Cancelling. Waiting for the refund to be confirmed"
                         : cancel.refusal,
               }
             : {}),
@@ -108,7 +108,7 @@ export function differenceNote(input: {
 }): string {
     const { differenceCents: d, paid, first } = input;
     const amount = input.format(Math.abs(d));
-    if (d === 0) return "Same charge — nothing to take or give back.";
+    if (d === 0) return "Same charge. Nothing to take or give back.";
     if (paid === "unpaid") {
         return d > 0
             ? `${amount} more to pay. The order's total goes up by it.`
@@ -116,8 +116,8 @@ export function differenceNote(input: {
     }
     if (paid === "by-hand") {
         return d > 0
-            ? `${amount} more to pay — take it at the counter.`
-            : `${amount} back to them — give it back from the till.`;
+            ? `${amount} more to pay. Take it at the counter.`
+            : `${amount} back to them. Give it back from the till.`;
     }
     return d > 0
         ? input.linkable
