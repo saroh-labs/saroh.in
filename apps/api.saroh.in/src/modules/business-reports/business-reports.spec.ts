@@ -13,7 +13,7 @@ jest.mock("../sites/site-origin", () => ({
     rendererHost: () => "saroh.app",
 }));
 
-import { BadRequestException, HttpException } from "@nestjs/common";
+import { BadRequestException, HttpException, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -117,31 +117,61 @@ describe("SubmitBusinessReportDto", () => {
     const ok = {
         site: "glow.in",
         message: "They took my money and never sent the order.",
+        email: "first.last@example.com",
+        phone: "+91 98450 12345",
     };
+    const without = (field: keyof typeof ok) =>
+        Object.fromEntries(Object.entries(ok).filter(([key]) => key !== field));
 
-    it("takes an address and a message, the email optional", async () => {
+    it("takes an address, a message, an email and a mobile number", async () => {
         const { dto, fields } = await check({
             ...ok,
-            email: "  Me@Example.com ",
+            email: "  First.Last@Example.com ",
+            phone: "  98450 12345 ",
         });
         expect(fields).toEqual([]);
-        expect(dto.email).toBe("me@example.com");
+        expect(dto.email).toBe("first.last@example.com");
+        // Kept as typed, trimmed: the rule for a phone a customer types.
+        expect(dto.phone).toBe("98450 12345");
     });
 
-    it("treats a blank email as none", async () => {
-        const { dto, fields } = await check({ ...ok, email: " " });
-        expect(fields).toEqual([]);
-        expect(dto.email).toBeUndefined();
-    });
-
-    it("refuses a short message, a bad email and a missing address", async () => {
+    it("refuses a short message and a missing address", async () => {
         expect((await check({ ...ok, message: "bad" })).fields).toEqual([
             "message",
         ]);
-        expect((await check({ ...ok, email: "nope" })).fields).toEqual([
-            "email",
-        ]);
-        expect((await check({ message: ok.message })).fields).toEqual(["site"]);
+        expect((await check(without("site"))).fields).toEqual(["site"]);
+    });
+
+    it.each([
+        ["missing", without("email")],
+        ["blank", { ...ok, email: " " }],
+        ["not one", { ...ok, email: "nope" }],
+        ["not text", { ...ok, email: 5 }],
+    ])("refuses an email that is %s (DEC-138)", async (_what, body) => {
+        expect((await check(body)).fields).toEqual(["email"]);
+    });
+
+    it.each([
+        ["missing", without("phone")],
+        ["blank", { ...ok, phone: " " }],
+        ["words", { ...ok, phone: "call me" }],
+        ["too short", { ...ok, phone: "12345" }],
+        ["too long", { ...ok, phone: "9".repeat(25) }],
+        ["not text", { ...ok, phone: 9845012345 }],
+    ])("refuses a mobile number that is %s (DEC-138)", async (_what, body) => {
+        expect((await check(body)).fields).toEqual(["phone"]);
+    });
+
+    it("says what is wrong in plain words", async () => {
+        const dto = plainToInstance(SubmitBusinessReportDto, {
+            site: ok.site,
+            message: ok.message,
+        });
+        const said = (await validate(dto)).flatMap((e) =>
+            Object.values(e.constraints ?? {}),
+        );
+        expect(said).toContain("Enter an email like name@example.com.");
+        expect(said).toContain("Enter a mobile number like +91 98450 12345.");
     });
 
     it("refuses a field it doesn't know, such as a business id", async () => {
@@ -153,6 +183,7 @@ describe("SubmitBusinessReportDto", () => {
 
 describe("BusinessReportsService.submit", () => {
     const service = new BusinessReportsService();
+    const WHO = { email: "first.last@example.com", phone: "+91 98450 12345" };
 
     it("stores the host and the business it resolved to", async () => {
         db.site.findUnique.mockResolvedValue({ organizationId: "org_1" });
@@ -160,7 +191,8 @@ describe("BusinessReportsService.submit", () => {
             service.submit({
                 site: "https://kavi.saroh.app/products/x",
                 message: "  Never delivered.  ",
-                email: "me@example.com",
+                email: "first.last@example.com",
+                phone: " +91 98450 12345 ",
                 ipHash: "hash",
             }),
         ).resolves.toEqual({ ok: true });
@@ -169,7 +201,8 @@ describe("BusinessReportsService.submit", () => {
                 organizationId: "org_1",
                 siteHost: "kavi.saroh.app",
                 message: "Never delivered.",
-                reporterEmail: "me@example.com",
+                reporterEmail: "first.last@example.com",
+                reporterPhone: "+91 98450 12345",
                 ipHash: "hash",
             },
             select: { id: true },
@@ -177,13 +210,18 @@ describe("BusinessReportsService.submit", () => {
     });
 
     it("keeps a report about an address that isn't a Saroh site, with no business", async () => {
-        await service.submit({ site: "glow.in", message: "Took my money." });
+        await service.submit({
+            ...WHO,
+            site: "glow.in",
+            message: "Took my money.",
+        });
         expect(db.businessReport.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
                     organizationId: null,
                     siteHost: "glow.in",
-                    reporterEmail: null,
+                    reporterEmail: WHO.email,
+                    reporterPhone: WHO.phone,
                 }),
             }),
         );
@@ -191,11 +229,13 @@ describe("BusinessReportsService.submit", () => {
 
     it("answers the same either way, so the form can't look businesses up", async () => {
         const unknown = await service.submit({
+            ...WHO,
             site: "glow.in",
             message: "Took my money.",
         });
         db.site.findUnique.mockResolvedValue({ organizationId: "org_1" });
         const known = await service.submit({
+            ...WHO,
             site: "kavi.saroh.app",
             message: "Took my money.",
         });
@@ -205,28 +245,61 @@ describe("BusinessReportsService.submit", () => {
     it("refuses an address it can't read", async () => {
         await expect(
             service.submit({
+                ...WHO,
                 site: "not an address",
                 message: "Took my money.",
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(db.businessReport.create).not.toHaveBeenCalled();
     });
+
+    it("refuses a number that is punctuation alone, which the pattern lets by", async () => {
+        await expect(
+            service.submit({
+                ...WHO,
+                phone: "------",
+                site: "glow.in",
+                message: "Took my money.",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(db.businessReport.create).not.toHaveBeenCalled();
+    });
+
+    it("logs the host only, never the email or the number", async () => {
+        const said: string[] = [];
+        const log = jest
+            .spyOn(Logger.prototype, "log")
+            .mockImplementation((line: unknown) => {
+                said.push(String(line));
+            });
+        await service.submit({
+            ...WHO,
+            site: "glow.in",
+            message: "Took my money.",
+        });
+        log.mockRestore();
+        expect(said).toEqual(["business report: glow.in (not a Saroh site)"]);
+    });
 });
 
 describe("PublicBusinessReportsController", () => {
+    const REPORT = {
+        site: "glow.in",
+        message: "Took my money.",
+        email: "first.last@example.com",
+        phone: "+91 98450 12345",
+    };
+
     it("passes a hash of the address on, never the address", async () => {
         const submit = jest.fn().mockResolvedValue({ ok: true });
         const controller = new PublicBusinessReportsController({
             submit,
         } as unknown as BusinessReportsService);
-        await controller.submit(
-            { site: "glow.in", message: "Took my money." },
-            "203.0.113.5",
-            undefined,
-        );
+        await controller.submit(REPORT, "203.0.113.5", undefined);
         const call = submit.mock.calls[0]?.[0] as { ipHash?: string };
         expect(call.ipHash).toBeDefined();
         expect(call.ipHash).not.toContain("203.0.113.5");
+        expect(call).toMatchObject(REPORT);
     });
 
     it("refuses a fourth report in a minute from one address with 429", async () => {
@@ -234,12 +307,7 @@ describe("PublicBusinessReportsController", () => {
         const controller = new PublicBusinessReportsController({
             submit,
         } as unknown as BusinessReportsService);
-        const send = () =>
-            controller.submit(
-                { site: "glow.in", message: "Took my money." },
-                "203.0.113.9",
-                undefined,
-            );
+        const send = () => controller.submit(REPORT, "203.0.113.9", undefined);
         await send();
         await send();
         await send();

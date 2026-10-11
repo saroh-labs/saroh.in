@@ -43,6 +43,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
     AdminOperationItem: "Child of AdminOperation; no organization.",
     WaitlistSignup:
         "A marketing-site waitlist entry, before any organization exists.",
+    ContactMessage:
+        "A message sent from saroh.in/contact (DEC-137); the writer need not have an account, and it belongs to no organization.",
 };
 
 const databaseDir = path.resolve(__dirname, "..");

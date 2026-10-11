@@ -22,11 +22,14 @@ vi.mock("next/link", () => ({
 afterEach(cleanup);
 
 describe("SiteFooter", () => {
-    it("writes to contact@saroh.in (DEC-101)", () => {
+    it("links About and Contact, the page that gives contact@saroh.in (DEC-101, DEC-137)", () => {
         render(<SiteFooter />);
         expect(
+            screen.getByRole("link", { name: "About" }).getAttribute("href"),
+        ).toBe("/about");
+        expect(
             screen.getByRole("link", { name: "Contact" }).getAttribute("href"),
-        ).toBe("mailto:contact@saroh.in");
+        ).toBe("/contact");
     });
 
     it("links customers of a business to /customers, always (DEC-121)", () => {

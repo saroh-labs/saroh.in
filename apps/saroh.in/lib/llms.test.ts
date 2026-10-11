@@ -148,6 +148,21 @@ describe("llmsText", () => {
         }
     });
 
+    it("lists About and Contact first, whatever the date, once their routes are built (DEC-137)", () => {
+        const routes = [...ALL_ROUTES, "/about", "/contact"];
+        for (const when of [BEFORE, AFTER]) {
+            const text = llmsText(BASE, at(when, { routes }), articles);
+            expect(linked(text).slice(0, 2)).toEqual(["/about", "/contact"]);
+            expect(text).toContain(
+                "## Saroh\n\n- [About](https://www.saroh.in/about): ",
+            );
+        }
+        // A build without the routes never links them.
+        const without = linked(llmsText(BASE, at(AFTER), articles));
+        expect(without).not.toContain("/about");
+        expect(without).not.toContain("/contact");
+    });
+
     it("gives every link a one-line description", () => {
         const text = llmsText(BASE, at(AFTER), articles);
         const links = text.split("\n").filter((l) => l.startsWith("- ["));

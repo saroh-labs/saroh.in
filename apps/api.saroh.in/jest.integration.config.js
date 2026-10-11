@@ -73,6 +73,9 @@ module.exports = {
         // Customers' reports: mocked specs in the unit project; only
         // business-reports.db.spec.ts runs here.
         "<rootDir>/src/modules/business-reports/(?!.*\\.db\\.spec\\.ts$)",
+        // Contact messages: mocked specs in the unit project; only
+        // contact-messages.db.spec.ts runs here.
+        "<rootDir>/src/modules/contact-messages/(?!.*\\.db\\.spec\\.ts$)",
         // Plans catalogue U3: pure specs run in the unit project; only the
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",

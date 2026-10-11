@@ -48,7 +48,8 @@ const ROW = {
     status: "OPEN",
     createdAt: new Date("2026-10-09T10:00:00Z"),
     doneAt: null,
-    reporterEmail: "me@example.com",
+    reporterEmail: "first.last@example.com",
+    reporterPhone: "+91 98450 12345",
     organization: { id: "org_1", name: "Kavi Studio" },
 };
 
@@ -69,7 +70,7 @@ beforeEach(() => {
 });
 
 describe("AdminBusinessReportsService.list", () => {
-    it("hides the reporter's email without organization:pii:read", async () => {
+    it("hides the reporter's email and number without organization:pii:read", async () => {
         const { service } = build();
         const page = await service.list(
             staffWith(AdminPermission.OrganizationRead),
@@ -80,11 +81,13 @@ describe("AdminBusinessReportsService.list", () => {
             business: { id: "org_1", name: "Kavi Studio" },
             hasEmail: true,
             reporterEmail: null,
+            hasPhone: true,
+            reporterPhone: null,
         });
         expect(page.open).toBe(1);
     });
 
-    it("shows it with organization:pii:read", async () => {
+    it("shows them with organization:pii:read", async () => {
         const { service } = build();
         const page = await service.list(
             staffWith(
@@ -93,7 +96,43 @@ describe("AdminBusinessReportsService.list", () => {
             ),
             {},
         );
-        expect(page.items[0]?.reporterEmail).toBe("me@example.com");
+        expect(page.items[0]).toMatchObject({
+            reporterEmail: "first.last@example.com",
+            reporterPhone: "+91 98450 12345",
+        });
+    });
+
+    it("says a report from before DEC-138 left no number, whoever reads it", async () => {
+        const { service } = build();
+        db.businessReport.findMany.mockResolvedValue([
+            { ...ROW, reporterEmail: null, reporterPhone: null },
+        ]);
+        const page = await service.list(
+            staffWith(
+                AdminPermission.OrganizationRead,
+                AdminPermission.OrganizationPiiRead,
+            ),
+            {},
+        );
+        expect(page.items[0]).toMatchObject({
+            hasEmail: false,
+            reporterEmail: null,
+            hasPhone: false,
+            reporterPhone: null,
+        });
+    });
+
+    it("reads the number in the same query as the email", async () => {
+        const { service } = build();
+        await service.list(staffWith(AdminPermission.OrganizationRead), {});
+        expect(db.businessReport.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                select: expect.objectContaining({
+                    reporterEmail: true,
+                    reporterPhone: true,
+                }) as unknown,
+            }),
+        );
     });
 
     it("lists open reports newest first by default, and all on asking", async () => {

@@ -1,5 +1,6 @@
 // @covers web:/ web:/features web:/solutions web:/pricing web:/pricing/draft web:/pricing/preview web:/waitlist web:/api/waitlist web:/api/revalidate api:waitlist api:pricing
 // @covers web:/integrations pkg:integrations
+// @covers web:/about web:/contact web:/api/contact api:contact-messages
 import { createRequire } from "node:module";
 
 import AxeBuilder from "@axe-core/playwright";
@@ -67,6 +68,10 @@ const INDEXED = [
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     "/waitlist",
+    // Who makes Saroh and how to write to it (DEC-137): always listed,
+    // whatever the launch mode.
+    "/about",
+    "/contact",
     // "Bought from a business that uses Saroh?" (DEC-121): always listed,
     // whatever the launch mode.
     "/customers",
@@ -402,6 +407,105 @@ test.describe("waitlist", () => {
     });
 });
 
+test.describe("about and contact", () => {
+    test("About draws no placeholder and links Contact", async ({ page }) => {
+        await page.goto(`${WEB}/about`);
+        await expect(
+            page.getByRole("heading", {
+                level: 1,
+                name: "Built for the owners who run everything themselves.",
+            }),
+        ).toBeVisible();
+        // The name, in Hindi, marked as Hindi.
+        await expect(page.locator('main [lang="hi"]').first()).toHaveText(
+            "सारोह",
+        );
+        // A fact that isn't set is not drawn, and never as a placeholder.
+        await expect(page.locator("main")).not.toContainText("[");
+        await page
+            .locator("main")
+            .getByRole("link", { name: "Contact us" })
+            .click();
+        await expect(page).toHaveURL(`${WEB}/contact`);
+    });
+
+    test("Contact refuses what it should, then takes a message to the API", async ({
+        page,
+    }, testInfo) => {
+        await page.goto(`${WEB}/contact`);
+        const form = page.getByRole("form", { name: "Send us a message" });
+        const send = form.getByRole("button", { name: "Send message" });
+        const name = form.getByRole("textbox", { name: "Your name" });
+        const email = form.getByRole("textbox", { name: "Email" });
+        const message = form.getByRole("textbox", { name: "Message" });
+
+        // Nothing is checked until Send: then one message at a time, the
+        // field at fault marked and holding the keyboard.
+        await expect(form.getByRole("alert")).toBeHidden();
+        await send.click();
+        await expect(form.getByRole("alert")).toHaveText("Add your name.");
+        await expect(name).toBeFocused();
+        await expect(name).toHaveAttribute("aria-invalid", "true");
+
+        const who = `E2E ${stamp(testInfo)}`;
+        await name.fill(who);
+        await email.fill("not-an-email");
+        await send.click();
+        await expect(form.getByRole("alert")).toHaveText(
+            "Check your email address. We need it to reply.",
+        );
+        await expect(email).toBeFocused();
+
+        const address = `${stamp(testInfo).toLowerCase()}@example.com`;
+        await email.fill(address);
+        await expect(form.getByRole("alert")).toHaveText(
+            "Write a short message, even one line.",
+        );
+
+        // The topic chips are one radio group; the message's hint follows.
+        const bug = form.getByRole("radio", {
+            name: "Something's not working",
+        });
+        await bug.click();
+        await expect(bug).toHaveAttribute("aria-checked", "true");
+        await expect(message).toHaveAttribute(
+            "placeholder",
+            "What did you click, and what did you see? A screenshot helps.",
+        );
+
+        await message.fill("A message from the browser tests.");
+        await expect(form.getByRole("alert")).toBeHidden();
+        const sent = page.waitForResponse(
+            (r) =>
+                r.url().endsWith("/api/contact") &&
+                r.request().method() === "POST",
+        );
+        await send.click();
+        expect((await sent).status(), "the API took the message").toBe(200);
+
+        // The thanks, by first name, naming the email, holding the keyboard.
+        const thanks = page.getByRole("heading", {
+            name: "Thanks, E2E. We've got it.",
+        });
+        await expect(thanks).toBeFocused();
+        await expect(page.getByText(address)).toBeVisible();
+
+        const axe = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+        expect(axeReport(axe.violations), "axe, sent state").toEqual([]);
+
+        // "Send another message" keeps who they are and clears the rest.
+        await page
+            .getByRole("button", { name: "Send another message" })
+            .click();
+        await expect(name).toHaveValue(who);
+        await expect(email).toHaveValue(address);
+        await expect(message).toHaveValue("");
+        await expect(
+            form.getByRole("radio", { name: "A question before signing up" }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+});
+
 test.describe("pricing", () => {
     test("before launch, Pricing waits at the waitlist (Gate W)", async ({
         request,
@@ -555,6 +659,21 @@ test.describe("links, redirects and the sitemap", () => {
             data: { business: "No address" },
         });
         expect(bad.status()).toBe(400);
+        // Nor does a contact message with no name, or about nothing the
+        // form offers.
+        const noName = await request.post(`${WEB}/api/contact`, {
+            data: {
+                topic: "question",
+                email: "no.name@example.com",
+                message: "A message with nobody's name on it.",
+            },
+        });
+        expect(noName.status()).toBe(400);
+        expect(await noName.json()).toEqual({ sent: false, failure: "name" });
+        const noTopic = await request.post(`${WEB}/api/contact`, {
+            data: { name: "No Topic", email: "no.topic@example.com" },
+        });
+        expect(noTopic.status()).toBe(400);
         // The revalidate hook wants its secret.
         const hook = await request.post(`${WEB}/api/revalidate`);
         expect(hook.status()).toBe(401);

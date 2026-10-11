@@ -2,7 +2,8 @@
  * Customers' reports (Terms rev 46) against a real Postgres: a report on a
  * platform address or a verified custom domain lands on its business, one on
  * any other address keeps no business, the console lists them newest first
- * with the email only for staff who may read personal data, and marking one
+ * with the reporter's email and mobile number only for staff who may read
+ * personal data (a report from before DEC-138 has neither), and marking one
  * done is audited once.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
@@ -64,15 +65,22 @@ describe("business reports", () => {
         await service.submit({
             site: `https://${address}.saroh.app/shop`,
             message: "Paid and nothing came.",
-            email: "me@example.com",
+            email: "first.last@example.com",
+            phone: "+91 98450 12345",
         });
         await service.submit({
             site: `www.${custom}`,
             message: "Rude about a refund.",
+            email: "asha.rao@example.com",
+            phone: "98450 67890",
         });
-        await service.submit({
-            site: "someone-else.example.org",
-            message: "Not a Saroh site at all.",
+        // A report from before DEC-138, when neither was asked for: the
+        // columns stay nullable for these.
+        await prisma.businessReport.create({
+            data: {
+                siteHost: "someone-else.example.org",
+                message: "Not a Saroh site at all.",
+            },
         });
 
         const rows = await prisma.businessReport.findMany({
@@ -101,6 +109,8 @@ describe("business reports", () => {
         expect(first).toMatchObject({
             hasEmail: true,
             reporterEmail: null,
+            hasPhone: true,
+            reporterPhone: null,
             business: { id: orgId, name: "Kavi Studio" },
         });
 
@@ -111,7 +121,17 @@ describe("business reports", () => {
             ),
             {},
         );
-        expect(pii.items[2]?.reporterEmail).toBe("me@example.com");
+        expect(pii.items[2]).toMatchObject({
+            reporterEmail: "first.last@example.com",
+            reporterPhone: "+91 98450 12345",
+        });
+        // The older report has neither, whoever reads it.
+        expect(pii.items[0]).toMatchObject({
+            hasEmail: false,
+            reporterEmail: null,
+            hasPhone: false,
+            reporterPhone: null,
+        });
     });
 
     it("marks one done, audited once", async () => {

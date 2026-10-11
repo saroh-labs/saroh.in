@@ -278,6 +278,17 @@ describe("Business report permissions", () => {
     });
 });
 
+describe("Contact message permissions", () => {
+    it("reads messages from saroh.in/contact with personal data access only", () => {
+        const route = routeHandlers().find(
+            (r) => r.name === "listContactMessages",
+        );
+        expect(route ? permissionsOf(route.handler) : undefined).toEqual([
+            AdminPermission.OrganizationPiiRead,
+        ]);
+    });
+});
+
 describe("Pricing permissions", () => {
     const perms = (name: string) => {
         const route = routeHandlers().find((r) => r.name === name);

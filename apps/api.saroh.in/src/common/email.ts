@@ -779,6 +779,61 @@ export async function sendLinkReportEmail(
     }
 }
 
+/** Where the team reads what people write to Saroh (DEC-101). */
+export const CONTACT_INBOX = "contact@saroh.in";
+
+/**
+ * Tells the team a message came in from saroh.in/contact (DEC-137; owner,
+ * 11 Oct 2026). Only ever to Saroh's own inbox, so the form can't be used
+ * to make Saroh write to a stranger. Plain text: the writer's words are
+ * never read as markup. The subject is Saroh's own words and nothing the
+ * writer typed, and a reply goes straight to the writer.
+ *
+ * The message is already stored when this is called, so a failure loses
+ * nothing: the caller logs the outcome and answers the visitor as sent.
+ * Without SMTP it prints the subject only in development; elsewhere
+ * nothing leaves.
+ */
+export async function sendContactMessageNotice(notice: {
+    /** Saroh's own words for the topic: "A question before signing up". */
+    topic: string;
+    name: string;
+    email: string;
+    /** What kind of business, in Saroh's words; absent when not given. */
+    kind?: string;
+    message: string;
+}): Promise<EmailOutcome> {
+    const subject = `New message from saroh.in: ${notice.topic}`;
+    if (!transporter) {
+        if (env.NODE_ENV === "development") {
+            console.info(`[Contact message] (no SMTP) ${subject}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    const text = [
+        `From: ${notice.name} <${notice.email}>`,
+        `About: ${notice.topic}`,
+        ...(notice.kind ? [`Business: ${notice.kind}`] : []),
+        "",
+        notice.message,
+        "",
+        "Reply to this email to answer them. The message is also in the admin console, under Messages.",
+    ].join("\n");
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to: CONTACT_INBOX,
+            replyTo: notice.email,
+            subject,
+            text,
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Site sign-in codes (ADR-011; round-2 plan A, A2)
 // ---------------------------------------------------------------------------

@@ -20,6 +20,30 @@ export interface BusinessReportRow {
     hasEmail: boolean;
     /** Only for staff who may read personal data; otherwise null. */
     reporterEmail: string | null;
+    /**
+     * Whether a mobile number was left. Asked for since DEC-138: an older
+     * report has none, and an older API doesn't say.
+     */
+    hasPhone?: boolean;
+    /** Only for staff who may read personal data; otherwise null. */
+    reporterPhone?: string | null;
+}
+
+/**
+ * What a row shows for the reporter's email or mobile number: the value for
+ * staff who may read personal data, that one was left for staff who may
+ * not, and null when none was left (the page draws that its own way).
+ */
+export function reporterDetail(
+    left: boolean | undefined,
+    value: string | null | undefined,
+    seesPersonalData: boolean,
+    what: "an email" | "a mobile number",
+): string | null {
+    if (!left) return null;
+    return seesPersonalData && value
+        ? value
+        : `Left ${what} (needs personal data access)`;
 }
 
 export interface BusinessReportPage {
