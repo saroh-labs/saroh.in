@@ -271,6 +271,11 @@ describe("a list read a page at a time, with views above it: Stock › Levels", 
         expect(wrapper?.[1]).not.toMatch(/(^| )px-/);
         expect(table).toMatch(/role="listitem"[^>]*class="[^"]*px-\[14px\]/);
         expect(table).toMatch(/role="listitem"[^>]*class="[^"]*border-b/);
+        // The head's fixed words may be read in a session recording. A
+        // location's name in it is the business's own, and is masked.
+        expect(table).toMatch(/data-list-head=""[^>]*data-ph-unmask=""/);
+        expect(table).toMatch(/<span data-ph-mask=""[^>]*>Hill Road<\/span>/);
+        expect(table).toMatch(/<span data-ph-mask=""[^>]*>Online<\/span>/);
     });
 });
 

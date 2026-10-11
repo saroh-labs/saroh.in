@@ -78,7 +78,10 @@ export function LevelsTable({
                         Product
                     </span>
                     {storefronts.map((s) => (
-                        <span key={s.id} className="truncate">
+                        // A location's name is the business's own: the
+                        // head's other words are readable in a session
+                        // recording, this one never.
+                        <span key={s.id} data-ph-mask="" className="truncate">
                             {s.name}
                         </span>
                     ))}
