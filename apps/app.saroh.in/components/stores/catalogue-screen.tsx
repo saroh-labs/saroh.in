@@ -39,8 +39,9 @@ import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
 import { CatalogueHeader } from "./catalogue/catalogue-header";
 import {
     CatalogueFilters,
+    CatalogueMoreFilters,
+    catalogueNarrowed,
     CatalogueSearch,
-    CatalogueStatusChips,
 } from "./catalogue/catalogue-toolbar";
 import { QuickLook } from "./catalogue/quick-look";
 
@@ -376,8 +377,24 @@ export function CatalogueScreen({
                             choices={choices}
                         />
                     }
-                    toolbarChips={
-                        <CatalogueStatusChips query={query} go={go} />
+                    toolbarMore={
+                        <CatalogueMoreFilters
+                            query={query}
+                            go={go}
+                            choices={choices}
+                        />
+                    }
+                    onClearFilters={
+                        catalogueNarrowed(query)
+                            ? () =>
+                                  go({
+                                      q: "",
+                                      status: null,
+                                      category: null,
+                                      collection: null,
+                                      storefront: null,
+                                  })
+                            : undefined
                     }
                     onRowClick={(r) => setOpenId(r.id)}
                     selectable={canWrite}

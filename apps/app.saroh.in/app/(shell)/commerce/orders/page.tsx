@@ -163,11 +163,19 @@ export default async function OrdersPage({
 
     return (
         <PageContainer width="full">
-            {/* B17: storefronts still on the 2-hour Pick-up default. */}
-            <LateRuleNotice />
-            <PlanLimitNotice moduleId="orders" className="mb-4" />
-            {moment ? <Moment moment={moment} className="mb-4" /> : null}
             <OrdersScreen
+                // Under the page's header, never above its title.
+                notices={
+                    <>
+                        {/* B17: storefronts still on the 2-hour Pick-up
+                            default. */}
+                        <LateRuleNotice />
+                        <PlanLimitNotice moduleId="orders" className="mb-4" />
+                        {moment ? (
+                            <Moment moment={moment} className="mb-4" />
+                        ) : null}
+                    </>
+                }
                 query={query}
                 page={page}
                 // Oldest first, so New order starts at the business's first

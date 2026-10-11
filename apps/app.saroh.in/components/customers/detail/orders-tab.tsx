@@ -66,7 +66,7 @@ export function OrdersTab({
                 value={filter}
                 onChange={onFilter}
                 chips={[
-                    { key: "all", label: "All", count },
+                    { key: "all", label: "All orders", count },
                     {
                         key: "open",
                         label: "Open",

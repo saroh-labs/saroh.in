@@ -1,9 +1,15 @@
 "use client";
 
+import { SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { Button } from "./button";
+import { chipClass } from "./chip";
+import { CountBadge } from "./count-badge";
 import type { Option } from "./option-select";
 import { OptionSelect } from "./option-select";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 
 /*
  * THE ONE LIST TOOLBAR.
@@ -11,17 +17,26 @@ import { OptionSelect } from "./option-select";
  * Every list in the workspace is laid out the same, from the top:
  *
  *   1. `tabs`     the screen's views, if it has any (`TabStrip`)
- *   2. one row:   `search` first (`ListSearch`, one width), then `filters`
- *                 (`ListFilter` dropdowns), then, pushed to the right,
- *                 `end` (the sort and the table/list/grid switch) and
- *                 `count` ("Showing 1 to 50 of 532")
- *   3. `chips`    the status filters of the list (`FilterChips`)
- *   4. the table  (the caller's, below the toolbar)
+ *   2. ONE row:   `search` first (`ListSearch`, one width), then at most
+ *                 THREE dropdowns (`ListFilter`: the list's most used),
+ *                 then `more` (one "Filters" button for the rest,
+ *                 `MoreFilters`), at most one attention toggle
+ *                 (`AttentionToggle`), and "Clear filters" once anything
+ *                 is narrowed. On the right, `end` (the sort and the
+ *                 table/list/grid switch) and `count` ("Showing 1 to 50
+ *                 of 532").
+ *   3. the table  (the caller's, below the toolbar)
  *
- * A slot left out takes no room. On a phone the row wraps: search takes
- * the full width first, the filters follow, and nothing in it is held to
- * its own width (no `shrink-0`), so a row of controls can never run past
- * the screen. The chips scroll sideways inside their own scroller.
+ * There is no second row of chips: a status or kind filter is one more
+ * dropdown in the row (owner, 11 Oct 2026).
+ *
+ * A slot left out takes no room. If the row wraps, the search keeps its
+ * width, the dropdowns flow after it, and the right-hand group stays on
+ * the first line. The count is on the right from `lg`. Below that, where
+ * the row has no room for it, it is one quiet line under the toolbar, on
+ * the left: never floating right on a line of its own. On a phone the
+ * search takes the full width first and nothing is held to its own width
+ * (no `shrink-0`), so a row of controls can never run past the screen.
  */
 export interface ListToolbarProps extends Omit<
     React.HTMLAttributes<HTMLDivElement>,
@@ -31,14 +46,28 @@ export interface ListToolbarProps extends Omit<
     tabs?: React.ReactNode;
     /** The list's search: one `ListSearch`. First in the row. */
     search?: React.ReactNode;
-    /** Dropdown filters: `ListFilter`s. After the search. */
+    /**
+     * The list's most used filters, each a `ListFilter` dropdown: at most
+     * THREE. After the search.
+     */
     filters?: React.ReactNode;
+    /** Every other filter, behind one button: `MoreFilters`. */
+    more?: React.ReactNode;
+    /**
+     * Puts everything back: the search, every dropdown, the toggle. Pass
+     * it only while something is narrowed (a search with words in it
+     * counts): "Clear filters" then ends the row.
+     */
+    onClear?: () => void;
+    /**
+     * At most ONE `AttentionToggle`, after the dropdowns: the one-press
+     * way to what needs the merchant now ("Needs you 4").
+     */
+    attention?: React.ReactNode;
     /** Pushed to the right: the sort, then the view switch. */
     end?: React.ReactNode;
     /** How many are showing, in words. Last on the right. */
     count?: React.ReactNode;
-    /** The status filters of the list: `FilterChips`. Under the row. */
-    chips?: React.ReactNode;
 }
 
 /** A slot that was given something to draw. */
@@ -49,73 +78,136 @@ export function ListToolbar({
     tabs,
     search,
     filters,
+    more,
+    onClear,
+    attention,
     end,
     count,
-    chips,
     className,
     ...props
 }: ListToolbarProps) {
-    const row = [search, filters, end, count].some(drawn);
-    if (!drawn(tabs) && !row && !drawn(chips)) return null;
+    const left =
+        [search, filters, more, attention].some(drawn) || onClear !== undefined;
+    const right = drawn(end);
+    if (!drawn(tabs) && !left && !right && !drawn(count)) return null;
     return (
         <div
             data-list-toolbar=""
-            className={cn("flex min-w-0 flex-col gap-3", className)}
+            // From `lg` two columns: the row, and the count beside its
+            // first line. Below that the count is the next line down.
+            className={cn(
+                "flex min-w-0 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-3",
+                className,
+            )}
             {...props}
         >
-            {tabs ? <div data-slot="list-tabs">{tabs}</div> : null}
-            {row ? (
+            {drawn(tabs) ? (
+                <div data-slot="list-tabs" className="min-w-0 lg:col-span-2">
+                    {tabs}
+                </div>
+            ) : null}
+            {left || right ? (
                 <div
                     data-slot="list-row"
-                    className="flex min-w-0 flex-wrap items-center gap-2"
+                    // Two columns from `sm`, both starting at the top: the
+                    // left one wraps on itself, so the right-hand group
+                    // stays on the first line however many filters wrap.
+                    className={cn(
+                        "flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start",
+                        !drawn(count) && "lg:col-span-2",
+                    )}
                 >
-                    {search ? (
+                    {left ? (
                         <div
-                            data-slot="list-search"
-                            className="w-full min-w-0 sm:w-auto sm:flex-[0_1_320px]"
+                            data-slot="list-main"
+                            className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
                         >
-                            {search}
+                            {drawn(search) ? (
+                                <div
+                                    data-slot="list-search"
+                                    className="w-full min-w-0 sm:w-auto sm:flex-[0_1_320px]"
+                                >
+                                    {search}
+                                </div>
+                            ) : null}
+                            {drawn(filters) ? (
+                                <div
+                                    data-slot="list-filters"
+                                    // `contents`: each dropdown wraps as
+                                    // an item of the row itself, so they
+                                    // flow on after the search.
+                                    className="contents"
+                                >
+                                    {filters}
+                                </div>
+                            ) : null}
+                            {drawn(more) ? (
+                                <div
+                                    data-slot="list-more"
+                                    className="flex min-w-0 max-w-full"
+                                >
+                                    {more}
+                                </div>
+                            ) : null}
+                            {drawn(attention) ? (
+                                <div
+                                    data-slot="list-attention"
+                                    className="flex min-w-0 max-w-full"
+                                >
+                                    {attention}
+                                </div>
+                            ) : null}
+                            {onClear ? (
+                                // Quiet, and last: the way back to
+                                // everything, wherever it was narrowed.
+                                <Button
+                                    data-slot="list-clear"
+                                    type="button"
+                                    variant="link"
+                                    size="inline"
+                                    onClick={onClear}
+                                    className="min-w-0 rounded-sm px-1 text-[13px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground active:text-muted-foreground"
+                                >
+                                    Clear filters
+                                </Button>
+                            ) : null}
                         </div>
                     ) : null}
-                    {filters ? (
-                        <div
-                            data-slot="list-filters"
-                            className="flex min-w-0 max-w-full flex-wrap items-center gap-2"
-                        >
-                            {filters}
-                        </div>
-                    ) : null}
-                    {end || count ? (
+                    {drawn(end) ? (
                         <div
                             data-slot="list-end"
-                            className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-2 sm:ml-auto"
+                            className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-2 sm:ml-auto sm:max-w-[45%] sm:justify-end"
                         >
                             {end}
-                            {count ? (
-                                <p
-                                    data-slot="list-count"
-                                    aria-live="polite"
-                                    className="min-w-0 text-xs tabular-nums text-muted-foreground"
-                                >
-                                    {count}
-                                </p>
-                            ) : null}
                         </div>
                     ) : null}
                 </div>
             ) : null}
-            {chips ? (
-                <div data-slot="list-chips" className="min-w-0">
-                    {chips}
-                </div>
+            {drawn(count) ? (
+                // ONE element, placed by the width: on the right of the
+                // row's first line from `lg` (as tall as a control, so it
+                // sits on that line's middle), and where the row has no
+                // room for it, one quiet line under the toolbar, on the
+                // left. Never floating right on a line of its own.
+                <p
+                    data-slot="list-count"
+                    aria-live="polite"
+                    className={cn(
+                        "min-w-0 text-xs tabular-nums text-muted-foreground max-lg:-mt-1 lg:flex lg:min-h-[38px] lg:items-center",
+                        !(left || right) && "lg:col-span-2",
+                    )}
+                >
+                    {count}
+                </p>
             ) : null}
         </div>
     );
 }
 
 /**
- * The trigger of a toolbar control that is not a flat list of options (a
- * picker with its own search): the same box as `ListFilter`'s.
+ * The trigger of a toolbar control that must stay an `OptionSelect` of a
+ * screen's own (a filter bar that is also drawn stacked in a sheet): the
+ * same box as `ListFilter`'s.
  */
 export const listFilterClass =
     "w-auto min-w-0 max-w-full gap-2 [&>span]:min-w-0 [&>svg]:shrink-0";
@@ -128,11 +220,22 @@ export const listFilterClass =
 export const listPickerClass =
     "h-[38px] min-w-0 max-w-[220px] justify-between gap-2 rounded-md border-input bg-field px-3 text-sm font-normal coarse:h-11 coarse:text-base";
 
+/** A narrowed filter's box: the selected look, an Ink edge. */
+export const NARROWED = "border-foreground";
+
 /**
- * The one dropdown filter of a list toolbar, and its sort: an
- * `OptionSelect` as wide as its words, the search field's height, with the
- * same gap before its chevron whatever it says. `label` is its accessible
- * name ("Location", "Sort").
+ * The one filter of a list toolbar, and its sort: an `OptionSelect` as
+ * wide as its words, the search field's height, with the same gap before
+ * its chevron whatever it says.
+ *
+ * - `label` is its accessible name: what it filters ("Order status",
+ *   "Location", "Kind of change").
+ * - The FIRST option is the unnarrowed one, and says what the filter is
+ *   about in the thing's own plural: "All orders", "All locations", "All
+ *   categories". Never a bare "All", and never "Any …".
+ * - An option's `count` is drawn as a quiet number at its right, and after
+ *   the label in the box once a narrowed option is chosen ("Open 3").
+ *   Leave it out when it isn't known.
  */
 export function ListFilter<V extends string>({
     label,
@@ -141,12 +244,19 @@ export function ListFilter<V extends string>({
     options,
     footer,
     holdsData = false,
+    narrowed,
     className,
 }: {
     label: string;
     value: V;
     onValueChange: (value: V) => void;
     options: readonly Option<V>[];
+    /**
+     * Whether it narrows the list now: its box then takes the selected
+     * look (an Ink edge). Worked out for a filter (any option but the
+     * first); pass `false` for a sort, which narrows nothing.
+     */
+    narrowed?: boolean;
     /** A line under the options, about what choosing one does. */
     footer?: React.ReactNode;
     /**
@@ -157,9 +267,11 @@ export function ListFilter<V extends string>({
     holdsData?: boolean;
     className?: string;
 }) {
+    const on = narrowed ?? (options.length > 0 && value !== options[0].value);
     return (
         <span
             data-list-filter=""
+            data-narrowed={on ? "" : undefined}
             data-ph-mask={holdsData ? "" : undefined}
             className="inline-flex min-w-0 max-w-full"
         >
@@ -169,8 +281,191 @@ export function ListFilter<V extends string>({
                 onValueChange={onValueChange}
                 options={options}
                 footer={footer}
-                className={cn(listFilterClass, className)}
+                className={cn(listFilterClass, on && NARROWED, className)}
             />
         </span>
+    );
+}
+
+const figures = new Intl.NumberFormat("en-IN");
+
+/**
+ * The ONE chip a list toolbar may hold: an on/off filter for what needs
+ * the merchant now ("Needs you 4", "Needs attention 1"), after the
+ * dropdowns in the same row. A one-press shortcut, so use it sparingly: at
+ * most one per list, and never on a row of its own. Everything else is a
+ * `ListFilter`.
+ *
+ * While its count is above zero and it is off, the count wears the
+ * attention tone (Ink). At zero, or unknown, it is a plain chip.
+ */
+export function AttentionToggle({
+    label,
+    count,
+    on,
+    onToggle,
+    className,
+}: {
+    /** Saroh's own words: "Needs you", "Needs attention". */
+    label: string;
+    /** How many wait. Leave it out, or pass null, when it isn't known. */
+    count?: number | null;
+    on: boolean;
+    onToggle: () => void;
+    className?: string;
+}) {
+    const waiting = typeof count === "number" && count > 0;
+    return (
+        <button
+            type="button"
+            data-attention-toggle=""
+            data-ph-unmask=""
+            aria-pressed={on}
+            onClick={onToggle}
+            // The dropdowns' height, and it may shrink with the row:
+            // nothing in a toolbar is held to its own width.
+            className={chipClass(on, cn("h-[38px] min-w-0 shrink", className))}
+        >
+            {label}
+            {typeof count === "number" ? (
+                <>
+                    {/* A real space: it is named "Needs you 4". */}{" "}
+                    {waiting && !on ? (
+                        <CountBadge
+                            count={figures.format(count)}
+                            tone="strong"
+                        />
+                    ) : (
+                        <span className="tabular-nums opacity-70">
+                            {figures.format(count)}
+                        </span>
+                    )}
+                </>
+            ) : null}
+        </button>
+    );
+}
+
+/**
+ * Every filter past the list's three most used, behind ONE button in the
+ * row: "Filters", and "Filters 2" while two of them are narrowed (then
+ * with the selected look). It opens them in a popover, one to a line. On a
+ * phone a list that already has a filters sheet draws that instead: one
+ * mechanism per width.
+ */
+export function MoreFilters({
+    count,
+    label = "Filters",
+    title,
+    className,
+    children,
+}: {
+    /** How many of the filters inside are narrowed. */
+    count: number;
+    label?: string;
+    /** The popover's accessible name: "Filter orders". */
+    title: string;
+    className?: string;
+    /** The filters, each full width (`OptionSelect`, a picker). */
+    children: React.ReactNode;
+}) {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    data-more-filters=""
+                    data-ph-unmask=""
+                    type="button"
+                    variant="outline"
+                    aria-label={count > 0 ? `${label}, ${count} on` : label}
+                    className={cn(
+                        "min-w-0 gap-1.5 font-medium",
+                        count > 0 && NARROWED,
+                        className,
+                    )}
+                >
+                    <SlidersHorizontal aria-hidden className="size-4" />
+                    {label}
+                    {count > 0 ? (
+                        <span aria-hidden className="tabular-nums opacity-70">
+                            {figures.format(count)}
+                        </span>
+                    ) : null}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                aria-label={title}
+                className="grid w-[min(300px,calc(100vw-2rem))] gap-2.5 p-3"
+            >
+                {children}
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+interface PageStep {
+    /** Where the page is, for a list the server reads by address. */
+    href?: string;
+    /** Or what to do, for a list that reads the page itself. */
+    onClick?: () => void;
+}
+
+/**
+ * How every paged list ends: Previous and Next together at the foot, on
+ * the right, each off when there is nowhere to go. The same two words on
+ * every list. (How many are showing is the toolbar's `count`.)
+ */
+export function ListPaging({
+    label,
+    previous,
+    next,
+    className,
+}: {
+    /** The nav's accessible name: "Pages of orders". */
+    label: string;
+    /** Null when this is the first page. */
+    previous: PageStep | null;
+    /** Null when this is the last. */
+    next: PageStep | null;
+    className?: string;
+}) {
+    if (!previous && !next) return null;
+    return (
+        <nav
+            data-list-paging=""
+            aria-label={label}
+            className={cn(
+                "flex min-w-0 flex-wrap items-center justify-end gap-2 pt-3.5",
+                className,
+            )}
+        >
+            <PageButton step={previous} words="Previous" />
+            <PageButton step={next} words="Next" />
+        </nav>
+    );
+}
+
+function PageButton({ step, words }: { step: PageStep | null; words: string }) {
+    if (!step) {
+        return (
+            <Button type="button" variant="outline" disabled>
+                {words}
+            </Button>
+        );
+    }
+    if (step.href !== undefined) {
+        return (
+            <Button variant="outline" asChild>
+                <Link href={step.href} scroll={false}>
+                    {words}
+                </Link>
+            </Button>
+        );
+    }
+    return (
+        <Button type="button" variant="outline" onClick={step.onClick}>
+            {words}
+        </Button>
     );
 }

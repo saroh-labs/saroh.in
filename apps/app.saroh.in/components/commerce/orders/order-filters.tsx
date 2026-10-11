@@ -1,14 +1,16 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { cn } from "@saroh/ui/lib/utils";
 
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
-import type { OrdersDate, OrdersPayment } from "@/lib/orders/list-filters";
+import type {
+    OrdersDate,
+    OrdersFilters,
+    OrdersPayment,
+} from "@/lib/orders/list-filters";
 import {
     DATE_OPTIONS,
-    filtersActive,
-    NO_FILTERS,
     PAYMENT_OPTIONS,
     stepOptions,
 } from "@/lib/orders/list-filters";
@@ -16,51 +18,126 @@ import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { Chip } from "@/components/shared/chip";
-import { listFilterClass } from "@/components/shared/list-toolbar";
+import {
+    AttentionToggle,
+    listFilterClass,
+    NARROWED,
+} from "@/components/shared/list-toolbar";
 import { ProductFilter } from "./product-filter";
 
-/** At the desk: the toolbar's one dropdown, as wide as its words. */
-const SELECT = listFilterClass;
-const DATE_FIELD = "w-auto min-w-0";
-/** In the phone's sheet (B5): each menu the sheet's width, one to a line. */
-const SELECT_STACKED = "w-full";
-const DATE_FIELD_STACKED = "w-full min-w-0";
+interface FilterProps {
+    query: OrdersQuery;
+    go: (patch: Partial<OrdersQuery>) => void;
+}
 
 /**
- * The Orders list's filter bar (plan B, B4), after the "Saroh Orders
- * Screen" design: Date (with a custom range), Step, How it's fulfilled,
- * Payment, Product and the Needs attention (B15) and Late toggles, then
- * Clear filters once any is on. Each change goes into the address
- * (`list-filters.ts`), and the server asks the API for the first page again.
+ * The Orders list's filters (plan B, B4), after the "Saroh Orders Screen"
+ * design. Each change goes into the address (`list-filters.ts`), and the
+ * server asks the API for the first page again.
+ *
+ * A list's toolbar holds its three most used filters, and the rest sit
+ * behind one Filters button. For orders the three are the status
+ * (`OrderStatusFilter`), the date (`OrderDateFilter`) and the location.
+ * `OrderMoreFilters` is the rest: Step, How it's fulfilled, Payment,
+ * Product and Late. At the desk they open in a popover; on a phone (B5,
+ * DEC-067) every filter, the date included, sits in one sheet behind the
+ * same button (`OrderFilters`), so a wall of menus never pushes the first
+ * order below the fold.
  *
  * Step and Fulfilment offer only what the business's orders show (the
  * API's `options`). When those couldn't be read the two menus are left
  * out, rather than offered empty. What counts as Needs attention is the
  * API's: a sensitive entry only for a role that may read it.
- *
- * On a phone (B5, DEC-067) the same filters sit in a sheet behind a Filters
- * button, `stacked`: one full-width menu to a line, then the toggles, so a
- * wall of menus never pushes the first order below the fold.
- *
- * At the desk the menus are the list toolbar's dropdown filters, after the
- * search; the two toggles follow the status chips in the chip row
- * (`OrderToggles`), and Clear filters ends that row.
  */
 export function OrderFilters({
     query,
     options,
     go,
+}: FilterProps & { options: OrderFilterOptions | null }) {
+    return (
+        <div role="group" aria-label="Filter orders" className="grid gap-2.5">
+            <OrderDateFilter query={query} go={go} stacked />
+            <OrderMoreFilters query={query} options={options} go={go} />
+            <div className="flex flex-wrap gap-2">
+                <OrderAttention query={query} go={go} />
+            </div>
+        </div>
+    );
+}
+
+/** How many of `OrderMoreFilters`' filters are narrowed, for its button. */
+export function moreFiltersOn(filters: OrdersFilters): number {
+    return [
+        !!filters.step,
+        !!filters.fulfilment,
+        !!filters.payment,
+        !!filters.product,
+        filters.late,
+    ].filter(Boolean).length;
+}
+
+/**
+ * Date, with a custom range. One of the toolbar's dropdowns at the desk,
+ * as wide as its words; `stacked` in the phone's sheet, the sheet's width.
+ */
+export function OrderDateFilter({
+    query,
+    go,
     stacked = false,
-}: {
-    query: OrdersQuery;
-    options: OrderFilterOptions | null;
-    go: (patch: Partial<OrdersQuery>) => void;
-    /** The phone's sheet: one menu to a line, the sheet's width. */
-    stacked?: boolean;
-}) {
-    const select = stacked ? SELECT_STACKED : SELECT;
-    const dateField = stacked ? DATE_FIELD_STACKED : DATE_FIELD;
+}: FilterProps & { stacked?: boolean }) {
+    const field = stacked ? "w-full min-w-0" : "w-auto min-w-0";
+    return (
+        <>
+            <OptionSelect<OrdersDate | "">
+                aria-label="Date"
+                value={query.date ?? ""}
+                onValueChange={(v) =>
+                    go({ date: v || null, from: null, to: null })
+                }
+                options={[{ value: "", label: "All dates" }, ...DATE_OPTIONS]}
+                className={
+                    stacked
+                        ? "w-full"
+                        : cn(listFilterClass, query.date && NARROWED)
+                }
+            />
+            {query.date === "custom" ? (
+                <div
+                    className={
+                        stacked ? "grid grid-cols-2 gap-2.5" : "contents"
+                    }
+                >
+                    <Input
+                        type="date"
+                        aria-label="From"
+                        value={query.from ?? ""}
+                        max={query.to ?? undefined}
+                        onChange={(e) => go({ from: e.target.value || null })}
+                        className={field}
+                    />
+                    <Input
+                        type="date"
+                        aria-label="To"
+                        value={query.to ?? ""}
+                        min={query.from ?? undefined}
+                        onChange={(e) => go({ to: e.target.value || null })}
+                        className={field}
+                    />
+                </div>
+            ) : null}
+        </>
+    );
+}
+
+/**
+ * Every filter past the three in the row: one to a line, each the width
+ * of what holds it (the desk's popover, the phone's sheet).
+ */
+export function OrderMoreFilters({
+    query,
+    options,
+    go,
+}: FilterProps & { options: OrderFilterOptions | null }) {
     const steps = options ? stepOptions(options, query.fulfilment) : [];
     const stepKnown = steps.some((s) => s.key === query.step);
 
@@ -75,55 +152,14 @@ export function OrderFilters({
     }
 
     return (
-        <div
-            role="group"
-            aria-label="Filter orders"
-            className={
-                stacked
-                    ? "grid gap-2.5"
-                    : "flex min-w-0 max-w-full flex-wrap items-center gap-2"
-            }
-        >
-            <OptionSelect<OrdersDate | "">
-                aria-label="Date"
-                value={query.date ?? ""}
-                onValueChange={(v) =>
-                    go({ date: v || null, from: null, to: null })
-                }
-                options={[{ value: "", label: "Any date" }, ...DATE_OPTIONS]}
-                className={select}
-            />
-            {query.date === "custom" ? (
-                <div
-                    className={
-                        stacked ? "grid grid-cols-2 gap-2.5" : "contents"
-                    }
-                >
-                    <Input
-                        type="date"
-                        aria-label="From"
-                        value={query.from ?? ""}
-                        max={query.to ?? undefined}
-                        onChange={(e) => go({ from: e.target.value || null })}
-                        className={dateField}
-                    />
-                    <Input
-                        type="date"
-                        aria-label="To"
-                        value={query.to ?? ""}
-                        min={query.from ?? undefined}
-                        onChange={(e) => go({ to: e.target.value || null })}
-                        className={dateField}
-                    />
-                </div>
-            ) : null}
+        <>
             {options && steps.length > 0 ? (
                 <OptionSelect<string>
                     aria-label="Step"
                     value={query.step ?? ""}
                     onValueChange={(v) => go({ step: v || null })}
                     options={[
-                        { value: "", label: "Any step" },
+                        { value: "", label: "All steps" },
                         ...steps.map((s) => ({ value: s.key, label: s.label })),
                         // A step from a shared link this business no longer
                         // shows: kept, so the menu says what the list is.
@@ -131,7 +167,7 @@ export function OrderFilters({
                             ? [{ value: query.step, label: "That step" }]
                             : []),
                     ]}
-                    className={select}
+                    className={cn("w-full", query.step && NARROWED)}
                 />
             ) : null}
             {options && options.types.length > 0 ? (
@@ -140,7 +176,7 @@ export function OrderFilters({
                     value={query.fulfilment ?? ""}
                     onValueChange={pickFulfilment}
                     options={[
-                        { value: "", label: "Any fulfilment" },
+                        { value: "", label: "All ways" },
                         ...options.types.map((t) => ({
                             value: t.type,
                             label: t.label,
@@ -150,7 +186,7 @@ export function OrderFilters({
                             ? [{ value: query.fulfilment, label: "That way" }]
                             : []),
                     ]}
-                    className={select}
+                    className={cn("w-full", query.fulfilment && NARROWED)}
                 />
             ) : null}
             <OptionSelect<OrdersPayment | "">
@@ -158,10 +194,10 @@ export function OrderFilters({
                 value={query.payment ?? ""}
                 onValueChange={(v) => go({ payment: v || null })}
                 options={[
-                    { value: "", label: "Any payment" },
+                    { value: "", label: "All payments" },
                     ...PAYMENT_OPTIONS,
                 ]}
-                className={select}
+                className={cn("w-full", query.payment && NARROWED)}
             />
             <ProductFilter
                 value={query.product}
@@ -171,87 +207,40 @@ export function OrderFilters({
                         : null
                 }
                 onChange={(product) => go({ product })}
-                className={stacked ? "w-full max-w-none" : undefined}
+                className={cn("w-full max-w-none", query.product && NARROWED)}
             />
-            {stacked ? (
-                <div className="flex flex-wrap gap-2">
-                    <Toggles query={query} go={go} />
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
-function Toggles({
-    query,
-    go,
-}: {
-    query: OrdersQuery;
-    go: (patch: Partial<OrdersQuery>) => void;
-}) {
-    return (
-        <>
-            <Toggle
-                label="Needs attention"
-                on={query.attention}
-                onFlip={() => go({ attention: !query.attention })}
-            />
-            <Toggle
-                label="Late"
-                on={query.late}
-                onFlip={() => go({ late: !query.late })}
+            {/* Late is one more dropdown: only what needs the merchant now
+                is a chip, and a list has at most one. */}
+            <OptionSelect<"" | "late">
+                aria-label="Late"
+                value={query.late ? "late" : ""}
+                onValueChange={(v) => go({ late: v === "late" })}
+                options={[
+                    { value: "", label: "On time and late" },
+                    { value: "late", label: "Late only" },
+                ]}
+                className={cn("w-full", query.late && NARROWED)}
             />
         </>
     );
 }
 
 /**
- * The desk's two on/off filters and Clear filters, after the status chips
- * in the list's chip row. On a phone they are in the Filters sheet.
+ * Needs attention (B15): the Orders list's one attention toggle, after the
+ * dropdowns in the toolbar's row at the desk and in the Filters sheet on a
+ * phone.
  */
-export function OrderToggles({
+export function OrderAttention({
     query,
     go,
-}: {
-    query: OrdersQuery;
-    go: (patch: Partial<OrdersQuery>) => void;
-}) {
+    className,
+}: FilterProps & { className?: string }) {
     return (
-        <div
-            role="group"
-            aria-label="Only show"
-            className="flex items-center gap-1.5 max-[759px]:hidden"
-        >
-            <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-            <Toggles query={query} go={go} />
-            {filtersActive(query) ? (
-                <Button
-                    variant="link"
-                    size="inline"
-                    type="button"
-                    onClick={() => go({ ...NO_FILTERS })}
-                    className="whitespace-nowrap rounded-sm px-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
-                >
-                    Clear filters
-                </Button>
-            ) : null}
-        </div>
-    );
-}
-
-/** A filter that is on or off: the design's pill, said by `aria-pressed`. */
-function Toggle({
-    label,
-    on,
-    onFlip,
-}: {
-    label: string;
-    on: boolean;
-    onFlip: () => void;
-}) {
-    return (
-        <Chip as="toggle" on={on} onClick={onFlip}>
-            {label}
-        </Chip>
+        <AttentionToggle
+            label="Needs attention"
+            on={query.attention}
+            onToggle={() => go({ attention: !query.attention })}
+            className={className}
+        />
     );
 }

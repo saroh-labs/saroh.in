@@ -94,7 +94,7 @@ export function OrderFiltersSheet({
                     </>
                 }
             >
-                <OrderFilters query={query} options={options} go={go} stacked />
+                <OrderFilters query={query} options={options} go={go} />
             </QuickLook>
         </>
     );

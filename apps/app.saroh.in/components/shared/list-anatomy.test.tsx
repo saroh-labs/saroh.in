@@ -14,11 +14,14 @@ vi.mock("@/lib/orders/list-actions", () => ({ findOrderProducts: vi.fn() }));
 
 import { ClassPacksTabs } from "@/components/class-packs/class-packs-tabs";
 import {
+    moreFiltersOn,
+    OrderAttention,
+    OrderDateFilter,
     OrderFilters,
-    OrderToggles,
+    OrderMoreFilters,
 } from "@/components/commerce/orders/order-filters";
 import { OrderGridHead } from "@/components/commerce/orders/order-row";
-import { OrderStatusChips } from "@/components/commerce/orders/order-tabs";
+import { OrderStatusFilter } from "@/components/commerce/orders/order-tabs";
 import { LevelsPanel } from "@/components/commerce/stock/levels-panel";
 import { Chips } from "@/components/customers/detail/parts";
 import { Filters } from "@/components/customers/list/filters";
@@ -30,8 +33,9 @@ import { SetupChecklist } from "@/components/shared/setup-checklist";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import {
     CatalogueFilters,
+    CatalogueMoreFilters,
+    catalogueNarrowed,
     CatalogueSearch,
-    CatalogueStatusChips,
 } from "@/components/stores/catalogue/catalogue-toolbar";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { StorefrontList } from "@/components/stores/storefront-list";
@@ -73,7 +77,23 @@ function inOrder(markup: string, ...needles: string[]) {
 const SEARCH = 'data-slot="list-search"';
 const FILTERS = 'data-slot="list-filters"';
 const END = 'data-slot="list-end"';
-const CHIPS = 'data-slot="list-chips"';
+const ATTENTION = 'data-slot="list-attention"';
+
+/** The box of the dropdown with this accessible name, as its tag. */
+const box = (markup: string, label: string) =>
+    new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`).exec(markup)?.[0] ??
+    "";
+/** What that box says: its chosen option, and a count if it shows one. */
+const says = (markup: string, label: string) => {
+    const from = markup.indexOf(box(markup, label));
+    const to = markup.indexOf("</button>", from);
+    return markup
+        .slice(from, to)
+        .replace(/<svg[\s\S]*?<\/svg>/g, "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+};
 
 describe("a server-read list: Customers", () => {
     const page: CustomersPage = {
@@ -92,113 +112,181 @@ describe("a server-read list: Customers", () => {
         sort: "last",
         chip: "returning",
     };
-    const out = html(
-        <Filters query={readCustomersQuery({})} page={page} go={noop} />,
-    );
-
-    it("search, then the location filter, then the sort on the right, then the chips", () => {
-        inOrder(out, SEARCH, FILTERS, END, CHIPS);
-        // The location is a filter; the sort is pushed to the right.
-        expect(out).toMatch(
-            new RegExp(
-                `${FILTERS}[\\s\\S]*aria-label="Location"[\\s\\S]*${END}`,
-            ),
+    const draw = (chip: CustomersPage["chip"]) =>
+        html(
+            <Filters
+                query={readCustomersQuery({})}
+                page={{ ...page, chip }}
+                go={noop}
+            />,
         );
-        expect(out).toMatch(new RegExp(`${END}[\\s\\S]*aria-label="Sort"`));
+    const out = draw("returning");
+
+    it("is ONE row: search, who to show, the location, then the sort on the right", () => {
+        inOrder(
+            out,
+            SEARCH,
+            FILTERS,
+            'aria-label="Show"',
+            'aria-label="Location"',
+            END,
+            'aria-label="Sort"',
+        );
+        // No second row: nothing is drawn as a chip.
+        expect(out).not.toMatch(
+            /role="radio"|aria-pressed|data-slot="list-chips"/,
+        );
     });
 
-    it("draws both dropdowns as the one control, with no size of its own", () => {
-        const boxes = out.match(/<button[^>]*role="combobox"[^>]*>/g) ?? [];
-        expect(boxes).toHaveLength(2);
-        const [location, sort] = boxes.map((b) =>
-            (/class="([^"]*)"/.exec(b)?.[1] ?? "")
+    it("draws every dropdown as the one control, with no size of its own", () => {
+        // With nothing narrowed, the three are drawn alike.
+        const plain = draw("all");
+        const boxes = ["Show", "Location", "Sort"].map((n) =>
+            (/class="([^"]*)"/.exec(box(plain, n))?.[1] ?? "")
                 .split(" ")
-                .filter((c) => !c.startsWith("data-") && c !== "")
                 .sort()
                 .join(" "),
         );
         // The same classes, so the same height and the same chevron gap.
-        expect(location).toBe(sort);
-        expect(location.split(" ")).toEqual(
+        expect(new Set(boxes).size).toBe(1);
+        expect(boxes[0].split(" ")).toEqual(
             expect.arrayContaining(["w-auto", "gap-2", "h-[38px]"]),
         );
-        expect(location).not.toMatch(/\bh-8\b|min-w-\[150px\]/);
+        expect(boxes[0]).not.toMatch(/\bh-8\b|min-w-\[150px\]/);
     });
 
-    it("searches at the one width", () => {
+    it("the box says what it filters when nothing is narrowed, and the count once something is", () => {
+        // Never a bare "All" beside "All locations".
+        expect(says(draw("all"), "Show")).toBe("All customers");
+        expect(says(out, "Show")).toBe("Returning 9");
+        expect(says(out, "Location")).toBe("All locations");
+        // Zero is a fact, and is said.
+        expect(says(draw("subscribers"), "Show")).toBe("Subscribers 0");
+    });
+
+    it("a narrowed filter takes the selected look, and Clear filters ends the row. A sort never does", () => {
+        expect(box(out, "Show")).toContain("border-foreground");
+        expect(box(out, "Location")).not.toContain("border-foreground");
+        expect(box(out, "Sort")).not.toContain("border-foreground");
+        inOrder(out, 'aria-label="Location"', 'data-slot="list-clear"', END);
+        expect(out).toContain("Clear filters");
+        // Nothing narrowed: nothing to clear.
+        expect(draw("all")).not.toContain("Clear filters");
+        // A search with words in it counts as narrowed.
+        const searched = html(
+            <Filters
+                query={readCustomersQuery({ q: "asha" })}
+                page={{ ...page, chip: "all" }}
+                go={noop}
+            />,
+        );
+        expect(searched).toContain("Clear filters");
+    });
+
+    it("says how many are showing on the right, and under the row where there is no room", () => {
+        const counted = html(
+            <Filters
+                query={readCustomersQuery({})}
+                page={page}
+                go={noop}
+                count="Showing 1 to 50 of 120"
+            />,
+        );
+        // Once, in one element the width places.
+        expect(counted.match(/Showing 1 to 50 of 120/g)).toHaveLength(1);
+        expect(counted).toMatch(
+            /data-slot="list-count"[^>]*>Showing 1 to 50 of 120</,
+        );
+    });
+
+    it("the placeholder fits the field: what it searches is its description", () => {
+        expect(out).toContain('placeholder="Search customers"');
+        expect(out).toContain('aria-label="Search customers"');
+        expect(out).toContain('aria-description="By name, phone or email"');
         expect(out).toContain("sm:max-w-[320px]");
-        expect(out).not.toContain("sm:max-w-[420px]");
-        expect(out).toContain(
-            'aria-label="Search customers by name, phone or email"',
-        );
-    });
-
-    it("draws the chips as a radio group, each count a quiet number, zero included", () => {
-        expect(out).toMatch(/role="radiogroup"[^>]*aria-label="Show"/);
-        expect(out).toMatch(
-            /aria-checked="true"[^>]*>Returning <span data-chip-count=""[^>]*>9</,
-        );
-        expect(out).toMatch(/>Subscribers <span data-chip-count=""[^>]*>0</);
-        expect(out).not.toMatch(/aria-pressed|role="tab"| · \d/);
     });
 });
 
-describe("a server-read list with a filter bar: Orders", () => {
+describe("a server-read list with many filters: Orders", () => {
     const query = readOrdersQuery({ tab: "open", late: "true" });
-    const chips = html(
-        <OrderStatusChips
-            query={query}
-            counts={{ all: 532, open: 3, refunded: 0 }}
-            go={noop}
-        >
-            <OrderToggles query={query} go={noop} />
-        </OrderStatusChips>,
-    );
 
-    it("All, Open and Refunded are status chips with the API's counts, not tabs", () => {
-        expect(chips).toMatch(
-            /role="radiogroup"[^>]*aria-label="Order status"/,
+    it("All orders, Open and Refunded are one dropdown with the API's counts", () => {
+        const draw = (tab: string) =>
+            html(
+                <OrderStatusFilter
+                    query={readOrdersQuery({ tab })}
+                    counts={{ all: 532, open: 3, refunded: 0 }}
+                    go={noop}
+                />,
+            );
+        expect(says(draw("all"), "Order status")).toBe("All orders");
+        expect(says(draw("open"), "Order status")).toBe("Open 3");
+        expect(says(draw("refunded"), "Order status")).toBe("Refunded 0");
+        expect(draw("open")).not.toMatch(
+            /data-tab-strip|data-count-badge|role="tab"|role="radio"/,
         );
-        expect(chips).toMatch(/>All <span data-chip-count=""[^>]*>532</);
-        expect(chips).toMatch(
-            /aria-checked="true"[^>]*>Open <span data-chip-count=""[^>]*>3</,
-        );
-        expect(chips).toMatch(/>Refunded <span data-chip-count=""[^>]*>0</);
-        expect(chips).not.toMatch(/data-tab-strip|data-count-badge|role="tab"/);
     });
 
-    it("the on/off filters follow the status chips in the same row, and say whether they are on", () => {
-        inOrder(chips, 'role="radiogroup"', 'aria-label="Only show"');
-        expect(chips).toMatch(/aria-pressed="true"[^>]*>Late</);
-        expect(chips).toMatch(/aria-pressed="false"[^>]*>Needs attention</);
-        // On a phone they are in the Filters sheet, not on the page.
-        expect(chips).toMatch(
-            /aria-label="Only show"[^>]*class="[^"]*max-\[759px\]:hidden/,
+    it("the row holds the three most used (status, date, location): the date is the one dropdown", () => {
+        const date = html(
+            <OrderDateFilter query={readOrdersQuery({})} go={noop} />,
         );
-        expect(chips).toContain("Clear filters");
+        expect(says(date, "Date")).toBe("All dates");
+        const b = box(date, "Date");
+        expect(b).toContain("w-auto");
+        expect(b).toContain("h-[38px]");
+        expect(b).not.toMatch(/h-\[34px\]|rounded-\[9px\]|text-\[12\.5px\]/);
+        // Not narrowed: the plain edge. Narrowed: the selected look.
+        expect(b).not.toContain("border-foreground");
+        const narrowed = html(
+            <OrderDateFilter
+                query={readOrdersQuery({ date: "month" })}
+                go={noop}
+            />,
+        );
+        expect(box(narrowed, "Date")).toContain("border-foreground");
+        expect(says(narrowed, "Date")).toBe("This month");
     });
 
-    it("the desk's filter menus are the one dropdown: no height, radius or type of their own", () => {
-        const menus = html(
+    it('every other filter is behind Filters, each reading "All …" until narrowed, with the selected look once it is', () => {
+        const more = (q: Record<string, string>) =>
+            html(
+                <OrderMoreFilters
+                    query={readOrdersQuery(q)}
+                    options={null}
+                    go={noop}
+                />,
+            );
+        const plain = more({});
+        expect(says(plain, "Payment")).toBe("All payments");
+        expect(plain).toContain("All products");
+        expect(plain).not.toMatch(/>Any /);
+        expect(box(plain, "Payment")).not.toContain("border-foreground");
+        // Late is a dropdown here, not a second chip.
+        expect(says(plain, "Late")).toBe("On time and late");
+        expect(plain).not.toContain("aria-pressed");
+        const late = more({ late: "true" });
+        expect(says(late, "Late")).toBe("Late only");
+        expect(box(late, "Late")).toContain("border-foreground");
+        // The Filters button counts only what is behind it.
+        expect(moreFiltersOn(readOrdersQuery({}))).toBe(0);
+        // The date is in the row, so it is not one of them.
+        expect(
+            moreFiltersOn(readOrdersQuery({ late: "true", date: "month" })),
+        ).toBe(1);
+    });
+
+    it("on a phone one sheet holds them all: the date, the rest and the one toggle", () => {
+        const sheet = html(
             <OrderFilters query={query} options={null} go={noop} />,
         );
-        expect(menus).toMatch(/role="group"[^>]*aria-label="Filter orders"/);
-        const boxes =
-            menus.match(
-                /<button[^>]*role="combobox"[^>]*aria-label="(?:Date|Payment)"[^>]*>/g,
-            ) ??
-            menus.match(/<button[^>]*aria-label="(?:Date|Payment)"[^>]*>/g) ??
-            [];
-        expect(boxes.length).toBeGreaterThanOrEqual(2);
-        for (const box of boxes) {
-            expect(box).toContain("w-auto");
-            expect(box).toContain("h-[38px]");
-            expect(box).not.toMatch(
-                /h-\[34px\]|rounded-\[9px\]|text-\[12\.5px\]/,
-            );
+        expect(sheet).toMatch(/role="group"[^>]*aria-label="Filter orders"/);
+        for (const name of ["Date", "Payment", "Late"]) {
+            expect(box(sheet, name)).not.toBe("");
         }
-        // The toggles moved to the chip row.
-        expect(menus).not.toContain("aria-pressed");
+        expect(sheet.match(/aria-pressed/g)).toHaveLength(1);
+        const toggle = html(<OrderAttention query={query} go={noop} />);
+        expect(toggle).toMatch(/aria-pressed="false"[^>]*>Needs attention</);
     });
 
     it("the grid's head is the tinted band", () => {
@@ -230,34 +318,63 @@ describe("a list read a page at a time, with views above it: Stock › Levels", 
         nextCursor: null,
         timezone: "Asia/Kolkata",
     } as unknown as StockLevels;
-    const out = html(
-        <LevelsPanel
-            levels={levels}
-            allStorefronts={levels.storefronts}
-            needsYou={4}
-            show="needs"
-            q=""
-            href={() => "/commerce/stock"}
-            counting={false}
-            values={{}}
-            onValue={noop}
-            pageSize={50}
-        />,
-    );
+    const draw = (show: string, needsYou = 4) =>
+        html(
+            <LevelsPanel
+                levels={levels}
+                allStorefronts={levels.storefronts}
+                needsYou={needsYou}
+                show={show}
+                q=""
+                href={() => "/commerce/stock"}
+                counting={false}
+                values={{}}
+                onValue={noop}
+                pageSize={50}
+            />,
+        );
+    const out = draw("needs");
 
-    it("search first, then the chips, then the table", () => {
-        inOrder(out, SEARCH, CHIPS, "data-list-table");
-        expect(out).toContain('aria-label="Search stock by product or SKU"');
+    it("is one row: search, the location dropdown, the Needs you toggle, then the table", () => {
+        inOrder(
+            out,
+            SEARCH,
+            'aria-label="Location"',
+            ATTENTION,
+            "data-list-table",
+        );
+        expect(out).toContain('placeholder="Search stock"');
+        expect(out).toContain('aria-description="By product or SKU"');
+        expect(out).not.toMatch(/role="radio"|data-slot="list-chips"/);
     });
 
-    it('writes "Needs you 4", never "Needs you · 4"', () => {
-        expect(out).toMatch(
-            /aria-checked="true"[^>]*>Needs you <span data-chip-count=""[^>]*>4</,
+    it("splits the two ideas: which location is a dropdown, what needs you is the one toggle", () => {
+        // Both write ?show=, so one clears the other.
+        expect(says(out, "Location")).toBe("All locations");
+        expect(out).toMatch(/data-attention-toggle=""[^>]*aria-pressed="true"/);
+        const there = draw("s2");
+        expect(says(there, "Location")).toBe("Online");
+        expect(there).toMatch(
+            /data-attention-toggle=""[^>]*aria-pressed="false"/,
         );
+        expect(out.match(/data-attention-toggle/g)).toHaveLength(1);
+    });
+
+    it('writes "Needs you 4", never "Needs you · 4", in the attention tone while it waits', () => {
+        const off = draw("all");
+        const toggle =
+            /<button[^>]*data-attention-toggle[\s\S]*?<\/button>/.exec(
+                off,
+            )?.[0];
+        expect(toggle?.replace(/<[^>]+>/g, "")).toBe("Needs you 4");
+        expect(toggle).toMatch(/data-count-badge=""[^>]*data-tone="strong"/);
         expect(out).not.toContain("Needs you ·");
-        // A location's chip is a record's own name: masked in a recording.
-        expect(out).toMatch(/data-ph-mask=""[^>]*>Hill Road</);
-        expect(out).toMatch(/data-ph-unmask=""[^>]*>All</);
+        // Nothing waiting: a plain chip, with zero said.
+        const none = /<button[^>]*data-attention-toggle[\s\S]*?<\/button>/.exec(
+            draw("all", 0),
+        )?.[0];
+        expect(none?.replace(/<[^>]+>/g, "")).toBe("Needs you 0");
+        expect(none).not.toContain("data-count-badge");
     });
 
     it("draws the head as the tinted band, and rules its rows edge to edge", () => {
@@ -271,27 +388,21 @@ describe("a list read a page at a time, with views above it: Stock › Levels", 
         expect(wrapper?.[1]).not.toMatch(/(^| )px-/);
         expect(table).toMatch(/role="listitem"[^>]*class="[^"]*px-\[14px\]/);
         expect(table).toMatch(/role="listitem"[^>]*class="[^"]*border-b/);
+        // The head's fixed words may be read in a session recording. A
+        // location's name in it is the business's own, and is masked.
+        expect(table).toMatch(/data-list-head=""[^>]*data-ph-unmask=""/);
+        expect(table).toMatch(/<span data-ph-mask=""[^>]*>Hill Road<\/span>/);
+        expect(table).toMatch(/<span data-ph-mask=""[^>]*>Online<\/span>/);
     });
 });
 
 describe("a list filtered on the server through DataView: Products", () => {
     const query = readProductsQuery({ status: "DRAFT" });
     const go = noop;
-
-    it("status is the chip row, with no count where none is known", () => {
-        const out = html(<CatalogueStatusChips query={query} go={go} />);
-        expect(out).toMatch(/role="radiogroup"[^>]*aria-label="Status"/);
-        for (const name of ["All", "Live", "Draft", "Archived"]) {
-            expect(out).toContain(`>${name}</button>`);
-        }
-        expect(out).toMatch(/aria-checked="true"[^>]*>Draft</);
-        expect(out).not.toContain("data-chip-count");
-    });
-
-    it("location, category and collection are each the one dropdown", () => {
-        const out = html(
+    const filters = (q = query) =>
+        html(
             <CatalogueFilters
-                query={query}
+                query={q}
                 go={go}
                 storefronts={{
                     everywhere: 12,
@@ -306,14 +417,42 @@ describe("a list filtered on the server through DataView: Products", () => {
                 }}
             />,
         );
-        for (const name of ["Location", "Category", "Collection"]) {
-            expect(out).toMatch(
-                new RegExp(`role="combobox"[^>]*aria-label="${name}"`),
-            );
-        }
+
+    it("the row holds three dropdowns: status, category, location. The collection is behind Filters", () => {
+        const out = filters();
+        inOrder(
+            out,
+            'aria-label="Status"',
+            'aria-label="Category"',
+            'aria-label="Location"',
+        );
         expect(out.match(/data-list-filter=""/g)).toHaveLength(3);
-        // No "Filter · 2" menu button with a count joined by a dot.
-        expect(out).not.toMatch(/Filter ·|aria-haspopup="menu"/);
+        expect(out).not.toContain('aria-label="Collection"');
+        const more = (collection?: string) =>
+            html(
+                <CatalogueMoreFilters
+                    query={readProductsQuery(collection ? { collection } : {})}
+                    go={go}
+                    choices={{ categories: [], collections: [] }}
+                />,
+            );
+        expect(more()).toMatch(/data-more-filters=""[^>]*aria-label="Filters"/);
+        expect(more("c1")).toContain('aria-label="Filters, 1 on"');
+        // Narrowed: the button takes the selected look.
+        expect(
+            /<button[^>]*data-more-filters[^>]*>/.exec(more("c1"))?.[0],
+        ).toContain("border-foreground");
+        // No row of chips, and no "Filter · 2" menu button.
+        expect(out).not.toMatch(/role="radio"|Filter ·|aria-haspopup="menu"/);
+    });
+
+    it('every unnarrowed filter reads "All {plural}": one way, never "Any"', () => {
+        const out = filters(readProductsQuery({}));
+        expect(says(out, "Location")).toBe("All locations");
+        expect(says(out, "Status")).toBe("All statuses");
+        expect(says(out, "Category")).toBe("All categories");
+        expect(out).not.toMatch(/>Any /);
+        expect(says(filters(), "Status")).toBe("Draft");
     });
 
     it("a list of choices that couldn't be read says so, with Try again, in the filter's place", () => {
@@ -327,7 +466,13 @@ describe("a list filtered on the server through DataView: Products", () => {
         );
         expect(out).toContain("Couldn't load categories");
         expect(out).toContain("Try again");
-        expect(out).toMatch(/role="combobox"[^>]*aria-label="Collection"/);
+        expect(out).toMatch(/role="combobox"[^>]*aria-label="Status"/);
+    });
+
+    it("knows when it is narrowed, a search with words in it included", () => {
+        expect(catalogueNarrowed(readProductsQuery({}))).toBe(false);
+        expect(catalogueNarrowed(readProductsQuery({ q: "rye" }))).toBe(true);
+        expect(catalogueNarrowed(query)).toBe(true);
     });
 
     it("the search is the one field", () => {
@@ -380,27 +525,29 @@ describe("views are tabs: Class packs", () => {
 });
 
 describe("a record's tab that narrows one list: Customer Detail", () => {
-    const out = html(
-        <Chips
-            label="Which orders"
-            value="open"
-            onChange={noop}
-            chips={[
-                { key: "all", label: "All", count: 7 },
-                { key: "open", label: "Open", count: 2 },
-                { key: "past", label: "Past" },
-            ]}
-        />,
-    );
-
-    it("is the chip row, with the count after the label", () => {
-        expect(out).toMatch(/role="radiogroup"[^>]*aria-label="Which orders"/);
-        expect(out).toMatch(
-            /aria-checked="true"[^>]*>Open <span data-chip-count=""[^>]*>2</,
+    const draw = (value: "all" | "open" | "past") =>
+        html(
+            <Chips
+                label="Which orders"
+                value={value}
+                onChange={noop}
+                chips={[
+                    { key: "all", label: "All orders", count: 7 },
+                    { key: "open", label: "Open", count: 2 },
+                    { key: "past", label: "Past" },
+                ]}
+            />,
         );
-        expect(out).toMatch(/>All <span data-chip-count=""[^>]*>7</);
-        expect(out).toContain(">Past</button>");
-        expect(out).not.toMatch(/All · 7|Open · 2|aria-pressed/);
+
+    it("is the one dropdown, the count after the label once it is narrowed", () => {
+        expect(draw("open")).toMatch(
+            /role="combobox"[^>]*aria-label="Which orders"/,
+        );
+        expect(says(draw("all"), "Which orders")).toBe("All orders");
+        expect(says(draw("open"), "Which orders")).toBe("Open 2");
+        // A count nobody knows is left out.
+        expect(says(draw("past"), "Which orders")).toBe("Past");
+        expect(draw("open")).not.toMatch(/Open · 2|aria-pressed|role="radio"/);
     });
 });
 

@@ -26,6 +26,13 @@ export interface ListSearchProps {
      * search, the back button), but never over what someone is typing.
      */
     defaultValue?: string;
+    /**
+     * What the search looks through, when the placeholder is too short to
+     * say ("By name, phone or email"). It is the field's accessible
+     * description. Keep the placeholder to "Search {things}": at the one
+     * width a longer one runs under the "/" hint.
+     */
+    describe?: string;
     /** True while the list is being read for the term: says "Searching…". */
     searching?: boolean;
     /** "/" anywhere on the page focuses this field. One per screen. */
@@ -66,6 +73,7 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
             placeholder,
             onSearch,
             defaultValue = "",
+            describe,
             searching = false,
             shortcut = true,
             name,
@@ -131,6 +139,7 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
                     value={text}
                     placeholder={placeholder}
                     aria-label={placeholder}
+                    aria-description={describe}
                     aria-keyshortcuts={shortcut ? "/" : undefined}
                     onChange={(e) => {
                         setText(e.target.value);
@@ -153,7 +162,7 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
                         }
                     }}
                     // 16px under a thumb: iOS zooms the page on a smaller field.
-                    className="flex h-[38px] w-full rounded-md border border-input bg-field py-2 pl-[34px] pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11 coarse:text-base [&::-webkit-search-cancel-button]:appearance-none"
+                    className="flex h-[38px] w-full rounded-md border border-input bg-field py-2 pl-[34px] pr-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11 coarse:text-base [&::-webkit-search-cancel-button]:appearance-none"
                 />
                 {searching && text !== "" ? (
                     <span

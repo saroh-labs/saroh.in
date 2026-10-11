@@ -4231,14 +4231,19 @@ page actions at three heights.
 badges) and a scan for each, but nothing said how a list is put together
 from them, so each screen composed the right pieces its own way. A scan per
 piece cannot see a wrong arrangement of right pieces.
-**Fix**: one anatomy, in code: `ListToolbar`, `ListFilter`, `FilterChips`
-and `listTable` (`@saroh/ui`), which `DataView` draws itself, and every list
-moved onto them. Tabs are views and a status filter is chips. `PageHeader`
-puts its actions level with the title in every case.
+**Fix**: one anatomy, in code: `ListToolbar`, `ListFilter` and `listTable`
+(`@saroh/ui`), which `DataView` draws itself, and every list moved onto
+them. Tabs are views. Every filter is a dropdown in the toolbar's one row
+(the first pass drew status filters as a row of chips under it. The owner
+looked again and asked for one row). `PageHeader` puts its actions level
+with the title in every case.
 **Check**: `components/shared/list-screens.test.ts` reads the app for a
 hand-drawn head row, a search outside the toolbar or at its own width, a
-hand-sized select, a new tab strip that is not a named set of views, a chip
-row by hand, a dot-joined count and an unnamed attention count. Compare
+hand-sized select, a new tab strip that is not a named set of views, a row
+of chips for a filter, more than three dropdowns or more than one attention
+toggle, a filter that reads "Any …" or a bare "All", a placeholder too long
+for the field, a pager drawn by hand, a dot-joined count and an unnamed
+attention count. Compare
 screens side by side before calling a consistency pass done, not one at a
 time.
 **Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
@@ -4271,3 +4276,17 @@ held to both neighbours by no-break spaces, in one element.
 **Check**: `list-anatomy.test.tsx` ("no separator leads or trails").
 **Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
 and dates
+
+## A header button was stretched to the width of its busy label
+
+**Symptom**: Orders' "Export" was about 184px wide beside "New order".
+**Cause**: `Button` lays its label and its `busyLabel` out in one cell so
+nothing beside it moves when it is busy. Export's busy label was a sentence
+with its progress in it (`Exporting… 50 of 532`), so the button was that
+wide at rest.
+**Fix**: the busy label is the verb alone ("Exporting…") and the progress
+is said beside the button while it runs.
+**Check**: a `busyLabel` is one word, the verb's "-ing" form, as the button
+rules already say. No other template-string busy label is left in the app.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy

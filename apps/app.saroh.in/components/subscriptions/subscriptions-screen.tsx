@@ -14,7 +14,7 @@ import { useState } from "react";
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import {
-    FilterChips,
+    ListFilter,
     ListTable,
     listTable,
     ListTableHead,
@@ -217,7 +217,7 @@ export function SubscriptionsScreen({
                 {/* Two views: who is subscribed, and the plans on sale.
                     Where each subscription stands (Active, Payment
                     failed, Paused, Cancelled) narrows the one list, so it
-                    is the chip row under the search, not more tabs. The
+                    is a dropdown beside the search, not more tabs. The
                     address keeps `?tab=` for both, as it always has. */}
                 <ListToolbar
                     tabs={
@@ -253,19 +253,28 @@ export function SubscriptionsScreen({
                     search={
                         !onPlans && subscriptions.length > SEARCH_FROM ? (
                             <ListSearch
-                                placeholder="Search subscriptions by name or plan"
+                                placeholder="Search subscriptions"
+                                describe="By name or plan"
                                 defaultValue={query}
                                 onSearch={setQuery}
                             />
                         ) : null
                     }
-                    chips={
+                    onClear={
+                        !onPlans && (tab !== "active" || needle)
+                            ? () => {
+                                  setQuery("");
+                                  pick("active");
+                              }
+                            : undefined
+                    }
+                    filters={
                         !onPlans && subscriptions.length > 0 ? (
-                            <FilterChips<ListTab>
+                            <ListFilter<ListTab>
                                 label="Subscription status"
                                 value={tab}
                                 onValueChange={pick}
-                                chips={TABS.map((t) => ({
+                                options={TABS.map((t) => ({
                                     value: t,
                                     label: TAB_LABEL[t],
                                     count: count(t),

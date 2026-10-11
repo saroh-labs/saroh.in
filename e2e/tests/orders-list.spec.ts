@@ -1,5 +1,5 @@
 // @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/tickets api:orders api:payments api:customer-workspace
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
@@ -84,46 +84,61 @@ const orders = (page: Page) =>
 const cards = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
 /**
- * The filter bar at this width (B4, B5). At the desk it is on the page; on a
- * phone it sits in a sheet behind the Filters button, which this opens. The
- * button is drawn once per layout (hidden at the desk), so only the visible
- * one is pressed.
+ * The filters behind the Filters button (B4, B5), which this opens: a
+ * popover at the desk (Step, How it's fulfilled, Payment, Product, Late),
+ * and on a phone one sheet that also holds the Date and Needs attention.
+ * Both are a dialog named "Filter orders". The button is drawn once per
+ * layout, so only the visible one is pressed. Call it once per page load:
+ * a second press closes the desk's popover.
  */
 async function filterBar(page: Page) {
-    if (cards(page)) {
-        await page
-            .getByRole("button", { name: /^Filters/ })
-            .filter({ visible: true })
-            .click();
-        return page
-            .getByRole("dialog", { name: "Filter orders" })
-            .getByRole("group", { name: "Filter orders" });
-    }
+    await page
+        .getByRole("button", { name: /^Filters/ })
+        .filter({ visible: true })
+        .click();
     return page
-        .getByRole("group", { name: "Filter orders" })
-        .filter({ visible: true });
+        .getByRole("dialog", { name: "Filter orders" })
+        .getByRole("group", { name: "Filter orders" });
 }
 
 /**
- * All, Open and Refunded narrow the one list by status, so they are its chip
- * row (a radio group), not tabs. The count follows the label ("Open 3").
+ * All orders, Open and Refunded narrow the one list by status: one of the
+ * toolbar's dropdowns. Its box says the chosen one ("Open 3").
  */
-const tab = (page: Page, name: string) =>
-    page.getByRole("radiogroup", { name: "Order status" }).getByRole("radio", {
-        name: new RegExp(`^${name}\\b`),
-    });
+const status = (page: Page) =>
+    page.getByRole("combobox", { name: "Order status" });
 
-/** A chip's count as it is drawn: grouped, as every figure in the app. */
+/** An option of the open status dropdown, by the words it starts with. */
+const statusOption = (page: Page, name: string) =>
+    page.getByRole("option", { name: new RegExp(`^${name}\\b`) });
+
+async function pickStatus(page: Page, name: string) {
+    await status(page).click();
+    await statusOption(page, name).click();
+}
+
+/** A count as it is drawn: grouped, as every figure in the app. */
 const chipCount = (n: number) => new Intl.NumberFormat("en-IN").format(n);
 
 /**
- * The two on/off filters (B15). At the desk they follow the status chips;
- * on a phone they are in the Filters sheet with the menus.
+ * The Date filter: in the toolbar's row at the desk, in the Filters sheet
+ * (`bar`) on a phone.
  */
-async function toggleBar(page: Page) {
-    if (cards(page)) return filterBar(page);
-    return page.getByRole("group", { name: "Only show" });
-}
+const dateBox = (page: Page, bar: Locator) =>
+    cards(page)
+        ? bar.getByRole("combobox", { name: "Date" })
+        : page.getByRole("combobox", { name: "Date" });
+
+/**
+ * Needs attention, the list's one toggle: after the dropdowns at the desk,
+ * in the Filters sheet (`bar`) on a phone.
+ */
+const attentionToggle = (page: Page, bar: Locator) =>
+    cards(page)
+        ? bar.getByRole("button", { name: "Needs attention" })
+        : page
+              .getByRole("button", { name: "Needs attention" })
+              .filter({ visible: true });
 
 test.describe("orders list", () => {
     test("the Open tab lists only open orders, with the API's counts", async ({
@@ -135,18 +150,20 @@ test.describe("orders list", () => {
         const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
-        await expect(tab(page, "All")).toHaveAttribute("aria-checked", "true");
+        await expect(status(page)).toContainText("All orders");
+        // Open, each option says how many it holds.
+        await status(page).click();
         for (const [name, n] of [
-            ["All", all.counts.all],
+            ["All orders", all.counts.all],
             ["Open", all.counts.open],
             ["Refunded", all.counts.refunded],
         ] as const) {
-            await expect(tab(page, name)).toContainText(chipCount(n));
+            await expect(statusOption(page, name)).toContainText(chipCount(n));
         }
 
-        await tab(page, "Open").click();
+        await statusOption(page, "Open").click();
         await expect(page).toHaveURL(/tab=open/);
-        await expect(tab(page, "Open")).toHaveAttribute("aria-checked", "true");
+        await expect(status(page)).toContainText("Open");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
             await expect(
@@ -192,7 +209,7 @@ test.describe("orders list", () => {
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
         await page.getByRole("button", { name: "Show all orders" }).click();
-        await expect(tab(page, "All")).toHaveAttribute("aria-checked", "true");
+        await expect(status(page)).toContainText("All orders");
     });
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
@@ -342,11 +359,12 @@ test.describe("orders list", () => {
         await expect(sheet).toBeVisible();
         const bar = sheet.getByRole("group", { name: "Filter orders" });
         await expect(bar.getByRole("combobox", { name: "Date" })).toBeVisible();
-        await bar.getByRole("button", { name: "Late" }).click();
+        // Late is one of the dropdowns.
+        await bar.getByRole("combobox", { name: "Late" }).click();
+        await page.getByRole("option", { name: "Late only" }).click();
         await expect(page).toHaveURL(/late=true/);
-        await expect(bar.getByRole("button", { name: "Late" })).toHaveAttribute(
-            "aria-pressed",
-            "true",
+        await expect(bar.getByRole("combobox", { name: "Late" })).toContainText(
+            "Late only",
         );
 
         await sheet.getByRole("button", { name: "Done" }).click();
@@ -380,7 +398,7 @@ test.describe("orders list", () => {
         if (rows.length > 0) {
             // Money is left out by the API, not hidden by the screen.
             expect(rows.every((r) => r.total === undefined)).toBe(true);
-            await tab(page, "Open").click();
+            await pickStatus(page, "Open");
             await expect(page).toHaveURL(/tab=open/);
             // The pill says the step in words on either layout; the desk
             // grid adds the bar, itself said in words.
@@ -541,13 +559,14 @@ test.describe("orders list filters (B4)", () => {
         await expect(
             bar.getByRole("combobox", { name: "How it's fulfilled" }),
         ).toContainText(type.label);
-        await expect(bar.getByRole("combobox", { name: "Date" })).toContainText(
-            "This month",
-        );
-        if (cards(page)) await page.keyboard.press("Escape");
-        await expect(tab(page, "All")).toContainText(
+        await expect(dateBox(page, bar)).toContainText("This month");
+        // Close the popover or the sheet before reading the page.
+        await page.keyboard.press("Escape");
+        await status(page).click();
+        await expect(statusOption(page, "All orders")).toContainText(
             chipCount(expected.counts.all),
         );
+        await page.keyboard.press("Escape");
         if (expected.rows.length === 0) {
             await expect(
                 page.getByRole("button", { name: "Clear filters" }).last(),
@@ -577,30 +596,33 @@ test.describe("orders list filters (B4)", () => {
         await expect(page).not.toHaveURL(/step=|date=/);
     });
 
-    test("Late and Needs attention are toggles in the address (B15)", async ({
+    test("Late and Needs attention are filters in the address (B15)", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
-        const bar = await toggleBar(page);
-        const late = bar.getByRole("button", { name: "Late" });
-        await expect(late).toHaveAttribute("aria-pressed", "false");
+        const bar = await filterBar(page);
+        const late = bar.getByRole("combobox", { name: "Late" });
+        await expect(late).toContainText("On time and late");
         await late.click();
+        await page.getByRole("option", { name: "Late only" }).click();
         await expect(page).toHaveURL(/late=true/);
-        await expect(late).toHaveAttribute("aria-pressed", "true");
+        await expect(late).toContainText("Late only");
 
-        const attention = bar.getByRole("button", { name: "Needs attention" });
+        // The desk's toggle is in the row, behind the open popover.
+        if (!cards(page)) await page.keyboard.press("Escape");
+        const attention = attentionToggle(page, bar);
         await expect(attention).toHaveAttribute("aria-pressed", "false");
         await attention.click();
         await expect(page).toHaveURL(/attention=true/);
         await expect(attention).toHaveAttribute("aria-pressed", "true");
         await page.reload();
-        await expect(
-            (await toggleBar(page)).getByRole("button", {
-                name: "Needs attention",
-            }),
-        ).toHaveAttribute("aria-pressed", "true");
+        const again = cards(page) ? await filterBar(page) : bar;
+        await expect(attentionToggle(page, again)).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
     });
 
     test("a customer's allergy tags their orders, and the filter keeps them (B15)", async ({

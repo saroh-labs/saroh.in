@@ -12,7 +12,7 @@ import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
 import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
 import {
-    FilterChips,
+    ListFilter,
     ListTable,
     listTable,
     ListTableHead,
@@ -210,34 +210,55 @@ export function InvoicesScreen({
                       : null}
             </p>
 
-            {/* The one list toolbar: what each paper was for is its
-                dropdown filter, and its standing is the chip row. */}
+            {/* The one list toolbar, in one row: an invoice's standing and
+                what it was for are its two dropdown filters. */}
             <ListToolbar
-                filters={
-                    scope ? (
-                        <ScopeNotice
-                            line={scopeLine(scope, mine.length)}
-                            clearHref={invoicesHref()}
-                        />
-                    ) : chips.length > 0 ? (
-                        <SourceFilter
-                            chips={chips}
-                            chosen={chip}
-                            onPick={pickChip}
-                        />
-                    ) : null
+                onClear={
+                    tab !== "all" || (!scope && chip !== "all")
+                        ? () => {
+                              setTab("all");
+                              setChip("all");
+                              setPeek(null);
+                              const q = new URLSearchParams(params.toString());
+                              q.delete("tab");
+                              q.delete("source");
+                              const s = q.toString();
+                              router.replace(
+                                  s ? `${pathname}?${s}` : pathname,
+                                  {
+                                      scroll: false,
+                                  },
+                              );
+                          }
+                        : undefined
                 }
-                chips={
-                    <FilterChips<InvoiceTab>
-                        label="Invoice status"
-                        value={tab}
-                        onValueChange={pick}
-                        chips={INVOICE_TABS.map((t) => ({
-                            value: t.id,
-                            label: t.label,
-                            count: mine.filter((i) => inTab(i, t.id)).length,
-                        }))}
-                    />
+                filters={
+                    <>
+                        <ListFilter<InvoiceTab>
+                            label="Invoice status"
+                            value={tab}
+                            onValueChange={pick}
+                            options={INVOICE_TABS.map((t) => ({
+                                value: t.id,
+                                label:
+                                    t.id === "all" ? "All invoices" : t.label,
+                                count: mine.filter((i) => inTab(i, t.id))
+                                    .length,
+                            }))}
+                        />
+                        {scope ? (
+                            <ScopeNotice
+                                line={scopeLine(scope, mine.length)}
+                                clearHref={invoicesHref()}
+                            />
+                        ) : chips.length > 0 ? (
+                            <SourceFilter
+                                chips={chips}
+                                chosen={chip}
+                                onPick={pickChip}
+                            />
+                        ) : null}
+                    </>
                 }
             />
 

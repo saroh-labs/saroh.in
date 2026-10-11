@@ -10,9 +10,12 @@ import { describe, expect, it } from "vitest";
  * shared pieces, and these scans fail when a screen draws its own again:
  *
  *   [view tabs]            `TabStrip`, only for different views of a screen
- *   search · filters ··· sort · view switch · count     `ListToolbar`
- *   [status chips]         `FilterChips`, never tabs
+ *   search · every filter a dropdown · [one attention toggle] ··· sort ·
+ *   view switch · count    ONE row: `ListToolbar`, `ListFilter`
  *   the table              `DataView`, or `listTable` and `ListTableHead`
+ *
+ * There is no row of chips under the toolbar: a status or kind filter is
+ * one more dropdown in it.
  *
  * A real exception goes on the list beside its rule, with its reason: the
  * list is the record of what is not on the shared piece.
@@ -200,11 +203,11 @@ describe("a list draws the one toolbar", () => {
     });
 });
 
-describe("tabs are views; a status filter is the chip row", () => {
+describe("tabs are views; a status filter is a dropdown in the row", () => {
     /**
      * Every screen that draws tabs, and what its tabs are. A tab opens a
      * different view or sub-page of the screen (other columns, another
-     * panel). Narrowing ONE list by status or kind is `FilterChips`.
+     * panel). Narrowing ONE list by status or kind is a `ListFilter`.
      * A new `TabStrip` goes here with what its views are.
      */
     const VIEWS: Allow = {
@@ -242,46 +245,121 @@ describe("tabs are views; a status filter is the chip row", () => {
 
     it("every tab strip is a set of views, named here", () => {
         hold(
-            "tabs are for views; add the screen to VIEWS with what its views are, or use FilterChips for a status filter",
+            "tabs are for views; add the screen to VIEWS with what its views are, or use ListFilter for a status filter",
             drawsTabs,
             VIEWS,
         );
     });
 
-    it("no tab is a status: All, Open, Live, Paid and the like are chips", () => {
+    it("no tab is a status: All, Open, Live, Paid and the like are a dropdown", () => {
         // A tab's label is a view's name. A status word as a tab label is
         // a filter of one list.
         const STATUS =
             /(?:label|title):\s*"(?:Open|Closed|Live|Draft|Drafts|Active|Paused|Ended|Scheduled|Archived|Cancelled|Refunded|Paid|Unpaid|Overdue|Won|Lost|Payment failed)"/;
         hold(
-            "draw status filters with FilterChips",
+            "draw status filters with ListFilter",
             (code) => drawsTabs(code) && STATUS.test(code),
         );
     });
 
     it("DataView's named subsets have one drawing, and no screen asks for another", () => {
         hold(
-            "DataView draws `filters` as chips: there is no filterStyle",
+            "DataView draws `filters` as one dropdown: there is no filterStyle",
             (code) => /\bfilterStyle\s*=/.test(code),
         );
     });
 
-    it("a chip row is FilterChips: no row of chips drawn by hand", () => {
+    it("no row of chips for a filter: every filter is a dropdown in the one row", () => {
+        // A list screen is one that draws the toolbar, its dropdown or
+        // DataView. On it, a status or kind filter is never a chip.
+        const listScreen = (code: string) =>
+            /<(?:ListToolbar|ListFilter|LinkFilter|DataView)\b|listFilterClass/.test(
+                code,
+            );
         hold(
-            "use FilterChips (@/components/shared/list-toolbar)",
+            "make the filter a ListFilter in the toolbar's row",
             (code) =>
+                // The chip row itself, and its slots, stay gone.
+                /\bFilterChips\b|\btoolbarChips\b/.test(code) ||
+                // A link or a button dressed as a filter chip.
                 /aria-current=\{[^}]*\}\s*className=\{chipClass\(/.test(code) ||
-                /<Chip\b(?:(?!>)[\s\S])*?as="toggle"(?:(?!>)[\s\S])*?onClick=\{\(\) => (?:onPick|go)\(/.test(
+                (listScreen(code) &&
+                    /<(?:Chip|ChipGroup)\b|chipClass\(/.test(code)),
+        );
+    });
+
+    it("at most three dropdowns in a row: the rest go behind one Filters button", () => {
+        // Seven dropdowns wrapped Orders' toolbar onto two lines and left
+        // the count on a line of its own. Three, a sort, and MoreFilters.
+        hold(
+            "keep the three most used in `filters` and put the rest in MoreFilters",
+            (code) =>
+                (code.match(/<(?:ListFilter|StorefrontFilter)\b/g)?.length ??
+                    0) > 4,
+        );
+    });
+
+    it("a paged list ends with ListPaging: no Previous and Next drawn by hand", () => {
+        hold(
+            "use ListPaging (@/components/shared/list-toolbar)",
+            (code) =>
+                />\s*Previous\s*</.test(code) && !/<ListPaging\b/.test(code),
+            {
+                "components/customers/list/unlinked-sheet.tsx":
+                    'a sheet\'s foot, not a list page: small steps beside "Page 2 of 3" while linking customers',
+            },
+        );
+    });
+
+    it("at most one attention toggle on a list, and only for what needs the merchant now", () => {
+        // The one chip a toolbar may hold: "Needs you 4", "Needs
+        // attention". A one-press shortcut, so there is one per list.
+        const toggles = (code: string) =>
+            code.match(/<AttentionToggle\b/g)?.length ?? 0;
+        hold(
+            "a list has one attention toggle: make the other a ListFilter",
+            (code) => toggles(code) > 1,
+        );
+        hold(
+            'an attention toggle is for "Needs …": anything else is a ListFilter',
+            (code) =>
+                toggles(code) === 1 &&
+                !/<AttentionToggle\b[\s\S]*?label="Needs (?:you|attention)"/.test(
                     code,
                 ),
+        );
+    });
+
+    it('an unnarrowed filter says "All {plural}": never a bare "All", never "Any …"', () => {
+        // "All locations" beside "Any category" beside a bare "All" read
+        // as three kinds of control. One way, in the thing's own plural.
+        hold(
+            'name the unnarrowed option "All {things}"',
+            (code) =>
+                /<(?:ListFilter|LinkFilter)\b|listFilterClass/.test(code) &&
+                /label:\s*"(?:Any [a-z][^"]*|All|Everything)"|any="Any /.test(
+                    code,
+                ),
+        );
+    });
+
+    it('a search\'s placeholder fits the field: "Search {things}", the rest is its description', () => {
+        // At the one width, with the "/" hint showing, about 30
+        // characters fit: "…by name, phone or ema" was cut off.
+        hold(
+            'shorten the placeholder to "Search {things}" and say the rest in `describe`',
+            (code) =>
+                /<ListSearch\b(?:(?!\/>)[\s\S])*?placeholder="[^"]{29,}"/.test(
+                    code,
+                ) || /searchPlaceholder="[^"]{29,}"/.test(code),
         );
     });
 });
 
 describe("one count style", () => {
-    it("no count joined to a chip or a tab by a dot", () => {
-        // "Needs you · 4", "Open · 2": the count is the chip's quiet number
-        // (`count`), or the tab's badge.
+    it("no count joined to a filter or a tab by a dot", () => {
+        // "Needs you · 4", "Open · 2": the count is the option's quiet
+        // number (`count`), or the tab's badge.
         hold(
             "pass the number as `count`",
             (code) =>

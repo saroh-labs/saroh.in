@@ -110,12 +110,15 @@ export interface DataViewProps<TRow> {
     /** Free-text filter across these columns. Omit to hide the search field. */
     searchableColumnIds?: string[];
     /**
-     * Named subsets, drawn as the chip row under the toolbar, each with its
-     * count: the one way a list is narrowed by status or kind. Never tabs
-     * (tabs are a screen's views) and never a segmented switch. The first
-     * is the default.
+     * Named subsets, drawn as ONE dropdown in the toolbar's row, each
+     * option with its count: the way a list is narrowed by status or kind.
+     * Never tabs (tabs are a screen's views) and never a row of chips. The
+     * first is the default, and a first one labelled "All" reads "All
+     * {noun}" in the box.
      */
     filters?: DataFilter<TRow>[];
+    /** The dropdown's accessible name: what it narrows by. "Show". */
+    filterLabel?: string;
     /**
      * Which filter is active on first render, from the page's `?view=` param.
      * Read on the server and passed in rather than pulled from
@@ -155,11 +158,19 @@ export interface DataViewProps<TRow> {
      * the built-in field.
      */
     toolbarSearch?: ReactNode;
+    /** Every filter past the three most used: one `MoreFilters` button. */
+    toolbarMore?: ReactNode;
     /**
-     * The screen's own chip row (`FilterChips`), where the server filters.
-     * Drawn when there are no `filters`.
+     * Puts the screen's own filters back (the ones it drew in the toolbar's
+     * slots). Pass it only while one of them is narrowed: "Clear filters"
+     * then shows, and also clears the list's own search and subset.
      */
-    toolbarChips?: ReactNode;
+    onClearFilters?: () => void;
+    /**
+     * The list's one attention toggle (`AttentionToggle`), after the
+     * dropdowns.
+     */
+    toolbarAttention?: ReactNode;
     /**
      * Dropdown filters after the search (`ListFilter`): a location, a
      * category.

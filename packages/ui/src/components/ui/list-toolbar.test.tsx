@@ -1,23 +1,22 @@
-import {
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-    within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { Chip } from "./chip";
-import { FilterChips } from "./filter-chips";
 import { ListSearch } from "./list-search";
 import { ListTable, ListTableHead, listTable } from "./list-table";
-import { ListFilter, ListToolbar } from "./list-toolbar";
+import {
+    AttentionToggle,
+    ListFilter,
+    ListPaging,
+    ListToolbar,
+    MoreFilters,
+} from "./list-toolbar";
 
 /**
- * The one list toolbar, its chip row and the one table look. What is pinned
- * here is what the owner saw differ between four screens side by side: the
- * order of the controls, where the search sits and how wide it is, tabs
- * against chips, how a count is drawn, and the table's head band.
+ * The one list toolbar, its dropdown filter and the one table look. What is
+ * pinned here is what the owner saw differ between list screens side by
+ * side: the order of the controls, where the search sits and how wide it
+ * is, how a list is narrowed (one row of dropdowns, never a row of chips
+ * under it), how a count is drawn, and the table's head band.
  */
 
 const classes = (el: Element | null) =>
@@ -35,6 +34,13 @@ const slot = (container: HTMLElement, name: string) =>
 const before = (a: Element, b: Element) =>
     Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
+const STATUSES = [
+    { value: "all", label: "All orders", count: 532 },
+    { value: "open", label: "Open", count: 3 },
+    { value: "refunded", label: "Refunded", count: 0 },
+    { value: "odd", label: "Unknown", count: null },
+];
+
 function everything() {
     return render(
         <ListToolbar
@@ -43,54 +49,66 @@ function everything() {
                 <ListSearch placeholder="Search stock" onSearch={vi.fn()} />
             }
             filters={
-                <ListFilter
-                    label="Location"
-                    value="all"
-                    onValueChange={vi.fn()}
-                    options={[
-                        { value: "all", label: "All locations" },
-                        { value: "hill", label: "Hill Road" },
-                    ]}
+                <>
+                    <ListFilter
+                        label="Order status"
+                        value="all"
+                        onValueChange={vi.fn()}
+                        options={STATUSES}
+                    />
+                    <ListFilter
+                        label="Location"
+                        value="all"
+                        onValueChange={vi.fn()}
+                        options={[
+                            { value: "all", label: "All locations" },
+                            { value: "hill", label: "Hill Road" },
+                        ]}
+                    />
+                </>
+            }
+            attention={
+                <AttentionToggle
+                    label="Needs you"
+                    count={4}
+                    on={false}
+                    onToggle={vi.fn()}
                 />
             }
             end={<button type="button">Sort</button>}
             count="Showing 1 to 50 of 532"
-            chips={
-                <FilterChips
-                    label="Show"
-                    value="all"
-                    onValueChange={vi.fn()}
-                    chips={[
-                        { value: "all", label: "All" },
-                        { value: "needs", label: "Needs you", count: 4 },
-                    ]}
-                />
-            }
         />,
     );
 }
 
 describe("ListToolbar", () => {
-    it("lays a list out in one order: tabs, then search, filters and the right side in one row, then chips", () => {
+    it("is the tabs, then ONE row: search, every filter, the attention toggle, then the right side", () => {
         const { container } = everything();
         const tabs = must(slot(container, "list-tabs"));
         const row = must(slot(container, "list-row"));
-        const chips = must(slot(container, "list-chips"));
         expect(before(tabs, row)).toBe(true);
-        expect(before(row, chips)).toBe(true);
+        // Nothing under the row but the count: no second row of chips.
+        expect(row.nextElementSibling).toBe(slot(container, "list-count"));
+        expect(slot(container, "list-chips")).toBeNull();
+        expect(container.querySelector('[role="radio"]')).toBeNull();
 
-        const search = must(slot(container, "list-search"));
-        const filters = must(slot(container, "list-filters"));
-        const end = must(slot(container, "list-end"));
-        // One row holds all three, in this order.
-        for (const part of [search, filters, end]) {
-            expect(part.parentElement).toBe(row);
+        const order = [
+            must(slot(container, "list-search")),
+            screen.getByRole("combobox", { name: "Order status" }),
+            screen.getByRole("combobox", { name: "Location" }),
+            screen.getByRole("button", { name: "Needs you 4" }),
+            must(slot(container, "list-end")),
+            must(slot(container, "list-count")),
+        ];
+        for (let i = 0; i < order.length - 1; i++) {
+            expect(before(order[i], order[i + 1])).toBe(true);
         }
-        expect(before(search, filters)).toBe(true);
-        expect(before(filters, end)).toBe(true);
+        for (const part of order.slice(0, 5)) {
+            expect(row.contains(part)).toBe(true);
+        }
     });
 
-    it("puts the sort before the count, both pushed to the right", () => {
+    it("puts the sort on the right of the row, and the count after it", () => {
         const { container } = everything();
         const end = must(slot(container, "list-end"));
         expect(classes(end)).toContain("sm:ml-auto");
@@ -102,50 +120,236 @@ describe("ListToolbar", () => {
         expect(classes(count)).toContain("tabular-nums");
     });
 
-    it("wraps on a phone, search first at full width, and nothing in it is unshrinkable", () => {
+    it("wraps cleanly: the filters flow on after the search, and the right side stays on the first line", () => {
+        const { container } = everything();
+        const row = must(slot(container, "list-row"));
+        // Two columns from `sm`, both starting at the top.
+        expect(classes(row)).toEqual(
+            expect.arrayContaining(["sm:flex-row", "sm:items-start"]),
+        );
+        const main = must(slot(container, "list-main"));
+        // The left column wraps on itself and takes the room that is left.
+        expect(classes(main)).toEqual(
+            expect.arrayContaining(["flex-1", "flex-wrap", "min-w-0"]),
+        );
+        const end = must(slot(container, "list-end"));
+        expect(end.parentElement).toBe(row);
+        expect(main.contains(end)).toBe(false);
+        // Each dropdown is an item of the row itself (the slot adds no
+        // box), so they wrap one by one after the search, not as a block.
+        expect(classes(slot(container, "list-filters"))).toContain("contents");
+        // The search keeps its one width.
+        expect(classes(slot(container, "list-search"))).toContain(
+            "sm:flex-[0_1_320px]",
+        );
+    });
+
+    it("stacks on a phone, search first at full width, and nothing in it is unshrinkable", () => {
         const { container } = everything();
         const row = must(slot(container, "list-row"));
         expect(classes(row)).toEqual(
-            expect.arrayContaining(["flex", "flex-wrap", "min-w-0"]),
+            expect.arrayContaining(["flex", "flex-col", "min-w-0"]),
         );
-        const search = must(slot(container, "list-search"));
-        // The phone's full width, then one width from `sm`.
-        expect(classes(search)).toEqual(
+        expect(classes(slot(container, "list-search"))).toEqual(
             expect.arrayContaining(["w-full", "min-w-0", "sm:w-auto"]),
         );
-        expect(classes(search)).toContain("sm:flex-[0_1_320px]");
         // A row of four buttons held to its own width ran 2px past a
         // 412px screen on CI's fonts: no part of the toolbar is `shrink-0`.
         const parts = [
             container.querySelector("[data-list-toolbar]"),
             row,
-            search,
-            slot(container, "list-filters"),
+            slot(container, "list-main"),
+            slot(container, "list-search"),
+            slot(container, "list-attention"),
             slot(container, "list-end"),
             slot(container, "list-count"),
-            slot(container, "list-chips"),
+            ...Array.from(container.querySelectorAll("[data-list-filter]")),
+            container.querySelector("[data-attention-toggle]"),
         ];
         for (const part of parts) {
             expect(classes(part)).not.toContain("shrink-0");
             expect(classes(part)).toContain("min-w-0");
         }
-        for (const wraps of [
-            slot(container, "list-filters"),
-            slot(container, "list-end"),
-        ]) {
-            expect(classes(wraps)).toContain("flex-wrap");
-            expect(classes(wraps)).toContain("max-w-full");
-        }
     });
 
     it("gives no room to a slot left out, and draws nothing at all when empty", () => {
-        const { container, rerender } = render(
-            <ListToolbar chips={<span>chips</span>} />,
-        );
-        expect(slot(container, "list-row")).toBeNull();
+        const { container, rerender } = render(<ListToolbar count="3 codes" />);
+        expect(slot(container, "list-main")).toBeNull();
         expect(slot(container, "list-tabs")).toBeNull();
-        expect(slot(container, "list-chips")).not.toBeNull();
-        rerender(<ListToolbar search={null} filters={null} chips={null} />);
+        expect(slot(container, "list-count")).not.toBeNull();
+        rerender(<ListToolbar search={null} filters={null} count={null} />);
+        expect(container).toBeEmptyDOMElement();
+    });
+});
+
+describe("ListToolbar: narrowed, cleared and counted", () => {
+    it("ends the row with a quiet Clear filters only while something is narrowed", () => {
+        const onClear = vi.fn();
+        const { container, rerender } = render(
+            <ListToolbar
+                search={<ListSearch placeholder="Search" onSearch={vi.fn()} />}
+                onClear={onClear}
+                count="3 of 12"
+            />,
+        );
+        const clear = screen.getByRole("button", { name: "Clear filters" });
+        const main = must(slot(container, "list-main"));
+        // Last in the row, after everything it clears.
+        expect(main.lastElementChild).toBe(clear);
+        expect(classes(clear)).toContain("underline");
+        expect(classes(clear)).not.toContain("shrink-0");
+        fireEvent.click(clear);
+        expect(onClear).toHaveBeenCalledTimes(1);
+        rerender(
+            <ListToolbar
+                search={<ListSearch placeholder="Search" onSearch={vi.fn()} />}
+                count="12"
+            />,
+        );
+        expect(
+            screen.queryByRole("button", { name: "Clear filters" }),
+        ).toBeNull();
+    });
+
+    it("says the count once: beside the row's first line from lg, and under the toolbar on the left below it", () => {
+        const { container } = render(
+            <ListToolbar
+                search={<ListSearch placeholder="Search" onSearch={vi.fn()} />}
+                count="Showing 1 to 50 of 532"
+            />,
+        );
+        // ONE element: two would be read twice and found twice.
+        expect(screen.getAllByText("Showing 1 to 50 of 532")).toHaveLength(1);
+        const count = must(slot(container, "list-count"));
+        const root = must(container.querySelector("[data-list-toolbar]"));
+        // Below `lg` it is the next line under the row, on the left:
+        // nothing pushes it right.
+        expect(count.parentElement).toBe(root);
+        expect(must(slot(container, "list-row")).nextElementSibling).toBe(
+            count,
+        );
+        expect(classes(root)).toContain("flex-col");
+        expect(count.className).not.toMatch(/ml-auto|text-right|justify-end/);
+        // From `lg` the toolbar is two columns, and the count is the
+        // second: beside the row's first line, as tall as a control.
+        expect(classes(root)).toEqual(
+            expect.arrayContaining([
+                "lg:grid",
+                "lg:grid-cols-[minmax(0,1fr)_auto]",
+                "lg:items-start",
+            ]),
+        );
+        expect(classes(count)).toEqual(
+            expect.arrayContaining(["lg:min-h-[38px]", "lg:items-center"]),
+        );
+    });
+
+    it("gives the row the whole width when there is no count", () => {
+        const { container } = render(
+            <ListToolbar end={<button type="button">Sort</button>} />,
+        );
+        expect(classes(slot(container, "list-row"))).toContain("lg:col-span-2");
+        expect(slot(container, "list-count")).toBeNull();
+    });
+
+    it("puts the Filters button after the dropdowns and before the attention toggle", () => {
+        const { container } = render(
+            <ListToolbar
+                filters={<span data-testid="f">a filter</span>}
+                more={
+                    <MoreFilters title="Filter orders" count={0}>
+                        <span>inside</span>
+                    </MoreFilters>
+                }
+                attention={
+                    <AttentionToggle
+                        label="Needs you"
+                        on={false}
+                        onToggle={vi.fn()}
+                    />
+                }
+            />,
+        );
+        const order = [
+            screen.getByTestId("f"),
+            must(slot(container, "list-more")),
+            must(slot(container, "list-attention")),
+        ];
+        expect(before(order[0], order[1])).toBe(true);
+        expect(before(order[1], order[2])).toBe(true);
+    });
+});
+
+describe("MoreFilters", () => {
+    it("is one button that says how many of its filters are narrowed, with the selected look", () => {
+        const { rerender } = render(
+            <MoreFilters title="Filter orders" count={0}>
+                <span>Step</span>
+            </MoreFilters>,
+        );
+        const plain = screen.getByRole("button", { name: "Filters" });
+        expect(plain).toHaveTextContent(/^Filters$/);
+        expect(classes(plain)).not.toContain("border-foreground");
+        expect(classes(plain)).not.toContain("shrink-0");
+        rerender(
+            <MoreFilters title="Filter orders" count={2}>
+                <span>Step</span>
+            </MoreFilters>,
+        );
+        const on = screen.getByRole("button", { name: "Filters, 2 on" });
+        expect(on).toHaveTextContent(/^Filters\s?2$/);
+        expect(classes(on)).toContain("border-foreground");
+    });
+
+    it("opens its filters in a named popover, one to a line", () => {
+        render(
+            <MoreFilters title="Filter orders" count={0}>
+                <span>Step</span>
+                <span>Payment</span>
+            </MoreFilters>,
+        );
+        expect(screen.queryByText("Step")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+        const panel = screen.getByRole("dialog", { name: "Filter orders" });
+        expect(within(panel).getByText("Payment")).toBeInTheDocument();
+        expect(classes(panel)).toContain("grid");
+    });
+});
+
+describe("ListPaging", () => {
+    it("ends a list with Previous and Next together, on the right", () => {
+        render(
+            <ListPaging
+                label="Pages of orders"
+                previous={{ href: "/orders" }}
+                next={{ href: "/orders?cursor=b" }}
+            />,
+        );
+        const nav = screen.getByRole("navigation", { name: "Pages of orders" });
+        expect(classes(nav)).toContain("justify-end");
+        const links = within(nav).getAllByRole("link");
+        expect(links.map((l) => l.textContent)).toEqual(["Previous", "Next"]);
+        expect(links[1]).toHaveAttribute("href", "/orders?cursor=b");
+    });
+
+    it("turns a way off when there is nowhere to go, and keeps both words", () => {
+        const onNext = vi.fn();
+        render(
+            <ListPaging
+                label="Pages of customers"
+                previous={null}
+                next={{ onClick: onNext }}
+            />,
+        );
+        expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: "Next" }));
+        expect(onNext).toHaveBeenCalledTimes(1);
+    });
+
+    it("draws nothing for a list of one page", () => {
+        const { container } = render(
+            <ListPaging label="Pages" previous={null} next={null} />,
+        );
         expect(container).toBeEmptyDOMElement();
     });
 });
@@ -162,6 +366,26 @@ describe("ListSearch in the toolbar", () => {
         expect(screen.getByRole("searchbox")).toHaveAccessibleName(
             "Search orders",
         );
+    });
+
+    it('keeps its words clear of the "/" hint, and says what it searches as its description', () => {
+        render(
+            <ListSearch
+                placeholder="Search customers"
+                describe="By name, phone or email"
+                onSearch={vi.fn()}
+            />,
+        );
+        const field = screen.getByRole("searchbox", {
+            name: "Search customers",
+        });
+        expect(field).toHaveAttribute(
+            "aria-description",
+            "By name, phone or email",
+        );
+        // Room on the right for the hint: the placeholder ran under it.
+        expect(classes(field)).toContain("pr-9");
+        expect(classes(field)).not.toContain("pr-3");
     });
 });
 
@@ -195,6 +419,125 @@ describe("ListFilter", () => {
         expect(container.querySelector("[data-list-filter]")).not.toBeNull();
     });
 
+    it("says what it filters when nothing is narrowed, and how many once something is", () => {
+        const { rerender } = render(
+            <ListFilter
+                label="Order status"
+                value="all"
+                onValueChange={vi.fn()}
+                options={STATUSES}
+            />,
+        );
+        const box = () =>
+            screen.getByRole("combobox", { name: "Order status" });
+        // The unnarrowed choice names the thing, with no count of its own:
+        // the page header already says how many there are.
+        expect(box()).toHaveTextContent(/^All orders$/);
+        const pick = (value: string) =>
+            rerender(
+                <ListFilter
+                    label="Order status"
+                    value={value}
+                    onValueChange={vi.fn()}
+                    options={STATUSES}
+                />,
+            );
+        pick("open");
+        expect(box()).toHaveTextContent(/^Open 3$/);
+        const count = must(box().querySelector("[data-value-count]"));
+        expect(classes(count)).toEqual(
+            expect.arrayContaining(["tabular-nums", "text-muted-foreground"]),
+        );
+        // Zero is a fact, and is said. A count nobody could read is not.
+        pick("refunded");
+        expect(box()).toHaveTextContent(/^Refunded 0$/);
+        pick("odd");
+        expect(box()).toHaveTextContent(/^Unknown$/);
+    });
+
+    it("draws each option's count as a quiet number at its right, and tells the list what was chosen", () => {
+        const onValueChange = vi.fn();
+        render(
+            <ListFilter
+                label="Order status"
+                value="all"
+                onValueChange={onValueChange}
+                options={[
+                    ...STATUSES,
+                    { value: "big", label: "Old", count: 1204 },
+                ]}
+            />,
+        );
+        fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+        const options = screen.getAllByRole("option");
+        expect(options.map((o) => o.textContent.replace(/\s+/g, " "))).toEqual([
+            "All orders 532",
+            "Open 3",
+            "Refunded 0",
+            "Unknown",
+            "Old 1,204",
+        ]);
+        const aside = must(options[1].querySelector("[data-option-count]"));
+        expect(classes(aside)).toEqual(
+            expect.arrayContaining([
+                "ml-auto",
+                "tabular-nums",
+                "text-muted-foreground",
+            ]),
+        );
+        expect(options[3].querySelector("[data-option-count]")).toBeNull();
+        fireEvent.keyDown(options[1], { key: "Enter" });
+        expect(onValueChange).toHaveBeenCalledWith("open");
+    });
+
+    it("takes the selected look once it narrows the list. A sort never does", () => {
+        const draw = (value: string, narrowed?: boolean) =>
+            render(
+                <ListFilter
+                    label="Order status"
+                    value={value}
+                    narrowed={narrowed}
+                    onValueChange={vi.fn()}
+                    options={STATUSES}
+                />,
+            );
+        const first = draw("all");
+        expect(classes(screen.getByRole("combobox"))).not.toContain(
+            "border-foreground",
+        );
+        first.unmount();
+        const picked = draw("open");
+        expect(classes(screen.getByRole("combobox"))).toContain(
+            "border-foreground",
+        );
+        expect(
+            picked.container.querySelector("[data-list-filter]"),
+        ).toHaveAttribute("data-narrowed");
+        picked.unmount();
+        // A sort on any option but its first narrows nothing.
+        draw("open", false);
+        expect(classes(screen.getByRole("combobox"))).not.toContain(
+            "border-foreground",
+        );
+    });
+
+    it("is never a tab, a radio or a chip", () => {
+        const { container } = render(
+            <ListFilter
+                label="Order status"
+                value="open"
+                onValueChange={vi.fn()}
+                options={STATUSES}
+            />,
+        );
+        expect(
+            container.querySelector(
+                '[role="tab"],[role="radio"],[aria-pressed],[data-count-badge]',
+            ),
+        ).toBeNull();
+        expect(container.textContent).not.toContain("·");
+    });
+
     it("masks a filter whose choices are records' own names", () => {
         const { container } = render(
             <ListFilter
@@ -211,177 +554,68 @@ describe("ListFilter", () => {
     });
 });
 
-describe("FilterChips", () => {
-    const chips = [
-        { value: "all", label: "All", count: 12 },
-        { value: "live", label: "Live", count: 9 },
-        { value: "ended", label: "Ended", count: 0 },
-        { value: "later", label: "Scheduled" },
-        { value: "unread", label: "Unknown", count: null },
-    ];
-
-    it("is a named radio group, never tabs", () => {
+describe("AttentionToggle", () => {
+    it("is an on/off button named with its count, in the attention tone while something waits", () => {
+        const onToggle = vi.fn();
         const { container } = render(
-            <FilterChips
-                label="Show"
-                value="live"
-                onValueChange={vi.fn()}
-                chips={chips}
+            <AttentionToggle
+                label="Needs you"
+                count={4}
+                on={false}
+                onToggle={onToggle}
             />,
         );
-        const group = screen.getByRole("radiogroup", { name: "Show" });
-        expect(within(group).getAllByRole("radio")).toHaveLength(5);
-        expect(screen.getByRole("radio", { name: "Live 9" })).toBeChecked();
-        expect(screen.getByRole("radio", { name: "All 12" })).not.toBeChecked();
-        expect(container.querySelector('[role="tab"]')).toBeNull();
-        expect(container.querySelector('[role="tablist"]')).toBeNull();
-        expect(container.querySelector("[data-tab-strip]")).toBeNull();
-    });
-
-    it("draws a count as a quiet tabular number after the label: zero when it is a fact, nothing when unknown", () => {
-        const { container } = render(
-            <FilterChips
-                label="Show"
-                value="all"
-                onValueChange={vi.fn()}
-                chips={chips}
-            />,
-        );
-        const count = (name: string) =>
-            screen
-                .getByRole("radio", { name })
-                .querySelector("[data-chip-count]");
-        expect(count("Live 9")).toHaveTextContent("9");
-        expect(classes(count("Live 9"))).toEqual(
-            expect.arrayContaining(["tabular-nums", "opacity-70"]),
-        );
-        // Zero is said; a count nobody could read is not drawn at all.
-        expect(count("Ended 0")).toHaveTextContent("0");
-        expect(count("Scheduled")).toBeNull();
-        expect(count("Unknown")).toBeNull();
-        // Never a badge, never joined with a dot.
-        expect(container.querySelector("[data-count-badge]")).toBeNull();
+        const toggle = screen.getByRole("button", { name: "Needs you 4" });
+        expect(toggle).toHaveAttribute("aria-pressed", "false");
+        const badge = must(container.querySelector("[data-count-badge]"));
+        expect(badge).toHaveAttribute("data-tone", "strong");
         expect(container.textContent).not.toContain("·");
+        fireEvent.click(toggle);
+        expect(onToggle).toHaveBeenCalledTimes(1);
+        // Saroh's own words: readable in a session recording.
+        expect(toggle).toHaveAttribute("data-ph-unmask");
     });
 
-    it("groups thousands in a count", () => {
+    it("is a plain chip at zero, when unknown, and once it is on", () => {
+        const { container, rerender } = render(
+            <AttentionToggle
+                label="Needs you"
+                count={0}
+                on={false}
+                onToggle={vi.fn()}
+            />,
+        );
+        expect(screen.getByRole("button")).toHaveAccessibleName("Needs you 0");
+        expect(container.querySelector("[data-count-badge]")).toBeNull();
+        rerender(
+            <AttentionToggle label="Needs you" on={false} onToggle={vi.fn()} />,
+        );
+        expect(screen.getByRole("button")).toHaveAccessibleName("Needs you");
+        rerender(
+            <AttentionToggle
+                label="Needs you"
+                count={4}
+                on
+                onToggle={vi.fn()}
+            />,
+        );
+        const on = screen.getByRole("button", { name: "Needs you 4" });
+        expect(on).toHaveAttribute("aria-pressed", "true");
+        expect(classes(on)).toContain("bg-primary");
+        // On the Ink fill an Ink badge would vanish: a quiet number.
+        expect(container.querySelector("[data-count-badge]")).toBeNull();
+    });
+
+    it("is the dropdowns' height, and may shrink with the row", () => {
         render(
-            <FilterChips
-                label="Show"
-                value="all"
-                onValueChange={vi.fn()}
-                chips={[{ value: "all", label: "All", count: 1204 }]}
-            />,
+            <AttentionToggle label="Needs you" on={false} onToggle={vi.fn()} />,
         );
-        expect(screen.getByRole("radio")).toHaveAccessibleName("All 1,204");
-    });
-
-    it("tells the list which chip was pressed, and moves with the arrow keys", async () => {
-        const onValueChange = vi.fn();
-        render(
-            <FilterChips
-                label="Show"
-                value="all"
-                onValueChange={onValueChange}
-                chips={chips}
-            />,
+        const cls = classes(screen.getByRole("button"));
+        expect(cls).toEqual(
+            expect.arrayContaining(["h-[38px]", "coarse:h-11", "min-w-0"]),
         );
-        fireEvent.click(screen.getByRole("radio", { name: "Ended 0" }));
-        expect(onValueChange).toHaveBeenCalledWith("ended");
-        const all = screen.getByRole("radio", { name: "All 12" });
-        all.focus();
-        fireEvent.keyDown(all, { key: "ArrowRight" });
-        await waitFor(() =>
-            expect(screen.getByRole("radio", { name: "Live 9" })).toHaveFocus(),
-        );
-    });
-
-    it("scrolls sideways on a phone inside the allowed scroller, and wraps from sm", () => {
-        const { container } = render(
-            <FilterChips
-                label="Show"
-                value="all"
-                onValueChange={vi.fn()}
-                chips={chips}
-            />,
-        );
-        // `data-scroll-x` is what the e2e sideways check allows.
-        const scroller = must(container.querySelector("[data-scroll-x]"));
-        const row = must(scroller.firstElementChild);
-        expect(classes(row)).toEqual(
-            expect.arrayContaining(["max-sm:flex-nowrap", "sm:flex-wrap"]),
-        );
-        expect(scroller.contains(screen.getAllByRole("radio")[0])).toBe(true);
-    });
-
-    it("marks Saroh's own words readable in a recording, and a record's name masked", () => {
-        render(
-            <FilterChips
-                label="Which products"
-                value="all"
-                onValueChange={vi.fn()}
-                chips={[
-                    { value: "all", label: "All" },
-                    { value: "s1", label: "Hill Road", holdsData: true },
-                ]}
-            />,
-        );
-        expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
-            "data-ph-unmask",
-        );
-        const store = screen.getByRole("radio", { name: "Hill Road" });
-        expect(store).toHaveAttribute("data-ph-mask");
-        expect(store).not.toHaveAttribute("data-ph-unmask");
-    });
-
-    it("draws links where each choice is an address, the chosen one current", () => {
-        const { container } = render(
-            <FilterChips
-                label="Which orders"
-                value="open"
-                chips={[
-                    {
-                        value: "open",
-                        label: "Open",
-                        count: 2,
-                        href: "/p?tab=orders",
-                    },
-                    {
-                        value: "recent",
-                        label: "Recent",
-                        href: "/p?orders=recent",
-                    },
-                ]}
-            />,
-        );
-        const group = screen.getByRole("group", { name: "Which orders" });
-        const open = within(group).getByRole("link", { name: "Open 2" });
-        expect(open).toHaveAttribute("aria-current", "true");
-        expect(open).toHaveAttribute("href", "/p?tab=orders");
-        expect(
-            within(group).getByRole("link", { name: "Recent" }),
-        ).not.toHaveAttribute("aria-current");
-        expect(container.querySelector('[role="radio"]')).toBeNull();
-    });
-
-    it("keeps on/off filters in the same row, after the choice and outside its group", () => {
-        render(
-            <FilterChips
-                label="Order status"
-                value="all"
-                onValueChange={vi.fn()}
-                chips={[{ value: "all", label: "All" }]}
-            >
-                <Chip as="toggle" on={false}>
-                    Late
-                </Chip>
-            </FilterChips>,
-        );
-        const late = screen.getByRole("button", { name: "Late" });
-        expect(late).toHaveAttribute("aria-pressed", "false");
-        const group = screen.getByRole("radiogroup", { name: "Order status" });
-        expect(group.contains(late)).toBe(false);
-        expect(before(group, late)).toBe(true);
+        expect(cls).not.toContain("shrink-0");
+        expect(cls).not.toContain("h-8");
     });
 });
 

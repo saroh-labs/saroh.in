@@ -159,12 +159,10 @@ test.describe("invoices", () => {
 
         // 5. The list has it under Paid, and its quick look says so.
         await page.goto("/billing/invoices?view=paid");
-        // An invoice's standing is the list's chip row, not tabs.
+        // An invoice's standing is a dropdown in the toolbar, not tabs.
         await expect(
-            page
-                .getByRole("radiogroup", { name: "Invoice status" })
-                .getByRole("radio", { name: /^Paid/ }),
-        ).toHaveAttribute("aria-checked", "true");
+            page.getByRole("combobox", { name: "Invoice status" }),
+        ).toContainText("Paid");
         await page.getByRole("button", { name: new RegExp(number) }).click();
         const look = page.getByRole("dialog");
         await expect(look.getByText(number).first()).toBeVisible();
@@ -211,7 +209,7 @@ test.describe("invoices", () => {
         await page.reload();
         await expect(source).toContainText("By hand");
         await source.click();
-        await page.getByRole("option", { name: "For anything" }).click();
+        await page.getByRole("option", { name: "All sources" }).click();
         await expect(page).not.toHaveURL(/source=/);
 
         // One pack's invoices, from Pack Detail: none sold is said, not

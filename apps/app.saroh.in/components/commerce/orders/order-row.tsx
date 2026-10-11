@@ -20,6 +20,7 @@ import {
 import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Tip } from "@saroh/ui/tooltip";
 import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /**
@@ -45,11 +46,11 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /** The desk grid: Order · Status · Placed · Total · the row menu (B5). */
 export const ORDER_GRID =
-    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,140px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[minmax(210px,1fr)_minmax(120px,210px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** The same grid with the design's 38px selection column first (B6). */
 export const ORDER_GRID_SELECT =
-    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,140px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(120px,210px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** A row's selection box (B6): checked, and what toggling it does. */
 export interface RowSelect {
@@ -100,25 +101,38 @@ export function OrderGridHead({
 }
 
 /**
- * The customer's initials; a returning customer's wears the design's
- * Saffron ring (a 1.5px gap in the row's colour, then 1.5px of Saffron).
- * Decoration, as the initials are: nothing the row needs rests on it.
+ * The customer's initials. A returning customer's wears a ring (a 1.5px
+ * gap in the row's colour, then 1.5px of Ink), on purpose: it is the one
+ * mark in the row for someone who has bought before. The initials are
+ * decoration, but the ring is a fact, so it is said in words too, for a
+ * screen reader and on hover.
  */
 function Avatar({ row }: { row: OrderRow }) {
     const returning = row.customer?.returning === true;
+    if (returning) {
+        return (
+            <Tip label="Returning customer">
+                <span
+                    role="img"
+                    aria-label="Returning customer"
+                    className={cn(AVATAR, RING)}
+                >
+                    <span aria-hidden>{rowInitials(row)}</span>
+                </span>
+            </Tip>
+        );
+    }
     return (
-        <span
-            aria-hidden
-            className={cn(
-                "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground",
-                returning &&
-                    "ring-[1.5px] ring-foreground ring-offset-[1.5px] ring-offset-card",
-            )}
-        >
+        <span aria-hidden className={AVATAR}>
             {rowInitials(row)}
         </span>
     );
 }
+
+const AVATAR =
+    "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground";
+const RING =
+    "ring-[1.5px] ring-foreground ring-offset-[1.5px] ring-offset-card";
 
 /** The row's words, worked out once for both layouts. */
 function rowView(row: OrderRow, showStore: boolean) {
@@ -285,23 +299,30 @@ export function OrderGridRow({
                     </div>
                 </div>
             </div>
-            <div className="grid min-w-0 justify-items-start gap-1.5">
-                <StepPill progress={v.progress} />
-                {v.progress.index !== null || v.age ? (
-                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+            {/* Two lines at most, so rows keep one height: the pill with
+                its step dashes where the column has room, then how long
+                it has waited and what is owed on one line. */}
+            <div className="grid min-w-0 justify-items-start gap-1">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+                    <StepPill progress={v.progress} />
+                    {v.progress.index !== null ? (
                         <StepBar progress={v.progress} />
+                    ) : null}
+                </div>
+                {v.age || v.money.unpaid || v.payment ? (
+                    <div className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         {v.age ? <AgeText age={v.age} /> : null}
+                        {v.money.unpaid ? (
+                            <span className="text-[11.5px] font-bold text-destructive-subtle-foreground">
+                                {v.money.unpaid}
+                            </span>
+                        ) : null}
+                        <OnlinePaymentText
+                            payment={v.payment}
+                            className="text-[11.5px]"
+                        />
                     </div>
                 ) : null}
-                {v.money.unpaid ? (
-                    <div className="text-[11.5px] font-bold text-destructive-subtle-foreground">
-                        {v.money.unpaid}
-                    </div>
-                ) : null}
-                <OnlinePaymentText
-                    payment={v.payment}
-                    className="text-[11.5px]"
-                />
             </div>
             <div className="min-w-0 truncate text-[12.5px] text-neutral-700 dark:text-muted-foreground">
                 <BusinessDate iso={row.placedAt} variant="moment" />

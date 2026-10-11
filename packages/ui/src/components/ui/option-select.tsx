@@ -24,7 +24,16 @@ export interface Option<V extends string> {
     disabled?: boolean;
     /** A quiet second line in the open list ("12 open orders"). */
     hint?: string;
+    /**
+     * How many this choice holds: a quiet tabular number at the right of
+     * the option, and after the label in the box once a narrowed choice
+     * (any but the first) is the chosen one. Leave it out, or pass null,
+     * when it isn't known. 0 is drawn.
+     */
+    count?: number | null;
 }
+
+const figures = new Intl.NumberFormat("en-IN");
 
 /**
  * What Radix is given for `value`.
@@ -82,6 +91,7 @@ export function OptionSelect<V extends string>({
     "aria-describedby"?: string;
     "aria-invalid"?: boolean;
 }) {
+    const chosen = options.find((o) => o.value === value);
     return (
         <Select
             value={radixValue(value, options)}
@@ -101,7 +111,29 @@ export function OptionSelect<V extends string>({
                     className,
                 )}
             >
-                <SelectValue placeholder={placeholder} />
+                {/* The box says the chosen option itself, so the server's
+                    HTML has the words (Radix fills them in only once the
+                    list has mounted), and how many it holds once the list
+                    is narrowed: "Open 3". */}
+                <SelectValue placeholder={placeholder}>
+                    {chosen ? (
+                        <>
+                            {chosen.label}
+                            {typeof chosen.count === "number" &&
+                            chosen !== options[0] ? (
+                                <>
+                                    {" "}
+                                    <span
+                                        data-value-count=""
+                                        className="tabular-nums text-muted-foreground"
+                                    >
+                                        {figures.format(chosen.count)}
+                                    </span>
+                                </>
+                            ) : null}
+                        </>
+                    ) : undefined}
+                </SelectValue>
             </SelectTrigger>
             <SelectContent>
                 {options.map((o) => (
@@ -110,6 +142,11 @@ export function OptionSelect<V extends string>({
                         value={o.value === "" ? NONE : o.value}
                         disabled={o.disabled}
                         hint={o.hint}
+                        aside={
+                            typeof o.count === "number"
+                                ? figures.format(o.count)
+                                : undefined
+                        }
                     >
                         {o.label}
                     </SelectItem>

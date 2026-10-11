@@ -74,17 +74,30 @@ export function OrderExport({
 
     const busy = read !== null;
     return (
-        <Button
-            data-ph-unmask=""
-            variant="outline"
-            disabled={total === 0}
-            onClick={() => void run()}
-            aria-live="polite"
-            busy={busy}
-            busyLabel={`Exporting… ${read} of ${total}`}
-        >
-            Export
-        </Button>
+        <>
+            {/* How far it has got is beside the button, not in it: a
+                button reserves its busy label's width at rest, which
+                stretched "Export" to the width of "Exporting… 50 of
+                532". */}
+            {busy ? (
+                <span
+                    role="status"
+                    className="text-[12px] tabular-nums text-muted-foreground"
+                >
+                    {read} of {total}
+                </span>
+            ) : null}
+            <Button
+                data-ph-unmask=""
+                variant="outline"
+                disabled={total === 0}
+                onClick={() => void run()}
+                busy={busy}
+                busyLabel="Exporting…"
+            >
+                Export
+            </Button>
+        </>
     );
 }
 

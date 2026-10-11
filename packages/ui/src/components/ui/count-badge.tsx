@@ -9,8 +9,8 @@ export type CountTone = "neutral" | "strong" | "danger";
  * tally. It is dark (`strong`) or red (`danger`) ONLY when the number
  * means "this needs you now", and then the badge says so to a screen
  * reader too (`says`): colour alone tells nobody what a number is for.
- * A count inside a chip is not this piece: it is the quiet number after
- * the chip's label (`FilterChips`).
+ * A count inside a dropdown filter is not this piece: it is the quiet number
+ * at the right of the option (`ListFilter`).
  */
 const TONE: Record<CountTone, string> = {
     // A plain tally: how many rows a tab holds.
