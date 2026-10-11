@@ -20,9 +20,12 @@ import {
 /**
  * The list's row and its columns, shared with the head band over it so the
  * two line up: initials, who and which plan, where it stands, what comes
- * next, and the price. They wrap on a phone, where the head is left out.
+ * next, and the price. From `md` they are one fixed grid, so a longer
+ * price in one row can't move the columns of the next. They wrap on a
+ * phone, where the head is left out.
  */
-export const SUBSCRIPTION_ROW = "flex flex-wrap items-center gap-3";
+export const SUBSCRIPTION_ROW =
+    "flex flex-wrap items-center gap-3 md:grid md:grid-cols-[34px_minmax(0,2fr)_minmax(110px,1fr)_minmax(0,2fr)_112px]";
 export const SUBSCRIPTION_COLS = {
     who: "min-w-0 flex-[2_1_200px]",
     status: "min-w-0 flex-[1_1_110px]",

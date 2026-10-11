@@ -28,7 +28,7 @@ function sources(dir: string, out: string[] = []): string[] {
         const full = path.join(dir, name);
         if (statSync(full).isDirectory()) sources(full, out);
         else if (
-            /\.tsx$/.test(name) &&
+            name.endsWith(".tsx") &&
             !/\.(test|spec)\.tsx$/.test(name) &&
             !name.endsWith(".test-kit.tsx")
         ) {
@@ -304,9 +304,9 @@ describe("one count style", () => {
         hold(
             'give the tab `countSays` ("need you"), or leave the tone out',
             (code) =>
-                /countTone/.test(code) &&
+                code.includes("countTone") &&
                 /"(?:strong|danger)"/.test(code) &&
-                !/countSays/.test(code),
+                !code.includes("countSays"),
             {
                 "components/class-packs/pack-detail/pack-detail.tsx":
                     'its attention badge is words that say it ("2 running out"), not a bare number',

@@ -271,7 +271,12 @@ export function LogList({
                                 <section
                                     key={d.key}
                                     aria-label={d.label}
-                                    className={cn(span, "min-w-0")}
+                                    // A rule between one day and the next:
+                                    // a day's last entry draws none.
+                                    className={cn(
+                                        span,
+                                        "min-w-0 border-t border-border first-of-type:border-t-0",
+                                    )}
                                 >
                                     <h3
                                         data-ph-unmask=""
