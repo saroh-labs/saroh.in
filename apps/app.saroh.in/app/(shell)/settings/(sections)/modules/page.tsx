@@ -15,7 +15,7 @@ import { requireSession } from "@/lib/session";
  * it read-only. Server component — fetches effective availability once from
  * api.saroh.in (which enforces the role) and hands it to the catalog.
  */
-export const metadata = { title: "Modules" };
+export const metadata = { title: "Modules · Settings" };
 
 export default async function ModulesSettingsPage() {
     await requireSession();

@@ -23,7 +23,7 @@ import { requireSession } from "@/lib/session";
  * reach, it says that. Anyone with `site:read` sees the codes; making and
  * changing one is `site:update`, which the API judges again on every save.
  */
-export const metadata = { title: "Share" };
+export const metadata = { title: "Share · Settings" };
 
 export default async function ShareSettingsPage() {
     await requireSession();

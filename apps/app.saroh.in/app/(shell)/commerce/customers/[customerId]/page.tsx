@@ -21,6 +21,8 @@ import { requireSession } from "@/lib/session";
 import type { Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
 
+// "Customer", never their name: a tab's title shows in a screen share, in
+// history and in bookmarks (`lib/page-title.ts`).
 export const metadata = { title: "Customer" };
 
 const STANDING: Record<

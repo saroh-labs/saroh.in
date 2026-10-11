@@ -3,6 +3,7 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import { AutoRefresh } from "@/components/operations/auto-refresh";
@@ -14,14 +15,30 @@ import { formatDateTime } from "@/lib/format";
 import type { OperationDetail } from "@/lib/machinery";
 import { getOperation } from "@/lib/machinery";
 
-export const metadata = { title: "Operation" };
-
 const TITLE: Record<OperationDetail["kind"], string> = {
     "jobs.retry": "Job retry",
     "jobs.cancel": "Job cancel",
     "webhooks.replay": "Webhook replay",
     "waitlist.invite": "Waitlist invites",
 };
+
+// One read for the tab's title and the page.
+const readOperation = cache((operationId: string) =>
+    getOperation(operationId).catch(() => null),
+);
+
+/** What kind of operation it is in the tab; "Operation" when it can't be read. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ operationId: string }>;
+}) {
+    const { operationId } = await params;
+    const operation = await readOperation(operationId);
+    return {
+        title: (operation ? TITLE[operation.kind] : undefined) ?? "Operation",
+    };
+}
 
 /** The permission each kind is started (and cancelled) under. */
 const START_PERMISSION: Record<OperationDetail["kind"], AdminPermission> = {
@@ -57,7 +74,7 @@ export default async function OperationPage({
     const gate = await requireStaff("platform:read");
     if (!gate.ok) return gate.screen;
     const { operationId } = await params;
-    const operation = await getOperation(operationId).catch(() => null);
+    const operation = await readOperation(operationId);
     if (!operation) notFound();
 
     const finished = operation.succeeded + operation.skipped + operation.failed;

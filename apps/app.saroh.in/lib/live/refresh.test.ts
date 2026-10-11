@@ -116,6 +116,13 @@ describe("the unread count in the tab's title", () => {
         expect(titleWithUnread("Saroh", 1)).toBe("(1) Saroh");
     });
 
+    it("goes in front of a title that names the business too", () => {
+        // The shell's template (`lib/page-title.ts`, 12 Oct 2026).
+        const title = "Order #1042 · Rye & Co. · Saroh";
+        expect(titleWithUnread(title, 3)).toBe(`(3) ${title}`);
+        expect(titleWithUnread(`(3) ${title}`, 0)).toBe(title);
+    });
+
     it("is absent at zero, and for someone with no inbox", () => {
         expect(titleWithUnread("Orders · Saroh", 0)).toBe("Orders · Saroh");
         expect(titleWithUnread("Orders · Saroh", null)).toBe("Orders · Saroh");

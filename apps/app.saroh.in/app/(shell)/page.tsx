@@ -19,13 +19,16 @@ import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import type { Organization } from "@/lib/organizations/service";
 import {
-    listOrganizations,
+    organizationsOnce,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
 import { checklistSubject } from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
+
+/** It had none: Home's tab read the bare "Saroh" (12 Oct 2026). */
+export const metadata = { title: "Home" };
 
 /**
  * Action-oriented Home (#119). Answers "where am I / what should I do next"
@@ -37,7 +40,8 @@ export default async function Home() {
     const session = await requireSession();
 
     // Zero-org funnel: a signed-in user with no organization onboards first.
-    const organizations = await listOrganizations();
+    // The shell's own read of the list (one call for the request).
+    const organizations = await organizationsOnce();
     if (organizations.length === 0) redirect("/onboarding");
 
     // Reachable in several businesses and none of them chosen yet — ask,

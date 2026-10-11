@@ -2,6 +2,8 @@ import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
+export const metadata = { title: "Contact not found" };
+
 /** The design's not-found: said plainly, with the way back. */
 export default function NotFoundPage() {
     return (

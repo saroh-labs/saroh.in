@@ -32,7 +32,7 @@ import { listStaff } from "@/lib/staff/service";
  * change it. The API enforces both, and this page hides what it can so a
  * member is not offered controls that would refuse them.
  */
-export const metadata = { title: "Team" };
+export const metadata = { title: "Team · Settings" };
 
 export default async function PeoplePage() {
     await requireSession();

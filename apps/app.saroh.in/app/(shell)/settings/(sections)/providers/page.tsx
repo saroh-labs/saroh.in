@@ -36,7 +36,7 @@ import { Plug } from "lucide-react";
  * connect, manage or disconnect it. No credentials are ever shown; the API is
  * OWNER/ADMIN-only.
  */
-export const metadata = { title: "Providers" };
+export const metadata = { title: "Providers · Settings" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();

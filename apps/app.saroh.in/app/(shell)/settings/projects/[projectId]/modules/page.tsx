@@ -12,7 +12,7 @@ import { requireSession } from "@/lib/session";
  * the role and same-Organization ownership. Server component — fetches effective
  * availability scoped to this Project once and hands it to the selector.
  */
-export const metadata = { title: "Project modules" };
+export const metadata = { title: "Project modules · Settings" };
 
 export default async function ProjectModulesPage({
     params,

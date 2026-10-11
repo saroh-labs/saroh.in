@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 import { businessZone } from "@/lib/format/business-zone";
@@ -148,6 +150,19 @@ export async function resolveActiveOrganization(
     // (#800); with every one paused the shell says so.
     return pickActive(orgs, await getActiveOrgId());
 }
+
+/**
+ * The chrome's two reads, once per request: the caller's businesses, and
+ * the one they are in. The shell draws from them and its layout writes the
+ * tab's title from them (`generateMetadata`), and React's `cache` makes
+ * those one call to the API rather than two. Only for a render: a Server
+ * Action that has just changed the list reads it fresh
+ * (`listOrganizations`).
+ */
+export const organizationsOnce = cache(() => listOrganizations());
+export const activeOrganizationOnce = cache(async () =>
+    resolveActiveOrganization(await organizationsOnce()),
+);
 
 /**
  * The active business's time zone, for a server component that writes a

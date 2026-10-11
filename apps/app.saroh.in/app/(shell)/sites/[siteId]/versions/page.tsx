@@ -17,7 +17,7 @@ import { readTestReleases } from "@/lib/sites/test-releases-api";
  * append-only, so republishing inserts a row rather than replacing one. The
  * history existed and had no surface; this is the surface.
  */
-export const metadata = { title: "Version history" };
+export const metadata = { title: "Version history · Website" };
 
 export default async function SiteVersionsPage({
     params,
