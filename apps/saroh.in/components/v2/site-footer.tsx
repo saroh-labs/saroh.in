@@ -100,9 +100,6 @@ export function SiteFooter({
                             {SAROH_NAME.parts}
                         </p>
                     </div>
-                    <p className="m-0 leading-normal">
-                        For shops, studios and clinics in India.
-                    </p>
                     <ul
                         aria-label="Follow Saroh"
                         className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
