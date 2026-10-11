@@ -22,7 +22,7 @@ import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
  * (`lib/domains/domain-view.ts`).
  */
 
-function CopyField({ label, value }: { label: string; value: string }) {
+export function CopyField({ label, value }: { label: string; value: string }) {
     return (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-1 sm:grid-cols-[6rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-3">
             <span className="label">{label}</span>

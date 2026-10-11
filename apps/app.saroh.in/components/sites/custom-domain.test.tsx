@@ -129,7 +129,7 @@ describe("Add domain", () => {
         expect(dialogName()).toBe("New domain");
         expect(field()?.labels?.[0]?.textContent).toBe("Domain to add");
         expect(dialog()?.textContent).toContain(
-            "A domain you already own, like www.yourshop.in.",
+            "A domain you already own, like www.yourshop.in. Leave out www and Saroh adds it, then shows how to forward the rest.",
         );
     });
 
