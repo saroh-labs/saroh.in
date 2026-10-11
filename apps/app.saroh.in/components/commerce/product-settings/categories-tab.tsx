@@ -17,6 +17,8 @@ import {
     restoreCategory,
 } from "@/lib/products/settings-actions";
 
+import { listTable } from "@/components/shared/list-toolbar";
+import { cn } from "@saroh/ui/lib/utils";
 import { CategoryMergeSheet } from "./category-merge-sheet";
 import { TabIntro } from "./product-settings";
 
@@ -157,11 +159,14 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 />
             ) : null}
 
-            <ul className="rounded-[12px] border border-border bg-card">
+            <ul data-list-table="" className={listTable.card}>
                 {categories.map((c) => (
                     <li
                         key={c.id}
-                        className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-4 py-3"
+                        className={cn(
+                            "flex flex-wrap items-center gap-2.5",
+                            listTable.rowStill,
+                        )}
                     >
                         <div className="min-w-0 flex-[1_1_200px]">
                             <p className="text-[13.5px] font-semibold [overflow-wrap:anywhere]">

@@ -17,15 +17,15 @@ import type { FulfilmentType } from "@/lib/orders/read";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { Chip } from "@/components/shared/chip";
+import { listFilterClass } from "@/components/shared/list-toolbar";
 import { ProductFilter } from "./product-filter";
 
-const SELECT =
-    "h-[34px] w-auto min-w-[128px] max-w-full rounded-[9px] px-2.5 text-[12.5px] coarse:h-11";
-const DATE_FIELD =
-    "h-[34px] w-auto rounded-[9px] px-2.5 text-[12.5px] coarse:h-11";
+/** At the desk: the toolbar's one dropdown, as wide as its words. */
+const SELECT = listFilterClass;
+const DATE_FIELD = "w-auto min-w-0";
 /** In the phone's sheet (B5): each menu the sheet's width, one to a line. */
-const SELECT_STACKED = "h-11 w-full rounded-[9px] px-3 text-[14px]";
-const DATE_FIELD_STACKED = "h-11 w-full min-w-0 rounded-[9px] px-3 text-[14px]";
+const SELECT_STACKED = "w-full";
+const DATE_FIELD_STACKED = "w-full min-w-0";
 
 /**
  * The Orders list's filter bar (plan B, B4), after the "Saroh Orders
@@ -42,6 +42,10 @@ const DATE_FIELD_STACKED = "h-11 w-full min-w-0 rounded-[9px] px-3 text-[14px]";
  * On a phone (B5, DEC-067) the same filters sit in a sheet behind a Filters
  * button, `stacked`: one full-width menu to a line, then the toggles, so a
  * wall of menus never pushes the first order below the fold.
+ *
+ * At the desk the menus are the list toolbar's dropdown filters, after the
+ * search; the two toggles follow the status chips in the chip row
+ * (`OrderToggles`), and Clear filters ends that row.
  */
 export function OrderFilters({
     query,
@@ -77,7 +81,7 @@ export function OrderFilters({
             className={
                 stacked
                     ? "grid gap-2.5"
-                    : "flex flex-wrap items-center gap-2 pt-2.5"
+                    : "flex min-w-0 max-w-full flex-wrap items-center gap-2"
             }
         >
             <OptionSelect<OrdersDate | "">
@@ -167,31 +171,66 @@ export function OrderFilters({
                         : null
                 }
                 onChange={(product) => go({ product })}
-                className={
-                    stacked
-                        ? "h-11 w-full max-w-none justify-between px-3 text-[14px]"
-                        : undefined
-                }
+                className={stacked ? "w-full max-w-none" : undefined}
             />
-            <div className={stacked ? "flex flex-wrap gap-2" : "contents"}>
-                <Toggle
-                    label="Needs attention"
-                    on={query.attention}
-                    onFlip={() => go({ attention: !query.attention })}
-                />
-                <Toggle
-                    label="Late"
-                    on={query.late}
-                    onFlip={() => go({ late: !query.late })}
-                />
-            </div>
-            {filtersActive(query) && !stacked ? (
+            {stacked ? (
+                <div className="flex flex-wrap gap-2">
+                    <Toggles query={query} go={go} />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function Toggles({
+    query,
+    go,
+}: {
+    query: OrdersQuery;
+    go: (patch: Partial<OrdersQuery>) => void;
+}) {
+    return (
+        <>
+            <Toggle
+                label="Needs attention"
+                on={query.attention}
+                onFlip={() => go({ attention: !query.attention })}
+            />
+            <Toggle
+                label="Late"
+                on={query.late}
+                onFlip={() => go({ late: !query.late })}
+            />
+        </>
+    );
+}
+
+/**
+ * The desk's two on/off filters and Clear filters, after the status chips
+ * in the list's chip row. On a phone they are in the Filters sheet.
+ */
+export function OrderToggles({
+    query,
+    go,
+}: {
+    query: OrdersQuery;
+    go: (patch: Partial<OrdersQuery>) => void;
+}) {
+    return (
+        <div
+            role="group"
+            aria-label="Only show"
+            className="flex items-center gap-1.5 max-[759px]:hidden"
+        >
+            <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+            <Toggles query={query} go={go} />
+            {filtersActive(query) ? (
                 <Button
                     variant="link"
                     size="inline"
                     type="button"
                     onClick={() => go({ ...NO_FILTERS })}
-                    className="rounded-sm px-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+                    className="whitespace-nowrap rounded-sm px-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                 >
                     Clear filters
                 </Button>

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import { FOLD_KEY } from "@/lib/setup-checklist";
 
+import { FACT_DOT } from "@/lib/format/join";
 import { SetupChecklist } from "./setup-checklist";
 
 const showUndo = vi.fn<(message: string, undo: () => unknown) => void>();
@@ -128,7 +129,11 @@ describe("while steps are left", () => {
             false,
         ]);
         // Said in words, not by the tick alone.
-        expect(rows[0]?.textContent).toBe("Done: Publish your site · live");
+        // The note's dot is held to the words either side of it, so a
+        // row that wraps never starts or ends a line with the dot.
+        expect(rows[0]?.textContent).toBe(
+            `Done: Publish your site${FACT_DOT}live`,
+        );
         expect(rows[2]?.textContent).toContain(
             "To do: Add your registered address",
         );

@@ -6,6 +6,11 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import {
+    ListTable,
+    ListTableHead,
+    listTable,
+} from "@/components/shared/list-toolbar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
@@ -53,15 +58,10 @@ export function Rows({
           : COLS.person;
     const many = (page.storefronts?.length ?? 0) > 1;
     return (
-        <div className="overflow-hidden rounded-[12px] border border-border bg-card">
+        <ListTable>
             <div className="sm:overflow-x-auto">
                 <div className="sm:min-w-[520px]">
-                    <div
-                        className={cn(
-                            "label hidden gap-3 border-b border-border bg-muted px-4 py-[9px] sm:grid",
-                            cols,
-                        )}
-                    >
+                    <ListTableHead className={cn("hidden gap-3 sm:grid", cols)}>
                         <span>Customer</span>
                         {page.sees.orders ? (
                             <>
@@ -72,22 +72,21 @@ export function Rows({
                         {page.sees.spent ? (
                             <span className="text-right">Spent</span>
                         ) : null}
-                    </div>
+                    </ListTableHead>
                     {page.rows.length === 0
                         ? empty
-                        : page.rows.map((row, i) => (
+                        : page.rows.map((row) => (
                               <Row
                                   key={row.contactId}
                                   row={row}
                                   cols={cols}
                                   sees={page.sees}
                                   many={many}
-                                  first={i === 0}
                               />
                           ))}
                 </div>
             </div>
-        </div>
+        </ListTable>
     );
 }
 
@@ -96,13 +95,11 @@ function Row({
     cols,
     sees,
     many,
-    first,
 }: {
     row: CustomerRow;
     cols: string;
     sees: CustomersPage["sees"];
     many: boolean;
-    first: boolean;
 }) {
     const tags = rowTags(row);
     const sub = lastSub(row, many);
@@ -111,8 +108,9 @@ function Row({
         <Link
             href={personHref(row.contactId)}
             className={cn(
-                "grid grid-cols-1 items-center gap-x-3 gap-y-1 px-4 py-[11px] text-[13px] text-foreground transition-colors duration-fast hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:hover:bg-muted",
-                !first && "border-t border-foreground/10",
+                "grid grid-cols-1 items-center gap-x-3 gap-y-1 text-[13px] text-foreground",
+                listTable.row,
+                listTable.pressable,
                 cols,
             )}
         >

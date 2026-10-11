@@ -150,7 +150,7 @@ export function RescheduleBooking({
                                         disabled={pending}
                                         onClick={() => move(slot.startAt)}
                                         className={cn(
-                                            "wk-press rounded-md border border-border px-3 py-1.5 text-sm tabular-nums",
+                                            "wk-press whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm tabular-nums",
                                             "hover:border-border-strong hover:bg-muted",
                                             "disabled:pointer-events-none disabled:text-disabled-foreground",
                                         )}

@@ -4218,3 +4218,56 @@ sm:shrink-0`), so the buttons wrap inside the card.
 the screen's edge on a Mac is past it somewhere else: nothing inside a card
 may be wider than the card.
 **Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## Four list screens side by side did not match
+
+**Symptom**: the owner put Stock, Customers, Discount codes and Locations
+side by side the day after the UX consistency pass. Each had its own toolbar
+order and search width, tabs on one and chips on another, three count styles
+("Needs you · 4", "Returning 9", a grey badge, a dark one and a red one), a
+tinted table head on two and a plain one with inset rules on a third, and
+page actions at three heights.
+**Cause**: the pass built one of each small piece (tabs, chips, search,
+badges) and a scan for each, but nothing said how a list is put together
+from them, so each screen composed the right pieces its own way. A scan per
+piece cannot see a wrong arrangement of right pieces.
+**Fix**: one anatomy, in code: `ListToolbar`, `ListFilter`, `FilterChips`
+and `listTable` (`@saroh/ui`), which `DataView` draws itself, and every list
+moved onto them. Tabs are views and a status filter is chips. `PageHeader`
+puts its actions level with the title in every case.
+**Check**: `components/shared/list-screens.test.ts` reads the app for a
+hand-drawn head row, a search outside the toolbar or at its own width, a
+hand-sized select, a new tab strip that is not a named set of views, a chip
+row by hand, a dot-joined count and an unnamed attention count. Compare
+screens side by side before calling a consistency pass done, not one at a
+time.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy
+
+## The 12-hour clock broke times in two in narrow columns
+
+**Symptom**: Stock's Log read "2:40" over "pm". Activity's "Today, 12:30 pm"
+and the Bookings agenda's times wrapped the same way.
+**Cause**: the move from "14:40" to "2:40 pm" made every time a word longer
+and gave it a space to break at. The columns had been sized for the 24-hour
+clock (42px, 64px, 96px) and nothing held a time to one line.
+**Fix**: `ViewerDate` keeps a time on one line itself, the hand-drawn time
+cells take `whitespace-nowrap`, and each column was widened to fit
+"12:30 pm" at its type size.
+**Check**: `list-anatomy.test.tsx` ("a time never wraps") and the Log's own
+test. When a formatter's output gets longer, grep every fixed-width column
+that draws it.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## A separator drawn as its own flex item led its line
+
+**Symptom**: a location's readiness card read "· Sells in person only".
+**Cause**: the count and the note were two flex items in a wrapping row, and
+the note's text began with the dot. Whenever the heading wrapped, the note
+started a line, dot first.
+**Fix**: `joinFacts` (`lib/format/join.ts`) joins what is there with a dot
+held to both neighbours by no-break spaces, in one element.
+**Check**: `list-anatomy.test.tsx` ("no separator leads or trails").
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates

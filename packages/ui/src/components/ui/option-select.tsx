@@ -1,10 +1,12 @@
 "use client";
 
+import type * as React from "react";
 import { cn } from "../../lib/utils";
 import {
     Select,
     SelectContent,
     SelectItem,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from "./select";
@@ -20,6 +22,8 @@ export interface Option<V extends string> {
     label: string;
     /** Shown, but not choosable — "M — already a variant". */
     disabled?: boolean;
+    /** A quiet second line in the open list ("12 open orders"). */
+    hint?: string;
 }
 
 /**
@@ -59,6 +63,7 @@ export function OptionSelect<V extends string>({
     placeholder,
     className,
     size = "default",
+    footer,
     ...aria
 }: {
     value: V;
@@ -71,6 +76,8 @@ export function OptionSelect<V extends string>({
     className?: string;
     /** `sm` for toolbars and table rows. */
     size?: "default" | "sm";
+    /** A line under the options, about what choosing one does. */
+    footer?: React.ReactNode;
     "aria-label"?: string;
     "aria-describedby"?: string;
     "aria-invalid"?: boolean;
@@ -102,10 +109,19 @@ export function OptionSelect<V extends string>({
                         key={o.value || NONE}
                         value={o.value === "" ? NONE : o.value}
                         disabled={o.disabled}
+                        hint={o.hint}
                     >
                         {o.label}
                     </SelectItem>
                 ))}
+                {footer ? (
+                    <>
+                        <SelectSeparator />
+                        <div className="max-w-[260px] px-2 pb-1 pt-0.5 text-[11px] leading-[1.45] text-muted-foreground">
+                            {footer}
+                        </div>
+                    </>
+                ) : null}
             </SelectContent>
         </Select>
     );

@@ -31,12 +31,13 @@ export function BookingsTab({
         lists.up.list.length ? "up" : "past",
     );
     const { list, upcoming } = lists[filter];
-    const chips: { key: BookingFilter; label: string }[] = [
-        { key: "up", label: `Upcoming · ${lists.up.list.length}` },
-        { key: "past", label: `Past · ${lists.past.list.length}` },
+    const chips: { key: BookingFilter; label: string; count: number }[] = [
+        { key: "up", label: "Upcoming", count: lists.up.list.length },
+        { key: "past", label: "Past", count: lists.past.list.length },
         {
             key: "issue",
-            label: `No-shows and late cancels · ${lists.issue.list.length}`,
+            label: "No-shows and late cancels",
+            count: lists.issue.list.length,
         },
     ];
     return (

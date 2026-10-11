@@ -35,7 +35,8 @@ export function ClockSelect({
         >
             <SelectTrigger
                 aria-label={label}
-                className="h-8 w-[5.5rem] px-2 tabular-nums"
+                // Wide enough for "12:30 pm" beside the chevron.
+                className="h-8 w-[6.5rem] px-2 tabular-nums"
             >
                 <SelectValue>{formatClock(value)}</SelectValue>
             </SelectTrigger>

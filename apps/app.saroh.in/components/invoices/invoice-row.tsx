@@ -2,6 +2,8 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 
+import { listTable } from "@/components/shared/list-toolbar";
+
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -22,6 +24,10 @@ const money = (amount: string | number, currency: string) =>
  * total. The whole row opens the quick look. A correction sits indented
  * under the invoice it corrects.
  */
+/** The list's columns: number, billed to, status, total. */
+export const INVOICE_GRID =
+    "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 md:grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,1.6fr)_96px]";
+
 export function InvoiceRow({
     invoice: i,
     selected,
@@ -47,14 +53,16 @@ export function InvoiceRow({
             aria-haspopup="dialog"
             onClick={onOpen}
             className={cn(
-                "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 rounded-[11px] border border-border px-3.5 py-3 text-left transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:border-border-strong active:bg-accent md:grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,1.6fr)_96px]",
-                selected
-                    ? "bg-muted shadow-[inset_3px_0_0_hsl(var(--foreground))]"
-                    : "bg-card",
-                nested && "md:ml-6 md:w-[calc(100%-1.5rem)]",
+                "w-full text-left",
+                INVOICE_GRID,
+                listTable.rowInner,
+                listTable.pressable,
+                selected && listTable.selected,
             )}
         >
-            <span className="min-w-0">
+            {/* A correction is indented under its invoice, inside the
+                first column, so every column still lines up. */}
+            <span className={cn("min-w-0", nested && "md:pl-6")}>
                 <span className="block font-mono text-[12.5px] font-medium text-foreground">
                     {i.number ?? "Draft"}
                 </span>

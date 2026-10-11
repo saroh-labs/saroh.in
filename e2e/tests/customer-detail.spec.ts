@@ -160,11 +160,12 @@ test.describe("customer detail", () => {
 
         await page.getByRole("button", { name: "See all bookings" }).click();
         await expect(page).toHaveURL(/tab=bk/);
+        // The chip's count follows its label as a number: "Upcoming 2".
         await expect(
-            page.getByRole("button", { name: /^Upcoming · \d+/ }),
-        ).toHaveAttribute("aria-pressed", "true");
+            page.getByRole("radio", { name: /^Upcoming \d+/ }),
+        ).toHaveAttribute("aria-checked", "true");
         await page
-            .getByRole("button", { name: /^No-shows and late cancels/ })
+            .getByRole("radio", { name: /^No-shows and late cancels/ })
             .click();
         await expect(
             page.getByText(/Late cancel|No-show/).first(),

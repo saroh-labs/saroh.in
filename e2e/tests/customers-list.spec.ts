@@ -72,11 +72,13 @@ test.describe("customers list", () => {
             page.getByRole("link", { name: new RegExp(escape(name)) }).first(),
         ).toBeVisible();
 
-        await page.getByRole("button", { name: /^Returning/ }).click();
+        // The chips are the list's status filter: a radio group.
+        const chips = page.getByRole("radiogroup", { name: "Show" });
+        await chips.getByRole("radio", { name: /^Returning/ }).click();
         await expect(page).toHaveURL(/chip=returning/);
         await expect(
-            page.getByRole("button", { name: /^Returning/ }),
-        ).toHaveAttribute("aria-pressed", "true");
+            chips.getByRole("radio", { name: /^Returning/ }),
+        ).toHaveAttribute("aria-checked", "true");
 
         await page.getByRole("combobox", { name: "Sort" }).click();
         await page.getByRole("option", { name: "Spent, highest" }).click();

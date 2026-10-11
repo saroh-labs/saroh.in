@@ -1,5 +1,6 @@
 "use client";
 
+import { ListTableHead, listTable } from "@/components/shared/list-toolbar";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -60,18 +61,20 @@ export function LevelsTable({
     } as CSSProperties;
 
     return (
-        <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
-            <div
-                className="px-4 min-[760px]:min-w-[var(--levels-min)]"
-                style={vars}
-            >
-                <div
+        // The one table look: the head band, and rows ruled edge to edge.
+        // The side padding is each row's own, never a wrapper's.
+        <div
+            data-list-table=""
+            className={cn(listTable.frame, "min-[760px]:overflow-x-auto")}
+        >
+            <div className="min-[760px]:min-w-[var(--levels-min)]" style={vars}>
+                <ListTableHead
                     className={cn(
                         DESK_GRID,
-                        "label gap-3 border-b border-border py-[11px] pb-2 max-[759px]:hidden",
+                        "gap-3 rounded-t-[10px] max-[759px]:hidden",
                     )}
                 >
-                    <span className="sticky left-0 z-10 -ml-4 bg-card pl-4">
+                    <span className="sticky left-0 z-10 -ml-[14px] bg-muted pl-[14px]">
                         Product
                     </span>
                     {storefronts.map((s) => (
@@ -80,7 +83,7 @@ export function LevelsTable({
                         </span>
                     ))}
                     <span>Last change</span>
-                </div>
+                </ListTableHead>
                 <div role="list" aria-label="Stock levels">
                     {rows.map((row) => {
                         const sub = rowSub(row);
@@ -90,7 +93,8 @@ export function LevelsTable({
                                 role="listitem"
                                 className={cn(
                                     DESK_GRID,
-                                    "items-center gap-3 border-b border-border py-[11px] last:border-b-0 max-[759px]:gap-1",
+                                    listTable.rowStill,
+                                    "items-center gap-3 max-[759px]:gap-1",
                                 )}
                             >
                                 <Link
@@ -99,7 +103,7 @@ export function LevelsTable({
                                         row.productId,
                                         "variants",
                                     )}
-                                    className="sticky left-0 z-10 -ml-4 grid min-w-0 gap-px bg-card pl-4 text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
+                                    className="sticky left-0 z-10 -ml-[14px] grid min-w-0 gap-px bg-card pl-[14px] text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
                                 >
                                     <span className="text-[13.5px] font-semibold [overflow-wrap:anywhere] min-[760px]:truncate">
                                         {row.productName}

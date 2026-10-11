@@ -78,7 +78,11 @@ describe("the Packs tab", () => {
         expect(html).toContain("7 of 10");
         expect(html).toContain("Use by 20 Oct");
         expect(html).toContain("Bought 1 Sep · ₹3,000 · Cash");
-        expect(html).toContain("Can still use · 1");
+        // The chip's count follows its label: no dot joins them.
+        expect(html).toMatch(
+            /aria-checked="true"[^>]*>Can still use <span[^>]*>1<\/span>/,
+        );
+        expect(html).not.toContain("Can still use · 1");
         expect(html).toContain("Classes booked · 1");
         expect(html).toContain('aria-expanded="false"');
         expect(html).toContain(">Extend<");
@@ -110,7 +114,9 @@ describe("the Packs tab", () => {
             }),
         ]);
         expect(html).toContain("Ran out 20 Sep with 2 unused");
-        expect(html).toMatch(/aria-pressed="true"[^>]*>Used up or expired · 1/);
+        expect(html).toMatch(
+            /aria-checked="true"[^>]*>Used up or expired <span[^>]*>1<\/span>/,
+        );
     });
 });
 

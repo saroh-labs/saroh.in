@@ -120,8 +120,39 @@ describe("LogList on a phone", () => {
     });
 
     it("scrolls no day sideways under 760px", () => {
-        expect(html.split(/[\s"]/)).not.toContain("overflow-x-auto");
-        expect(html.split(/[\s"]/)).not.toContain("min-w-[540px]");
-        expect(html).toContain("min-[760px]:min-w-[540px]");
+        // The log's card scrolls only at the desk. (The chip row above it
+        // is the one sideways scroller a phone has, inside ScrollX.)
+        const card = /<div data-list-table=""[^>]*class="([^"]*)"/.exec(html);
+        expect(card?.[1].split(" ")).toContain("min-[760px]:overflow-x-auto");
+        expect(card?.[1].split(" ")).not.toContain("overflow-x-auto");
+        expect(html.split(/[\s"]/)).not.toContain("min-w-[580px]");
+        expect(html).toContain("min-[760px]:min-w-[580px]");
+    });
+
+    it("draws the one table: a head band at the desk, each day a group, a time that never wraps", () => {
+        expect(html).toMatch(/data-list-head=""[^>]*max-\[759px\]:hidden/);
+        for (const name of ["Time", "Product", "Kind", "Change", "Note"]) {
+            expect(html).toContain(`>${name}</span>`);
+        }
+        // The time's column fits "12:30 pm"; the cell never breaks.
+        expect(html).toContain("min-[760px]:grid-cols-[62px_");
+        expect(html).toMatch(/class="whitespace-nowrap tabular-nums[^"]*">/);
+    });
+
+    it("follows the one toolbar: dropdown filters, the count, then the kind as chips", () => {
+        const at = (needle: string) => html.indexOf(needle);
+        expect(at('data-slot="list-filters"')).toBeGreaterThan(-1);
+        expect(at('data-slot="list-filters"')).toBeLessThan(
+            at('data-slot="list-end"'),
+        );
+        expect(at('data-slot="list-end"')).toBeLessThan(
+            at('data-slot="list-chips"'),
+        );
+        expect(html).toMatch(
+            /role="radiogroup"[^>]*aria-label="Kind of change"/,
+        );
+        expect(html).toContain('aria-label="Product"');
+        // No chip is a link or a tab any more.
+        expect(html).not.toMatch(/role="tab"/);
     });
 });

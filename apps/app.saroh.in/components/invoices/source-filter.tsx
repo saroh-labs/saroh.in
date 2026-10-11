@@ -1,15 +1,15 @@
-import { ChipGroup } from "@/components/shared/choice-group";
+import { ListFilter } from "@/components/shared/list-toolbar";
 import type { SourceChip } from "@/lib/invoices/sources";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
- * What the Invoices list is narrowed to by what each paper was for (D18).
- *
- * The chips: All, then each source the business has — Orders, Bookings,
- * Subscriptions, Packs, Courses, By hand. A radio group, as every chip row
- * is (`Chip`): one choice at a time.
+ * What the Invoices list is narrowed to by what each paper was for (D18):
+ * every kind, then each source the business has (Orders, Bookings,
+ * Subscriptions, Packs, Courses, By hand). It is a kind, not a status, so
+ * it is one of the list toolbar's dropdown filters; the status is the chip
+ * row under it.
  */
-export function SourceChips({
+export function SourceFilter({
     chips,
     chosen,
     onPick,
@@ -20,12 +20,14 @@ export function SourceChips({
 }) {
     if (chips.length === 0) return null;
     return (
-        <ChipGroup
+        <ListFilter<SourceChip>
             label="What it was for"
-            className="mb-3 gap-2"
             value={chosen}
-            onChange={onPick}
-            choices={chips.map((c) => ({ value: c.id, label: c.label }))}
+            onValueChange={onPick}
+            options={chips.map((c) => ({
+                value: c.id,
+                label: c.id === "all" ? "For anything" : c.label,
+            }))}
         />
     );
 }
@@ -43,7 +45,7 @@ export function ScopeNotice({
     clearHref: string;
 }) {
     return (
-        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
             <span
                 role="status"
                 className="inline-flex h-8 items-center gap-2 rounded-full bg-muted px-3 text-[13px] font-semibold text-foreground"

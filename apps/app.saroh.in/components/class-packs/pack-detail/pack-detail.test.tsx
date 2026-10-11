@@ -239,7 +239,8 @@ async function flush() {
 describe("Pack Detail's Who has it", () => {
     it("extends a holder by 7 days: the new date, and a refresh", async () => {
         render({ state: "ok", data: [ASHA] });
-        expect(text()).toContain("Can still use · 1");
+        // The count follows the chip's label as a number of its own.
+        expect(text()).toContain("Can still use 1");
         expect(text()).toContain("6 of 10");
         expect(text()).toContain("Use by 10 Nov");
         expect(text()).toContain("Bought 1 Sep · ₹1,500 · UPI");

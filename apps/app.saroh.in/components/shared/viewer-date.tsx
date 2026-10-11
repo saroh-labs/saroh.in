@@ -10,6 +10,7 @@ import {
     formatTime,
     viewerTimeZone,
 } from "@/lib/format/datetime";
+import { cn } from "@saroh/ui/lib/utils";
 
 /**
  * A date shown in the VIEWER'S timezone, without breaking hydration.
@@ -38,6 +39,14 @@ import {
 const noop = () => undefined;
 const subscribe = () => noop;
 const getServerTimeZone = () => "UTC";
+
+/**
+ * The variants that say a time of day. Since the 12-hour clock a time is
+ * two words ("2:40 pm"), and in a narrow column the second dropped to a
+ * line of its own. A time is one fact: it never wraps, wherever it is
+ * drawn. The column it sits in is sized to fit it (`listTable.timeCol`).
+ */
+const HAS_TIME = new Set(["time", "datetime", "moment", "recent"]);
 
 export function ViewerDate({
     iso,
@@ -112,7 +121,14 @@ export function ViewerDate({
         // `<time dateTime>` carries the exact instant regardless of how the
         // visible text is rounded to a day, so the machine-readable value is
         // never the approximate one.
-        <time dateTime={iso} className={className}>
+        <time
+            dateTime={iso}
+            className={
+                HAS_TIME.has(variant)
+                    ? cn("whitespace-nowrap", className)
+                    : className
+            }
+        >
             {text}
         </time>
     );

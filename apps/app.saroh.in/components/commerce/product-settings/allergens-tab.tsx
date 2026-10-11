@@ -12,6 +12,7 @@ import { useTransition } from "react";
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
@@ -154,7 +155,7 @@ export function AllergensTab({
                     }
                 />
             ) : (
-                <ul className="rounded-[12px] border border-border bg-card">
+                <ul data-list-table="" className={listTable.card}>
                     {allergens.map((a) => {
                         const used = a.contains + a.mayContain;
                         const title = used
@@ -163,7 +164,10 @@ export function AllergensTab({
                         return (
                             <li
                                 key={a.id}
-                                className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-4 py-[11px] last:border-b-0"
+                                className={cn(
+                                    "flex flex-wrap items-center gap-2.5",
+                                    listTable.rowStill,
+                                )}
                             >
                                 <span className="flex-[1_1_140px] text-[13.5px] font-semibold">
                                     {a.name}

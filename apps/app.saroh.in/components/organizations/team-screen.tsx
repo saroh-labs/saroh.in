@@ -90,6 +90,11 @@ import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { CheckRow } from "@/components/shared/check-row";
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import {
+    ListTable,
+    listTable,
+    ListTableHead,
+} from "@/components/shared/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
@@ -553,18 +558,13 @@ function PeopleTab({
                 />
             ) : null}
 
-            <div className="overflow-hidden rounded-xl border border-border">
-                <div
-                    className={cn(
-                        grid,
-                        "label hidden h-[38px] border-b border-border bg-muted px-4 xl:grid",
-                    )}
-                >
+            <ListTable>
+                <ListTableHead className={cn(grid, "hidden xl:grid")}>
                     <span>Person</span>
                     <span>Role</span>
                     {withExtras ? <span>Extra permissions</span> : null}
                     <span />
-                </div>
+                </ListTableHead>
                 <ul>
                     {members.map((m) => {
                         const role = m.roleKey ?? m.role;
@@ -584,10 +584,7 @@ function PeopleTab({
                         return (
                             <li
                                 key={m.userId}
-                                className={cn(
-                                    grid,
-                                    "border-b border-border px-4 py-[11px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
-                                )}
+                                className={cn(grid, listTable.row)}
                             >
                                 <div className="flex min-w-0 items-center gap-[11px]">
                                     <Avatar
@@ -699,7 +696,7 @@ function PeopleTab({
                         );
                     })}
                 </ul>
-            </div>
+            </ListTable>
 
             <div className="flex items-start gap-[9px] rounded-[10px] bg-foreground/[0.03] px-[15px] py-3">
                 <Info
@@ -786,13 +783,13 @@ function PendingInvites({
     return (
         <section
             aria-label="Invited, not joined yet"
-            className="overflow-hidden rounded-xl border border-border"
+            className={listTable.card}
         >
-            <p className="label flex h-[38px] items-center border-b border-border bg-muted px-4">
+            <p className={cn(listTable.head, "flex")}>
                 Invited · not joined yet
             </p>
             <ul>
-                {shown.map((invitation, i) => {
+                {shown.map((invitation) => {
                     const role = invitation.roleKey ?? invitation.role;
                     const resending = pending.includes(
                         `resend:${invitation.id}`,
@@ -804,8 +801,8 @@ function PendingInvites({
                         <li
                             key={invitation.id}
                             className={cn(
-                                "flex flex-wrap items-center gap-3 px-4 py-[11px]",
-                                i > 0 && "border-t border-border",
+                                "flex flex-wrap items-center gap-3",
+                                listTable.rowStill,
                             )}
                         >
                             <span

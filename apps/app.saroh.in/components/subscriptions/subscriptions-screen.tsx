@@ -13,6 +13,13 @@ import { useState } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import type { ContactOption } from "@/components/shared/contact-picker";
+import {
+    FilterChips,
+    ListTable,
+    listTable,
+    ListTableHead,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { plansOnTab } from "@/lib/subscriptions/plan-cards";
@@ -31,7 +38,11 @@ import { TabStrip } from "@saroh/ui/tabs";
 import { PlansTab } from "./plans-tab";
 import { SubscribeDialog } from "./subscribe-dialog";
 import { SubscriptionQuickLook } from "./subscription-quick-look";
-import { SubscriptionRow } from "./subscription-row";
+import {
+    SUBSCRIPTION_COLS,
+    SUBSCRIPTION_ROW,
+    SubscriptionRow,
+} from "./subscription-row";
 
 const TABS: ListTab[] = ["active", "failed", "paused", "cancelled"];
 const SEARCH_FROM = 8;
@@ -203,47 +214,71 @@ export function SubscriptionsScreen({
                 ) : (
                     <div className="mb-3" />
                 )}
-                <TabStrip
-                    label="Subscriptions"
-                    idPrefix="tab"
-                    value={tab}
-                    onValueChange={pick}
-                    tabs={[
-                        ...TABS.map((t) => ({
-                            value: t,
-                            label: TAB_LABEL[t],
-                            controls: "subscriptions-panel",
-                            count: count(t),
-                            countTone:
-                                t === "failed" && count(t) > 0
-                                    ? ("danger" as const)
-                                    : ("neutral" as const),
-                        })),
-                        {
-                            value: "plans",
-                            label: "Plans",
-                            controls: "subscriptions-panel",
-                            // No count when they couldn't be read: a 0
-                            // would say there are none.
-                            count: planRead ? plansOnTab(planRead) : undefined,
-                        },
-                    ]}
+                {/* Two views: who is subscribed, and the plans on sale.
+                    Where each subscription stands (Active, Payment
+                    failed, Paused, Cancelled) narrows the one list, so it
+                    is the chip row under the search, not more tabs. The
+                    address keeps `?tab=` for both, as it always has. */}
+                <ListToolbar
+                    tabs={
+                        <TabStrip
+                            label="Subscriptions"
+                            idPrefix="tab"
+                            value={onPlans ? "plans" : "subscribers"}
+                            onValueChange={(v) =>
+                                pick(v === "plans" ? "plans" : "active")
+                            }
+                            tabs={[
+                                {
+                                    value: "subscribers",
+                                    label: "Subscribers",
+                                    controls: "subscriptions-panel",
+                                    count: subscriptions.length,
+                                },
+                                {
+                                    value: "plans",
+                                    label: "Plans",
+                                    controls: "subscriptions-panel",
+                                    // No count when they couldn't be
+                                    // read: a 0 would say there are none.
+                                    count: planRead
+                                        ? plansOnTab(planRead)
+                                        : undefined,
+                                },
+                            ]}
+                        />
+                    }
+                    // Search earns its row only on a list long enough to
+                    // need it; a phone has little room to spare.
+                    search={
+                        !onPlans && subscriptions.length > SEARCH_FROM ? (
+                            <ListSearch
+                                placeholder="Search subscriptions by name or plan"
+                                defaultValue={query}
+                                onSearch={setQuery}
+                            />
+                        ) : null
+                    }
+                    chips={
+                        !onPlans && subscriptions.length > 0 ? (
+                            <FilterChips<ListTab>
+                                label="Subscription status"
+                                value={tab}
+                                onValueChange={pick}
+                                chips={TABS.map((t) => ({
+                                    value: t,
+                                    label: TAB_LABEL[t],
+                                    count: count(t),
+                                }))}
+                            />
+                        ) : null
+                    }
                 />
-                {/* Search earns its row only on a list long enough to
-                    need it; a phone has little room to spare. */}
-                {!onPlans && subscriptions.length > SEARCH_FROM ? (
-                    <ListSearch
-                        placeholder="Search subscriptions by name or plan"
-                        defaultValue={query}
-                        onSearch={setQuery}
-                        className="mt-3"
-                    />
-                ) : null}
             </div>
             <div
                 id="subscriptions-panel"
                 role="tabpanel"
-                aria-labelledby={`tab-${tab}`}
+                aria-labelledby={`tab-${onPlans ? "plans" : "subscribers"}`}
                 className="pt-4"
             >
                 {tab === "plans" ? (
@@ -313,19 +348,44 @@ export function SubscriptionsScreen({
                                 />
                             )
                         ) : (
-                            <ul className="flex flex-col gap-2">
-                                {rows.map((s) => (
-                                    <li key={s.id}>
-                                        <SubscriptionRow
-                                            sub={s}
-                                            plans={plans}
-                                            now={now}
-                                            open={s.id === peekId}
-                                            onOpen={() => setPeekId(s.id)}
-                                        />
-                                    </li>
-                                ))}
-                            </ul>
+                            <ListTable>
+                                <ListTableHead
+                                    className={cn(
+                                        SUBSCRIPTION_ROW,
+                                        "max-md:hidden",
+                                    )}
+                                >
+                                    <span className="w-[34px]" />
+                                    <span className={SUBSCRIPTION_COLS.who}>
+                                        Subscriber
+                                    </span>
+                                    <span className={SUBSCRIPTION_COLS.status}>
+                                        Status
+                                    </span>
+                                    <span className={SUBSCRIPTION_COLS.when}>
+                                        Next
+                                    </span>
+                                    <span className={SUBSCRIPTION_COLS.price}>
+                                        Price
+                                    </span>
+                                </ListTableHead>
+                                <ul aria-label="Subscriptions">
+                                    {rows.map((s) => (
+                                        <li
+                                            key={s.id}
+                                            className={listTable.rule}
+                                        >
+                                            <SubscriptionRow
+                                                sub={s}
+                                                plans={plans}
+                                                now={now}
+                                                open={s.id === peekId}
+                                                onOpen={() => setPeekId(s.id)}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </ListTable>
                         )}
                         {truncated ? (
                             <p className="mt-3 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">

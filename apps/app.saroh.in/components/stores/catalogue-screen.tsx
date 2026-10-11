@@ -37,7 +37,11 @@ import { runAction } from "@/lib/api/run-action";
 import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
 import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
 import { CatalogueHeader } from "./catalogue/catalogue-header";
-import { CatalogueToolbar } from "./catalogue/catalogue-toolbar";
+import {
+    CatalogueFilters,
+    CatalogueSearch,
+    CatalogueStatusChips,
+} from "./catalogue/catalogue-toolbar";
 import { QuickLook } from "./catalogue/quick-look";
 
 /** The most rows one read brings back (the API's cap). */
@@ -357,14 +361,23 @@ export function CatalogueScreen({
                     hideModeToggle
                     noun={{ one: "product", other: "products" }}
                     showTotal={false}
+                    toolbarSearch={
+                        <CatalogueSearch
+                            query={query}
+                            go={go}
+                            searching={navigating}
+                        />
+                    }
                     toolbarExtra={
-                        <CatalogueToolbar
+                        <CatalogueFilters
                             query={query}
                             go={go}
                             storefronts={data.storefronts}
                             choices={choices}
-                            searching={navigating}
                         />
+                    }
+                    toolbarChips={
+                        <CatalogueStatusChips query={query} go={go} />
                     }
                     onRowClick={(r) => setOpenId(r.id)}
                     selectable={canWrite}

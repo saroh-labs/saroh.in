@@ -128,9 +128,9 @@ export function RecentChanges({
                         {log.map((e) => (
                             <li
                                 key={e.id}
-                                className="grid grid-cols-[96px_minmax(0,1fr)_40px_70px] items-baseline gap-2.5 border-t border-border py-[9px] text-[12.5px] max-sm:grid-cols-[minmax(0,1fr)_40px_64px]"
+                                className="grid grid-cols-[116px_minmax(0,1fr)_40px_70px] items-baseline gap-2.5 border-t border-border py-[9px] text-[12.5px] max-sm:grid-cols-[minmax(0,1fr)_40px_64px]"
                             >
-                                <span className="tabular-nums text-muted-foreground max-sm:col-span-3">
+                                <span className="whitespace-nowrap tabular-nums text-muted-foreground max-sm:col-span-3">
                                     {moment(e.createdAt)}
                                 </span>
                                 <span className="min-w-0 text-pretty text-neutral-700 dark:text-muted-foreground">

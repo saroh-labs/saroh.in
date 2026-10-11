@@ -192,3 +192,177 @@ describe("DataView — how many", () => {
         expect(screen.queryByText("1 customer")).toBeNull();
     });
 });
+
+/**
+ * A list's own toolbar and table (the one list anatomy): search first, the
+ * count on the right, the named subsets as chips under them, never tabs,
+ * then the table with its tinted head band.
+ */
+describe("DataView — the one toolbar and the one table", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    const many: Row[] = [
+        { id: "a", name: "Asha Rao", note: "Paid in cash" },
+        { id: "b", name: "Bela Shah", note: "Owes" },
+        { id: "c", name: "Chitra Nair", note: "Owes" },
+    ];
+    const filtered = (more: Record<string, unknown> = {}) => (
+        <DataView
+            viewId="anatomy"
+            rows={many}
+            columns={[
+                ...columns,
+                {
+                    id: "spent",
+                    header: "Spent",
+                    priority: "secondary",
+                    numeric: true,
+                    cell: () => "1,200",
+                },
+            ]}
+            rowKey={(r) => r.id}
+            noun={{ one: "customer", other: "customers" }}
+            searchableColumnIds={["name"]}
+            filters={[
+                { id: "all", label: "All" },
+                {
+                    id: "owes",
+                    label: "Owes",
+                    predicate: (r) => r.note === "Owes",
+                },
+                { id: "none", label: "Lapsed", predicate: () => false },
+            ]}
+            {...more}
+        />
+    );
+
+    it("draws the named subsets as chips with their counts, never as tabs", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const group = screen.getByRole("radiogroup", { name: "Show" });
+        expect(group).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: "All 3" })).toBeChecked();
+        expect(screen.getByRole("radio", { name: "Owes 2" })).not.toBeChecked();
+        // Zero is a fact, so it is said.
+        expect(screen.getByRole("radio", { name: "Lapsed 0" })).toBeVisible();
+        expect(screen.queryByRole("tab")).toBeNull();
+        expect(screen.queryByRole("tablist")).toBeNull();
+        expect(container.querySelector("[data-tab-strip]")).toBeNull();
+        expect(container.querySelector("[data-count-badge]")).toBeNull();
+    });
+
+    it("narrows the rows when a chip is pressed, and says how many are showing", () => {
+        setWidth(true);
+        render(filtered());
+        screen.getByRole("radio", { name: "Owes 2" }).click();
+        return screen.findByText("2 of 3 customers").then(() => {
+            expect(screen.queryByText("Asha Rao")).toBeNull();
+            expect(screen.getByText("Bela Shah")).toBeInTheDocument();
+        });
+    });
+
+    it("orders the toolbar: search, then the count on the right, then the chips, then the table", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const at = (selector: string) => {
+            const el = container.querySelector(selector);
+            if (!el) throw new Error(`no ${selector}`);
+            return el;
+        };
+        const order = [
+            at('[data-slot="list-search"]'),
+            at('[data-slot="list-end"]'),
+            at('[data-slot="list-chips"]'),
+            at("table"),
+        ];
+        for (let i = 0; i < order.length - 1; i++) {
+            expect(
+                order[i].compareDocumentPosition(order[i + 1]) &
+                    Node.DOCUMENT_POSITION_FOLLOWING,
+            ).toBeTruthy();
+        }
+        expect(at('[data-slot="list-count"]')).toHaveTextContent("3 customers");
+        expect(
+            screen.getByRole("searchbox", { name: "Search customers" }),
+        ).toBeInTheDocument();
+    });
+
+    it("takes a screen's own search, dropdown filters, sort and chips in the same slots", () => {
+        setWidth(true);
+        const { container } = render(
+            <DataView
+                viewId="own-slots"
+                rows={many}
+                columns={columns}
+                rowKey={(r) => r.id}
+                noun={{ one: "product", other: "products" }}
+                toolbarSearch={<input aria-label="Search products" />}
+                toolbarExtra={<button type="button">Category</button>}
+                toolbarEnd={<button type="button">Sort</button>}
+                toolbarChips={<div data-testid="own-chips">Live</div>}
+            />,
+        );
+        const inSlot = (slot: string) =>
+            container.querySelector(`[data-slot="${slot}"]`)?.textContent;
+        expect(
+            container
+                .querySelector('[data-slot="list-search"]')
+                ?.querySelector("input"),
+        ).toHaveAccessibleName("Search products");
+        expect(inSlot("list-filters")).toBe("Category");
+        expect(inSlot("list-end")).toContain("Sort");
+        expect(inSlot("list-chips")).toBe("Live");
+    });
+
+    it("draws the table's head as a tinted band of small uppercase labels, rows ruled edge to edge", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const headRow = container.querySelector("thead tr");
+        expect(headRow?.className.split(" ")).toEqual(
+            expect.arrayContaining(["bg-muted", "border-b", "h-10"]),
+        );
+        const heads = Array.from(container.querySelectorAll("thead th"));
+        for (const th of heads) {
+            expect(th.className.split(" ")).toEqual(
+                expect.arrayContaining(["label", "px-[14px]"]),
+            );
+        }
+        // Figures: right-aligned, head and cell alike, in tabular numerals.
+        const spent = heads.find((th) => th.textContent === "Spent");
+        expect(spent?.className.split(" ")).toContain("text-right");
+        const cell = container.querySelector("tbody tr td:last-child");
+        expect(cell?.className.split(" ")).toEqual(
+            expect.arrayContaining([
+                "text-right",
+                "tabular-nums",
+                "px-[14px]",
+                "py-[11px]",
+            ]),
+        );
+        const row = container.querySelector("tbody tr");
+        expect(row?.className.split(" ")).toEqual(
+            expect.arrayContaining([
+                "border-b",
+                "last:border-b-0",
+                "hover:bg-foreground/[0.035]",
+            ]),
+        );
+        // The frame carries no side padding, so the rules reach its edges.
+        const frame = container.querySelector("table")?.closest(".border");
+        expect(frame?.className).not.toMatch(/(^| )p[xlr]?-/);
+    });
+
+    it("draws the phone's list in the same card, with the same rules", () => {
+        setWidth(false);
+        const { container } = render(filtered());
+        const list = screen.getByRole("list");
+        expect(list.className.split(" ")).toEqual(
+            expect.arrayContaining(["overflow-hidden", "border", "bg-card"]),
+        );
+        const item = container.querySelector("li");
+        expect(item?.className.split(" ")).toEqual(
+            expect.arrayContaining(["border-b", "last:border-b-0"]),
+        );
+    });
+});
