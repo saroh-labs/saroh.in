@@ -3,12 +3,14 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-lock";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { EmailPromptBlock } from "@/components/communications/email-prompt";
+import { AccountUpdatesBlock } from "@/components/providers/account-updates-row";
 import { ProviderList } from "@/components/providers/provider-list";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { readAccountUpdates } from "@/lib/communications/account-updates-service";
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
@@ -63,9 +65,10 @@ export default async function ProvidersSettingsPage() {
         sarohEmail,
         access,
         emailSetup,
+        accountUpdates,
     ] =
         result.status === "denied"
-            ? [null, null, null, [], null, null, null, null]
+            ? [null, null, null, [], null, null, null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -85,6 +88,10 @@ export default async function ProvidersSettingsPage() {
                   // whether the plan lets it connect its own: the prompt
                   // and the email rows' lock read it. Null when unread.
                   readEmailSetup(emailMay),
+                  // Whether Saroh posts updates to customers' Messages,
+                  // and whether that choice can have an effect yet. Null
+                  // when unread or not this person's: no row is drawn.
+                  readAccountUpdates(),
               ]);
     const view =
         result.status === "denied"
@@ -142,6 +149,11 @@ export default async function ProvidersSettingsPage() {
                     webhooks={webhooks}
                 />
             )}
+            {/* The business's own choice about Saroh's posts in its
+                customers' Messages: drawn only while it can have an effect. */}
+            {accountUpdates?.offered ? (
+                <AccountUpdatesBlock state={accountUpdates} />
+            ) : null}
         </SettingsPanel>
     );
 }
