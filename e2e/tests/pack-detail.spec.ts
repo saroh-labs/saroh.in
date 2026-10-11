@@ -138,7 +138,15 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             // Who has it: the holder, and Extend.
             await page.getByRole("tab", { name: /^Who has it/ }).click();
             await expect(page).toHaveURL(/\?tab=who$/);
-            await expect(page.getByText("Can still use · 1")).toBeVisible();
+            // Who has it narrows with a dropdown; open, each choice says
+            // how many it holds.
+            const who = page.getByRole("combobox", { name: "Who has it" });
+            await expect(who).toContainText("Can still use");
+            await who.click();
+            await expect(
+                page.getByRole("option", { name: /^Can still use/ }),
+            ).toContainText("1");
+            await page.keyboard.press("Escape");
             await expect(
                 page.getByRole("link", { name: `Open Asha Pack ${stamp}` }),
             ).toBeVisible();

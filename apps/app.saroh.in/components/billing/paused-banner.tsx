@@ -20,7 +20,7 @@ export function PausedBanner({ view }: { view: PausedView | null }) {
     const b = pausedBanner(view);
     if (!b) return null;
     return (
-        <Notice tone="warning" layout="banner">
+        <Notice tone="warning" layout="banner" align="center">
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
                 <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-warning-subtle-foreground">
                     <span className="font-semibold">

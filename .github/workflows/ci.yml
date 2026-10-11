@@ -209,6 +209,11 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # No tag is stripped by one pattern replace with nothing: the code
+      # scanner refuses it, and nothing else runs the scanner before a push.
+      - name: Tag stripping
+        run: pnpm run check:tag-strip
+
       # One word each (UX-078): no "Reschedule", "Shut" or "reservation" in
       # what merchants and customers read.
       - name: One word each

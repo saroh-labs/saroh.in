@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -190,5 +190,287 @@ describe("DataView — how many", () => {
         setWidth(true);
         render(view("count-in-header", { showTotal: false }));
         expect(screen.queryByText("1 customer")).toBeNull();
+    });
+});
+
+/**
+ * A list's own toolbar and table (the one list anatomy): ONE row of search,
+ * the named subsets as a dropdown and the count on the right, never tabs
+ * and never a row of chips, then the table with its tinted head band.
+ */
+describe("DataView — the one toolbar and the one table", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    const many: Row[] = [
+        { id: "a", name: "Asha Rao", note: "Paid in cash" },
+        { id: "b", name: "Bela Shah", note: "Owes" },
+        { id: "c", name: "Chitra Nair", note: "Owes" },
+    ];
+    const filtered = (more: Record<string, unknown> = {}) => (
+        <DataView
+            viewId="anatomy"
+            rows={many}
+            columns={[
+                ...columns,
+                {
+                    id: "spent",
+                    header: "Spent",
+                    priority: "secondary",
+                    numeric: true,
+                    cell: () => "1,200",
+                },
+            ]}
+            rowKey={(r) => r.id}
+            noun={{ one: "customer", other: "customers" }}
+            searchableColumnIds={["name"]}
+            filters={[
+                { id: "all", label: "All" },
+                {
+                    id: "owes",
+                    label: "Owes",
+                    predicate: (r) => r.note === "Owes",
+                },
+                { id: "none", label: "Lapsed", predicate: () => false },
+            ]}
+            {...more}
+        />
+    );
+
+    it("draws the named subsets as one dropdown, never as tabs or chips", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const box = screen.getByRole("combobox", { name: "Show" });
+        // The unnarrowed choice says what the list holds, not a bare "All".
+        expect(box).toHaveTextContent(/^All customers$/);
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(
+            screen
+                .getAllByRole("option")
+                .map((o) => o.textContent.replace(/\s+/g, " ")),
+            // Zero is a fact, so it is said.
+        ).toEqual(["All customers 3", "Owes 2", "Lapsed 0"]);
+        expect(screen.queryByRole("tab")).toBeNull();
+        expect(screen.queryByRole("radio")).toBeNull();
+        expect(container.querySelector("[data-tab-strip]")).toBeNull();
+        expect(container.querySelector("[data-count-badge]")).toBeNull();
+    });
+
+    it("narrows the rows when an option is chosen, and says how many are showing", async () => {
+        setWidth(true);
+        render(filtered());
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "Show" }), {
+            key: "ArrowDown",
+        });
+        fireEvent.keyDown(screen.getByRole("option", { name: /^Owes/ }), {
+            key: "Enter",
+        });
+        await screen.findByText("2 of 3 customers");
+        expect(screen.queryByText("Asha Rao")).toBeNull();
+        expect(screen.getByText("Bela Shah")).toBeInTheDocument();
+        // The box now says the narrowed choice and its count.
+        expect(
+            screen.getByRole("combobox", { name: "Show" }),
+        ).toHaveTextContent(/^Owes 2$/);
+    });
+
+    it("is one row: search, the dropdown, the count on the right, then the table", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const at = (selector: string) => {
+            const el = container.querySelector(selector);
+            if (!el) throw new Error(`no ${selector}`);
+            return el;
+        };
+        const order = [
+            at('[data-slot="list-search"]'),
+            at('[role="combobox"][aria-label="Show"]'),
+            at('[data-slot="list-count"]'),
+            at("table"),
+        ];
+        for (let i = 0; i < order.length - 1; i++) {
+            expect(
+                order[i].compareDocumentPosition(order[i + 1]) &
+                    Node.DOCUMENT_POSITION_FOLLOWING,
+            ).toBeTruthy();
+        }
+        // No second row of controls under the toolbar's one.
+        expect(container.querySelector('[data-slot="list-chips"]')).toBeNull();
+        expect(at('[data-slot="list-row"]').nextElementSibling).toBe(
+            at('[data-slot="list-count"]'),
+        );
+        expect(at('[data-slot="list-count"]')).toHaveTextContent("3 customers");
+        expect(
+            screen.getByRole("searchbox", { name: "Search customers" }),
+        ).toBeInTheDocument();
+    });
+
+    it("takes a screen's own search, dropdown filters, attention toggle and sort in the same slots", () => {
+        setWidth(true);
+        const { container } = render(
+            <DataView
+                viewId="own-slots"
+                rows={many}
+                columns={columns}
+                rowKey={(r) => r.id}
+                noun={{ one: "product", other: "products" }}
+                toolbarSearch={<input aria-label="Search products" />}
+                toolbarExtra={<button type="button">Category</button>}
+                toolbarEnd={<button type="button">Sort</button>}
+                toolbarAttention={<button type="button">Needs you</button>}
+            />,
+        );
+        const inSlot = (slot: string) =>
+            container.querySelector(`[data-slot="${slot}"]`)?.textContent;
+        expect(
+            container
+                .querySelector('[data-slot="list-search"]')
+                ?.querySelector("input"),
+        ).toHaveAccessibleName("Search products");
+        expect(inSlot("list-filters")).toBe("Category");
+        expect(inSlot("list-end")).toContain("Sort");
+        expect(inSlot("list-attention")).toBe("Needs you");
+    });
+
+    it("draws the table's head as a tinted band of small uppercase labels, rows ruled edge to edge", () => {
+        setWidth(true);
+        const { container } = render(filtered());
+        const headRow = container.querySelector("thead tr");
+        expect(headRow?.className.split(" ")).toEqual(
+            expect.arrayContaining(["bg-muted", "border-b", "h-10"]),
+        );
+        const heads = Array.from(container.querySelectorAll("thead th"));
+        for (const th of heads) {
+            expect(th.className.split(" ")).toEqual(
+                expect.arrayContaining(["label", "px-[14px]"]),
+            );
+        }
+        // Figures: right-aligned, head and cell alike, in tabular numerals.
+        const spent = heads.find((th) => th.textContent === "Spent");
+        expect(spent?.className.split(" ")).toContain("text-right");
+        const cell = container.querySelector("tbody tr td:last-child");
+        expect(cell?.className.split(" ")).toEqual(
+            expect.arrayContaining([
+                "text-right",
+                "tabular-nums",
+                "px-[14px]",
+                "py-[11px]",
+            ]),
+        );
+        const row = container.querySelector("tbody tr");
+        expect(row?.className.split(" ")).toEqual(
+            expect.arrayContaining([
+                "border-b",
+                "last:border-b-0",
+                "hover:bg-foreground/[0.035]",
+            ]),
+        );
+        // The frame carries no side padding, so the rules reach its edges.
+        const frame = container.querySelector("table")?.closest(".border");
+        expect(frame?.className).not.toMatch(/(^| )p[xlr]?-/);
+    });
+
+    it("draws the phone's list in the same card, with the same rules", () => {
+        setWidth(false);
+        const { container } = render(filtered());
+        const list = screen.getByRole("list");
+        expect(list.className.split(" ")).toEqual(
+            expect.arrayContaining(["overflow-hidden", "border", "bg-card"]),
+        );
+        const item = container.querySelector("li");
+        expect(item?.className.split(" ")).toEqual(
+            expect.arrayContaining(["border-b", "last:border-b-0"]),
+        );
+    });
+});
+
+/**
+ * How a list ends. A view pages the rows it holds itself; one whose server
+ * cuts the pages (`paging`) draws every row it is given and the same footer
+ * from the screen's numbers — once, never a footer of its own beside it.
+ */
+describe("DataView — pages", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    const many: Row[] = Array.from({ length: 60 }, (_, i) => ({
+        id: `r${i + 1}`,
+        name: `Customer ${i + 1}`,
+        note: "",
+    }));
+    const paged = (more: Partial<Parameters<typeof DataView<Row>>[0]> = {}) => (
+        <DataView
+            viewId="pages"
+            rows={many}
+            columns={columns}
+            rowKey={(r) => r.id}
+            noun={{ one: "customer", other: "customers" }}
+            {...more}
+        />
+    );
+
+    it("pages the rows it holds itself, fifty to a page", () => {
+        setWidth(true);
+        const { container } = render(paged());
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(50);
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "1 to 50 of 60",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Next" }));
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(10);
+    });
+
+    it("draws every row of a page the server cut, and one footer from the screen's numbers", () => {
+        setWidth(true);
+        const { container } = render(
+            paged({
+                paging: {
+                    page: 2,
+                    total: 532,
+                    size: 100,
+                    to: (n) => ({ href: `/customers?page=${n}` }),
+                    onSize: vi.fn(),
+                },
+            }),
+        );
+        // All sixty given, not the view's own fifty.
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(60);
+        expect(container.querySelectorAll("[data-list-paging]")).toHaveLength(
+            1,
+        );
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "101 to 200 of 532",
+        );
+        expect(
+            screen.getByRole("combobox", { name: "Rows per page" }),
+        ).toHaveTextContent("100");
+        const nav = screen.getByRole("navigation", {
+            name: "Pages of customers",
+        });
+        expect(nav.querySelector('a[href="/customers?page=3"]')).not.toBeNull();
+        expect(nav.querySelector('a[href="/customers?page=1"]')).not.toBeNull();
+    });
+
+    it("asks the screen for a page, and never moves by itself", () => {
+        setWidth(true);
+        const go = vi.fn();
+        const { container } = render(
+            paged({
+                paging: {
+                    page: 1,
+                    total: 120,
+                    size: 50,
+                    to: (n) => ({ onClick: () => void go(n) }),
+                    onSize: vi.fn(),
+                },
+            }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Next" }));
+        expect(go.mock.calls).toEqual([[2]]);
+        // The rows are the screen's to change.
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(60);
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "1 to 50 of 120",
+        );
     });
 });

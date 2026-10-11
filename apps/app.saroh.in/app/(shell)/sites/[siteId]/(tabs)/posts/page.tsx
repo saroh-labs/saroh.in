@@ -94,6 +94,7 @@ export default async function SitePostsPage({
             <PlanLimitNotice moduleId="blog" className="mb-4" />
             <ListCard
                 main="Post"
+                paged={{ list: "site-posts", things: "posts" }}
                 end="Updated"
                 note="Drafts are visible to the team and to nobody else."
             >

@@ -49,43 +49,51 @@ export function LateRuleNoticeCard({
     };
 
     return (
-        <Notice tone="info" role="note" className="mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <span className="flex-[1_1_260px] text-pretty text-[13px] text-foreground">
-                    <strong className="font-semibold">
-                        Pick-up orders at {notice.name} now count as late after{" "}
-                        {lateAfterWords(notice.pickupLateAfterMinutes)}.
-                    </strong>{" "}
-                    <span className="max-sm:hidden">
-                        Set it to what suits your counter.
-                    </span>
-                </span>
-                {canChange ? (
-                    <Button
-                        size="sm"
-                        asChild
-                        variant="outline"
-                        className="border-border-strong"
-                    >
-                        <Link
-                            href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+        // The words on the left; what to do about them on the right, level
+        // with the words. On a phone the buttons go under the words.
+        <Notice
+            tone="info"
+            role="note"
+            className="mb-4 sm:items-center"
+            action={
+                <>
+                    {canChange ? (
+                        <Button
+                            size="sm"
+                            asChild
+                            variant="outline"
+                            className="border-border-strong"
                         >
-                            Change it
-                        </Link>
-                    </Button>
-                ) : (
-                    <span className="text-[12px] text-muted-foreground">
-                        An owner or admin can change it in Locations.
-                    </span>
-                )}
-                <IconButton
-                    label={`Dismiss this notice for ${notice.name}`}
-                    icon={<X />}
-                    variant="ghost"
-                    disabled={pending}
-                    onClick={dismiss}
-                />
-            </div>
+                            <Link
+                                href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                            >
+                                Change it
+                            </Link>
+                        </Button>
+                    ) : (
+                        <span className="text-[12px] text-muted-foreground">
+                            An owner or admin can change it in Locations.
+                        </span>
+                    )}
+                    <IconButton
+                        label={`Dismiss this notice for ${notice.name}`}
+                        icon={<X />}
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={dismiss}
+                    />
+                </>
+            }
+        >
+            <p className="text-pretty text-[13px] text-foreground">
+                <strong className="font-semibold">
+                    Pick-up orders at {notice.name} now count as late after{" "}
+                    {lateAfterWords(notice.pickupLateAfterMinutes)}.
+                </strong>{" "}
+                <span className="max-sm:hidden">
+                    Set it to what suits your counter.
+                </span>
+            </p>
         </Notice>
     );
 }

@@ -29,6 +29,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -90,6 +91,11 @@ import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { CheckRow } from "@/components/shared/check-row";
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import {
+    ListTable,
+    listTable,
+    ListTableHead,
+} from "@/components/shared/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
@@ -536,6 +542,10 @@ function PeopleTab({
         ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
         : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
     const rowButton = "text-[12.5px]";
+    // A page of people at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("team", members, {
+        label: "Pages of people",
+    });
 
     return (
         <div className="space-y-3.5">
@@ -553,20 +563,15 @@ function PeopleTab({
                 />
             ) : null}
 
-            <div className="overflow-hidden rounded-xl border border-border">
-                <div
-                    className={cn(
-                        grid,
-                        "label hidden h-[38px] border-b border-border bg-muted px-4 xl:grid",
-                    )}
-                >
+            <ListTable>
+                <ListTableHead className={cn(grid, "hidden xl:grid")}>
                     <span>Person</span>
                     <span>Role</span>
                     {withExtras ? <span>Extra permissions</span> : null}
                     <span />
-                </div>
+                </ListTableHead>
                 <ul>
-                    {members.map((m) => {
+                    {paged.map((m) => {
                         const role = m.roleKey ?? m.role;
                         const extras = extraLabels(
                             m.extraActions ?? [],
@@ -584,10 +589,7 @@ function PeopleTab({
                         return (
                             <li
                                 key={m.userId}
-                                className={cn(
-                                    grid,
-                                    "border-b border-border px-4 py-[11px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
-                                )}
+                                className={cn(grid, listTable.row)}
                             >
                                 <div className="flex min-w-0 items-center gap-[11px]">
                                     <Avatar
@@ -699,7 +701,8 @@ function PeopleTab({
                         );
                     })}
                 </ul>
-            </div>
+            </ListTable>
+            {paging}
 
             <div className="flex items-start gap-[9px] rounded-[10px] bg-foreground/[0.03] px-[15px] py-3">
                 <Info
@@ -786,13 +789,13 @@ function PendingInvites({
     return (
         <section
             aria-label="Invited, not joined yet"
-            className="overflow-hidden rounded-xl border border-border"
+            className={listTable.card}
         >
-            <p className="label flex h-[38px] items-center border-b border-border bg-muted px-4">
+            <p className={cn(listTable.head, "flex")}>
                 Invited · not joined yet
             </p>
             <ul>
-                {shown.map((invitation, i) => {
+                {shown.map((invitation) => {
                     const role = invitation.roleKey ?? invitation.role;
                     const resending = pending.includes(
                         `resend:${invitation.id}`,
@@ -804,8 +807,8 @@ function PendingInvites({
                         <li
                             key={invitation.id}
                             className={cn(
-                                "flex flex-wrap items-center gap-3 px-4 py-[11px]",
-                                i > 0 && "border-t border-border",
+                                "flex flex-wrap items-center gap-3",
+                                listTable.rowStill,
                             )}
                         >
                             <span

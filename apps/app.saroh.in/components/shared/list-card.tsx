@@ -1,5 +1,10 @@
+"use client";
+
 import { cn } from "@saroh/ui/lib/utils";
+import { ListTable, ListTableHead } from "@saroh/ui/list-table";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import type { ReactNode } from "react";
+import { Children } from "react";
 
 /*
  * An optional column between the title and the right-hand edge (the Pages
@@ -12,8 +17,8 @@ const MIDDLE = "hidden w-[88px] shrink-0 text-right sm:block";
 const END_BESIDE_MIDDLE = "sm:w-[136px] sm:justify-end";
 
 /**
- * The workspace design's list: one bordered card, a row of column headings,
- * then a row per item with its title, a line under it, and whatever belongs
+ * The workspace design's list, in the one table look (`listTable`): one
+ * bordered card, the head band of column headings, then a row per item with its title, a line under it, and whatever belongs
  * on the right. Providers and Notifications draw it; the column headings are
  * what make the right-hand edge scannable as "status" or "when".
  */
@@ -22,9 +27,16 @@ export function ListCard({
     middle,
     end,
     note,
+    paged,
     children,
     className,
 }: {
+    /**
+     * Page the rows with the shared footer: the list's own id (its rows
+     * per page are kept under it) and what its rows are ("posts"). Left
+     * out for a card that is one of several on a screen, grouped by day.
+     */
+    paged?: { list: string; things: string };
     /** The left column's heading: "Provider", "Notification". */
     main: string;
     /** A column's heading between the two: "Updated". Desk only. */
@@ -36,13 +48,14 @@ export function ListCard({
     children: ReactNode;
     className?: string;
 }) {
+    const all = Children.toArray(children);
+    const { rows, paging } = useLocalPages(paged?.list ?? "list-card", all, {
+        label: `Pages of ${paged?.things ?? "rows"}`,
+    });
     return (
         <div className={className}>
-            <div className="overflow-hidden rounded-[12px] border border-border">
-                <div
-                    aria-hidden
-                    className="label flex items-center gap-3 border-b border-border bg-muted px-[18px] py-[9px]"
-                >
+            <ListTable>
+                <ListTableHead className="flex gap-3">
                     <span className="min-w-0 flex-1">{main}</span>
                     {middle ? <span className={MIDDLE}>{middle}</span> : null}
                     <span
@@ -53,9 +66,10 @@ export function ListCard({
                     >
                         {end}
                     </span>
-                </div>
-                <ul>{children}</ul>
-            </div>
+                </ListTableHead>
+                <ul>{paged ? rows : all}</ul>
+            </ListTable>
+            {paged ? paging : null}
             {note ? (
                 <p className="mt-2.5 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                     {note}
@@ -93,7 +107,7 @@ export function ListRow({
     return (
         <div
             className={cn(
-                "flex min-h-14 flex-wrap items-center gap-3 px-[18px] py-[13px]",
+                "flex min-h-14 flex-wrap items-center gap-3 px-[14px] py-[11px]",
                 className,
             )}
         >

@@ -11,6 +11,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { ListCard, ListRow } from "@/components/shared/list-card";
+import { listTable } from "@/components/shared/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
@@ -28,8 +29,8 @@ const GROUPS: { key: NoticeGroup; label: string }[] = [
     { key: "earlier", label: "Earlier" },
 ];
 
-const ROW =
-    "block w-full text-left transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+/** A row that opens what it is about: the one table's wash and press. */
+const ROW = `block w-full text-left ${listTable.wash} ${listTable.pressable}`;
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -199,7 +200,7 @@ export function NotificationsInbox({
                                                     n.createdAt,
                                                     zone,
                                                 )}
-                                                className="text-[12px] tabular-nums text-muted-foreground"
+                                                className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground"
                                             >
                                                 {when}
                                             </time>

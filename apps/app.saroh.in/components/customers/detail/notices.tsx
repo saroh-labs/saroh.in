@@ -36,7 +36,7 @@ export function PossibleMatch({
             ? `${first.name} at ${first.storefront.name} has the same email`
             : `${matches.length} customers at your locations have the same email`;
     return (
-        <Notice tone="info" role="note" className="mb-4">
+        <Notice tone="info" role="note" className="mb-4" align="center">
             <div className="flex flex-wrap items-center gap-2.5">
                 <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground [overflow-wrap:anywhere]">
                     <strong className="font-semibold">
@@ -84,7 +84,7 @@ export function DuplicateNotice({
     return (
         <div className={`${className} grid gap-1.5`}>
             {duplicates.slice(0, 3).map((dup) => (
-                <Notice key={dup.contactId}>
+                <Notice key={dup.contactId} align="center">
                     <div className="flex flex-wrap items-center gap-2.5">
                         <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
                             <strong className="font-semibold text-foreground">
@@ -127,7 +127,7 @@ export function PartialNotice({
     const [pending, start] = useTransition();
     if (!missing.length) return null;
     return (
-        <Notice role="status" className="mb-4">
+        <Notice role="status" className="mb-4" align="center">
             <div className="flex flex-wrap items-center gap-2.5">
                 <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
                     <strong className="font-semibold text-foreground">

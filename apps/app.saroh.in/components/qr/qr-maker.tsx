@@ -46,7 +46,7 @@ export function QrMaker({
     return (
         <div data-qr-maker={m.isChanging ? "change" : "make"}>
             {m.isChanging && bound ? (
-                <Notice role="status" className="mb-4">
+                <Notice role="status" className="mb-4" align="center">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             Changing the code placed at{" "}

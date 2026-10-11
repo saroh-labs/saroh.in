@@ -139,13 +139,14 @@ function TodayLine({
             className={cn(
                 // The whole row is the link (its title's overlay), as the
                 // design draws it; the marks sit above that overlay.
-                "relative grid grid-cols-[76px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
+                "relative grid grid-cols-[84px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
                 !first && "border-t border-border",
             )}
         >
             <span
                 className={cn(
-                    "font-display text-[15px] font-semibold tabular-nums",
+                    // "12:30 pm" stays on one line in its 84px column.
+                    "whitespace-nowrap font-display text-[15px] font-semibold tabular-nums",
                     first ? "text-foreground" : "text-foreground",
                 )}
             >

@@ -3,6 +3,7 @@ import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { storefrontHref } from "@/lib/stores/links";
 import type {
     StorefrontKind,
@@ -39,7 +40,7 @@ export function StorefrontList({
             aria-label="Locations"
             className="min-w-0 max-w-[280px] flex-[0_1_236px] overflow-hidden rounded-xl border border-border bg-card max-sm:max-w-none max-sm:flex-[1_1_100%]"
         >
-            <p className="label border-b border-border px-[15px] py-[11px]">
+            <p className={cn(listTable.head, "flex")}>
                 {storefronts.length === 1
                     ? "1 location"
                     : `${storefronts.length} locations`}

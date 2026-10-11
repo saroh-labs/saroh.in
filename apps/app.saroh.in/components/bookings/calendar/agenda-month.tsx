@@ -53,7 +53,9 @@ export function AgendaList({
                             b.state === "cancelled" && "text-muted-foreground",
                         )}
                     >
-                        <div className="w-16 shrink-0 tabular-nums">
+                        {/* Wide enough for "12:30 pm" in bold at 14px:
+                            at 64px the "pm" dropped under the time. */}
+                        <div className="w-[76px] shrink-0 whitespace-nowrap tabular-nums">
                             <div className="text-[14px] font-bold">
                                 {formatClock(b.start)}
                             </div>

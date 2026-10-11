@@ -168,8 +168,8 @@ export function LeadsView({
             showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView}
-            // Leads | Follow-ups is the page's tab row; status narrows the list.
-            filterStyle="segmented"
+            // Leads | Follow-ups is the page's tab row; status narrows the
+            // list, as the chip row.
             searchableColumnIds={["title", "contact", "stage"]}
             emptyState={{
                 icon: <Inbox />,

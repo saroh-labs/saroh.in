@@ -180,6 +180,9 @@ module.exports = {
         "<rootDir>/src/modules/products/product-rules.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
+        // The Products list's query: a page by number and its sizes, with a
+        // mocked Prisma.
+        "<rootDir>/src/modules/products/catalogue-page.dto.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         // #517 photos and videos: limits, kind/type match, posters from the
         // library, with a jest-mocked Prisma.
@@ -194,6 +197,8 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
+        // The stock lists' numbered pages: the window and the DTOs — pure.
+        "<rootDir>/src/modules/stock/stock-paging.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
         "<rootDir>/src/modules/catalogue/sku-pattern.spec.ts",
         "<rootDir>/src/modules/catalogue/field-rules.spec.ts",

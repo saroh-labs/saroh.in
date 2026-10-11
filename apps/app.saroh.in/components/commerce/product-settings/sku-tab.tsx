@@ -17,6 +17,7 @@ import {
 import { patternProblem } from "@/lib/products/sku-pattern";
 
 import { CheckRow } from "@/components/shared/check-row";
+import { listTable } from "@/components/shared/list-toolbar";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
@@ -191,8 +192,14 @@ export function SkuTab({
             <p className="mb-2 mt-[18px] text-[12.5px] font-semibold">
                 What your variants would be called
             </p>
-            <div className="overflow-hidden rounded-[12px] border border-border bg-card">
-                <div className="label grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5 border-b border-border/70 px-4 py-[9px] text-muted-foreground/80">
+            <div data-list-table="" className={listTable.card}>
+                <div
+                    data-list-head=""
+                    className={cn(
+                        listTable.head,
+                        "grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2.5",
+                    )}
+                >
                     <span>Variant</span>
                     <span>Today</span>
                     <span>Suggested</span>
@@ -221,7 +228,10 @@ export function SkuTab({
                     rows.slice(0, SHOWN).map((r, i) => (
                         <div
                             key={`${r.productId}-${i}`}
-                            className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-2.5 border-b border-border/70 px-4 py-[9px] last:border-b-0"
+                            className={cn(
+                                listTable.rowStill,
+                                "grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-2.5",
+                            )}
                         >
                             <span className="min-w-0 text-[13px]">
                                 {r.product}

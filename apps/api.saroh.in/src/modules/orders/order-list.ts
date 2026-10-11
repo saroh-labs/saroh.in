@@ -32,8 +32,11 @@ import { withBookingPayments } from "./treatment-ledger";
 
 const logger = new Logger("OrderList");
 
-/** Rows per page (default 87). */
+/** Rows per page when the caller names no size (default 87). */
 export const ORDER_PAGE_SIZE = 50;
+
+/** The sizes a list offers; any other is refused by the DTO. */
+export const ORDER_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 /** A walk-in's Needs attention (B13): none, since there is nobody to note. */
 const NO_ATTENTION: OrderAttention = { entries: [], hiddenSensitiveCount: 0 };
@@ -44,11 +47,21 @@ export interface OrderListPage {
     counts: { all: number; open: number; refunded: number };
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
+    /** How many rows a page holds, as asked or the default. */
+    pageSize: number;
 }
 
 export interface OrderListQuery extends OrderListFilter {
     /** The last row's id from the page before. */
     cursor?: string;
+    /**
+     * Or the page by its number, from 1: what a list with numbered pages
+     * asks. Read by offset, so a row placed while someone pages can move
+     * one down a page; the cursor stays for Export, which must not.
+     */
+    page?: number;
+    /** Rows per page: one of `ORDER_PAGE_SIZES`. */
+    size?: number;
 }
 
 /** Who is looking, and so what each row may say. */
@@ -98,6 +111,15 @@ export async function listOrderRows(
         ? presetRange(query.date, zone, now)
         : dayRange(query.from, query.to, zone);
 
+    if (query.cursor && query.page) {
+        throw new BadRequestException({
+            message: "Page by a cursor or a page number, not both.",
+            details: { field: "page" },
+        });
+    }
+    const size = query.size ?? ORDER_PAGE_SIZE;
+    const skip = query.page ? (query.page - 1) * size : 0;
+
     let after = Prisma.sql`TRUE`;
     if (query.cursor) {
         // Read from the order itself, whether or not the filters still keep
@@ -144,7 +166,7 @@ export async function listOrderRows(
             SELECT m.id FROM m
             WHERE ${kept} AND ${tabCondition(query.tab)} AND ${after}
             ORDER BY m."createdAt" DESC, m.id DESC
-            LIMIT ${ORDER_PAGE_SIZE + 1}`,
+            LIMIT ${size + 1} OFFSET ${skip}`,
         prisma.$queryRaw<
             { all: number; open: number; refunded: number }[]
         >`${matching}
@@ -154,8 +176,8 @@ export async function listOrderRows(
             FROM m WHERE ${kept}`,
     ]);
 
-    const more = ids.length > ORDER_PAGE_SIZE;
-    const page = ids.slice(0, ORDER_PAGE_SIZE).map((r) => r.id);
+    const more = ids.length > size;
+    const page = ids.slice(0, size).map((r) => r.id);
     const loaded = page.length
         ? await prisma.order.findMany({
               where: { id: { in: page }, organizationId },
@@ -291,6 +313,7 @@ export async function listOrderRows(
         // An aggregate with no GROUP BY always answers one row.
         counts,
         nextCursor: more ? (page[page.length - 1] ?? null) : null,
+        pageSize: size,
     };
 }
 

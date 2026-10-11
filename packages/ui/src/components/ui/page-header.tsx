@@ -58,9 +58,23 @@ export interface PageHeaderProps extends Omit<
 }
 
 /**
+ * How the actions meet the title's line, from `sm` up.
+ *
+ * The title is 30px at a line-height of 1.1: a 33px line box. A default
+ * button is 38px. Both start at the top of the row, so the button's
+ * middle (19px down) would sit 2.5px under the title's (16.5px down).
+ * The side column is therefore at least one button tall (so a lone view
+ * switch or figure centres the same way) and is lifted (38 - 33) / 2 =
+ * 2.5px: its first line's middle is then 19 - 2.5 = 16.5px, the title's.
+ * The lift comes out of the 9px under the breadcrumb, never out of the
+ * title's own place, so a title sits where it sat with or without actions.
+ */
+const ACTIONS_ON_TITLE = "sm:-mt-[2.5px] sm:min-h-[38px]";
+
+/**
  * The one page header: breadcrumb above the title, the title at 30px with its
  * count beside it, one line of description, then meta and actions on the
- * right. Every list, detail and settings screen draws this and nothing else,
+ * right, level with the title's line whatever is written under it. Every list, detail and settings screen draws this and nothing else,
  * so "what page is this, where am I, what can I do" has one answer. A screen
  * that needs something it lacks adds a slot here rather than a header of its
  * own.
@@ -137,22 +151,13 @@ export function PageHeader({
             {/* The breadcrumb sits above the whole row, so the actions line
                 up with the title rather than with the crumbs. */}
             {crumbs}
-            <div
-                className={cn(
-                    "flex flex-col gap-3 sm:flex-row sm:justify-between",
-                    // On the title's line when there is no description (the
-                    // applied screens); on the description's last line when
-                    // there is one.
-                    // A record's header (an avatar or a cover, then several
-                    // lines about it) keeps its actions level with the name:
-                    // at the foot they sat beside whichever line came last.
-                    lead
-                        ? "sm:items-start"
-                        : description
-                          ? "sm:items-end"
-                          : "sm:items-center",
-                )}
-            >
+            {/* The actions are ALWAYS level with the title, whatever is
+                under it. They used to follow the description's last line,
+                and a lead's top, so two screens side by side put the same
+                button at three heights. The row starts both at the top;
+                `ACTIONS_ON_TITLE` then centres the buttons on the title's
+                first line. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div
                     className={cn(
                         "min-w-0",
@@ -217,7 +222,13 @@ export function PageHeader({
                     </div>
                 </div>
                 {meta || actions ? (
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 sm:justify-end">
+                    <div
+                        data-slot="page-side"
+                        className={cn(
+                            "flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2 sm:justify-end",
+                            ACTIONS_ON_TITLE,
+                        )}
+                    >
                         {meta ? (
                             <div
                                 data-slot="page-meta"

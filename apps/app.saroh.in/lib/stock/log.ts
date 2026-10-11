@@ -168,10 +168,9 @@ export function groupByDay<T extends { createdAt: string }>(
     return days;
 }
 
-/** "N entries", with "so far" while more pages wait. */
-export function logCountWords(n: number, more: boolean): string {
-    const words = count(n, "entry", "entries");
-    return more ? `${words} so far` : words;
+/** "N entries": every entry under the filters, across its pages. */
+export function logCountWords(n: number): string {
+    return count(n, "entry", "entries");
 }
 
 // ---- Checks ----
@@ -227,19 +226,4 @@ export function checkWords(c: CheckLike): { title: string; body: string } {
                 body: c.detail,
             };
     }
-}
-
-/**
- * The checks list after "Show more": the next page added to what is shown —
- * or, when the API started again because the check the last page ended on
- * has closed (`restarted`), the first page in its place. A check already
- * shown is never shown twice.
- */
-export function moreChecks<T extends { key: string }>(
-    shown: readonly T[],
-    next: { checks: readonly T[]; restarted?: boolean },
-): T[] {
-    if (next.restarted) return [...next.checks];
-    const have = new Set(shown.map((c) => c.key));
-    return [...shown, ...next.checks.filter((c) => !have.has(c.key))];
 }

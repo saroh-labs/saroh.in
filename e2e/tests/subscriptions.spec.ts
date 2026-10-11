@@ -122,16 +122,26 @@ test.describe("subscriptions", () => {
         await expect(
             page.getByRole("heading", { name: "Subscriptions" }),
         ).toBeVisible();
-        const failedTab = page.getByRole("tab", { name: /Payment failed/ });
-        await expect(failedTab).toBeVisible();
+        // Where each subscription stands is a dropdown in the toolbar; the
+        // tabs above it are the two views, Subscribers and Plans.
+        const standing = page.getByRole("combobox", {
+            name: "Subscription status",
+        });
+        await expect(standing).toBeVisible();
+        await standing.click();
+        await expect(
+            page.getByRole("option", { name: /^Payment failed/ }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
         await expect(page.getByText(/Renewals last ran/)).toBeVisible();
 
         // A failed renewal is counted, and the banner takes you to it.
         await page.getByRole("button", { name: "Show them" }).click();
-        await expect(failedTab).toHaveAttribute("aria-selected", "true");
+        await expect(standing).toContainText("Payment failed");
         await expect(page).toHaveURL(/tab=failed/);
 
-        await page.getByRole("tab", { name: /^Active/ }).click();
+        await standing.click();
+        await page.getByRole("option", { name: /^Active/ }).click();
         await page.getByRole("button", { name: /Priya Raman/ }).click();
         const look = page.getByRole("dialog", { name: "Priya Raman" });
         await expect(look.getByText("Next charge")).toBeVisible();

@@ -132,7 +132,7 @@ export function BookingsView({
                             now,
                         })}
                     </span>
-                    <span className="block font-medium tabular-nums">
+                    <span className="block whitespace-nowrap font-medium tabular-nums">
                         {formatTimeRange(b.startAt, b.endAt, b.timezone)}
                     </span>
                 </span>

@@ -10,6 +10,7 @@ import {
     IsString,
     IsUrl,
     Matches,
+    Max,
     MaxLength,
     Min,
     MinLength,
@@ -620,6 +621,20 @@ export class ListOrdersQuery {
     @IsString()
     @MaxLength(64)
     cursor?: string;
+
+    /** Or the page by its number, from 1 (a list with numbered pages). */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt({ message: "page must be a whole number" })
+    @Min(1)
+    @Max(100_000)
+    page?: number;
+
+    /** Rows per page: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn([10, 25, 50, 100], { message: "size is 10, 25, 50 or 100" })
+    size?: number;
 
     /**
      * "true": this page is read for Export (B16), which takes

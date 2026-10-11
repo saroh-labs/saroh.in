@@ -15,7 +15,9 @@ import {
     ordersShown,
 } from "@/lib/customer-workspace/view";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { Chips, Empty } from "./parts";
 
@@ -64,18 +66,27 @@ export function OrdersTab({
                 value={filter}
                 onChange={onFilter}
                 chips={[
-                    { key: "all", label: `All · ${count}` },
+                    { key: "all", label: "All orders", count },
                     {
                         key: "open",
-                        label: `Open · ${rows.filter(isOpen).length}`,
+                        label: "Open",
+                        count: rows.filter(isOpen).length,
                     },
                     { key: "past", label: "Past" },
                 ]}
             />
-            <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5 max-[759px]:hidden">
+            {/* The one table look: the head band, rows ruled edge to edge. */}
+            <div
+                data-list-table=""
+                className={cn(
+                    listTable.frame,
+                    "overflow-x-auto max-[759px]:hidden",
+                )}
+            >
                 <div className="min-w-[560px]">
                     <div
-                        className={`${COLS} label border-b border-border pb-[7px] pt-2.5`}
+                        data-list-head=""
+                        className={cn(COLS, listTable.head, "rounded-t-[10px]")}
                     >
                         <span>Order</span>
                         <span>What</span>
@@ -87,7 +98,11 @@ export function OrdersTab({
                     {shown.map((o) => (
                         <div
                             key={o.id}
-                            className={`${COLS} items-center border-b border-foreground/10 py-2.5 text-[13px] last:border-b-0`}
+                            className={cn(
+                                COLS,
+                                listTable.row,
+                                "items-center text-[13px]",
+                            )}
                         >
                             <TextLink
                                 href={`/commerce/orders/${o.id}`}

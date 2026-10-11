@@ -68,6 +68,7 @@ export function FollowUpsList({
     return (
         <ListCard
             main="Follow-up"
+            paged={{ list: "follow-ups", things: "follow-ups" }}
             end="Due"
             note="Marking one done records it on the lead's activity. A new follow-up is set from the lead."
         >

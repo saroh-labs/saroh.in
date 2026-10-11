@@ -8,6 +8,7 @@ import type { StockLevelsQueryDto, StockLogQueryDto } from "./dto";
 import type { StockLevelsView } from "./levels-read";
 import { readLevels } from "./levels-read";
 import { stockReader } from "./stock-access";
+import { stockWindow } from "./stock-paging";
 import {
     canUndoEntry,
     countMismatched,
@@ -64,6 +65,10 @@ export interface StockLogView {
     entries: StockLogEntry[];
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
+    /** Entries under the filters, across every page. */
+    total: number;
+    /** Entries a page, as asked or the default. */
+    pageSize: number;
     seesPeople: boolean;
     seesOrders: boolean;
     /** The business's zone, for the log's days and times. */
@@ -88,7 +93,9 @@ export class StockReadsService {
 
     /**
      * The stock log, newest first: by kind, storefront, product or variant,
-     * a page at a time. Names only for a role that reads the audit trail;
+     * a page at a time: by its number (`page`, read by offset, so an entry
+     * made while someone pages moves one down a page) or after `cursor`.
+     * Names only for a role that reads the audit trail;
      * order links only for one that reads orders.
      */
     async log(
@@ -97,6 +104,8 @@ export class StockReadsService {
     ): Promise<StockLogView> {
         const reader = stockReader(ctx);
         const { organizationId } = reader;
+        const window = stockWindow(query, DEFAULT_LOG_PAGE);
+        const take = window.take ?? DEFAULT_LOG_PAGE;
         await this.assertFilters(organizationId, query);
         const where: Prisma.StockEntryWhereInput = {
             organizationId,
@@ -105,20 +114,24 @@ export class StockReadsService {
             ...(query.product ? { productId: query.product } : {}),
             ...(query.variant ? { variantId: query.variant } : {}),
         };
-        const take = query.limit ?? DEFAULT_LOG_PAGE;
-        const page = await prisma.stockEntry.findMany({
-            where,
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            take: take + 1,
-            ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-            include: {
-                store: { select: { name: true } },
-                product: { select: { name: true } },
-                variant: { select: { title: true } },
-                order: { select: { id: true, orderId: true } },
-                reversedBy: { select: { id: true } },
-            },
-        });
+        const [page, total] = await Promise.all([
+            prisma.stockEntry.findMany({
+                where,
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                take: take + 1,
+                ...(query.cursor
+                    ? { cursor: { id: query.cursor }, skip: 1 }
+                    : { skip: window.skip }),
+                include: {
+                    store: { select: { name: true } },
+                    product: { select: { name: true } },
+                    variant: { select: { title: true } },
+                    order: { select: { id: true, orderId: true } },
+                    reversedBy: { select: { id: true } },
+                },
+            }),
+            prisma.stockEntry.count({ where }),
+        ]);
         const more = page.length > take;
         const entries = more ? page.slice(0, take) : page;
 
@@ -176,6 +189,8 @@ export class StockReadsService {
                 };
             }),
             nextCursor: more ? entries[entries.length - 1].id : null,
+            total,
+            pageSize: take,
             seesPeople: reader.seesPeople,
             seesOrders: reader.seesOrders,
             timezone: await businessTimezone(prisma, organizationId),

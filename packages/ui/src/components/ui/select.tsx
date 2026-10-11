@@ -122,8 +122,16 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef<
     React.ElementRef<typeof SelectPrimitive.Item>,
-    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+        /** A quiet second line in the open list only, never in the box. */
+        hint?: React.ReactNode;
+        /**
+         * A quiet figure at the far side of the option (how many it
+         * holds), in the open list only.
+         */
+        aside?: React.ReactNode;
+    }
+>(({ className, children, hint, aside, ...props }, ref) => (
     <SelectPrimitive.Item
         ref={ref}
         className={cn(
@@ -138,7 +146,27 @@ const SelectItem = React.forwardRef<
             </SelectPrimitive.ItemIndicator>
         </span>
 
-        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        {hint ? (
+            <span className="grid min-w-0">
+                <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+                <span className="text-[11px] text-muted-foreground">
+                    {hint}
+                </span>
+            </span>
+        ) : (
+            <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        )}
+        {aside === undefined || aside === null ? null : (
+            <>
+                {/* A real space, so the option is named "Open 3". */}{" "}
+                <span
+                    data-option-count=""
+                    className="ml-auto pl-4 text-[13px] tabular-nums text-muted-foreground"
+                >
+                    {aside}
+                </span>
+            </>
+        )}
     </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,10 +14,10 @@ import {
     emptyTitle,
     isNarrowed,
     listHref,
-    pageCount,
     pageText,
 } from "@/lib/customers/list";
 
+import { ListPaging } from "@/components/shared/list-toolbar";
 import { Filters } from "./filters";
 import { NoMatch, Rows } from "./rows";
 import { ListFirstRun, ListHeading, ListNote } from "./states";
@@ -109,11 +110,16 @@ export function CustomersList({
         );
     }
 
-    const pages = pageCount(page);
     return (
         <div>
             {heading}
-            <Filters query={query} page={page} go={go} searching={navigating} />
+            <Filters
+                query={query}
+                page={page}
+                go={go}
+                searching={navigating}
+                count={page.total > page.pageSize ? pageText(page) : null}
+            />
             {notice}
             <div aria-busy={navigating}>
                 <Rows
@@ -129,34 +135,17 @@ export function CustomersList({
                     }
                 />
             </div>
-            {page.total > page.pageSize ? (
-                <nav
-                    aria-label="Pages"
-                    className="mt-3 flex items-center gap-2 text-[12.5px] text-muted-foreground"
-                >
-                    <span className="flex-1 tabular-nums">
-                        {pageText(page)}
-                    </span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page <= 1}
-                        onClick={() => go({ page: page.page - 1 })}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={page.page >= pages}
-                        onClick={() => go({ page: page.page + 1 })}
-                    >
-                        Next
-                    </Button>
-                </nav>
-            ) : null}
+            <ListPaging
+                label="Pages of customers"
+                page={page.page}
+                total={page.total}
+                size={page.pageSize}
+                to={(n) => ({ onClick: () => go({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize("customers", size);
+                    go({ size });
+                }}
+            />
             <ListNote />
         </div>
     );

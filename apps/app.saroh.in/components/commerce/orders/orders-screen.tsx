@@ -2,10 +2,15 @@
 
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
-import Link from "next/link";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
+import {
+    ListPaging,
+    ListToolbar,
+    MoreFilters,
+} from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { useArrivals } from "@/components/shared/use-arrivals";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
@@ -15,13 +20,9 @@ import type {
     OrderFilterOptions,
     OrderListPage,
 } from "@/lib/orders/business-service";
+import { filtersActive, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
-import {
-    nextPageHref,
-    ordersHref,
-    pageRange,
-    previousPageHref,
-} from "@/lib/orders/list-query";
+import { ordersHref, pageHref, pageRange } from "@/lib/orders/list-query";
 import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
@@ -30,13 +31,18 @@ import type { OrderPlace } from "@/lib/stores/abilities";
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
-import { OrderFilters } from "./order-filters";
+import {
+    moreFiltersOn,
+    OrderAttention,
+    OrderDateFilter,
+    OrderMoreFilters,
+} from "./order-filters";
 import { OrderFiltersSheet } from "./order-filters-sheet";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
 import { SearchField } from "./order-search";
-import { OrderTabs } from "./order-tabs";
+import { OrderStatusFilter } from "./order-tabs";
 import {
     OrdersAttentionPartial,
     OrdersEmpty,
@@ -52,7 +58,7 @@ import { useOrderSelection } from "./use-order-selection";
  * filters (B4, `order-filters.tsx`) live in the address, the server asks for
  * one page of them, and the tab counts come back with it — so the counts,
  * the rows and the rail's badge are the same fact however many orders there
- * are. Previous and Next follow the API's cursor, and so does Export.
+ * are. The footer pages by number; Export walks the API's cursor.
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. At the desk a row opens its quick view and has a row menu (B5,
@@ -70,12 +76,15 @@ export function OrdersScreen({
     stores,
     openByStore,
     businessName,
+    notices,
     kitchen = false,
     filterOptions = null,
     share = null,
     can = NO_ABILITIES,
     newOrder = null,
 }: {
+    /** The page's notices, drawn under its header. */
+    notices?: React.ReactNode;
     query: OrdersQuery;
     /** The page on screen, read on the server. */
     page: OrderListPage;
@@ -183,15 +192,16 @@ export function OrdersScreen({
         [query, router],
     );
 
-    const previous = previousPageHref(query);
-    const next = page.nextCursor ? nextPageHref(query, page.nextCursor) : null;
-    const range = pageRange(
-        query,
-        rows.length,
-        page.counts[query.tab],
-        !!page.nextCursor,
-    );
+    const total = page.counts[query.tab];
+    const range = pageRange(query, rows.length, total);
     const firstStore = stores.length === 1 ? stores[0] : undefined;
+    // Anything narrowed, a search with words in it included: the toolbar
+    // then offers the way back to every order.
+    const narrowed =
+        filtersActive(query) ||
+        query.q.trim() !== "" ||
+        query.tab !== "all" ||
+        query.storefront !== null;
     // Needs attention couldn't be read for this page (B15): the API sends
     // null rather than an empty list, and the page says so.
     const attentionUnread = rows.some((r) => r.attention === null);
@@ -248,11 +258,105 @@ export function OrdersScreen({
                 }
             />
 
-            <OrderTabs query={query} counts={page.counts} />
+            {/* A notice about the page sits under its header, never above
+                the title. */}
+            {notices}
+
+            {/* The one list toolbar, in one row: search, the three most
+                used filters, one Filters button for the rest, the one
+                attention toggle, Clear filters, and the range. */}
+            <ListToolbar
+                search={
+                    <SearchField query={query} go={go} searching={navigating} />
+                }
+                // The three most used: the status, the date, the location.
+                filters={
+                    <>
+                        <OrderStatusFilter
+                            query={query}
+                            counts={page.counts}
+                            go={go}
+                        />
+                        {/* The desk's; a phone has the date in the sheet. */}
+                        <div className="max-[759px]:hidden min-[760px]:contents">
+                            <OrderDateFilter query={query} go={go} />
+                        </div>
+                        {many ? (
+                            <StorefrontFilter
+                                stores={stores}
+                                countFor={(id) => openByStore?.[id] ?? null}
+                                total={
+                                    openByStore
+                                        ? Object.values(openByStore).reduce(
+                                              (n, c) => n + c,
+                                              0,
+                                          )
+                                        : null
+                                }
+                                value={query.storefront}
+                                onChange={(storefront) => go({ storefront })}
+                                noun={{
+                                    one: "open order",
+                                    other: "open orders",
+                                }}
+                                note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
+                            />
+                        ) : null}
+                    </>
+                }
+                // Every other filter is behind one Filters button: a
+                // popover at the desk, the sheet on a phone.
+                more={
+                    <>
+                        <OrderFiltersSheet
+                            query={query}
+                            options={filterOptions}
+                            go={go}
+                            className="min-[760px]:hidden"
+                        />
+                        <MoreFilters
+                            title="Filter orders"
+                            count={moreFiltersOn(query)}
+                            className="max-[759px]:hidden"
+                        >
+                            <div
+                                role="group"
+                                aria-label="Filter orders"
+                                className="grid gap-2.5"
+                            >
+                                <OrderMoreFilters
+                                    query={query}
+                                    options={filterOptions}
+                                    go={go}
+                                />
+                            </div>
+                        </MoreFilters>
+                    </>
+                }
+                attention={
+                    <OrderAttention
+                        query={query}
+                        go={go}
+                        className="max-[759px]:hidden"
+                    />
+                }
+                onClear={
+                    narrowed
+                        ? () =>
+                              go({
+                                  ...NO_FILTERS,
+                                  q: "",
+                                  tab: "all",
+                                  storefront: null,
+                              })
+                        : undefined
+                }
+                count={range ? `Showing ${range}` : null}
+            />
 
             {/* From Home's "Last 24 hours" (F6): the list is narrowed, and
                 says so, with the whole list one click away. The count is the
-                API's for the tab in view. */}
+                API's for the status in view. */}
             {query.since ? (
                 <div className="pt-3.5">
                     <SinceNotice
@@ -263,46 +367,6 @@ export function OrdersScreen({
                     />
                 </div>
             ) : null}
-
-            <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
-                <SearchField query={query} go={go} searching={navigating} />
-                {/* A phone: the filters are behind one button (B5). */}
-                <OrderFiltersSheet
-                    query={query}
-                    options={filterOptions}
-                    go={go}
-                    className="min-[760px]:hidden"
-                />
-                {many ? (
-                    <StorefrontFilter
-                        stores={stores}
-                        countFor={(id) => openByStore?.[id] ?? null}
-                        total={
-                            openByStore
-                                ? Object.values(openByStore).reduce(
-                                      (n, c) => n + c,
-                                      0,
-                                  )
-                                : null
-                        }
-                        value={query.storefront}
-                        onChange={(storefront) => go({ storefront })}
-                        noun={{ one: "open order", other: "open orders" }}
-                        label="Show orders taken at"
-                        note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
-                    />
-                ) : null}
-                {range ? (
-                    <div className="ml-auto text-[12px] text-muted-foreground">
-                        Showing {range}
-                    </div>
-                ) : null}
-            </div>
-
-            {/* The desk: the filter bar, on the page. */}
-            <div className="max-[759px]:hidden">
-                <OrderFilters query={query} options={filterOptions} go={go} />
-            </div>
 
             <div aria-busy={navigating} className="pt-3.5">
                 {attentionUnread ? (
@@ -421,34 +485,18 @@ export function OrdersScreen({
                 />
             ) : null}
 
-            {previous || next ? (
-                <nav
-                    aria-label="Pages of orders"
-                    className="flex flex-wrap items-center justify-end gap-2 pt-3.5"
-                >
-                    <PageLink href={previous} label="Previous" />
-                    <PageLink href={next} label="Next" />
-                </nav>
-            ) : null}
+            <ListPaging
+                label="Pages of orders"
+                page={query.page}
+                total={total}
+                size={query.size}
+                to={(n) => ({ href: pageHref(query, n) })}
+                onSize={(size) => {
+                    rememberPageSize("orders", size);
+                    go({ size });
+                }}
+            />
         </div>
-    );
-}
-
-/** Previous or Next: a link while there is a page there, else off. */
-function PageLink({ href, label }: { href: string | null; label: string }) {
-    if (!href) {
-        return (
-            <Button variant="outline" disabled>
-                {label}
-            </Button>
-        );
-    }
-    return (
-        <Button variant="outline" asChild>
-            <Link href={href} scroll={false}>
-                {label}
-            </Link>
-        </Button>
     );
 }
 

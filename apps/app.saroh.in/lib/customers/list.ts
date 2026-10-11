@@ -1,6 +1,7 @@
 import { formatMoneyMajor, formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { absentText } from "@saroh/ui/lib/absent";
+import { DEFAULT_PAGE_SIZE, readPageSize } from "@saroh/ui/lib/paging";
 
 /**
  * The Customers list (DEC-041, round 2 C4): its address, what the API
@@ -143,6 +144,8 @@ export interface ListQuery {
     store: string | null;
     /** 1-based. */
     page: number;
+    /** Rows a page: 10, 25, 50 or 100. */
+    size: number;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -169,7 +172,11 @@ function isSort(v: string | undefined): v is CustomerSort {
  * mistyped link opens the list rather than an error. `?storefront=` (what
  * Products and the old per-storefront links say) reads as `?store=`.
  */
-export function readListQuery(params: Params): ListQuery {
+export function readListQuery(
+    params: Params,
+    /** The size this browser last chose, for an address that names none. */
+    remembered: number = DEFAULT_PAGE_SIZE,
+): ListQuery {
     const chip = one(params, "chip");
     const sort = one(params, "sort");
     const page = Number(one(params, "page"));
@@ -179,6 +186,7 @@ export function readListQuery(params: Params): ListQuery {
         sort: isSort(sort) ? sort : null,
         store: one(params, "store") ?? one(params, "storefront") ?? null,
         page: Number.isInteger(page) && page >= 1 ? page : 1,
+        size: readPageSize(one(params, "size"), remembered),
     };
 }
 
@@ -205,6 +213,7 @@ export function listHref(
     if (next.sort) s.set("sort", next.sort);
     if (next.store) s.set("store", next.store);
     if (next.page > 1) s.set("page", String(next.page));
+    if (next.size !== DEFAULT_PAGE_SIZE) s.set("size", String(next.size));
     const str = s.toString();
     return str ? `/commerce/customers?${str}` : "/commerce/customers";
 }
@@ -217,6 +226,7 @@ export function apiSearch(query: ListQuery): string {
     if (query.sort) s.set("sort", query.sort);
     if (query.store) s.set("store", query.store);
     if (query.page > 1) s.set("page", String(query.page));
+    if (query.size !== DEFAULT_PAGE_SIZE) s.set("size", String(query.size));
     return s.toString();
 }
 

@@ -180,7 +180,7 @@ export function PlaceSection({
                         // No counter, but Pick-up still on (just switched,
                         // or saved that way before): the way out, right
                         // here.
-                        <Notice role="status" className="mt-2">
+                        <Notice role="status" className="mt-2" align="center">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                                 <span className="min-w-0 flex-[1_1_220px]">
                                     Pick-up is still on, but with no counter

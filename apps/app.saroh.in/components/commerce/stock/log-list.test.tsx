@@ -8,7 +8,6 @@ import { LogList } from "./log-list";
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock("@/lib/stock/screen-actions", () => ({ loadLogPage: vi.fn() }));
 
 /**
  * The stock log on a phone (T3): each entry is two wrapping lines by CSS
@@ -45,10 +44,14 @@ function entry(over: Partial<StockLogEntry> = {}): StockLogEntry {
     };
 }
 
-function render(entries: StockLogEntry[]) {
+function render(
+    entries: StockLogEntry[],
+    { total, page = 1 }: { total?: number; page?: number } = {},
+) {
     const log: StockLog = {
         entries,
         nextCursor: null,
+        total,
         seesPeople: true,
         seesOrders: true,
         timezone: "Asia/Kolkata",
@@ -62,11 +65,42 @@ function render(entries: StockLogEntry[]) {
                 { id: "s2", name: "Online" },
             ]}
             products={[{ id: "p1", name: "Sourdough loaf" }]}
-            href={() => "/commerce/stock?tab=log"}
-            pageSize={50}
+            href={(change) =>
+                change.page
+                    ? `/commerce/stock?tab=log&logPage=${change.page}`
+                    : "/commerce/stock?tab=log"
+            }
+            paging={{ page, size: 50 }}
         />,
     );
 }
+
+describe("LogList's footer", () => {
+    it("pages by number under the table, and counts every entry the filters keep", () => {
+        const html = render([entry(), entry({ id: "e2" })], {
+            total: 120,
+            page: 2,
+        });
+        expect(html).toContain("120 entries");
+        expect(html).toContain('aria-label="Rows per page"');
+        expect(html).toContain('aria-label="Pages of stock changes"');
+        expect(html).toMatch(/data-list-range=""[^>]*>51 to 100 of 120</);
+        // Previous, Next and each number are addresses of this screen.
+        expect(html).toContain('href="/commerce/stock?tab=log&amp;logPage=1"');
+        expect(html).toContain('href="/commerce/stock?tab=log&amp;logPage=3"');
+        expect(html).not.toContain("Show older");
+        // The footer follows the table.
+        expect(html.indexOf("data-list-paging")).toBeGreaterThan(
+            html.indexOf("data-list-table"),
+        );
+    });
+
+    it("draws no footer for a list that fits the smallest page", () => {
+        const html = render([entry()], { total: 1 });
+        expect(html).toContain("1 entry");
+        expect(html).not.toContain("data-list-paging");
+    });
+});
 
 describe("LogList on a phone", () => {
     const html = render([
@@ -120,8 +154,38 @@ describe("LogList on a phone", () => {
     });
 
     it("scrolls no day sideways under 760px", () => {
-        expect(html.split(/[\s"]/)).not.toContain("overflow-x-auto");
-        expect(html.split(/[\s"]/)).not.toContain("min-w-[540px]");
-        expect(html).toContain("min-[760px]:min-w-[540px]");
+        // The log's card scrolls only at the desk.
+        const card = /<div data-list-table=""[^>]*class="([^"]*)"/.exec(html);
+        expect(card?.[1].split(" ")).toContain("min-[760px]:overflow-x-auto");
+        expect(card?.[1].split(" ")).not.toContain("overflow-x-auto");
+        expect(html.split(/[\s"]/)).not.toContain("min-w-[580px]");
+        expect(html).toContain("min-[760px]:min-w-[580px]");
+    });
+
+    it("draws the one table: a head band at the desk, each day a group, a time that never wraps", () => {
+        expect(html).toMatch(/data-list-head=""[^>]*max-\[759px\]:hidden/);
+        for (const name of ["Time", "Product", "Kind", "Change", "Note"]) {
+            expect(html).toContain(`>${name}</span>`);
+        }
+        // The time's column fits "12:30 pm"; the cell never breaks.
+        expect(html).toContain("min-[760px]:grid-cols-[62px_");
+        expect(html).toMatch(/class="whitespace-nowrap tabular-nums[^"]*">/);
+    });
+
+    it("follows the one toolbar: the kind, the location and the product as dropdowns in one row, then the count", () => {
+        const at = (needle: string) => html.indexOf(needle);
+        const order = [
+            'aria-label="Kind of change"',
+            'aria-label="Location"',
+            'aria-label="Product"',
+            'data-slot="list-count"',
+        ].map(at);
+        expect(order.every((i) => i >= 0)).toBe(true);
+        expect(order).toEqual([...order].sort((a, b) => a - b));
+        // The unnarrowed kind says what it filters.
+        expect(html).toMatch(/>All changes</);
+        expect(html).not.toContain(">Everything<");
+        // One row: no chips under it, no tabs.
+        expect(html).not.toMatch(/role="(?:tab|radio)"|data-slot="list-chips"/);
     });
 });

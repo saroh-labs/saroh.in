@@ -4218,3 +4218,113 @@ sm:shrink-0`), so the buttons wrap inside the card.
 the screen's edge on a Mac is past it somewhere else: nothing inside a card
 may be wider than the card.
 **Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## Four list screens side by side did not match
+
+**Symptom**: the owner put Stock, Customers, Discount codes and Locations
+side by side the day after the UX consistency pass. Each had its own toolbar
+order and search width, tabs on one and chips on another, three count styles
+("Needs you · 4", "Returning 9", a grey badge, a dark one and a red one), a
+tinted table head on two and a plain one with inset rules on a third, and
+page actions at three heights.
+**Cause**: the pass built one of each small piece (tabs, chips, search,
+badges) and a scan for each, but nothing said how a list is put together
+from them, so each screen composed the right pieces its own way. A scan per
+piece cannot see a wrong arrangement of right pieces.
+**Fix**: one anatomy, in code: `ListToolbar`, `ListFilter` and `listTable`
+(`@saroh/ui`), which `DataView` draws itself, and every list moved onto
+them. Tabs are views. Every filter is a dropdown in the toolbar's one row
+(the first pass drew status filters as a row of chips under it. The owner
+looked again and asked for one row). `PageHeader` puts its actions level
+with the title in every case.
+**Check**: `components/shared/list-screens.test.ts` reads the app for a
+hand-drawn head row, a search outside the toolbar or at its own width, a
+hand-sized select, a new tab strip that is not a named set of views, a row
+of chips for a filter, more than three dropdowns or more than one attention
+toggle, a filter that reads "Any …" or a bare "All", a placeholder too long
+for the field, a pager drawn by hand, a dot-joined count and an unnamed
+attention count. Compare
+screens side by side before calling a consistency pass done, not one at a
+time.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy
+
+## The 12-hour clock broke times in two in narrow columns
+
+**Symptom**: Stock's Log read "2:40" over "pm". Activity's "Today, 12:30 pm"
+and the Bookings agenda's times wrapped the same way.
+**Cause**: the move from "14:40" to "2:40 pm" made every time a word longer
+and gave it a space to break at. The columns had been sized for the 24-hour
+clock (42px, 64px, 96px) and nothing held a time to one line.
+**Fix**: `ViewerDate` keeps a time on one line itself, the hand-drawn time
+cells take `whitespace-nowrap`, and each column was widened to fit
+"12:30 pm" at its type size.
+**Check**: `list-anatomy.test.tsx` ("a time never wraps") and the Log's own
+test. When a formatter's output gets longer, grep every fixed-width column
+that draws it.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## A separator drawn as its own flex item led its line
+
+**Symptom**: a location's readiness card read "· Sells in person only".
+**Cause**: the count and the note were two flex items in a wrapping row, and
+the note's text began with the dot. Whenever the heading wrapped, the note
+started a line, dot first.
+**Fix**: `joinFacts` (`lib/format/join.ts`) joins what is there with a dot
+held to both neighbours by no-break spaces, in one element.
+**Check**: `list-anatomy.test.tsx` ("no separator leads or trails").
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## A header button was stretched to the width of its busy label
+
+**Symptom**: Orders' "Export" was about 184px wide beside "New order".
+**Cause**: `Button` lays its label and its `busyLabel` out in one cell so
+nothing beside it moves when it is busy. Export's busy label was a sentence
+with its progress in it (`Exporting… 50 of 532`), so the button was that
+wide at rest.
+**Fix**: the busy label is the verb alone ("Exporting…") and the progress
+is said beside the button while it runs.
+**Check**: a `busyLabel` is one word, the verb's "-ing" form, as the button
+rules already say. No other template-string busy label is left in the app.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
+screen's anatomy
+
+## The code scanner found the same tag strip again
+
+**Symptom**: CodeQL failed the list batch's pull request with three findings
+of `js/incomplete-multi-character-sanitization`, all in one new test file
+(`components/shared/list-anatomy.test.tsx`): helpers that read a button's
+words with `markup.replace(/<[^>]+>/g, "")` (11 Oct 2026).
+**Cause**: the same miss as the entry above, three days on. That entry fixed
+the code and wrote the rule down, and prose did not stop an agent writing
+the pattern again in a test.
+**Fix**: the helpers take tags out in a loop until nothing changes
+(`without`). `pnpm check:tag-strip` (`scripts/check-tag-strip.mjs`) now fails
+a tag pattern replaced with nothing in one pass, anywhere in `apps`,
+`packages` or `e2e`; prepush and CI run it.
+**Rule**: to read markup's words, loop the replace until the string stops
+changing, or put a space where the tag was. Never one pass with `""`.
+**Category**: security · CodeQL on PRs · `scripts/check-tag-strip.mjs`
+
+## A notice's button sat against its words, on twenty screens
+
+**Symptom**: on Orders, the late-rule notice drew "Change it" and the
+dismiss cross straight after its sentence, with the rest of the bar empty,
+and its glyph a few pixels above the words (owner, 11 Oct 2026). Invoices'
+overdue notice, Subscriptions' unpaid one and about twenty others did the
+same.
+**Cause**: each caller laid out its own row inside `Notice` (words with
+`flex-1`, then a button) and expected the row to span the bar. `Notice`'s
+text column had no `flex-1`, so the row was only as wide as its content
+and the button had nothing to be pushed across. The glyph is set on the
+first line of text, and a row with a button in it is taller than a line.
+**Fix**: the text column in `Notice` takes the row's width, so every such
+row reaches the right edge; `align="center"` sets the glyph level with a
+row the caller's button made taller, and the callers with such a row pass
+it. The late-rule notice uses the `action` slot.
+**Rule**: a button that belongs to a notice goes in `action`. Where the
+caller needs its own row, it passes `align="center"`.
+**Check**: `packages/ui/src/components/ui/notice.test.tsx`.
+**Category**: design system · `packages/ui/src/components/ui/notice.tsx`

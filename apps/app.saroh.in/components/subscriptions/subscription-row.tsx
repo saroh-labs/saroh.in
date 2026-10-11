@@ -3,6 +3,7 @@
 import { AbsentOr } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import {
@@ -16,6 +17,22 @@ import {
 } from "@/lib/subscriptions/view";
 
 /** One subscription on the list; it opens the quick look. */
+/**
+ * The list's row and its columns, shared with the head band over it so the
+ * two line up: initials, who and which plan, where it stands, what comes
+ * next, and the price. From `md` they are one fixed grid, so a longer
+ * price in one row can't move the columns of the next. They wrap on a
+ * phone, where the head is left out.
+ */
+export const SUBSCRIPTION_ROW =
+    "flex flex-wrap items-center gap-3 md:grid md:grid-cols-[34px_minmax(0,2fr)_minmax(110px,1fr)_minmax(0,2fr)_112px]";
+export const SUBSCRIPTION_COLS = {
+    who: "min-w-0 flex-[2_1_200px]",
+    status: "min-w-0 flex-[1_1_110px]",
+    when: "min-w-0 flex-[2_1_200px]",
+    price: "min-w-[72px] text-right tabular-nums",
+} as const;
+
 export function SubscriptionRow({
     sub,
     plans,
@@ -38,10 +55,11 @@ export function SubscriptionRow({
             onClick={onOpen}
             aria-haspopup="dialog"
             className={cn(
-                "flex w-full flex-wrap items-center gap-3 rounded-[11px] border border-border px-3.5 py-3 text-left hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active",
-                open
-                    ? "bg-muted shadow-[inset_3px_0_0_hsl(var(--foreground))]"
-                    : "bg-card",
+                "w-full text-left",
+                SUBSCRIPTION_ROW,
+                listTable.rowInner,
+                listTable.pressable,
+                open && listTable.selected,
             )}
         >
             <span
@@ -50,7 +68,7 @@ export function SubscriptionRow({
             >
                 {initials(sub.contact.name)}
             </span>
-            <span className="min-w-0 flex-[2_1_200px]">
+            <span className={SUBSCRIPTION_COLS.who}>
                 <span className="block text-[14px] font-semibold text-foreground">
                     {sub.contact.name}
                 </span>
@@ -67,12 +85,13 @@ export function SubscriptionRow({
                     ) : null}
                 </span>
             </span>
-            <span className="min-w-0 flex-[1_1_110px]">
+            <span className={SUBSCRIPTION_COLS.status}>
                 <StatusBadge tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</StatusBadge>
             </span>
             <span
                 className={cn(
-                    "min-w-0 flex-[2_1_200px] text-[12.5px]",
+                    SUBSCRIPTION_COLS.when,
+                    "text-[12.5px]",
                     when.danger
                         ? "text-destructive-subtle-foreground"
                         : "text-muted-foreground",
@@ -80,7 +99,12 @@ export function SubscriptionRow({
             >
                 <AbsentOr says="None">{when.text}</AbsentOr>
             </span>
-            <span className="shrink-0 font-display text-[14px] font-semibold tabular-nums text-foreground">
+            <span
+                className={cn(
+                    SUBSCRIPTION_COLS.price,
+                    "font-display text-[14px] font-semibold text-foreground",
+                )}
+            >
                 {shortPrice(sub.price, sub.currency, sub.interval)}
             </span>
         </button>

@@ -109,8 +109,6 @@ export const RAW_ALLOWED = {
     "components/settings/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
     "components/shared/app-sidebar.tsx": ["button"],
-    // button: a shared piece that passes its props to the button
-    "components/shared/chip.tsx": ["button"],
     // button: the one hand-drawn radio, shared by every choice group
     "components/shared/choice-group.tsx": ["button"],
     // button: a control styled by its screen's own helper

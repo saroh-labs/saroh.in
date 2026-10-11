@@ -1,28 +1,37 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useTransition } from "react";
+
+import {
+    AttentionToggle,
+    ListFilter,
+    ListPaging,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
 
 import { productHref } from "@/lib/products/links";
+import type { StockHref, StockListPage } from "@/lib/stock/list-query";
+import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
 import { untrackedLine } from "@/lib/stock/screen";
-import { loadLevelsPage } from "@/lib/stock/screen-actions";
 import type { StockLevels } from "@/lib/stock/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Boxes } from "lucide-react";
 
-import { chipClass } from "@/components/shared/chip";
-import { runAction } from "@/lib/api/run-action";
 import { ListSearch } from "@saroh/ui/list-search";
 import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
 
 /**
- * Levels (#527): the chips (All, Needs you, a storefront), the search, the
- * table a page at a time, and the footer naming what isn't tracked. The
- * chip and the search are in the address; the next page comes on "Show
- * more".
+ * Levels (#527): the one list toolbar (search, the location dropdown and
+ * the Needs you toggle, in one row), the table a page at a time, the one
+ * list footer (rows per page, the page numbers, Previous and Next), and
+ * the line naming what isn't tracked. The filters, the search and the page
+ * are in the address. A page is so many products: one that counts three
+ * sizes draws three rows and is one of the footer's count.
  */
 export function LevelsPanel({
     levels,
@@ -34,7 +43,7 @@ export function LevelsPanel({
     counting,
     values,
     onValue,
-    pageSize,
+    paging,
 }: {
     levels: StockLevels;
     /** Every open storefront, for the chips and the footer. */
@@ -43,28 +52,14 @@ export function LevelsPanel({
     show: string;
     q: string;
     /** The screen's address with these changed. */
-    href: (change: Record<string, string | undefined>) => string;
+    href: StockHref;
     counting: boolean;
     values: Readonly<Record<string, string>>;
     onValue: (key: string, raw: string, logSaid: number) => void;
-    pageSize: number;
+    /** The page on screen and its rows per page. */
+    paging: StockListPage;
 }) {
     const router = useRouter();
-    const [loaded, setLoaded] = useState({
-        from: levels,
-        rows: levels.rows,
-        next: levels.nextCursor ?? null,
-    });
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [pending, start] = useTransition();
-    // New levels from the server (a filter, a save): start from them.
-    if (loaded.from !== levels) {
-        setLoaded({
-            from: levels,
-            rows: levels.rows,
-            next: levels.nextCursor ?? null,
-        });
-    }
 
     // The search follows typing into the address, a beat behind.
     const [searching, startSearch] = useTransition();
@@ -75,25 +70,21 @@ export function LevelsPanel({
         );
     };
 
+    // One storefront's view is what it sells or still holds: the API
+    // leaves the rest out, so the footer counts what is drawn.
     const storefrontView = allStorefronts.some((s) => s.id === show);
-    // One storefront's view: what it sells or still holds.
-    const rows = storefrontView
-        ? loaded.rows.filter((r) =>
-              r.cells.some((c) => c.soldHere || c.onHand > 0),
-          )
-        : loaded.rows;
 
-    const chips = [
-        { id: "all", label: "All" },
-        {
-            id: "needs",
-            label: needsYou > 0 ? `Needs you · ${needsYou}` : "Needs you",
-        },
-        // A storefront chip only where there is more than one (ADR-010).
-        ...(allStorefronts.length > 1
-            ? allStorefronts.map((s) => ({ id: s.id, label: s.name }))
-            : []),
+    // Two ideas, so two controls: which location (a dropdown, as on the
+    // Log), and the one attention toggle, "Needs you". Both write `?show=`
+    // as they always have, so choosing one clears the other.
+    const locations = [
+        { value: "all", label: "All locations" },
+        ...allStorefronts.map((s) => ({ value: s.id, label: s.name })),
     ];
+    const show_ = (id: string) =>
+        router.push(href({ show: id === "all" ? undefined : id }), {
+            scroll: false,
+        });
 
     const soldOutWords = (ids: string[] | undefined) => {
         if (!ids?.length) return null;
@@ -104,68 +95,56 @@ export function LevelsPanel({
         return `Sold out at ${names.join(" and ")}`;
     };
 
-    const more = () =>
-        start(async () => {
-            const cursor = loaded.next;
-            setLoadError(null);
-            if (!cursor) return;
-            const res = await runAction(
-                () =>
-                    loadLevelsPage({
-                        storefront: storefrontView ? show : undefined,
-                        q: q || undefined,
-                        needs: show === "needs",
-                        cursor,
-                        limit: pageSize,
-                    }),
-                { quiet: true, onUnreached: setLoadError },
-            );
-            if (!res) return;
-            if (!res.ok) {
-                setLoadError(res.error);
-                return;
-            }
-            setLoaded((l) => ({
-                ...l,
-                rows: [...l.rows, ...res.data.rows],
-                next: res.data.nextCursor ?? null,
-            }));
-        });
-
     return (
         <div>
-            <ListSearch
-                placeholder="Search stock by product or SKU"
-                defaultValue={q}
-                searching={searching}
-                onSearch={search}
-                className="mb-3"
+            <ListToolbar
+                className="mb-3.5"
+                search={
+                    <ListSearch
+                        placeholder="Search stock"
+                        describe="By product or SKU"
+                        defaultValue={q}
+                        searching={searching}
+                        onSearch={search}
+                    />
+                }
+                filters={
+                    // A location filter only where there is more than
+                    // one (ADR-010).
+                    allStorefronts.length > 1 ? (
+                        <ListFilter
+                            holdsData
+                            label="Location"
+                            value={storefrontView ? show : "all"}
+                            onValueChange={show_}
+                            options={locations}
+                        />
+                    ) : null
+                }
+                onClear={
+                    q || show !== "all"
+                        ? () =>
+                              router.push(
+                                  href({ q: undefined, show: undefined }),
+                                  { scroll: false },
+                              )
+                        : undefined
+                }
+                attention={
+                    <AttentionToggle
+                        label="Needs you"
+                        count={needsYou}
+                        on={show === "needs"}
+                        onToggle={() =>
+                            show_(show === "needs" ? "all" : "needs")
+                        }
+                    />
+                }
             />
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div
-                    role="group"
-                    aria-label="Which products"
-                    className="flex flex-wrap gap-2"
-                >
-                    {chips.map((c) => (
-                        <Link
-                            key={c.id}
-                            href={href({
-                                show: c.id === "all" ? undefined : c.id,
-                            })}
-                            scroll={false}
-                            aria-current={show === c.id ? "true" : undefined}
-                            className={chipClass(show === c.id)}
-                        >
-                            {c.label}
-                        </Link>
-                    ))}
-                </div>
-            </div>
 
             <LevelsTable
                 storefronts={levels.storefronts}
-                rows={rows}
+                rows={levels.rows}
                 timezone={levels.timezone ?? "Asia/Kolkata"}
                 counting={counting}
                 values={values}
@@ -211,31 +190,17 @@ export function LevelsPanel({
                 }
             />
 
-            {loaded.next ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={more}
-                        busy={pending}
-                        busyLabel="Loading…"
-                    >
-                        Show more
-                    </Button>
-                    <span className="text-[12px] text-muted-foreground">
-                        {`${new Set(loaded.rows.map((r) => r.productId)).size} products shown`}
-                    </span>
-                    {loadError ? (
-                        <span
-                            role="alert"
-                            className="text-[12px] text-destructive"
-                        >
-                            {loadError}
-                        </span>
-                    ) : null}
-                </div>
-            ) : null}
+            <ListPaging
+                label={STOCK_PAGES_LABEL.levels}
+                page={paging.page}
+                total={levels.total ?? 0}
+                size={paging.size}
+                to={(n) => ({ href: href({ page: n }) })}
+                onSize={(size) => {
+                    rememberPageSize(STOCK_LISTS.levels, size);
+                    router.push(href({ size }), { scroll: false });
+                }}
+            />
 
             {levels.untracked.length > 0 ? (
                 <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">

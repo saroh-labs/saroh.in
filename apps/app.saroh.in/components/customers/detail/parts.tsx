@@ -1,5 +1,5 @@
-import { Chip } from "@/components/shared/chip";
 import { FailedRead } from "@/components/shared/failed-read";
+import { ListFilter } from "@/components/shared/list-toolbar";
 import { EmptyState } from "@saroh/ui/data-state";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 
@@ -78,29 +78,23 @@ export function Chips<K extends string>({
     onChange,
 }: {
     label: string;
-    chips: { key: K; label: string }[];
+    /** `count` follows the label as a quiet number; leave it out if unknown. */
+    chips: { key: K; label: string; count?: number }[];
     value: K;
     onChange: (key: K) => void;
 }) {
     return (
-        <div
-            role="group"
-            aria-label={label}
-            className="mb-2.5 flex flex-wrap gap-1.5"
-        >
-            {chips.map((c) => {
-                const on = c.key === value;
-                return (
-                    <Chip
-                        key={c.key}
-                        as="toggle"
-                        on={on}
-                        onClick={() => onChange(c.key)}
-                    >
-                        {c.label}
-                    </Chip>
-                );
-            })}
+        <div className="mb-2.5">
+            <ListFilter<K>
+                label={label}
+                value={value}
+                onValueChange={onChange}
+                options={chips.map((c) => ({
+                    value: c.key,
+                    label: c.label,
+                    count: c.count,
+                }))}
+            />
         </div>
     );
 }

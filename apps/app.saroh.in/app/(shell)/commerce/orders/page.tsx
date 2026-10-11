@@ -1,3 +1,4 @@
+import { rememberedPageSize } from "@/lib/paging/remembered";
 import { redirect } from "next/navigation";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -77,7 +78,7 @@ export default async function OrdersPage({
         );
     }
 
-    const query = readOrdersQuery(params);
+    const query = readOrdersQuery(params, await rememberedPageSize("orders"));
     const storesRead = listBusinessStores();
     // What a row's menu and quick view may offer (B5), as Order Detail
     // asks it. A pay link needs a provider that opens the checkout window
@@ -139,17 +140,17 @@ export default async function OrdersPage({
         pick,
         placesRead,
     ]);
-    // A page past the end, or a cursor from a list that has since changed
-    // (an order the API can't find answers as an empty page): start again at
-    // the first page rather than show an empty one.
-    if (query.cursor && page.rows.length === 0) {
-        redirect(ordersHref(query, { cursor: null, back: [] }));
+    // A page past the end (the list has since got shorter, or the address
+    // was typed): start again at the first page rather than show an empty
+    // one.
+    if (query.page > 1 && page.rows.length === 0) {
+        redirect(ordersHref(query, { page: 1 }));
     }
     // The business's first, 10th or 100th order (wave G), said once: only
     // on the whole list's first page, where the count is every order.
     const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
     const moment = await ordersListMoment(page, {
-        plain: unnarrowed && !query.storefront && !query.cursor,
+        plain: unnarrowed && !query.storefront && query.page === 1,
         viewer: organization,
     });
     // No orders yet: share the online shop while it is live, else the
@@ -163,11 +164,19 @@ export default async function OrdersPage({
 
     return (
         <PageContainer width="full">
-            {/* B17: storefronts still on the 2-hour Pick-up default. */}
-            <LateRuleNotice />
-            <PlanLimitNotice moduleId="orders" className="mb-4" />
-            {moment ? <Moment moment={moment} className="mb-4" /> : null}
             <OrdersScreen
+                // Under the page's header, never above its title.
+                notices={
+                    <>
+                        {/* B17: storefronts still on the 2-hour Pick-up
+                            default. */}
+                        <LateRuleNotice />
+                        <PlanLimitNotice moduleId="orders" className="mb-4" />
+                        {moment ? (
+                            <Moment moment={moment} className="mb-4" />
+                        ) : null}
+                    </>
+                }
                 query={query}
                 page={page}
                 // Oldest first, so New order starts at the business's first

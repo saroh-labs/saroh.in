@@ -4,15 +4,26 @@ import { cn } from "../../lib/utils";
 
 export type CountTone = "neutral" | "strong" | "danger";
 
+/*
+ * ONE COUNT STYLE. A count on a tab or a menu row is `neutral`: a plain
+ * tally. It is dark (`strong`) or red (`danger`) ONLY when the number
+ * means "this needs you now", and then the badge says so to a screen
+ * reader too (`says`): colour alone tells nobody what a number is for.
+ * A count inside a dropdown filter is not this piece: it is the quiet number
+ * at the right of the option (`ListFilter`).
+ */
 const TONE: Record<CountTone, string> = {
     // A plain tally: how many rows a tab holds.
     neutral: "bg-muted text-muted-foreground data-[on]:text-foreground",
-    // Something is waiting: unread notifications, open orders. Ink, because
-    // Saffron is the menu's marker and nothing else.
+    // Needs you now: unread notifications, open orders, lines running
+    // low. Ink, because Saffron is the menu's marker and nothing else.
     strong: "bg-primary text-primary-foreground",
-    // Something has gone wrong: overdue, failed.
+    // Needs you now, and something has gone wrong: overdue, failed.
     danger: "bg-destructive-subtle text-destructive-subtle-foreground",
 };
+
+/** The two tones that mean "needs you now". */
+export type AttentionTone = Exclude<CountTone, "neutral">;
 
 export interface CountBadgeProps extends Omit<
     React.HTMLAttributes<HTMLSpanElement>,
@@ -29,6 +40,12 @@ export interface CountBadgeProps extends Omit<
     max?: number;
     /** On the selected tab, a neutral count reads in Ink. */
     on?: boolean;
+    /**
+     * What an attention count means, after the number: "need you",
+     * "unread", "overdue". The badge is then named "4 need you". Give
+     * it whenever `tone` is `strong` or `danger`.
+     */
+    says?: string;
 }
 
 /**
@@ -41,6 +58,7 @@ export function CountBadge({
     tone = "neutral",
     max,
     on = false,
+    says,
     className,
     ...props
 }: CountBadgeProps) {
@@ -49,7 +67,14 @@ export function CountBadge({
         <span
             data-count-badge=""
             data-on={on ? "" : undefined}
-            aria-label={count === null ? "count unknown" : undefined}
+            data-tone={tone}
+            aria-label={
+                count === null
+                    ? "count unknown"
+                    : says && tone !== "neutral"
+                      ? `${count} ${says}`
+                      : undefined
+            }
             className={cn(
                 "inline-flex min-w-5 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums leading-[1.3]",
                 TONE[tone],

@@ -58,7 +58,7 @@ export function ArchivedBanner({
     }
 
     return (
-        <Notice layout="banner">
+        <Notice layout="banner" align="center">
             <div className="flex flex-wrap items-center gap-2.5">
                 <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
                     <strong className="font-semibold text-foreground">

@@ -16,6 +16,7 @@ import {
     useSyncExternalStore,
 } from "react";
 
+import { FACT_DOT, joinFacts } from "@/lib/format/join";
 import type {
     ChecklistRow,
     FinishedView,
@@ -136,12 +137,17 @@ export function SetupChecklist({
                         aria-hidden
                         className="size-4 shrink-0 text-success-subtle-foreground"
                     />
-                    {doneTitle}
-                    {note ? (
-                        <span className="font-normal text-muted-foreground">
-                            · {note}
-                        </span>
-                    ) : null}
+                    {/* One run of words: as flex items of their own, the
+                        note's dot led its line whenever the row wrapped. */}
+                    <span className="min-w-0">
+                        {doneTitle}
+                        {note ? (
+                            <span className="font-normal text-muted-foreground">
+                                {FACT_DOT}
+                                {note}
+                            </span>
+                        ) : null}
+                    </span>
                     {doneView ? <ViewLink view={doneView} /> : null}
                 </p>
                 {children}
@@ -172,14 +178,13 @@ export function SetupChecklist({
                 >
                     {finished ? doneTitle : title}
                 </h2>
-                <span className="text-[12.5px] tabular-nums text-muted-foreground">
-                    {count}
+                {/* The count and the fact beside it are one run of words,
+                    joined by a dot that is held to both: as a flex item
+                    of its own the note began "· Sells in person only",
+                    and led its line whenever the heading wrapped. */}
+                <span className="min-w-0 text-[12.5px] tabular-nums text-muted-foreground">
+                    {joinFacts(count, note)}
                 </span>
-                {note ? (
-                    <span className="text-[12.5px] text-muted-foreground">
-                        · {note}
-                    </span>
-                ) : null}
                 {hide && !finished ? (
                     <Button
                         type="button"
@@ -309,7 +314,7 @@ function Row({ row }: { row: ChecklistRow }) {
                 <span className="min-w-0 [overflow-wrap:anywhere]">
                     <span className="sr-only">Done: </span>
                     {row.label}
-                    {row.note ? ` · ${row.note}` : null}
+                    {row.note ? `${FACT_DOT}${row.note}` : null}
                 </span>
                 {row.view ? <ViewLink view={row.view} /> : null}
             </li>

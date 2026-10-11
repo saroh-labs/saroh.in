@@ -3,14 +3,22 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
-import { InvoiceRow } from "@/components/invoices/invoice-row";
-import { ScopeNotice, SourceChips } from "@/components/invoices/source-filter";
+import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
+import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
+import {
+    ListFilter,
+    ListTable,
+    listTable,
+    ListTableHead,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { invoicesHref } from "@/lib/invoices/links";
@@ -34,8 +42,8 @@ import {
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { withoutSince } from "@/lib/views/since";
+import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
-import { TabStrip } from "@saroh/ui/tabs";
 
 /** The business's GST standing, for the line under the title. */
 export interface InvoiceBusinessTax {
@@ -157,6 +165,11 @@ export function InvoicesScreen({
             : undefined;
         return tab !== "all" && parent !== undefined && inTab(parent, tab);
     });
+    // A page of them at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("invoices", shown, {
+        label: "Pages of invoices",
+        resetOn: `${tab}|${chip}`,
+    });
     const tabLabel = INVOICE_TABS.find((t) => t.id === tab)?.label ?? "";
     // Every issued paper a bill of supply (D15): the line says so, rather
     // than "GST tax invoices".
@@ -203,36 +216,59 @@ export function InvoicesScreen({
                       : null}
             </p>
 
-            <TabStrip
-                label="Invoices"
-                idPrefix="invoices-tab"
-                value={tab}
-                onValueChange={pick}
-                tabs={INVOICE_TABS.map((t) => {
-                    const n = mine.filter((i) => inTab(i, t.id)).length;
-                    return {
-                        value: t.id,
-                        label: t.label,
-                        count: n,
-                        countTone:
-                            t.id === "overdue" && n > 0 ? "danger" : "neutral",
-                    };
-                })}
+            {/* The one list toolbar, in one row: an invoice's standing and
+                what it was for are its two dropdown filters. */}
+            <ListToolbar
+                onClear={
+                    tab !== "all" || (!scope && chip !== "all")
+                        ? () => {
+                              setTab("all");
+                              setChip("all");
+                              setPeek(null);
+                              const q = new URLSearchParams(params.toString());
+                              q.delete("tab");
+                              q.delete("source");
+                              const s = q.toString();
+                              router.replace(
+                                  s ? `${pathname}?${s}` : pathname,
+                                  {
+                                      scroll: false,
+                                  },
+                              );
+                          }
+                        : undefined
+                }
+                filters={
+                    <>
+                        <ListFilter<InvoiceTab>
+                            label="Invoice status"
+                            value={tab}
+                            onValueChange={pick}
+                            options={INVOICE_TABS.map((t) => ({
+                                value: t.id,
+                                label:
+                                    t.id === "all" ? "All invoices" : t.label,
+                                count: mine.filter((i) => inTab(i, t.id))
+                                    .length,
+                            }))}
+                        />
+                        {scope ? (
+                            <ScopeNotice
+                                line={scopeLine(scope, mine.length)}
+                                clearHref={invoicesHref()}
+                            />
+                        ) : chips.length > 0 ? (
+                            <SourceFilter
+                                chips={chips}
+                                chosen={chip}
+                                onPick={pickChip}
+                            />
+                        ) : null}
+                    </>
+                }
             />
 
             <div className="flex flex-col pb-[26px] pt-4">
-                {scope ? (
-                    <ScopeNotice
-                        line={scopeLine(scope, mine.length)}
-                        clearHref={invoicesHref()}
-                    />
-                ) : (
-                    <SourceChips
-                        chips={chips}
-                        chosen={chip}
-                        onPick={pickChip}
-                    />
-                )}
                 {paidSince ? (
                     <div className="mb-3.5">
                         <SinceNotice
@@ -247,7 +283,7 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
-                    <Notice tone="error" className="mb-3.5">
+                    <Notice tone="error" className="mb-3.5" align="center">
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
                                 {overdueCount} overdue · {sums(overdue)}, worked
@@ -300,19 +336,30 @@ export function InvoicesScreen({
                         }
                     />
                 ) : (
-                    <ul className="flex flex-col gap-2">
-                        {shown.map((i) => (
-                            <li key={i.id}>
-                                <InvoiceRow
-                                    invoice={i}
-                                    selected={peek?.id === i.id}
-                                    onOpen={() => setPeek(i)}
-                                    timeZone={timeZone}
-                                />
-                            </li>
-                        ))}
-                    </ul>
+                    <ListTable>
+                        <ListTableHead
+                            className={cn(INVOICE_GRID, "max-md:hidden")}
+                        >
+                            <span>Invoice</span>
+                            <span>Billed to</span>
+                            <span>Status</span>
+                            <span className="text-right">Total</span>
+                        </ListTableHead>
+                        <ul aria-label="Invoices">
+                            {paged.map((i) => (
+                                <li key={i.id} className={listTable.rule}>
+                                    <InvoiceRow
+                                        invoice={i}
+                                        selected={peek?.id === i.id}
+                                        onOpen={() => setPeek(i)}
+                                        timeZone={timeZone}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    </ListTable>
                 )}
+                {shown.length > 0 ? paging : null}
 
                 {truncated ? (
                     <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">

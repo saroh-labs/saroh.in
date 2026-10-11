@@ -11,12 +11,12 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
+import { ListFilter } from "@/components/shared/list-toolbar";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { ProgressBar } from "@saroh/ui/progress-bar";
-import { Segmented } from "@saroh/ui/segmented";
 
 const BAR = {
     ok: "success",
@@ -130,25 +130,27 @@ export function HoldersTab({
     }
 
     const list = which === "live" ? rows.live : rows.done;
+    // Which of one list: a dropdown, each count a quiet number.
     const segments = [
-        { key: "live", label: `Can still use · ${rows.live.length}` },
-        { key: "done", label: `Used up or expired · ${rows.done.length}` },
+        { key: "live", label: "Can still use", count: rows.live.length },
+        { key: "done", label: "Used up or expired", count: rows.done.length },
     ] as const;
 
     return (
         <>
             {head}
-            <Segmented
-                label="Who has it"
-                block
-                className="mt-2.5 max-w-[420px]"
-                value={which}
-                onValueChange={setWhich}
-                options={segments.map((s) => ({
-                    value: s.key,
-                    label: s.label,
-                }))}
-            />
+            <div className="mt-2.5">
+                <ListFilter
+                    label="Who has it"
+                    value={which}
+                    onValueChange={setWhich}
+                    options={segments.map((s) => ({
+                        value: s.key,
+                        label: s.label,
+                        count: s.count,
+                    }))}
+                />
+            </div>
             <div id={panelId}>
                 {list.length === 0 ? (
                     <EmptyState

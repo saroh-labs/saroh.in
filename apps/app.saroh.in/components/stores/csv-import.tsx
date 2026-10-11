@@ -551,7 +551,7 @@ export function CsvImport({
                             ) : null}
 
                             {room?.over && meter ? (
-                                <Notice tone="info">
+                                <Notice tone="info" align="center">
                                     <div className="flex flex-wrap items-center gap-3">
                                         <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
                                             {room.words}{" "}

@@ -109,6 +109,7 @@ export function YourPlan(props: YourPlanProps) {
                     tone={n.tone === "attention" ? "warning" : "neutral"}
                     role="note"
                     layout="banner"
+                    align="center"
                 >
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                         <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">

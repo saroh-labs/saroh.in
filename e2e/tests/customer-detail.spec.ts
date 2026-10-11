@@ -160,11 +160,12 @@ test.describe("customer detail", () => {
 
         await page.getByRole("button", { name: "See all bookings" }).click();
         await expect(page).toHaveURL(/tab=bk/);
-        await expect(
-            page.getByRole("button", { name: /^Upcoming · \d+/ }),
-        ).toHaveAttribute("aria-pressed", "true");
+        // Which bookings is a dropdown, open on the upcoming ones.
+        const which = page.getByRole("combobox", { name: "Which bookings" });
+        await expect(which).toContainText("Upcoming");
+        await which.click();
         await page
-            .getByRole("button", { name: /^No-shows and late cancels/ })
+            .getByRole("option", { name: /^No-shows and late cancels/ })
             .click();
         await expect(
             page.getByText(/Late cancel|No-show/).first(),

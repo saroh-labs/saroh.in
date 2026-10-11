@@ -62,6 +62,13 @@ export interface NoticeProps extends Omit<
     layout?: "card" | "banner";
     /** `false` for no glyph, or a glyph of the caller's own. */
     icon?: React.ReactNode | false;
+    /**
+     * `"center"` when the words share one row with a button of the
+     * caller's own: from `sm` the glyph then sits level with that row's
+     * middle, not with a first line that the button made taller. Left out,
+     * the glyph sits on the first line of text.
+     */
+    align?: "start" | "center";
 }
 
 /**
@@ -82,6 +89,7 @@ export const Notice = React.forwardRef<HTMLDivElement, NoticeProps>(
             role,
             layout = "card",
             icon,
+            align = "start",
             className,
             children,
             ...props
@@ -105,16 +113,28 @@ export const Notice = React.forwardRef<HTMLDivElement, NoticeProps>(
                 )}
                 {...props}
             >
-                <div className="flex min-w-0 items-start gap-2.5">
+                {/* The words take the row's width (`flex-1`), so a caller's
+                    own row inside them, words then a button, reaches the
+                    right edge. Without it the column was only as wide as
+                    its words and the button sat against them. */}
+                <div
+                    className={cn(
+                        "flex min-w-0 flex-1 items-start gap-2.5",
+                        align === "center" && "sm:items-center",
+                    )}
+                >
                     {icon === false ? null : (
                         <span
                             aria-hidden
-                            className="mt-0.5 shrink-0 [&_svg]:size-4"
+                            className={cn(
+                                "mt-0.5 shrink-0 [&_svg]:size-4",
+                                align === "center" && "sm:mt-0",
+                            )}
                         >
                             {icon ?? <Glyph />}
                         </span>
                     )}
-                    <div className="min-w-0 [overflow-wrap:anywhere]">
+                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                         {title ? (
                             <p className="font-semibold">{title}</p>
                         ) : null}

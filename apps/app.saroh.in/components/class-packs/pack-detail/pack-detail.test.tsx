@@ -11,6 +11,10 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+    openOptions,
+    pickOption,
+} from "@/components/shared/pick-option.test-kit";
 import type { PackDetailTab } from "@/lib/class-packs/pack-detail";
 import type {
     PackDetail,
@@ -239,7 +243,12 @@ async function flush() {
 describe("Pack Detail's Who has it", () => {
     it("extends a holder by 7 days: the new date, and a refresh", async () => {
         render({ state: "ok", data: [ASHA] });
-        expect(text()).toContain("Can still use · 1");
+        // Who has it is a dropdown; open, each choice says how many.
+        expect(openOptions("Who has it")).toEqual([
+            "Can still use 1",
+            "Used up or expired 0",
+        ]);
+        pickOption("Who has it", "Can still use");
         expect(text()).toContain("6 of 10");
         expect(text()).toContain("Use by 10 Nov");
         expect(text()).toContain("Bought 1 Sep · ₹1,500 · UPI");
@@ -334,7 +343,7 @@ describe("Pack Detail's Who has it", () => {
                 },
             ],
         });
-        click(button(/^Used up or expired/));
+        pickOption("Who has it", "Used up or expired");
         expect(text()).toContain("All used");
         expect(button("Extend").disabled).toBe(true);
         expect(text()).toContain("Nothing left to extend");
