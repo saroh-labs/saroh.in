@@ -5,6 +5,7 @@ import {
 } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { Interval, Renewals, Subscription } from "./service";
 
@@ -86,7 +87,7 @@ export function nextLine(sub: Sub, now: Date = new Date()): string {
     if (sub.endsAt) return `Ends ${formatDate(sub.endsAt, tz, { now })}`;
     return sub.nextRenewalAt
         ? `Renews ${formatDate(sub.nextRenewalAt, tz, { now })}`
-        : "None";
+        : absentText();
 }
 
 /** The day the current period ends, in its own timezone: "1 Oct". */

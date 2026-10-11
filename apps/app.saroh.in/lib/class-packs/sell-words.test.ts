@@ -70,8 +70,8 @@ describe("paid by", () => {
         expect(paidByLabel("UPI")).toBe("UPI");
         expect(paidByLabel("NONE")).toBe("None");
         expect(paidByLabel("ONLINE")).toBe("Online");
-        expect(paidByLabel(null)).toBe("Not recorded");
-        expect(paidByLabel(undefined)).toBe("Not recorded");
+        expect(paidByLabel(null)).toBe("—");
+        expect(paidByLabel(undefined)).toBe("—");
     });
 });
 

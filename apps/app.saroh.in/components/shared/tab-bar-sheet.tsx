@@ -15,7 +15,7 @@ import { CountBadge } from "@saroh/ui/count-badge";
  *
  * Every section the actor reaches, with all of its pages — including a
  * seated section's, since its tab can only open one of them — then the rows
- * that belong to no section, under Workspace. What the bar does not hold is
+ * that belong to no section, under Manage. What the bar does not hold is
  * here, so the phone reaches exactly what the rail does.
  *
  * A modal dialog: focus goes to Close when it opens (not the first row, so a

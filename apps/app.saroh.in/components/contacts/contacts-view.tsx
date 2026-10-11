@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
 import Link from "next/link";
@@ -34,7 +35,7 @@ import { Users } from "lucide-react";
  */
 
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
-const Missing = () => <span className="text-muted-foreground">Not set</span>;
+const Missing = () => <AbsentValue says="Not set" />;
 
 const FILTERS: DataFilter<ContactListItem>[] = [
     { id: "all", label: "All" },
@@ -56,10 +57,17 @@ const FILTERS: DataFilter<ContactListItem>[] = [
 ];
 
 /** The phone's labelled facts about a contact, or nothing. */
-export function ContactSummary({ contact: c }: { contact: ContactListItem }) {
+export function ContactSummary({
+    contact: c,
+    currency,
+}: {
+    contact: ContactListItem;
+    /** The business's currency: what a lead's Worth is in. */
+    currency: string;
+}) {
     const leads = openLeadsLabel(
         c.openLeadCount,
-        formatMoney(c.openLeadValue, null),
+        formatMoney(c.openLeadValue, currency),
     );
     const parts: { key: string; node: ReactNode }[] = [];
     if (c.company) parts.push({ key: "company", node: c.company });
@@ -96,9 +104,12 @@ export function ContactSummary({ contact: c }: { contact: ContactListItem }) {
 
 export function ContactsView({
     contacts,
+    currency,
     initialView,
 }: {
     contacts: ContactListItem[];
+    /** The business's currency: what open leads are worth in (owner, 11 Oct). */
+    currency: string;
     initialView?: string;
 }) {
     const columns: DataColumn<ContactListItem>[] = [
@@ -129,7 +140,7 @@ export function ContactsView({
             header: "Summary",
             priority: "secondary",
             tableHidden: true,
-            cell: (c) => <ContactSummary contact={c} />,
+            cell: (c) => <ContactSummary contact={c} currency={currency} />,
         },
         {
             id: "company",
@@ -155,13 +166,12 @@ export function ContactsView({
             // click. Unvalued open leads sort as 0 but still render their count,
             // which is the honest ordering: we cannot rank an unknown amount.
             sortValue: (c) => c.openLeadValue ?? 0,
-            // Words, not "unvalued (1)" (UX-051). Lead amounts carry no
-            // currency anywhere in the schema, so none is drawn — see
-            // `lib/format/money.ts`.
+            // Words, not "unvalued (1)" (UX-051). A lead's amount records
+            // no currency: it is in the business's (owner, 11 Oct).
             cell: (c) => {
                 const label = openLeadsLabel(
                     c.openLeadCount,
-                    formatMoney(c.openLeadValue, null),
+                    formatMoney(c.openLeadValue, currency),
                 );
                 return label ? (
                     <span className="whitespace-nowrap">{label}</span>
@@ -332,7 +342,7 @@ export function ContactsView({
                                 <p className="pt-1 text-xs font-medium text-foreground">
                                     {openLeadsLabel(
                                         c.openLeadCount,
-                                        formatMoney(c.openLeadValue, null),
+                                        formatMoney(c.openLeadValue, currency),
                                     )}
                                 </p>
                             ) : null}

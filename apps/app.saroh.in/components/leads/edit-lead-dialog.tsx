@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { PenLine } from "lucide-react";
@@ -22,11 +22,14 @@ export function EditLeadDialog({
     leadId,
     title,
     value,
+    currency,
 }: {
     leadId: string;
     title: string;
     /** Minor units, as the API stores it. */
     value: number | null;
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -106,12 +109,11 @@ export function EditLeadDialog({
             </div>
             <div className="grid gap-1.5">
                 <Label htmlFor={worthId}>Worth</Label>
-                <Input
+                <MoneyInput
                     id={worthId}
-                    inputMode="decimal"
+                    currency={currency}
                     value={worth}
-                    className="tabular-nums"
-                    onChange={(e) => setWorth(e.target.value)}
+                    onValueChange={setWorth}
                 />
             </div>
             {error ? (

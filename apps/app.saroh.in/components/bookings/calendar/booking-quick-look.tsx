@@ -6,6 +6,7 @@ import {
     formatDay,
 } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
+import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -401,13 +402,20 @@ function OneToOne({
                     ["Paid", paid],
                     [
                         "Phone",
-                        phoneText({
-                            bookerPhone: b.bookerPhone,
-                            hasContact: b.contact !== null,
-                            person: person ?? undefined,
-                        }),
+                        <AbsentOr says="Not known">
+                            {phoneText({
+                                bookerPhone: b.bookerPhone,
+                                hasContact: b.contact !== null,
+                                person: person ?? undefined,
+                            })}
+                        </AbsentOr>,
                     ],
-                    ["Email", b.contact?.email ?? b.bookerEmail ?? "Not set"],
+                    [
+                        "Email",
+                        b.contact?.email ?? b.bookerEmail ?? (
+                            <AbsentValue says="Not set" />
+                        ),
+                    ],
                     ...needsAttention(person),
                 ]}
             />

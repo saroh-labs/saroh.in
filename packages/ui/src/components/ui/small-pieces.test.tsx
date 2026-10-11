@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ABSENT_MARK, absentText, isAbsentText } from "../../lib/absent";
+import { AbsentOr, AbsentValue } from "./absent-value";
 import { Badge } from "./badge";
 import {
     COPIED_MS,
@@ -82,6 +84,51 @@ describe("Badge", () => {
     it("never sets uppercase", () => {
         render(<Badge>Paid</Badge>);
         expect(screen.getByText("Paid").className).not.toMatch(/uppercase/);
+    });
+});
+
+describe("AbsentValue", () => {
+    it("draws a muted dash the eye sees and a word a screen reader hears", () => {
+        const { container } = render(<AbsentValue says="Not set" />);
+        const el = must(container.querySelector("[data-absent]"));
+        expect(classes(el)).toContain("text-muted-foreground");
+        const [dash, words] = Array.from(el.children);
+        expect(dash).toHaveTextContent(ABSENT_MARK);
+        expect(dash).toHaveAttribute("aria-hidden", "true");
+        expect(words).toHaveTextContent("Not set");
+        expect(classes(must(words))).toContain("sr-only");
+        // Saroh's own mark, never a record's data.
+        expect(el).toHaveAttribute("data-ph-unmask");
+    });
+
+    it('says "None" unless told otherwise', () => {
+        render(<AbsentValue />);
+        expect(screen.getByText("None")).toBeInTheDocument();
+    });
+
+    it("the string twin is the same dash", () => {
+        expect(absentText()).toBe(ABSENT_MARK);
+        expect(ABSENT_MARK).toBe("\u2014");
+        expect(isAbsentText(absentText())).toBe(true);
+        expect(isAbsentText(null)).toBe(true);
+        expect(isAbsentText("")).toBe(true);
+        expect(isAbsentText("0")).toBe(false);
+        expect(isAbsentText(0)).toBe(false);
+    });
+
+    it("AbsentOr draws what it is given, or the dash for nothing", () => {
+        const { container, rerender } = render(
+            <AbsentOr says="Not known">12 Oct</AbsentOr>,
+        );
+        expect(container).toHaveTextContent("12 Oct");
+        expect(container.querySelector("[data-absent]")).toBeNull();
+        for (const nothing of [null, undefined, "", absentText()]) {
+            rerender(<AbsentOr says="Not known">{nothing}</AbsentOr>);
+            expect(container.querySelector("[data-absent]")).not.toBeNull();
+            expect(screen.getByText("Not known")).toBeInTheDocument();
+        }
+        rerender(<AbsentOr>{0}</AbsentOr>);
+        expect(container).toHaveTextContent("0");
     });
 });
 

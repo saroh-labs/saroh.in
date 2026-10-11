@@ -1,3 +1,4 @@
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
@@ -41,11 +42,13 @@ export default async function LeadsPage({
     const canWrite = canOrUnknown(organization, "lead:write");
     const canLog = canOrUnknown(organization, "activity:write");
 
-    const [leads, params, addLead, tasks] = await Promise.all([
+    const [leads, params, addLead, tasks, currency] = await Promise.all([
         listLeads(),
         searchParams,
         canWrite ? loadAddLead() : Promise.resolve(null),
         listOpenTasks().catch(() => null),
+        // A lead's Worth is in the business's currency (owner, 11 Oct).
+        readBusinessCurrency(),
     ]);
     const tab = params.tab === "follow-ups" ? "follow-ups" : "leads";
 
@@ -92,7 +95,11 @@ export default async function LeadsPage({
                         )}
                     />
                 ) : (
-                    <LeadsView leads={leads} initialView={viewParam(params)} />
+                    <LeadsView
+                        leads={leads}
+                        currency={currency}
+                        initialView={viewParam(params)}
+                    />
                 )}
             </div>
         </PageContainer>

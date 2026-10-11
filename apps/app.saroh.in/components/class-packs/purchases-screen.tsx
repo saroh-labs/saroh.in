@@ -1,6 +1,7 @@
 "use client";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
@@ -132,7 +133,11 @@ export function PurchasesScreen({
             width: "118px",
             sortValue: (p) => paidByLabel(p.paidBy),
             cell: (p) => (
-                <span className="text-[12.5px]">{paidByLabel(p.paidBy)}</span>
+                <span className="text-[12.5px]">
+                    <AbsentOr says="Not recorded">
+                        {paidByLabel(p.paidBy)}
+                    </AbsentOr>
+                </span>
             ),
         },
         {

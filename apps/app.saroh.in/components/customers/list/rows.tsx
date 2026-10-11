@@ -1,6 +1,7 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -162,7 +163,9 @@ function Row({
                                     variant="recent"
                                 />
                             ) : (
-                                noOrderText(row)
+                                <AbsentOr says="None">
+                                    {noOrderText(row)}
+                                </AbsentOr>
                             )}
                         </span>
                         {sub ? (
@@ -185,7 +188,9 @@ function Row({
             ) : null}
             {sees.spent ? (
                 <span className="hidden text-right font-medium tabular-nums sm:block">
-                    {spentText(row.spent ?? [])}
+                    <AbsentOr says="None">
+                        {spentText(row.spent ?? [])}
+                    </AbsentOr>
                 </span>
             ) : null}
         </Link>

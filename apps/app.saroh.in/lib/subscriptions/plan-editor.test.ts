@@ -301,9 +301,9 @@ describe("how it's paid, and the side panel", () => {
             { label: "3 people · older price", value: "₹1,200" },
         ]);
         expect(glance(form({ price: "" }), null)).toEqual([
-            { label: "Per month", value: "Not set" },
+            { label: "Per month", value: "—" },
             { label: "On it now", value: "0" },
-            { label: "Coming in a month", value: "None" },
+            { label: "Coming in a month", value: "—" },
         ]);
     });
 });

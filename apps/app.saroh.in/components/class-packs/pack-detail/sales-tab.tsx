@@ -1,11 +1,13 @@
 "use client";
 
 import { FailedRead } from "@/components/shared/failed-read";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import {
     EmptyState,
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { isAbsentText } from "@saroh/ui/lib/absent";
 import Link from "next/link";
 
 import { whoCanChange } from "@/components/shared/who-can-change";
@@ -94,9 +96,11 @@ export function SalesTab({
                             <ProgressBar
                                 value={m.pct}
                                 max={100}
-                                label={`${m.label}: ${m.n}`}
+                                label={`${m.label}: ${isAbsentText(m.n) ? "None sold" : m.n}`}
                             />
-                            <span className="text-foreground/80">{m.n}</span>
+                            <span className="text-foreground/80">
+                                <AbsentOr says="None sold">{m.n}</AbsentOr>
+                            </span>
                             <span className="text-right font-semibold tabular-nums">
                                 {m.amt}
                             </span>

@@ -125,7 +125,7 @@ describe("packCard", () => {
         delete older.creditsLeft;
         const card = packCard(older, true);
         expect(card.takings).toBeNull();
-        expect(card.stillToUse).toBe("Not known");
+        expect(card.stillToUse).toBe("—");
         expect(card.stillToUseNote).toBe("across 32 people");
     });
 

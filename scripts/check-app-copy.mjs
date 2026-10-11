@@ -3,8 +3,13 @@
 // reads `apps/app.saroh.in` with TypeScript's own parser and fails on:
 //
 // - an em dash in any string or JSX text. A sentence is two sentences, a
-//   comma, a colon or "and"; an absent value is a word ("Not set", "None",
-//   "Not known"), never a lone "—";
+//   comma, a colon or "and". The one dash a merchant sees is the mark for a
+//   value that isn't there, and it is written in one file only,
+//   `packages/ui/src/lib/absent.ts`: a cell draws it with `AbsentValue`
+//   (`@saroh/ui/absent-value`, which says "None", "Not set" or "Not known"
+//   to a screen reader) and a plain string takes `absentText()`. That file
+//   is read here too and is on the allow-list, so a dash typed anywhere
+//   else still fails;
 // - an en dash between two figures or two words: a range says "to";
 // - a semicolon in what is read;
 // - a word the product never says: organization, workspace, storefront,
@@ -29,6 +34,11 @@ import { join } from "node:path";
 const root = join(import.meta.dirname, "..");
 const APP = "apps/app.saroh.in";
 const SOURCES = ["app", "components", "lib"];
+/**
+ * Read as well, from the repository root: the one file outside the app
+ * whose string the app draws. It is named by its full path below.
+ */
+const SHARED = ["packages/ui/src/lib/absent.ts"];
 // The app's own TypeScript: this script has no dependencies of its own.
 const ts = createRequire(join(root, APP, "package.json"))("typescript");
 
@@ -37,6 +47,11 @@ const ts = createRequire(join(root, APP, "package.json"))("typescript");
  * required. Keep it short: nearly every hit is a sentence to rewrite.
  */
 const ALLOWED = [
+    {
+        file: "packages/ui/src/lib/absent.ts",
+        rule: "em dash",
+        why: "the mark for a value that isn't there (owner, 11 Oct): the only place the dash is written. Everything else draws it through AbsentValue or absentText()",
+    },
     {
         file: "lib/services/service-editor.ts",
         rule: "em dash",
@@ -48,24 +63,9 @@ const ALLOWED = [
         why: "the invoice paper's titles, which the API draws identically on the PDF. Reword both sides together",
     },
     {
-        file: "components/shared/nav-items.tsx",
-        rule: "workspace",
-        why: 'the menu\'s last group is headed "Workspace" until the owner renames it',
-    },
-    {
-        file: "lib/nav/mobile-nav.ts",
-        rule: "workspace",
-        why: "the same heading, on the phone's More sheet",
-    },
-    {
-        file: "components/shared/app-sidebar.tsx",
-        rule: "workspace",
-        why: "the menu's landmark name, kept in step with its heading",
-    },
-    {
         file: "lib/settings/search.ts",
         rule: "workspace",
-        why: '"Workspace address" is a word Settings search still finds the web address by, and is never shown',
+        why: '"Workspace address" is a word Settings search still finds the web address by. A synonym is matched, never shown',
     },
     {
         file: "lib/organizations/storefront-team.ts",
@@ -211,10 +211,11 @@ function readsAsWords(s) {
 
 function problemsIn(text, { read }) {
     const out = [];
-    if (text.includes("—"))
+    // The character, or the same thing spelt as an entity in JSX text.
+    if (/—|&mdash;|&#8212;|&#x2014;/i.test(text))
         out.push([
             "em dash",
-            "write two sentences, a comma, a colon or a word",
+            "write two sentences, a comma or a colon. A value that isn't there is AbsentValue or absentText() from @saroh/ui",
         ]);
     if (!read) return out;
     const said = plain(text);
@@ -302,9 +303,12 @@ const found = [];
 const usedAllowance = new Set();
 let scanned = 0;
 
-for (const file of SOURCES.flatMap(walk)) {
+/** Where a file is, from the repository root. */
+const pathOf = (file) => (SHARED.includes(file) ? file : `${APP}/${file}`);
+
+for (const file of [...SOURCES.flatMap(walk), ...SHARED]) {
     scanned += 1;
-    const text = readFileSync(join(root, APP, file), "utf8");
+    const text = readFileSync(join(root, pathOf(file)), "utf8");
     const sf = ts.createSourceFile(
         file,
         text,
@@ -376,7 +380,7 @@ for (const [file, line, rule, say, value] of found) {
     seen.add(key);
     const shown = value.replace(/\s+/g, " ").trim().slice(0, 90);
     console.error(
-        `${APP}/${file}:${line}: ${rule} in "${shown}": ${say} (docs/patterns/saroh-product.md, One word each)`,
+        `${pathOf(file)}:${line}: ${rule} in "${shown}": ${say} (docs/patterns/saroh-product.md, One word each)`,
     );
 }
 for (const a of ALLOWED) {

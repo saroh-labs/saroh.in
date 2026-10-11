@@ -1,5 +1,6 @@
 import { formatMoneyMajor, formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 /**
  * The Customers list (DEC-041, round 2 C4): its address, what the API
@@ -384,7 +385,7 @@ export function lastSub(
  * a person the merchant added on the list (the design's words), else "—".
  */
 export function noOrderText(row: CustomerRow): string {
-    return row.addedByHand ? "Added by hand" : "None";
+    return row.addedByHand ? "Added by hand" : absentText();
 }
 
 /**
@@ -392,7 +393,7 @@ export function noOrderText(row: CustomerRow): string {
  * "—" when nothing is paid, which is a state, not a measurement.
  */
 export function spentText(spent: MoneyTotal[]): string {
-    if (spent.length === 0) return "None";
+    if (spent.length === 0) return absentText();
     return spent.map((m) => formatMoneyMajor(m.amount, m.currency)).join(" + ");
 }
 

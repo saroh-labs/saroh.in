@@ -1,6 +1,7 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
@@ -90,7 +91,7 @@ export function MonthStrip({
                                         : "text-foreground",
                                 )}
                             >
-                                {part.value}
+                                <AbsentOr says="Not yet">{part.value}</AbsentOr>
                             </span>
                         </button>
                     );

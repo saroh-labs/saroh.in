@@ -1,5 +1,6 @@
 import { formatMoneyMajor, moneySign } from "@/lib/format/money";
 import { plural } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { CalendarMonth, LayerKey, MoneyEntry } from "./types";
 
@@ -207,7 +208,7 @@ export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
     const soFar = at.when === "current" ? " so far" : "";
     const ahead = at.when === "future";
     const money = (minor: number) =>
-        ahead ? "Not yet" : minorMoney(minor, at.currency);
+        ahead ? absentText() : minorMoney(minor, at.currency);
     return [
         { key: "in", label: `In${soFar}`, value: money(done.in), out: false },
         {

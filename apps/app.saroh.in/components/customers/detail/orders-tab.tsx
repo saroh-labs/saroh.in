@@ -3,6 +3,7 @@
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { EmptyState } from "@saroh/ui/data-state";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
@@ -98,9 +99,11 @@ export function OrdersTab({
                                 {orderWhat(o)}
                             </span>
                             <span className="tabular-nums">
-                                {o.total && o.currency
-                                    ? formatMoneyMajor(o.total, o.currency)
-                                    : "Not known"}
+                                {o.total && o.currency ? (
+                                    formatMoneyMajor(o.total, o.currency)
+                                ) : (
+                                    <AbsentValue says="Not known" />
+                                )}
                             </span>
                             <span className="text-muted-foreground">
                                 {o.via.storefront.name}

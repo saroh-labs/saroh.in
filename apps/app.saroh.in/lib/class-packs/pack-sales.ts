@@ -1,6 +1,7 @@
 import { formatDate, formatMonth, localDateKey } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { customerHref, invoiceHref } from "@/lib/invoices/links";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { MoneyTotal } from "./pack-cards";
 import { totals } from "./pack-detail";
@@ -90,7 +91,7 @@ export function salesByMonth(
     const months = groups.map((g) => ({
         key: g.key,
         label: g.label,
-        n: g.sales.length > 0 ? `${g.sales.length} sold` : "None sold",
+        n: g.sales.length > 0 ? `${g.sales.length} sold` : absentText(),
         amt: g.sales.length > 0 ? totals(sumByCurrency(g.sales)) : "",
         pct: Math.round((100 * own(g.sales)) / most),
     }));

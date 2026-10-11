@@ -1,6 +1,7 @@
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { METHOD_WORD } from "@/lib/payments/method-words";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
 import type { PackKind } from "./pack-cards";
@@ -39,7 +40,7 @@ const PAID_BY_LABEL: Record<PaidBy, string> = {
 
 /** How a sale was paid, in a list: "UPI"; "—" when nobody recorded it. */
 export function paidByLabel(paidBy: PaidBy | null | undefined): string {
-    return paidBy ? PAID_BY_LABEL[paidBy] : "Not recorded";
+    return paidBy ? PAID_BY_LABEL[paidBy] : absentText();
 }
 
 /** The pack as the dialog reads it. */

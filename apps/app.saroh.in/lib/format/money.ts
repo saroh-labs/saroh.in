@@ -13,11 +13,12 @@ import { NUMBER_LOCALE } from "./locale";
  *
  * Amounts travel the wire in MINOR units, and `currency` is nullable because
  * the sources genuinely disagree: a commerce Order records a currency, a CRM
- * Lead records a bare integer and nothing else. The nullability is the whole
- * point of this module — `Intl.NumberFormat` will happily invent a symbol from
- * the runtime locale, so a merchant in India would see ₹ printed against a lead
- * amount the product never claimed was rupees, and the same build would show $
- * to a colleague abroad. When no currency is stated, none is drawn.
+ * Lead records a bare integer and nothing else. `Intl.NumberFormat` will
+ * happily invent a symbol from the runtime locale, so this module never
+ * guesses: when no currency is passed, none is drawn. A lead's Worth is in
+ * the business's currency (owner, 11 Oct 2026), so its screens pass
+ * `readBusinessCurrency()` (`lib/organizations/business-currency.ts`), the
+ * business's own and never the viewer's locale.
  *
  * Pure display: no server imports, safe in both server and client components.
  */

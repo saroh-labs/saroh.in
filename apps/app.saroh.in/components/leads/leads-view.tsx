@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -47,13 +48,16 @@ const FILTERS: DataFilter<LeadListItem>[] = [
     { id: "lost", label: "Lost", predicate: (l) => l.status === "LOST" },
 ];
 
-const Missing = () => <span className="text-muted-foreground">Not set</span>;
+const Missing = () => <AbsentValue says="Not set" />;
 
 export function LeadsView({
     leads,
+    currency,
     initialView,
 }: {
     leads: LeadListItem[];
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
     initialView?: string;
 }) {
     const now = new Date();
@@ -89,14 +93,17 @@ export function LeadsView({
         },
         {
             id: "value",
-            header: "Value",
+            header: "Worth",
             priority: "secondary",
             numeric: true,
             money: true,
             sortValue: (l) => l.value ?? 0,
-            // No currency is recorded against a Lead anywhere in the schema, so
-            // none is drawn — see `lib/format/money.ts`.
-            cell: (l) => formatMoney(l.value, null) ?? <Missing />,
+            // A lead records an amount and no currency: it is in the
+            // business's (owner, 11 Oct). Empty is the absent mark.
+            cell: (l) =>
+                formatMoney(l.value, currency) ?? (
+                    <AbsentValue says="Not set" />
+                ),
         },
         {
             id: "stage",
@@ -135,7 +142,9 @@ export function LeadsView({
                 // which is not, hence `ViewerDate`.
                 l.status === "OPEN" ? (
                     <span className="whitespace-nowrap text-muted-foreground">
-                        {formatWaiting(l.createdAt, now) ?? "Not known"}
+                        {formatWaiting(l.createdAt, now) ?? (
+                            <AbsentValue says="Not known" />
+                        )}
                     </span>
                 ) : (
                     <ViewerDate
@@ -181,6 +190,11 @@ export function LeadsView({
                                     ? contactName(l.contact)
                                     : "Unknown contact"}
                             </p>
+                            {l.value === null ? null : (
+                                <p className="text-sm tabular-nums">
+                                    {formatMoney(l.value, currency)}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </Link>

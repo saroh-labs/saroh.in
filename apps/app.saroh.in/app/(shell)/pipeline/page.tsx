@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/format/money";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -79,9 +80,11 @@ export default async function PipelinePage() {
     const pipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
 
     // Leads for this pipeline only; bucket them by stage id for the columns.
-    const [leads, addLead] = await Promise.all([
+    const [leads, addLead, currency] = await Promise.all([
         listLeads({ pipelineId: pipeline.id }),
         canWrite ? loadAddLead(pipelines) : Promise.resolve(null),
+        // A lead's Worth is in the business's currency (owner, 11 Oct).
+        readBusinessCurrency(),
     ]);
     const organization = viewer;
     // From what the API resolved this person may do; the role's name only as
@@ -203,7 +206,7 @@ export default async function PipelinePage() {
                                     stageLeads.map((lead) => {
                                         const amount = formatMoney(
                                             lead.value,
-                                            null,
+                                            currency,
                                             { decimals: "always" },
                                         );
                                         return (

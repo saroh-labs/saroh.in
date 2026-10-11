@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
@@ -37,6 +38,7 @@ export interface LeadContactOption {
 export function AddLeadDialog({
     contacts,
     stages,
+    currency,
     stageId,
     label = "Add a lead",
     ariaLabel,
@@ -52,6 +54,8 @@ export function AddLeadDialog({
     contacts: LeadContactOption[];
     /** The pipeline's stages; the first is where a lead starts. */
     stages: { id: string; name: string }[];
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
     /** Start in this stage — a column's own "+". */
     stageId?: string;
     label?: string;
@@ -266,13 +270,12 @@ export function AddLeadDialog({
 
             <div className="grid grid-cols-2 items-start gap-3">
                 <Field label="Worth" optional error={errors.worth}>
-                    <Input
+                    <MoneyInput
                         id={ids.worth}
-                        inputMode="decimal"
+                        currency={currency}
                         value={worth}
                         placeholder="45000"
-                        className="tabular-nums"
-                        onChange={(e) => setWorth(e.target.value)}
+                        onValueChange={setWorth}
                     />
                 </Field>
                 {stages.length > 1 ? (

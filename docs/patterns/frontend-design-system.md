@@ -150,23 +150,24 @@
   draws its own; the scan in `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts`
   fails when one does, and its allowlists are the record of what is left.
 
-    | Piece                                    | Where                                                   | The rule                                                                                                                                                                                  |
-    | ---------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-    | `TabStrip`                               | `@saroh/ui/tabs`                                        | The one tab look: Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move). |
-    | `SectionList`                            | `components/shared/section-list.tsx`                    | The one vertical list of sections (Settings, Website › Settings).                                                                                                                         |
-    | `Segmented`                              | `@saroh/ui/segmented`                                   | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                         |
-    | `Chip`, `chipClass`                      | `components/shared/chip.tsx`                            | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                       |
-    | `ChipGroup`, `RadioCards`, `ChoiceGroup` | `components/shared/choice-group.tsx`                    | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                    |
-    | `CheckRow`, `SwitchRow`                  | `components/shared/check-row.tsx`                       | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                            |
-    | `ListSearch`                             | `@saroh/ui/list-search`                                 | "Search {things}" (required), icon, 38px, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. DataView draws it.                                                      |
-    | `StatusBadge`, `Badge`                   | `components/shared/status-badge.tsx`, `@saroh/ui/badge` | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                        |
-    | `CountBadge`                             | `@saroh/ui/count-badge`                                 | Unread and tab counts: `neutral`, `strong` (Ink, something waits), `danger`. `null` is "—", never 0.                                                                                      |
-    | `Notice`                                 | `@saroh/ui/notice`                                      | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                            |
-    | `TextLink`, `textLinkClass`              | `@saroh/ui/text-link`                                   | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                           |
-    | `IconButton`, `Tip`                      | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`            | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                           |
-    | `CopyButton`, `ShareLink`, `copyText`    | `@saroh/ui/copy-button`                                 | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.       |
-    | `ProgressBar`, `doneOf`                  | `@saroh/ui/progress-bar`                                | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                 |
-    | `.label`                                 | `packages/ui/src/globals.css`                           | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                           |
+    | Piece                                    | Where                                                   | The rule                                                                                                                                                                                                                                                                                                               |
+    | ---------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `TabStrip`                               | `@saroh/ui/tabs`                                        | The one tab look: Ink underline, 14px, optional count, one line inside `ScrollX` on a phone, 44px on touch. Links (`href`, `aria-current="page"`) or buttons (`role="tab"`, arrows move).                                                                                                                              |
+    | `SectionList`                            | `components/shared/section-list.tsx`                    | The one vertical list of sections (Settings, Website › Settings).                                                                                                                                                                                                                                                      |
+    | `Segmented`                              | `@saroh/ui/segmented`                                   | The one either/or: a grey track, the chosen option Ink. A radio group, or a `nav` of links. A block as wide as its words, under its label; `block` fills the row.                                                                                                                                                      |
+    | `Chip`, `chipClass`                      | `components/shared/chip.tsx`                            | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
+    | `ChipGroup`, `RadioCards`, `ChoiceGroup` | `components/shared/choice-group.tsx`                    | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
+    | `CheckRow`, `SwitchRow`                  | `components/shared/check-row.tsx`                       | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
+    | `ListSearch`                             | `@saroh/ui/list-search`                                 | "Search {things}" (required), icon, 38px, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. DataView draws it.                                                                                                                                                                                   |
+    | `StatusBadge`, `Badge`                   | `components/shared/status-badge.tsx`, `@saroh/ui/badge` | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
+    | `CountBadge`                             | `@saroh/ui/count-badge`                                 | Unread and tab counts: `neutral`, `strong` (Ink, something waits), `danger`. `null` is "—", never 0.                                                                                                                                                                                                                   |
+    | `AbsentValue`, `AbsentOr`, `absentText`  | `@saroh/ui/absent-value`, `@saroh/ui/lib/absent`        | A value that isn't there, in a cell, a stat tile, a row's meta or a quick look: a muted dash, `aria-hidden`, with `says` ("None", "Not set", "Not known") as the visually hidden word. `absentText()` is the dash for a plain string. Never typed by hand (`check:copy`). A Settings read row says "Not set" in words. |
+    | `Notice`                                 | `@saroh/ui/notice`                                      | `tone`, `title`, `action`, `role`, `layout` (`card`, `banner`). The `-subtle` tokens, never an alpha tint. `ReadOnlyNote` and `SinceNotice` are thin wrappers.                                                                                                                                                         |
+    | `TextLink`, `textLinkClass`              | `@saroh/ui/text-link`                                   | Ink, underlined at rest, focus ring. `external` adds the glyph and the new tab.                                                                                                                                                                                                                                        |
+    | `IconButton`, `Tip`                      | `@saroh/ui/icon-button`, `@saroh/ui/tooltip`            | `label` is required: the name and the tooltip. `Tip` replaces `title=` and is the control's `aria-description`.                                                                                                                                                                                                        |
+    | `CopyButton`, `ShareLink`, `copyText`    | `@saroh/ui/copy-button`                                 | "Copied" in the label for 1.6s, no toast. One failure sentence, with the value shown selected. `ShareLink` opens the phone's share sheet. The only code that touches the clipboard.                                                                                                                                    |
+    | `ProgressBar`, `doneOf`                  | `@saroh/ui/progress-bar`                                | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
+    | `.label`                                 | `packages/ui/src/globals.css`                           | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,
@@ -348,7 +349,9 @@ text, a column's name, the navigation, an empty state, a banner.
       size), `ErrorPage`, `NotFound`, `DataView`'s column heads; in the
       workspace, the rail, the tab bar and its sheet, the plan-ending
       banner, the recording notice, `ReadOnlyNote`, a `Moment`'s title, a
-      `SetupChecklist`'s heading, and the goal picker after setup;
+      `SetupChecklist`'s heading, the goal picker after setup, and
+      `AbsentValue`'s dash and word (Saroh's own mark, not a record's: a
+      masked cell or figure around it still masks it);
     - always masked: `TableCell`, `DataView`'s rows (table and list),
       `Avatar`, `StatCard`'s figure, the account button, `RadioCards`' rows
       (a choice is as often a location or a person as a fixed word), a
@@ -610,7 +613,12 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
       `formatMoneyMajor("1250.50", currency)` write "₹1,250" and
       "₹1,250.50": the currency's sign, Indian grouping, no ".00". A ledger
       or invoice column asks for `{ decimals: "always" }` ("₹1,250.00").
-      Null in, null out, so the caller words what is missing.
+      Null in, null out, so the caller draws what is missing. A lead's
+      Worth records no currency of its own: it is in the business's
+      (owner, 11 Oct 2026), read with `readBusinessCurrency()`
+      (`lib/organizations/business-currency.ts`) by the Leads list, the
+      Pipeline, the lead page, a contact's leads and the Contacts list, and
+      typed in a `MoneyInput`. It is still kept in minor units.
       `formatNumber(1204)` is "1,204". The sign and the decimal places are
       `moneySign` and `moneyDecimals` from `@saroh/ui/lib/money`, the same
       ones `MoneyInput` shows and keeps.
@@ -651,7 +659,10 @@ zone)` is "9:00 am", `clockWords("09:30")` the same for a wall-clock value,
   are the 24-hour "HH:MM" for a machine (a `?start=`, a comparison), never
   drawn. Opening hours keep their compact form ("9am–7pm",
   `lib/opening-hours.ts`).
-- **Current** (10 Oct 2026) — `tabular-nums` on columns of figures, and a
-  word where zero is a state rather than a measurement: "Not set", "None",
-  "Not known", "Not yet", never a lone "—" and never 0 (`saroh-product.md`
-  → One word each; `pnpm check:copy` fails a dash).
+- **Current** (11 Oct 2026) — `tabular-nums` on columns of figures, and
+  the absent mark where zero is a state rather than a measurement:
+  `<AbsentValue says="None" />` (`@saroh/ui/absent-value`), a muted "—"
+  with the word a screen reader hears ("Not set", "None", "Not known",
+  "Not yet"), never 0 and never a dash typed by hand (`saroh-product.md` →
+  One word each; `pnpm check:copy` fails a dash anywhere but the shared
+  piece). A Settings read row says "Not set" in words.

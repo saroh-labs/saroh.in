@@ -1,6 +1,7 @@
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     Interval,
@@ -276,7 +277,7 @@ export function rowWhen(
             ? [`Next ${formatDate(sub.nextRenewalAt, tz, { now })}`, badge]
                   .filter(Boolean)
                   .join(" · ")
-            : "None",
+            : absentText(),
         danger: false,
     };
 }
@@ -404,7 +405,7 @@ export function headline(
     if (tab === "paused") {
         return {
             pill,
-            big: "None",
+            big: absentText(),
             when: "",
             line: `${pausedLine(sub, now)} Nothing is charged while paused.`,
         };
@@ -412,7 +413,7 @@ export function headline(
     if (tab === "cancelled") {
         return {
             pill,
-            big: "None",
+            big: absentText(),
             when: "",
             line: `Cancelled. Ended ${sub.cancelledAt ? d(sub.cancelledAt) : "at the end of its period"}. Nothing more is charged.`,
         };
@@ -420,7 +421,7 @@ export function headline(
     if (ending) {
         return {
             pill,
-            big: "None",
+            big: absentText(),
             when: "",
             line: `Ends ${d(ending)}. No more charges. What's paid for still happens.`,
         };
@@ -436,7 +437,7 @@ export function headline(
     if (!sub.nextRenewalAt) {
         return {
             pill,
-            big: "None",
+            big: absentText(),
             when: "",
             line: "Nothing is due to renew.",
         };

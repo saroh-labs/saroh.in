@@ -5,6 +5,7 @@ import type {
 } from "@/lib/editor-shell/types";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { AutopayLimit, PlanEditorRecord, PlanValues } from "./plan-drafts";
 import type { Interval, Plan } from "./service";
@@ -373,7 +374,7 @@ export function glance(
                       Math.round(price * PER_MONTH[form.interval]),
                       cur,
                   )
-                : "Not set",
+                : absentText(),
         },
         { label: "On it now", value: String(figures?.subscriberCount ?? 0) },
         {
@@ -381,7 +382,7 @@ export function glance(
             value:
                 coming > 0
                     ? formatMoneyMajor(coming, figures?.currency ?? cur)
-                    : "None",
+                    : absentText(),
         },
     ];
 }

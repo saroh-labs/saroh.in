@@ -1,3 +1,4 @@
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -194,6 +195,8 @@ export default async function PersonPage({
         gates.leads && canWrite && !removed
             ? (await loadAddLead()).stages
             : null;
+    // What a lead is worth is in the business's currency (owner, 11 Oct).
+    const currency = gates.leads ? await readBusinessCurrency() : "";
 
     const extra: (Tab & { panel: ReactNode })[] = [];
     if (gates.leads) {
@@ -206,6 +209,7 @@ export default async function PersonPage({
                     person={person}
                     leads={crm ? crm.leads : null}
                     stages={stages}
+                    currency={currency}
                 />
             ),
         });

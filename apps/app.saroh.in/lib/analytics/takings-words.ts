@@ -1,6 +1,7 @@
 import { formatDay } from "@/lib/format/datetime";
 import { formatMoney, formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     PlaceShare,
@@ -345,7 +346,9 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
         {
             key: "best",
             label: "Best week",
-            value: f.best ? formatDay(f.best.start, { year: "never" }) : "None",
+            value: f.best
+                ? formatDay(f.best.start, { year: "never" })
+                : absentText(),
             note: f.best
                 ? `${money(f.best.takingsMinor, f.currency)}, the marked bar.`
                 : "No week of the twelve took money.",
@@ -356,7 +359,7 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
             label: "Average order, 4 weeks",
             value:
                 f.averageOrderMinor === null
-                    ? "None"
+                    ? absentText()
                     : money(f.averageOrderMinor, f.currency),
             note:
                 f.averageOrderMinor === null

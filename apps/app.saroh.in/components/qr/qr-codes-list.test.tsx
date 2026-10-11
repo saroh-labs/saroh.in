@@ -163,10 +163,10 @@ describe("QrCodesList", () => {
     });
 
     it("shows a dash, not a zero, where no booking has been counted", () => {
-        expect(
-            row(list(), "bbb")?.querySelector("[data-qr-bookings]")
-                ?.textContent,
-        ).toBe("None");
+        const cell = row(list(), "bbb")?.querySelector("[data-qr-bookings]");
+        // The eye sees the dash, and a screen reader hears the word.
+        expect(cell?.querySelector("[aria-hidden]")?.textContent).toBe("—");
+        expect(cell?.querySelector(".sr-only")?.textContent).toBe("None");
     });
 
     it("says a gone page is gone, and still offers Change", () => {

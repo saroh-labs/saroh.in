@@ -1,5 +1,6 @@
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { emailRefusalNote } from "@/lib/communications/email-setup";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     InvitationState,
@@ -33,7 +34,7 @@ export function rowRating(
 export function ratingLabel(
     r: { average: number; count: number } | null,
 ): string {
-    return r ? `${r.average.toFixed(1)} · ${r.count}` : "None";
+    return r ? `${r.average.toFixed(1)} · ${r.count}` : absentText();
 }
 
 /** Where an order's invitation stands, as one sentence. */

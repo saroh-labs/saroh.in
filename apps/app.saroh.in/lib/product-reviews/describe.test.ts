@@ -30,7 +30,7 @@ describe("labels", () => {
     it("reads '4.6 · 12', and '—' when there are none", () => {
         expect(ratingLabel({ average: 4.6, count: 12 })).toBe("4.6 · 12");
         expect(ratingLabel({ average: 5, count: 1 })).toBe("5.0 · 1");
-        expect(ratingLabel(null)).toBe("None");
+        expect(ratingLabel(null)).toBe("—");
     });
 
     it("draws stars", () => {

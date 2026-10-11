@@ -369,11 +369,11 @@ describe("takingsTiles", () => {
             ),
         );
         expect(none[2]).toMatchObject({
-            value: "None",
+            value: "—",
             note: "No week of the twelve took money.",
         });
         expect(none[3]).toMatchObject({
-            value: "None",
+            value: "—",
             note: "No paid orders to average.",
         });
     });

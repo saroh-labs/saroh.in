@@ -170,7 +170,7 @@ describe("Sales by month", () => {
         });
         expect(months[5]).toMatchObject({ n: "1 sold", amt: "₹1,500" });
         expect(months[5].pct).toBe(56);
-        expect(months[0]).toMatchObject({ n: "None sold", amt: "", pct: 0 });
+        expect(months[0]).toMatchObject({ n: "—", amt: "", pct: 0 });
         expect(note).toBe("₹4,200 in the last six months");
     });
 
@@ -183,7 +183,7 @@ describe("Sales by month", () => {
             ZONE,
         );
         expect(months[5].n).toBe("1 sold");
-        expect(months[4].n).toBe("None sold");
+        expect(months[4].n).toBe("—");
     });
 
     it("no sales, and none lately, are said differently", () => {

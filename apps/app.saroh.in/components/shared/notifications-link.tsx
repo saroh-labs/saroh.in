@@ -11,7 +11,7 @@ import { Tip } from "@saroh/ui/tooltip";
 /**
  * Notifications, in the top bar beside search and help (2026-09-25).
  *
- * It left the rail's Workspace group, which is now the business's Settings:
+ * It left the rail's last group ("Manage"), which is now the business's Settings:
  * what has happened for you is not part of setting the business up. The
  * unread count rides on the bell in the rail's badge style, capped at 99+ so
  * it never widens the bar; the accessible name carries the real number.

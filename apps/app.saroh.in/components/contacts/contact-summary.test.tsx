@@ -30,13 +30,16 @@ function contact(over: Partial<ContactListItem> = {}): ContactListItem {
 describe("ContactSummary", () => {
     it("draws nothing for someone with no facts — no row of bare dashes", () => {
         expect(
-            renderToStaticMarkup(<ContactSummary contact={contact()} />),
+            renderToStaticMarkup(
+                <ContactSummary contact={contact()} currency="INR" />,
+            ),
         ).toBe("");
     });
 
     it("labels each fact it has", () => {
         const html = renderToStaticMarkup(
             <ContactSummary
+                currency="INR"
                 contact={contact({
                     company: "Rao & Co",
                     openLeadCount: 1,

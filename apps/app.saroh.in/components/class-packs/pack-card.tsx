@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -91,7 +92,7 @@ export function PackCard({
                 <div className="min-w-0">
                     <div className={EYEBROW}>Still to use</div>
                     <div className="mt-0.5 text-[17px] font-semibold tabular-nums">
-                        {card.stillToUse}
+                        <AbsentOr says="Not known">{card.stillToUse}</AbsentOr>
                     </div>
                     <div className="text-[12px] text-muted-foreground">
                         {card.stillToUseNote}

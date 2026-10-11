@@ -5,6 +5,7 @@ import { goesToAddress } from "@/lib/orders/lifecycle";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
 import { shortPrice } from "@/lib/subscriptions/view";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import { addedLine } from "./added";
 import type {
@@ -183,7 +184,7 @@ export function initials(name: string): string {
 export function totals(list: MoneyTotal[]): string {
     return list.length
         ? list.map((t) => formatMoneyMajor(t.amount, t.currency)).join(" + ")
-        : "None";
+        : absentText();
 }
 
 // ---------------------------------------------------------------- header

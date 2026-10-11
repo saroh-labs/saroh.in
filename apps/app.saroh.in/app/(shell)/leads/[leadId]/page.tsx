@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/format/money";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -68,7 +69,11 @@ export default async function LeadDetailPage({
     const { leadId } = await params;
     await requireSession();
 
-    const lead = await getLead(leadId);
+    // A lead's Worth is in the business's currency (owner, 11 Oct).
+    const [lead, currency] = await Promise.all([
+        getLead(leadId),
+        readBusinessCurrency(),
+    ]);
     if (!lead) notFound();
 
     /*
@@ -86,7 +91,7 @@ export default async function LeadDetailPage({
     const canConsent = canOrUnknown(organization, "consent:write");
 
     const stages = lead.pipeline?.stages ?? [];
-    const amount = formatMoney(lead.value, null, { decimals: "always" });
+    const amount = formatMoney(lead.value, currency, { decimals: "always" });
     // Timeline newest-first for reading; the API returns it oldest-first.
     const timeline = [...lead.activities].reverse();
 
@@ -148,10 +153,10 @@ export default async function LeadDetailPage({
                             </Link>
                             {" · "}
                             {lead.contact.email}
-                            {amount ? ` · Value: ${amount}` : ""}
+                            {amount ? ` · Worth: ${amount}` : ""}
                         </>
                     ) : amount ? (
-                        `Value: ${amount}`
+                        `Worth: ${amount}`
                     ) : undefined
                 }
                 actions={
@@ -168,6 +173,7 @@ export default async function LeadDetailPage({
                                     leadId={lead.id}
                                     title={lead.title}
                                     value={lead.value}
+                                    currency={currency}
                                 />
                                 <DeleteLeadMenu
                                     leadId={lead.id}

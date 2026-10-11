@@ -135,7 +135,8 @@ export function AppSidebar({
         // own when the rail is taller than the window, and `overscroll-contain`
         // keeps that scroll from running on into the page.
         <aside
-            aria-label="Workspace"
+            // Names the whole rail, not its last group (that is "Manage").
+            aria-label="Main menu"
             // The rail's words are Saroh's own, so a session recording may
             // read them (DEC-125); a site's own name below is marked back.
             data-ph-unmask=""
@@ -164,7 +165,7 @@ export function AppSidebar({
                     <Fragment key={group.label ?? `group-${index}`}>
                         {/*
                          * The pinned group's space is a spacer, not `mt-auto`:
-                         * it grows to push Workspace to the foot of the rail,
+                         * it grows to push Manage to the foot of the rail,
                          * and keeps its 10px when the rail is full and scrolls.
                          */}
                         {group.pinToBottom && (

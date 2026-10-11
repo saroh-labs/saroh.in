@@ -347,9 +347,9 @@ describe("the side column", () => {
         const unpriced = { ...TEN, price: null };
         expect(eachNote(unpriced, SERVICES)).toBe("");
         expect(glance(unpriced, SERVICES, null)).toEqual([
-            ["Per class", "Not set"],
-            ["Saving vs drop-in", "Not set"],
-            ["Sold so far", "Not known"],
+            ["Per class", "—"],
+            ["Saving vs drop-in", "—"],
+            ["Sold so far", "—"],
         ]);
     });
 });

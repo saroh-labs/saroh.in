@@ -2,6 +2,7 @@
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { formatDate } from "@/lib/format/datetime";
+import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -198,7 +199,7 @@ function OrderTile({
                 {tile.label}
             </div>
             <div className="mt-1 font-display text-[22px] font-semibold tabular-nums leading-[1.2]">
-                {tile.value}
+                <AbsentOr says="None">{tile.value}</AbsentOr>
             </div>
             <div className="mt-0.5 text-[11.5px] text-muted-foreground">
                 {tile.note}
@@ -388,7 +389,11 @@ function NextBooking({
                                     : "text-foreground",
                             )}
                         >
-                            {typeof s.n === "number" ? s.n : "Not known"}
+                            {typeof s.n === "number" ? (
+                                s.n
+                            ) : (
+                                <AbsentValue says="Not known" />
+                            )}
                         </div>
                         <div className="text-[11.5px] text-muted-foreground">
                             {s.label}

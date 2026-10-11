@@ -1,3 +1,4 @@
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
@@ -142,7 +143,7 @@ export function VariantsStat({
                     : undefined
             }
             label="Variants"
-            value={product.variants.length || "None"}
+            value={product.variants.length || <AbsentValue says="None" />}
             hint={
                 product.variants.length
                     ? product.variants
