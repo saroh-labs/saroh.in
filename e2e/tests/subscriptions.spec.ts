@@ -201,11 +201,16 @@ test.describe("a subscription's page, on Northwind", () => {
         await expect(sheet).toBeVisible();
         // Its own other plan: every other on offer is some other test's,
         // which may be archived while this one is open.
-        const choice = sheet
-            .getByRole("radio")
-            .filter({ hasText: own.other.name });
-        const text = (await choice.textContent()) ?? "";
+        // A row's words are its label's ("Plan · ₹1,200/month"): the radio
+        // is named by them and holds none itself.
+        const choice = sheet.getByRole("radio", { name: own.other.name });
+        const text =
+            (await sheet
+                .locator("label")
+                .filter({ hasText: own.other.name })
+                .textContent()) ?? "";
         const [planName = "", price = ""] = text.split(" · ");
+        expect(price).toMatch(/^₹/);
         await choice.click();
         await sheet
             .getByRole("button", { name: "Change from next renewal" })

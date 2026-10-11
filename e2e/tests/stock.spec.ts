@@ -109,7 +109,9 @@ test.describe("Stock screen", () => {
 
             // 2. Undo reverses the count as a batch.
             await page.getByRole("button", { name: "Undo" }).click();
-            await expect(page.getByText("Count undone.")).toBeVisible();
+            await expect(
+                page.getByText("Undone.", { exact: true }),
+            ).toBeVisible();
             await expect(
                 page.getByText("7 on hand · 0 promised"),
             ).toBeVisible();

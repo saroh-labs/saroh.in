@@ -224,18 +224,23 @@ test.describe("a walk-in with only a name", () => {
                 .getByRole("radiogroup", { name: "How it leaves" })
                 .getByRole("radio", { checked: true })
                 .textContent();
-            const create = sheet
+            // The sheet's own button, under the total. It is never off:
+            // what stops the order is said beside the total, and pressing
+            // the button makes nothing while that stands.
+            const create = sheet.getByRole("button", {
+                name: /· create$|^Create/,
+            });
+            const problem = sheet
                 .getByRole("group", { name: "Order total" })
-                .getByRole("button");
-            if (ways?.startsWith("Pick-up")) {
-                await expect(create).toBeEnabled();
-            } else {
-                await expect(
-                    sheet.getByText(
-                        "Deliveries need a customer to send the tracking to.",
-                    ),
-                ).toBeVisible();
-                await expect(create).toBeDisabled();
+                .getByRole("status");
+            await expect(create).toBeEnabled();
+            if (!ways?.startsWith("Pick-up")) {
+                const why =
+                    "Deliveries need a customer to send the tracking to.";
+                await expect(problem).toHaveText(why);
+                await create.click();
+                await expect(sheet).toBeVisible();
+                await expect(problem).toHaveText(why);
             }
         } finally {
             await removeProducts(page.request, NW, loaf);

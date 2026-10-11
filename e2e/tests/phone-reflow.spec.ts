@@ -605,8 +605,7 @@ test.describe("phone reflow: subscriptions", () => {
             const sheet = page.getByRole("dialog", { name: "Change plan" });
             await expect(sheet).toBeVisible();
             await sheet
-                .getByRole("radio")
-                .filter({ hasText: "Fortnightly celebration cakes" })
+                .getByRole("radio", { name: /Fortnightly celebration cakes/ })
                 .click();
             await fitsAtPhoneWidths(
                 page,

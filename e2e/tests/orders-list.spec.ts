@@ -435,7 +435,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
                 .filter({ hasText: `#${t.orderId}` });
             await expect(row).toContainText(
                 t.nextVisit
-                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    ? /Next (today|tomorrow|yesterday|\d{1,2} \w{3})/
                     : "Next visit not booked",
             );
             await expect(row).not.toContainText(/\bLate\b/);

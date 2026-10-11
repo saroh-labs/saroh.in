@@ -103,7 +103,7 @@ test.describe("Track stock and Sold out", () => {
             await page.getByRole("button", { name: "Mark sold out" }).click();
             await expect(page.getByText(/^Marked sold out at /)).toBeVisible();
             await expect(
-                page.getByText("Sold out, marked by hand"),
+                page.getByText("Sold out, marked by hand", { exact: true }),
             ).toBeVisible();
             // The Details row agrees with the card.
             await expect(

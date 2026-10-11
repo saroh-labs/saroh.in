@@ -108,7 +108,7 @@ test.describe("Collections", () => {
             await sheet
                 .getByRole("button", { name: "Create collection" })
                 .click();
-            await expect(page.getByText(`${picked} created.`)).toBeVisible();
+            await expect(page.getByText("Collection created.")).toBeVisible();
             await expect(
                 page
                     .getByRole("listitem")

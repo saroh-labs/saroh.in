@@ -69,10 +69,11 @@ test.describe("invoices", () => {
         await expect(
             page.getByText(/issued and its pay link copied/).first(),
         ).toBeVisible();
-        const number = (
-            await page.getByRole("heading", { level: 1 }).innerText()
-        ).trim();
-        expect(number).toMatch(/\d{4}$/);
+        // The loading shell has a heading too ("Loading the invoice"): read
+        // the number once the invoice's own heading is there.
+        const heading = page.getByRole("heading", { level: 1 });
+        await expect(heading).toHaveText(/\d{4}$/);
+        const number = (await heading.innerText()).trim();
         await expect(
             page.getByText("Due", { exact: true }).first(),
         ).toBeVisible();

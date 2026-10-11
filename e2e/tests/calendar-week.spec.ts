@@ -86,6 +86,13 @@ test.describe("calendar week", () => {
     test("‹ › step by week and This week comes back", async ({ page }) => {
         await page.goto("/calendar?view=week");
         const title = page.getByRole("heading", { level: 1 });
+        // The loading shell has a heading of its own ("Loading"): read the
+        // week's once the week is there.
+        await expect(title).toHaveText(
+            new RegExp(
+                `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
+            ),
+        );
         const thisWeek = await title.textContent();
         await page.getByRole("link", { name: "Next week" }).click();
         await page.waitForURL(/view=week&day=/);
