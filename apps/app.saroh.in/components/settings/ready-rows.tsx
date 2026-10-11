@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PlanWay } from "@/components/billing/plan-way";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { isPlanHref } from "@/lib/billing/plan-access";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { ReadyAside, ReadyStep } from "@/lib/settings/ready";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 
@@ -41,12 +42,16 @@ export function readyRows(
  * link as given, or, for the way to a plan someone can't change, no button
  * and who can (`WHO_CAN_CHANGE_PLAN`) after the line. Row data only, so
  * the one checklist draws it like any other step nobody here can do.
+ * While plans aren't shown (DEC-136) the way to a plan is neither.
  */
 export function planRow(
     action: { label: string; href: string },
     canChangePlan: boolean,
     why?: string,
 ): Pick<ChecklistRow, "action" | "why"> {
+    if (isPlanHref(action.href) && !plansShown()) {
+        return why ? { why } : {};
+    }
     if (canChangePlan || !isPlanHref(action.href)) {
         return { action, ...(why ? { why } : {}) };
     }
@@ -56,10 +61,11 @@ export function planRow(
 /**
  * What the plan holds back (taking payment online on a plan without it,
  * DEC-092): listed under the steps, outside the count and the bar, with the
- * plan that has it. So the count can reach all done without it.
+ * plan that has it. So the count can reach all done without it. Nothing
+ * while plans aren't shown (DEC-136).
  */
 export function PlanAsides({ items }: { items: readonly ReadyAside[] }) {
-    if (items.length === 0) return null;
+    if (items.length === 0 || !plansShown()) return null;
     return (
         <ul
             aria-label="Not counted: comes with another plan"

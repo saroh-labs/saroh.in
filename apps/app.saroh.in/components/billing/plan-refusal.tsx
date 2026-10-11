@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 
 import { upgradeHref } from "@/lib/billing/access";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { useCanChangePlan } from "./plan-way";
 
 /**
@@ -29,6 +30,11 @@ type Listener = (refusal: PlanRefusal) => void;
 const listeners = new Set<Listener>();
 
 export function showPlanRefusal(refusal: PlanRefusal): void {
+    // Plans aren't shown (DEC-136): what stopped, and no way to a plan.
+    if (!plansShown()) {
+        showError(refusal.title);
+        return;
+    }
     // No host (a surface outside the shell): still the notice's words.
     if (listeners.size === 0) {
         showError(refusal.title, refusal.body || undefined);

@@ -123,3 +123,13 @@ hot-reload hygiene and protects nothing.
   `docs/architecture/RLS_ROLLOUT_AND_OPS.md`.
 - **Adopted** — **Every flag has a deletion plan and a count of its readers,**
   written where it is declared. Gap: none of the keys in `flags.ts` has one.
+- **Current** — **A switch that only hides a screen is a `NEXT_PUBLIC_*`
+  enum, `on` or `off`, where only `on` shows it.** Unset is off, so the
+  environment that leaves it out is the one that hides. It is validated in the
+  app's `env.ts`, read through one small module that everything else asks,
+  set to `on` in the development `vars` of `wrangler.jsonc`, on CI's browser
+  stack (`ci.yml`), in `scripts/prepush.sh` and in the app's `dev` script,
+  and declared in `turbo.json`. Its module says how it is removed and who
+  reads it. It protects nothing: the API half is still the flag. The
+  workspace's plans are the worked example (`NEXT_PUBLIC_PLANS`,
+  `lib/saroh-billing/plans-shown.ts`, DEC-136).

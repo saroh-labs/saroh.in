@@ -514,6 +514,18 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
 `billing-actions.ts`, `components/settings/plan-billing/`,
 `components/billing/`.
 
+- **Shown only where `NEXT_PUBLIC_PLANS` is `on`** (DEC-136,
+  `lib/saroh-billing/plans-shown.ts`). Left out, as production has it until
+  pricing opens, none of this section is drawn: Settings › Plan and billing
+  and Saroh's invoice PDF are a 404; the page leaves the Settings sections,
+  Settings search, the command menu and Activity; the plan and paused reads
+  aren't asked, so no banner, limit notice, meter, lock or paused mark
+  appears; a plan's refusal is said as any other failure; onboarding reads
+  no plan picked on saroh.in and no invite. Switching it on is one line in
+  the production `vars` of `apps/app.saroh.in/wrangler.jsonc` and a deploy of
+  the workspace. It is a third step beside the two above, and none does
+  another's work: publishing a catalogue (steps 3 to 5) and
+  `PLAN_ENFORCEMENT` (step 6) stay the API's.
 - **Settings › Plan and billing** (owner only, as before): Your plan (from
   `GET …/billing/access` and the subscription), the plan picker (from
   `GET /public/pricing`; Monthly | Yearly only while yearly is on; "Start

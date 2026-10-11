@@ -38,6 +38,10 @@
         "NEXT_PUBLIC_POSTHOG_HOST",
         "NEXT_PUBLIC_POSTHOG_REPLAY",
         "NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE",
+        // The workspace: whether Saroh's own plans are shown (DEC-136).
+        // Compiled into the bundle, so a build with it differs from one
+        // without.
+        "NEXT_PUBLIC_PLANS",
         // saroh.in: shows Resources pages before their publish date on a
         // preview deployment; ignored on production (plan KTD-2). Hashed, not
         // passed through: a build without it pre-renders /help as a 404, and

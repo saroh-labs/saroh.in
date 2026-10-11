@@ -51,6 +51,20 @@ describe("/ (Home)", () => {
         expect(container.querySelector('a[href^="/pricing"]')).toBeNull();
     });
 
+    it("before launch says nothing of a catalogue published early (DEC-136)", async () => {
+        launch.mode = "waitlist";
+        read.catalog = fakeCatalog();
+        const { container } = render(await HomePage());
+        // Not in the answers, the hero's line or the structured data.
+        expect(container.innerHTML).not.toMatch(RUPEE);
+        expect(container.innerHTML).not.toMatch(/Plan [ABC]\b/);
+        expect(container.innerHTML).not.toContain('"offers"');
+        expect(container.innerHTML).not.toContain("/pricing");
+        expect(container.textContent).toContain(
+            "Plan details are announced at launch",
+        );
+    });
+
     it("reads the headline whole and has the anchors other pages link to", async () => {
         const { container } = render(await HomePage());
         expect(

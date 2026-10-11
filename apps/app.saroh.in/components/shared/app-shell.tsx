@@ -36,6 +36,7 @@ import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
@@ -185,8 +186,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         recordingOn ? usageSharingOrNull() : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
-    // so they stay in the rail with a lock and a way up (U14).
-    const planLocked = modules ? planLockedModuleKeys(modules) : [];
+    // so they stay in the rail with a lock and a way up (U14). None while
+    // plans aren't shown (DEC-136): a lock would name a plan.
+    const planLocked =
+        modules && plansShown() ? planLockedModuleKeys(modules) : [];
     const moduleKeys = modules
         ? [
               ...modules

@@ -10,6 +10,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
 
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
+
 /**
  * Whether the person reading may change the plan (`mayChangePlan`,
  * `lib/billing/plan-access.ts`), for every plan prompt in the app (UX
@@ -23,6 +25,9 @@ import { createContext, useContext } from "react";
  *
  * Outside the shell (the site editor) nobody has said, and the link shows:
  * the page it opens decides.
+ *
+ * While plans aren't shown (DEC-136, `plansShown`) none of this is drawn:
+ * no link, no "who can", no plan card. There is no page for them to open.
  */
 const PlanAccessContext = createContext(true);
 
@@ -71,6 +76,7 @@ export function PlanWay({
     fallback?: ReactNode;
 }) {
     const can = useCanChangePlan();
+    if (when && !plansShown()) return null;
     if (!when || can) return children;
     if (fallback !== undefined) return fallback;
     return (
@@ -94,12 +100,16 @@ export function PlanWay({
 export function PlanLockedCard(
     props: Omit<PlanLockedStateProps, "canChangePlan">,
 ) {
-    return <PlanLockedState {...props} canChangePlan={useCanChangePlan()} />;
+    const canChangePlan = useCanChangePlan();
+    if (!plansShown()) return null;
+    return <PlanLockedState {...props} canChangePlan={canChangePlan} />;
 }
 
 /** `LimitReachedState` for this reader, the same way. */
 export function LimitReachedCard(
     props: Omit<LimitReachedStateProps, "canChangePlan">,
 ) {
-    return <LimitReachedState {...props} canChangePlan={useCanChangePlan()} />;
+    const canChangePlan = useCanChangePlan();
+    if (!plansShown()) return null;
+    return <LimitReachedState {...props} canChangePlan={canChangePlan} />;
 }

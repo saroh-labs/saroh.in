@@ -71,6 +71,13 @@ export const env = createEnv({
             .string()
             .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
             .optional(),
+        /**
+         * Saroh's own plans in the workspace (DEC-136): Settings › Plan and
+         * billing and every plan prompt. Shown only when "on"; unset or
+         * "off", the page is a 404 and nothing names a plan. Read through
+         * `lib/saroh-billing/plans-shown.ts`, nowhere else.
+         */
+        NEXT_PUBLIC_PLANS: z.enum(["on", "off"]).optional(),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
@@ -89,6 +96,7 @@ export const env = createEnv({
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
             process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
+        NEXT_PUBLIC_PLANS: process.env.NEXT_PUBLIC_PLANS,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

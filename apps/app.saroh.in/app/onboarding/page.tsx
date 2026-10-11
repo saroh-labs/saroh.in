@@ -25,6 +25,7 @@ import {
     planIntentNote,
 } from "@/lib/saroh-billing/plan-checkout";
 import { readPlanIntent } from "@/lib/saroh-billing/plan-intent";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { requireSession } from "@/lib/session";
 import { Notice } from "@saroh/ui/notice";
 
@@ -59,6 +60,9 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  * plan: the business takes the launch offer instead of a checkout, and the
  * name it was listed under on the waitlist fills the form. Unlike a plan it
  * works for another business too — one owner may have listed two (OQ-11).
+ *
+ * While plans aren't shown (DEC-136) neither is read: no plan is named
+ * under the heading, nothing goes on to a checkout, and no offer is taken.
  */
 export default async function OnboardingPage({
     searchParams,
@@ -72,12 +76,15 @@ export default async function OnboardingPage({
         searchParams,
     ]);
     const hasOrgs = organizations.length > 0;
-    const invite = await readInviteIntent(query);
+    const plans = plansShown();
+    const invite = plans
+        ? await readInviteIntent(query)
+        : ({ kind: "none" } as const);
     if (hasOrgs && query.plan !== undefined && invite.kind === "none") {
         redirect("/");
     }
     const intent =
-        hasOrgs || invite.kind !== "none"
+        !plans || hasOrgs || invite.kind !== "none"
             ? ({ kind: "none" } as const)
             : await readPlanIntent(query);
     const note = inviteNote(invite) ?? planIntentNote(intent);

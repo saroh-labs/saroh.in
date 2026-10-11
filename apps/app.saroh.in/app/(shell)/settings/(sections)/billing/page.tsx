@@ -2,6 +2,7 @@ import { PartialRead } from "@/components/shared/failed-read";
 import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
+import { notFound } from "next/navigation";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
 import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
@@ -26,6 +27,7 @@ import {
     yearlyOffer,
     yourPlan,
 } from "@/lib/saroh-billing/plan-view";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import {
     getBillingAccess,
     getCheckouts,
@@ -55,8 +57,13 @@ import { requireSession } from "@/lib/session";
  * Reads degrade per source: the plan and access are the page (a failure is
  * the section's boundary); the price list, invoices, add-ons and checkouts
  * each say when they couldn't be read, and the rest still shows.
+ *
+ * Not found while plans aren't shown (DEC-136): the segment's layout
+ * answers first, and the page says so too.
  */
-export const metadata = { title: "Plan and billing" };
+export function generateMetadata() {
+    return plansShown() ? { title: "Plan and billing" } : {};
+}
 
 const DENIED = (
     <PermissionDeniedState {...whoCanChange({ thing: "Plan and billing" })} />
@@ -73,6 +80,7 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
 }
 
 export default async function PlanBillingPage() {
+    if (!plansShown()) notFound();
     await requireSession();
     const org = await resolveActiveOrganization();
     // Unknown (no business resolved) opens, and the API decides.

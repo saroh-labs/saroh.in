@@ -25,6 +25,7 @@ import {
 import { mayAddWebsite } from "@/lib/business-limits";
 import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -1157,6 +1158,9 @@ export function isNavSectionActive(
     );
 }
 
+/** Settings › Plan and billing, hidden while plans aren't shown. */
+const PLAN_PAGE_HREF = "/settings/billing";
+
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
  * everyone signed in may (Your profile is about the person, not the
@@ -1260,11 +1264,16 @@ export const SETTINGS_PAGES = [
  * The action as `navCan` judges it, and for an owner-only page the role too.
  * A null role is "we do not know yet" and fails open, as everywhere in the
  * nav: the page itself still refuses anyone who is not the owner.
+ *
+ * Plan and billing is nobody's while plans aren't shown (DEC-136): the
+ * tabs, `/settings`, the command menu and Settings search all ask here, so
+ * it leaves them together, and its address is a 404.
  */
 export function mayOpenSettingsPage(
     actor: { role: NavRole | null; actions?: readonly string[] | null },
     page: SettingsPage,
 ): boolean {
+    if (page.href === PLAN_PAGE_HREF && !plansShown()) return false;
     if (page.action && !navCan(actor, page.action)) return false;
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
         return false;

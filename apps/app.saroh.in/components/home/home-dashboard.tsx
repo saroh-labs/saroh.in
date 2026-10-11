@@ -17,6 +17,7 @@ import type { HomeModel } from "@/lib/home/service";
 import { showsWeek, weekRows } from "@/lib/home/week";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { PlanLockedCard } from "@/components/billing/plan-way";
@@ -219,8 +220,9 @@ function FirstRun({
 
     // Turned on, but the plan holds it (#837): the business did pick, so
     // "has not picked" would be false. The owner gets the way to a plan
-    // that has it; anyone else, who changes it.
-    if (heldByPlan(modules)) {
+    // that has it; anyone else, who changes it. Not while plans aren't
+    // shown (DEC-136): Home then says what is true without naming one.
+    if (plansShown() && heldByPlan(modules)) {
         return (
             <PlanLockedCard
                 name="What's turned on"

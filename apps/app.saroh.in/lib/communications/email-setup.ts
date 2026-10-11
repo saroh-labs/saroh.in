@@ -1,3 +1,4 @@
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
@@ -78,7 +79,8 @@ export function emailPrompt(
 ): EmailPrompt | null {
     if (!setup || setup.connected) return null;
     if (setup.canConnect === false) {
-        if (!may.plans) return null;
+        // No plans to see while they aren't shown (DEC-136).
+        if (!may.plans || !plansShown()) return null;
         return {
             kind: "plans",
             title: EMAIL_PROMPT_TITLE,
@@ -110,9 +112,10 @@ export function emailRefusalNote(
     if (setup.canConnect === false) {
         return {
             text: words.plans,
-            action: may.plans
-                ? { href: SEE_PLANS_HREF, label: planLabel() }
-                : null,
+            action:
+                may.plans && plansShown()
+                    ? { href: SEE_PLANS_HREF, label: planLabel() }
+                    : null,
         };
     }
     return {

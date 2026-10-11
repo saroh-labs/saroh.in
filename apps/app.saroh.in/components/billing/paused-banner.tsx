@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PausedView } from "@/lib/billing/paused";
 import { PLAN_AND_BILLING_HREF, pausedBanner } from "@/lib/billing/paused";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { PlanWay } from "./plan-way";
@@ -14,9 +15,10 @@ import { PlanWay } from "./plan-way";
  * will (#800, #801): what, when, and the way to keep everything. Said in
  * words, not by colour: "Paused by your plan" or "will pause on …". The
  * API decides (`GET …/billing/paused`); nothing when nothing is over, the
- * read failed, or nothing is enforced.
+ * read failed, nothing is enforced, or plans aren't shown (DEC-136).
  */
 export function PausedBanner({ view }: { view: PausedView | null }) {
+    if (!plansShown()) return null;
     const b = pausedBanner(view);
     if (!b) return null;
     return (
@@ -56,6 +58,7 @@ export function PausedNote({
     children: React.ReactNode;
     className?: string;
 }) {
+    if (!plansShown()) return null;
     return (
         <Notice tone="warning" role="note" className={className}>
             {children}{" "}
