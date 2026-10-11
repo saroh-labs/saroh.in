@@ -121,6 +121,7 @@ test.describe("a Member", () => {
         const who = await makeContact(owner.request, {
             firstName: "Member",
             lastName: `Reads ${tag}`,
+            email: `member-reads-${tag}@example.com`,
         });
         try {
             await openNorthwindAs(page, "northwindMember");
@@ -175,6 +176,7 @@ test.describe("a Member", () => {
         const who = await makeContact(owner.request, {
             firstName: "Stale",
             lastName: `Tab ${tag}`,
+            email: `stale-tab-${tag}@example.com`,
         });
         try {
             await openNorthwindAs(page, "admin");
@@ -271,6 +273,7 @@ test.describe("a Member", () => {
         const who = await makeContact(owner.request, {
             firstName: "Diary",
             lastName: `Reads ${tag}`,
+            email: `diary-reads-${tag}@example.com`,
         });
         const booked = await bookOwn(owner.request, who.id);
         try {

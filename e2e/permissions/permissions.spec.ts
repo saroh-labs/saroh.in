@@ -573,17 +573,18 @@ test("a person's extra permissions show on Team, and a Manager gives only what t
     await expect(
         page.getByRole("switch", { name: /^Manage payments/ }),
     ).toHaveCount(0);
-    // Giving what they hold is one switch and a save.
-    await expect(
-        page.getByRole("button", { name: "No changes yet" }),
-    ).toBeDisabled();
+    // Giving what they hold is one switch and a save. The sheet's button
+    // is "Save", and it is never off for "nothing changed".
+    const save = page.getByRole("button", { name: "Save", exact: true });
+    await expect(save).toBeEnabled();
     await page
         .getByRole("switch", { name: "Change locations, off", exact: true })
         .click();
     await expect(
-        page.getByRole("button", { name: "Save changes" }),
-    ).toBeEnabled();
-    await page.getByRole("button", { name: "Cancel" }).click();
+        page.getByRole("switch", { name: "Change locations, on", exact: true }),
+    ).toBeVisible();
+    await expect(save).toBeEnabled();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
     // Their own row: nobody changes their own permissions.
     await page

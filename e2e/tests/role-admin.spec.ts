@@ -30,6 +30,8 @@ import { people } from "../fixtures/sessions";
  * Every row of `NAV_GROUPS` (`components/shared/nav-items.tsx`) whose module
  * Northwind runs. Sell › Stock is drawn only while the business tracks stock,
  * which a product spec may have turned off, so it is allowed and not asked.
+ * Class packs is not in it: the module is not offered on any plan (DEC-099),
+ * so it is hidden from the menu for every role, whatever the seed turned on.
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
@@ -55,7 +57,6 @@ const MENU: readonly MenuRow[] = [
             { label: "Services", href: "/services" },
             { label: "Availability", href: "/bookings/availability" },
             { label: "Courses", href: "/courses" },
-            { label: "Class packs", href: "/class-packs" },
         ],
     },
     {

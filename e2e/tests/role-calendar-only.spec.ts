@@ -35,8 +35,8 @@ const HERS = { id: "seed_booking_calendar-only", booker: "Meera Nair" };
 
 /**
  * `NAV_GROUPS` (`components/shared/nav-items.tsx`) for the role's five
- * permissions: Appointments is the only module in reach, and its Courses and
- * Class packs pages ask reads the role doesn't hold. Settings is offered for
+ * permissions: Appointments is the only module in reach, and its Courses
+ * page asks a read the role doesn't hold. Settings is offered for
  * `module:read`.
  */
 const MENU: readonly MenuRow[] = [
@@ -101,6 +101,7 @@ test.describe("someone who is Calendar only", () => {
         const someone = await makeContact(owner.request, {
             firstName: "Someone",
             lastName: `Else ${tag}`,
+            email: `someone-else-${tag}@example.com`,
         });
         // With nobody put on it, on a service Tara doesn't take: not hers.
         const theirs = await bookOwn(owner.request, someone.id);
