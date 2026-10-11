@@ -21,6 +21,17 @@ export function getAppUrl(): string {
 }
 
 /**
+ * This app's own public address, for the tags that must be written as full
+ * addresses (the sign-in page's share card and `og:url`).
+ */
+export function getAccountsUrl(): string {
+    if (env.NEXT_PUBLIC_ACCOUNTS_URL) return env.NEXT_PUBLIC_ACCOUNTS_URL;
+    return env.NODE_ENV === "production"
+        ? "https://accounts.saroh.in"
+        : "https://accounts.saroh.localhost";
+}
+
+/**
  * The first-run funnel: create an organization, then choose modules.
  *
  * A freshly verified user has no organization yet, so this is the correct

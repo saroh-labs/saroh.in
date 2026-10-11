@@ -12,9 +12,15 @@ import {
     getInvitation,
 } from "@/lib/invitations";
 
+// The link is a credential, and the page behind it names a business, who
+// asked and a role to anyone who holds it. So the tab and a pasted link's
+// preview say only this, never the business or the person; and the page
+// sends no referrer, so the token never leaves in a Referer header to
+// anything it links to (as a pay link does, saroh.app `pay/[token]`).
 export const metadata: Metadata = {
-    title: "You have been invited · Saroh",
+    title: "You have been invited",
     description: "Someone has invited you to their business on Saroh.",
+    referrer: "no-referrer",
 };
 
 const ROLE_LABEL = {
