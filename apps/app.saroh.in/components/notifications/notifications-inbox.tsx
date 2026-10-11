@@ -199,7 +199,7 @@ export function NotificationsInbox({
                                                     n.createdAt,
                                                     zone,
                                                 )}
-                                                className="text-[12px] tabular-nums text-muted-foreground"
+                                                className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground"
                                             >
                                                 {when}
                                             </time>

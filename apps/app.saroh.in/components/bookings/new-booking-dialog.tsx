@@ -458,7 +458,7 @@ export function NewBookingDialog({
                                     }))}
                                     itemClassName={(on) =>
                                         cn(
-                                            "rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums coarse:min-h-11",
+                                            "whitespace-nowrap rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums coarse:min-h-11",
                                             on
                                                 ? "border-foreground bg-foreground text-background"
                                                 : "border-border hover:border-border-strong hover:bg-accent",

@@ -179,7 +179,7 @@ export function WeekHourGrid({
                         {LABELS.map((l) => (
                             <span
                                 key={l.text}
-                                className="absolute right-1.5 text-[10.5px] tabular-nums text-muted-foreground"
+                                className="absolute right-1.5 whitespace-nowrap text-[10.5px] tabular-nums text-muted-foreground"
                                 style={{ top: l.top }}
                             >
                                 {l.text}
