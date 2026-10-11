@@ -1151,7 +1151,8 @@ describe("Website starts from the kind's template (DEC-070, K15)", () => {
 
     it.each([
         ["WORK", ["/", "/about", "/work"]],
-        ["BUSINESS", ["/", "/about"]],
+        // Nothing else on yet: Home and the Contact page (DEC-141).
+        ["BUSINESS", ["/", "/contact"]],
     ] as const)(
         "%s: turning Website on drafts the kind's pages",
         async (kind, paths) => {

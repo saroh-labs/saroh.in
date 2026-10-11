@@ -98,13 +98,32 @@ describe("a site made from a template with colourways (KTD-1)", () => {
 
     it("leaves a site from a template without colourways unstyled", async () => {
         const ctx = await business();
+        // The starter has colourways since v4 (DEC-141); Writing has none.
         const { siteId } = await sites.createFromTemplate(ctx, {
             name: "Crumb",
+            templateId: "writing",
         });
         const site = await prisma.site.findUniqueOrThrow({
             where: { id: siteId },
             select: { style: true },
         });
         expect(site.style).toBeNull();
+    });
+
+    it("starts a site with no template asked for in the starter's first colourway", async () => {
+        const ctx = await business();
+        const { siteId } = await sites.createFromTemplate(ctx, {
+            name: "Crumb",
+        });
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { style: true, templateStyleId: true },
+        });
+        expect(site.templateStyleId).toBe("stone");
+        expect(site.style).toMatchObject({
+            fontPair: "source-serif-inter",
+            palette: { bg: "#F6F3EC", accent: "#235847" },
+            type: { displaySize: 56, bodySize: 17 },
+        });
     });
 });

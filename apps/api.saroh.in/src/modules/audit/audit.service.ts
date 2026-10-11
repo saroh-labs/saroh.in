@@ -96,6 +96,13 @@ export const AuditAction = {
     // the publication. Metadata: how it went live (`source`), and the test
     // release when it was one. The target is the new publication.
     SitePublishOverride: "site.publish_approval.override",
+    // A site's draft brought up to its template's newest version by Saroh
+    // (DEC-141, `sites/template-upgrade.ts`), written in the upgrade's own
+    // transaction with the site as the target and `system:template-upgrade`
+    // as the actor. Metadata: the versions it moved between, whether the
+    // look and the footer were applied or kept, and counts of pages and
+    // sections. Never a name or a line of the site's text.
+    SiteTemplateUpgrade: "site.template.upgrade",
     // "Download your data" (DEC-120): an owner asked for the business's
     // zip, and each time one made a link to download it. The target is the
     // export; metadata is counts and sizes, never a link or a key.
