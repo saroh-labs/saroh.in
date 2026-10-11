@@ -1,57 +1,36 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@saroh/ui/form";
-import { Input } from "@saroh/ui/input";
 import { showError } from "@saroh/ui/toast";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useState } from "react";
 
 import type { UndoOutcome } from "@/components/organizations/use-settings-undo";
 import { FormSheet } from "@/components/shared/form-sheet";
+import {
+    DEFAULT_WEEK,
+    OpeningHoursFields,
+} from "@/components/stores/opening-hours";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
-import type { WeekText } from "@/lib/organizations/opening-hours";
-import {
-    dayProblem,
-    WEEK,
-    weekFromText,
-    weekText,
-} from "@/lib/organizations/opening-hours";
+import { sameWeek } from "@/lib/organizations/opening-hours";
 import { undoStorefrontHours } from "@/lib/organizations/settings-actions";
 import { hoursUndo } from "@/lib/organizations/settings-undo";
+import { hoursBackwards } from "@/lib/stores/opening-hours-summary";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
-import type { StorefrontHours } from "@/lib/stores/storefronts";
-
-const day = z.string().superRefine((value, ctx) => {
-    const problem = dayProblem(value);
-    if (problem) ctx.addIssue({ code: "custom", message: problem });
-});
-
-const hoursSchema = z.object({
-    mon: day,
-    tue: day,
-    wed: day,
-    thu: day,
-    fri: day,
-    sat: day,
-    sun: day,
-});
+import type {
+    OpeningHoursDay,
+    StorefrontHours,
+} from "@/lib/stores/storefronts";
 
 const WORDS = sheetWords("hours", { kind: undefined, registered: false });
 
 /**
- * The week the business keeps, edited in its row's sheet: a day as a shop
- * writes it on its door, "07:00–19:00" or "Closed". The draft starts from
- * the first location's week and Save writes every location, one PATCH
- * each (the organization's own save never carries hours).
+ * The week the business keeps, edited in its row's sheet with the same
+ * fields a location's own Opening hours sheet has (`OpeningHoursFields`):
+ * which days it opens and the hours it keeps, picked rather than typed,
+ * with a day-by-day list for a week that isn't the same every day. The
+ * draft starts from the first location's week and Save writes every
+ * location, one PATCH each (the organization's own save never carries
+ * hours).
  *
  * A location that refuses is named in a toast and the sheet stays open
  * with what was typed; the ones that did save show at once.
@@ -77,19 +56,27 @@ export function BusinessHoursSheet({
     onSaved: (said: string, undo: (() => Promise<UndoOutcome>) | null) => void;
 }) {
     const first = stores.at(0);
-    const form = useForm<WeekText>({
-        resolver: zodResolver(hoursSchema),
-        defaultValues: weekText(first?.openingHours ?? null),
-    });
-    const { isDirty, isSubmitting } = form.formState;
+    const saved = first?.openingHours ?? null;
+    const [week, setWeek] = useState<OpeningHoursDay[]>(saved ?? DEFAULT_WEEK);
+    const [isSubmitting, setSubmitting] = useState(false);
+    // A week never saved is a draft worth saving as it stands.
+    const isDirty = saved === null || !sameWeek(week, saved);
 
-    async function onSubmit(values: WeekText) {
+    async function save() {
+        setSubmitting(true);
+        try {
+            await write();
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    async function write() {
         const results = await Promise.all(
             stores.map(async (store) => ({
                 store,
                 result: await updateStorefront(store.id, {
-                    // A closed day keeps each location's own times.
-                    openingHours: weekFromText(values, store.openingHours),
+                    openingHours: week,
                 }),
             })),
         );
@@ -142,66 +129,43 @@ export function BusinessHoursSheet({
     }
 
     return (
-        <Form {...form}>
-            <FormSheet
-                id={`${BUSINESS_ROW_ID.hours}-panel`}
-                returnFocusTo={returnTo}
-                title={WORDS.title}
-                description={WORDS.description}
-                open={open}
-                pending={isSubmitting}
-                onClose={onClose}
-                onSubmit={(e) => {
-                    // Nothing changed, and the locations already agree:
-                    // there is nothing to write.
-                    if (!isDirty && !differ) {
-                        e.preventDefault();
-                        onClose();
-                        return;
-                    }
-                    void form.handleSubmit(onSubmit)(e);
-                }}
-            >
-                {differ && first ? (
-                    <p className="text-pretty rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
-                        Your locations have different hours. These are{" "}
-                        {first.name}&apos;s, and saving sets them all to these.
-                    </p>
-                ) : null}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-4 [&_label]:text-[12.5px] [&_label]:font-medium">
-                    {WEEK.map(({ key, label }) => (
-                        <FormField
-                            key={key}
-                            control={form.control}
-                            name={key}
-                            render={({ field }) => (
-                                <FormItem className="min-w-0">
-                                    <FormLabel>{label}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            maxLength={20}
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            placeholder={
-                                                key === "mon"
-                                                    ? "07:00–19:00 or Closed"
-                                                    : undefined
-                                            }
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    ))}
-                </div>
-                <p className="mt-2 text-pretty text-[11.5px] leading-normal text-muted-foreground">
-                    Write a day as 07:00–19:00, or Closed. Online orders placed
-                    while you&apos;re closed are ready from the next opening
-                    time.
+        <FormSheet
+            id={`${BUSINESS_ROW_ID.hours}-panel`}
+            returnFocusTo={returnTo}
+            title={WORDS.title}
+            description={WORDS.description}
+            open={open}
+            pending={isSubmitting}
+            onClose={onClose}
+            onSubmit={(e) => {
+                e.preventDefault();
+                // A day that closes before it opens is said under the
+                // fields; nothing is sent until it is put right.
+                if (hoursBackwards(week)) return;
+                // Nothing changed, and the locations already agree: there
+                // is nothing to write.
+                if (!isDirty && !differ) {
+                    onClose();
+                    return;
+                }
+                void save();
+            }}
+        >
+            {differ && first ? (
+                <p className="text-pretty rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
+                    Your locations have different hours. These are {first.name}
+                    &apos;s, and saving sets them all to these.
                 </p>
-            </FormSheet>
-        </Form>
+            ) : null}
+            <OpeningHoursFields
+                week={week}
+                setWeek={setWeek}
+                saved={saved !== null}
+            />
+            <p className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
+                Online orders placed while you&apos;re closed are ready from the
+                next opening time.
+            </p>
+        </FormSheet>
     );
 }
