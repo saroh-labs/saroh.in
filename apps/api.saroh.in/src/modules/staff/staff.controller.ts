@@ -21,6 +21,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import {
     AddExtraHoursDto,
+    AddSelfDto,
     AddTimeOffDto,
     CreateStaffDto,
     RemoveOffDto,
@@ -55,6 +56,19 @@ export class StaffController {
         @Body() dto: CreateStaffDto,
     ): Promise<StaffView> {
         return this.staff.create(ctx, dto);
+    }
+
+    /**
+     * "It's just me": the caller on the diary as themselves. No team seat
+     * is added, as they already use one.
+     */
+    @Post("me")
+    @HttpCode(201)
+    addSelf(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: AddSelfDto,
+    ): Promise<StaffView> {
+        return this.staff.addSelf(ctx, dto);
     }
 
     @Get(":staffId")
