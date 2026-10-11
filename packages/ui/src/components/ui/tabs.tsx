@@ -43,7 +43,17 @@ export interface TabItem<V extends string = string> {
      * leave it out for no count at all.
      */
     count?: number | string | null;
+    /**
+     * Leave it out: a tab's count is a plain tally. `strong` or `danger`
+     * only when the number means "needs you now", with `countSays`.
+     */
     countTone?: CountTone;
+    /**
+     * What an attention count means, after the number ("need you"): the
+     * badge's accessible name is then "4 need you". Required with a
+     * `countTone` other than neutral.
+     */
+    countSays?: string;
     /** Button mode: the panel this tab shows (`aria-controls`). */
     controls?: string;
     /** Drawn after the label and count, such as a dot for unsaved changes. */
@@ -113,7 +123,12 @@ export function TabStrip<V extends string = string>({
         <>
             {t.label}
             {t.count === undefined ? null : (
-                <CountBadge count={t.count} tone={t.countTone} on={on} />
+                <CountBadge
+                    count={t.count}
+                    tone={t.countTone}
+                    says={t.countSays}
+                    on={on}
+                />
             )}
             {t.extra}
         </>

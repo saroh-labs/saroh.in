@@ -158,6 +158,29 @@ describe("CountBadge", () => {
         expect(classes(el())).toContain("text-[11px]");
     });
 
+    it("a plain tally is neutral and needs no name of its own", () => {
+        const { container } = render(<CountBadge count={12} />);
+        const el = must(container.querySelector("[data-count-badge]"));
+        expect(el).toHaveAttribute("data-tone", "neutral");
+        expect(classes(el)).toContain("bg-muted");
+        expect(el).not.toHaveAttribute("aria-label");
+    });
+
+    it("an attention count says what it means: colour alone tells nobody", () => {
+        const { rerender } = render(
+            <CountBadge count={4} tone="strong" says="need you" />,
+        );
+        expect(screen.getByLabelText("4 need you")).toHaveTextContent("4");
+        rerender(<CountBadge count={2} tone="danger" says="overdue" />);
+        expect(screen.getByLabelText("2 overdue")).toHaveAttribute(
+            "data-tone",
+            "danger",
+        );
+        // A neutral count never borrows the words.
+        rerender(<CountBadge count={2} tone="neutral" says="overdue" />);
+        expect(screen.queryByLabelText("2 overdue")).toBeNull();
+    });
+
     it("takes a few words too", () => {
         render(<CountBadge count="2 need you" tone="strong" />);
         expect(screen.getByText("2 need you")).toBeInTheDocument();

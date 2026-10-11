@@ -122,8 +122,11 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef<
     React.ElementRef<typeof SelectPrimitive.Item>,
-    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+        /** A quiet second line in the open list only, never in the box. */
+        hint?: React.ReactNode;
+    }
+>(({ className, children, hint, ...props }, ref) => (
     <SelectPrimitive.Item
         ref={ref}
         className={cn(
@@ -138,7 +141,16 @@ const SelectItem = React.forwardRef<
             </SelectPrimitive.ItemIndicator>
         </span>
 
-        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        {hint ? (
+            <span className="grid min-w-0">
+                <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+                <span className="text-[11px] text-muted-foreground">
+                    {hint}
+                </span>
+            </span>
+        ) : (
+            <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        )}
     </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;

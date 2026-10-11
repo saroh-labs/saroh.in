@@ -158,6 +158,40 @@ describe("TabStrip, link mode", () => {
         expect(unknown).toHaveTextContent("—");
     });
 
+    it("draws a tab's count as the shared badge: neutral unless it needs someone, and then named", () => {
+        const { container } = render(
+            <TabStrip
+                label="Stock views"
+                value="levels"
+                tabs={[
+                    {
+                        value: "levels",
+                        label: "Levels",
+                        href: "/stock",
+                        count: 4,
+                        countTone: "strong",
+                        countSays: "need you",
+                    },
+                    {
+                        value: "log",
+                        label: "Log",
+                        href: "/stock?tab=log",
+                        count: 50,
+                    },
+                ]}
+            />,
+        );
+        const badges = container.querySelectorAll("[data-count-badge]");
+        expect(badges).toHaveLength(2);
+        expect(badges[0]).toHaveAttribute("data-tone", "strong");
+        expect(badges[0]).toHaveAttribute("aria-label", "4 need you");
+        // The plain tally: the neutral tone, and no words of its own.
+        expect(badges[1]).toHaveAttribute("data-tone", "neutral");
+        expect(badges[1]).not.toHaveAttribute("aria-label");
+        // Never joined to the label with a dot.
+        expect(container.textContent).not.toContain("·");
+    });
+
     it("scrolls sideways inside ScrollX without adding a second landmark or focus stop", () => {
         const { container } = render(
             <TabStrip label="Orders" value="all" tabs={tabs} />,

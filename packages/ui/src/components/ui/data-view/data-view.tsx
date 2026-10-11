@@ -6,11 +6,13 @@ import { useMemo, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Checkbox } from "../checkbox";
 import { EmptyState } from "../data-state";
+import { FilterChips } from "../filter-chips";
 import { ListSearch } from "../list-search";
+import { listTable } from "../list-table";
+import { ListToolbar } from "../list-toolbar";
 import { ScrollX } from "../scroll-x";
 import { Segmented } from "../segmented";
 import { Skeleton } from "../skeleton";
-import { TabStrip } from "../tabs";
 
 import type {
     DataColumn,
@@ -55,13 +57,15 @@ export function DataView<TRow>({
     searchableColumnIds,
     filters,
     initialFilterId,
-    filterStyle = "tabs",
     isLoading = false,
     error = null,
     noun,
     showTotal = true,
     searchPlaceholder,
+    toolbarSearch,
     toolbarExtra,
+    toolbarEnd,
+    toolbarChips,
     countLabel,
     hideModeToggle = false,
     onRowClick,
@@ -214,9 +218,15 @@ export function DataView<TRow>({
     // One filter is not a filter — a lone chip nobody can switch away from is
     // chrome that costs a row of height and answers nothing.
     const hasFilters = (filters?.length ?? 0) > 1;
-    const segmented = hasFilters && filterStyle === "segmented";
     const countOf = (f: DataFilter<TRow>) =>
         f.predicate ? rows.filter(f.predicate).length : rows.length;
+    // The row that holds search, filters and the count is drawn at all.
+    const hasToolbar =
+        searchable.length > 0 ||
+        Boolean(toolbarSearch) ||
+        showModes ||
+        Boolean(toolbarExtra) ||
+        Boolean(toolbarEnd);
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
@@ -229,18 +239,18 @@ export function DataView<TRow>({
         m === "table" ? (
             // Horizontal scroll is on the wrapper, never the page: a table
             // that widens the document breaks every other element on it.
-            <ScrollX
-                label={regionLabel}
-                className="rounded-[11px] border border-border bg-card"
-            >
-                <table className="w-full border-collapse text-[13.5px]">
+            <ScrollX label={regionLabel} className={listTable.frame}>
+                <table
+                    data-list-table=""
+                    className="w-full border-collapse text-[13.5px]"
+                >
                     {/* Column names are Saroh's own words, and a recording
                         may read them; every row below is a record's data
                         and is masked whatever a cell draws. */}
                     <thead data-ph-unmask="">
                         {/* A faint head fill and a stronger rule, as the
                                 applied Products screen draws it. */}
-                        <tr className="h-10 border-b border-border bg-muted">
+                        <tr className={listTable.headRow}>
                             {selectable ? (
                                 <th
                                     scope="col"
@@ -288,7 +298,7 @@ export function DataView<TRow>({
                                                 : undefined
                                         }
                                         className={cn(
-                                            "label whitespace-nowrap px-[14px] text-left",
+                                            listTable.th,
                                             col.numeric && "text-right",
                                         )}
                                     >
@@ -360,7 +370,8 @@ export function DataView<TRow>({
                                             : undefined
                                     }
                                     className={cn(
-                                        "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-muted",
+                                        "wk-item data-[state=selected]:bg-muted",
+                                        listTable.tr,
                                         onRowClick &&
                                             "cursor-pointer active:bg-foreground/[0.07]",
                                     )}
@@ -385,9 +396,9 @@ export function DataView<TRow>({
                                             <td
                                                 key={col.id}
                                                 className={cn(
-                                                    "px-[14px] py-[11px] align-middle",
+                                                    listTable.td,
                                                     col.numeric &&
-                                                        "text-right tabular-nums",
+                                                        listTable.numeric,
                                                     // Money is the figure people
                                                     // scan for: Space Grotesk.
                                                     col.money &&
@@ -475,10 +486,7 @@ export function DataView<TRow>({
             // and gloved use needs. Detail columns are dropped, not hidden
             // behind a disclosure nobody taps.
             // Every row is a record's data: masked in a recording.
-            <ul
-                data-ph-mask=""
-                className="divide-y rounded-xl border border-border bg-card"
-            >
+            <ul data-ph-mask="" data-list-table="" className={listTable.card}>
                 {visible.map((row, rowIndex) => {
                     // `.at()` rather than a destructure: a caller could
                     // declare only `detail` columns, leaving this empty,
@@ -487,7 +495,7 @@ export function DataView<TRow>({
                     const rest = listColumns.slice(1);
                     const href = rowHref?.(row);
                     const body = (
-                        <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
+                        <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 py-[11px] pl-[14px]">
                             <div className="min-w-0 space-y-1">
                                 <div className="truncate font-medium">
                                     {!href && onRowClick ? (
@@ -534,7 +542,11 @@ export function DataView<TRow>({
                                     "--wk-i": rowIndex,
                                 } as React.CSSProperties
                             }
-                            className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50 active:bg-accent"
+                            className={cn(
+                                "wk-item relative flex items-center gap-2 border-b border-border pr-[14px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
+                                (href || onRowClick) &&
+                                    "active:bg-foreground/[0.07]",
+                            )}
                         >
                             {/*
                              * An OVERLAY link, not a wrapper.
@@ -612,56 +624,40 @@ export function DataView<TRow>({
         mode === null ? (unsplit ? null : phoneMode) : inDesk ? null : mode;
     const regionLabel =
         noun.other.charAt(0).toUpperCase() + noun.other.slice(1);
+    // How many are showing, on the toolbar's right: the total (unless the
+    // page header already says it), or "3 of 12 codes" once narrowed.
+    const narrowedCount = countLabel
+        ? countLabel(visible.length, rows.length)
+        : `${visible.length} of ${count(rows.length)}`;
+    const wholeCount = countLabel
+        ? countLabel(visible.length, rows.length)
+        : count(rows.length);
+    const toolbarCount = !hasToolbar
+        ? null
+        : visible.length !== rows.length
+          ? narrowedCount
+          : showTotal
+            ? wholeCount
+            : null;
 
     return (
-        // 14px between tabs, toolbar and table, as the applied screens space them.
+        // 14px between toolbar and table, as the applied screens space them.
         <div className="space-y-[14px]">
             {/*
-             * Header tabs, when they filter (brand file §13): sub-views of the
-             * same rows (All, Unfulfilled, Refunds), each with its count, on
-             * the one tab strip. They filter the list and never navigate, so
-             * they are tabs, not links; `?view=` keeps the choice in the
-             * address.
+             * The one list toolbar: search first, then the screen's
+             * dropdown filters, then (to the right) the density switch and
+             * how many rows are showing. Under it, the chip row.
+             *
+             * Named subsets of the same rows (All, Live, Ended) are chips,
+             * never tabs: tabs are a screen's views. Each chip shows its
+             * count, so nobody presses into an empty one; `?view=` keeps
+             * the choice in the address.
              */}
-            {hasFilters && !segmented ? (
-                <TabStrip
-                    label="Filter"
-                    className="-mt-2"
-                    value={filterId ?? ""}
-                    onValueChange={chooseFilter}
-                    tabs={(filters ?? []).map((f) => ({
-                        value: f.id,
-                        label: f.label,
-                        count: countOf(f),
-                    }))}
-                />
-            ) : null}
-
-            {/* The toolbar: search, density, and how many rows are showing. */}
-            {searchable.length > 0 || showModes || toolbarExtra || segmented ? (
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {/*
-                     * Segmented filters: the same sub-views, drawn as one
-                     * control in the toolbar — the page's own tabs keep the
-                     * underline, so there is one row that navigates and one
-                     * that narrows the list. Each count is visible before the
-                     * choice, so nobody clicks into an empty view.
-                     */}
-                    {segmented ? (
-                        <Segmented
-                            label="Filter"
-                            value={filterId ?? ""}
-                            onValueChange={chooseFilter}
-                            className="overflow-x-auto"
-                            options={(filters ?? []).map((f) => ({
-                                value: f.id,
-                                label: f.label,
-                                count: countOf(f),
-                            }))}
-                        />
-                    ) : null}
-
-                    {searchable.length > 0 ? (
+            <ListToolbar
+                search={
+                    toolbarSearch ? (
+                        toolbarSearch
+                    ) : searchable.length > 0 ? (
                         <ListSearch
                             key={clearNonce}
                             onSearch={setSearch}
@@ -669,46 +665,54 @@ export function DataView<TRow>({
                                 searchPlaceholder ?? `Search ${noun.other}`
                             }
                         />
-                    ) : null}
-
-                    {toolbarExtra}
-
-                    {showModes ? (
-                        // A desk's choice only (T8): below the table
-                        // boundary the phone always draws the list, so a
-                        // switch there would change nothing.
-                        <Segmented
-                            label="View density"
-                            className="hidden min-[760px]:inline-flex"
-                            value={mode ?? deskMode}
-                            onValueChange={choose}
-                            options={modes.map((m) => {
-                                const Icon = MODE_META[m].icon;
-                                return {
-                                    value: m,
-                                    label: MODE_META[m].label,
-                                    icon: <Icon />,
-                                };
-                            })}
+                    ) : null
+                }
+                filters={toolbarExtra}
+                end={
+                    toolbarEnd || showModes ? (
+                        <>
+                            {toolbarEnd}
+                            {showModes ? (
+                                // A desk's choice only (T8): below the
+                                // table boundary the phone always draws
+                                // the list, so a switch there would
+                                // change nothing.
+                                <Segmented
+                                    label="View density"
+                                    className="hidden min-[760px]:inline-flex"
+                                    value={mode ?? deskMode}
+                                    onValueChange={choose}
+                                    options={modes.map((m) => {
+                                        const Icon = MODE_META[m].icon;
+                                        return {
+                                            value: m,
+                                            label: MODE_META[m].label,
+                                            icon: <Icon />,
+                                        };
+                                    })}
+                                />
+                            ) : null}
+                        </>
+                    ) : null
+                }
+                count={toolbarCount}
+                chips={
+                    hasFilters ? (
+                        <FilterChips
+                            label="Show"
+                            value={filterId ?? ""}
+                            onValueChange={chooseFilter}
+                            chips={(filters ?? []).map((f) => ({
+                                value: f.id,
+                                label: f.label,
+                                count: countOf(f),
+                            }))}
                         />
-                    ) : null}
-
-                    <p
-                        className="ml-auto text-xs text-muted-foreground"
-                        aria-live="polite"
-                    >
-                        {visible.length === rows.length
-                            ? showTotal
-                                ? countLabel
-                                    ? countLabel(visible.length, rows.length)
-                                    : count(rows.length)
-                                : null
-                            : countLabel
-                              ? countLabel(visible.length, rows.length)
-                              : `${visible.length} of ${count(rows.length)}`}
-                    </p>
-                </div>
-            ) : null}
+                    ) : (
+                        toolbarChips
+                    )
+                }
+            />
 
             {error ? (
                 <p
@@ -842,11 +846,7 @@ export function DataView<TRow>({
 
             {/* Shown when neither search nor density is on offer, so a list
                 still says how much it holds. */}
-            {showTotal &&
-            searchable.length === 0 &&
-            !showModes &&
-            !toolbarExtra &&
-            visible.length > 0 ? (
+            {showTotal && !hasToolbar && visible.length > 0 ? (
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                     {count(rows.length)}
                 </p>

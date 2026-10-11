@@ -1,5 +1,5 @@
-import { cn } from "@saroh/ui/lib/utils";
 import type { ComponentPropsWithoutRef } from "react";
+import { cn } from "../../lib/utils";
 
 /**
  * The one chip: a choice among a few, drawn as a pill. Ink when chosen,

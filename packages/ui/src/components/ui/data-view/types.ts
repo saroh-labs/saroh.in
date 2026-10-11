@@ -109,7 +109,12 @@ export interface DataViewProps<TRow> {
     empty?: ReactNode;
     /** Free-text filter across these columns. Omit to hide the search field. */
     searchableColumnIds?: string[];
-    /** Named subsets, rendered as chips. The first is the default. */
+    /**
+     * Named subsets, drawn as the chip row under the toolbar, each with its
+     * count: the one way a list is narrowed by status or kind. Never tabs
+     * (tabs are a screen's views) and never a segmented switch. The first
+     * is the default.
+     */
     filters?: DataFilter<TRow>[];
     /**
      * Which filter is active on first render, from the page's `?view=` param.
@@ -118,13 +123,6 @@ export interface DataViewProps<TRow> {
      * boundary, and the value is only ever needed once.
      */
     initialFilterId?: string;
-    /**
-     * How the filters are drawn. `tabs` (default) is an underlined row above
-     * the toolbar. `segmented` puts them in the toolbar as one control beside
-     * search — for a page whose own tabs already sit above the list, so two
-     * underlined rows do not read as two levels of navigation.
-     */
-    filterStyle?: "tabs" | "segmented";
     isLoading?: boolean;
     error?: string | null;
     /**
@@ -151,8 +149,24 @@ export interface DataViewProps<TRow> {
      * design want.
      */
     hideModeToggle?: boolean;
-    /** Extra toolbar controls beside the search — a storefront filter, say. */
+    /**
+     * The screen's own `ListSearch`, where the server searches (every
+     * record, not the page on screen). Takes the search slot in place of
+     * the built-in field.
+     */
+    toolbarSearch?: ReactNode;
+    /**
+     * The screen's own chip row (`FilterChips`), where the server filters.
+     * Drawn when there are no `filters`.
+     */
+    toolbarChips?: ReactNode;
+    /**
+     * Dropdown filters after the search (`ListFilter`): a location, a
+     * category.
+     */
     toolbarExtra?: ReactNode;
+    /** Pushed to the right, before the density switch: the sort. */
+    toolbarEnd?: ReactNode;
     /** Replaces the plain count at the toolbar's end, e.g. "4 products across 2 storefronts". */
     countLabel?: (visible: number, total: number) => string;
     /**

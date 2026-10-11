@@ -47,8 +47,9 @@ function isTyping(target: EventTarget | null) {
 }
 
 /**
- * The one list search: an icon, one height, left under the tabs, the full
- * width on a phone.
+ * The one list search: an icon, one height, ONE width (320px, the full
+ * width on a phone), first in the list's toolbar row (`ListToolbar`). A
+ * call site never sets its width.
  *
  * It owns the text it shows, so typing re-renders this field and nothing
  * else; the term reaches the list only once typing pauses (180ms) or the
@@ -106,7 +107,10 @@ export const ListSearch = React.forwardRef<HTMLInputElement, ListSearchProps>(
         return (
             <div
                 data-list-search=""
-                className={cn("relative w-full sm:max-w-[320px]", className)}
+                className={cn(
+                    "relative w-full min-w-0 sm:max-w-[320px]",
+                    className,
+                )}
             >
                 <Search
                     aria-hidden
