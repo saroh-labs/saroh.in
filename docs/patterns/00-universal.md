@@ -182,7 +182,10 @@ each with why it stops there:
   so a reviewer reads one file to know what can leave. A7's Track words went
   to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
   the second allow-list file it re-exports; the order serializers are the
-  next seam if A8 and A13 grow it further.
+  next seam if A8 and A13 grow it further. DEC-142's reads (invoices to
+  pay, a class's line, courses, the email choice, what changed) went to a
+  third, `account-details-view.ts`, re-exported the same way, adding only
+  Home's new fields here (816 now, with A8, A11 and A13).
 - `home/home.service.ts` (778 after F11; 785 after F4; 797 before F2) — `build()` is one parallel
   read of every Home source, each behind its own guard, and the ranking of
   what they return. Round 2 put each source in its own file

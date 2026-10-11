@@ -3,7 +3,7 @@
  * design): only the tabs of what this business offers, and only the ones
  * whose page has shipped.
  *
- * Home and Me always show. Bookings (A6), Orders (A7), Plan (A8) and
+ * Home and Your details (`me`) always show. Bookings (A6), Orders (A7), Plan (A8) and
  * Messages (A13) each show once their unit adds its key to
  * {@link SHIPPED_ACCOUNT_TABS} and the business offers it: a clinic sees
  * Bookings, a bakery Orders and no Bookings. A tab never points at a
@@ -67,7 +67,8 @@ export function accountTabs(
         ["orders", "Orders", offers.orders],
         ["plan", "Plan", offers.plans],
         ["messages", "Messages", offers.messages],
-        ["me", "Me", true],
+        // "Your details" (DEC-142): "Me" didn't say what was behind it.
+        ["me", "Your details", true],
     ];
     return all
         .filter(([key, , offered]) => offered && shipped.has(key))

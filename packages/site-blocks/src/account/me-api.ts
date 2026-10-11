@@ -1,5 +1,6 @@
 import type { TestReleaseRefusal } from "../test-release/words";
 import type { SignInApi } from "./api";
+import type { PayInvoice, SaveNotices } from "./details-api";
 import type { AccountNote, AccountView } from "./model";
 
 /**
@@ -27,4 +28,8 @@ export interface MeApi {
     addNote: (text: string) => Promise<NoteResult>;
     signOut: () => Promise<{ ok: boolean }>;
     signOutEverywhere: () => Promise<{ ok: boolean }>;
+    /** "Pay now" on an open invoice (DEC-142). */
+    payInvoice: PayInvoice;
+    /** Whether the business may email them (DEC-142). */
+    saveNotices: SaveNotices;
 }

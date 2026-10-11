@@ -4,18 +4,29 @@ import type {
     AccountBlock,
     AccountBookingRow,
     AccountBookings,
+    AccountCourse,
     AccountHomeData,
+    AccountInvoiceDue,
     AccountNote,
+    AccountNotices,
     AccountOrder,
     AccountPacksOnSale,
     AccountPlanTab,
     AccountReceipt,
     AccountThread,
     AccountView,
+    AccountWaitlistPlace,
+    BookingLookup,
     TrackLookup,
 } from "@saroh/site-blocks";
 
 import { bookingsResult, isBookingRow } from "./account-bookings-shape";
+import {
+    coursesResult,
+    invoicesDueResult,
+    noticesResult,
+    waitlistResult,
+} from "./account-details-shape";
 import { packsOnSaleResult } from "./account-packs-shape";
 import {
     homeResult,
@@ -132,8 +143,11 @@ export async function getOrders(): Promise<AccountBlock<AccountOrder[]>> {
     return value ? { ok: true, value } : { ok: false };
 }
 
-/** One order's Track (A7). Another customer's is "missing". */
-export async function getOrder(orderId: string): Promise<TrackLookup> {
+/**
+ * One order's Track (A7). Another customer's is "missing". Once per
+ * request: the order's own page reads it for its title and for its body.
+ */
+export const getOrder = cache(async (orderId: string): Promise<TrackLookup> => {
     const read = await readJson(`me/orders/${encodeURIComponent(orderId)}`);
     if (!read.ok) {
         return {
@@ -143,7 +157,7 @@ export async function getOrder(orderId: string): Promise<TrackLookup> {
     }
     const order = orderDetailResult(read.body);
     return order ? { ok: true, order } : { ok: false, reason: "unavailable" };
-}
+});
 
 /** The Bookings tab's lists (A6). A failed read stays failed, never "none". */
 export async function getBookings(): Promise<AccountBlock<AccountBookings>> {
@@ -163,15 +177,72 @@ export async function getMyBooking(
     return read.ok && isBookingRow(read.body) ? read.body : null;
 }
 
+/**
+ * One booking, for its own page (DEC-142): another customer's, or one that
+ * isn't there, is "missing"; anything else that went wrong is
+ * "unavailable". The two are never the same answer.
+ */
+export async function getBooking(ref: string): Promise<BookingLookup> {
+    const read = await readJson(`me/bookings/${encodeURIComponent(ref)}`);
+    if (!read.ok) {
+        return {
+            ok: false,
+            reason: read.reason === "missing" ? "missing" : "unavailable",
+        };
+    }
+    return isBookingRow(read.body)
+        ? { ok: true, booking: read.body }
+        : { ok: false, reason: "unavailable" };
+}
+
+/** A list read as a block: a failed read stays failed, never "none". */
+async function listBlock<T>(
+    path: string,
+    result: (body: unknown) => T[] | null,
+): Promise<AccountBlock<T[]>> {
+    const read = await readJson(path);
+    const value = read.ok ? result(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
+/** The customer's open invoices (DEC-142), the one due soonest first. */
+export function getInvoicesDue(): Promise<AccountBlock<AccountInvoiceDue[]>> {
+    return listBlock("me/invoices", invoicesDueResult);
+}
+
+/** Their places in a class's line (DEC-142). */
+export function getWaitlist(): Promise<AccountBlock<AccountWaitlistPlace[]>> {
+    return listBlock("me/waitlist", waitlistResult);
+}
+
+/** The courses they hold a seat on (DEC-142). */
+export function getCourses(): Promise<AccountBlock<AccountCourse[]>> {
+    return listBlock("me/courses", coursesResult);
+}
+
+/** Whether the business may email them (DEC-142). */
+export async function getNotices(): Promise<AccountBlock<AccountNotices>> {
+    const read = await readJson("me/notifications");
+    const value = read.ok ? noticesResult(read.body) : null;
+    return value ? { ok: true, value } : { ok: false };
+}
+
 export type ReceiptLookup =
     | { ok: true; receipt: PayInvoice }
     | { ok: false; reason: "missing" | "unavailable" | "signed-out" };
 
-/** One receipt, as the pay link's paper. Another customer's is "missing". */
-export async function getReceipt(invoiceId: string): Promise<ReceiptLookup> {
-    const read = await readJson(`me/receipts/${encodeURIComponent(invoiceId)}`);
-    if (!read.ok) return read;
-    return isPayInvoice(read.body)
-        ? { ok: true, receipt: read.body }
-        : { ok: false, reason: "unavailable" };
-}
+/**
+ * One receipt, as the pay link's paper. Another customer's is "missing".
+ * Once per request: the page reads it for its title and for its body.
+ */
+export const getReceipt = cache(
+    async (invoiceId: string): Promise<ReceiptLookup> => {
+        const read = await readJson(
+            `me/receipts/${encodeURIComponent(invoiceId)}`,
+        );
+        if (!read.ok) return read;
+        return isPayInvoice(read.body)
+            ? { ok: true, receipt: read.body }
+            : { ok: false, reason: "unavailable" };
+    },
+);

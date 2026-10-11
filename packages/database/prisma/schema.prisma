@@ -6623,6 +6623,14 @@ model CustomerAccount {
   linkedAt       DateTime  @default(now())
   lastSignedInAt DateTime?
 
+  // When the customer last opened their account's Home, and the visit
+  // before that one (DEC-142): Home says what changed since
+  // `previousVisitAt` for as long as the visit that began after it lasts.
+  // Only the Home read moves them (`site-accounts/account-visit.ts`). Null
+  // until a first, then a second, visit.
+  lastVisitAt     DateTime?
+  previousVisitAt DateTime?
+
   sessions CustomerSession[]
 
   // Bookings made signed in (A9).

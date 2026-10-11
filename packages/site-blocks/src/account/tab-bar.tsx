@@ -2,28 +2,34 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useState } from "react";
 
 import { cn } from "../lib/utils";
+import { ACCOUNT_TAB_HREF, currentTab } from "./hrefs";
 import type { AccountTab, AccountTabKey } from "./model";
 
 /**
- * The account's bottom tab bar (round-2 plan A, A5; Saroh Customer Site
- * design): only this business's tabs (e.g. a clinic: Home · Appointments ·
- * Messages · Me), fixed to the foot of the screen, the current one in the
- * accent's deep shade, and a dot on Messages while the business has written
- * something not yet opened (A13). The API decides which tabs there are;
- * this draws them.
+ * The account's tabs (round-2 plan A, A5; Saroh Customer Site design; made
+ * responsive by DEC-142): only this business's tabs (e.g. a clinic: Home ·
+ * Bookings · Messages · Your details), the current one marked in the
+ * accent, and a dot on Messages while the business has written something
+ * not yet opened (A13). The API decides which tabs there are; this draws
+ * them.
+ *
+ * One component at every width, in one place in the page (after the
+ * header, before the content):
+ *
+ * - **On a phone** it is the bar fixed to the foot of the screen, an icon
+ *   over each word.
+ * - **From tablet width up** it is a row of tabs under the header that
+ *   stays at the top as the page scrolls, an icon beside each word, the
+ *   current one underlined in the accent. A wide window no longer has a
+ *   phone's bar pinned to its foot.
  */
 
-export const ACCOUNT_TAB_HREF: Record<AccountTabKey, string> = {
-    home: "/account",
-    bookings: "/account/bookings",
-    orders: "/account/orders",
-    plan: "/account/plan",
-    messages: "/account/messages",
-    me: "/account/me",
-};
+// Kept here for the callers that read them from the tab bar.
+export { ACCOUNT_TAB_HREF, currentTab };
 
 /** The design's icons, 24px grid, stroked. */
 const ICON: Record<AccountTabKey, string> = {
@@ -34,27 +40,6 @@ const ICON: Record<AccountTabKey, string> = {
     messages: "M4 5 H20 V16 H9 L5 20 V16 H4 Z",
     me: "M12 12 A4 4 0 1 0 12 4 A4 4 0 0 0 12 12 Z M4 20 C5 16 8.5 14 12 14 C15.5 14 19 16 20 20",
 };
-
-/** Which tab a path is on: the longest tab address it starts with. */
-export function currentTab(
-    pathname: string | null,
-    tabs: AccountTab[],
-): AccountTabKey | null {
-    if (!pathname) return null;
-    let best: AccountTabKey | null = null;
-    let length = -1;
-    for (const tab of tabs) {
-        const href = ACCOUNT_TAB_HREF[tab.key];
-        const on =
-            pathname === href ||
-            (href !== "/account" && pathname.startsWith(`${href}/`));
-        if (on && href.length > length) {
-            best = tab.key;
-            length = href.length;
-        }
-    }
-    return best;
-}
 
 export function AccountTabBar({
     tabs,
@@ -75,13 +60,15 @@ export function AccountTabBar({
     return (
         <nav
             aria-label="Account"
-            className="bg-site-surface border-site-border font-site-body fixed inset-x-0 bottom-0 z-40 border-t px-2 pb-[calc(6px+env(safe-area-inset-bottom))] pt-1.5"
+            className={cn(
+                "bg-site-surface border-site-border font-site-body fixed inset-x-0 bottom-0 z-40 border-t px-2 pb-[calc(6px+env(safe-area-inset-bottom))] pt-1.5",
+                // From tablet width up: a row under the header.
+                "md:bg-site-bg md:sticky md:inset-x-auto md:bottom-auto md:top-0 md:border-b md:border-t-0 md:px-6 md:pb-0 md:pt-0",
+            )}
         >
             <div
-                className="mx-auto grid max-w-[640px]"
-                style={{
-                    gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
-                }}
+                className="mx-auto grid max-w-[640px] grid-cols-[repeat(var(--account-tabs),minmax(0,1fr))] md:flex md:max-w-[960px] md:gap-1"
+                style={{ "--account-tabs": tabs.length } as CSSProperties}
             >
                 {tabs.map((tab) => {
                     const on = tab.key === current;
@@ -93,11 +80,14 @@ export function AccountTabBar({
                             href={ACCOUNT_TAB_HREF[tab.key]}
                             aria-current={on ? "page" : undefined}
                             className={cn(
-                                "relative grid min-h-[52px] cursor-pointer justify-items-center gap-0.5 rounded-[calc(var(--site-radius)+6px)] px-0.5 py-1.5 text-[11px] transition-colors",
+                                "relative grid min-h-[52px] cursor-pointer content-start justify-items-center gap-0.5 rounded-[calc(var(--site-radius)+6px)] px-0.5 py-1.5 text-[11px] transition-[color,background-color,opacity] duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none",
                                 "hover:text-site-fg focus-visible:ring-site-fg focus-visible:outline-none focus-visible:ring-2 active:opacity-70",
+                                // A row tab: the icon beside the word, and
+                                // the accent under the current one.
+                                "md:flex md:min-h-[48px] md:items-center md:gap-2 md:rounded-none md:px-3 md:py-0 md:text-[14px] md:hover:bg-[color-mix(in_srgb,hsl(var(--site-fg))_5%,transparent)] md:focus-visible:ring-inset",
                                 on
-                                    ? "text-site-fg font-bold"
-                                    : "text-site-muted font-medium",
+                                    ? "text-site-fg font-bold md:shadow-[inset_0_-2px_0_hsl(var(--site-accent))]"
+                                    : "text-site-body font-medium",
                             )}
                         >
                             <svg
@@ -106,7 +96,10 @@ export function AccountTabBar({
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 aria-hidden="true"
-                                className={on ? "text-site-accent" : undefined}
+                                className={cn(
+                                    "shrink-0 md:size-[18px]",
+                                    on ? "text-site-accent" : undefined,
+                                )}
                             >
                                 <path
                                     d={ICON[tab.key]}
@@ -116,18 +109,18 @@ export function AccountTabBar({
                                     strokeLinejoin="round"
                                 />
                             </svg>
-                            {/* Held to its own column: with six tabs on a
-                                phone, "Appointments" ran into Home and
-                                Orders. It ends in "…" instead, and the
-                                whole word is still what is read out. */}
-                            <span className="block w-full truncate text-center">
+                            {/* Held to its own column on a phone. One word
+                                fits on a line; "Your details" takes two
+                                where six tabs share the bar, rather than
+                                being cut to "Your det…". */}
+                            <span className="block w-full overflow-hidden text-center leading-[1.15] [overflow-wrap:anywhere] [text-wrap:balance] md:w-auto md:whitespace-nowrap">
                                 {tab.label}
                             </span>
                             {dot ? (
                                 <>
                                     <span
                                         aria-hidden="true"
-                                        className="bg-site-accent absolute right-[calc(50%-16px)] top-1 size-2 rounded-full"
+                                        className="bg-site-accent absolute right-[calc(50%-16px)] top-1 size-2 rounded-full md:static md:order-last"
                                     />
                                     <span className="sr-only">
                                         {`(${unread} new)`}

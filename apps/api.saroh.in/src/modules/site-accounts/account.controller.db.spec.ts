@@ -242,7 +242,7 @@ describe("Me", () => {
                 { key: "home", label: "Home" },
                 { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
-                { key: "me", label: "Me" },
+                { key: "me", label: "Your details" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
@@ -536,6 +536,13 @@ describe("Home", () => {
                     renewsAt: periodEnd.toISOString(),
                 }),
             },
+            // DEC-142. A first visit has nothing to compare with.
+            changes: { ok: true, value: [] },
+            since: null,
+            invoicesDue: { ok: true, value: [] },
+            waitlist: { ok: true, value: [] },
+            courses: { ok: true, value: [] },
+            linkPending: false,
         });
         const text = JSON.stringify(res.body);
         expect(text).not.toContain("Other Attendee");
@@ -559,6 +566,8 @@ describe("Home", () => {
             expect(res.body.orders).toEqual({ ok: false });
             // A bakery takes no bookings: no block at all, not an empty one.
             expect(res.body.nextBooking).toBeNull();
+            // Nor a line to wait in (DEC-142).
+            expect(res.body.waitlist).toBeNull();
             expect(res.body.plan).toEqual({ ok: true, value: null });
             expect(res.body.classes).toEqual({ ok: true, value: null });
         } finally {

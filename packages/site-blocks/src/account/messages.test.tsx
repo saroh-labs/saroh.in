@@ -163,7 +163,7 @@ describe("the Messages tab's dot", () => {
     const tabs = [
         { key: "home" as const, label: "Home" },
         { key: "messages" as const, label: "Messages" },
-        { key: "me" as const, label: "Me" },
+        { key: "me" as const, label: "Your details" },
     ];
 
     it("shows while something is unread, and never on Messages itself", () => {
@@ -198,25 +198,53 @@ describe("the Messages tab's dot", () => {
 });
 
 describe("the tab bar's labels", () => {
-    it("each keeps to its column, so six tabs on a phone never run together", () => {
+    const SIX = [
+        { key: "home", label: "Home" },
+        { key: "bookings", label: "Bookings" },
+        { key: "orders", label: "Orders" },
+        { key: "plan", label: "Plan" },
+        { key: "messages", label: "Messages" },
+        { key: "me", label: "Your details" },
+    ] as const;
+
+    it("each keeps to its column, and a two-word label takes two lines rather than being cut", () => {
         pathname = "/account";
-        render(
-            <AccountTabBar
-                tabs={[
-                    { key: "home", label: "Home" },
-                    { key: "bookings", label: "Appointments" },
-                    { key: "orders", label: "Orders" },
-                    { key: "plan", label: "Plan" },
-                    { key: "messages", label: "Messages" },
-                    { key: "me", label: "Me" },
-                ]}
-            />,
-        );
-        const link = screen.getByRole("link", { name: "Appointments" });
-        // The whole word is still its name; on screen it ends in "…".
+        render(<AccountTabBar tabs={[...SIX]} />);
+        const link = screen.getByRole("link", { name: "Your details" });
+        // The whole words are its name and what is drawn: never "Your det…".
         const label = link.querySelector("span");
-        expect(label?.textContent).toBe("Appointments");
-        expect(label?.className).toMatch(/\btruncate\b/);
+        expect(label?.textContent).toBe("Your details");
         expect(label?.className).toMatch(/\bw-full\b/);
+        expect(label?.className).not.toMatch(/\btruncate\b/);
+        expect(label?.className).toMatch(/overflow-hidden/);
+    });
+
+    it("is one nav at every width, before the page: a bar on a phone, a row beyond it (DEC-142)", () => {
+        pathname = "/account/orders";
+        render(<AccountTabBar tabs={[...SIX]} />);
+        const nav = screen.getByRole("navigation", { name: "Account" });
+        // Fixed to the foot on a phone; from tablet width up, a row that
+        // stays at the top. One element, so one order in the page.
+        expect(nav.className).toMatch(/\bfixed\b/);
+        expect(nav.className).toMatch(/\bbottom-0\b/);
+        expect(nav.className).toMatch(/\bmd:sticky\b/);
+        expect(nav.className).toMatch(/\bmd:top-0\b/);
+        expect(screen.getAllByRole("navigation")).toHaveLength(1);
+        expect(screen.getByRole("link", { name: "Orders" })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
+        expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute(
+            "aria-current",
+        );
+    });
+
+    it("an order's or a booking's own page keeps its tab marked", () => {
+        pathname = "/account/orders/ord_1";
+        render(<AccountTabBar tabs={[...SIX]} />);
+        expect(screen.getByRole("link", { name: "Orders" })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
     });
 });

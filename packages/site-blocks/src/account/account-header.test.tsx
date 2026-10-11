@@ -23,7 +23,7 @@ const TABS: AccountTab[] = [
     { key: "home", label: "Home" },
     { key: "bookings", label: "Appointments" },
     { key: "messages", label: "Messages" },
-    { key: "me", label: "Me" },
+    { key: "me", label: "Your details" },
 ];
 
 beforeEach(() => {
@@ -40,7 +40,23 @@ describe("accountTitle", () => {
         expect(accountTitle("/account/bookings", TABS, "Farah")).toBe(
             "Appointments",
         );
-        expect(accountTitle("/account/me", TABS, "Farah")).toBe("Me");
+        // "Your details", never "Me" (DEC-142).
+        expect(accountTitle("/account/me", TABS, "Farah")).toBe("Your details");
+    });
+
+    it("names a thing's own page for the thing, not its list (DEC-142)", () => {
+        const tabs: AccountTab[] = [
+            ...TABS,
+            { key: "orders", label: "Orders" },
+        ];
+        expect(accountTitle("/account/orders/ord_1", tabs, "Farah")).toBe(
+            "Your order",
+        );
+        expect(accountTitle("/account/bookings/bk_1", tabs, "Farah")).toBe(
+            "Your booking",
+        );
+        // The lists keep their tab's name.
+        expect(accountTitle("/account/orders", tabs, "Farah")).toBe("Orders");
     });
 
     it("calls a receipt a receipt, and anything else the account", () => {

@@ -338,7 +338,10 @@ export type {
     AccountTrackStep,
     AccountView,
 } from "./account/model";
-export { AccountOrders, ORDERS_HREF, trackHref } from "./account/orders-list";
+export { AccountOrders } from "./account/orders-list";
+// From the plain module: a server page reads these as values, which a
+// constant exported from a client file never is.
+export { ACCOUNT_TAB_HREF, ORDERS_HREF, trackHref } from "./account/hrefs";
 // A6: the Bookings tab, its Move and Cancel sheets, and a class moved on the
 // booking page.
 export type {
@@ -382,7 +385,7 @@ export type {
     PlanPacksShop,
 } from "./account/packs-api";
 // G20: joining a plan and buying a pack from the site's Prices page.
-export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+export { AccountTabBar } from "./account/tab-bar";
 // The account's compact header, and the site's chrome stepping aside for it
 // (DEC-073 #10).
 export {
@@ -392,7 +395,30 @@ export {
     businessInitial,
     isAccountPath,
 } from "./account/account-header";
-export type { TrackLookup } from "./account/track-sheet";
+export type { TrackLookup } from "./account/order-track";
+// DEC-142: the rest of what a customer sees, and each thing's own page.
+export { AccountLoading } from "./account/account-loading";
+export type { AccountLoadingShape } from "./account/account-loading";
+export { AccountBookingPage } from "./account/booking-page";
+export type { BookingLookup } from "./account/booking-page";
+export { DETAILS_OFFLINE } from "./account/details-api";
+export type {
+    LeaveLine,
+    LeaveResult,
+    NoticesResult,
+    PayInvoice,
+    SaveNotices,
+} from "./account/details-api";
+export { TO_PAY_HREF, bookingHref, orderHref } from "./account/details-model";
+export type {
+    AccountChange,
+    AccountCourse,
+    AccountInvoiceDue,
+    AccountNotices,
+    AccountWaitlistPlace,
+} from "./account/details-model";
+export { AccountOrderPage } from "./account/order-page";
+export { BackLink } from "./account/parts";
 export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
 export type {
     JoinApi,

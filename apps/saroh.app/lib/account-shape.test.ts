@@ -26,7 +26,7 @@ const ACCOUNT = {
     businessName: "Kavi Dental",
     tabs: [
         { key: "home", label: "Home" },
-        { key: "me", label: "Me" },
+        { key: "me", label: "Your details" },
     ],
     offers: { appointments: true, orders: false, plans: false },
     bookingsLabel: "Appointments",
@@ -75,6 +75,10 @@ describe("homeResult", () => {
             classes: { ok: true, value: null },
             orders: null,
             plan: { ok: false },
+            // An API from before DEC-142 sends none of the newer blocks:
+            // none is drawn (`account-details-shape.test.ts`).
+            since: null,
+            linkPending: false,
         });
     });
 
@@ -90,6 +94,8 @@ describe("homeResult", () => {
             classes: { ok: false },
             orders: { ok: false },
             plan: { ok: false },
+            since: null,
+            linkPending: false,
         });
         expect(homeResult(null)).toBe(null);
     });
