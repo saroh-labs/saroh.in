@@ -528,6 +528,7 @@ export function CalendarScreen({
             {/* The date is the page's title; the two view switches sit
                 before New booking. */}
             <PageHeader
+                holdsData={false}
                 className="mb-3"
                 breadcrumb={["Bookings", "Calendar"]}
                 title={heading}

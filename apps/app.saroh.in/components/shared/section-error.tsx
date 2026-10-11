@@ -119,7 +119,13 @@ export function SectionError({
 
     return (
         <PageContainer>
-            {heading ? <PageHeader title={heading} className="mb-6" /> : null}
+            {heading ? (
+                <PageHeader
+                    holdsData={false}
+                    title={heading}
+                    className="mb-6"
+                />
+            ) : null}
             <FailedState
                 data-ph-unmask=""
                 title={couldntLoad(things)}

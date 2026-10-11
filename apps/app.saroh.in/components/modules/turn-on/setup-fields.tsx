@@ -215,6 +215,7 @@ export function WebsiteFields({
                 </dl>
             ) : (
                 <Field
+                    holdsData
                     htmlFor={`${id}-address`}
                     label="Web address"
                     error={errors.address}

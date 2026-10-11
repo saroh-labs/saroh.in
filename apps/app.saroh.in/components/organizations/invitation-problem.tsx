@@ -50,6 +50,7 @@ export function InvitationProblemView({
         <main className="mx-auto flex min-h-[60vh] max-w-lg items-center p-8">
             {problem === "unreachable" ? (
                 <FailedState
+                    data-ph-unmask=""
                     className="w-full"
                     title={INVITATION_UNREACHABLE.title}
                     description={INVITATION_UNREACHABLE.description}
@@ -80,6 +81,7 @@ export function InvitationProblemView({
                 />
             ) : problem === "gone" ? (
                 <FailedState
+                    data-ph-unmask=""
                     className="w-full"
                     icon={<MailX />}
                     title={INVITATION_GONE.title}

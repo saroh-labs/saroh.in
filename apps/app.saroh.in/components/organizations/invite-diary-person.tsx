@@ -26,6 +26,7 @@ export function InviteDiaryPerson({
     const picked = people.find((p) => p.id === value);
     return (
         <Field
+            holdsData
             label="On the diary as"
             hint={
                 picked

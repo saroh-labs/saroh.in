@@ -79,6 +79,7 @@ export function ProductStockTab({
         return (
             <div className="flex flex-col gap-3">
                 <TabState
+                    data-ph-mask=""
                     icon={Box}
                     title="Not tracked"
                     description={`${untrackedShort(product.storefronts ?? [])} ${

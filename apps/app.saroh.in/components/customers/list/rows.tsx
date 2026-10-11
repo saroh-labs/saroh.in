@@ -206,6 +206,7 @@ export function NoMatch({
     return (
         <div className="p-4">
             <EmptyState
+                data-ph-mask=""
                 kind="no-results"
                 things="customers"
                 cause="filters"
@@ -213,6 +214,7 @@ export function NoMatch({
                 className="border-0"
                 action={
                     <Button
+                        data-ph-unmask=""
                         type="button"
                         variant="outline"
                         className="wk-press"

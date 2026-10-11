@@ -63,7 +63,10 @@ export function Moment({
             tone="success"
             role="status"
             data-moment={moment.key}
-            title={moment.title}
+            // The title is Saroh's own words ("Your first order"), so a
+            // session recording may read it. The fact under it names a
+            // customer and an amount, and stays masked.
+            title={<span data-ph-unmask="">{moment.title}</span>}
             className={cn(
                 "duration-slow ease-out animate-in fade-in-0 motion-reduce:animate-none",
                 className,

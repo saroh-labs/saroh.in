@@ -266,6 +266,7 @@ export function ModuleGoalPicker({
                             // aria-labelledby, so the reader hears "Sell products,
                             // checkbox" rather than the row's entire prose.
                             <Label
+                                data-ph-unmask=""
                                 key={goal.moduleKey}
                                 // `wk-choice` + `data-selected` carry the commit
                                 // motion (workspace.css): the row settles with a

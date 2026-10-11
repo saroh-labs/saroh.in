@@ -403,6 +403,7 @@ export function ServiceEditor({
         <main className="w-full pb-8">
             <div className="sticky top-[61px] z-10 border-b border-border bg-card px-4 py-3 dark:bg-background sm:px-[26px]">
                 <PageHeader
+                    holdsData="title"
                     className="mb-0"
                     breadcrumb={[
                         <Link key="bookings" href="/bookings">

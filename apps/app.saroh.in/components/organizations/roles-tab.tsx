@@ -521,6 +521,7 @@ function Permissions({
                                     className="flex items-center gap-3 border-t border-border py-[9px]"
                                 >
                                     <Label
+                                        data-ph-unmask=""
                                         htmlFor={id}
                                         className="min-w-0 flex-1 text-[13px] font-normal leading-normal"
                                     >

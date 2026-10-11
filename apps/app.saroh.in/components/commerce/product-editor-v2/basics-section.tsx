@@ -259,6 +259,7 @@ export function BasicsSection({
 
             <div className="flex flex-wrap gap-3.5">
                 <Field
+                    holdsData={false}
                     label="Price"
                     className="flex-[1_1_150px]"
                     error={

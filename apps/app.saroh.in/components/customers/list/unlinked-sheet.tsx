@@ -177,6 +177,7 @@ function UnlinkedSheet({
                 />
             ) : read.state === "failed" ? (
                 <FailedState
+                    data-ph-unmask=""
                     size="panel"
                     title={couldntLoad("these customers")}
                     onRetry={() => goTo(page)}

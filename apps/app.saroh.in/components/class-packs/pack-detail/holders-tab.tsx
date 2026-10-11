@@ -98,6 +98,7 @@ export function HoldersTab({
             <>
                 {head}
                 <FailedState
+                    data-ph-unmask=""
                     size="panel"
                     title={couldntLoad("who has this pack")}
                     description={nothingChanged(

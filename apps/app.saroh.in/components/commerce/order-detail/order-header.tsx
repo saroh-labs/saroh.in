@@ -40,6 +40,7 @@ export function OrderHeading({
 }) {
     return (
         <PageHeader
+            holdsData
             className="mb-0"
             breadcrumb={[
                 "Sell",

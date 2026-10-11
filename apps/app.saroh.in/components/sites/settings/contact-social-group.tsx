@@ -94,6 +94,7 @@ export function ContactSocialGroup({
         return (
             <Group id="contact" title="Contact and social">
                 <FailedState
+                    data-ph-unmask=""
                     size="panel"
                     title={CONTACT_UNREAD.title}
                     description={CONTACT_UNREAD.description}

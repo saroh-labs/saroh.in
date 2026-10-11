@@ -160,6 +160,7 @@ export function CancelBookingControl({
                 extra={
                     plan?.canOverride ? (
                         <Button
+                            data-ph-unmask=""
                             type="button"
                             variant="outline"
                             disabled={busy}

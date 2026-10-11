@@ -78,6 +78,7 @@ export function Header({
     return (
         <>
             <PageHeader
+                holdsData
                 className="mb-3.5"
                 breadcrumb={
                     sells

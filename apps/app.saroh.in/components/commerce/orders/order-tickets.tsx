@@ -60,6 +60,7 @@ export function OrderTickets({
     return (
         <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-[26px]">
             <PageHeader
+                holdsData="description"
                 className="mb-5 print:hidden"
                 breadcrumb={[
                     "Sell",

@@ -324,6 +324,7 @@ function SectionSlot({
                         className="grid gap-2"
                     >
                         <Field
+                            holdsData
                             label={
                                 <>
                                     Your note about{" "}

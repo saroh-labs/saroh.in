@@ -61,6 +61,7 @@ export function PublishBanner({
         <>
             <div className="sticky top-[61px] z-10 border-b border-border bg-card px-4 py-3 dark:bg-background sm:px-[26px]">
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={breadcrumb}
                     title={title}

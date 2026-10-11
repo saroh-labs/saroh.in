@@ -147,6 +147,7 @@ function TemplateCard({
         .join(" ");
     return (
         <Label
+            data-ph-mask=""
             htmlFor={`${id}-radio`}
             className={cn(
                 "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left text-sm font-normal leading-normal transition-colors duration-fast",

@@ -1,5 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { PageContainer } from "@saroh/ui/page-container";
+import type { PageHeaderProps } from "@saroh/ui/page-header";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Lock } from "lucide-react";
 
@@ -16,9 +17,15 @@ export function SettingsPanelHeader({
     actions,
     readOnlyNote,
     className,
+    holdsData = false,
 }: {
     title: string;
     description?: React.ReactNode;
+    /**
+     * `PageHeader`'s own: say so when the description shows a record's data,
+     * and a session recording masks it. A section's name is a menu word.
+     */
+    holdsData?: PageHeaderProps["holdsData"];
     /** How many the section lists ("4 people"); nothing at zero. */
     count?: React.ReactNode;
     actions?: React.ReactNode;
@@ -32,6 +39,7 @@ export function SettingsPanelHeader({
             <PageHeader
                 className="mb-0"
                 breadcrumb={["Settings", title]}
+                holdsData={holdsData}
                 title={title}
                 count={count}
                 description={description}

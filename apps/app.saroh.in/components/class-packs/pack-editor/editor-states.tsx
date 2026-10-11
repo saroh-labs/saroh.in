@@ -44,6 +44,7 @@ export function PackEditorState({
     return (
         <PageContainer width="full">
             <PageHeader
+                holdsData
                 breadcrumb={packCrumbs(here)}
                 title={here ?? "Class pack"}
             />
@@ -98,6 +99,7 @@ export function PackEditorState({
                         />
                     ) : (
                         <PermissionDeniedState
+                            data-ph-unmask=""
                             title={
                                 state === "forbidden"
                                     ? DENIED.title

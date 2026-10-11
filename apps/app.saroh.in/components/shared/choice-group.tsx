@@ -264,6 +264,7 @@ export function RadioCards<T extends string>({
                 const off = disabled || o.disabled === true;
                 return (
                     <Label
+                        data-ph-mask=""
                         key={o.value}
                         htmlFor={`${id}-${o.value}`}
                         className={cn(

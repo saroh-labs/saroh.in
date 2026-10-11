@@ -414,6 +414,7 @@ export function TeamScreen({
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
                 <EmptyState
+                    data-ph-mask=""
                     icon={<Users />}
                     title="No one else yet"
                     description={`You are the only person in ${organizationName} so far.`}
@@ -999,6 +1000,7 @@ function MemberDrawer({
                    owner. The viewer leaves from their own row. */
                 member && !locked && current === "OWNER" && !member.isSelf ? (
                     <Button
+                        data-ph-mask=""
                         type="button"
                         variant="ghost"
                         className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"

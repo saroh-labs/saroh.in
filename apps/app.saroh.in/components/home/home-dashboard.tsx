@@ -207,16 +207,9 @@ function FirstRun({
     if (onButNotOpen(modules)) {
         return (
             <PermissionDeniedState
+                data-ph-unmask=""
                 title="Nothing here is open to you yet"
-                // The words are Saroh's and are read in a session
-                // recording; the business's own name is not.
-                description={
-                    <>
-                        <span data-ph-mask="">{businessName}</span> runs on
-                        Saroh, but your role doesn&rsquo;t include any of it
-                        yet.
-                    </>
-                }
+                description={`${businessName} runs on Saroh, but your role doesn't include any of it yet.`}
                 note={WHO_CAN_CHANGE}
             />
         );

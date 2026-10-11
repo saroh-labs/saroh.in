@@ -88,6 +88,7 @@ export function PageLoading({
     return (
         <PageContainer width={width}>
             <PageHeader
+                holdsData={false}
                 breadcrumb={breadcrumb}
                 title={title ?? <TitleBar label={label} />}
                 description={description}

@@ -84,6 +84,7 @@ export default async function OrganizationSettingsPage() {
             width="full"
             header={
                 <SettingsPanelHeader
+                    holdsData={false}
                     // The settings read has the kind as saved; the
                     // organization list is the fallback.
                     title={

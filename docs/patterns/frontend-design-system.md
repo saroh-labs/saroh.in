@@ -339,14 +339,28 @@ text, a column's name, the navigation, an empty state, a banner.
 
 - **The shared components mark themselves**, so most screens do nothing:
     - readable: `Button`, `Label` (and `FormLabel`), `FormDescription`,
-      `FormMessage`, `TableHead`, `TabsTrigger`, `PageHeader`'s title and
-      description, the state cards' title, description and note (`EmptyState`,
-      `FailedState`, `PermissionDeniedState`, `CapabilityOffState`),
-      `ErrorPage`, `NotFound`, `DataView`'s column heads; in the workspace,
-      the rail, the tab bar and its sheet, the plan-ending banner, the
-      recording notice, `ReadOnlyNote`, and the goal picker after setup;
+      `FormMessage`, `Field`'s label, hint and error (`FieldHint`,
+      `FieldError`), `TableHead`, `TabsTrigger`, `PageHeader`'s title and
+      description, every state card's title, description and note
+      (`EmptyState`, `FailedState`, `PermissionDeniedState`,
+      `ModuleOffState`, `PlanLockedState`, `LimitReachedState`,
+      `PausedState`, `SignedOutState`, `ProviderDisconnectedState`, at any
+      size), `ErrorPage`, `NotFound`, `DataView`'s column heads; in the
+      workspace, the rail, the tab bar and its sheet, the plan-ending
+      banner, the recording notice, `ReadOnlyNote`, a `Moment`'s title, a
+      `SetupChecklist`'s heading, and the goal picker after setup;
     - always masked: `TableCell`, `DataView`'s rows (table and list),
-      `Avatar`, `StatCard`'s figure, the account button.
+      `Avatar`, `StatCard`'s figure, the account button, `RadioCards`' rows
+      (a choice is as often a location or a person as a fixed word), a
+      `Moment`'s fact line;
+    - masked unless the screen marks it: a `Notice` (its body is as often
+      the API's sentence as Saroh's, so only one with fixed copy says
+      `data-ph-unmask`), and `PageHeader`'s breadcrumb, count, badge, lead
+      and meta.
+- **A state card masks its own title where the title is data.** A
+  no-results card that repeats a search, and `PausedState` naming the
+  business, mask the title and leave the sentence under it readable
+  (`titleHoldsData`, set by the card itself).
 - **When you put a record's data inside a readable component, say so on
   it:** `<Button data-ph-mask="">Link to {holderName}</Button>`,
   `<EmptyState data-ph-mask="" title={`No orders match “${q}”`} />`. When
@@ -359,7 +373,15 @@ text, a column's name, the navigation, an empty state, a banner.
 - **`PageHeader`: a title that is not a literal says `holdsData`.** `true`
   masks the title and the description (a customer's name as the page
   title), `"title"` or `"description"` only that one, `false` says they are
-  fixed words. The same test fails without it.
+  fixed words. The same test fails without it. `SettingsPanelHeader` hands
+  `holdsData` on and is held to the same.
+- **`Field`: a label or hint that names a record says `holdsData`**, which
+  masks the whole field (`holdsData={false}` for fixed words that only look
+  like a record's). Never `data-ph-unmask` on a `Field`: it would read
+  whatever the control inside it draws, a select's chosen value included.
+- **A screen's own wrapper around a state card hands the mark on.**
+  `TabState` (a product tab) and `Empty` (a customer tab) take
+  `data-ph-mask` and the test reads them as it reads the cards.
 - **Everything else is masked until someone marks it:** a hand-rolled
   `<h1>`, `<button>` or `<label>`, a card's text, a `Badge`, a toast, a
   dialog's or a sheet's title and description. That is on purpose: toasts

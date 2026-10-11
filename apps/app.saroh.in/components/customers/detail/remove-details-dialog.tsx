@@ -147,6 +147,7 @@ export function RemoveDetailsDialog({
             ) : null}
 
             <Field
+                holdsData
                 label={`Type ${name} to confirm`}
                 error={
                     tried && !matches && refused.length === 0

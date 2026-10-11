@@ -50,7 +50,11 @@ export function SettingsSectionError({
     if (denied) return <SectionError error={error} retry={retry} />;
 
     return (
-        <SettingsPanel header={<SettingsPanelHeader title={copy.heading} />}>
+        <SettingsPanel
+            header={
+                <SettingsPanelHeader holdsData={false} title={copy.heading} />
+            }
+        >
             <FailedState
                 data-ph-unmask=""
                 className="max-w-[760px]"

@@ -173,6 +173,7 @@ export function PlanDetail({
         <>
             <div className="px-4 pt-5 sm:px-[26px]">
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={[
                         "Payments",

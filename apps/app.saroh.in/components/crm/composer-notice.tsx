@@ -27,6 +27,7 @@ export function ComposerNotice({ gate }: { gate: ComposerGate }) {
     }
     return gate.kind === "plan" ? (
         <PlanLockedCard
+            data-ph-unmask=""
             size="inline"
             name="Sending from here"
             title={gate.title}
@@ -36,6 +37,7 @@ export function ComposerNotice({ gate }: { gate: ComposerGate }) {
         />
     ) : (
         <ProviderDisconnectedState
+            data-ph-unmask=""
             size="inline"
             provider="email"
             title={gate.title}

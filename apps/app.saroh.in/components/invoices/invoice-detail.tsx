@@ -344,6 +344,7 @@ export function InvoiceDetail({
         <div>
             {details.step}
             <PageHeader
+                holdsData
                 className="mb-4 print:hidden"
                 breadcrumb={[
                     "Payments",

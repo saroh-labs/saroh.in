@@ -417,7 +417,11 @@ function RegisteredAddressChoice({
 
                 <div className="grid gap-1.5">
                     <div className="flex items-center justify-between gap-4">
-                        <Label htmlFor={`${id}-switch`} className="font-medium">
+                        <Label
+                            data-ph-unmask=""
+                            htmlFor={`${id}-switch`}
+                            className="font-medium"
+                        >
                             {ADDRESS_SHEET.switchLabel}
                         </Label>
                         <Switch

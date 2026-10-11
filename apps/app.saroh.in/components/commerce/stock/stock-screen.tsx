@@ -208,6 +208,7 @@ export function StockScreen({
     return (
         <div className="flex flex-col gap-5">
             <PageHeader
+                holdsData="description"
                 className="mb-0"
                 breadcrumb={["Sell", "Stock"]}
                 title="Stock"

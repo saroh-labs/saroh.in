@@ -35,14 +35,21 @@ export function Empty({
     children,
     action,
     className,
+    "data-ph-mask": mask,
 }: {
     title?: string;
     children: React.ReactNode;
     action?: React.ReactNode;
     className?: string;
+    /**
+     * Say so where the words name the customer: a session recording then
+     * masks them. Left out, they are read as Saroh's own.
+     */
+    "data-ph-mask"?: "";
 }) {
     return title ? (
         <EmptyState
+            data-ph-mask={mask}
             size="panel"
             className={className}
             title={title}
@@ -51,6 +58,7 @@ export function Empty({
         />
     ) : (
         <EmptyState
+            data-ph-mask={mask}
             size="inline"
             className={className}
             title={children}

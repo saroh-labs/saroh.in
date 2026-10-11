@@ -56,6 +56,7 @@ export function PayPreview({
                 </SiteThemeScope>
             ) : (
                 <EmptyState
+                    data-ph-mask=""
                     size="inline"
                     // One string: text split over lines here rendered with
                     // different whitespace on the server and the client, a

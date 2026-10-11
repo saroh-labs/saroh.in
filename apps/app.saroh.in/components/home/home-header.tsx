@@ -40,6 +40,7 @@ export function HomeHeader({
 
     return (
         <PageHeader
+            holdsData
             className="mb-0"
             breadcrumb={["Home"]}
             title={greeting(lastDay, name)}

@@ -47,7 +47,7 @@ export function ReviewsTab({
 
     if (reviews.length === 0) {
         return (
-            <Empty title={`No reviews from ${firstName} yet`}>
+            <Empty data-ph-mask="" title={`No reviews from ${firstName} yet`}>
                 Customers are asked after their order is delivered.
             </Empty>
         );

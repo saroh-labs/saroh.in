@@ -152,6 +152,7 @@ function CourierDraft({
                 {!own ? (
                     <>
                         <Field
+                            holdsData
                             label="Tracking number"
                             className="mt-3"
                             hint={
@@ -173,6 +174,7 @@ function CourierDraft({
                             />
                         </Field>
                         <Field
+                            holdsData
                             label="Tracking link"
                             optional
                             className="mt-3"

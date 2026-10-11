@@ -54,6 +54,7 @@ export function PackDetailHeader({
         <>
             <div className={cn("border-b border-border pb-4 pt-5", GUTTER)}>
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={packCrumbs(name)}
                     lead={

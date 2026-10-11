@@ -70,7 +70,7 @@ export function Overview({
         <div className="flex flex-col gap-4">
             {attention}
             {orders && d.orders && rows.length === 0 ? (
-                <Empty title="No orders yet">
+                <Empty data-ph-mask="" title="No orders yet">
                     {addedByHand(d)
                         ? `${addedLine(d.contact, d.timezone, now)}. `
                         : null}

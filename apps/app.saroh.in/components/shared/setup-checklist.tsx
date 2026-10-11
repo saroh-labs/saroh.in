@@ -163,6 +163,10 @@ export function SetupChecklist({
                 <h2
                     id={headingId}
                     className="font-display text-[15px] font-semibold tracking-[-0.01em]"
+                    // The goal, in Saroh's own fixed words ("Finish setup"):
+                    // a session recording may read it. The rows under it
+                    // are not marked and stay masked.
+                    data-ph-unmask=""
                     // Said when the last step lands, without stealing focus.
                     aria-live={finished ? "polite" : undefined}
                 >

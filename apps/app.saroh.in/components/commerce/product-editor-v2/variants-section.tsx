@@ -358,6 +358,7 @@ export function VariantsSection({
                         </>
                     ) : (
                         <EmptyState
+                            data-ph-mask=""
                             size="inline"
                             className="mb-3"
                             title="No variants yet"

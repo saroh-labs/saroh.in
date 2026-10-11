@@ -104,7 +104,9 @@ export function MessagesTab({
                 </p>
             ) : null}
             {messages.length === 0 ? (
-                <Empty>{emptyThreadText(thread.signsIn, firstName)}</Empty>
+                <Empty data-ph-mask="">
+                    {emptyThreadText(thread.signsIn, firstName)}
+                </Empty>
             ) : (
                 <ol
                     aria-label={`Messages with ${firstName}`}
@@ -143,6 +145,7 @@ export function MessagesTab({
             {thread.canReply ? (
                 <div className="mt-3.5 rounded-xl border border-border bg-card px-3.5 py-3">
                     <Field
+                        holdsData
                         label={`Reply to ${firstName}`}
                         labelHidden
                         className="space-y-0"

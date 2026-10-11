@@ -266,6 +266,7 @@ export function SubscriptionDetail({
         <>
             <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
                 <PageHeader
+                    holdsData
                     className="mb-0"
                     breadcrumb={[
                         "Payments",

@@ -134,11 +134,13 @@ export function LinesStep({
                     {shown.length === 0 ? (
                         products.length === 0 ? (
                             <EmptyState
+                                data-ph-mask=""
                                 size="inline"
                                 title={`Nothing is sold at ${storeName} yet`}
                             />
                         ) : (
                             <EmptyState
+                                data-ph-mask=""
                                 size="inline"
                                 kind="no-results"
                                 things="products"

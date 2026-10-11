@@ -21,16 +21,23 @@ export function TabState({
     title,
     description,
     children,
+    "data-ph-mask": mask,
 }: {
     icon: LucideIcon;
     title: string;
     description: React.ReactNode;
     /** Up to two `StateLink`s. */
     children?: React.ReactNode;
+    /**
+     * Say so where the words name the product's own data (its sizes, its
+     * locations): a session recording then masks them.
+     */
+    "data-ph-mask"?: "";
 }) {
     const actions = Children.toArray(children);
     return (
         <EmptyState
+            data-ph-mask={mask}
             size="panel"
             icon={<Icon />}
             title={title}
@@ -110,6 +117,7 @@ export function PanelForbidden({ what }: { what: string }) {
     const words = whoCanChange({ thing: what });
     return (
         <PermissionDeniedState
+            data-ph-unmask=""
             size="panel"
             title={words.title}
             description={words.description}

@@ -183,6 +183,7 @@ export function ProductHeader({
     return (
         <div className="border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
             <PageHeader
+                holdsData
                 className="mb-0"
                 breadcrumb={[
                     "Sell",
