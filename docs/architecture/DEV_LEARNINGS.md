@@ -4077,3 +4077,65 @@ way to `reportError`. When one is added, ask where its 5xx goes. Read the
 installed version's source for the hook: `onError` here is handed the
 error and no request, which no type says loudly.
 **Category**: observability · `packages/auth/src/server-errors.ts`
+
+## The consistency pass broke seven things only a browser could see
+
+**Symptom**: the first browser run after the UX consistency pass (11 Oct
+2026), with every unit test, type check and lint green:
+
+- Customer Detail's ⋯ More actions opened nothing, so nobody could merge,
+  delete or remove a customer's details from there.
+- With the keyboard on a control that has a hint, Escape closed the hint and
+  left the sheet open. The site editor's block sheet on a phone took two
+  presses, and so did its Publish menu.
+- A product with a photo had no title: the heading was zero wide.
+- On a phone, a record's page (a customer, an order, an invoice) was wider
+  than the screen, and Chrome zoomed the page out to fit it.
+- A product's Orders tab on a phone was the error page.
+- A location's Pick-up sheet closed on Save with "3 minutes" typed, saying
+  nothing and keeping nothing.
+- The eyebrow on the sign-in panel was dark on dark (contrast 2.1).
+
+**Cause**: one shared piece each, changed for every screen at once.
+
+- `Tip` was put between a trigger and its control
+  (`<DropdownMenuTrigger asChild><Tip><Button/></Tip>`). `asChild` hands the
+  trigger's ref, handlers and state to its child, which was now the Tip, and
+  the Tip kept them. Four places did this.
+- A showing tooltip is Radix's topmost layer, and Radix gives Escape to the
+  topmost layer alone. Turning every `title=` into a `Tip` put a layer over
+  every focused icon button.
+- `PageHeader` wrapped `lead` in a block box. The product's cover is an
+  inline link around a photo with `size-full`: in a block box its `size-14`
+  did nothing, and the photo drew at its own 1600px.
+- `PageHeader` moved the actions inside a wrapping row and kept their
+  `shrink-0`. As a child of that row they were held to the width of all
+  their buttons in a line, so they couldn't wrap.
+- `arrivalProps` was exported from `use-arrivals.ts`, a "use client" file,
+  and `order-row.tsx` (drawn by a server component too) called it.
+- The sheet frame closes an edit whose draft is unchanged without running
+  its submit. The Pick-up sheet said "unchanged" from what the draft would
+  send, and a time it couldn't read sends nothing.
+- `.label` gained a colour (muted Ink) when the label styles became one, and
+  the panel's eyebrow, which had inherited the panel's, took it.
+
+**Fix**: `Tip` passes on what it is handed and takes itself off the page
+before Radix reads an Escape (`packages/ui/src/components/ui/tooltip.tsx`);
+`PageHeader`'s lead is a flex box and its actions hold their width only from
+`sm` up; `arrivalProps` lives in `components/shared/arrival-props.ts`, which
+is not a client file; `wayChanged` (`lib/stores/delivery-summary.ts`) counts
+a draft with something to fix as changed; the eyebrow is `text-inherit`.
+**Check**: `tooltip.test.tsx` and `tooltip-escape.test.tsx` (a real Radix
+dialog), `page-header.test.tsx`, `split-shell.test.tsx`,
+`use-arrivals.test.tsx` (neither file may say "use client") and
+`delivery-summary.test.ts`. The browser specs that found them:
+`customer-detail`, `customer-merge`, `person-page`, `site-editor-narrow`,
+`site-versions`, `product-editor`, `phone-reflow`, `product-page-stock`,
+`storefront-settings` and `a11y`.
+**Rule**: a change to a shared piece is checked in a browser, on desk and
+phone, before it is merged: none of these was visible to jsdom, which has
+no layout, no server components and no layer stack unless a test builds
+one. A wrapper that can sit under `asChild` passes on what it is given. An
+overlay's `dirty` is "differs from what is saved", not "would send
+something".
+**Category**: frontend · `docs/patterns/frontend-verification.md`
