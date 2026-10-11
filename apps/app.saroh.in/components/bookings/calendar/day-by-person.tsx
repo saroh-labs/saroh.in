@@ -1,90 +1,125 @@
 "use client";
 
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
+import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
 import { cn } from "@saroh/ui/lib/utils";
-import type { CSSProperties, MouseEvent } from "react";
+import { TextLink } from "@saroh/ui/text-link";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 import type { Block, Column, Span } from "@/lib/services/diary";
+import { UNASSIGNED } from "@/lib/services/diary";
 import {
-    blockLine,
-    blockTitle,
-    STATE_LABEL,
-    UNASSIGNED,
-} from "@/lib/services/diary";
-import { bookingLanes } from "@/lib/services/diary-lanes";
+    closedSpans,
+    drawnLanes,
+    firstSight,
+    offSpans,
+} from "@/lib/services/diary-view";
 
-/** Pixels a minute takes on the diary: an hour is 48px (the design's 0.8). */
-export const PX = 0.8;
+import { blockLabel, DiaryBlock, lanePlace } from "./diary-block";
+import { FreeGap } from "./free-gap";
+import { at, CLOSED_HATCH, OFF_HATCH, tall } from "./geometry";
+import { FirstSight, NowLine, NowTime, useNowMinute } from "./now-line";
 
-/**
- * On a touch screen the day view draws a minute twice as tall (`--ppm`,
- * set on its wrapper): a 30-minute booking is then 48px, a whole thumb,
- * where 0.8 drew it at 24px. The phone shows one person, so the longer
- * day costs only scrolling. Anything outside the day view keeps 0.8.
- */
-const SCALE = `var(--ppm, ${PX}px)`;
-/** The least height a booking is drawn at on a phone: a 44px touch target. */
-const MIN_TOUCH_MINUTES = 28;
-
-const at = (minute: number, from: number) =>
-    `calc(${minute - from} * ${SCALE})`;
-const tall = (a: number, b: number) => `calc(${Math.max(0, b - a)} * ${SCALE})`;
-
-/** Closed time: a faint hatch you can click to open hours. */
-export const CLOSED_HATCH =
-    "bg-[repeating-linear-gradient(135deg,transparent_0_7px,hsl(var(--muted)/0.7)_7px_9px)] dark:bg-[repeating-linear-gradient(135deg,transparent_0_7px,hsl(var(--muted))_7px_9px)]";
-
-/** Time off: the danger tint, hatched. */
-export const OFF_HATCH =
-    "bg-[repeating-linear-gradient(135deg,hsl(var(--destructive-subtle))_0_6px,transparent_6px_12px)]";
-
-export function blockColour(block: Block): string {
-    if (block.state === "cancelled" || block.state === "noshow") {
-        return "bg-muted text-muted-foreground";
-    }
-    return block.kind === "class"
-        ? "bg-diary-class text-diary-foreground"
-        : "bg-diary-one text-diary-foreground";
-}
-
-export function blockLabel(block: Block): string {
-    return `${formatClockRange(block.start, block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${STATE_LABEL[block.state]}`;
-}
-
-/** The hour marks down the left edge. */
-export function HourRail({ span }: { span: Span }) {
+/** The hour marks down the left edge, and whatever stands on them. */
+export function HourRail({
+    span,
+    children,
+}: {
+    span: Span;
+    /** The time now and the first-sight anchor. */
+    children?: ReactNode;
+}) {
     const marks: number[] = [];
     for (let m = span[0]; m < span[1]; m += 60) marks.push(m);
     return (
-        <div
-            aria-hidden
-            className="relative"
-            style={{ height: tall(span[0], span[1]) }}
-        >
-            {marks.map((m) => (
-                <div
-                    key={m}
-                    className="absolute inset-x-0 h-px"
-                    style={{ top: at(m, span[0]) }}
-                >
-                    <span className="absolute -top-[7px] right-2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
-                        {formatClock(m, { short: true })}
-                    </span>
-                </div>
-            ))}
+        <div className="relative" style={{ height: tall(span[0], span[1]) }}>
+            <div aria-hidden>
+                {marks.map((m) => (
+                    <div
+                        key={m}
+                        className="absolute inset-x-0 h-px"
+                        style={{ top: at(m, span[0]) }}
+                    >
+                        <span className="absolute -top-[7px] right-2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+                            {formatClock(m, { short: true })}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            {children}
         </div>
     );
 }
 
+/** The shortest time off that has room for its words: 30 minutes is 24px. */
+const OFF_LABEL_MINUTES = 30;
+
 /**
- * Layout 3a, the default: one column per person, their free gaps to book,
- * closed time to open, time off hatched red, and the now line on today.
- * On a phone one person shows at a time — the switch above picks who.
+ * Closed time and time off in one column of the diary, inside the hours
+ * shown. Free time gets nothing: it is the plain page. Both hatches let a
+ * click through to whatever is under them.
+ */
+export function Hatches({
+    closed,
+    off,
+    from,
+}: {
+    closed: readonly Span[];
+    off: readonly Span[];
+    from: number;
+}) {
+    return (
+        <>
+            {closed.map(([a, b]) => (
+                <div
+                    key={`c${a}`}
+                    aria-hidden
+                    data-hatch="closed"
+                    className={cn(
+                        "pointer-events-none absolute inset-x-0",
+                        CLOSED_HATCH,
+                    )}
+                    style={{ top: at(a, from), height: tall(a, b) }}
+                />
+            ))}
+            {off.map(([a, b]) => (
+                <div
+                    key={`o${a}`}
+                    data-hatch="off"
+                    className={cn(
+                        "pointer-events-none absolute inset-x-0",
+                        OFF_HATCH,
+                    )}
+                    style={{ top: at(a, from), height: tall(a, b) }}
+                >
+                    {/* Said in words, so it is not the colour alone. A
+                        stretch too short to hold them keeps the hatch's
+                        own direction and width. */}
+                    {b - a >= OFF_LABEL_MINUTES ? (
+                        <span className="absolute left-1.5 top-1 rounded-[4px] bg-card px-1 text-[11px] font-medium leading-4 text-muted-foreground">
+                            Time off
+                        </span>
+                    ) : null}
+                </div>
+            ))}
+        </>
+    );
+}
+
+/**
+ * The day by person, the default layout: one column per person under their
+ * avatar and name. Bookings are the only solid colour. Free time is the
+ * plain page and books on a click; closed time is a quiet hatch and opens
+ * hours; time off is hatched the other way and says so. A thin line marks
+ * now on today. On a phone one person shows at a time, picked by the switch
+ * above.
  */
 export function DayByPerson({
     columns,
     span,
-    nowMinute,
+    today,
+    timezone,
+    sightKey,
     phoneKey,
     selected,
     canBook,
@@ -93,11 +128,15 @@ export function DayByPerson({
     onBlock,
     onFree,
     onClosed,
+    onAddPerson,
 }: {
     columns: Column[];
     span: Span;
-    /** Minutes from midnight now, when the day shown is today. */
-    nowMinute: number | null;
+    /** The day shown is today: draw the now line. */
+    today: boolean;
+    timezone: string;
+    /** The day and layout: the diary is brought into view once for each. */
+    sightKey: string;
     /** The one column a phone shows. */
     phoneKey: string;
     selected: string | null;
@@ -107,11 +146,18 @@ export function DayByPerson({
     onBlock: (block: Block) => void;
     onFree: (column: Column, free: Span) => void;
     onClosed: (column: Column, minute: number) => void;
+    /** "Add who takes bookings", from the head of the services' own column. */
+    onAddPerson?: () => void;
 }) {
     const [from, to] = span;
     const height = tall(from, to);
-    const lanesByColumn = new Map(
-        columns.map((c) => [c.key, bookingLanes(c.blocks, MIN_TOUCH_MINUTES)]),
+    const nowMinute = useNowMinute(timezone, today);
+    const sight = firstSight(
+        // On today the aim is now, known only once the browser has drawn.
+        today ? nowMinute : null,
+        today ? [] : columns.flatMap((c) => c.blocks),
+        today ? [] : columns.flatMap((c) => c.day?.windows ?? []),
+        span,
     );
 
     function closedAt(column: Column, e: MouseEvent<HTMLButtonElement>) {
@@ -138,164 +184,130 @@ export function DayByPerson({
             >
                 <div className="border-b border-border" />
                 {columns.map((c) => (
-                    <div
+                    <ColumnHead
                         key={c.key}
-                        className={cn(
-                            "min-w-0 border-b border-l border-b-border border-l-border/60 px-3 py-2.5",
-                            c.key !== phoneKey && "max-[759px]:hidden",
-                        )}
-                    >
-                        <div className="truncate text-[13px] font-semibold">
-                            {c.name}
-                        </div>
-                        <div className="truncate text-[11.5px] text-muted-foreground">
-                            {columnSub(c)}
-                        </div>
-                    </div>
+                        column={c}
+                        hidden={c.key !== phoneKey}
+                        onAddPerson={onAddPerson}
+                    />
                 ))}
-                <HourRail span={span} />
-                {columns.map((c) => (
-                    <div
-                        key={c.key}
-                        className={cn(
-                            "relative border-l border-border/60",
-                            c.key !== phoneKey && "max-[759px]:hidden",
-                        )}
-                        style={{ height }}
-                    >
-                        {canOpenHours && c.key !== UNASSIGNED && c.day ? (
-                            <button
-                                type="button"
-                                aria-label={`Open hours for ${c.name} on ${dayText}`}
-                                onClick={(e) => closedAt(c, e)}
-                                className={cn(
-                                    "absolute inset-0 z-0 w-full cursor-pointer transition-[filter] duration-fast hover:brightness-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:brightness-95",
-                                    CLOSED_HATCH,
-                                )}
-                            />
-                        ) : (
-                            <div
-                                aria-hidden
-                                className={cn("absolute inset-0", CLOSED_HATCH)}
-                            />
-                        )}
-                        {c.day?.off.map(([a, b]) => (
-                            <div
-                                key={`o${a}`}
-                                aria-hidden
-                                className={cn(
-                                    "pointer-events-none absolute inset-x-0",
-                                    OFF_HATCH,
-                                )}
-                                style={{
-                                    top: at(Math.max(a, from), from),
-                                    height: tall(
-                                        Math.max(a, from),
-                                        Math.min(b, to),
-                                    ),
-                                }}
-                            />
-                        ))}
-                        {c.key === UNASSIGNED
-                            ? // The services' own hours (UX-023): free time
-                              // customers can book, with nobody to tap-book
-                              // it with — New booking takes any service.
-                              c.day?.free.map((f) => (
-                                  <div
-                                      key={`f${f[0]}`}
-                                      className="absolute inset-x-1 z-[1] box-border overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px]"
-                                      style={{
-                                          top: at(f[0], from),
-                                          height: tall(f[0], f[1]),
-                                      }}
-                                  >
-                                      <span className="block text-[11px] font-semibold text-success-subtle-foreground">
-                                          Free {formatClockRange(f[0], f[1])}
-                                      </span>
-                                  </div>
-                              ))
-                            : canBook
-                              ? c.day?.free.map((f) => (
-                                    <button
-                                        key={`f${f[0]}`}
-                                        type="button"
-                                        onClick={() => onFree(c, f)}
-                                        aria-label={`Book ${c.name} at ${formatClock(f[0])}, free until ${formatClock(f[1])}`}
-                                        className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left transition-[filter,border-style] duration-fast hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-95"
-                                        style={{
-                                            top: at(f[0], from),
-                                            height: tall(f[0], f[1]),
-                                        }}
-                                    >
-                                        <span className="block text-[11px] font-semibold text-success-subtle-foreground">
-                                            Free {formatClockRange(f[0], f[1])}
-                                        </span>
-                                    </button>
-                                ))
-                              : null}
-                        {c.blocks.map((b) => {
-                            const lane = lanesByColumn
-                                .get(c.key)
-                                ?.get(b.key) ?? { lane: 0, lanes: 1 };
-                            return (
+                <HourRail span={span}>
+                    <NowTime minute={nowMinute} span={span} />
+                    <FirstSight
+                        sightKey={sightKey}
+                        minute={sight}
+                        span={span}
+                    />
+                </HourRail>
+                {columns.map((c) => {
+                    const lanes = drawnLanes(c.blocks);
+                    // The services' own hours have nobody to book with a
+                    // click: New booking takes any service at any open time.
+                    const bookable = canBook && c.key !== UNASSIGNED;
+                    return (
+                        <div
+                            key={c.key}
+                            data-diary-column={c.key}
+                            className={cn(
+                                "relative border-l border-border/60",
+                                c.key !== phoneKey && "max-[759px]:hidden",
+                            )}
+                            style={{ height }}
+                        >
+                            {canOpenHours && c.key !== UNASSIGNED && c.day ? (
                                 <button
-                                    key={b.key}
                                     type="button"
-                                    onClick={() => onBlock(b)}
-                                    aria-label={blockLabel(b)}
-                                    className={cn(
-                                        "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90 coarse:min-h-11",
-                                        blockColour(b),
-                                        selected === b.key &&
-                                            "ring-2 ring-foreground ring-offset-0",
-                                        b.state === "cancelled" &&
-                                            "line-through",
+                                    aria-label={`Open hours for ${c.name} on ${dayText}`}
+                                    onClick={(e) => closedAt(c, e)}
+                                    className="absolute inset-0 z-0 w-full cursor-pointer transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/60"
+                                />
+                            ) : null}
+                            {c.day ? (
+                                <Hatches
+                                    closed={closedSpans(c.day, span)}
+                                    off={offSpans(c.day, span)}
+                                    from={from}
+                                />
+                            ) : null}
+                            {bookable
+                                ? c.day?.free.map((f) => (
+                                      <FreeGap
+                                          key={`f${f[0]}`}
+                                          column={c}
+                                          free={f}
+                                          from={from}
+                                          onBook={onFree}
+                                      />
+                                  ))
+                                : null}
+                            {c.blocks.map((b) => (
+                                <DiaryBlock
+                                    key={b.key}
+                                    block={b}
+                                    from={from}
+                                    selected={selected === b.key}
+                                    label={blockLabel(b)}
+                                    onOpen={() => onBlock(b)}
+                                    place={lanePlace(
+                                        lanes.get(b.key) ?? {
+                                            lane: 0,
+                                            lanes: 1,
+                                        },
                                     )}
-                                    style={{
-                                        top: at(b.start, from),
-                                        height: tall(b.start, b.end),
-                                        // Overlapping bookings sit side by side
-                                        // (`bookingLanes`), never on top.
-                                        ...(lane.lanes > 1
-                                            ? {
-                                                  left: `calc(${(lane.lane / lane.lanes) * 100}% + 2px)`,
-                                                  width: `calc(${100 / lane.lanes}% - 4px)`,
-                                                  right: "auto",
-                                              }
-                                            : {}),
-                                        // A cancelled booking over the time it
-                                        // gave back steps aside, so the free
-                                        // gap under it can still be booked.
-                                        ...(b.state === "cancelled" &&
-                                        c.day?.free.some(
-                                            ([fa, fb]) =>
-                                                fa < b.end && b.start < fb,
-                                        )
-                                            ? { left: "auto", width: "34%" }
-                                            : {}),
-                                    }}
-                                >
-                                    <span className="block truncate text-[12px] font-bold">
-                                        {blockTitle(b)}
-                                    </span>
-                                    <span className="block truncate text-[11px]">
-                                        {formatClockRange(b.start, b.end)} ·{" "}
-                                        {blockLine(b)}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                        {nowMinute !== null &&
-                        nowMinute >= from &&
-                        nowMinute <= to ? (
-                            <div
-                                aria-hidden
-                                className="pointer-events-none absolute inset-x-0 z-[3] h-[2px] bg-foreground"
-                                style={{ top: at(nowMinute, from) }}
-                            />
-                        ) : null}
-                    </div>
-                ))}
+                                />
+                            ))}
+                            <NowLine minute={nowMinute} span={span} />
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * A column's head: the person's initials and name, then their hours. The
+ * services' own column (nobody on the diary yet) is not a person, so it has
+ * no avatar; it is where "Add who takes bookings" lives.
+ */
+function ColumnHead({
+    column: c,
+    hidden,
+    onAddPerson,
+}: {
+    column: Column;
+    /** Not the one a phone shows. */
+    hidden: boolean;
+    onAddPerson?: () => void;
+}) {
+    const person = c.key !== UNASSIGNED;
+    return (
+        <div
+            className={cn(
+                "flex min-w-0 items-center gap-2.5 border-b border-l border-b-border border-l-border/60 px-3 py-2.5",
+                hidden && "max-[759px]:hidden",
+            )}
+        >
+            {person ? (
+                <Avatar size="table" aria-hidden>
+                    <AvatarFallback>{avatarInitials(c.name)}</AvatarFallback>
+                </Avatar>
+            ) : null}
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold">
+                    {c.name}
+                </div>
+                <div className="truncate text-[11.5px] text-muted-foreground">
+                    {columnSub(c)}
+                </div>
+                {!person && c.day && onAddPerson ? (
+                    <TextLink
+                        onClick={onAddPerson}
+                        className="text-[12px] coarse:inline-flex coarse:min-h-11 coarse:items-center"
+                    >
+                        Add who takes bookings
+                    </TextLink>
+                ) : null}
             </div>
         </div>
     );
