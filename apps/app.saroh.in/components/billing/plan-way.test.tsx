@@ -45,16 +45,31 @@ describe("who may open Plan and billing, and who may change the plan", () => {
         expect(mayOpenPlan({ role: "OWNER", actions: [] })).toBe(false);
     });
 
-    it("falls back to the built-in map when no permissions came back", () => {
+    it("falls back to the built-in map when no permissions came back: only the Owner changes", () => {
         for (const role of ["OWNER", "ADMIN"]) {
             expect(mayOpenPlan({ role })).toBe(true);
-            expect(mayChangePlan({ role })).toBe(true);
         }
+        expect(mayChangePlan({ role: "OWNER" })).toBe(true);
+        // An Admin reads Plan and billing and changes nothing there
+        // (DEC-131, amended 2026-10-11).
+        expect(mayChangePlan({ role: "ADMIN" })).toBe(false);
+        expect(mayChangePlan({ role: "ADMIN", actions: null })).toBe(false);
         for (const role of ["MEMBER", "REVIEWER"]) {
             expect(mayOpenPlan({ role })).toBe(false);
             expect(mayChangePlan({ role })).toBe(false);
         }
         expect(mayChangePlan(null)).toBe(false);
+    });
+
+    it("reads an Admin as the API resolves one: opens, never changes", () => {
+        // What `GET /organizations` sends for an Admin: `billing:read`
+        // and no `billing:manage`.
+        const admin = {
+            role: "ADMIN",
+            actions: ["org:read", "member:invite", "billing:read"],
+        };
+        expect(mayOpenPlan(admin)).toBe(true);
+        expect(mayChangePlan(admin)).toBe(false);
     });
 
     it("knows a link to the plans from any other", () => {

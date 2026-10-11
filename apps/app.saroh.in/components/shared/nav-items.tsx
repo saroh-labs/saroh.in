@@ -124,7 +124,8 @@ export type NavAction =
     | "discount:write"
     // Settings › Plan and billing: what Saroh costs the business and its
     // invoices. Owner and Admin by default, as the API has it; changing the
-    // plan is `billing:manage`, which the page asks (`plan-access.ts`).
+    // plan is `billing:manage`, the Owner's alone, which the page asks
+    // (`plan-access.ts`).
     | "billing:read";
 
 /**

@@ -58,6 +58,34 @@ describe("a refusal by role, as the app says it", () => {
         );
     });
 
+    it("says only the owner can change the plan, however the API worded it", () => {
+        const said = "Only the owner can change the plan.";
+        expect(roleDeniedSentence("billing:manage")).toBe(said);
+        // The older envelope's sentence pointed at Settings › Team, where
+        // no role can be given this.
+        expect(roleDeniedMessage(envelope("billing:manage"))).toBe(said);
+        expect(said).not.toMatch(/admin|Team/);
+        // A refusal by role: the calm notice, never the red error.
+        expect(isRoleRefusal(said)).toBe(true);
+        expect(
+            toFailure(
+                {
+                    error: {
+                        code: "FORBIDDEN",
+                        message: said,
+                        statusCode: 403,
+                        correlationId: "cid",
+                        details: {
+                            code: "ROLE_DENIED",
+                            action: "billing:manage",
+                        },
+                    },
+                },
+                "Couldn't change your plan.",
+            ),
+        ).toEqual({ ok: false, error: said, denied: true });
+    });
+
     it("falls back to the plain line for a permission with no row", () => {
         expect(roleDeniedSentence("saved-view:write")).toBe(
             ROLE_DENIED_FALLBACK,
