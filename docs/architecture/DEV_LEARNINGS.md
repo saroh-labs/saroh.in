@@ -4162,3 +4162,23 @@ app, the API's sentences and the merchant's site. Change all three, and give
 each its own check.
 **Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
 and dates
+
+## The code scanner found what the gate could not
+
+**Symptom**: every check on the batch's pull request passed but CodeQL, which
+raised five findings in new code: a customer's phone number written to
+`sessionStorage` with a kept booking, tags taken out of a post's body by
+replacing patterns (twice), and two test helpers that unescaped an ampersand
+first or matched `<script` in one case only. One came back after the first
+fix: a second pattern replace, done in a loop.
+**Cause**: nothing local runs the scanner, and each of these reads as
+reasonable code. Replacing a tag pattern can leave the same pattern behind
+(`<scr<script>ipt>`), however many times it is done.
+**Fix**: the kept booking holds no phone number (a signed-in customer's comes
+from their account); `postParagraphs` reads the body a character at a time
+and copies no bracket (`lib/content/plain-text.ts`, with tests for nested
+tags); the helpers unescape `&amp;` last and match without regard to case.
+**Check**: `plain-text.test.ts`; the booking flow's reload test asserts the
+phone is not in storage. The scanner itself stays CI's: read its findings on
+the pull request before calling a batch green.
+**Category**: security · `docs/patterns/frontend-data-and-state.md`
