@@ -16,6 +16,8 @@ import {
     MinLength,
 } from "class-validator";
 
+import type { ContactTopic } from "../contact-messages/dto";
+import { CONTACT_TOPICS } from "../contact-messages/dto";
 import type { DeployApp, DeployEnvironment } from "./admin-deployments";
 import { DEPLOY_APPS, DEPLOY_ENVIRONMENTS } from "./admin-deployments";
 
@@ -466,6 +468,19 @@ export class ListBusinessReportsDto {
 
 /** Marking a report done carries a reason, as every operator write does. */
 export class MarkBusinessReportDoneDto extends OperatorReasonDto {}
+
+/** Messages from saroh.in/contact (DEC-137), newest first. */
+export class ListContactMessagesDto {
+    /** One of the form's topics; every topic when unset. */
+    @IsOptional()
+    @IsIn(CONTACT_TOPICS)
+    topic?: ContactTopic;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    cursor?: string;
+}
 
 /**
  * A catalogue override on one business (plans catalogue U11): grant or

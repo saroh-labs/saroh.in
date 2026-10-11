@@ -128,6 +128,9 @@ module.exports = {
         // Terms rev 46: customers' reports about a business — the address
         // rules, the DTO and the public write, with a jest-mocked Prisma.
         "<rootDir>/src/modules/business-reports/**/*.spec.ts",
+        // DEC-137: messages from saroh.in/contact — the DTO, the public
+        // write, its limits and the retention rule, with a jest-mocked Prisma.
+        "<rootDir>/src/modules/contact-messages/**/*.spec.ts",
         // S3-005 CRM: ContactsService, PipelinesService, and LeadsService specs
         // with a jest-mocked Prisma (incl. $transaction) — org-scoped reads,
         // authz (MEMBER denied), tenant isolation (cross-tenant id → 404), and

@@ -1,11 +1,14 @@
+import { ABOUT } from "@/content/about";
 import type { ChangelogEntry } from "@/content/changelog";
 import { changelogHref, liveEntries } from "@/content/changelog";
+import { CONTACT_PAGE } from "@/content/contact-page";
 import type { HelpFrontmatter } from "@/content/help";
 import { helpHref, liveArticles } from "@/content/help";
 import { integrationHref, liveIntegrations } from "@/content/integrations";
 import type { PublishContext } from "@/content/resources";
 import {
     linkShown,
+    routeExists,
     shownLegal,
     shownResources,
     shownTools,
@@ -15,8 +18,8 @@ import { galleryTemplates, templateHref } from "@/content/templates";
 
 /**
  * `/llms.txt` (Resources plan U7, llmstxt.org): the site's name, one line
- * on what Saroh is, then the Resources and legal pages shown now, each with
- * a one-line description, Help's articles, the changelog's entries and
+ * on what Saroh is, About and Contact (DEC-137), then the Resources and
+ * legal pages shown now, each with a one-line description, Help's articles, the changelog's entries and
  * the gallery's templates under their page. It follows the same publish rule as the nav, the footer
  * and the sitemap (KTD-2): an unpublished page, or one whose route this
  * build lacks, is never listed, so the file never points at a 404.
@@ -47,6 +50,18 @@ export function llmsText(
     >[] = galleryTemplates(),
 ): string {
     const out: string[] = ["# Saroh", "", `> ${LLMS_SUMMARY}`];
+
+    // Who makes Saroh and how to write to it (DEC-137): no publish date,
+    // so only the build's routes decide.
+    const company = [ABOUT, CONTACT_PAGE].filter((page) =>
+        routeExists(page.href, ctx.routes),
+    );
+    if (company.length > 0) {
+        out.push("", "## Saroh", "");
+        for (const page of company) {
+            out.push(line(base, page.href, page.name, page.line));
+        }
+    }
 
     const resources = shownResources(ctx);
     if (resources.length > 0) {

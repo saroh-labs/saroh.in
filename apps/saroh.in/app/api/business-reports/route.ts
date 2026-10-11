@@ -1,16 +1,17 @@
-// POST /api/business-reports {site, message, email?} — /customers' report
+// POST /api/business-reports {site, message, email, phone} — /customers' report
 //
 // Forwarded to api.saroh.in's public `POST /public/business-reports`, as
 // `/api/waitlist` forwards a join: the API origin stays out of the browser,
 // there is no CORS preflight, and the visitor's address is signed into
 // `x-saroh-relay` for the API's per-visitor limit (`lib/waitlist-forward.ts`).
-// Only the three fields go on.
+// Only the four fields go on, and only once each passes the form's own check
+// (`reportProblem`), which is the API's.
 
 import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import type { ReportResult } from "@/lib/business-report";
-import { reportBody } from "@/lib/business-report";
+import { reportBody, reportProblem } from "@/lib/business-report";
 import { forwardHeaders, relaySecret } from "@/lib/waitlist-forward";
 
 export async function POST(req: Request) {
@@ -26,7 +27,8 @@ export async function POST(req: Request) {
         posted = null;
     }
     const body = reportBody(posted);
-    if (!body) return fail("site", 400);
+    const problem = reportProblem(body);
+    if (problem) return fail(problem, 400);
 
     if (!env.API_URL) {
         console.error(

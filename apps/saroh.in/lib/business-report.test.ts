@@ -6,21 +6,28 @@ import { TERMS } from "@/content/terms";
 import { parseLegal } from "@/lib/legal-markdown";
 import { indexedPaths } from "@/lib/site-pages";
 
-import { prefilledSite, reportBody, reportProblem } from "./business-report";
+import {
+    phoneOk,
+    prefilledSite,
+    reportBody,
+    reportProblem,
+} from "./business-report";
 
 const GOOD = {
     site: "rye.saroh.app",
     message: "Paid for a cake that never came.",
-    email: "",
+    email: "first.last@example.com",
+    phone: "+91 98450 12345",
 };
+const NOTHING = { site: "", message: "", email: "", phone: "" };
 
 describe("reportProblem", () => {
-    it("lets a good report go, with or without an email", () => {
+    it("lets a good report go", () => {
         expect(reportProblem(GOOD)).toBeNull();
-        expect(reportProblem({ ...GOOD, email: "me@example.com" })).toBeNull();
         expect(
             reportProblem({ ...GOOD, site: "https://Shop.example.com/x?y=1" }),
         ).toBeNull();
+        expect(reportProblem({ ...GOOD, phone: "9845012345" })).toBeNull();
     });
 
     it("names the field that is wrong", () => {
@@ -28,27 +35,73 @@ describe("reportProblem", () => {
         expect(reportProblem({ ...GOOD, site: "the cake shop" })).toBe("site");
         expect(reportProblem({ ...GOOD, message: "bad" })).toBe("message");
         expect(reportProblem({ ...GOOD, email: "nope" })).toBe("email");
+        expect(reportProblem({ ...GOOD, phone: "call me" })).toBe("phone");
+    });
+
+    it("needs the email and the mobile number (DEC-138)", () => {
+        expect(reportProblem({ ...GOOD, email: "" })).toBe("email");
+        expect(reportProblem({ ...GOOD, email: "  " })).toBe("email");
+        expect(reportProblem({ ...GOOD, phone: "" })).toBe("phone");
+        expect(reportProblem({ ...GOOD, phone: "  " })).toBe("phone");
+    });
+
+    it("names the first field at fault, in the form's order", () => {
+        expect(reportProblem(NOTHING)).toBe("site");
+        expect(reportProblem({ ...NOTHING, site: GOOD.site })).toBe("message");
+        expect(reportProblem({ ...GOOD, email: "", phone: "" })).toBe("email");
+    });
+});
+
+/**
+ * The same lists as the API's `common/customer-phone.spec.ts`: the page and
+ * the server must agree on every one.
+ */
+describe("phoneOk", () => {
+    it("takes a number as people write one", () => {
+        for (const phone of [
+            "9845012345",
+            "+91 98450 12345",
+            "(080) 4099-2210",
+            " 022 4000 0000 ",
+        ]) {
+            expect(phoneOk(phone)).toBe(true);
+        }
+    });
+
+    it("refuses nothing, words, too few digits and punctuation alone", () => {
+        for (const phone of [
+            "",
+            "   ",
+            "call me",
+            "12345",
+            "------",
+            "98450x12345",
+            "9".repeat(25),
+        ]) {
+            expect(phoneOk(phone)).toBe(false);
+        }
     });
 });
 
 describe("reportBody", () => {
-    it("keeps only the three fields", () => {
+    it("keeps only the four fields, trimmed", () => {
         expect(
-            reportBody({ ...GOOD, email: " me@example.com ", other: 1 }),
-        ).toEqual({
-            site: GOOD.site,
-            message: GOOD.message,
-            email: "me@example.com",
-        });
-        expect(reportBody(GOOD)).toEqual({
-            site: GOOD.site,
-            message: GOOD.message,
-        });
+            reportBody({
+                ...GOOD,
+                email: " first.last@example.com ",
+                phone: " +91 98450 12345 ",
+                other: 1,
+            }),
+        ).toEqual(GOOD);
     });
 
-    it("is null for anything that isn't a report", () => {
-        expect(reportBody(null)).toBeNull();
-        expect(reportBody({ site: "rye.saroh.app" })).toBeNull();
+    it("leaves a field that is missing or isn't text empty, to be named", () => {
+        expect(reportBody(null)).toEqual(NOTHING);
+        expect(reportBody("report")).toEqual(NOTHING);
+        expect(reportBody({ site: "rye.saroh.app", phone: 98450 })).toEqual({
+            ...NOTHING,
+            site: "rye.saroh.app",
+        });
     });
 });
 

@@ -58,6 +58,7 @@ export class PublicBusinessReportsController {
             site: dto.site,
             message: dto.message,
             email: dto.email,
+            phone: dto.phone,
             ipHash,
         });
     }

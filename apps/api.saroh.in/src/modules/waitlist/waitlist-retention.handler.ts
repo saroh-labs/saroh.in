@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { deleteOldContactMessages } from "../contact-messages/contact-retention";
 import { LINK_PREVIEW_SOURCE, QR_MAKER_SOURCE } from "./waitlist-keys";
 
 /** The self-rescheduling job that deletes old waitlist entries (U30, KTD-17). */
@@ -26,14 +27,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * It reschedules itself like the pending payment sweep (ADR-007): one
  * PENDING run at a time (a partial unique index), and a throw only when the
  * next run cannot be enqueued.
+ *
+ * The same daily run clears the messages sent from saroh.in/contact after
+ * their 12 months (DEC-137, `contact-messages/contact-retention.ts`): one
+ * chain for what saroh.in's visitors leave with Saroh. Its count is kept
+ * apart from `sweep`'s, and one failing never stops the other.
  */
 @Injectable()
 export class WaitlistRetentionHandler {
     private readonly logger = new Logger(WaitlistRetentionHandler.name);
 
     readonly handle = async (_job: Job): Promise<void> => {
+        const now = new Date();
         try {
-            const deleted = await this.sweep(new Date());
+            const deleted = await this.sweep(now);
             if (deleted > 0) {
                 this.logger.log(
                     `waitlist: retention deleted ${deleted} entries`,
@@ -42,6 +49,18 @@ export class WaitlistRetentionHandler {
         } catch (error) {
             this.logger.error(
                 `Waitlist retention sweep failed before it finished: ${String(error)}`,
+            );
+        }
+        try {
+            const messages = await deleteOldContactMessages(now);
+            if (messages > 0) {
+                this.logger.log(
+                    `contact messages: retention deleted ${messages}`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `Contact message retention failed: ${String(error)}`,
             );
         }
         const next = new Date(Date.now() + WAITLIST_RETENTION_EVERY_MS);
