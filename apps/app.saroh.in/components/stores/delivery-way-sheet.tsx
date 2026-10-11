@@ -13,6 +13,7 @@ import {
     LATE_PRESETS,
     paidWay,
     thresholdScope,
+    wayChanged,
     wayDraft,
     wayInput,
     waySaved,
@@ -92,8 +93,9 @@ export function DeliveryWaySheet({
             open={open}
             pending={pending}
             fieldsClassName="gap-5"
-            // What the draft would send is the truest reading of a change.
-            dirty={changed}
+            // What the draft would send is the truest reading of a change,
+            // and so is something still to fix: Save then says what.
+            dirty={wayChanged(store, type, draft)}
             onClose={onClose}
             onSubmit={(e) => {
                 e.preventDefault();

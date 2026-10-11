@@ -5,6 +5,7 @@ import {
     draftProblems,
     LATE_PRESETS,
     lateShort,
+    wayChanged,
     wayDraft,
     wayInput,
     waySaved,
@@ -279,6 +280,23 @@ describe("draftProblems", () => {
         };
         expect(draftProblems(base, "PICKUP", draft).late).toBe(
             "5 minutes at the soonest. Between 5 minutes and 30 days.",
+        );
+    });
+
+    it("a draft with something to fix has changed, though it would send nothing", () => {
+        // Told "nothing changed", the sheet closed on Save: the 3 minutes
+        // typed were dropped and the bounds never said.
+        const draft = {
+            ...wayDraft(base, "PICKUP"),
+            preset: null,
+            amount: "3",
+            unit: "minutes" as const,
+        };
+        expect(wayInput(base, "PICKUP", draft)).toEqual({});
+        expect(wayChanged(base, "PICKUP", draft)).toBe(true);
+        // As saved: nothing changed, and Save just closes.
+        expect(wayChanged(base, "PICKUP", wayDraft(base, "PICKUP"))).toBe(
+            false,
         );
     });
 

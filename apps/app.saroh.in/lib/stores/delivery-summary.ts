@@ -275,6 +275,20 @@ export function wayInput(
     return input;
 }
 
+/**
+ * Whether the draft differs from what is saved, for the sheet's frame
+ * (`dirty`). A draft with something to fix has changed, though it would
+ * send nothing: `wayInput` leaves out a time it can't read (3 minutes), and
+ * a sheet told "nothing changed" closes on Save without a word, dropping
+ * what was typed and never saying what was wrong with it.
+ */
+export function wayChanged(store: Store, type: Way, draft: WayDraft): boolean {
+    return (
+        Object.keys(wayInput(store, type, draft)).length > 0 ||
+        Object.keys(draftProblems(store, type, draft)).length > 0
+    );
+}
+
 /** The toast for a save, in the words each change has always used. */
 export function waySaved(type: Way, input: StorefrontInput): string {
     const label = FULFILMENT_LABEL[type];
