@@ -356,7 +356,7 @@ export function useKitchen({
                     // The edit stands and the money is still owed; asking
                     // for it online didn't start. Nothing was lost.
                     showWarning(
-                        `Saved. ${money(due)} more is due.`,
+                        `Order saved. ${money(due)} more is due.`,
                         `It couldn't be asked for online: ${d.moneyError} ${record}`,
                     );
                 } else {
