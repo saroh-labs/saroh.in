@@ -4182,3 +4182,22 @@ tags); the helpers unescape `&amp;` last and match without regard to case.
 phone is not in storage. The scanner itself stays CI's: read its findings on
 the pull request before calling a batch green.
 **Category**: security · `docs/patterns/frontend-data-and-state.md`
+
+## A large batch's pull request ran no integration and no browser tests on CI
+
+**Symptom**: on a pull request of 2,200 files every listed check was green,
+and three were "skipped": the integration shards, the browser shards and the
+permission states. The summary jobs passed in two seconds.
+**Cause**: CI's "What changed" job asked `printf '%s\n' "$files" | grep -qE …`
+under `set -o pipefail`. `grep -q` leaves at its first match. With a list
+longer than the pipe holds, `printf` is still writing, dies of a broken pipe,
+and pipefail turns the match into a failure: "the API didn't change", "no
+browser test is needed". A short list fits in the pipe, so small pull
+requests were right and only the largest ones were wrong.
+**Fix**: `has()` reads the list from a here-string and sends grep's output to
+`/dev/null`, so nothing is left writing. The same shape in `scripts/prepush.sh`
+(seven places) is changed the same way.
+**Check**: proven by hand on a list of 60,000 lines (old: no match; new:
+match). A skipped job on a pull request that touches `apps/` or `packages/`
+is a finding: read the "skipping" rows, not only the red ones.
+**Category**: ci · `docs/patterns/devops-tooling-and-deploy.md`
