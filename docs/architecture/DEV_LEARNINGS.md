@@ -4337,12 +4337,16 @@ the press on the row's "More actions" timed out because a toast "intercepts
 pointer events" (11 Oct 2026). It had passed on the pull request and locally,
 and had been written off as flaky before.
 **Cause**: the test searches down to one row, so on a phone that row sits at
-the foot of the screen, where toasts are drawn. Stop selling and Undo each
-raise one; whether they were still up when the menu was pressed depended on
-how fast the run was.
-**Fix**: the spec waits for the toasts to go before it presses the menu.
-**Rule**: in a browser spec, after an action that raises a toast, wait for
-the toast to go (`[data-sonner-toast]` count 0) before pressing anything
-that can sit under it on a phone. A test that fails "sometimes" has a cause;
-read the call log before calling it flaky.
+the foot of the screen, where toasts are drawn. The test had just pressed
+Undo inside a toast, and its pointer stayed there. A toast under the pointer
+waits rather than going, so it never left: waiting 20 seconds for it failed
+every time. Before, the run passed only when the list happened to lay the
+row clear of the toast.
+**Fix**: the spec moves the pointer off the toast, waits for the toasts to
+go, then presses the menu.
+**Rule**: in a browser spec, after pressing a button inside a toast, move
+the pointer away (`page.mouse.move(1, 1)`) and wait for
+`[data-sonner-toast]` to reach 0 before pressing anything that can sit under
+it on a phone. A test that fails "sometimes" has a cause; read the call log
+before calling it flaky.
 **Category**: tests · `docs/patterns/frontend-verification.md`
