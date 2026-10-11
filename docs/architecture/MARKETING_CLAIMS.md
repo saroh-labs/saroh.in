@@ -57,7 +57,7 @@ Two kinds of switch decide many rows:
 | ---------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `SITE_SHOP` flag             | `orders/public-checkout.service.ts`, the renderer                       | Your online shop: products on the site, bag and checkout, public reviews                  |
 | `SITE_ACCOUNT_AREA` env      | `site-accounts/account-area.ts`, `saroh.app/lib/account-area-switch.ts` | Customer accounts: move or cancel a booking, join a plan, pause, buy a pack, later visits |
-| `ACCOUNT_THREAD` flag        | `site-accounts/notice-reach.ts`                                         | Messages in the customer's account                                                        |
+| `ACCOUNT_THREAD` flag        | `communications/account-thread.ts`                                      | Messages in the customer's account                                                        |
 | `RAZORPAY_AUTOPAY` flag      | `payments/providers/razorpay-mandates.ts`                               | UPI Autopay / card mandates; until then every renewal is an invoice with a pay link       |
 | `SITE_TEST_RELEASES` flag    | `sites/test-releases.*`, `sites/publish-approval.ts`                    | Test releases and "Publishing needs approval" (advisory review is live without it)        |
 | `CLOUDFLARE_HOSTNAMES_*` env | `domains/domain-hosting.provider.ts` (off when unset, WARN at boot)     | Your website on your own domain: registering it and its certificate (CAP1)                |
