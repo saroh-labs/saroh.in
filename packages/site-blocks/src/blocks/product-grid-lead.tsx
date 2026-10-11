@@ -1,6 +1,7 @@
 import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import type { ShopListingCard } from "../product/shop-listing";
 
@@ -105,9 +106,13 @@ function LeadCard({
                         className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : (
-                    <span
-                        aria-hidden="true"
-                        className="bg-site-surface border-site-border block aspect-[4/5] w-full rounded-[var(--site-radius)] border"
+                    // Its neighbours have photos: its name, in the photo's
+                    // own box. (With no photo in the section at all, the
+                    // grid is told photos are off and draws none.)
+                    <NamePlate
+                        name={p.name}
+                        large={lead}
+                        className="aspect-[4/5] w-full rounded-[var(--site-radius)]"
                     />
                 )
             ) : null}

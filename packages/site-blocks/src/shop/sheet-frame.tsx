@@ -23,6 +23,9 @@ import { cn } from "../lib/utils";
  * A `footer` is pinned to the sheet's foot while the rest scrolls above it:
  * the bag's total and its button stay under the thumb however long the bag
  * is. The page behind is held still while the sheet is open.
+ *
+ * `mark="done"` opens the sheet on a tick in the site's accent, over its
+ * title: an order placed is a moment of success, and reads as one.
  */
 
 export const sheetButton = (off: boolean) =>
@@ -42,12 +45,15 @@ export const sheetAltButton = cn(
 export function SheetFrame({
     title,
     lead,
+    mark,
     onClose,
     footer,
     children,
 }: {
     title: string;
     lead?: ReactNode;
+    /** A tick in the accent over the title: it worked. */
+    mark?: "done";
     onClose: () => void;
     /** Pinned to the foot of the sheet; the rest scrolls above it. */
     footer?: ReactNode;
@@ -116,13 +122,47 @@ export function SheetFrame({
                             : "pb-[calc(20px+env(safe-area-inset-bottom))]",
                     )}
                 >
-                    <div className="flex items-center gap-2.5">
-                        <h2
-                            id={`${ids}-title`}
-                            className="font-site-heading flex-1 text-[21px] font-semibold tracking-[-0.015em]"
-                        >
-                            {title}
-                        </h2>
+                    <div
+                        className={cn(
+                            "flex gap-2.5",
+                            mark ? "items-start" : "items-center",
+                        )}
+                    >
+                        <div className="min-w-0 flex-1">
+                            {mark ? (
+                                <div
+                                    aria-hidden="true"
+                                    data-sheet-mark=""
+                                    className="bg-site-accent text-site-accent-fg mb-3 flex size-11 items-center justify-center rounded-full"
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        width="20"
+                                        height="20"
+                                        fill="none"
+                                    >
+                                        <path
+                                            d="M5 12.5 10 17.5 19 7.5"
+                                            stroke="currentColor"
+                                            strokeWidth="2.25"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </div>
+                            ) : null}
+                            <h2
+                                id={`${ids}-title`}
+                                className={cn(
+                                    "font-site-heading font-semibold tracking-[-0.015em] [text-wrap:balance]",
+                                    mark
+                                        ? "text-[calc(1.625rem*var(--site-heading-scale,1))] leading-[1.15]"
+                                        : "text-[calc(1.3125rem*var(--site-heading-scale,1))]",
+                                )}
+                            >
+                                {title}
+                            </h2>
+                        </div>
                         <button
                             type="button"
                             onClick={onClose}

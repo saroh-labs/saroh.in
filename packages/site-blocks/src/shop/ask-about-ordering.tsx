@@ -60,7 +60,7 @@ export function AskAboutOrdering({
                 >
                     Ask about ordering
                 </a>
-                <p className="text-site-muted mt-2 text-xs">
+                <p className="text-site-body mt-2.5 text-sm leading-normal">
                     Send {businessName} a message about this, and they'll get
                     back to you.
                 </p>
@@ -76,7 +76,7 @@ export function AskAboutOrdering({
                 >
                     Call to order
                 </a>
-                <p className="text-site-muted mt-2 text-xs">
+                <p className="text-site-body mt-2.5 text-sm leading-normal [overflow-wrap:anywhere]">
                     Ask {businessName} about ordering {about}.
                 </p>
             </div>

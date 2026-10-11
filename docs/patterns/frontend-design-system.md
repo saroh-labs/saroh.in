@@ -617,6 +617,25 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   the first section's hero fetched first. Give the `<img>` its width and
   height, or a box with an aspect ratio. No `srcset`: storage keeps one
   file per photo and nothing resizes on request.
+- **Current** (12 Oct 2026) — **A product with no photo never leaves an
+  empty frame on a merchant's site**, and "No photo yet" never reaches a
+  customer (it is a note for the owner, said in the workspace). Where
+  nothing shown has a photo (the shop, a Product grid section, the bag) the
+  cards are cards of words and no photo box is drawn. Where some have one,
+  the others take `NamePlate` (`site-blocks/src/product/name-plate.tsx`):
+  a quiet panel in the accent with the product's name, in the photo's own
+  box, so the row lines up. A product page with no photo leads with the
+  name. A new list of products follows the same two cases.
+- **Current** (12 Oct 2026) — **A whole page with nothing to show has one
+  look and stays out of search.** A failed read or an empty page on a
+  merchant's site is `SitePageState` (`site-blocks/src/shop/page-state.tsx`):
+  what happened as the heading, one sentence, "Try again" on the page's own
+  address for a failed read, and the business's phone and WhatsApp when the
+  site shows them. Its route adds `NOT_FOR_SEARCH` to its metadata
+  (`apps/saroh.app/lib/module-pages.ts`, `routeHasNothing`) and nothing
+  else: the page answers 200, and "not available" is not a page to rank.
+  A button that can't be pressed goes quiet (`quietFill`, body-colour
+  words), never the accent at half opacity.
 - **Current** (10 Oct 2026) — **The customer's words**: Pick-up (never
   collect or pickup), bag (never basket), booking (never appointment, save
   where a merchant typed it), the payment window (never the provider's

@@ -1,7 +1,7 @@
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
 import { ReachLinks } from "../../reach-links";
-import { card, focusRing } from "../styles";
+import { card, quietButton } from "../styles";
 
 /**
  * A pay-now hold that ran out before it was paid. Its place went back on the
@@ -48,10 +48,7 @@ export function ExpiredCard({
             <button
                 type="button"
                 onClick={onAgain}
-                className={cn(
-                    "border-site-border bg-site-surface text-site-fg mt-4 h-11 rounded-[calc(var(--site-radius)+8px)] border px-4 text-sm font-semibold",
-                    focusRing,
-                )}
+                className={cn(quietButton, "mt-4")}
             >
                 Pick a time again
             </button>

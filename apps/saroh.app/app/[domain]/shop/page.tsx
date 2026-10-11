@@ -5,6 +5,8 @@ import {
     modulePageTopOf,
     ModulePageUnavailable,
     NotTakingOrders,
+    reachOf,
+    shopLeadLine,
     ShopListing,
     ShopUnavailable,
 } from "@saroh/site-blocks";
@@ -16,11 +18,14 @@ import {
     isFreePage,
     moduleLabel,
     moduleRoute,
+    NOT_FOR_SEARCH,
+    routeHasNothing,
 } from "@/lib/module-pages";
 import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { getSiteContact } from "@/lib/site-contact";
 import { canonical, shopDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
@@ -45,6 +50,12 @@ import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
  *    is sold there.
  *
  * `/shop/<product>` is always the product page, Shop page or not.
+ *
+ * The built-in shop says how an order reaches the customer in one line
+ * under its heading, from the location's checkout (`shopLeadLine`), and
+ * nothing when the site takes no online orders. A page that has nothing to
+ * show (the module is off, the read failed, nothing is on sale) is kept out
+ * of search: it answers 200, and "not available" is not a page to rank.
  */
 
 export async function generateMetadata({
@@ -83,6 +94,7 @@ export async function generateMetadata({
             : [],
     });
     return shareable(resolved, {
+        ...(shopHasNothing(resolved, catalogue) ? NOT_FOR_SEARCH : {}),
         title: `${label} · ${name}`,
         description,
         openGraph: {
@@ -108,6 +120,22 @@ async function shopIsMissing(
     if (!resolved.siteId) return true;
     const lookup = await getCatalogue(resolved.siteId);
     return !lookup.ok && lookup.reason === "missing";
+}
+
+/**
+ * Whether `/shop` draws no shop now: its page is taken off while Commerce
+ * is off, or the built-in shop's read failed or came back with nothing on
+ * sale. A published Shop page is the merchant's own and always has
+ * something to say.
+ */
+function shopHasNothing(
+    resolved: NonNullable<Awaited<ReturnType<typeof getSiteForHost>>>,
+    catalogue: Awaited<ReturnType<typeof getCatalogue>> | null,
+): boolean {
+    return routeHasNothing(
+        moduleRoute(resolved.snapshot.pages, resolved.modules, "SHOP"),
+        !catalogue?.ok || catalogue.data.products.length === 0,
+    );
 }
 
 /** A free-form page of the merchant's own, or their writing, lives here. */
@@ -158,7 +186,14 @@ export default async function ShopPage({
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         dontCachePage("shop unavailable");
-        return <ShopUnavailable business={snapshot.site.name} />;
+        return (
+            <ShopUnavailable
+                business={snapshot.site.name}
+                retryHref="/shop"
+                // The layout's own read, shared through `cache`.
+                reach={reachOf(await getSiteContact(siteId))}
+            />
+        );
     }
     // Every listed product's price and stock is on this page (#863).
     listsProducts(siteId);
@@ -171,6 +206,16 @@ export default async function ShopPage({
             <ShopListing
                 products={lookup.data.products}
                 bagSite={checkout?.canOrder ? siteId : null}
+                // How an order reaches the customer, only from what this
+                // location's checkout offers now; nothing otherwise.
+                lead={shopLeadLine(checkout)}
+                business={snapshot.site.name}
+                // The ways to reach the business, where nothing is on sale.
+                reach={
+                    lookup.data.products.length === 0
+                        ? reachOf(await getSiteContact(siteId))
+                        : null
+                }
             />
         </main>
     );

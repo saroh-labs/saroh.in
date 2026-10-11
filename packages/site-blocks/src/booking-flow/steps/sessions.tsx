@@ -4,7 +4,7 @@ import type { BusinessReach } from "../../reach-links";
 import { ReachLinks } from "../../reach-links";
 import type { BookingStart } from "../model";
 import { dateIn, dateText, dayParts, placesText } from "../model";
-import { focusRing, optionClasses, quietFill } from "../styles";
+import { optionClasses, quietFill, textAction } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { fullSessionText } from "../waitlist";
 import type { Weeks } from "./weeks";
@@ -78,7 +78,11 @@ export function Sessions({
                         onClick={() => onPick(s)}
                         className={cn(
                             optionClasses(on),
-                            closed && "cursor-not-allowed opacity-70",
+                            // Full, with no waitlist: quiet and dashed, so
+                            // it is told from an open class by its shape.
+                            closed &&
+                                "hover:border-site-border cursor-not-allowed border-dashed active:scale-100",
+                            closed && quietFill,
                         )}
                     >
                         <span
@@ -127,10 +131,7 @@ export function Sessions({
                 <button
                     type="button"
                     onClick={onMore}
-                    className={cn(
-                        "text-site-fg justify-self-start text-sm font-semibold underline",
-                        focusRing,
-                    )}
+                    className={cn(textAction, "justify-self-start")}
                 >
                     Show more classes
                 </button>

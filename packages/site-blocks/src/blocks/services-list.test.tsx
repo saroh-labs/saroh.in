@@ -117,3 +117,57 @@ describe("servicesList (#255)", () => {
         expect(formatPrice(100, "NOT-A-CODE")).toBeNull();
     });
 });
+
+describe("the services list's states (starter audit)", () => {
+    const realFetch = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = realFetch;
+    });
+
+    it("holds the list's shape while the services are read, and says so to a screen reader", () => {
+        // A read that never answers: the section stays in its loading state.
+        globalThis.fetch = vi.fn(() => new Promise<Response>(() => undefined));
+        const { container } = render(<ServicesListSection content={content} />);
+        const loading = screen.getByRole("status", {
+            name: "Loading services",
+        });
+        expect(loading).toHaveAttribute("data-services-loading");
+        // Three rows, drawn for the eye only.
+        expect(loading.querySelectorAll("[aria-hidden='true']")).toHaveLength(
+            3,
+        );
+        // The heading is there already, so nothing under it jumps.
+        expect(container.querySelector("h2")).not.toBeNull();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("gives Book in a row a ring, a pressed state and 44px under a finger", () => {
+        render(
+            <ServicesListSection
+                content={{ ...content, layout: "list" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        const book = screen.getByRole("link", {
+            name: /Cut and finish/,
+        });
+        expect(book).toHaveAttribute("href", "/book?service=fixture-cut");
+        expect(book.className).toContain("coarse:min-h-11");
+        expect(book.className).toContain("focus-visible:ring-2");
+        expect(book.className).toContain("active:opacity-70");
+    });
+
+    it("gives a card's Book button 44px under a finger", () => {
+        render(
+            <ServicesListSection
+                content={{ ...content, layout: "cards" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        const book = screen.getByRole("link", { name: /Cut and finish/ });
+        expect(book.className).toContain("coarse:h-11");
+        expect(book.className).toContain("bg-site-accent");
+    });
+});
