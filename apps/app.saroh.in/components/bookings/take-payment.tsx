@@ -179,9 +179,8 @@ export function TakePayment({
                             className="flex flex-wrap gap-1.5"
                         >
                             {choices.map((c) => (
-                                <Tip label={c.off ?? undefined}>
+                                <Tip key={c.key} label={c.off ?? undefined}>
                                     <Chip
-                                        key={c.key}
                                         on={choice === c.key}
                                         disabled={c.off !== null}
                                         onClick={() => {

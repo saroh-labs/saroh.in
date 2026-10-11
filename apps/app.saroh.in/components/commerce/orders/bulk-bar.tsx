@@ -221,9 +221,11 @@ export function BulkBar({
                     ) : null}
                     <div className="ml-auto flex flex-wrap gap-[7px]">
                         {actions.map((action) => (
-                            <Tip label={action.disabled ?? action.title}>
+                            <Tip
+                                key={action.kind}
+                                label={action.disabled ?? action.title}
+                            >
                                 <button
-                                    key={action.kind}
                                     type="button"
                                     onClick={() => run(action)}
                                     disabled={action.disabled !== null || busy}

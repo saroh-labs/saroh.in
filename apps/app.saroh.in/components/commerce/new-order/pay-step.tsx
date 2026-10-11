@@ -68,9 +68,8 @@ export function PayStep({
                 className="flex flex-wrap gap-1.5"
             >
                 {options.map((o) => (
-                    <Tip label={o.off ?? undefined}>
+                    <Tip key={o.key} label={o.off ?? undefined}>
                         <Chip
-                            key={o.key}
                             on={pay === o.key}
                             disabled={o.off !== null}
                             onClick={() => onPay(o.key)}

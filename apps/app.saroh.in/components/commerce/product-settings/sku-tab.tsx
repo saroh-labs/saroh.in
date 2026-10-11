@@ -144,9 +144,8 @@ export function SkuTab({
                 </Field>
                 <div className="mt-[9px] flex flex-wrap gap-1.5">
                     {TOKENS.map((t) => (
-                        <Tip label={t.what}>
+                        <Tip key={t.t} label={t.what}>
                             <button
-                                key={t.t}
                                 type="button"
                                 disabled={!canWrite}
                                 aria-label={`Add ${t.t}, ${t.what}`}

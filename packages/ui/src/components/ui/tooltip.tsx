@@ -95,7 +95,7 @@ function listen() {
         "keydown",
         (event) => {
             if (event.key !== "Escape" || showing.size === 0) return;
-            const hints = [...showing];
+            const hints = Array.from(showing);
             showing.clear();
             for (const drop of hints) drop();
         },

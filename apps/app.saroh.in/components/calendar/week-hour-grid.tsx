@@ -137,9 +137,8 @@ export function WeekHourGrid({
                             )}
                         >
                             {allDay.map((chip) => (
-                                <Tip label={chip.full}>
+                                <Tip key={chip.key} label={chip.full}>
                                     <Link
-                                        key={chip.key}
                                         href={chip.href}
                                         aria-label={chip.full}
                                         className={cn(
@@ -215,9 +214,8 @@ export function WeekHourGrid({
                                 />
                             ))}
                             {blocks.map((b) => (
-                                <Tip label={b.full}>
+                                <Tip key={b.key} label={b.full}>
                                     <Link
-                                        key={b.key}
                                         href={b.href}
                                         aria-label={b.full}
                                         className={cn(

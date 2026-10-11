@@ -130,9 +130,8 @@ export function WeekColumns({
                                 </span>
                             ) : null}
                             {col.cards.map((card) => (
-                                <Tip label={card.full}>
+                                <Tip key={card.key} label={card.full}>
                                     <Link
-                                        key={card.key}
                                         href={card.href}
                                         className={cn(
                                             "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5 overflow-hidden rounded-[7px] border border-foreground/10 bg-card px-[7px] py-1.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70",
