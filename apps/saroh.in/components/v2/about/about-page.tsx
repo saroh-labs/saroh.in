@@ -285,7 +285,9 @@ function CompanyFact({
     children: React.ReactNode;
 }) {
     return (
-        <div className="grid gap-1">
+        // `content-start`: a cell beside a taller one (a three-line address)
+        // keeps its words right under its label, not spread down the cell.
+        <div className="grid content-start gap-1">
             <dt className="font-semibold text-foreground">{label}</dt>
             <dd className="m-0">{children}</dd>
         </div>
