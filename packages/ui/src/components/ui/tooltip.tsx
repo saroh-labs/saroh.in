@@ -83,6 +83,12 @@ export function Tip({
     );
 }
 
+/**
+ * A closed hint's fade is the fast token (120ms at most across the skins).
+ * By this long after it closed it is taken off the page whatever happened.
+ */
+const FADED_BY_MS = 200;
+
 /** The hints on the page right now, each by the way to take it off. */
 const showing = new Set<() => void>();
 let listening = false;
@@ -179,7 +185,14 @@ function Hint({
             setOpen(false);
         });
     }, []);
-    React.useEffect(() => () => void showing.delete(drop), [drop]);
+    const gone = React.useRef<number | undefined>(undefined);
+    React.useEffect(
+        () => () => {
+            window.clearTimeout(gone.current);
+            showing.delete(drop);
+        },
+        [drop],
+    );
     // A hint that has closed is still on the page while it fades, and
     // still the topmost layer: it took Escape then too (and in the built
     // app, on a phone, it was found there long after it closed). So it is
@@ -205,12 +218,19 @@ function Hint({
                         setDropped(false);
                         listen();
                         showing.add(drop);
+                        window.clearTimeout(gone.current);
                     } else {
-                        // Gone at once, with no fade out: a hint left on
-                        // the page while it fades is still a layer above
-                        // the sheet, and one that never finished fading
-                        // stayed there.
-                        setDropped(true);
+                        // It fades out (the design system's exit, faster
+                        // than its entry), and is taken off the page for
+                        // certain once that is over: a hint whose fade
+                        // never reported its end stayed on the page as a
+                        // layer above the sheet (seen in the built app on
+                        // a phone).
+                        window.clearTimeout(gone.current);
+                        gone.current = window.setTimeout(
+                            () => setDropped(true),
+                            FADED_BY_MS,
+                        );
                     }
                     setOpen(next);
                 }}
