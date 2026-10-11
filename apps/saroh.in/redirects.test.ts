@@ -13,7 +13,6 @@ const OLD_URLS = [
     "/insights",
     "/how-it-works",
     "/coming-soon",
-    "/about",
     "/what-it-will-not-do",
     "/modules",
     "/modules/website",
@@ -62,6 +61,11 @@ describe("redirects", () => {
         expect(resolve(to)).toBeNull();
     });
 
+    it("leaves /about to the About page (DEC-137)", () => {
+        expect(resolve("/about")).toBeNull();
+        expect(SERVED_PATHS).toContain("/about");
+    });
+
     it("lands /modules/commerce on Orders, not via /sell", () => {
         expect(resolve("/modules/commerce")).toBe("/features/orders");
     });
@@ -82,11 +86,17 @@ describe("redirects", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, 8 features, 3 solutions, /customers and the waitlist while it is the ask; Pricing once it opens", () => {
+    it("lists Home, 8 features, 3 solutions, About, Contact, /customers and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(14);
+        expect(waitlist).toHaveLength(16);
         expect(waitlist).toContain("/waitlist");
         expect(waitlist).toContain("/customers");
+        // About and Contact are pages in either mode (DEC-137).
+        for (const mode of ["waitlist", "open"] as const) {
+            expect(indexedPaths(mode)).toEqual(
+                expect.arrayContaining(["/about", "/contact"]),
+            );
+        }
         // Pricing waits at the waitlist until launch, and a sitemap never
         // lists a redirect.
         expect(waitlist).not.toContain("/pricing");

@@ -2,7 +2,8 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { SAROH_CONTACT_EMAIL } from "@/content/contact";
+import { ABOUT } from "@/content/about";
+import { CONTACT_PAGE } from "@/content/contact-page";
 import { CUSTOMERS } from "@/content/customers";
 import { SAROH_NAME } from "@/content/name";
 import { MADE_BY } from "@/content/resources";
@@ -55,8 +56,8 @@ const SOCIAL_MARKS: Readonly<Record<string, readonly string[]>> = {
  * together", `content/name.ts`), who it is for and Saroh's own accounts as
  * a row of marks; on the right the link columns: Features, Solutions,
  * Resources (plan U1, when any is live), Tools (the free tools, when any is
- * live) and Saroh (Pricing once the launch switch is open, Questions,
- * Contact, Sign in once it is open too). The two sit side by side from
+ * live) and Saroh (Pricing once the launch switch is open, About,
+ * Questions, Contact, Sign in once it is open too). The two sit side by side from
  * 1024px and stack below it; the columns wrap at 130px. Under them, who
  * makes Saroh with the copyright line (the year the site was built) and the legal pages that are published (R6): Privacy from its
  * date, and "Cookie choices" where the cookie notice can appear. No Terms
@@ -177,15 +178,17 @@ export function SiteFooter({
                                 Pricing
                             </Link>
                         ) : null}
+                        <Link href={ABOUT.href} className={LINK}>
+                            {ABOUT.name}
+                        </Link>
                         <Link href="/#faq" className={LINK}>
                             Questions
                         </Link>
-                        <a
-                            href={`mailto:${SAROH_CONTACT_EMAIL}`}
-                            className={LINK}
-                        >
-                            Contact
-                        </a>
+                        {/* The Contact page gives contact@saroh.in
+                            (DEC-101) and a form (DEC-137). */}
+                        <Link href={CONTACT_PAGE.href} className={LINK}>
+                            {CONTACT_PAGE.name}
+                        </Link>
                         {LAUNCH_MODE === "open" ? (
                             <a href={SIGN_IN_URL} className={LINK}>
                                 Sign in

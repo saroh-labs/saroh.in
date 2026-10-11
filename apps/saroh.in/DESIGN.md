@@ -20,6 +20,12 @@ is fixed.
   them all at once. No page hard-codes a CTA.
 - **Merchant words:** "location", never "storefront" or "store"; no claim the
   product can't back (`docs/patterns/saroh-product.md`).
+- **Plan words wait for launch, as content.** On a page that is live before
+  the launch switch opens, a line about Saroh's plans, prices or limits is
+  marked `openOnly` or given a second wording (`content/launch-words.ts`,
+  About and Contact, DEC-137), never cut from the component.
+- **A company fact comes from `content/company.ts`,** and one that isn't set
+  there is not drawn: no placeholder, no bracketed blank (DEC-137).
 - **`cn` from `@/lib/cn`**, not `@saroh/ui/lib/utils`: it knows this app's
   `mk-*` keys. Focus rings are written
   `focus-visible:[outline-style:solid] focus-visible:outline-2 …`, never
@@ -44,7 +50,9 @@ dark bands and the featured plan; it is never body text.
 - **JetBrains Mono** (`font-mono`): only the waitlist's opening date, and
   the link preview tool's address field, tag names and tags to copy.
 - **Plus Jakarta Sans 600** (`font-wordmark`): only the phone menu's "Menu".
-- **Noto Sans Devanagari 500**: only सारोह in the waitlist footer.
+- **Noto Sans Devanagari**: only सारोह in the waitlist footer (500), and
+  the Hindi in About's "What the name means" (400 to 700, DEC-137). Each is
+  its own file, subset to its page's words and loaded on that page only.
 
 All are self-hosted (`app/layout.tsx`, `app/fonts/`); the build fetches no
 font from a network. The scale is the `text-mk-*` keys in

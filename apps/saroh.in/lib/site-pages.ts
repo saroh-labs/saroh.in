@@ -1,4 +1,6 @@
+import { ABOUT } from "@/content/about";
 import { changelogHref, liveEntries } from "@/content/changelog";
+import { CONTACT_PAGE } from "@/content/contact-page";
 import { featureHref } from "@/content/features";
 import { helpHref, liveArticles, summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
@@ -12,8 +14,9 @@ import type { LaunchMode } from "@/lib/links";
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
  * (plan U26): Home, Pricing, the eight features, the three solutions, the
- * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16), and
- * /customers, for customers of a business on Saroh (Terms rev 46).
+ * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16),
+ * About and Contact (DEC-137), and /customers, for customers of a business
+ * on Saroh (Terms rev 46).
  * `/pricing` only once the launch switch is open: before that it redirects
  * to the waitlist (`redirects.js`), and a sitemap never lists a redirect.
  *
@@ -48,6 +51,10 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         ...FEATURE_SLUGS.map(featureHref),
         ...SOLUTION_SLUGS.map(solutionHref),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
+        // Who makes Saroh and how to write to it (DEC-137): pages in
+        // either launch mode, with no publish date.
+        ABOUT.href,
+        CONTACT_PAGE.href,
         // For customers of a business on Saroh (Terms rev 46): every
         // merchant site's footer links here, whatever the launch mode.
         "/customers",

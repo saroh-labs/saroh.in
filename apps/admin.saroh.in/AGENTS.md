@@ -60,10 +60,15 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   (180 days after it was deleted, `lib/deletion-words.ts`).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
-  `waitlist`, `deployments`, `usage`, `business-reports`) import `next/headers`; a client component takes types from them,
+  `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`.
+- **Messages (`/messages`, DEC-137)** lists what people wrote from
+  saroh.in/contact, newest first, by topic on asking. Read-only: the reply
+  goes from the team's mailbox. Every row is personal data, so the screen
+  and its `GET /admin/contact-messages` need `organization:pii:read`; it
+  adds no permission.
 - **Usage (`/usage`, #798)** lists every business by the storage its
   photos and videos use (READY media, in GB as the plan's `storageGb`
   counts it), sorted by the API across all businesses (Most / Least) and

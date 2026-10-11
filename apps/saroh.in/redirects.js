@@ -9,11 +9,12 @@
  * - V1 (the "Saroh Marketing Site" pages, removed in U26): the five job pages,
  *   How it works and Coming soon. There is no V2 Website page, so `/website`
  *   goes Home; Coming soon's "what's planned" is the waitlist's ask.
- * - Before V1: `/modules`, `/modules/<slug>`, `/about` and
- *   `/what-it-will-not-do`, repointed straight to where their V1 page now
- *   goes. Payments and messages had no page of their own: they lived on Sell
- *   and Contacts, so they follow those. Automations went to Coming soon, so
- *   it follows it to the waitlist; What it will not do goes Home.
+ * - Before V1: `/modules`, `/modules/<slug>` and `/what-it-will-not-do`,
+ *   repointed straight to where their V1 page now goes. Payments and
+ *   messages had no page of their own: they lived on Sell and Contacts, so
+ *   they follow those. Automations went to Coming soon, so it follows it to
+ *   the waitlist; What it will not do goes Home. `/about` went Home too
+ *   until the About page came back at its own address (DEC-137).
  *
  * `/pricing` is not published until the site's launch switch opens
  * (`NEXT_PUBLIC_LAUNCH_MODE=open`, plan KTD-16; Gate W kept it unpublished),
@@ -66,7 +67,6 @@ const REDIRECTS = [
     ),
     moved("/modules/automations", "/waitlist"),
     moved("/modules/:slug", "/"),
-    moved("/about", "/"),
     moved("/what-it-will-not-do", "/"),
 ];
 
