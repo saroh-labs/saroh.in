@@ -69,8 +69,9 @@ export interface TemplateContext {
      */
     serviceIds?: string[];
     /**
-     * The shop can be shown for the business (the Shop page's own gate:
-     * Commerce rolled out and on, and the shop open for it). Absent means
+     * The business sells online (the Shop page's own gate:
+     * Commerce rolled out and on and the shop open for it, and a location
+     * that delivers or ships, DEC-069 L13). Absent means
      * not known: lay down nothing that sells.
      */
     sells?: boolean;

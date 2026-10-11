@@ -158,7 +158,8 @@ function canonical(value: unknown): string {
             .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
             .join(",")}}`;
     }
-    return JSON.stringify(value) ?? "null";
+    // `JSON.stringify(undefined)` is not a string at all.
+    return value === undefined ? "null" : JSON.stringify(value);
 }
 
 /**
@@ -187,9 +188,9 @@ export function sameAsMade(
 ): boolean {
     if (stored.length !== made.length) return false;
     return stored.every((section, index) => {
+        // The two are the same length, so there is one at every index.
         const other = made[index];
         return (
-            other !== undefined &&
             section.hidden !== true &&
             section.type === other.type &&
             section.contractVersion === other.contractVersion &&
@@ -278,14 +279,31 @@ function withoutOwnerNote(
 }
 
 /**
+ * Whether a section is one a page ends on: a button, a form, or a text
+ * block on the accent band (the starter's own closing band).
+ */
+function closes(section: PlannedSection): boolean {
+    if (CLOSING.has(section.type)) return true;
+    return (
+        section.type === "richText" &&
+        section.content !== null &&
+        typeof section.content === "object" &&
+        (section.content as { band?: unknown }).band === "accent"
+    );
+}
+
+/**
  * An edited page's sections with the template's bound sections it lacks.
  *
- * Each goes where the template has it, relative to what the page holds:
- * after the nearest section before it in the template that the page also
- * has. A product grid lands after the hero; a services list after the
- * product grid, when there is one. The place is not hung on the hero (that
- * would put an address above the owner's own words): with nothing else to
- * follow it goes above a closing button or form, else last.
+ * - **What the business offers** (products, services, classes, plans,
+ *   packs) goes where the template has it, relative to what the page
+ *   holds: after the nearest section before it in the template that the
+ *   page also has. A product grid lands after the hero; a services list
+ *   after the product grid, when there is one.
+ * - **The place** goes at the foot: above the section the page ends on (a
+ *   button, a form, a closing band), else last. Never up among the owner's
+ *   own words.
+ * - With nothing to follow, an offer goes to the foot too.
  */
 export function withBoundSections(
     stored: readonly StoredSection[],
@@ -298,20 +316,18 @@ export function withBoundSections(
         const conflicts = CONFLICTS[wanted.type] ?? [wanted.type];
         if (sections.some((s) => conflicts.includes(s.type))) return;
 
-        const place = PLACE.has(wanted.type);
         let at = -1;
-        for (let i = index - 1; i >= 0 && at === -1; i--) {
-            const before = next[i]?.type;
-            if (before === undefined) continue;
-            if (place && before === "hero") continue;
-            at = sections.map((s) => s.type).lastIndexOf(before);
+        if (!PLACE.has(wanted.type)) {
+            for (let i = index - 1; i >= 0 && at === -1; i--) {
+                at = sections.map((s) => s.type).lastIndexOf(next[i].type);
+            }
         }
-        const last = sections[sections.length - 1];
+        const foot = sections.length - 1;
         const position =
             at !== -1
                 ? at + 1
-                : place && last !== undefined && CLOSING.has(last.type)
-                  ? sections.length - 1
+                : foot >= 0 && closes(sections[foot])
+                  ? foot
                   : sections.length;
         sections.splice(position, 0, {
             type: wanted.type,

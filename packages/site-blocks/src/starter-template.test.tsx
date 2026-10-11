@@ -7,6 +7,7 @@ import {
     STARTER_TEMPLATE_ID,
     starterTemplate,
     starterTemplateV1,
+    starterTemplateV3,
 } from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -59,9 +60,33 @@ function imageSources(container: HTMLElement): string[] {
 }
 
 describe("the starter template, rendered", () => {
-    it("starter@3 draws no image a new site cannot load", () => {
+    it("starter@4, the one a new site starts from, draws no image and no note to the owner (DEC-141)", () => {
         expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
-        for (const page of renderSite(starterTemplate)) {
+        const pages = renderSite(starterTemplate);
+        // A business with nothing switched on: Home alone, from the
+        // template (its Contact page is made by the API).
+        expect(pages.map((p) => p.path)).toEqual(["/"]);
+        for (const page of pages) {
+            expect(imageSources(page.container)).toEqual([]);
+            expect(page.container.innerHTML).not.toContain("/templates/");
+            // The photo brief is the owner's to read in the editor, never
+            // a visitor's.
+            expect(page.container.textContent).not.toContain("daylight");
+            const home = within(page.container);
+            expect(
+                home.getByRole("heading", { level: 1, name: "Asha Rao" }),
+            ).toBeVisible();
+            expect(home.queryByText(HERO_PROMPT)).toBeNull();
+            expect(
+                home.getByRole("link", { name: "Get in touch" }),
+            ).toHaveAttribute("href", "/#message");
+            page.unmount();
+        }
+    });
+
+    it("starter@3 draws no image a new site cannot load", () => {
+        expect(getTemplate(STARTER_TEMPLATE_ID, 3)).toBe(starterTemplateV3);
+        for (const page of renderSite(starterTemplateV3)) {
             expect(imageSources(page.container)).toEqual([]);
             expect(page.container.innerHTML).not.toContain("/templates/");
             page.unmount();
@@ -69,7 +94,7 @@ describe("the starter template, rendered", () => {
     });
 
     it("starter@3 draws its words on both pages, prompting the owner (UX-070)", () => {
-        const [home, about] = renderSite(starterTemplate).map((p) =>
+        const [home, about] = renderSite(starterTemplateV3).map((p) =>
             within(p.container),
         );
         expect(home.getByRole("heading", { name: "Asha Rao" })).toBeVisible();
