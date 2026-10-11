@@ -30,7 +30,7 @@ import { History } from "lucide-react";
  * That zone is read from the settings; should the read fail, the times say
  * UTC — still true, since the zone is named beside each one.
  */
-export const metadata = { title: "Activity" };
+export const metadata = { title: "Activity · Settings" };
 
 const DENIED = (
     <PermissionDeniedState {...whoCanChange({ thing: "Activity" })} />

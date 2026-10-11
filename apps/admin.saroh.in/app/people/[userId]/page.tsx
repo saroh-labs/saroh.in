@@ -23,6 +23,8 @@ import {
 } from "@/lib/format";
 import { getPerson } from "@/lib/people";
 
+// "Person", never their name or address: a tab's title shows in a screen
+// share, in history and in bookmarks.
 export const metadata = { title: "Person" };
 
 /** One person across every business they belong to (plan U6). */

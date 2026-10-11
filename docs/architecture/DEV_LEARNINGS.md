@@ -4380,3 +4380,41 @@ the loser reading on another connection the moment it was refused. In 11 of
 50 ms later.
 **Check**: the spec itself, run twelve times in RLS mode after the fix.
 **Category**: backend · `docs/patterns/backend-data-and-money.md`
+
+## The signed-in apps were unindexed by accident, and their tabs didn't say what they were
+
+**Symptom**: none reported. Found 12 Oct 2026 in an audit before early
+access. The workspace, accounts and the console said "do not index" nowhere
+in production: no `X-Robots-Tag`, no robots tag in a root layout. They
+stayed out of search engines only because they redirect to sign-in, and on
+17 Oct accounts' sign-in, sign-up, password and invitation pages answer 200
+to anyone. Live, the workspace's redirect to sign-in also carried none of
+next.config's headers, not even HSTS. And the tabs: Home had no title, no
+title named the business, one record page named its record, accounts'
+`/account` and its 404 read "Sign in · Saroh", and Settings › Plan and
+billing fell back to the bare "Saroh" while plans were hidden.
+**Cause**: nothing set any of it. The dev environment's `noIndex()` runs
+only where `DEV_ACCESS_KEY` is set. next.config's `headers()` reaches what
+Next answers, never what the middleware answers itself, and on Workers the
+files in `public/` and `/_next/static` are served without running the Worker
+at all. Titles were each page's own business, so a page that forgot showed
+its layout's.
+**Fix**: `robots: { index: false, follow: false }` in the three root
+layouts, and `X-Robots-Tag: noindex, nofollow` with the security headers
+from three places: next.config, `withPrivateApp`
+(`packages/auth/src/private-app.ts`) outermost in each `middleware.ts` /
+`proxy.ts`, and `public/_headers`. Accounts' sign-in page carries the one
+share card a pasted link to any signed-in page previews, static, with
+`og:url` and the canonical fixed to `/login`; the invitation and
+reset-password pages send no referrer. Titles: `‹Page› · ‹Business› ·
+Saroh` from the shell's layout (`lib/page-title.ts`), a record by its
+reference or name and never a person, every not-found titled.
+**Check**: `pnpm run check:titles` (every page titled, each root layout
+noindex) and `check:security-headers` (the three places agree and the
+middleware is wrapped), both in prepush and CI; `private-app.test.ts`,
+`page-title.test.ts`.
+**Rule**: a header meant for every answer is set where the answer is made:
+next.config for pages, the middleware for what it answers, `_headers` for
+files. Curl the redirect, not only the page. And "private because it
+redirects" is not a mechanism.
+**Category**: security · frontend · `docs/patterns/frontend-app-structure.md` → Titles, and staying out of search

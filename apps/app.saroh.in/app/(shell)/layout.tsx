@@ -1,8 +1,19 @@
 import { ROWS_COOKIE, readRowsCookie } from "@saroh/ui/lib/paging";
 import { PageSizes } from "@saroh/ui/page-sizes";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
 import { AppShell } from "@/components/shared/app-shell";
+import { activeBusinessTitle } from "@/lib/organizations/tab-title";
+
+/**
+ * The tab says whose page it is: "Orders · Rye & Co. · Saroh". A page
+ * writes only "Orders"; the business comes from the read the shell already
+ * makes (`activeOrganizationOnce`), so it costs no call to the API.
+ */
+export function generateMetadata(): Promise<Metadata> {
+    return activeBusinessTitle();
+}
 
 /**
  * Every route that belongs inside the working app. The `(shell)` group exists

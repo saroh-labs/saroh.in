@@ -8,9 +8,12 @@ import {
 } from "@/components/auth/panel-copy";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
+// `?token=` is a credential: the page sends no referrer, so it never leaves
+// in a Referer header (as a pay link's doesn't, saroh.app `pay/[token]`).
 export const metadata: Metadata = {
-    title: "Reset password · Saroh",
+    title: "Reset password",
     description: "Set a new password for your Saroh account.",
+    referrer: "no-referrer",
 };
 
 /**

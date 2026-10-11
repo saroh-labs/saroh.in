@@ -4,6 +4,7 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import {
@@ -60,7 +61,25 @@ import {
 import { moduleLabel } from "@/lib/modules";
 import { planLine } from "@/lib/plan-words";
 
-export const metadata = { title: "Business" };
+// One read for the tab's title and the page.
+const readSummary = cache((organizationId: string) =>
+    getBusinessSummary(organizationId).catch(() => null),
+);
+
+/**
+ * The business's name in the tab, so several open at once can be told
+ * apart; "Business" when it can't be read (no record, or no access to the
+ * directory, which the API decides). A business's name, never a person's.
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ organizationId: string }>;
+}) {
+    const { organizationId } = await params;
+    const summary = await readSummary(organizationId);
+    return { title: summary?.name ?? "Business" };
+}
 
 /**
  * Everything about one business in one place (plan U4), and what an operator
@@ -77,7 +96,7 @@ export default async function BusinessPage({
     const { staff } = gate;
     const { organizationId } = await params;
 
-    const summary = await getBusinessSummary(organizationId).catch(() => null);
+    const summary = await readSummary(organizationId);
     if (!summary) notFound();
 
     const canViewAs = can(staff, "organization:view-as");

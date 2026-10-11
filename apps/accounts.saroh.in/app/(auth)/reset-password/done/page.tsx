@@ -6,7 +6,7 @@ import Link from "next/link";
 import { DONE_PANEL } from "@/components/auth/panel-copy";
 
 export const metadata: Metadata = {
-    title: "Password changed · Saroh",
+    title: "Password changed",
     description: "Your password has been changed.",
 };
 

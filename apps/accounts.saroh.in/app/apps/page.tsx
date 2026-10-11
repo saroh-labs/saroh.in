@@ -11,7 +11,7 @@ import { getAppUrl } from "@/lib/app-urls";
 import { isStaff } from "@/lib/businesses";
 
 export const metadata: Metadata = {
-    title: "Saroh's apps · Saroh",
+    title: "Saroh's apps",
     robots: { index: false, follow: false },
 };
 

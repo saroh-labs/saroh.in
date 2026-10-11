@@ -56,6 +56,8 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 
+// "Contact", never their name: a tab's title shows in a screen share, in
+// history and in bookmarks (`lib/page-title.ts`).
 export const metadata = { title: "Contact" };
 
 /**

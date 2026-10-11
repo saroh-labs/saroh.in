@@ -27,7 +27,7 @@ import { TextLink } from "@saroh/ui/text-link";
  * Read-only by construction. The snapshot is immutable, the preview is inert,
  * and the only action is putting this version back.
  */
-export const metadata = { title: "Past version" };
+export const metadata = { title: "Past version · Website" };
 
 export default async function PastVersionPage({
     params,

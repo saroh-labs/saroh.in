@@ -5,6 +5,8 @@ import "./auth.css";
 
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 
+import { getAccountsUrl } from "@/lib/app-urls";
+
 import Providers from "./providers";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
@@ -38,8 +40,17 @@ const fontMono = localFont({
 });
 
 export const metadata: Metadata = {
-    title: "Sign in · Saroh",
-    description: "Sell, take bookings, bill and run your website in one place.",
+    // So a page's canonical, `og:url` and share image are written as full
+    // addresses on this host.
+    metadataBase: new URL(getAccountsUrl()),
+    // Every page names itself; "Saroh" alone is what a page that forgot
+    // would show (`pnpm run check:titles` fails one that does).
+    title: { default: "Saroh", template: "%s · Saroh" },
+    // Nothing on this host belongs in a search engine: sign-in, sign-up, a
+    // password link, an invitation, your account. The same is said in a
+    // header on every answer, redirects among them (`withPrivateApp` in
+    // proxy.ts, next.config, public/_headers).
+    robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

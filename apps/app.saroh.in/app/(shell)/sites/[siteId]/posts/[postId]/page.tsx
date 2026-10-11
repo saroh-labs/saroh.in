@@ -1,15 +1,37 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { PostEditor } from "@/components/sites/post-editor";
 import { PostReadView } from "@/components/sites/post-read-view";
 import { activeCut, postPaused } from "@/lib/billing/paused";
 import { getPost, listPostCategories } from "@/lib/content/service";
+import { recordTitle } from "@/lib/page-title";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
-/** The tab's title (UX-081): without one it read the bare "Saroh". */
-export const metadata = { title: "Post · Website" };
+// One read for the tab's title and the page.
+const readPost = cache((siteId: string, postId: string) =>
+    getPost(siteId, postId),
+);
+
+/**
+ * The tab's title (UX-081): the post's own title, then "Website"; "Post"
+ * when it can't be read or has none yet.
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ siteId: string; postId: string }>;
+}) {
+    const { siteId, postId } = await params;
+    return recordTitle(
+        () => readPost(siteId, postId),
+        (post) => post.title,
+        "Post",
+        "Website",
+    );
+}
 
 /*
  * The editor is document-shaped and owns the whole area (#232) — it carries
@@ -27,7 +49,7 @@ export default async function EditPostPage({
     if (!site) notFound();
 
     const [post, categories, paused] = await Promise.all([
-        getPost(siteId, postId),
+        readPost(siteId, postId),
         listPostCategories(siteId),
         // Past the plan's blog posts limit (#800): read-only, and why.
         pausedOrNull(),
