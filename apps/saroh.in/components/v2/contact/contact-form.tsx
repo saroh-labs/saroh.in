@@ -221,8 +221,8 @@ export function ContactForm() {
                 </h2>
                 <p className="m-0 max-w-[44ch] text-[16px] leading-[1.6] text-mk-copy">
                     {done.replyTo}{" "}
-                    <span className="break-all">{email.trim()}</span>.{" "}
-                    {done.urgent}
+                    <span className="break-all">{email.trim()}</span>{" "}
+                    {done.replyBy}.{done.urgent}
                 </p>
                 <button
                     type="button"

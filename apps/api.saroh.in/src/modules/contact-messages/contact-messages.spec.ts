@@ -5,11 +5,16 @@ jest.mock("@saroh/database", () => {
     return { prisma };
 });
 
+jest.mock("../../common/email", () => ({
+    sendContactMessageNotice: jest.fn().mockResolvedValue("sent"),
+}));
+
 import { HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
+import { sendContactMessageNotice } from "../../common/email";
 import { ContactMessagesService } from "./contact-messages.service";
 import {
     CONTACT_MESSAGE_KEEP_DAYS,
@@ -101,6 +106,10 @@ describe("SendContactMessageDto", () => {
     });
 });
 
+const notice = sendContactMessageNotice as jest.MockedFunction<
+    typeof sendContactMessageNotice
+>;
+
 describe("ContactMessagesService.send", () => {
     const service = new ContactMessagesService();
 
@@ -126,6 +135,39 @@ describe("ContactMessagesService.send", () => {
             },
             select: { id: true },
         });
+    });
+
+    it("tells the team's inbox, in the page's own words for the topic", async () => {
+        notice.mockClear();
+        await service.send({
+            topic: "bug",
+            name: "Asha Rao",
+            email: "asha.rao@example.com",
+            kind: "gym",
+            message: "  The calendar didn't open.  ",
+        });
+        expect(notice).toHaveBeenCalledTimes(1);
+        expect(notice).toHaveBeenCalledWith({
+            topic: "Something's not working",
+            name: "Asha Rao",
+            email: "asha.rao@example.com",
+            kind: "gym",
+            message: "The calendar didn't open.",
+        });
+    });
+
+    it("still answers as sent when the notice can't go: the message is stored", async () => {
+        notice.mockResolvedValueOnce("failed");
+        db.contactMessage.create.mockClear();
+        await expect(
+            service.send({
+                topic: "question",
+                name: "Asha Rao",
+                email: "asha.rao@example.com",
+                message: "One line.",
+            }),
+        ).resolves.toEqual({ ok: true });
+        expect(db.contactMessage.create).toHaveBeenCalledTimes(1);
     });
 
     it("keeps no kind and no digest when there is none", async () => {
@@ -160,7 +202,7 @@ describe("ContactMessagesService.send", () => {
             message: "My booking page is empty.",
         });
         spy.mockRestore();
-        expect(logged).toEqual(["contact message: help"]);
+        expect(logged).toEqual(["contact message: help, notice sent"]);
     });
 
     it("fails when the message could not be stored", async () => {

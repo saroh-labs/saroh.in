@@ -178,7 +178,7 @@ describe("ContactForm: sending", () => {
         const thanks = await screen.findByRole("status");
         expect(thanks.textContent).toContain("Thanks, Asha. We've got it.");
         expect(thanks.textContent).toContain(
-            "We'll reply to asha.rao@example.com.",
+            "We'll reply to asha.rao@example.com within one working day.",
         );
         // What they typed, said back: masked in a session recording.
         expect(thanks.hasAttribute("data-ph-mask")).toBe(true);

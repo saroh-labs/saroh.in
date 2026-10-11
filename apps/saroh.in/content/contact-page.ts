@@ -50,7 +50,7 @@ export const CONTACT_PAGE = {
 
     eyebrow: "Contact",
     title: "Talk to a person, not a bot.",
-    lead: "A question before you sign up, something not working, or an idea for what we should build next: write to us. Your message goes to the Saroh team.",
+    lead: "A question before you sign up, something not working, or an idea for what we should build next: write to us. A real person reads every message and replies within one working day.",
 
     form: {
         title: "Send us a message",
@@ -116,7 +116,9 @@ export const CONTACT_PAGE = {
         title: (firstName: string) => `Thanks, ${firstName}. We've got it.`,
         /** Before the address they gave. */
         replyTo: "We'll reply to",
-        /** After it. */
+        /** Straight after it: the reply time the owner promises (CT2). */
+        replyBy: "within one working day",
+        /** Then. */
         urgent: `If it's urgent, email ${SAROH_CONTACT_EMAIL} with "Urgent" at the start of the subject.`,
         again: "Send another message",
     },
