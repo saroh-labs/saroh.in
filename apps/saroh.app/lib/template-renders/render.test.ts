@@ -524,7 +524,7 @@ describe("the starter's renders (DEC-141)", () => {
             "hero",
             "productGrid",
             "features",
-            "richText",
+            "cta",
         ]);
         const render = templateRender("starter-shop", "harbour", "/");
         expect(render?.action).toEqual({ label: "Order", href: "/shop" });
@@ -547,7 +547,7 @@ describe("the starter's renders (DEC-141)", () => {
             "servicesList",
             "features",
             "visitUs",
-            "richText",
+            "cta",
         ]);
         const render = templateRender("starter-salon", "clay", "/");
         expect(render?.action).toEqual({ label: "Book", href: "/book" });
@@ -571,7 +571,7 @@ describe("the starter's renders (DEC-141)", () => {
         expect(types("starter-salon", "/about")).toEqual([
             "hero",
             "richText",
-            "richText",
+            "cta",
         ]);
     });
 

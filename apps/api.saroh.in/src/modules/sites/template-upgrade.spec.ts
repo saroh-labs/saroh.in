@@ -241,10 +241,11 @@ describe("madeCandidates", () => {
 });
 
 describe("what the starter writes, through the sanitizer", () => {
-    it("is unchanged: the closing band keeps its link, and a saved page is still the template's", () => {
+    it("is unchanged, so a page saved without a change is still the template's", () => {
         // A draft is sanitized when it is saved. If that altered the
-        // template's own text, the band would lose its one action, and a
-        // page saved without a change would stop matching its template.
+        // template's own text (About's list of facts, with the business's
+        // own words escaped into it), a page saved without a change would
+        // stop matching its template and count as edited.
         const { pages } = instantiateTemplate(starterTemplate, {
             ...salon,
             organizationName: 'Rye & "Co."',
@@ -255,11 +256,11 @@ describe("what the starter writes, through the sanitizer", () => {
             .flatMap((p) => p.sections)
             .filter((s) => s.type === "richText")
             .map((s) => (s.content as { value: string }).value);
-        expect(texts.length).toBeGreaterThanOrEqual(3);
+        expect(texts.length).toBeGreaterThan(0);
         for (const value of texts) {
+            expect(value).toContain("<dl>");
             expect(sanitizeRichHtml(value)).toBe(value);
         }
-        expect(texts.some((t) => t.includes('<a href="/book">'))).toBe(true);
     });
 });
 

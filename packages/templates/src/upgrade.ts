@@ -280,7 +280,7 @@ function withoutOwnerNote(
 
 /**
  * Whether a section is one a page ends on: a button, a form, or a text
- * block on the accent band (the starter's own closing band).
+ * block on the accent band (a closing band a merchant made by hand).
  */
 function closes(section: PlannedSection): boolean {
     if (CLOSING.has(section.type)) return true;

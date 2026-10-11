@@ -458,7 +458,7 @@ describe("SitesService.createFromTemplate", () => {
         // and no line where nothing true can be said: never a prompt.
         expect(homeSections[0].content).toMatchObject({
             heading: "Acme",
-            cta: { label: "Get in touch", href: "/#message" },
+            cta: { label: "Get in touch", href: "/contact" },
         });
         expect(homeSections[0].content).not.toHaveProperty("subheading");
         // The form takes messages from the first publish.

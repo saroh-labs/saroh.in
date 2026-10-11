@@ -210,7 +210,7 @@ describe("Turning Website on drafts starter@4", () => {
         expect(hero).toMatchObject({
             variant: "centered",
             heading: "Asha Rao",
-            cta: { label: "Get in touch", href: "/#message" },
+            cta: { label: "Get in touch", href: "/contact" },
         });
         // No line where nothing true can be said. Never a prompt.
         expect(hero).not.toHaveProperty("subheading");
@@ -271,7 +271,7 @@ describe("Turning Website on drafts starter@4", () => {
             "servicesList",
             "features",
             "visitUs",
-            "richText",
+            "cta",
         ]);
 
         const [hero, services] = pageAt(pages, "/").sections;
@@ -285,11 +285,10 @@ describe("Turning Website on drafts starter@4", () => {
         expect(services?.content).toMatchObject({ serviceIds: [serviceId] });
 
         // The closing band asks for the same thing.
-        const closing = pageAt(pages, "/").sections.at(-1)?.content as {
-            value: string;
-        };
-        expect(closing.value).toContain('href="/book"');
-        expect(closing.value).toContain(">Book a time</a>");
+        expect(pageAt(pages, "/").sections.at(-1)?.content).toMatchObject({
+            label: "Book a time",
+            href: "/book",
+        });
 
         // What it offers straight after Home; Contact last.
         expect(await menu(siteId)).toEqual([
@@ -356,7 +355,7 @@ describe("A module switched on after the site exists", () => {
             "hero",
             "servicesList",
             "features",
-            "richText",
+            "cta",
         ]);
         expect(home.sections[0]?.content).toMatchObject({
             subheading: "Haircut",

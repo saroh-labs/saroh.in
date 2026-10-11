@@ -385,7 +385,7 @@ describe("withBoundSections", () => {
         const endings = [
             { type: "cta", contractVersion: 1, content: { label: "Go" } },
             { type: "enquiry", contractVersion: 1, content: { fields: [] } },
-            // The starter's own closing band.
+            // A closing band made by hand, from a text block.
             {
                 type: "richText",
                 contractVersion: 1,

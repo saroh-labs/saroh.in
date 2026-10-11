@@ -42,10 +42,9 @@ import { STARTER_STYLES } from "./starter-look";
  * - **A Journal page.** It has no module to switch on, and a new site has no
  *   posts: the page would be empty. The editor's Add page offers it.
  *
- * The closing band is a text block on the accent band (a heading, one line
- * and the action as a link) because the call-to-action block holds a button
- * and nothing else. If that block gains a heading and a line, the band
- * becomes one block: change {@link closingBand} only.
+ * - **Words for the closing band.** The call-to-action block composes its
+ *   own heading and line from where its button goes, so the template gives
+ *   it the button alone ({@link closingBand}).
  */
 
 const APPOINTMENTS = "APPOINTMENTS";
@@ -123,13 +122,17 @@ export interface StarterAction {
     href: string;
 }
 
-/** Where the message form sits on Home when it is the page's action. */
+/** Where the message form sits on Home, for a link that jumps to it. */
 const MESSAGE_ANCHOR = "message";
 
 /**
- * The site's one primary action. Bookings before the shop, as the site's
- * header button chooses (`apps/saroh.app/lib/header-action.ts`), so the two
- * never ask for different things.
+ * The site's one primary action: bookings, else the shop, else the Contact
+ * page. The same rule, order and addresses as the site's header button
+ * (`sitePrimaryAction` in `@saroh/site-blocks`), so the header, the hero and
+ * the closing band never ask for different things. The header says it in a
+ * word ("Book", "Order", "Contact us"); a hero has room for the phrase the
+ * closing band's own heading uses ("Book a time", "Browse the shop", "Get
+ * in touch").
  */
 export function starterPrimaryAction(ctx: TemplateContext): StarterAction {
     if (starterBooks(ctx)) {
@@ -138,11 +141,7 @@ export function starterPrimaryAction(ctx: TemplateContext): StarterAction {
     if (starterSells(ctx)) {
         return { kind: "shop", label: "Browse the shop", href: "/shop" };
     }
-    return {
-        kind: "contact",
-        label: "Get in touch",
-        href: `/#${MESSAGE_ANCHOR}`,
-    };
+    return { kind: "contact", label: "Get in touch", href: "/contact" };
 }
 
 /**
@@ -187,45 +186,17 @@ function goodToKnow(ctx: TemplateContext): { title: string; body: string }[] {
     return items;
 }
 
-/** The closing band's words for each action: a heading and one line. */
-function closingWords(
-    ctx: TemplateContext,
-    kind: StarterAction["kind"],
-): { heading: string; line: string } {
-    switch (kind) {
-        case "book":
-            return {
-                heading: "Ready when you are",
-                line: "Choose a service and a time that suits you.",
-            };
-        case "shop":
-            return {
-                heading: "Take a look",
-                line: "Everything on sale is in the shop, with its price.",
-            };
-        case "contact":
-            return {
-                heading: "Have a question?",
-                line: `Send a message and ${ctx.organizationName} will reply by email.`,
-            };
-    }
-}
-
 /**
- * A page's last section: a heading, one line and the primary action, on
- * the accent band. See the file's header for why it is a text block.
+ * A page's last section: the closing band, carrying the primary action. Only
+ * the button is written here. The band's heading and its one line are the
+ * block's own (`cta-words.ts` in `@saroh/site-blocks`): it says what the
+ * button does and whose site it is ("Book a time with Kesar Salon", "Choose
+ * a time that suits you."), from the address the button goes to, so the
+ * band is never a lone button and never a claim.
  */
 function closingBand(ctx: TemplateContext) {
     const action = starterPrimaryAction(ctx);
-    const words = closingWords(ctx, action.kind);
-    return {
-        band: "accent",
-        format: "html",
-        value:
-            `<h2>${escapeHtml(words.heading)}</h2>` +
-            `<p>${escapeHtml(words.line)}</p>` +
-            `<p><a href="${escapeHtml(action.href)}">${escapeHtml(action.label)}</a></p>`,
-    };
+    return { label: action.label, href: action.href, style: "primary" };
 }
 
 /** What the message form asks. An email field is the contract's rule. */
@@ -237,14 +208,16 @@ const MESSAGE_FIELDS = [
 ] as const;
 
 /**
- * Home's last section where the business neither books nor sells: the
- * message form itself, with its heading and line. The hero's button, and
- * the About page's band, jump to it.
+ * Home's last section where the business neither books nor sells: a
+ * message form, with its heading and line, so the page ends in the thing a
+ * visitor came to do and is not a headline over nothing. The hero's button
+ * goes to the Contact page, as the header's does; the form here saves the
+ * visitor who scrolls the trip.
  */
 function messageForm(ctx: TemplateContext) {
     return {
         anchor: MESSAGE_ANCHOR,
-        title: "Get in touch",
+        title: "Send a message",
         description: `Send a message and ${ctx.organizationName} will reply by email.`,
         submitLabel: "Send",
         successMessage: "Thank you. Your message has been sent.",
@@ -257,7 +230,7 @@ const actsByMessage = (ctx: TemplateContext) =>
 
 /** The band that closes a page. */
 const CLOSING_BAND: TemplateSection = {
-    type: "richText",
+    type: "cta",
     contractVersion: 1,
     content: closingBand,
 };

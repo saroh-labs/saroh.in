@@ -178,17 +178,12 @@ describe("starter@4 — sections for what is switched on", () => {
             "servicesList",
             "features",
             "visitUs",
-            "richText",
+            "cta",
         ]);
     });
 
     it("is a shop's Home: the products, what to know, the action", () => {
-        expect(types(shop)).toEqual([
-            "hero",
-            "productGrid",
-            "features",
-            "richText",
-        ]);
+        expect(types(shop)).toEqual(["hero", "productGrid", "features", "cta"]);
     });
 
     it("lays everything down, in order, when everything is on", () => {
@@ -201,7 +196,7 @@ describe("starter@4 — sections for what is switched on", () => {
             "packs",
             "features",
             "visitUs",
-            "richText",
+            "cta",
         ]);
     });
 
@@ -307,7 +302,7 @@ describe("starter@4 — one primary action", () => {
     it.each([
         ["takes bookings", salon, "book", "Book a time", "/book"],
         ["sells", shop, "shop", "Browse the shop", "/shop"],
-        ["does neither", plain, "contact", "Get in touch", "/#message"],
+        ["does neither", plain, "contact", "Get in touch", "/contact"],
         // The header's button chooses bookings first; so does the page.
         ["does both", everything, "book", "Book a time", "/book"],
     ] as const)("is %s: %s", (_label, ctx, kind, label, href) => {
@@ -331,33 +326,43 @@ describe("starter@4 — one primary action", () => {
                 }
                 const last = page.sections[page.sections.length - 1];
                 if (last.type === "enquiry") {
-                    // The form is the action: the hero's button jumps to it.
+                    // Where a message is the action, Home ends in the form
+                    // itself: a band asking for one above it would ask twice.
+                    expect(page.isHome).toBe(true);
                     expect(action.kind).toBe("contact");
-                    expect(action.href).toBe(
-                        `/#${(last.content as { anchor: string }).anchor}`,
-                    );
                     continue;
                 }
-                expect(last.type).toBe("richText");
-                const band = last.content as { band: string; value: string };
-                expect(band.band).toBe("accent");
-                // A heading, one line, and the one link.
-                expect(band.value).toMatch(
-                    /^<h2>[^<]+<\/h2><p>[^<]+<\/p><p><a /,
-                );
-                expect(band.value.match(/<a /g)).toHaveLength(1);
-                expect(band.value).toContain(`href="${action.href}"`);
-                expect(band.value).toContain(`>${action.label}</a>`);
+                // The closing band: the call-to-action block, which writes
+                // its own heading and line from where its button goes.
+                expect(last.type).toBe("cta");
+                expect(last.content).toEqual({
+                    label: action.label,
+                    href: action.href,
+                    style: "primary",
+                });
             }
         },
     );
 
-    it("has no other button on Home", () => {
+    it("goes to the Contact page it always starts with, when a message is the action", () => {
+        expect(starterPrimaryAction(plain).href).toBe("/contact");
+        expect(templateModulePageKinds(starterTemplate, plain)).toContain(
+            "CONTACT",
+        );
+    });
+
+    it("has no other button on a page: one in the hero, one closing band", () => {
         for (const [, ctx] of profiles) {
-            const others = home(ctx)
-                .sections.slice(1)
-                .filter((s) => s.type === "cta");
-            expect(others).toHaveLength(0);
+            for (const page of instantiateTemplate(starterTemplate, ctx)
+                .pages) {
+                const bands = page.sections.filter((s) => s.type === "cta");
+                expect(bands.length).toBeLessThanOrEqual(1);
+                if (bands.length === 1) {
+                    expect(page.sections[page.sections.length - 1]).toBe(
+                        bands[0],
+                    );
+                }
+            }
         }
     });
 });

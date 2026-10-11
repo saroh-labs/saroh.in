@@ -79,7 +79,7 @@ describe("the starter template, rendered", () => {
             expect(home.queryByText(HERO_PROMPT)).toBeNull();
             expect(
                 home.getByRole("link", { name: "Get in touch" }),
-            ).toHaveAttribute("href", "/#message");
+            ).toHaveAttribute("href", "/contact");
             page.unmount();
         }
     });
