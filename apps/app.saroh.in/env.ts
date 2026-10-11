@@ -53,6 +53,14 @@ export const env = createEnv({
          * the share of allowed sessions recorded, from 0 to 1; unset, every
          * one (`REPLAY_SAMPLE_RATE`).
          */
+        /**
+         * Whether a new website may be started from a chosen template
+         * (DEC-135): `on` shows the template picker on `/sites/new` and in
+         * the Turn on sheet; anything else, unset included, hides it and the
+         * site starts from the one for what is being set up
+         * (`lib/sites/templates-switch.ts`).
+         */
+        NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
             .regex(/^phc_[A-Za-z0-9]+$/)
@@ -75,6 +83,7 @@ export const env = createEnv({
         NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET:
             process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+        NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,

@@ -23,6 +23,7 @@ import {
     startingTemplate,
     suggestedTemplates,
 } from "@/lib/sites/template-picker";
+import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
 export const metadata = { title: "New site" };
 
@@ -34,6 +35,10 @@ export const metadata = { title: "New site" };
  *
  * `?template=<id or slug>` starts the picker on that template, as the
  * gallery's "Use this template" will link.
+ *
+ * With the template choice switched off (`NEXT_PUBLIC_TEMPLATES`, DEC-135)
+ * no template is read, shown or taken from the address: the site starts
+ * from the one for what is being set up.
  */
 export default async function NewSitePage({
     searchParams,
@@ -41,12 +46,15 @@ export default async function NewSitePage({
     searchParams: Promise<{ template?: string | string[] }>;
 }) {
     await requireSession();
+    const choice = templateChoiceOn();
 
     const [templates, organization, sites, modules, params] = await Promise.all(
         [
             // A failed catalogue is said in the form, not a failed page: the
             // site can still be made from the kind's template.
-            listTemplates().catch((): Template[] | null => null),
+            choice
+                ? listTemplates().catch((): Template[] | null => null)
+                : Promise.resolve<Template[] | null>([]),
             resolveActiveOrganization(),
             listSites().catch(() => []),
             modulesOrUnknown(),
@@ -121,7 +129,8 @@ export default async function NewSitePage({
     const kindTemplate = kindDefaults(kind).starterTemplate;
     const states = moduleStates(modules);
     const listed = templates ?? [];
-    const asked = typeof params.template === "string" ? params.template : null;
+    const asked =
+        choice && typeof params.template === "string" ? params.template : null;
 
     return (
         <PageContainer width="form">
@@ -133,10 +142,15 @@ export default async function NewSitePage({
                     "New site",
                 ]}
                 title="New site"
-                description="Name your new site, check its web address and pick a template."
+                description={
+                    choice
+                        ? "Name your new site, check its web address and pick a template."
+                        : "Name your new site and check its web address."
+                }
             />
             <CreateSiteForm
                 templates={templates}
+                choice={choice}
                 defaults={defaults}
                 defaultTemplateId={kindTemplate}
                 startTemplateId={startingTemplate(listed, asked, kindTemplate)}

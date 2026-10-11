@@ -14,7 +14,11 @@ import { NO_OFFER, WAITLIST_MONEY } from "@/content/waitlist";
  */
 const readLaunchOffer = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/launch-offer", () => ({ readLaunchOffer }));
-vi.mock("@/env", () => ({ env: {} }));
+const mocked = vi.hoisted(() => {
+    const env: Record<string, string | undefined> = {};
+    return { env };
+});
+vi.mock("@/env", () => mocked);
 vi.mock("next/link", () => ({
     default: ({
         href,
@@ -34,6 +38,8 @@ afterEach(() => {
     cleanup();
     readLaunchOffer.mockReset();
     vi.useRealTimers();
+    mocked.env = {};
+    window.history.replaceState(null, "", "/");
 });
 
 async function renderPage() {
@@ -84,6 +90,25 @@ describe("/waitlist", () => {
         expect(link.getAttribute("href")).toBe("/integrations");
         expect(link.parentElement?.textContent).toBe(
             `${WAITLIST_MONEY.line} See integrations`,
+        );
+    });
+
+    it("saves a gallery template from ?template= only while the gallery is shown (DEC-135)", async () => {
+        readLaunchOffer.mockResolvedValue(null);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        // 20 Oct: past the gallery's day.
+        vi.setSystemTime(new Date("2026-10-20T06:00:00.000Z"));
+        window.history.replaceState(null, "", "/waitlist?template=gym");
+
+        // Switch unset: the template in the address is ignored.
+        await renderPage();
+        expect(screen.queryByTestId("waitlist-template")).toBeNull();
+        cleanup();
+
+        mocked.env = { NEXT_PUBLIC_TEMPLATES: "on" };
+        await renderPage();
+        expect(screen.getByTestId("waitlist-template").textContent).toBe(
+            "Saving the Gym template for your invite.",
         );
     });
 

@@ -56,6 +56,9 @@
         "DEV_REDIRECT_ORIGIN": "https://saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
+        // The Templates gallery's switch (DEC-135): "on" here. Production
+        // leaves it out, which is off: no /templates and no link to it.
+        "NEXT_PUBLIC_TEMPLATES": "on",
         // Ad conversions (DEC-127) are production's alone. Set here they
         // would still load nothing: lib/ga.ts reads them only where
         // VERCEL_ENV is "production".
@@ -88,6 +91,8 @@
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+                // The Templates gallery is off while this is left out
+                // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
                 // Ad conversions (DEC-127): Google Ads and the Meta Pixel,
                 // each off until its PUBLIC id (not a secret) is set here.
                 // Even then a tag loads only after a visitor accepts

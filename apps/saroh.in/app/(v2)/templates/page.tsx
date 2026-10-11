@@ -31,7 +31,8 @@ export const metadata: Metadata = pageMetadata({
  *
  * Published with early access (17 Oct, `content/resources.ts`): before its
  * day the page is a 404 and is linked nowhere (KTD-2); `RESOURCES_PREVIEW`
- * shows it on previews and locally.
+ * shows it on previews and locally. With its switch off
+ * (`NEXT_PUBLIC_TEMPLATES`, DEC-135) it is a 404 whatever the date.
  */
 export default function TemplatesPage() {
     const ctx = resourcesContext();

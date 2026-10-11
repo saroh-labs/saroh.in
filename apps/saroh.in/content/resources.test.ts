@@ -156,6 +156,35 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         ).toBe(false);
     });
 
+    it("Templates switched off is linked and listed nowhere, after its day and on a preview (DEC-135)", () => {
+        for (const preview of [false, true]) {
+            const off: PublishContext = {
+                ...after,
+                preview,
+                off: ["templates"],
+            };
+            const ids = shownResources(off).map((p) => p.id);
+            expect(ids).not.toContain("templates");
+            // Only Templates: the pages beside it stay.
+            expect(ids).toEqual(
+                shownResources({ ...after, preview })
+                    .map((p) => p.id)
+                    .filter((id) => id !== "templates"),
+            );
+            expect(resourcePaths(off)).not.toContain("/templates");
+            expect(
+                indexedPaths("waitlist", off).filter((p) =>
+                    p.startsWith("/templates"),
+                ),
+            ).toEqual([]);
+            // A link into the gallery (the launch entry's "See templates").
+            expect(linkShown("/templates", off)).toBe(false);
+            expect(linkShown("/templates/gym", off)).toBe(false);
+            expect(linkShown("/help", off)).toBe(true);
+        }
+        expect(linkShown("/templates/gym", after)).toBe(true);
+    });
+
     it("the QR code maker joins the nav, footer and sitemap on 17 Oct, beside the link preview tool", () => {
         const names = (ctx: PublishContext) =>
             resourceItems(shownTools(ctx)).map((i) => i.name);
