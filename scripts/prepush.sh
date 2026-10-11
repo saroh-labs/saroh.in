@@ -311,6 +311,9 @@ e2e_stack() {
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
     export NEXT_PUBLIC_ROOT_DOMAIN=localhost
+    # Saroh's own plans are shown on this stack (DEC-136), as CI: the plan
+    # specs need Settings › Plan and billing and its prompts.
+    export NEXT_PUBLIC_PLANS=on
     export EMAIL_FROM="Saroh <noreply@saroh.in>"
     export E2E_APP_URL=http://localhost:3003
     export E2E_ACCOUNTS_URL=http://localhost:3000

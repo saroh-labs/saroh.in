@@ -22,6 +22,10 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
+        // Plans are shown here, as on the e2e stack (DEC-136), so every
+        // plan notice and lock is still tested. A test of the hidden state
+        // mocks `lib/saroh-billing/plans-shown`.
+        env: { NEXT_PUBLIC_PLANS: "on" },
         // jsdom answers `:modal` slowly enough to time a test out.
         setupFiles: ["./vitest.setup.ts"],
         // Plus the editor's pure helpers that sit beside the component using

@@ -8,7 +8,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/env", () => ({ env: {} }));
+// Plans shown, as the runner has it everywhere else (DEC-136).
+vi.mock("@/env", () => ({ env: { NEXT_PUBLIC_PLANS: "on" } }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
     usePathname: () => "/",

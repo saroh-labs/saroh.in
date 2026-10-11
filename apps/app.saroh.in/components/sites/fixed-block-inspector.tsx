@@ -1,5 +1,6 @@
 "use client";
 
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
@@ -14,6 +15,17 @@ import { settingsEditHref } from "@/lib/sites/settings-edit";
 
 /** The lock's reason, said beside the controls it disables (G6). */
 export const FIXED_LOCK = "On every page. Can't be removed or moved";
+
+/**
+ * What follows the footer on the site. It names the plan only while plans
+ * are shown (DEC-136). Until plans are sold no business has a paid one,
+ * and a site without a paid plan carries the line (`onFree` in the API).
+ */
+export function madeWithNote(): string {
+    return plansShown()
+        ? "On the Free plan, “Made with Saroh” follows it on your site."
+        : "“Made with Saroh” follows it on your site.";
+}
 
 /** What the inspector edits about the header and footer (G6). */
 export interface FixedBlockText {
@@ -170,8 +182,7 @@ export function FixedBlockInspector({
                 <div className="grid gap-2">
                     <p className="text-[0.8125rem] leading-relaxed">
                         Your footer is more than one line of plain text, so
-                        it&apos;s changed in Website settings. On the Free plan,
-                        “Made with Saroh” follows it on your site.
+                        it&apos;s changed in Website settings. {madeWithNote()}
                     </p>
                     {settings}
                 </div>
@@ -185,7 +196,7 @@ export function FixedBlockInspector({
                         note={
                             text.footerText.trim() === ""
                                 ? "Nothing is written at the foot of this site yet, so visitors see the site's name."
-                                : "On the Free plan, “Made with Saroh” follows it on your site."
+                                : madeWithNote()
                         }
                     />
                     <div className="grid gap-2 border-t pt-3">

@@ -553,6 +553,10 @@ jobs:
       # reads `localhost` as a tenant subdomain and rewrites every request —
       # `/preview/<token>` included — into a tenant lookup that finds nothing.
       NEXT_PUBLIC_ROOT_DOMAIN: localhost
+      # Saroh's own plans are shown on this stack (DEC-136): the plan specs
+      # need Settings › Plan and billing and its prompts. Production leaves
+      # it out.
+      NEXT_PUBLIC_PLANS: "on"
       EMAIL_FROM: Saroh <noreply@saroh.in>
       E2E_APP_URL: http://localhost:3003
       E2E_ACCOUNTS_URL: http://localhost:3000
