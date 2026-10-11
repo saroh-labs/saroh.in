@@ -4,8 +4,9 @@
  * the new look and the sections for what its business has switched on.
  *
  *     node apps/api.saroh.in/dist/cli/template-upgrade.cli.js --dry-run
- *     node apps/api.saroh.in/dist/cli/template-upgrade.cli.js
+ *     node apps/api.saroh.in/dist/cli/template-upgrade.cli.js --business=<id or slug>
  *     node apps/api.saroh.in/dist/cli/template-upgrade.cli.js --limit=20
+ *     node apps/api.saroh.in/dist/cli/template-upgrade.cli.js
  *
  * Run it inside the API's own container (it reads the same environment:
  * the database, and the switches that say which modules a business has).
@@ -16,6 +17,7 @@
  *
  * - `--dry-run` reads and plans, writes nothing, and prints what a run
  *   would do.
+ * - `--business=<id or slug>` keeps the run to one business's sites.
  * - `--limit=N` stops after N sites have been upgraded, for a first careful
  *   run. Run it again to carry on: a site already on the newest version is
  *   skipped, so it is safe to run more than once and to stop partway.
@@ -39,6 +41,8 @@ const TAG = "[template-upgrade]";
 export interface UpgradeArgs {
     dryRun: boolean;
     limit?: number;
+    /** A business's id or web address, as typed. */
+    business?: string;
 }
 
 /** The arguments, or null when one is not understood. */
@@ -52,6 +56,11 @@ export function parseArgs(argv: readonly string[]): UpgradeArgs | null {
         const limit = /^--limit=(\d+)$/.exec(arg);
         if (limit && Number(limit[1]) > 0) {
             args.limit = Number(limit[1]);
+            continue;
+        }
+        const business = /^--business=(.+)$/.exec(arg);
+        if (business?.[1]?.trim()) {
+            args.business = business[1].trim();
             continue;
         }
         return null;
@@ -77,10 +86,28 @@ export function formatReport(report: TemplateUpgradeReport): string[] {
 async function main(argv: string[]): Promise<number> {
     const args = parseArgs(argv);
     if (!args) {
-        console.error(`${TAG} usage: template-upgrade [--dry-run] [--limit=N]`);
+        console.error(
+            `${TAG} usage: template-upgrade [--dry-run] [--limit=N] [--business=<id or slug>]`,
+        );
         return 2;
     }
-    const report = await upgradeTemplateSites(args);
+    let organizationId: string | undefined;
+    if (args.business) {
+        const organization = await prisma.organization.findFirst({
+            where: { OR: [{ id: args.business }, { slug: args.business }] },
+            select: { id: true },
+        });
+        if (!organization) {
+            console.error(`${TAG} no business with that id or slug`);
+            return 2;
+        }
+        organizationId = organization.id;
+    }
+    const report = await upgradeTemplateSites({
+        dryRun: args.dryRun,
+        ...(args.limit === undefined ? {} : { limit: args.limit }),
+        ...(organizationId ? { organizationId } : {}),
+    });
     for (const line of formatReport(report)) console.info(`${TAG} ${line}`);
     return report.failed > 0 ? 1 : 0;
 }

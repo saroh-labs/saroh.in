@@ -432,9 +432,16 @@ const BATCH = 100;
  * version. Idempotent (a site on the newest version is skipped) and
  * resumable (each site commits by itself). A site that fails is counted
  * and the run goes on; nothing of it was written.
+ *
+ * `organizationId` keeps the run to one business's sites: for a first
+ * careful run on a business that has agreed to go first.
  */
 export async function upgradeTemplateSites(
-    options: { dryRun?: boolean; limit?: number } = {},
+    options: {
+        dryRun?: boolean;
+        limit?: number;
+        organizationId?: string;
+    } = {},
 ): Promise<TemplateUpgradeReport> {
     const dryRun = options.dryRun === true;
     const report: TemplateUpgradeReport = {
@@ -457,6 +464,9 @@ export async function upgradeTemplateSites(
             where: {
                 deletedAt: null,
                 templateId: { in: [...UPGRADED_TEMPLATE_IDS] },
+                ...(options.organizationId
+                    ? { organizationId: options.organizationId }
+                    : {}),
             },
             orderBy: { id: "asc" },
             take: BATCH,

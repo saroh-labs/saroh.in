@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import type {
     InstantiatedTemplate,
@@ -471,6 +472,24 @@ export async function syncSiteWithModules(
     actor: PageActor,
     switchedOn: string,
 ): Promise<SyncCounts | null> {
+    const following = await followingSite(tx, actor, switchedOn);
+    return following
+        ? syncFollowingSite(tx, actor, following, switchedOn)
+        : null;
+}
+
+/** The business's website and its template, when the template follows modules. */
+interface FollowingSite {
+    site: SyncSite;
+    template: TemplateManifest;
+}
+
+/** The site a module switch may change, or null (see above). Reads only. */
+async function followingSite(
+    tx: Pick<Tx, "site">,
+    actor: PageActor,
+    switchedOn: string,
+): Promise<FollowingSite | null> {
     if (!FOLLOWED_MODULES.has(switchedOn)) return null;
     const row = await tx.site.findFirst({
         where: { organizationId: actor.organizationId, deletedAt: null },
@@ -485,12 +504,54 @@ export async function syncSiteWithModules(
     if (!row) return null;
     const template = recordedTemplate(row);
     if (!template || (template.modulePages ?? []).length === 0) return null;
-
-    const site: SyncSite = {
-        id: row.id,
-        name: row.name,
-        organizationId: actor.organizationId,
+    return {
+        template,
+        site: {
+            id: row.id,
+            name: row.name,
+            organizationId: actor.organizationId,
+        },
     };
+}
+
+const logger = new Logger("TemplateSync");
+
+/**
+ * {@link syncSiteWithModules} for the module switch itself
+ * (`ModuleLifecycleService.enable`): it must never be the reason a module
+ * cannot be switched on. The site's changes are made inside a savepoint, so
+ * if anything in them fails they are undone alone, the switch still
+ * commits, and the failure is logged (by its kind: an error's message can
+ * quote a business's own words). The business then has its module and a
+ * site that did not gain the page, which it can add from Website.
+ */
+export async function syncSiteAfterModuleSwitch(
+    tx: Tx,
+    actor: PageActor,
+    switchedOn: string,
+): Promise<void> {
+    const following = await followingSite(tx, actor, switchedOn);
+    if (!following) return;
+    await tx.$executeRaw`SAVEPOINT template_sync`;
+    try {
+        await syncFollowingSite(tx, actor, following, switchedOn);
+        await tx.$executeRaw`RELEASE SAVEPOINT template_sync`;
+    } catch (error) {
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT template_sync`;
+        logger.error(
+            `site not brought up to its template after ${switchedOn} was switched on: ${
+                error instanceof Error ? error.name : "error"
+            }`,
+        );
+    }
+}
+
+async function syncFollowingSite(
+    tx: Tx,
+    actor: PageActor,
+    { site, template }: FollowingSite,
+    switchedOn: string,
+): Promise<SyncCounts | null> {
     const read = { db: tx, siteId: site.id };
     const context = await buildTemplateContext(actor.organizationId, read);
     const before = await buildTemplateContext(actor.organizationId, {

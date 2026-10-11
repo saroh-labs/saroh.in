@@ -174,11 +174,15 @@ export async function buildTemplateContext(
     });
     const books = modules.includes("APPOINTMENTS") && services.length > 0;
 
-    // The Shop page's own gate, so Home never shows a grid the shop's
-    // route would refuse.
+    // It sells ONLINE: the Shop page's own gate (so Home never shows a grid
+    // the shop's route would refuse), and a first location that sends
+    // orders out. The rule that gives a site its Shop page when Sell is
+    // switched on (DEC-069, L13, `module-setup.writers.ts`): a counter that
+    // only hands orders over is not a shop on the website.
     const sells =
         modules.includes("COMMERCE") &&
-        (await modulePageState("SHOP", organizationId, db)).state === "on";
+        (await modulePageState("SHOP", organizationId, db)).state === "on" &&
+        (await sendsOrders(db, organizationId));
     // Asked only when they would be said: a business that takes bookings
     // is described by its services.
     const categories =
@@ -218,6 +222,25 @@ export async function buildTemplateContext(
         hasPlace: place.address,
         hasHours: place.hours,
     };
+}
+
+/**
+ * Whether the business's first location delivers or ships: the location
+ * Sell's setup names (`firstStorefront`, `module-setup.writers.ts`), and
+ * the ways that need the website.
+ */
+async function sendsOrders(
+    db: ContextDb,
+    organizationId: string,
+): Promise<boolean> {
+    const first = await db.store.findFirst({
+        where: { organizationId, deletedAt: null },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { settings: { select: { fulfilmentTypes: true } } },
+    });
+    return (first?.settings?.fulfilmentTypes ?? []).some(
+        (way) => way === "LOCAL_DELIVERY" || way === "SHIPPING",
+    );
 }
 
 /**

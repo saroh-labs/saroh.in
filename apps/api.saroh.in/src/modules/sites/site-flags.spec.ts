@@ -1,4 +1,11 @@
-import { instantiateTemplate, listTemplates } from "@saroh/templates";
+import {
+    HERO_PROMPT,
+    instantiateTemplate,
+    listTemplates,
+    starterTemplate,
+    starterTemplateV2,
+    starterTemplateV3,
+} from "@saroh/templates";
 
 import {
     ADDRESS_MISSING_MESSAGE,
@@ -7,6 +14,8 @@ import {
     checkShop,
     checkSite,
     FLAGS_AWAITING_NAVIGATION,
+    hasOwnerNote,
+    OWNER_NOTE_MESSAGE,
     type FlagPageInput,
     type FlagSiteInput,
     type FlagType,
@@ -1310,5 +1319,165 @@ describe("the footer still in its template's words (round 2)", () => {
                 ).some((f) => f.field === "footer"),
             ).toBe(true);
         }
+    });
+});
+
+describe("a template's note to the owner (DEC-141)", () => {
+    const withNote = (subheading: string, hidden = false) =>
+        page([
+            {
+                type: "hero",
+                content: {
+                    variant: "none",
+                    heading: "Kesar Salon",
+                    subheading,
+                },
+                hidden,
+            },
+        ]);
+
+    it("blocks publishing while the hero's line is starter@3's prompt", () => {
+        const flags = checkPage(withNote(HERO_PROMPT), ["/"]);
+        expect(flags).toEqual([
+            {
+                type: "placeholderText",
+                message: OWNER_NOTE_MESSAGE,
+                pageId: "page_1",
+                sectionIndex: 0,
+                field: "subheading",
+                blocking: true,
+            },
+        ]);
+        // Said once: the placeholder check does not name it a second time.
+        expect(flags).toHaveLength(1);
+        expect(OWNER_NOTE_MESSAGE).toContain(HERO_PROMPT);
+    });
+
+    it("is what an unedited starter@3 site still carries", () => {
+        const { pages } = instantiateTemplate(starterTemplateV3, {
+            organizationName: "Asha Rao",
+        });
+        const home = pages[0];
+        if (!home) throw new Error("no home page");
+        const flags = checkPage(page(home.sections), ["/", "/about"]);
+        expect(flags.filter((f) => f.blocking)).toHaveLength(1);
+        expect(hasOwnerNote(pages)).toBe(true);
+    });
+
+    it("says nothing once the owner writes their own line, or clears it", () => {
+        for (const line of ["Haircuts and colour in Indiranagar", ""]) {
+            expect(
+                checkPage(withNote(line), ["/"]).filter((f) => f.blocking),
+            ).toEqual([]);
+        }
+        expect(
+            hasOwnerNote([
+                {
+                    sections: [
+                        { type: "hero", content: { heading: "Kesar Salon" } },
+                    ],
+                },
+            ]),
+        ).toBe(false);
+    });
+
+    it("does not stop a publish for a hero that is hidden, or on a hidden page", () => {
+        expect(checkPage(withNote(HERO_PROMPT, true), ["/"])).toEqual([]);
+        const hero = { type: "hero", content: { subheading: HERO_PROMPT } };
+        expect(hasOwnerNote([{ sections: [{ ...hero, hidden: true }] }])).toBe(
+            false,
+        );
+        expect(hasOwnerNote([{ hidden: true, sections: [hero] }])).toBe(false);
+        expect(hasOwnerNote([{ sections: [hero] }])).toBe(true);
+    });
+
+    it("reads a snapshot's pages, whatever is in them, without throwing", () => {
+        for (const pages of [[null], [42], [{ sections: "x" }], [{}]]) {
+            expect(hasOwnerNote(pages)).toBe(false);
+        }
+    });
+
+    it("is nowhere in a site a new business starts with", () => {
+        for (const ctx of [
+            { organizationName: "Asha Rao" },
+            {
+                organizationName: "Kesar Salon",
+                description: "Haircut and Colour in Bengaluru",
+                modules: ["APPOINTMENTS"],
+                serviceIds: ["svc_1"],
+                hasPlace: true,
+            },
+        ]) {
+            const { pages } = instantiateTemplate(starterTemplate, ctx);
+            expect(hasOwnerNote(pages)).toBe(false);
+            for (const made of pages) {
+                const flags = checkPage(
+                    page(made.sections, { path: made.path }),
+                    pages.map((p) => p.path),
+                );
+                expect(flags.filter((f) => f.blocking)).toEqual([]);
+                expect(
+                    flags.filter((f) => f.type === "placeholderText"),
+                ).toEqual([]);
+            }
+        }
+    });
+});
+
+describe("the first starters' stock sentences (DEC-141)", () => {
+    it.each([
+        ["starter@2", starterTemplateV2],
+        ["starter@3", starterTemplateV3],
+    ])("%s: every text block it wrote is named, with its words", (_v, t) => {
+        const { pages } = instantiateTemplate(t, {
+            organizationName: "Asha Rao",
+        });
+        for (const made of pages) {
+            const texts = made.sections.filter((s) => s.type === "richText");
+            const flags = checkPage(
+                page(made.sections, { path: made.path }),
+                pages.map((p) => p.path),
+            ).filter(
+                (f) =>
+                    f.type === "placeholderText" &&
+                    f.message.includes("rich text block still has") &&
+                    f.message.includes("template's placeholder words"),
+            );
+            expect(texts.length).toBeGreaterThan(0);
+            expect(flags).toHaveLength(texts.length);
+            // Advisory: a sentence the owner decides to keep is theirs.
+            expect(flags.every((f) => f.blocking === undefined)).toBe(true);
+        }
+    });
+
+    it("names the greeting starter@2 put under the headline", () => {
+        const [home] = instantiateTemplate(starterTemplateV2, {
+            organizationName: "Asha Rao",
+        }).pages;
+        const flags = checkPage(page(home?.sections ?? []), ["/", "/about"]);
+        expect(
+            flags.some(
+                (f) =>
+                    f.sectionIndex === 0 &&
+                    f.type === "placeholderText" &&
+                    f.message.includes("Welcome"),
+            ),
+        ).toBe(true);
+    });
+
+    it("leaves the owner's own paragraph on the same subject alone", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "richText",
+                    content: {
+                        format: "html",
+                        value: "<h2>Working together</h2><p>Every job starts with a visit to see the room.</p>",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(flags)).not.toContain("placeholderText");
     });
 });

@@ -29,7 +29,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { auditMetadata } from "../audit/audit.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { allows, authorize } from "../organizations/organization-policy";
-import { syncSiteWithModules } from "../sites/template-sync";
+import { syncSiteAfterModuleSwitch } from "../sites/template-sync";
 import type { ModuleImpactView } from "./dto";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, moduleRolledOut, MODULES } from "./module-registry";
@@ -197,7 +197,7 @@ export class ModuleLifecycleService {
             // is switched on reaches it (the Turn on sheet, a plain switch,
             // an operator); and last, so it sees what the setup just made
             // (a first service). Nothing is done for any other site.
-            await syncSiteWithModules(tx, ctx, moduleKey);
+            await syncSiteAfterModuleSwitch(tx, ctx, moduleKey);
         });
 
         // After the commit, so only a module that really is enabled is counted.
