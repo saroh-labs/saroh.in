@@ -159,10 +159,12 @@ test.describe("invoices", () => {
 
         // 5. The list has it under Paid, and its quick look says so.
         await page.goto("/billing/invoices?view=paid");
-        await expect(page.getByRole("tab", { name: /^Paid/ })).toHaveAttribute(
-            "aria-selected",
-            "true",
-        );
+        // An invoice's standing is the list's chip row, not tabs.
+        await expect(
+            page
+                .getByRole("radiogroup", { name: "Invoice status" })
+                .getByRole("radio", { name: /^Paid/ }),
+        ).toHaveAttribute("aria-checked", "true");
         await page.getByRole("button", { name: new RegExp(number) }).click();
         const look = page.getByRole("dialog");
         await expect(look.getByText(number).first()).toBeVisible();
@@ -190,14 +192,16 @@ test.describe("invoices", () => {
         await api(page, org).post(`/invoices/${id}/issue`);
 
         await page.goto("/billing/invoices");
-        const chips = page.getByRole("radiogroup", {
+        // What it was for is a kind, not a status: one of the toolbar's
+        // dropdown filters.
+        const source = page.getByRole("combobox", {
             name: "What it was for",
         });
-        await expect(chips).toBeVisible();
-        const byHand = chips.getByRole("radio", { name: "By hand" });
-        await expect(byHand).toHaveCSS("cursor", "pointer");
-        await byHand.click();
-        await expect(byHand).toHaveAttribute("aria-checked", "true");
+        await expect(source).toBeVisible();
+        await expect(source).toHaveCSS("cursor", "pointer");
+        await source.click();
+        await page.getByRole("option", { name: "By hand" }).click();
+        await expect(source).toContainText("By hand");
         await expect(page).toHaveURL(/[?&]source=MANUAL\b/);
         // Every row left is one written by hand, or a correction to one.
         const rows = page.getByRole("button", { name: /Written by hand/ });
@@ -205,10 +209,9 @@ test.describe("invoices", () => {
 
         // It is part of the address, so a reload keeps it.
         await page.reload();
-        await expect(
-            chips.getByRole("radio", { name: "By hand" }),
-        ).toHaveAttribute("aria-checked", "true");
-        await chips.getByRole("radio", { name: "All" }).click();
+        await expect(source).toContainText("By hand");
+        await source.click();
+        await page.getByRole("option", { name: "For anything" }).click();
         await expect(page).not.toHaveURL(/source=/);
 
         // One pack's invoices, from Pack Detail: none sold is said, not
@@ -218,10 +221,10 @@ test.describe("invoices", () => {
             page.getByText("No invoices for this pack yet"),
         ).toBeVisible();
         await expect(page.getByText("Showing 0 for this pack")).toBeVisible();
-        await expect(chips).toHaveCount(0);
+        await expect(source).toHaveCount(0);
         await page.getByRole("link", { name: "Show all invoices" }).click();
         await expect(page).toHaveURL(/\/billing\/invoices$/);
-        await expect(chips).toBeVisible();
+        await expect(source).toBeVisible();
     });
 });
 

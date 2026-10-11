@@ -138,7 +138,10 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             // Who has it: the holder, and Extend.
             await page.getByRole("tab", { name: /^Who has it/ }).click();
             await expect(page).toHaveURL(/\?tab=who$/);
-            await expect(page.getByText("Can still use · 1")).toBeVisible();
+            // The chip's count follows its label as a number.
+            await expect(
+                page.getByRole("radio", { name: "Can still use 1" }),
+            ).toHaveAttribute("aria-checked", "true");
             await expect(
                 page.getByRole("link", { name: `Open Asha Pack ${stamp}` }),
             ).toBeVisible();

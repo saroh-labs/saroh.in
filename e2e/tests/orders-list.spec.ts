@@ -104,10 +104,26 @@ async function filterBar(page: Page) {
         .filter({ visible: true });
 }
 
+/**
+ * All, Open and Refunded narrow the one list by status, so they are its chip
+ * row (a radio group), not tabs. The count follows the label ("Open 3").
+ */
 const tab = (page: Page, name: string) =>
-    page.getByRole("navigation", { name: "Orders" }).getByRole("link", {
-        name: new RegExp(`^${name}`),
+    page.getByRole("radiogroup", { name: "Order status" }).getByRole("radio", {
+        name: new RegExp(`^${name}\\b`),
     });
+
+/** A chip's count as it is drawn: grouped, as every figure in the app. */
+const chipCount = (n: number) => new Intl.NumberFormat("en-IN").format(n);
+
+/**
+ * The two on/off filters (B15). At the desk they follow the status chips;
+ * on a phone they are in the Filters sheet with the menus.
+ */
+async function toggleBar(page: Page) {
+    if (cards(page)) return filterBar(page);
+    return page.getByRole("group", { name: "Only show" });
+}
 
 test.describe("orders list", () => {
     test("the Open tab lists only open orders, with the API's counts", async ({
@@ -119,18 +135,18 @@ test.describe("orders list", () => {
         const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
+        await expect(tab(page, "All")).toHaveAttribute("aria-checked", "true");
         for (const [name, n] of [
             ["All", all.counts.all],
             ["Open", all.counts.open],
             ["Refunded", all.counts.refunded],
         ] as const) {
-            await expect(tab(page, name)).toContainText(String(n));
+            await expect(tab(page, name)).toContainText(chipCount(n));
         }
 
         await tab(page, "Open").click();
         await expect(page).toHaveURL(/tab=open/);
-        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "page");
+        await expect(tab(page, "Open")).toHaveAttribute("aria-checked", "true");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
             await expect(
@@ -176,7 +192,7 @@ test.describe("orders list", () => {
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
         await page.getByRole("button", { name: "Show all orders" }).click();
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
+        await expect(tab(page, "All")).toHaveAttribute("aria-checked", "true");
     });
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
@@ -236,7 +252,7 @@ test.describe("orders list", () => {
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
-        const filter = page.getByRole("button", { name: /Location filter/ });
+        const filter = page.getByRole("combobox", { name: "Location" });
         const row = orders(page).getByRole("listitem").first();
         // Counting the filter before the list is drawn counts nothing.
         await expect(row).toBeVisible();
@@ -530,7 +546,7 @@ test.describe("orders list filters (B4)", () => {
         );
         if (cards(page)) await page.keyboard.press("Escape");
         await expect(tab(page, "All")).toContainText(
-            String(expected.counts.all),
+            chipCount(expected.counts.all),
         );
         if (expected.rows.length === 0) {
             await expect(
@@ -567,7 +583,7 @@ test.describe("orders list filters (B4)", () => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
-        const bar = await filterBar(page);
+        const bar = await toggleBar(page);
         const late = bar.getByRole("button", { name: "Late" });
         await expect(late).toHaveAttribute("aria-pressed", "false");
         await late.click();
@@ -581,7 +597,7 @@ test.describe("orders list filters (B4)", () => {
         await expect(attention).toHaveAttribute("aria-pressed", "true");
         await page.reload();
         await expect(
-            (await filterBar(page)).getByRole("button", {
+            (await toggleBar(page)).getByRole("button", {
                 name: "Needs attention",
             }),
         ).toHaveAttribute("aria-pressed", "true");
