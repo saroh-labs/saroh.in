@@ -44,7 +44,7 @@ const beforeHelp: PublishContext = {
 const none: PublishContext = { ...shown, routes: [] };
 
 const PLAN_WORDS =
-    /free plan|paid plan|\bplans?\b|on us\b|locked in|cancel|\bpricing\b|one working day|real person/i;
+    /free plan|paid plan|\bplans?\b|on us\b|locked in|cancel|\bpricing\b/i;
 
 const hrefs = (container: HTMLElement) =>
     Array.from(container.querySelectorAll("a")).map(
@@ -55,6 +55,13 @@ describe.each(["waitlist", "open"] as const)("/contact in %s mode", (mode) => {
     it("says nothing of Saroh's plans, and makes no promise the product doesn't back", () => {
         const { container } = render(<ContactPage mode={mode} ctx={shown} />);
         expect(container.textContent).not.toMatch(PLAN_WORDS);
+    });
+
+    it("promises a reply within one working day, as the owner does (CT2)", () => {
+        const { container } = render(<ContactPage mode={mode} ctx={shown} />);
+        expect(container.textContent).toContain(
+            "A real person reads every message and replies within one working day.",
+        );
     });
 
     it("draws no placeholder: nothing in brackets, no made-up number", () => {
