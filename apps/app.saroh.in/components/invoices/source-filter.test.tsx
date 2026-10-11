@@ -5,11 +5,11 @@ import { paymentsLockedCopy } from "@/lib/invoices/access";
 import { chipsFor } from "@/lib/invoices/sources";
 
 import { PaymentsLocked } from "./payments-locked";
-import { ScopeNotice, SourceChips } from "./source-filter";
+import { ScopeNotice, SourceFilter } from "./source-filter";
 
 const noop = () => undefined;
 
-describe("SourceChips (D18)", () => {
+describe("SourceFilter (D18)", () => {
     const chips = chipsFor(
         [
             { id: "a", source: "ORDER" as const },
@@ -18,27 +18,26 @@ describe("SourceChips (D18)", () => {
         "PACK",
     );
     const html = renderToStaticMarkup(
-        <SourceChips chips={chips} chosen="PACK" onPick={noop} />,
+        <SourceFilter chips={chips} chosen="PACK" onPick={noop} />,
     );
 
-    it("is a named radio group with the chosen chip checked", () => {
-        expect(html).toContain('role="radiogroup"');
+    it("is the list toolbar's one dropdown, named for what it narrows", () => {
+        expect(html).toContain("data-list-filter");
+        expect(html).toContain('role="combobox"');
         expect(html).toContain('aria-label="What it was for"');
-        expect(html).toMatch(/aria-checked="true"[^>]*>Packs</);
-        expect(html).toMatch(/aria-checked="false"[^>]*>Orders</);
+        // A kind of invoice is not a status: no chips, no tabs.
+        expect(html).not.toMatch(/role="(radio|tab)"/);
     });
 
-    it("every chip is a button with focus, hover and pressed states", () => {
-        expect(html.match(/<button/g)).toHaveLength(3);
+    it("has the keyboard's focus ring and no width of its own", () => {
         expect(html).toContain("focus-visible:ring-2");
-        expect(html).toContain("hover:");
-        expect(html).toContain("active:");
+        expect(html).toContain("w-auto");
     });
 
     it("draws nothing when there is nothing to choose between", () => {
         expect(
             renderToStaticMarkup(
-                <SourceChips chips={[]} chosen="all" onPick={noop} />,
+                <SourceFilter chips={[]} chosen="all" onPick={noop} />,
             ),
         ).toBe("");
     });

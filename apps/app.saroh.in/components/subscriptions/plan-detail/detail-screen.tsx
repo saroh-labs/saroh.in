@@ -160,11 +160,13 @@ export function PlanDetail({
     }
 
     const subscribeTo = subscribeHref(plan);
-    const TABS: { key: DetailTab; label: string }[] = [
+    const TABS: { key: DetailTab; label: string; count?: number }[] = [
         { key: "overview", label: "Overview" },
         {
             key: "subscribers",
-            label: subs ? `Subscribers · ${subs.rows.length}` : "Subscribers",
+            label: "Subscribers",
+            // No count when they couldn't be read: a 0 would say none.
+            count: subs ? subs.rows.length : undefined,
         },
         { key: "history", label: "History" },
     ];
@@ -246,6 +248,7 @@ export function PlanDetail({
                 tabs={TABS.map((t) => ({
                     value: t.key,
                     label: t.label,
+                    count: t.count,
                     controls: "plan-panel",
                 }))}
             />
