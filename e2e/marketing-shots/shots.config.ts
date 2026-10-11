@@ -765,10 +765,16 @@ const HELP_SHOTS_B: Shot[] = [
 
 /* Create your business. */
 
-/** The setup form, answered as a florist would, never created. */
+/**
+ * The setup form, answered as a florist would, never created. Setup is a
+ * stepper since 11 Oct 2026 (DEC-130): Continue opens the name step. The
+ * shots below that clip "Its address on Saroh" and "Is it registered as a
+ * company?" predate DEC-130 and are retaken with the Help article.
+ */
 const SETUP_FILLED: Step[] = [
     { waitFor: 'text="What are you setting up?"' },
     { click: '[role="radio"]:has-text("A business")' },
+    { click: 'form button[type="submit"]' },
     { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
     { waitFor: 'text="Available. Your website will live here."' },
 ];

@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { stamp } from "../fixtures/own-data";
 import { people, useSession } from "../fixtures/sessions";
+import { answerFirst, answerKind, answerName } from "../fixtures/walk-setup";
 import { urls } from "../playwright.config";
 import { lastCode, readSiteCode } from "./site-codes";
 
@@ -54,27 +55,23 @@ async function signUp(
 }
 
 /**
- * Set up a business on the one setup screen, and wait to be in the
+ * Set up a business through setup's three steps, and wait to be in the
  * workspace. "A business" is chosen already, and an account made with a
- * code is asked its name here. The goal is left on the one chosen for a
- * business (Sell): where it lands depends on what the stack has rolled
- * out, so only "out of setup" is waited for.
+ * code is asked its name on the name step. The goal is left on the one
+ * chosen for a business (Sell): where it lands depends on what the stack
+ * has rolled out, so only "out of setup" is waited for.
  */
 async function setUp(page: Page, name: string) {
     await expect(
         page.getByRole("radio", { name: /A business/ }),
     ).toHaveAttribute("aria-checked", "true");
-    // The plan sign-up started: this screen is its steps 2 and 3.
-    await expect(page.getByText("Steps 2 and 3 of 3")).toBeVisible();
-    await page.getByLabel("Your name", { exact: true }).fill("Asha Plan");
-    await page.getByLabel("What is it called?").fill(name);
-    await expect(
-        page.getByText("Available. Your website will live here."),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Create the business" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"), {
-        timeout: 20_000,
-    });
+    // The plan sign-up started: the account was step 1 of its four.
+    await expect(page.getByText("Step 2 of 4", { exact: true })).toBeVisible();
+    await answerKind(page);
+    await expect(page.getByText("Step 3 of 4", { exact: true })).toBeVisible();
+    await answerName(page, { yourName: "Asha Plan", name });
+    await expect(page.getByText("Step 4 of 4", { exact: true })).toBeVisible();
+    await answerFirst(page);
 }
 
 /** The plan key the business is on, from the API. */
