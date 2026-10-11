@@ -114,11 +114,13 @@ export function PacksTab({
                 chips={[
                     {
                         key: "live",
-                        label: `Can still use · ${lists.live.length}`,
+                        label: "Can still use",
+                        count: lists.live.length,
                     },
                     {
                         key: "done",
-                        label: `Used up or expired · ${lists.done.length}`,
+                        label: "Used up or expired",
+                        count: lists.done.length,
                     },
                 ]}
             />

@@ -1,4 +1,5 @@
 import { cn } from "@saroh/ui/lib/utils";
+import { ListTable, ListTableHead } from "@saroh/ui/list-table";
 import type { ReactNode } from "react";
 
 /*
@@ -12,8 +13,8 @@ const MIDDLE = "hidden w-[88px] shrink-0 text-right sm:block";
 const END_BESIDE_MIDDLE = "sm:w-[136px] sm:justify-end";
 
 /**
- * The workspace design's list: one bordered card, a row of column headings,
- * then a row per item with its title, a line under it, and whatever belongs
+ * The workspace design's list, in the one table look (`listTable`): one
+ * bordered card, the head band of column headings, then a row per item with its title, a line under it, and whatever belongs
  * on the right. Providers and Notifications draw it; the column headings are
  * what make the right-hand edge scannable as "status" or "when".
  */
@@ -38,11 +39,8 @@ export function ListCard({
 }) {
     return (
         <div className={className}>
-            <div className="overflow-hidden rounded-[12px] border border-border">
-                <div
-                    aria-hidden
-                    className="label flex items-center gap-3 border-b border-border bg-muted px-[18px] py-[9px]"
-                >
+            <ListTable>
+                <ListTableHead className="flex gap-3">
                     <span className="min-w-0 flex-1">{main}</span>
                     {middle ? <span className={MIDDLE}>{middle}</span> : null}
                     <span
@@ -53,9 +51,9 @@ export function ListCard({
                     >
                         {end}
                     </span>
-                </div>
+                </ListTableHead>
                 <ul>{children}</ul>
-            </div>
+            </ListTable>
             {note ? (
                 <p className="mt-2.5 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                     {note}
@@ -93,7 +91,7 @@ export function ListRow({
     return (
         <div
             className={cn(
-                "flex min-h-14 flex-wrap items-center gap-3 px-[18px] py-[13px]",
+                "flex min-h-14 flex-wrap items-center gap-3 px-[14px] py-[11px]",
                 className,
             )}
         >

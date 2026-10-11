@@ -4,11 +4,13 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useState } from "react";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";
+import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 
 export interface ActivityEntry {
@@ -40,20 +42,26 @@ export function ActivityList({
 
     return (
         <>
-            <section
-                aria-label="Activity"
-                className="overflow-hidden rounded-xl border border-border bg-card"
-            >
+            <section aria-label="Activity" className={listTable.card}>
                 <ol>
                     {entries.map(({ line }) => (
                         <li
                             key={line.id}
-                            className="relative grid grid-cols-[96px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 border-t border-border/70 px-[18px] py-[11px] text-[13px] transition-colors duration-fast first:border-t-0 hover:bg-muted min-[480px]:grid-cols-[96px_minmax(0,1fr)_auto]"
+                            // The first column fits "Today, 12:30 pm"
+                            // on one line: at 96px the 12-hour clock
+                            // broke it after the comma.
+                            className={cn(
+                                "relative grid grid-cols-[112px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 text-[13px] min-[480px]:grid-cols-[112px_minmax(0,1fr)_auto]",
+                                listTable.row,
+                            )}
                         >
                             <ViewerDate
                                 iso={line.at}
                                 variant="recent"
-                                className="tabular-nums text-muted-foreground"
+                                className={cn(
+                                    listTable.time,
+                                    "text-muted-foreground",
+                                )}
                             />
                             <button
                                 type="button"

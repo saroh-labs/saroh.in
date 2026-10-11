@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { listTable } from "@/components/shared/list-toolbar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { ProductDetail } from "@/lib/products/service";
 import type {
@@ -25,6 +26,9 @@ export const TONE_BADGE: Record<
     bad: "error",
     muted: "neutral",
 };
+
+/** The card's own gutter, which its title and footnote keep too. */
+const GUTTER = "px-[18px]";
 
 const GRID =
     "grid grid-cols-[minmax(130px,1.4fr)_64px_68px_72px_68px_minmax(112px,1fr)] gap-2";
@@ -70,7 +74,9 @@ export function StockTable({
                 <div
                     ref={box}
                     onScroll={measure}
-                    className="overflow-x-auto px-[18px] pb-1"
+                    // No side padding here: it is each row's own, so the
+                    // head band and the row rules run edge to edge.
+                    className="overflow-x-auto pb-1"
                 >
                     <div
                         className="min-w-[540px]"
@@ -79,10 +85,8 @@ export function StockTable({
                     >
                         <div
                             role="row"
-                            className={cn(
-                                GRID,
-                                "label border-b border-border pb-[7px] pt-2.5",
-                            )}
+                            data-list-head=""
+                            className={cn(GRID, listTable.head, GUTTER)}
                         >
                             <span role="columnheader">
                                 {product.option?.name ?? "Size"}
@@ -121,9 +125,10 @@ export function StockTable({
                                         }
                                         className={cn(
                                             GRID,
-                                            "-mx-1.5 items-center rounded-md px-1.5 py-[11px] text-[13px]",
-                                            open &&
-                                                "cursor-pointer hover:bg-muted/60",
+                                            GUTTER,
+                                            "items-center py-[11px] text-[13px]",
+                                            open && listTable.wash,
+                                            open && listTable.pressable,
                                         )}
                                     >
                                         <span
@@ -209,6 +214,7 @@ export function StockTable({
                                                   role="row"
                                                   className={cn(
                                                       GRID,
+                                                      GUTTER,
                                                       "items-center pb-[9px] text-[12.5px] text-neutral-700 dark:text-muted-foreground",
                                                   )}
                                               >
@@ -284,6 +290,7 @@ export function StockTable({
                             role="row"
                             className={cn(
                                 GRID,
+                                GUTTER,
                                 "items-center pb-3 pt-[11px] text-[12.5px] text-muted-foreground",
                             )}
                         >

@@ -134,8 +134,10 @@ export function MessagesTab({
                                 </div>
                                 <div className="mt-1 text-[11.5px] text-muted-foreground">
                                     {messageFrom(m, firstName)} ·{" "}
-                                    {formatDate(m.at, timeZone, { now })},{" "}
-                                    {formatTime(m.at, timeZone)}
+                                    <span className="whitespace-nowrap">
+                                        {formatDate(m.at, timeZone, { now })},{" "}
+                                        {formatTime(m.at, timeZone)}
+                                    </span>
                                 </div>
                             </li>
                         );
