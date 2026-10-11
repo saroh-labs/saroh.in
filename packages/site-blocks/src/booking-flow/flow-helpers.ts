@@ -1,4 +1,5 @@
 import type { PublicVisit } from "../blocks/visit-us";
+import { timeWords } from "../lib/clock";
 import { weekSummary } from "../lib/opening-hours";
 import type {
     BookingDays,
@@ -6,7 +7,7 @@ import type {
     BookingStart,
     BookPay,
 } from "./model";
-import { dateIn, dateText, timeIn } from "./model";
+import { dateIn, dateText } from "./model";
 
 export function newKey(): string {
     return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -55,10 +56,10 @@ export function nextFreeStart(
     );
 }
 
-/** "That time has gone. We've chosen the next free one: Sun 20 Sep at 08:00." */
+/** "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am." */
 export function nextChosenText(start: BookingStart, zone: string): string {
     const day = dateText(dateIn(start.startAt, zone), true);
-    return `That time has gone. We've chosen the next free one: ${day} at ${timeIn(start.startAt, zone)}.`;
+    return `That time has gone. We've chosen the next free one: ${day} at ${timeWords(start.startAt, zone)}.`;
 }
 
 // ── The header's facts (E6) ─────────────────────────────────────────────
@@ -110,7 +111,7 @@ export function headerFacts(
 /**
  * What the live site does at the booking page's last step, for a test
  * release's stop: "the customer signs in here and books Haircut, Sat 4 Oct
- * at 11:00 with Asha and pays ₹500".
+ * at 11:00 am with Asha and pays ₹500".
  */
 export function testReleaseBookingLine({
     serviceName,

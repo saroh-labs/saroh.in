@@ -138,7 +138,7 @@ const STATE_TAG: Record<AccountBookingState, string> = {
     cancelled: "Cancelled",
 };
 
-/** "Check-up · Mon 5 Oct, 10:00". */
+/** "Check-up · Mon 5 Oct, 10:00 am". */
 export function bookingTitle(row: AccountBookingRow): string {
     return `${row.service} · ${bookingWhen(row.startAt, row.timezone)}`;
 }
@@ -219,7 +219,7 @@ export function cancelledText(result: AccountCancelResult): string {
 }
 
 /**
- * What a move says it did: "Moved to Tue 6 Oct at 11:00." and, once the
+ * What a move says it did: "Moved to Tue 6 Oct at 11:00 am." and, once the
  * business really is told of it (A14), "‹Business› has been told."
  */
 export function movedText(
@@ -275,7 +275,7 @@ export function timesAsDays(
     return { timezone: zone, kind: "one", capacity: 1, days };
 }
 
-/** "Mon 5 Oct at 10:00", a free time in the sheet. */
+/** "Mon 5 Oct at 10:00 am", a free time in the sheet. */
 export function timeLabel(iso: string, timezone: string): string {
     return bookingWhen(iso, timezone).replace(", ", " at ");
 }

@@ -39,7 +39,7 @@ function done(over: Partial<Extract<Phase, { kind: "done" }>> = {}) {
         booking: BOOKING,
         paid: false,
         price: "₹600",
-        when: "Mon 12 Oct, 10:00",
+        when: "Mon 12 Oct, 10:00 am",
         first: "Asha",
         ...over,
     };
@@ -115,7 +115,7 @@ describe("who the booking is with (DEC-121)", () => {
         booking: BOOKING,
         paid: false,
         price: "₹600",
-        when: "Mon 12 Oct, 10:00",
+        when: "Mon 12 Oct, 10:00 am",
         first: "Asha",
     };
     const card = (soldBy?: string) =>
@@ -162,7 +162,7 @@ describe("the booked card says whether a message is coming", () => {
                     booking: { ...BOOKING, reach },
                     paid: false,
                     price: null,
-                    when: "Mon 12 Oct, 10:00",
+                    when: "Mon 12 Oct, 10:00 am",
                     first: "Asha",
                 }}
                 headingRef={createRef()}

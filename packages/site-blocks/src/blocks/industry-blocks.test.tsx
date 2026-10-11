@@ -291,7 +291,7 @@ describe("timetable", () => {
                 .map((h) => h.textContent),
         ).toContain("Mon 5 Oct");
         expect(
-            within(table).getByRole("rowheader", { name: "18:30" }),
+            within(table).getByRole("rowheader", { name: "6:30 pm" }),
         ).toBeTruthy();
     });
 

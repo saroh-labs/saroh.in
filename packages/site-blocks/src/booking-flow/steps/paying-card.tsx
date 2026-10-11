@@ -1,8 +1,8 @@
 import { destructiveAlertClasses } from "../../alert";
+import { timeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
 import type { CheckoutRequest } from "../checkout";
 import type { Phase } from "../flow-state";
-import { timeIn } from "../model";
 import { card, focusRing, quietFill } from "../styles";
 import { useCheckout } from "../use-checkout";
 
@@ -98,7 +98,7 @@ export function PayingCard({
             </p>
             {until ? (
                 <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
-                    It&apos;s held for you until {timeIn(until, zone)}
+                    It&apos;s held for you until {timeWords(until, zone)}
                     {minutesLeft !== null
                         ? `, ${minutesLeft} ${minutesLeft === 1 ? "minute" : "minutes"} left`
                         : ""}

@@ -92,7 +92,7 @@ describe("booking days response", () => {
         expect(screen.queryByRole("alert")).toBeNull();
         // The day, and its one time, in the business's zone.
         expect(screen.getByText("Mon 21 Sep")).toBeInTheDocument();
-        expect(screen.getByText("14:00")).toBeInTheDocument();
+        expect(screen.getByText("2:00 pm")).toBeInTheDocument();
         expect(
             screen.getByText("Times are in India Standard Time"),
         ).toBeInTheDocument();
@@ -233,7 +233,7 @@ describe("booking block — sign-in is always on (A9)", () => {
         expect(link).not.toHaveAttribute("href");
         expect(link).toHaveAttribute("aria-disabled", "true");
         // Its times are read, never tapped.
-        expect(screen.getByText("14:00").tagName).toBe("SPAN");
+        expect(screen.getByText("2:00 pm").tagName).toBe("SPAN");
     });
 });
 
@@ -260,14 +260,14 @@ describe("booking block — each free time is a way in", () => {
         // the booking page opens on (`findInitialStart`).
         expect(
             await screen.findByRole("link", {
-                name: "Book Mon 21 Sep at 09:00",
+                name: "Book Mon 21 Sep at 9:00 am",
             }),
         ).toHaveAttribute(
             "href",
             "/book?service=svc_1&date=2026-09-21&start=09%3A00",
         );
         const later = screen.getByRole("link", {
-            name: "Book Mon 21 Sep at 14:00",
+            name: "Book Mon 21 Sep at 2:00 pm",
         });
         expect(later).toHaveAttribute(
             "href",
@@ -297,9 +297,9 @@ describe("booking block — each free time is a way in", () => {
                 bookHref="/book"
             />,
         );
-        await screen.findByRole("link", { name: "Book Mon 21 Sep at 14:00" });
+        await screen.findByRole("link", { name: "Book Mon 21 Sep at 2:00 pm" });
         expect(
-            screen.queryByRole("link", { name: "Book Mon 21 Sep at 09:00" }),
+            screen.queryByRole("link", { name: "Book Mon 21 Sep at 9:00 am" }),
         ).toBeNull();
     });
 

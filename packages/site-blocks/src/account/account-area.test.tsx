@@ -84,7 +84,7 @@ describe("the account's words", () => {
         expect(accountMoney("2500.00", "INR")).toBe("₹2,500");
         expect(accountMoney("12.50", "INR")).toBe("₹12.50");
         expect(bookingWhen("2026-10-05T04:30:00.000Z", "Asia/Kolkata")).toBe(
-            "Mon 5 Oct, 10:00",
+            "Mon 5 Oct, 10:00 am",
         );
     });
 
@@ -175,7 +175,7 @@ describe("Home", () => {
             screen.getByRole("heading", { name: "Next booking" }),
         ).toBeInTheDocument();
         expect(
-            screen.getByText("Check-up · Mon 5 Oct, 10:00"),
+            screen.getByText("Check-up · Mon 5 Oct, 10:00 am"),
         ).toBeInTheDocument();
         expect(screen.getByText("With Dr. Rao")).toBeInTheDocument();
         expect(

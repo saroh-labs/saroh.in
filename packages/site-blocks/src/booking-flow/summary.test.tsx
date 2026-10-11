@@ -20,7 +20,7 @@ describe("what is left to do before booking (UX-083)", () => {
                 {...BASE}
                 quiet
                 serviceName="Consultation"
-                whenText="Thu 8 Oct at 11:00"
+                whenText="Thu 8 Oct at 11:00 am"
                 name=""
                 hasService
                 confirmLabel="Book"
@@ -36,7 +36,7 @@ describe("what is left to do before booking (UX-083)", () => {
             <SummaryAside
                 {...BASE}
                 serviceName="Consultation"
-                whenText="Thu 8 Oct at 11:00"
+                whenText="Thu 8 Oct at 11:00 am"
                 name=""
                 hasService
                 confirmLabel="Book"
@@ -55,11 +55,11 @@ describe("what is left to do before booking (UX-083)", () => {
                 {...BASE}
                 quiet
                 hasService
-                whenText="Thu 8 Oct at 11:00"
+                whenText="Thu 8 Oct at 11:00 am"
                 barLabel="Book"
             />,
         );
-        expect(screen.getByText("Thu 8 Oct at 11:00")).toBeInTheDocument();
+        expect(screen.getByText("Thu 8 Oct at 11:00 am")).toBeInTheDocument();
         expect(screen.queryByText("Add your name.")).toBeNull();
     });
 
@@ -69,7 +69,7 @@ describe("what is left to do before booking (UX-083)", () => {
                 <SummaryAside
                     {...BASE}
                     serviceName="Consultation"
-                    whenText="Thu 8 Oct at 11:00"
+                    whenText="Thu 8 Oct at 11:00 am"
                     name="Asha"
                     hasService
                     confirmLabel="Book and pay at the desk"
@@ -78,7 +78,7 @@ describe("what is left to do before booking (UX-083)", () => {
                 <PhoneBar
                     {...BASE}
                     hasService
-                    whenText="Thu 8 Oct at 11:00"
+                    whenText="Thu 8 Oct at 11:00 am"
                     barLabel="Book"
                 />
             </>

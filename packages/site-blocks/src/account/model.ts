@@ -3,6 +3,7 @@ import type {
     AutopayMethod,
     AutopayState,
 } from "../autopay/api";
+import { timeWords } from "../lib/clock";
 import { siteMoney } from "../lib/money";
 
 /**
@@ -272,7 +273,10 @@ export function accountMoney(amount: string, currency: string): string {
     );
 }
 
-/** "Mon 5 Oct, 10:00", in the zone the booking was made in. */
+/**
+ * "Mon 5 Oct, 10:00 am", in the zone the booking was made in: the API's
+ * `whenWords` with the weekday, so the page and the email agree.
+ */
 export function bookingWhen(iso: string, timeZone: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
@@ -283,13 +287,7 @@ export function bookingWhen(iso: string, timeZone: string): string {
             month: "short",
             timeZone,
         }).format(d);
-        const time = new Intl.DateTimeFormat("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone,
-        }).format(d);
-        return `${day}, ${time}`;
+        return `${day}, ${timeWords(d, timeZone)}`;
     } catch {
         return d.toISOString().slice(0, 16).replace("T", " ");
     }
@@ -410,7 +408,7 @@ const VISIT_STATE: Record<AccountOrderVisit["state"], string> = {
     "to-book": "To book",
 };
 
-/** "Visit 2 · Mon 5 Oct, 10:00" and its word. */
+/** "Visit 2 · Mon 5 Oct, 10:00 am" and its word. */
 export function visitLine(visit: AccountOrderVisit): {
     title: string;
     state: string;
@@ -435,7 +433,7 @@ export function orderTitle(order: AccountOrder): string {
 }
 
 /**
- * Under a message: who it is from and when — "You · 10:05", "Kavi Dental ·
+ * Under a message: who it is from and when — "You · 10:05 am", "Kavi Dental ·
  * Yesterday", "Kavi Dental · 3 Oct" — in the visitor's own time. `now` is
  * passed in so the words don't change between the server and the browser.
  */
@@ -459,12 +457,7 @@ export function messageMeta(
     const yesterday = day(new Date(now.getTime() - 86_400_000));
     let when: string;
     if (day(at) === today) {
-        when = new Intl.DateTimeFormat("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone,
-        }).format(at);
+        when = timeWords(at, timeZone);
     } else if (day(at) === yesterday) {
         when = "Yesterday";
     } else {

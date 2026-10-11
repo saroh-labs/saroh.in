@@ -16,6 +16,7 @@ import {
     isBookingDays,
     timeIn,
 } from "../booking-flow/model";
+import { timeWords } from "../lib/clock";
 import { useQrSource, withQrSource } from "../qr-source";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
@@ -235,7 +236,7 @@ export default function BookingSection({
               )
             : undefined;
     const chip =
-        "border-site-border text-site-fg coarse:min-h-11 inline-flex min-h-9 items-center rounded-[var(--site-radius)] border px-3 text-sm tabular-nums";
+        "border-site-border text-site-fg coarse:min-h-11 inline-flex min-h-9 items-center rounded-[var(--site-radius)] whitespace-nowrap border px-3 text-sm tabular-nums";
 
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
@@ -306,7 +307,7 @@ export default function BookingSection({
                                 </p>
                                 <ul className="mt-2 flex flex-wrap gap-2">
                                     {group.slots.map((slot) => {
-                                        const time = timeIn(
+                                        const time = timeWords(
                                             slot.startAt,
                                             zone ?? "UTC",
                                         );

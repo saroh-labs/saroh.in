@@ -216,7 +216,7 @@ describe("the waitlist's words", () => {
                 },
                 zone,
             ),
-        ).toBe("Held for you until 15:00");
+        ).toBe("Held for you until 3:00 pm");
     });
 
     it("promises only the way they will really hear", () => {
@@ -367,7 +367,7 @@ describe("a full class on the booking page (A12)", () => {
         });
         const acc = account({ waitlist: wl });
         render(<BookingFlow page={PAGE} account={acc} apiUrl="x" />);
-        await pickFullSession(/Held for you until 15:00/);
+        await pickFullSession(/Held for you until 3:00 pm/);
         fireEvent.click(confirmButton(/Book and pay at the desk/));
         expect(
             await screen.findByRole("heading", {

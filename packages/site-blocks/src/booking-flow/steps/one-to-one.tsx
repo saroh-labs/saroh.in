@@ -1,3 +1,4 @@
+import { timeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
 import { ReachLinks } from "../../reach-links";
@@ -14,7 +15,6 @@ import {
     dayHeading,
     dayParts,
     groupStarts,
-    timeIn,
 } from "../model";
 import { focusRing, quietFill } from "../styles";
 import type { Weeks } from "./weeks";
@@ -228,11 +228,11 @@ export function OneToOne({
                                 <span className="text-site-muted flex-[0_0_84px] text-[12.5px] font-semibold">
                                     {g.label}
                                 </span>
-                                <div className="grid min-w-0 flex-[1_1_240px] grid-cols-[repeat(auto-fill,minmax(78px,1fr))] gap-2">
+                                <div className="grid min-w-0 flex-[1_1_240px] grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
                                     {g.starts.map((s) => {
                                         const on =
                                             chosen?.startAt === s.startAt;
-                                        const t = timeIn(s.startAt, zone);
+                                        const t = timeWords(s.startAt, zone);
                                         return (
                                             <button
                                                 key={s.startAt}
@@ -246,7 +246,7 @@ export function OneToOne({
                                                 }
                                                 onClick={() => onStart(s)}
                                                 className={cn(
-                                                    "h-[45px] cursor-pointer rounded-[calc(var(--site-radius)+7px)] border text-[15px] font-semibold tabular-nums transition-colors duration-100 ease-out",
+                                                    "h-[45px] cursor-pointer whitespace-nowrap rounded-[calc(var(--site-radius)+7px)] border text-[15px] font-semibold tabular-nums transition-colors duration-100 ease-out",
                                                     focusRing,
                                                     on
                                                         ? "border-site-fg bg-site-fg text-site-bg"

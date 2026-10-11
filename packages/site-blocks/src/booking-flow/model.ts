@@ -4,6 +4,7 @@
  * Pure — no React, no fetch — so every rule here is tested on its own.
  */
 
+import { clockParts, clockValue } from "../lib/clock";
 import { siteMoney } from "../lib/money";
 import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
@@ -685,19 +686,18 @@ export function serviceLine(service: BookingService): string {
     return parts.join(" · ");
 }
 
-/** "07:00" — a wall-clock time in the business's zone. */
+/**
+ * "07:00", a wall-clock time in the business's zone as a 24-hour value: a
+ * `?start=` in an address and what it is matched against. Never drawn. What
+ * a customer reads is `timeWords` ("7:00 am", `lib/clock.ts`).
+ */
 export function timeIn(iso: string, zone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: zone,
-    }).format(new Date(iso));
+    return clockValue(iso, zone);
 }
 
 /** The local hour of an instant in the zone, 0–23. */
 function hourIn(iso: string, zone: string): number {
-    return Number(timeIn(iso, zone).slice(0, 2));
+    return clockParts(iso, zone).hour;
 }
 
 /** A `YYYY-MM-DD` as a date at noon UTC, so no zone moves its day. */

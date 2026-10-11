@@ -231,9 +231,9 @@ afterEach(() => {
 
 async function chooseOneToOne() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
-    await screen.findByRole("radio", { name: "07:00 with Karan Mehta" });
+    await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
     fireEvent.click(
-        screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+        screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
 }
 
@@ -690,7 +690,7 @@ describe("the booking page (U19)", () => {
         await tryIt("Pay ₹1,200 and book");
         // The same choice again: the same key.
         fireEvent.click(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         );
         await tryIt("Pay ₹1,200 and book");
         // Paying at the desk instead: a new key.
@@ -698,7 +698,7 @@ describe("the booking page (U19)", () => {
         await tryIt("Book and pay at the desk");
         // Another time: a new key.
         fireEvent.click(
-            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
         );
         await tryIt("Book and pay at the desk");
 
@@ -713,10 +713,12 @@ describe("the booking page (U19)", () => {
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
 
-        const full = await screen.findByRole("radio", { name: /07:00.*Full/ });
+        const full = await screen.findByRole("radio", {
+            name: /7:00 to 7:45 am.*Full/,
+        });
         expect(full).toBeDisabled();
         const open = screen.getByRole("radio", {
-            name: /18:30.*2 places left/,
+            name: /6:30 to 7:15 pm.*2 places left/,
         });
         expect(open).toBeEnabled();
         fireEvent.click(open);
@@ -733,9 +735,9 @@ describe("the booking page (U19)", () => {
                 initialServiceId="svc_pt"
             />,
         );
-        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" });
+        await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
         fireEvent.click(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         );
         expect(screen.queryByRole("radio", { name: /Pay ₹1,200/ })).toBeNull();
         expect(
@@ -821,7 +823,7 @@ describe("Where and anything we should know (E7)", () => {
     async function chooseAt(service: RegExp) {
         fireEvent.click(screen.getByRole("radio", { name: service }));
         const time = await screen.findByRole("radio", {
-            name: "07:00 with Dr Kavitha Rao",
+            name: "7:00 am with Dr Kavitha Rao",
         });
         fireEvent.click(time);
     }
@@ -1124,7 +1126,9 @@ describe("online checkout (E11)", () => {
 
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
         fireEvent.click(
-            await screen.findByRole("radio", { name: /18:30.*2 places left/ }),
+            await screen.findByRole("radio", {
+                name: /6:30 to 7:15 pm.*2 places left/,
+            }),
         );
         expect(
             screen.getByRole("radio", {
@@ -1322,7 +1326,7 @@ describe("online checkout (E11)", () => {
         );
         fireEvent.click(
             await screen.findByRole("radio", {
-                name: "07:00 with Karan Mehta",
+                name: "7:00 am with Karan Mehta",
             }),
         );
         expect(screen.queryByText(/Online — /)).toBeNull();
@@ -1365,7 +1369,7 @@ describe("opening on a time from On today (G18)", () => {
             />,
         );
         const time = await screen.findByRole("radio", {
-            name: "08:00 with Karan Mehta",
+            name: "8:00 am with Karan Mehta",
         });
         await waitFor(() =>
             expect(time).toHaveAttribute("aria-checked", "true"),
@@ -1397,7 +1401,7 @@ describe("opening on a time from On today (G18)", () => {
             screen.getByRole("radio", { name: "Sun 20 Sep: 2 times free" }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "false");
         expect(screen.queryByLabelText("Name")).toBeNull();
     });
@@ -1415,7 +1419,7 @@ describe("opening on a time from On today (G18)", () => {
             />,
         );
         const open = await screen.findByRole("radio", {
-            name: /18:30.*2 places left/,
+            name: /6:30 to 7:15 pm.*2 places left/,
         });
         await waitFor(() =>
             expect(open).toHaveAttribute("aria-checked", "true"),
@@ -1454,9 +1458,9 @@ describe("opening on a time from On today (G18)", () => {
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
-        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" });
+        await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" });
         expect(
-            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "false");
         expect(screen.queryByText(/has gone/)).toBeNull();
     });
@@ -1506,7 +1510,7 @@ describe("sign-in at the last step (A9)", () => {
         );
         fireEvent.click(
             await screen.findByRole("radio", {
-                name: "07:00 with Karan Mehta",
+                name: "7:00 am with Karan Mehta",
             }),
         );
         payAtDesk();
@@ -1633,7 +1637,7 @@ describe("sign-in at the last step (A9)", () => {
         expect(verifyCode).toHaveBeenCalledWith("meera@example.in", "123456");
         // The time chosen is as it was.
         expect(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "true");
 
         fireEvent.change(nameField, { target: { value: "Meera Shah" } });
@@ -1790,7 +1794,7 @@ describe("sign-in at the last step (A9)", () => {
         // Not "the time has gone": the times aren't read again.
         expect(calls.filter((c) => c.url.endsWith("/days"))).toHaveLength(1);
         expect(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "true");
     });
 
@@ -1799,7 +1803,7 @@ describe("sign-in at the last step (A9)", () => {
         serve((url) => {
             if (url.endsWith("/days")) {
                 daysRead += 1;
-                // Read again after the 409: 07:00 has gone.
+                // Read again after the 409: 7:00 am has gone.
                 return json(
                     daysRead === 1
                         ? TWO_STARTS
@@ -1837,11 +1841,11 @@ describe("sign-in at the last step (A9)", () => {
 
         expect(
             await screen.findByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 08:00.",
+                "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am.",
             ),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("radio", { name: "08:00 with Karan Mehta" }),
+            screen.getByRole("radio", { name: "8:00 am with Karan Mehta" }),
         ).toHaveAttribute("aria-checked", "true");
         // Signed in now: booking the next one needs no code.
         expect(

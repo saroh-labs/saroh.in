@@ -11,6 +11,7 @@ import { SignInSheet } from "../account/sign-in-sheet";
 import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
+import { timeWords } from "../lib/clock";
 import { phoneOk, phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { useQrSource } from "../qr-source";
@@ -70,7 +71,6 @@ import {
     payChoices,
     restAfterDeposit,
     rulesText,
-    timeIn,
     unpayableText,
     visitsOf,
     whereText,
@@ -539,7 +539,7 @@ export default function BookingFlow({
           (!chosenStart ? "Pick a time." : !whoOk ? NAME_LEFT : ""));
 
     const whenText = chosenStart
-        ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeIn(chosenStart.startAt, zone)}${
+        ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeWords(chosenStart.startAt, zone)}${
               chosenStart.staffName ? ` with ${chosenStart.staffName}` : ""
           }`
         : "";
@@ -772,7 +772,7 @@ export default function BookingFlow({
             setNotice(
                 keptText({
                     serviceName: service?.name ?? "",
-                    whenText: `${dateText(dateIn(found.startAt, tz), true)} at ${timeIn(found.startAt, tz)}${
+                    whenText: `${dateText(dateIn(found.startAt, tz), true)} at ${timeWords(found.startAt, tz)}${
                         found.staffName ? ` with ${found.staffName}` : ""
                     }`,
                     hadNote: kept.hadNote,

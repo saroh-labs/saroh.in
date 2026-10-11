@@ -110,7 +110,7 @@ describe("On today (G18)", () => {
         });
     }
 
-    it("lists 11:00 Hatha with 3 left, beside the headline", () => {
+    it("lists 11:00 am Hatha with 3 left, beside the headline", () => {
         render(
             <OnTodayHero
                 content={HERO}
@@ -123,8 +123,8 @@ describe("On today (G18)", () => {
             screen.getByRole("heading", { name: "On today" }),
         ).toBeInTheDocument();
         expect(screen.getByText("Fri 18 Sep")).toBeInTheDocument();
-        const hatha = screen.getByRole("link", { name: /11:00.*Hatha/ });
-        expect(hatha).toHaveTextContent("11:00HathaWith Meera3 left");
+        const hatha = screen.getByRole("link", { name: /11:00 am.*Hatha/ });
+        expect(hatha).toHaveTextContent("11:00 amHathaWith Meera3 left");
         expect(
             screen.getByRole("heading", {
                 level: 1,
@@ -133,16 +133,16 @@ describe("On today (G18)", () => {
         ).toBeInTheDocument();
     });
 
-    it("shows the time the booking page offers, 10:15, not a rounded one", () => {
+    it("shows the time the booking page offers, 10:15 am, not a rounded one", () => {
         render(<OnTodayHero content={HERO} today={PULSE} bookHref="/book" />);
         expect(
-            screen.getByRole("link", { name: /10:15.*Personal training/ }),
+            screen.getByRole("link", { name: /10:15 am.*Personal training/ }),
         ).toHaveTextContent("Karan · 45 min");
     });
 
     it("links each time into the booking page with it chosen", () => {
         render(<OnTodayHero content={HERO} today={PULSE} bookHref="/book" />);
-        const link = screen.getByRole("link", { name: /10:15/ });
+        const link = screen.getByRole("link", { name: /10:15 am/ });
         const url = new URL(link.getAttribute("href") ?? "", "https://x.test");
         expect(url.pathname).toBe("/book");
         expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -158,7 +158,7 @@ describe("On today (G18)", () => {
     it("says Full for a class with no places left", () => {
         render(<OnTodayHero content={HERO} today={PULSE} bookHref="/book" />);
         expect(
-            screen.getByRole("link", { name: /18:00.*HIIT/ }),
+            screen.getByRole("link", { name: /6:00 pm.*HIIT/ }),
         ).toHaveTextContent("Full");
     });
 
@@ -249,7 +249,7 @@ describe("On today (G18)", () => {
             expect.anything(),
         );
         expect(
-            await screen.findByRole("link", { name: /11:00.*Hatha/ }),
+            await screen.findByRole("link", { name: /11:00 am.*Hatha/ }),
         ).toBeInTheDocument();
     });
 
@@ -312,7 +312,7 @@ describe("On today (G18)", () => {
             />,
         );
         expect(
-            await screen.findByRole("link", { name: /11:00.*Hatha/ }),
+            await screen.findByRole("link", { name: /11:00 am.*Hatha/ }),
         ).toHaveAttribute(
             "href",
             "/book?service=svc_hatha&date=2026-09-18&start=11%3A00",

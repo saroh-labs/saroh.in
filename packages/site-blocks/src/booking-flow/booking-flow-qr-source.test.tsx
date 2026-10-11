@@ -134,7 +134,7 @@ function openAt(address: string) {
 async function chooseAndPay() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
     fireEvent.click(
-        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" }),
+        await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
     const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });
     if (desk) fireEvent.click(desk);
@@ -195,7 +195,7 @@ describe("the QR code a booking came from", () => {
         );
         fireEvent.click(
             await screen.findByRole("radio", {
-                name: "07:00 with Karan Mehta",
+                name: "7:00 am with Karan Mehta",
             }),
         );
         const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });

@@ -160,7 +160,7 @@ afterEach(() => {
 async function chooseOneToOne() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
     fireEvent.click(
-        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" }),
+        await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
 }
 
@@ -269,7 +269,7 @@ describe("the booking page on a phone", () => {
         );
         // A time is 45px tall already.
         expect(
-            screen.getByRole("radio", { name: "07:00 with Karan Mehta" })
+            screen.getByRole("radio", { name: "7:00 am with Karan Mehta" })
                 .className,
         ).toContain("h-[45px]");
     });
@@ -358,7 +358,7 @@ describe("choosing on the booking page", () => {
         // Other weeks are other times: the one chosen is let go.
         expect(
             await screen.findByRole("radio", {
-                name: "07:00 with Karan Mehta",
+                name: "7:00 am with Karan Mehta",
             }),
         ).toHaveAttribute("aria-checked", "false");
         // The business books 21 days ahead: nothing later than these.
@@ -469,7 +469,7 @@ describe("the booking through a reload", () => {
         serve(() => json(ONE_DAYS));
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
         const seven = await screen.findByRole("radio", {
-            name: "07:00 with Karan Mehta",
+            name: "7:00 am with Karan Mehta",
         });
         await waitFor(() =>
             expect(seven).toHaveAttribute("aria-checked", "true"),
@@ -485,7 +485,7 @@ describe("the booking through a reload", () => {
         );
         expect(
             screen.getAllByText(
-                "We kept what you chose: Personal training, Sun 20 Sep at 07:00 with Karan Mehta. Your note wasn't kept, so add it again if you need to.",
+                "We kept what you chose: Personal training, Sun 20 Sep at 7:00 am with Karan Mehta. Your note wasn't kept, so add it again if you need to.",
             ).length,
         ).toBeGreaterThan(0);
     });
@@ -516,14 +516,14 @@ describe("the booking through a reload", () => {
         );
         render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
         const nine = await screen.findByRole("radio", {
-            name: "09:00 with Karan Mehta",
+            name: "9:00 am with Karan Mehta",
         });
         await waitFor(() =>
             expect(nine).toHaveAttribute("aria-checked", "true"),
         );
         expect(
             screen.getAllByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 09:00.",
+                "That time has gone. We've chosen the next free one: Sun 20 Sep at 9:00 am.",
             ).length,
         ).toBeGreaterThan(0);
     });

@@ -1,5 +1,5 @@
+import { timeWords } from "../lib/clock";
 import type { Result } from "./api";
-import { timeIn } from "./model";
 
 /**
  * A full class's waitlist on the booking page (round-2 A12, R13): the
@@ -122,7 +122,7 @@ export function fullSessionText(
 ): string {
     if (place?.status === "OFFERED") {
         return place.offeredUntil
-            ? `Held for you until ${timeIn(place.offeredUntil, zone)}`
+            ? `Held for you until ${timeWords(place.offeredUntil, zone)}`
             : "Held for you";
     }
     if (place?.placeInLine) {
@@ -163,6 +163,6 @@ export const LEFT_WAITLIST = "You've left the waitlist for that class.";
 /** Signed in, a place turned out to be held for them already. */
 export function heldForYouText(offeredUntil: string | null, zone: string) {
     return offeredUntil
-        ? `A place is held for you until ${timeIn(offeredUntil, zone)}. Book it before then.`
+        ? `A place is held for you until ${timeWords(offeredUntil, zone)}. Book it before then.`
         : "A place is held for you. Book it now.";
 }

@@ -1,8 +1,9 @@
+import { timeRangeWords } from "../../lib/clock";
 import { cn } from "../../lib/utils";
 import type { BusinessReach } from "../../reach-links";
 import { ReachLinks } from "../../reach-links";
 import type { BookingStart } from "../model";
-import { dateIn, dateText, dayParts, placesText, timeIn } from "../model";
+import { dateIn, dateText, dayParts, placesText } from "../model";
 import { focusRing, optionClasses, quietFill } from "../styles";
 import type { WaitlistPlace } from "../waitlist";
 import { fullSessionText } from "../waitlist";
@@ -62,10 +63,9 @@ export function Sessions({
                 const place = full ? waitlist?.placeOf(s.startAt) : undefined;
                 const date = dateIn(s.startAt, zone);
                 const { dow, n } = dayParts(date);
-                const end = timeIn(
-                    new Date(
-                        new Date(s.startAt).getTime() + duration * 60_000,
-                    ).toISOString(),
+                const times = timeRangeWords(
+                    s.startAt,
+                    new Date(s.startAt).getTime() + duration * 60_000,
                     zone,
                 );
                 return (
@@ -96,8 +96,7 @@ export function Sessions({
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block text-[15px] font-semibold">
-                                {timeIn(s.startAt, zone)} to {end} ·{" "}
-                                {dateText(date)}
+                                {times} · {dateText(date)}
                             </span>
                             {s.staffName ? (
                                 <span className="text-site-body mt-0.5 block text-[13px]">

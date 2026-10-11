@@ -174,7 +174,7 @@ export function clearBookingDraft(): void {
  */
 export function keptText(input: {
     serviceName: string;
-    /** "Sun 20 Sep at 07:00 with Karan Mehta", or "" with no time chosen. */
+    /** "Sun 20 Sep at 7:00 am with Karan Mehta", or "" with no time chosen. */
     whenText: string;
     hadNote: boolean;
 }): string {

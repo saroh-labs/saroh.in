@@ -112,7 +112,7 @@ describe("the words", () => {
                 timezone: "Asia/Kolkata",
                 state: "booked",
             }),
-        ).toEqual({ title: "Visit 2 · Mon 5 Oct, 10:00", state: "Booked" });
+        ).toEqual({ title: "Visit 2 · Mon 5 Oct, 10:00 am", state: "Booked" });
         expect(
             visitLine({
                 number: 3,
@@ -299,7 +299,7 @@ describe("Track", () => {
         );
         expect(screen.getByText("Root canal · visits")).toBeInTheDocument();
         expect(
-            screen.getByText("Visit 1 · Thu 8 Oct, 10:00"),
+            screen.getByText("Visit 1 · Thu 8 Oct, 10:00 am"),
         ).toBeInTheDocument();
         expect(screen.getByText("To book")).toBeInTheDocument();
         expect(

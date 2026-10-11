@@ -183,7 +183,9 @@ function account(over: Partial<BookingAccount> = {}): BookingAccount {
 async function pickSession() {
     fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
     fireEvent.click(
-        await screen.findByRole("radio", { name: /18:30.*4 places left/ }),
+        await screen.findByRole("radio", {
+            name: /6:30 to 7:15 pm.*4 places left/,
+        }),
     );
 }
 
@@ -374,7 +376,9 @@ describe("a class credit online (A10)", () => {
         expect(credit).toHaveBeenCalledTimes(2);
         // The time is still chosen, and paying is back to the other ways.
         expect(
-            screen.getByRole("radio", { name: /18:30.*4 places left/ }),
+            screen.getByRole("radio", {
+                name: /6:30 to 7:15 pm.*4 places left/,
+            }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByRole("radio", { name: /Pay ₹500 for this class/ }),
