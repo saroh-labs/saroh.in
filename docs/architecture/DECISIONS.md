@@ -1638,3 +1638,25 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Retention and erasure are unchanged, because there is none for a report: no job deletes `BusinessReport` rows, a report is kept when its business is deleted (DEC-121), and it is in no data export or privacy-removal plan (it is reachable from neither `Contact` nor `Customer`). So the number is kept exactly as long as the email already was. Open, for the owner: how long a report, and the email and number on it, should be kept.
 - What Privacy still says (`apps/saroh.in/content/privacy.ts`; legal text, not changed here): it does not mention a report at all. "What we collect" has no row for a report's email and mobile number. Its "Account" row names a phone, but for Saroh's own users, to sign in. Its "Messages" row covers "What you write to contact@saroh.in", which a report is not. "How long we keep it" has no row for a report. Nothing in it calls the email optional, so no sentence is now false; the page is silent where the form now requires two personal details from someone who need not have an account.
 - A session recording masks what is typed (every input, by the recorder's own rule, DEC-125); the form's thanks says none of it back.
+
+## DEC-139 A business's own domain is paused, not removed, when its plan stops including one
+
+**Status: Accepted — 2026-10-12** · owner (closes the first open question on #862)
+
+- Context: connecting your own domain belongs to a paid plan. Nothing said what happens to the domain when a business moves to a plan without it.
+- The business is told before the paid period ends, in the app and by email, that the domain will stop on a named day.
+- For 3 days after the plan ends the domain still shows the site, and the notice stays up.
+- After the 3 days the domain is paused: it stops showing the site and sends a visitor on to the business's Saroh address, so the business's customers can still reach it. The connection is kept: its DNS check, its certificate and its record with the host.
+- When the business is on a plan with a domain again, the domain shows the site again at once. Nobody reconnects anything. A business that goes back to the free plan does not have to remove its domain first.
+- This follows how a downgrade already treats everything else (DEC-131): things pause and come back, and nothing is deleted. Removing the domain would make the business that returns redo its DNS and wait for a certificate.
+- It applies only while plan enforcement is on (`PLAN_ENFORCEMENT`), as every plan rule does (DEC-136).
+
+## DEC-140 A bare domain is connected through `www` for now, and by two records later
+
+**Status: Accepted — 2026-10-12** · owner (closes the second and third open questions on #862)
+
+- Context: a business connects its domain with a CNAME record, and many providers do not allow one on a bare domain (`example.com`). This will come up often.
+- Now: the business connects `www.example.com`, and the connect steps guide it to forward the bare domain to `www` at its provider. Where a provider can point a bare domain the way a CNAME does (an ALIAS or flattened record), the bare domain is accepted as it is. The daily re-check says when a bare domain is not forwarding.
+- Known weakness: some providers forward only `http://`, so `https://example.com` warns until the visitor uses `www`.
+- Later, if this keeps coming up: every business adds two records, one for the bare domain and one for `www`, which works at every provider. That needs a forwarding service of Saroh's own on an address that never changes. How it would be built is worked out before it is started.
+- Merchant sites stay on the host's free plan for now. The paid plan for the merchant-site domain is looked at again at about 40 to 50 paying businesses, with real traffic from India to measure (amends DEC-107's open question).
