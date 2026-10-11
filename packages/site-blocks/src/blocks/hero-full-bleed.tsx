@@ -9,6 +9,8 @@ import { siteImage } from "../lib/site-image";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 import { CtaButton } from "./cta";
+import { HeroHeading } from "./hero-heading";
+import type { HeroLevel } from "./hero-level";
 
 /**
  * The hero's `fullBleed` look (industry templates U2): the photo fills the
@@ -43,8 +45,11 @@ export default function FullBleedHero({
     visit,
     now,
     priority = false,
+    level = 1,
 }: {
     content: RenderedHero;
+    /** `1` for the page's first hero, `2` for any later one (`hero.tsx`). */
+    level?: HeroLevel;
     /** The page opens on this hero: its photo is fetched first. */
     priority?: boolean;
     /** The live site, for the open line's read. See `SectionRenderer`. */
@@ -76,6 +81,9 @@ export default function FullBleedHero({
     return (
         <section
             data-hero-look="fullBleed"
+            // It paints its own ground (`site-craft.ts`): the section
+            // after it starts a full padding down.
+            data-site-ground="photo"
             className="bg-site-fg text-site-bg relative isolate flex min-h-[min(88vh,760px)] w-full items-end overflow-hidden [[data-site-first-hero]_&]:pt-24"
         >
             {src ? (
@@ -114,9 +122,12 @@ export default function FullBleedHero({
                             {openStateText(status)}
                         </p>
                     ) : null}
-                    <h1 className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(var(--site-display-size,76px)*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]">
+                    <HeroHeading
+                        level={level}
+                        className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(var(--site-display-size,76px)*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
+                    >
                         {content.heading}
-                    </h1>
+                    </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-4 max-w-[46ch] text-pretty text-base leading-[1.55] opacity-90 sm:text-lg">
                             {content.subheading}

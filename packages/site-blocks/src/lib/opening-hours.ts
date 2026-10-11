@@ -123,6 +123,15 @@ function zoneFormat(timeZone: string): Intl.DateTimeFormat {
     });
 }
 
+/**
+ * Today's weekday on the business's wall clock: the day a week of hours
+ * marks as today. The same clock `openState` reads, so the two never
+ * disagree about which day it is; an unknown zone reads as India, as there.
+ */
+export function weekdayIn(now: Date, timeZone: string): Weekday {
+    return wallClock(now, timeZone).day;
+}
+
 /** A `YYYY-MM-DD` moved by whole days, read as a calendar date (no zone). */
 function addDays(date: string, by: number): string {
     const d = new Date(`${date}T12:00:00Z`);

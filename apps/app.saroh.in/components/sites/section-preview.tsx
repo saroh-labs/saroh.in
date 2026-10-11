@@ -232,6 +232,8 @@ export function DraftPreview({
                         // block's own default (production) applies.
                         apiUrl={env.NEXT_PUBLIC_API_URL}
                         modulePage={top !== null}
+                        // For a closing band whose content gives no heading.
+                        siteName={chrome?.name}
                     />
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
@@ -268,7 +270,12 @@ export function DraftPreview({
     // the site's name (G17). A Free site's "Made with Saroh" is drawn by the
     // live site alone (DEC-102), which reads the plan.
     const footer = chrome ? (
-        <SiteFooter footer={chrome.footer} name={chrome.name} />
+        <SiteFooter
+            footer={chrome.footer}
+            name={chrome.name}
+            // The menu again at the foot, as the live site lists it.
+            navigation={chrome.navigation}
+        />
     ) : null;
 
     return (

@@ -90,6 +90,7 @@ export default async function PreviewPage({
             plans={plans}
             packs={packs}
             productGrids={productGrids}
+            siteName={preview.snapshot.site.name}
         />
     );
 }

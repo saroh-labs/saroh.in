@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useId, useState, useSyncExternalStore } from "react";
+import {
+    useEffect,
+    useId,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
+
+import type { SitePrimaryKind } from "./site-primary-action";
 import { trimTrailingSlashes } from "./url-path";
 
 /**
@@ -22,10 +30,18 @@ export interface SiteNavItem {
     kind?: string;
 }
 
-/** The header's one main button: "Book" or "Order", or nothing. */
+/**
+ * The header's one main button: "Book", "Order" or "Contact us", or
+ * nothing (`sitePrimaryAction`).
+ */
 export interface SiteHeaderAction {
     label: string;
     href: string;
+    /**
+     * Which action it is, when the rule chose it: the menu then leaves out
+     * that module's page wherever the merchant put it.
+     */
+    kind?: SitePrimaryKind;
 }
 
 const noSubscribe = () => () => undefined;
@@ -168,8 +184,21 @@ export function useShownInPageItems<T extends SiteNavItem>(items: T[]): T[] {
 }
 
 /**
+ * How the chrome's controls move: short, and on one curve that starts fast
+ * and settles, so a press answers at once. Colour, opacity and transform
+ * only. Literal strings, so Tailwind finds them.
+ */
+const MOVES =
+    "transition-[color,background-color,border-color,opacity,transform] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)]";
+
+/**
  * The menu as a row of pills, from 820px up. The page you are on is the
  * filled pill, and says so to a screen reader with `aria-current`.
+ *
+ * A menu too long for the row scrolls sideways inside it rather than
+ * pushing the bag, the account and the main button off the edge: every
+ * entry stays a Tab away, and focus brings it into view. The row's own
+ * padding keeps a focus ring from being clipped.
  */
 export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
     const current = useCurrentPath();
@@ -178,7 +207,7 @@ export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
     return (
         <nav
             aria-label="Site"
-            className="ml-2.5 hidden min-w-0 items-center gap-0.5 min-[820px]:flex"
+            className="-my-1 ml-1.5 hidden min-w-0 flex-[0_4_auto] items-center gap-0.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] min-[820px]:flex min-[820px]:min-w-[10rem] [&::-webkit-scrollbar]:hidden"
         >
             {items.map((item) => {
                 const on = isCurrent(item.href, current);
@@ -188,12 +217,12 @@ export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
                         href={item.href}
                         aria-current={on ? "page" : undefined}
                         className={
-                            "focus-visible:ring-site-accent coarse:min-h-11 inline-flex h-[34px] shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 " +
+                            `focus-visible:ring-site-accent coarse:min-h-11 inline-flex h-[34px] shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 ${MOVES} ` +
                             (on
                                 ? "bg-site-fg text-site-bg active:opacity-80"
                                 : // Over a full-bleed hero's photo (U2), the page's
                                   // paper, as the header's name.
-                                  "text-site-body hover:bg-site-border/40 hover:text-site-fg active:bg-site-border/70 [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:hover:bg-site-bg/15")
+                                  "text-site-body hover:bg-site-border/40 hover:text-site-fg active:bg-site-border/70 [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:hover:bg-site-bg/15 [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg")
                         }
                     >
                         {item.label}
@@ -205,12 +234,40 @@ export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
 }
 
 /**
- * Below 820px: a menu button, and under the header a list of the pages with
- * the main button full-width at its foot.
+ * The header's main button at the desk. Drawn here, in the browser's half,
+ * for one reason: on the page it opens it says so (`aria-current`), since
+ * the menu no longer holds an entry for that page to say it.
+ */
+export function SiteActionLink({ action }: { action: SiteHeaderAction }) {
+    const current = useCurrentPath();
+    return (
+        <Link
+            href={action.href}
+            aria-current={isCurrent(action.href, current) ? "page" : undefined}
+            className={`bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg coarse:min-h-11 [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-offset-site-fg hidden h-10 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-[var(--site-radius)] px-4 text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98] active:opacity-80 min-[820px]:inline-flex ${MOVES}`}
+        >
+            {action.label}
+        </Link>
+    );
+}
+
+/** What Tab moves between inside the open menu. */
+const FOCUSABLE = "a[href], button:not([disabled])";
+
+/**
+ * Below 820px: a menu button, and under the header a panel of the pages
+ * with the main button full-width at its foot.
  *
- * The list closes when an entry is chosen, on Escape, and on any navigation,
- * back and forward included: it remembers the path it was opened on and is
- * only open while that is still the path.
+ * The panel closes when an entry is chosen, on Escape (focus goes back to
+ * the button), on a press anywhere outside it, and on any navigation, back
+ * and forward included: it remembers the path it was opened on and is only
+ * open while that is still the path.
+ *
+ * While it is open, Tab moves between the button and the panel's entries
+ * and nowhere else, so a keyboard never wanders onto the page underneath;
+ * the page is dimmed by the site's own ink. A menu taller than the screen
+ * scrolls inside the panel, so every entry can be reached. The bag and the
+ * account stay where they were in the row above.
  */
 export function SiteMenu({
     items: all,
@@ -227,22 +284,66 @@ export function SiteMenu({
     );
     const open = openedOn !== undefined && openedOn === pathname;
     const listId = useId();
+    const button = useRef<HTMLButtonElement>(null);
+    const panel = useRef<HTMLElement>(null);
     const close = () => setOpenedOn(undefined);
+
+    useEffect(() => {
+        if (!open) return;
+        const within = (target: EventTarget | null) =>
+            target instanceof Node &&
+            (button.current?.contains(target) === true ||
+                panel.current?.contains(target) === true);
+        const onPress = (e: Event) => {
+            if (!within(e.target)) setOpenedOn(undefined);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setOpenedOn(undefined);
+                button.current?.focus();
+                return;
+            }
+            if (e.key !== "Tab") return;
+            const stops = [
+                button.current,
+                ...Array.from(
+                    panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ??
+                        [],
+                ),
+            ].filter((el): el is HTMLElement => el !== null);
+            if (stops.length === 0) return;
+            const at = stops.indexOf(document.activeElement as HTMLElement);
+            const next = e.shiftKey
+                ? at <= 0
+                    ? stops.length - 1
+                    : at - 1
+                : at < 0 || at === stops.length - 1
+                  ? 0
+                  : at + 1;
+            e.preventDefault();
+            stops[next]?.focus();
+        };
+        document.addEventListener("pointerdown", onPress);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("pointerdown", onPress);
+            document.removeEventListener("keydown", onKey);
+        };
+    }, [open]);
+
     // Every entry gone and no main button: no menu to open.
     if (items.length === 0 && action === null) return null;
 
     return (
         <>
             <button
+                ref={button}
                 type="button"
                 aria-label="Menu"
                 aria-expanded={open}
                 aria-controls={listId}
                 onClick={() => setOpenedOn(open ? undefined : pathname)}
-                onKeyDown={(e) => {
-                    if (e.key === "Escape") close();
-                }}
-                className="border-site-border bg-site-surface text-site-fg focus-visible:ring-site-accent coarse:size-11 hover:bg-site-border/40 active:bg-site-border/70 aria-expanded:bg-site-border/40 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-[var(--site-radius)] border transition-colors focus-visible:outline-none focus-visible:ring-2 min-[820px]:hidden"
+                className={`border-site-border bg-site-surface text-site-fg focus-visible:ring-site-accent hover:bg-site-border/40 active:bg-site-border/70 aria-expanded:bg-site-border/40 [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-[var(--site-radius)] border focus-visible:outline-none focus-visible:ring-2 active:scale-[0.96] min-[820px]:hidden ${MOVES}`}
             >
                 <svg
                     width="18"
@@ -252,7 +353,12 @@ export function SiteMenu({
                     aria-hidden="true"
                 >
                     <path
-                        d="M4 7 H20 M4 12 H20 M4 17 H20"
+                        // Three lines; a cross while the panel is open.
+                        d={
+                            open
+                                ? "M6 6 L18 18 M18 6 L6 18"
+                                : "M4 7 H20 M4 12 H20 M4 17 H20"
+                        }
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
@@ -260,44 +366,108 @@ export function SiteMenu({
                 </svg>
             </button>
             {open ? (
-                <nav
-                    id={listId}
-                    aria-label="Site"
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") close();
-                    }}
-                    className="border-site-border bg-site-bg absolute inset-x-0 top-full grid gap-0.5 border-b border-t px-3 pb-3.5 pt-2 min-[820px]:hidden"
-                >
-                    {items.map((item) => {
-                        const on = isCurrent(item.href, current);
-                        return (
+                <>
+                    {/* The page under the menu, dimmed in the site's own
+                        ink. A press on it closes the menu (the listener
+                        above); it holds nothing to read or focus. */}
+                    <div
+                        aria-hidden="true"
+                        data-site-menu-scrim=""
+                        className="bg-site-fg/30 absolute inset-x-0 top-full h-[100dvh] min-[820px]:hidden"
+                    />
+                    <nav
+                        ref={panel}
+                        id={listId}
+                        aria-label="Site"
+                        data-site-menu-panel=""
+                        className="border-site-border bg-site-bg absolute inset-x-0 top-full grid max-h-[calc(100dvh-5rem)] gap-0.5 overflow-y-auto overscroll-contain border-b border-t px-3 pb-3.5 pt-2 min-[820px]:hidden"
+                    >
+                        {items.map((item) => {
+                            const on = isCurrent(item.href, current);
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    onClick={close}
+                                    aria-current={on ? "page" : undefined}
+                                    className={
+                                        `text-site-fg focus-visible:ring-site-accent active:bg-site-border/70 flex min-h-12 cursor-pointer items-center rounded-[var(--site-radius)] px-3 py-2 text-left text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${MOVES} ` +
+                                        (on
+                                            ? "bg-site-border/40 font-bold"
+                                            : "hover:bg-site-border/25 font-medium")
+                                    }
+                                >
+                                    {item.label}
+                                </Link>
+                            );
+                        })}
+                        {action ? (
                             <Link
-                                key={item.href}
-                                href={item.href}
+                                href={action.href}
                                 onClick={close}
-                                aria-current={on ? "page" : undefined}
-                                className={
-                                    "text-site-fg focus-visible:ring-site-accent active:bg-site-border/70 flex h-[46px] cursor-pointer items-center rounded-[var(--site-radius)] px-3 text-left text-base transition-colors focus-visible:outline-none focus-visible:ring-2 " +
-                                    (on
-                                        ? "bg-site-border/40 font-bold"
-                                        : "hover:bg-site-border/25 font-medium")
+                                aria-current={
+                                    isCurrent(action.href, current)
+                                        ? "page"
+                                        : undefined
                                 }
+                                className={`bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg mt-2 flex h-12 w-full cursor-pointer items-center justify-center rounded-[var(--site-radius)] text-[15px] font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.99] active:opacity-80 ${MOVES}`}
                             >
-                                {item.label}
+                                {action.label}
                             </Link>
-                        );
-                    })}
-                    {action ? (
-                        <Link
-                            href={action.href}
-                            onClick={close}
-                            className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg mt-2 flex h-12 w-full cursor-pointer items-center justify-center rounded-[var(--site-radius)] text-[15px] font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-80"
-                        >
-                            {action.label}
-                        </Link>
-                    ) : null}
-                </nav>
+                        ) : null}
+                    </nav>
+                </>
             ) : null}
         </>
+    );
+}
+
+/**
+ * The site's menu again at the foot of the page, as a list. Every page is
+ * here, the one the header's main button opens included: the footer is
+ * where someone looks for a page by name, not a second ask.
+ *
+ * In the browser's half for the same reason the header's row is: an entry
+ * that jumps to a section showing nothing leaves (`useShownInPageItems`).
+ * With no entry left it draws nothing, its heading included.
+ */
+export function SiteFooterMenu({
+    items: all,
+    heading,
+    headingClassName,
+    linkClassName,
+}: {
+    items: SiteNavItem[];
+    heading: string;
+    headingClassName: string;
+    linkClassName: string;
+}) {
+    const current = useCurrentPath();
+    const items = useShownInPageItems(all);
+    const headingId = useId();
+    if (items.length === 0) return null;
+    return (
+        <nav aria-labelledby={headingId} data-site-footer-menu="">
+            <h2 id={headingId} className={headingClassName}>
+                {heading}
+            </h2>
+            <ul className="m-0 grid list-none gap-0.5 p-0">
+                {items.map((item) => (
+                    <li key={item.href}>
+                        <Link
+                            href={item.href}
+                            aria-current={
+                                isCurrent(item.href, current)
+                                    ? "page"
+                                    : undefined
+                            }
+                            className={linkClassName}
+                        >
+                            {item.label}
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </nav>
     );
 }

@@ -267,7 +267,14 @@ export default async function SiteLayout({
         catalogueFailed:
             catalogue?.ok === false && catalogue.reason === "unavailable",
     });
-    const action = headerAction({ booking, shopServes });
+    // The site's one primary action: Book, else Order, else its contact
+    // page (`sitePrimaryAction`). The menu beside it leaves that page out.
+    const action = headerAction({
+        booking,
+        shopServes,
+        pages: snapshot.pages,
+        modules: resolved.modules,
+    });
 
     /*
      * The bag (G13), only where the site takes an online order now: the
@@ -398,6 +405,11 @@ export default async function SiteLayout({
                             // off (G15).
                             modules={resolved.modules}
                             action={action}
+                            // The business's mark beside its name: the
+                            // site's own icon, else its logo (DEC-124),
+                            // as the site read resolved it. Neither: the
+                            // name alone.
+                            logo={resolved.icon}
                             // A Shop entry in the menu while /shop serves (P4).
                             shopServes={shopServes}
                             account={account}
@@ -408,12 +420,24 @@ export default async function SiteLayout({
                         <SiteFooter
                             footer={snapshot.site.footer}
                             name={snapshot.site.name}
+                            // The header's own menu, listed again at the
+                            // foot with every page in it.
+                            navigation={navigation}
+                            modules={resolved.modules}
+                            shopServes={shopServes}
                             contact={{
                                 phone: contact?.phone ?? null,
                                 email: contact?.email ?? null,
                                 address: null,
                                 places: contact?.places ?? [],
                                 social: contact?.social ?? [],
+                                // Today is marked on the business's own
+                                // clock (DEC-033). The contact read names
+                                // no zone; the booking page's does, and
+                                // without one the footer reads India.
+                                timeZone: booking?.ok
+                                    ? booking.page.timezone
+                                    : null,
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
                             // "Report" rides with it: no Saroh link on a
