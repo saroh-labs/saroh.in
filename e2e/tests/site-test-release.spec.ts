@@ -255,7 +255,7 @@ test.describe("flows stop short on a test release (T6)", () => {
             .getByRole("radio", { name: /Warehouse walkthrough/ })
             .click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-            hasText: /^\d{2}:\d{2}$/,
+            hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
         await times.first().click();

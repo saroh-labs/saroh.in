@@ -153,7 +153,7 @@ test.describe("site sign-in: in the browser", () => {
         );
         await openDays.nth(day).click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-            hasText: /^\d{2}:\d{2}$/,
+            hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
         await expect(times.nth(nth)).toBeVisible({ timeout: 15_000 });
         await times.nth(nth).click();

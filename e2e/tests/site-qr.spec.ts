@@ -228,7 +228,7 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         const times = phone.locator(
             '[role="radiogroup"] button[role="radio"]',
             {
-                hasText: /^\d{2}:\d{2}$/,
+                hasText: /^\d{1,2}:\d{2} [ap]m$/,
             },
         );
         await expect(times.first()).toBeVisible({ timeout: 15_000 });

@@ -86,7 +86,7 @@ async function pickTime(
     expect(count, "open days on the walkthrough").toBeGreaterThan(8);
     await openDays.nth(count - fromEnd).click();
     const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-        hasText: /^\d{2}:\d{2}$/,
+        hasText: /^\d{1,2}:\d{2} [ap]m$/,
     });
     await expect(times.first()).toBeVisible({ timeout: 15_000 });
     const time = times.first();
@@ -343,7 +343,7 @@ test.describe("the booking page", () => {
             page.getByRole("heading", { name: /to confirm your place$/ }),
         ).toBeVisible();
         await expect(
-            page.getByText(/held for you until \d{2}:\d{2}/),
+            page.getByText(/held for you until \d{1,2}:\d{2} [ap]m/),
         ).toBeVisible();
 
         // Everyone else, meanwhile, is no longer offered that time.
@@ -378,7 +378,7 @@ test.describe("the booking page", () => {
         // Released: its token is cleared with its draft invoice, and the
         // time is offered again.
         expect(after.status()).toBe(404);
-        expect(label).toMatch(/^\d{2}:\d{2}$/);
+        expect(label).toMatch(/^\d{1,2}:\d{2} [ap]m$/);
         const again = await page.request.get(
             `${urls.API_URL}/public/services/${serviceId}/days`,
         );
