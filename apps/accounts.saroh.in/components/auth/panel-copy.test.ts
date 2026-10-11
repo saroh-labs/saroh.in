@@ -67,12 +67,16 @@ describe("the sign-up panel", () => {
         expect(copy.SIGNUP_PANEL.heading).toBe(copy.PROMISE);
     });
 
-    it("gives the plan in three steps, starting on the first", () => {
+    // The same four strings setup's stepper is pinned to
+    // (`apps/app.saroh.in/lib/organizations/setup-steps.test.ts`).
+    it("gives the plan in four steps, starting on the first", () => {
         expect(copy.SIGNUP_PANEL.steps).toEqual([
             "Make your account",
-            "Name your business",
+            "Say what you are setting up",
+            "Give it a name and a web address",
             "Pick what to do first",
         ]);
+        expect(copy.SIGNUP_PANEL.body).toMatch(/^Four short steps and /);
         expect(copy.SIGNUP_PANEL.currentStep).toBe(1);
         expect(copy.VERIFY_PANEL.steps).toEqual(copy.SIGNUP_PANEL.steps);
     });
@@ -94,12 +98,12 @@ describe("the sign-up panel", () => {
 });
 
 describe("codeNext: what the code step says comes after the code", () => {
-    it("says a new account names its business next", () => {
+    it("says a new account sets its business up next", () => {
         expect(copy.codeNext(null, "sign-up")).toBe(
-            "Next, you name your business.",
+            "Next, you set up your business.",
         );
         expect(copy.codeNext(`${APP}/onboarding?plan=grow`, "sign-up")).toBe(
-            "Next, you name your business.",
+            "Next, you set up your business.",
         );
     });
 

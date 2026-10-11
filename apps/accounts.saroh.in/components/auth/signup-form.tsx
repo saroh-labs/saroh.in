@@ -114,7 +114,7 @@ export function SignupForm({
                 blurb={
                     joining
                         ? "No password. We email you a code, and then you join the business that invited you."
-                        : "No password. We email you a code, and then you name your business."
+                        : "No password. We email you a code, and then you set up your business."
                 }
             />
             <form onSubmit={handleSubmit} noValidate>

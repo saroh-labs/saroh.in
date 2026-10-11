@@ -2,6 +2,7 @@ import {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "@saroh/auth/constants";
+import { SETUP_PLAN, SETUP_PLAN_COUNT_WORDS } from "@saroh/ui/lib/setup-plan";
 
 import { isJoining } from "@/lib/joining";
 
@@ -17,8 +18,10 @@ import { isJoining } from "@/lib/joining";
  *
  * Every line has to be TRUE:
  *
- * - The plan's three steps are real. The account is made here, and setup's
- *   one screen names the business and picks what to do first.
+ * - The plan's four steps are real. The account is made here, and setup
+ *   asks its three questions one at a time: what is being set up, its name
+ *   and web address, and what to do first. The list is `SETUP_PLAN` in
+ *   `@saroh/ui`, which setup's own stepper is built from.
  * - Signing up and signing in take a code sent to the address, and no
  *   password. One can be added from the account page.
  * - Resetting a password signs every other device out
@@ -39,11 +42,7 @@ export const PROMISE =
     "Sell, take bookings, bill and run your website in one place.";
 
 /** The plan from nothing to working, in the order it happens. */
-export const PLAN_STEPS = [
-    "Make your account",
-    "Name your business",
-    "Pick what to do first",
-];
+export const PLAN_STEPS: string[] = [...SETUP_PLAN];
 
 export interface PanelCopy {
     eyebrow: string;
@@ -71,7 +70,7 @@ export const LOGIN_PANEL: PanelCopy = {
 export const SIGNUP_PANEL: PanelCopy = {
     eyebrow: "Sign up",
     heading: PROMISE,
-    body: "Three short steps and you are in, with no password to think up. Next, we email you a code to check the address is yours.",
+    body: `${SETUP_PLAN_COUNT_WORDS} and you are in, with no password to think up. Next, we email you a code to check the address is yours.`,
     steps: PLAN_STEPS,
     currentStep: 1,
 };
@@ -91,7 +90,7 @@ export const SIGNUP_JOIN_PANEL: PanelCopy = {
 export const VERIFY_PANEL: PanelCopy = {
     eyebrow: "Check your email",
     heading: "One code and your account is ready.",
-    body: `Type the ${VERIFICATION_OTP_LENGTH} digits we emailed you. Next, you name your business.`,
+    body: `Type the ${VERIFICATION_OTP_LENGTH} digits we emailed you. Next, you set up your business.`,
     steps: PLAN_STEPS,
     currentStep: 1,
 };
@@ -129,7 +128,7 @@ export function codeNext(
     if (isJoining(returnTo)) {
         return "Next, you join the business that invited you.";
     }
-    if (settingUp(returnTo, from)) return "Next, you name your business.";
+    if (settingUp(returnTo, from)) return "Next, you set up your business.";
     return returnTo ? "Next, you carry on where you were going." : undefined;
 }
 

@@ -68,7 +68,7 @@ export function CodeStep({
     kind?: CodeKind;
     /** Kept only when the code makes a new account (someone joining). */
     name?: string;
-    /** What happens after the code: "Next, you name your business." */
+    /** What happens after the code: "Next, you set up your business." */
     next?: string;
     /** Under "You're signed in", while the page hands off. */
     doneLine: string;
