@@ -181,6 +181,27 @@ describe("list", () => {
         expect(member.actions).toContain("member:read");
     });
 
+    it("shows the Admin without changing the Saroh plan, and the Owner with it", async () => {
+        const roles = await service().list("org_1");
+        const actionsOf = (key: string) =>
+            roles.find((r) => r.key === key)!.actions;
+        expect(actionsOf("OWNER")).toContain("billing:manage");
+        expect(actionsOf("ADMIN")).not.toContain("billing:manage");
+        expect(actionsOf("ADMIN")).toContain("billing:read");
+    });
+
+    it("lists a made-up role without an owner-only power its row somehow names", async () => {
+        role.findMany!.mockResolvedValue([
+            {
+                ...STOCK_CLERK,
+                actions: ["billing:read", "billing:manage", "org:delete"],
+            },
+        ]);
+        const clerk = (await service().list("org_1")).at(-1)!;
+        expect(clerk.actions).toEqual(["billing:read"]);
+        expect(clerk.grants).toEqual(["billing:read"]);
+    });
+
     it("lists invented roles after the built-ins, with who holds them", async () => {
         role.findMany!.mockResolvedValue([STOCK_CLERK]);
         membership.groupBy!.mockResolvedValue([
@@ -248,6 +269,16 @@ describe("create", () => {
         expect(stored).toEqual(["org:update"]);
     });
 
+    it("never stores changing the Saroh plan: it is the Owner's alone (DEC-131, amended)", async () => {
+        await service().create(OWNER, {
+            label: "Finance",
+            actions: ["billing:read", "billing:manage"],
+        });
+        expect(role.create!.mock.calls[0][0].data.actions).toEqual([
+            "billing:read",
+        ]);
+    });
+
     it("drops unknown and repeated permissions rather than failing the save", async () => {
         await service().create(OWNER, {
             label: "Deputy",
@@ -285,7 +316,7 @@ describe("update", () => {
     it("changes only what was sent, and vets the permissions", async () => {
         stored(STOCK_CLERK);
         await service().update(OWNER, "stock-clerk", {
-            actions: ["order:write", "org:delete"],
+            actions: ["order:write", "org:delete", "billing:manage"],
         });
         expect(role.updateMany).toHaveBeenCalledWith({
             where: { id: "role_1", updatedAt: SAVED_AT },

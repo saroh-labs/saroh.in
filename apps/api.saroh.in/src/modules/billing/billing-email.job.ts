@@ -49,7 +49,7 @@ type Tx = Prisma.TransactionClient;
  * claimed as a `CustomerNotice` once its email has left.
  *
  * Who hears: everyone on the team whose role manages billing
- * (`billing:manage`, the owner and admins by default), in one message.
+ * (`billing:manage`, the owner alone since 2026-10-11), in one message.
  */
 export const BILLING_EMAIL_TYPE = "billing.email";
 

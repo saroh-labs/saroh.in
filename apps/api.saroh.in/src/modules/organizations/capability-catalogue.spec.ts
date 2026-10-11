@@ -71,6 +71,10 @@ describe("capability catalogue", () => {
         // Changing the web address holds an address and moves every shared
         // link (DEC-069): the Owner's alone too.
         expect(grantable).not.toContain("org:address:update");
+        // What the business pays Saroh is the Owner's alone (DEC-131,
+        // amended 2026-10-11). Reading it stays grantable.
+        expect(grantable).not.toContain("billing:manage");
+        expect(grantable).toContain("billing:read");
     });
 
     it("offers everything else", () => {

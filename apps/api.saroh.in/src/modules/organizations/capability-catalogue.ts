@@ -359,6 +359,9 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "money",
         label: "Change the Saroh plan",
         note: "Changes what the business pays.",
+        // The owner's alone (DEC-131, amended 2026-10-11): the plan, add-ons,
+        // a coupon and the payment method are what the business pays Saroh.
+        ownerOnly: true,
     },
 
     // — Messaging —————————————————————————————————————————————
