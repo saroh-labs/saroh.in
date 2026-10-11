@@ -178,6 +178,140 @@ describe("PageHeader", () => {
     });
 });
 
+/**
+ * The actions are level with the title, whatever is under it. Side by side,
+ * Stock and Locations (a description) sat lower than Customers and Discount
+ * codes (none), and a record with a picture sat at the top: three heights
+ * for the same button.
+ */
+describe("PageHeader: the actions are level with the title", () => {
+    const actions = <button type="button">New thing</button>;
+    const cases = [
+        [
+            "a bare title",
+            <PageHeader key="a" title="Customers" actions={actions} />,
+        ],
+        [
+            "a description under it",
+            <PageHeader
+                key="b"
+                title="Stock"
+                description="Hill Road and Online."
+                actions={actions}
+            />,
+        ],
+        [
+            "a description of several lines",
+            <PageHeader
+                key="c"
+                title="Services"
+                description={
+                    <>
+                        <p>One line.</p>
+                        <p>And another.</p>
+                    </>
+                }
+                actions={actions}
+            />,
+        ],
+        [
+            "a picture before it",
+            <PageHeader
+                key="d"
+                title="Priya Raman"
+                lead={<div aria-hidden>PR</div>}
+                description="Since 2024."
+                actions={actions}
+            />,
+        ],
+        [
+            "a count, a badge and a meta figure",
+            <PageHeader
+                key="e"
+                title="Invoices"
+                count="12 invoices"
+                badge={<span>Paid</span>}
+                meta={<span>Owed to you</span>}
+                actions={actions}
+            />,
+        ],
+    ] as const;
+
+    const parts = (container: HTMLElement) => {
+        const side = container.querySelector<HTMLElement>(
+            '[data-slot="page-side"]',
+        );
+        if (!side?.parentElement) throw new Error("no side column");
+        return {
+            row: side.parentElement.className.split(" "),
+            side: side.className.split(" "),
+        };
+    };
+
+    it.each(cases)("with %s", (_name, header) => {
+        const { container } = render(header);
+        const { row, side } = parts(container);
+        // Title block and side column both start at the row's top...
+        expect(row).toContain("sm:items-start");
+        // ...never on the description's last line, never the row's middle.
+        expect(row).not.toContain("sm:items-end");
+        expect(row).not.toContain("sm:items-center");
+        // ...and the buttons are centred on the title's first line.
+        expect(side).toEqual(
+            expect.arrayContaining(["sm:-mt-[2.5px]", "sm:min-h-[38px]"]),
+        );
+        expect(side).toContain("items-center");
+    });
+
+    it("draws every case the same way: one alignment, not one per slot", () => {
+        const seen = new Set(
+            cases.map(([, header]) => {
+                const { container, unmount } = render(header);
+                const { row, side } = parts(container);
+                unmount();
+                return `${row.join(" ")} | ${side.join(" ")}`;
+            }),
+        );
+        expect(seen.size).toBe(1);
+    });
+
+    it("lifts the side column by half the gap between a button and the title's line", () => {
+        const { container } = render(
+            <PageHeader title="Orders" actions={actions} />,
+        );
+        const h1 = screen.getByRole("heading", { level: 1 }).className;
+        const size = Number(/text-\[(\d+)px\]/.exec(h1)?.[1]);
+        const leading = Number(/leading-\[([\d.]+)\]/.exec(h1)?.[1]);
+        const { side } = parts(container);
+        const button = Number(/sm:min-h-\[(\d+)px\]/.exec(side.join(" "))?.[1]);
+        const lift = Number(/sm:-mt-\[([\d.]+)px\]/.exec(side.join(" "))?.[1]);
+        // 30px at 1.1 is a 33px line; a default button is 38px.
+        expect(size * leading).toBeCloseTo(33);
+        expect(button).toBe(38);
+        // Both start at the top, so the button's middle (19px) is brought
+        // to the title line's (16.5px) by lifting it 2.5px.
+        expect(lift).toBeCloseTo((button - size * leading) / 2);
+        expect(button / 2 - lift).toBeCloseTo((size * leading) / 2);
+    });
+
+    it("stacks under the title on a phone, where nothing is lifted", () => {
+        const { container } = render(
+            <PageHeader title="Orders" actions={actions} />,
+        );
+        const { row, side } = parts(container);
+        expect(row).toEqual(
+            expect.arrayContaining(["flex-col", "sm:flex-row"]),
+        );
+        // Only `sm:` variants move it: no bare negative margin.
+        expect(side.filter((c) => c.startsWith("-mt-"))).toEqual([]);
+    });
+
+    it("draws no side column when there is nothing for it", () => {
+        const { container } = render(<PageHeader title="Orders" />);
+        expect(container.querySelector('[data-slot="page-side"]')).toBeNull();
+    });
+});
+
 describe("countLabel", () => {
     const noun = { one: "booking", other: "bookings" };
 
