@@ -61,9 +61,10 @@ import { requireSession } from "@/lib/session";
  * Not found while plans aren't shown (DEC-136): the segment's layout
  * answers first, and the page says so too.
  */
-export function generateMetadata() {
-    return plansShown() ? { title: "Plan and billing" } : {};
-}
+// Always named. While plans aren't shown the address is not-found, and
+// the not-found page's own title replaces this one; a tab never falls back
+// to the bare "Saroh".
+export const metadata = { title: "Plan and billing · Settings" };
 
 const DENIED = (
     <PermissionDeniedState {...whoCanChange({ thing: "Plan and billing" })} />

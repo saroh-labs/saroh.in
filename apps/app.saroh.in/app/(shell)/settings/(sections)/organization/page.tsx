@@ -14,7 +14,10 @@ import {
 import { SettingsColumns } from "@/components/shared/settings-columns";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
+import {
+    activeOrganizationOnce,
+    resolveActiveOrganization,
+} from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
 import { readWebAddress } from "@/lib/organizations/web-address-service";
@@ -45,8 +48,11 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  * is where that is changed.
  */
 export async function generateMetadata() {
-    const organization = await resolveActiveOrganization();
-    return { title: kindWords(organization?.kind).settingsTab };
+    // The shell's own read of the business, so the title costs no call.
+    const organization = await activeOrganizationOnce().catch(() => null);
+    return {
+        title: `${kindWords(organization?.kind).settingsTab} · Settings`,
+    };
 }
 
 export default async function OrganizationSettingsPage() {

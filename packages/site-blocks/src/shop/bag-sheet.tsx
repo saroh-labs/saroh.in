@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
-import { focusRing, inputFill, optionClasses } from "../booking-flow/styles";
+import {
+    focusRing,
+    inputFill,
+    optionClasses,
+    quietFill,
+} from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type {
@@ -518,9 +523,11 @@ export function BagSheet({
                 </p>
             ) : null}
             {quote ? (
-                <div className="mt-2 flex gap-2.5 text-base">
+                <div className="mt-2.5 flex items-baseline gap-2.5 text-base">
                     <span className="flex-1 font-semibold">Total</span>
-                    <span className="font-semibold tabular-nums">{total}</span>
+                    <span className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale,1))] font-semibold tabular-nums tracking-[-0.01em]">
+                        {total}
+                    </span>
                 </div>
             ) : null}
             <button
@@ -558,9 +565,41 @@ export function BagSheet({
                 </div>
             ) : null}
             {load.kind === "loading" ? (
-                <p role="status" className="text-site-muted mt-3 text-sm">
-                    Checking prices…
-                </p>
+                // The bag's own shape while its prices are asked for: the
+                // sheet opens at the height it will have, not on one line
+                // that then jumps.
+                <div role="status" data-bag-loading="" className="mt-3">
+                    <p className="text-site-body text-sm">Checking prices…</p>
+                    <div aria-hidden="true" className="mt-3 grid gap-3">
+                        {items.slice(0, 3).map((item) => (
+                            <div
+                                key={`${item.listingId}:${item.variantId ?? ""}`}
+                                className="border-site-border flex gap-3 border-t pt-3"
+                            >
+                                <span
+                                    className={cn(
+                                        "size-14 shrink-0 rounded-[calc(var(--site-radius)+4px)]",
+                                        quietFill,
+                                    )}
+                                />
+                                <span className="grid flex-1 content-start gap-2 pt-1">
+                                    <span
+                                        className={cn(
+                                            "h-3.5 w-3/5 rounded",
+                                            quietFill,
+                                        )}
+                                    />
+                                    <span
+                                        className={cn(
+                                            "h-3 w-1/4 rounded",
+                                            quietFill,
+                                        )}
+                                    />
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ) : null}
 
             {quote ? (

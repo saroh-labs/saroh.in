@@ -17,6 +17,9 @@ import { formatDateTime } from "@/lib/format";
 import { getHealth } from "@/lib/machinery";
 import { requireSession } from "@/lib/session";
 
+// What the menu and the page's own heading call it.
+export const metadata = { title: "Health" };
+
 /**
  * The console's front door: the health board (plan U9), then how the
  * instance is doing in aggregate.

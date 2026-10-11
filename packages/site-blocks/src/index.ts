@@ -148,6 +148,7 @@ export {
     openState,
     openStateText,
     weekSummary,
+    weekdayIn,
 } from "./lib/opening-hours";
 export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
@@ -155,8 +156,8 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 export { formatAmount } from "./lib/money";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
-export { shopFactsLine } from "./lib/shop-facts";
-export type { ShopFactsInput } from "./lib/shop-facts";
+export { shopFactsLine, shopLeadLine } from "./lib/shop-facts";
+export type { ShopFactsInput, ShopLeadInput } from "./lib/shop-facts";
 export { siteImage } from "./lib/site-image";
 export type { ImagePlace, SiteImageProps } from "./lib/site-image";
 export { emailed, reachOrNull, toldText } from "./lib/told";
@@ -496,6 +497,7 @@ export {
     footerLine,
     madeWithSarohHref,
     siteMenu,
+    siteMenuEntries,
     withShopLink,
 } from "./site-chrome";
 export type {
@@ -505,7 +507,24 @@ export type {
     SiteContactPlace,
     SiteCredit,
     SiteFooterContent,
+    SiteHeaderLogo,
 } from "./site-chrome";
+// The one thing a site asks of a visitor: the header's main button, and
+// what a template's hero and closing band agree with. Pure.
+export {
+    SITE_PRIMARY_ACTIONS,
+    SITE_PRIMARY_ORDER,
+    contactPageHref,
+    opensPrimaryAction,
+    sitePrimaryAction,
+    withoutPrimaryAction,
+} from "./site-primary-action";
+export type { SitePrimaryAction, SitePrimaryKind } from "./site-primary-action";
+// A page of the site's own that holds no block (not found, an error).
+export { SitePageMessage } from "./site-page-message";
+// The closing band's words when its content gives none. Pure.
+export { ctaBandWords } from "./blocks/cta-words";
+export type { CtaBandWords } from "./blocks/cta-words";
 // Who a customer is buying from, in the business's own details (DEC-121).
 export {
     SoldByBlock,

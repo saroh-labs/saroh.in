@@ -70,6 +70,7 @@ export function OrderPlacedToPay({
     return (
         <SheetFrame
             title="Order placed"
+            mark="done"
             lead={`Order ${started.orderNumber} · ${total}. ${toPayLead(toPay)} ${businessName} will be in touch when it's ready.`}
             onClose={onClose}
         >
@@ -221,6 +222,7 @@ export function CheckoutPay({
             return (
                 <SheetFrame
                     title="Order placed"
+                    mark="done"
                     lead={`Order ${s.orderNumber} · ${formatAmount(s.total, s.currency)}. ${businessName} will be in touch when it's ready.`}
                     onClose={onClose}
                 >
@@ -294,7 +296,10 @@ export function CheckoutPay({
                 }
                 onClose={onClose}
             >
-                <p role="status" className="text-site-muted mt-3 text-sm">
+                <p
+                    role="status"
+                    className="border-site-border text-site-body mt-4 border-t pt-3 text-sm tabular-nums"
+                >
                     Order {started.orderNumber} · {total}
                 </p>
             </SheetFrame>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { SENT_PANEL } from "@/components/auth/panel-copy";
 
 export const metadata: Metadata = {
-    title: "Check your email · Saroh",
+    title: "Check your email",
     description: "A reset link is on its way.",
 };
 

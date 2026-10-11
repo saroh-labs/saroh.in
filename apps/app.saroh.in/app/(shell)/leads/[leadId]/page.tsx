@@ -32,6 +32,8 @@ import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /** The tab's title (UX-081): without one it read the bare "Saroh". */
+// "Lead", never their name: a tab's title shows in a screen share, in
+// history and in bookmarks (`lib/page-title.ts`).
 export const metadata = { title: "Lead" };
 
 /**

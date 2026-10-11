@@ -2,6 +2,8 @@ import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
+export const metadata = { title: "Order not found" };
+
 /**
  * An order this business does not have — the design's "No order #9999":
  * another business's order, or a mistyped link. Said plainly, with a way back.

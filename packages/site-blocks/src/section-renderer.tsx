@@ -31,6 +31,8 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import type { HeroLevel } from "./blocks/hero-level";
+import { heroLevels } from "./blocks/hero-level";
 import HoursSection from "./blocks/hours";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
@@ -96,8 +98,21 @@ export default function SectionRenderer({
     modulePage = false,
     reach,
     first = false,
+    heroLevel = 1,
+    siteName,
 }: {
     section: Section;
+    /**
+     * Which heading a hero's headline is: `1` for the page's first hero,
+     * `2` for a later one (`hero-level.ts`). A section drawn on its own is
+     * `1`, as every hero was.
+     */
+    heroLevel?: HeroLevel;
+    /**
+     * Whose site this is, for the closing band's heading when its content
+     * gives none (`ctaBandWords`). Absent, the band's words name no one.
+     */
+    siteName?: string | null;
     /**
      * The page's first section: a hero here is what the page opens on, and
      * its photo is fetched first (`lib/site-image.ts`).
@@ -184,6 +199,7 @@ export default function SectionRenderer({
                     today={fixtures?.today}
                     now={now}
                     priority={first}
+                    level={heroLevel}
                 />
             );
         case "richText":
@@ -195,7 +211,10 @@ export default function SectionRenderer({
             );
         case "cta":
             return (
-                <CtaSection content={section.content as RenderedCtaSection} />
+                <CtaSection
+                    content={section.content as RenderedCtaSection}
+                    siteName={siteName}
+                />
             );
         case "gallery":
             return (
@@ -400,8 +419,11 @@ export function PageSections({
     top = null,
     modulePage = top !== null,
     reach,
+    siteName,
 }: {
     sections: Section[];
+    /** Whose site this is, for the closing band's composed heading. */
+    siteName?: string | null;
     /** How to reach the business, for the blocks that offer it. */
     reach?: BusinessReach | null;
     /**
@@ -444,6 +466,19 @@ export function PageSections({
      */
     fixtures?: SiteFixtures;
 }) {
+    const nothing = (i: number) =>
+        sectionRendersNothing(sections[i], {
+            journal,
+            plans,
+            packs,
+            productGrid: productGrids?.[i],
+        });
+    // One h1 a page: the first hero's headline, unless the page already
+    // opens on its own title (a module page's top).
+    const levels = heroLevels(sections, {
+        titled: top !== null,
+        skip: nothing,
+    });
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
@@ -453,16 +488,7 @@ export function PageSections({
                 // no wrapper and so no anchor to jump to. The layout already
                 // left its entry out of the menu, and the header drops one
                 // whose target is missing.
-                if (
-                    sectionRendersNothing(section, {
-                        journal,
-                        plans,
-                        packs,
-                        productGrid: productGrids?.[i],
-                    })
-                ) {
-                    return null;
-                }
+                if (nothing(i)) return null;
                 const style = paddingOverride(section.content);
                 // Close under the page's title, not a section's padding away.
                 const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
@@ -482,6 +508,8 @@ export function PageSections({
                         modulePage={modulePage}
                         reach={reach}
                         first={i === 0}
+                        heroLevel={levels[i]}
+                        siteName={siteName}
                     />
                 );
                 return (

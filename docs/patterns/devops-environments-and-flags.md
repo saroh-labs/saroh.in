@@ -82,6 +82,12 @@ session can't touch production's.
   Rotate by changing the key. The API and the merchant sites are not behind it
   — dev holds no real customers and its payments run in sandbox
   (`CASHFREE_ENV=sandbox`).
+- **In every environment**, `withPrivateApp` (`@saroh/auth/private-app`)
+  wraps it in the workspace's, accounts' and the console's middleware:
+  `withPrivateApp(withDevAccess(…))`, outermost, so every answer the
+  middleware gives, the redirect to sign-in among them, says
+  `X-Robots-Tag: noindex, nofollow` and carries the security headers
+  (`frontend-app-structure.md` → Titles, and staying out of search).
 - `AUTH_COOKIE_PREFIX` names dev's session cookie apart from production's, a
   second guard should the domains ever share a parent.
 - The key lives only in the GitHub environment `cloudflare-development`,

@@ -6,6 +6,8 @@ import { PageContainer } from "@/components/shared/page-container";
 
 import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
 
+export const metadata = { title: "Plan not found" };
+
 /** The design's not-found: said plainly, with the way back to the plans. */
 export default function NotFoundPage() {
     return (

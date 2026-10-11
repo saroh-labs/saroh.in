@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
@@ -22,6 +23,7 @@ import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { productHref, productTabOf } from "@/lib/products/links";
 import {
     getProductOverview,
@@ -43,7 +45,33 @@ import {
     getStockTracking,
 } from "@/lib/stock/service";
 
-export const metadata = { title: "Product" };
+// One read for the tab's title and the page: the business's product, as
+// the storefront in the address sees it or the first that sells it.
+const readOverview = cache(
+    (storefront: string | undefined, productId: string) =>
+        withStorefrontFallback(storefront, (at) =>
+            getProductOverview(at, productId),
+        ),
+);
+
+/** The product's own name in the tab; "Product" when it can't be read. */
+export async function generateMetadata({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ productId: string }>;
+    searchParams: Promise<{ storefront?: string }>;
+}) {
+    const [{ productId }, { storefront }] = await Promise.all([
+        params,
+        searchParams,
+    ]);
+    return recordTitle(
+        () => readOverview(storefront, productId),
+        (overview) => overview.product.name,
+        "Product",
+    );
+}
 
 const ROLE_WORD = {
     OWNER: "Owner",
@@ -110,9 +138,7 @@ export default async function ProductPage({
     // The business's product (#531), as the storefront in the address sees
     // it — or the first that sells it.
     const [read, business, web, paused] = await Promise.all([
-        withStorefrontFallback(query.storefront, (at) =>
-            getProductOverview(at, productId),
-        ),
+        readOverview(query.storefront, productId),
         // The business's Track stock switch (#515). Optional: unknown, the
         // product's own switch decides.
         getStockTracking().catch(() => null),

@@ -33,7 +33,7 @@ import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
  * be true. It is left out when the choice couldn't be read, rather than
  * shown as a choice nobody made.
  */
-export const metadata = { title: "Your profile" };
+export const metadata = { title: "Your profile · Settings" };
 
 export default async function ProfilePage() {
     const { user } = await requireSession();

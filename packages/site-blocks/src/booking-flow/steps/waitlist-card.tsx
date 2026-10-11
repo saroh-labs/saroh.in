@@ -1,6 +1,6 @@
 import { cn } from "../../lib/utils";
 import type { Phase } from "../flow-state";
-import { card, focusRing } from "../styles";
+import { card, quietButton } from "../styles";
 import { ordinal, waitlistReachText, waitlistTerms } from "../waitlist";
 
 /**
@@ -46,18 +46,11 @@ export function WaitlistCard({
                 {waitlistReachText(phase.reach, phase.email)}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    onClick={onAgain}
-                    className={cn(
-                        "border-site-border bg-site-surface text-site-fg h-11 cursor-pointer rounded-[calc(var(--site-radius)+8px)] border px-4 text-sm font-semibold hover:opacity-90 active:opacity-80",
-                        focusRing,
-                    )}
-                >
+                <button type="button" onClick={onAgain} className={quietButton}>
                     Book something else
                 </button>
             </div>
-            <p className="text-site-muted border-site-border mt-4 border-t pt-3.5 text-[12.5px] leading-[1.55]">
+            <p className="text-site-body border-site-border mt-5 border-t pt-4 text-sm leading-[1.55]">
                 {waitlistTerms()}
             </p>
         </div>

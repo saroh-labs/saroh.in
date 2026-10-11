@@ -1,0 +1,11 @@
+# Files Cloudflare serves without running the Worker (everything in this
+# folder, and Next's own under /_next/static) get no header from next.config
+# or the middleware, so they are named here. Keep in step with
+# PRIVATE_APP_HEADERS (packages/auth/src/private-app.ts);
+# `pnpm run check:security-headers` fails when they differ.
+/*
+  X-Robots-Tag: noindex, nofollow
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Content-Type-Options: nosniff

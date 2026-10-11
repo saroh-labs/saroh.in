@@ -43,11 +43,15 @@ export const metadata: Metadata = {
         default: "Saroh",
         template: "%s · Saroh",
     },
-    // "storefronts" appeared nowhere in the UI — the product calls them stores,
-    // and a description that uses a word the app never says is a small lie
-    // search engines repeat. Named for what a merchant does, not for our nouns.
-    description:
-        "Run your business from one place: sell, take bookings, follow up on enquiries, and keep your website in step.",
+    // Inside a business the shell's layout puts its name in the template:
+    // "Orders · Rye & Co. · Saroh" (`lib/page-title.ts`).
+    //
+    // No description: nobody without a session ever gets a page of this app
+    // (they are sent to sign in, whose page has the one share card), so
+    // nothing could read it. And never indexed, said here and in a header on
+    // every answer, the redirect to sign-in among them (`withPrivateApp` in
+    // middleware.ts, next.config, public/_headers).
+    robots: { index: false, follow: false },
     // On a phone's home screen (10 Oct 2026). The manifest itself is
     // `app/manifest.ts`, which Next links from here; these are the tags
     // iOS reads instead of it.

@@ -16,6 +16,7 @@ import {
 } from "../lib/product-grid-read";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
@@ -46,6 +47,13 @@ import { PlatesGrid } from "./product-grid-plates";
  * options it comes in, the name, a line about it and the price, and "Shop →"
  * beside the title. Drawn from `--site-*` only; gates G2 and G7 fail the
  * build otherwise.
+ *
+ * **A product with no photo** (starter audit, 12 Oct 2026) never leaves an
+ * empty box. Where none of the products shown has a photo, the section is
+ * drawn as it is with photos switched off: cards of words, in every look.
+ * Where some have one, the others take a quiet panel with their name in
+ * the photo's own box (`NamePlate`), so the row lines up. A Home page built
+ * from this section reads finished before the business has a single photo.
  */
 
 /** The products to show, and where their pages live. */
@@ -359,7 +367,11 @@ function ProductCards({
     // prices, and no button (the card itself opens the product).
     const show: CardShow = {
         price: content.showPrices !== false,
-        photo: content.showPhotos !== false,
+        // Photos, only while there is one to show: a section of products
+        // with none is cards of words, never rows of empty boxes.
+        photo:
+            content.showPhotos !== false &&
+            products.some((p) => p.image !== null),
         line: content.showDescriptions !== false,
         label: said(content.buttonLabel),
     };
@@ -513,10 +525,8 @@ function CardBody({
                     className="mb-1.5 h-[130px] w-full object-cover"
                 />
             ) : (
-                <span
-                    aria-hidden="true"
-                    className="bg-site-bg mb-1.5 block h-[130px]"
-                />
+                // Its neighbours have photos: its name, in the photo's box.
+                <NamePlate name={p.name} className="mb-1.5 h-[130px]" />
             )}
             <CardWords product={p} show={show} />
         </>
@@ -631,7 +641,12 @@ function BareGrid({
                                         {...siteImage()}
                                         className="h-full w-full object-cover"
                                     />
-                                ) : null}
+                                ) : (
+                                    <NamePlate
+                                        name={p.name}
+                                        className="h-full w-full"
+                                    />
+                                )}
                                 {soldOut ? (
                                     <span className="absolute left-0 top-0 flex">
                                         {soldOut}

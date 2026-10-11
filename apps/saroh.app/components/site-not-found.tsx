@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ctaClasses } from "@saroh/site-blocks";
+import { ctaClasses, SitePageMessage } from "@saroh/site-blocks";
 
 import type { NotFoundWay } from "@/lib/not-found-ways";
 
@@ -11,6 +11,12 @@ import type { NotFoundWay } from "@/lib/not-found-ways";
  * and type, never Saroh's brand: a visitor who followed a broken link is
  * still on the business's website, and the menu above lets them keep
  * browsing. Said in the business's voice ("we"), naming the site.
+ *
+ * THE SITE'S OWN THEME. `[domain]/layout.tsx` mounts `SiteTheme` with the
+ * publication's variables above every page under it, this one included, so
+ * the page wears the merchant's colours, font pair and type scale. The
+ * frame (`SitePageMessage`) reads them the way a block does: the heading
+ * face at the heading scale, the body size, the section padding.
  */
 export function SiteNotFound({
     siteName,
@@ -22,32 +28,29 @@ export function SiteNotFound({
     secondary: NotFoundWay | null;
 }) {
     return (
-        <main className="mx-auto flex min-h-[60vh] w-full max-w-screen-sm flex-col items-center justify-center px-4 py-16 text-center sm:px-5">
-            <p className="font-site-mono text-xs uppercase tracking-[0.2em] text-site-muted">
-                Page not found
-            </p>
-            <h1 className="mt-4 font-site-heading text-3xl font-bold tracking-tight text-site-fg sm:text-4xl">
-                We can&rsquo;t find that page
-            </h1>
-            <p className="mt-3 max-w-md text-base text-site-body">
-                {siteName
-                    ? `There’s no page at this address on ${siteName}. It may have moved, or the link may have a typo.`
-                    : "There’s no page at this address. It may have moved, or the link may have a typo."}
-            </p>
-            <div className="mt-8 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
-                <Link href="/" className={ctaClasses("primary")}>
-                    Back to home
-                </Link>
-                {secondary ? (
-                    <Link
-                        href={secondary.href}
-                        className={ctaClasses("secondary")}
-                    >
-                        {secondary.label}
+        <SitePageMessage
+            eyebrow="Page not found"
+            title={<>We can&rsquo;t find that page</>}
+            actions={
+                <>
+                    <Link href="/" className={ctaClasses("primary")}>
+                        Back to home
                     </Link>
-                ) : null}
-            </div>
-        </main>
+                    {secondary ? (
+                        <Link
+                            href={secondary.href}
+                            className={ctaClasses("secondary")}
+                        >
+                            {secondary.label}
+                        </Link>
+                    ) : null}
+                </>
+            }
+        >
+            {siteName
+                ? `There’s no page at this address on ${siteName}. It may have moved, or the link may have a typo.`
+                : "There’s no page at this address. It may have moved, or the link may have a typo."}
+        </SitePageMessage>
     );
 }
 
@@ -65,18 +68,14 @@ export function NoSiteHere() {
         // The whole viewport takes the ground: the root layout's body has
         // none, and a dark preference would otherwise leave white margins.
         <div className="min-h-screen bg-site-bg text-site-body">
-            <main className="mx-auto flex min-h-screen w-full max-w-screen-sm flex-col items-center justify-center px-4 py-16 text-center sm:px-5">
-                <p className="font-site-mono text-xs uppercase tracking-[0.2em] text-site-muted">
-                    Nothing here
-                </p>
-                <h1 className="mt-4 font-site-heading text-3xl font-bold tracking-tight text-site-fg sm:text-4xl">
-                    There&rsquo;s no website at this address
-                </h1>
-                <p className="mt-3 max-w-md text-base text-site-body">
-                    Check the address for a typo. If this is the right one, the
-                    website may not be published yet, or may be offline for now.
-                </p>
-            </main>
+            <SitePageMessage
+                eyebrow="Nothing here"
+                title={<>There&rsquo;s no website at this address</>}
+                fill
+            >
+                Check the address for a typo. If this is the right one, the
+                website may not be published yet, or may be offline for now.
+            </SitePageMessage>
         </div>
     );
 }
