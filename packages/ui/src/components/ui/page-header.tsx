@@ -143,13 +143,22 @@ export function PageHeader({
                     // On the title's line when there is no description (the
                     // applied screens); on the description's last line when
                     // there is one.
-                    description ? "sm:items-end" : "sm:items-center",
+                    // A record's header (an avatar or a cover, then several
+                    // lines about it) keeps its actions level with the name:
+                    // at the foot they sat beside whichever line came last.
+                    lead
+                        ? "sm:items-start"
+                        : description
+                          ? "sm:items-end"
+                          : "sm:items-center",
                 )}
             >
                 <div
                     className={cn(
                         "min-w-0",
-                        lead && "flex items-center gap-3.5",
+                        // The lead stands beside the name, not half way
+                        // down whatever is written under it.
+                        lead && "flex items-start gap-3.5",
                     )}
                 >
                     {lead ? (

@@ -129,7 +129,7 @@ export function Header({
                         {/* Phone and email are part of the person: whoever
                             reads the customer (`contact:read`) sees them
                             (matrix §3). */}
-                        <div className="mt-[5px] flex min-w-0 flex-wrap gap-3.5 text-[13px]">
+                        <div className="mt-[5px] flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px]">
                             {email ? (
                                 // A long address wraps on a phone, whole,
                                 // rather than pushing the page sideways.
@@ -147,16 +147,24 @@ export function Header({
                             <span className="text-foreground/75">
                                 {phone?.trim() ? phone : "No phone"}
                             </span>
+                            {/* On the same line as how to reach them. The
+                                address is said once: when they sign in with
+                                the email already shown, only the fact is. */}
+                            {signsIn ? (
+                                <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                                    <Globe
+                                        aria-hidden
+                                        className="size-[13px] shrink-0"
+                                    />
+                                    {email && signsIn.endsWith(` as ${email}`)
+                                        ? signsIn.slice(
+                                              0,
+                                              -` as ${email}`.length,
+                                          )
+                                        : signsIn}
+                                </span>
+                            ) : null}
                         </div>
-                        {signsIn ? (
-                            <div className="mt-[5px] flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                                <Globe
-                                    aria-hidden
-                                    className="size-[13px] shrink-0"
-                                />
-                                {signsIn}
-                            </div>
-                        ) : null}
                     </>
                 }
                 // On a phone the group drops under the name and wraps a
@@ -164,19 +172,13 @@ export function Header({
                 actions={
                     <>
                         {starts.map((s) => (
-                            <Button
-                                key={s.href}
-                                variant="outline"
-
-                                asChild
-                            >
+                            <Button key={s.href} variant="outline" asChild>
                                 <Link href={s.href}>{s.label}</Link>
                             </Button>
                         ))}
                         <Tip label={canEdit ? undefined : EDIT_OFF}>
                             <Button
                                 variant="outline"
-
                                 disabled={!canEdit}
                                 onClick={onEdit}
                             >
@@ -192,9 +194,9 @@ export function Header({
                                         }
                                     >
                                         <Button
-                                            size="sm"
+                                            size="icon"
                                             variant="outline"
-                                            className="w-[34px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent"
+                                            className="data-[state=open]:border-border-strong data-[state=open]:bg-accent"
                                             disabled={!canMore}
                                             aria-label="More actions"
                                         >
