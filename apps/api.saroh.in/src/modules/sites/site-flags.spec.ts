@@ -5,6 +5,7 @@ import {
     starterTemplate,
     starterTemplateV2,
     starterTemplateV3,
+    templateModulePageKinds,
 } from "@saroh/templates";
 
 import {
@@ -1410,15 +1411,26 @@ describe("a template's note to the owner (DEC-141)", () => {
         ]) {
             const { pages } = instantiateTemplate(starterTemplate, ctx);
             expect(hasOwnerNote(pages)).toBe(false);
+            // The template's own pages and the module pages it starts with.
+            const paths = [
+                ...pages.map((p) => p.path),
+                ...templateModulePageKinds(starterTemplate, ctx).map(
+                    (kind) => `/${kind.toLowerCase()}`,
+                ),
+            ];
             for (const made of pages) {
                 const flags = checkPage(
                     page(made.sections, { path: made.path }),
-                    pages.map((p) => p.path),
+                    paths,
                 );
                 expect(flags.filter((f) => f.blocking)).toEqual([]);
                 expect(
                     flags.filter((f) => f.type === "placeholderText"),
                 ).toEqual([]);
+                // Its one action goes somewhere the site has.
+                expect(flags.filter((f) => f.type === "brokenLink")).toEqual(
+                    [],
+                );
             }
         }
     });

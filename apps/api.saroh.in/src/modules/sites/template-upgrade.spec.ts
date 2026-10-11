@@ -8,6 +8,7 @@ import {
 } from "@saroh/templates";
 
 import { formatReport, parseArgs } from "../../cli/template-upgrade.cli";
+import { sanitizeRichHtml } from "./sanitize";
 import { planTemplateStyle } from "./site-create";
 import { defaultSiteStyle, parseSiteStyle } from "./site-style";
 import { emptyCounts } from "./template-sync";
@@ -236,6 +237,29 @@ describe("madeCandidates", () => {
                 "Acme",
             ),
         ).toHaveLength(1);
+    });
+});
+
+describe("what the starter writes, through the sanitizer", () => {
+    it("is unchanged: the closing band keeps its link, and a saved page is still the template's", () => {
+        // A draft is sanitized when it is saved. If that altered the
+        // template's own text, the band would lose its one action, and a
+        // page saved without a change would stop matching its template.
+        const { pages } = instantiateTemplate(starterTemplate, {
+            ...salon,
+            organizationName: 'Rye & "Co."',
+            area: "Navi <Mumbai>",
+            hasPlace: true,
+        });
+        const texts = pages
+            .flatMap((p) => p.sections)
+            .filter((s) => s.type === "richText")
+            .map((s) => (s.content as { value: string }).value);
+        expect(texts.length).toBeGreaterThanOrEqual(3);
+        for (const value of texts) {
+            expect(sanitizeRichHtml(value)).toBe(value);
+        }
+        expect(texts.some((t) => t.includes('<a href="/book">'))).toBe(true);
     });
 });
 
