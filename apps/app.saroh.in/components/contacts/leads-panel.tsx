@@ -20,12 +20,15 @@ export function LeadsPanel({
     person,
     leads,
     stages,
+    currency,
 }: {
     person: { id: string; name: string; email: string };
     /** Null when they could not be read. */
     leads: ContactDetail["leads"] | null;
     /** Stages for "Add a lead"; null when this viewer may not add one. */
     stages: { id: string; name: string }[] | null;
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
 }) {
     return (
         <ContactPanelSection
@@ -39,6 +42,7 @@ export function LeadsPanel({
                         // Only this person: the lead is theirs.
                         contacts={[person]}
                         stages={stages}
+                        currency={currency}
                         variant="outline"
                         size="sm"
                     />
@@ -47,7 +51,7 @@ export function LeadsPanel({
         >
             <ul>
                 {(leads ?? []).map((lead) => {
-                    const amount = formatMoney(lead.value, null, {
+                    const amount = formatMoney(lead.value, currency, {
                         decimals: "always",
                     });
                     const status =

@@ -613,7 +613,12 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
       `formatMoneyMajor("1250.50", currency)` write "₹1,250" and
       "₹1,250.50": the currency's sign, Indian grouping, no ".00". A ledger
       or invoice column asks for `{ decimals: "always" }` ("₹1,250.00").
-      Null in, null out, so the caller words what is missing.
+      Null in, null out, so the caller draws what is missing. A lead's
+      Worth records no currency of its own: it is in the business's
+      (owner, 11 Oct 2026), read with `readBusinessCurrency()`
+      (`lib/organizations/business-currency.ts`) by the Leads list, the
+      Pipeline, the lead page, a contact's leads and the Contacts list, and
+      typed in a `MoneyInput`. It is still kept in minor units.
       `formatNumber(1204)` is "1,204". The sign and the decimal places are
       `moneySign` and `moneyDecimals` from `@saroh/ui/lib/money`, the same
       ones `MoneyInput` shows and keeps.

@@ -1,3 +1,4 @@
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
@@ -25,10 +26,12 @@ export default async function ContactsPage({
 }) {
     await requireSession();
 
-    const [contacts, params, organization] = await Promise.all([
+    const [contacts, params, organization, currency] = await Promise.all([
         listContacts(),
         searchParams,
         resolveActiveOrganization(),
+        // What open leads are worth is in the business's currency.
+        readBusinessCurrency(),
     ]);
     // A Member reads contacts but adds none (DEC-020).
     const canAdd = organization?.actions
@@ -57,6 +60,7 @@ export default async function ContactsPage({
             <div className="mt-6">
                 <ContactsView
                     contacts={contacts}
+                    currency={currency}
                     initialView={viewParam(params)}
                 />
             </div>
