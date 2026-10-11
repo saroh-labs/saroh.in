@@ -11,6 +11,8 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Check, ChevronDown } from "lucide-react";
+
+import { listPickerClass } from "@/components/shared/list-toolbar";
 import { useEffect, useRef, useState } from "react";
 
 import type { OrderProductOption } from "@/lib/orders/business-service";
@@ -74,22 +76,17 @@ export function ProductFilter({
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
-                    size="sm"
                     type="button"
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
                     aria-label={`Product: ${value ? label : "any product"}. Change it.`}
-                    className={cn(
-                        "max-w-[220px] gap-1.5 font-normal",
-                        value && "border-foreground",
-                        className,
-                    )}
+                    className={cn(listPickerClass, className)}
                 >
                     <span className="min-w-0 truncate">{label}</span>
                     <ChevronDown
                         aria-hidden
-                        className="size-3.5 shrink-0 text-muted-foreground"
+                        className="size-4 shrink-0 text-muted-foreground"
                     />
                 </Button>
             </PopoverTrigger>

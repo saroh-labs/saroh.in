@@ -45,11 +45,11 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /** The desk grid: Order · Status · Placed · Total · the row menu (B5). */
 export const ORDER_GRID =
-    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,140px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** The same grid with the design's 38px selection column first (B6). */
 export const ORDER_GRID_SELECT =
-    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,140px)_minmax(108px,132px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** A row's selection box (B6): checked, and what toggling it does. */
 export interface RowSelect {
@@ -72,6 +72,7 @@ export function OrderGridHead({
 }) {
     return (
         <div
+            data-list-head=""
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "label h-10 rounded-t-[11px] border-b border-border bg-muted",

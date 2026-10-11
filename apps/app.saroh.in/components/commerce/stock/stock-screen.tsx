@@ -1,6 +1,6 @@
 "use client";
 
-import { count as countOf } from "@/lib/format/plural";
+import { count as countOf, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
@@ -176,20 +176,23 @@ export function StockScreen({
         checks === "failed"
             ? null
             : Object.values(checks.counts).reduce((a, b) => a + b, 0);
-    // A count, as every other strip shows one: how many lines need
-    // someone (in Ink), how many checks are open (in red). Checks that
-    // couldn't be read are a dash, never 0.
+    // Both counts mean "this needs you now", so both wear the one
+    // attention tone (Ink) and say so in their name: how many lines are
+    // running low, how many checks are open. Checks that couldn't be read
+    // are a dash, never 0.
     const tabs: {
         id: Tab;
         label: string;
         count?: number | null;
-        tone?: "strong" | "danger";
+        tone?: "strong";
+        says?: string;
     }[] = [
         {
             id: "levels",
             label: "Levels",
             count: needsYou > 0 ? needsYou : undefined,
             tone: "strong",
+            says: plural(needsYou, "needs you", "need you"),
         },
         { id: "log", label: "Log" },
         {
@@ -201,7 +204,8 @@ export function StockScreen({
                     : checkCount > 0
                       ? checkCount
                       : undefined,
-            tone: "danger",
+            tone: "strong",
+            says: plural(checkCount ?? 0, "check needs you", "checks need you"),
         },
     ];
 
@@ -253,6 +257,7 @@ export function StockScreen({
                     href: href({ tab: t.id === "levels" ? undefined : t.id }),
                     count: t.count,
                     countTone: t.tone,
+                    countSays: t.says,
                 }))}
             />
 

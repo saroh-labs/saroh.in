@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
+import { ListToolbar } from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { useArrivals } from "@/components/shared/use-arrivals";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
@@ -30,13 +31,13 @@ import type { OrderPlace } from "@/lib/stores/abilities";
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
-import { OrderFilters } from "./order-filters";
+import { OrderFilters, OrderToggles } from "./order-filters";
 import { OrderFiltersSheet } from "./order-filters-sheet";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
 import { SearchField } from "./order-search";
-import { OrderTabs } from "./order-tabs";
+import { OrderStatusChips } from "./order-tabs";
 import {
     OrdersAttentionPartial,
     OrdersEmpty,
@@ -248,11 +249,67 @@ export function OrdersScreen({
                 }
             />
 
-            <OrderTabs query={query} counts={page.counts} />
+            {/* The one list toolbar: search, then the dropdown filters
+                (behind one Filters button on a phone, B5), the range on
+                the right, and the status chips under it. */}
+            <ListToolbar
+                search={
+                    <SearchField query={query} go={go} searching={navigating} />
+                }
+                filters={
+                    <>
+                        <OrderFiltersSheet
+                            query={query}
+                            options={filterOptions}
+                            go={go}
+                            className="min-[760px]:hidden"
+                        />
+                        {many ? (
+                            <StorefrontFilter
+                                stores={stores}
+                                countFor={(id) => openByStore?.[id] ?? null}
+                                total={
+                                    openByStore
+                                        ? Object.values(openByStore).reduce(
+                                              (n, c) => n + c,
+                                              0,
+                                          )
+                                        : null
+                                }
+                                value={query.storefront}
+                                onChange={(storefront) => go({ storefront })}
+                                noun={{
+                                    one: "open order",
+                                    other: "open orders",
+                                }}
+                                note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
+                            />
+                        ) : null}
+                        {/* The desk: the filter menus, on the page. */}
+                        <div className="min-w-0 max-w-full max-[759px]:hidden">
+                            <OrderFilters
+                                query={query}
+                                options={filterOptions}
+                                go={go}
+                            />
+                        </div>
+                    </>
+                }
+                count={range ? `Showing ${range}` : null}
+                chips={
+                    <OrderStatusChips
+                        query={query}
+                        counts={page.counts}
+                        go={go}
+                    >
+                        <OrderToggles query={query} go={go} />
+                    </OrderStatusChips>
+                }
+            />
 
             {/* From Home's "Last 24 hours" (F6): the list is narrowed, and
                 says so, with the whole list one click away. The count is the
-                API's for the tab in view. */}
+                API's for the status in view. */}
             {query.since ? (
                 <div className="pt-3.5">
                     <SinceNotice
@@ -263,46 +320,6 @@ export function OrdersScreen({
                     />
                 </div>
             ) : null}
-
-            <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
-                <SearchField query={query} go={go} searching={navigating} />
-                {/* A phone: the filters are behind one button (B5). */}
-                <OrderFiltersSheet
-                    query={query}
-                    options={filterOptions}
-                    go={go}
-                    className="min-[760px]:hidden"
-                />
-                {many ? (
-                    <StorefrontFilter
-                        stores={stores}
-                        countFor={(id) => openByStore?.[id] ?? null}
-                        total={
-                            openByStore
-                                ? Object.values(openByStore).reduce(
-                                      (n, c) => n + c,
-                                      0,
-                                  )
-                                : null
-                        }
-                        value={query.storefront}
-                        onChange={(storefront) => go({ storefront })}
-                        noun={{ one: "open order", other: "open orders" }}
-                        label="Show orders taken at"
-                        note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
-                    />
-                ) : null}
-                {range ? (
-                    <div className="ml-auto text-[12px] text-muted-foreground">
-                        Showing {range}
-                    </div>
-                ) : null}
-            </div>
-
-            {/* The desk: the filter bar, on the page. */}
-            <div className="max-[759px]:hidden">
-                <OrderFilters query={query} options={filterOptions} go={go} />
-            </div>
 
             <div aria-busy={navigating} className="pt-3.5">
                 {attentionUnread ? (

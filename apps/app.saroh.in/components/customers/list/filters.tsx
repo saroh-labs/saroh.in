@@ -1,9 +1,12 @@
 "use client";
 
-import { formatNumber } from "@/lib/format/money";
 import { ListSearch } from "@saroh/ui/list-search";
 
-import { Chip } from "@/components/shared/chip";
+import {
+    FilterChips,
+    ListFilter,
+    ListToolbar,
+} from "@/components/shared/list-toolbar";
 import type {
     CustomerChip,
     CustomerSort,
@@ -11,15 +14,15 @@ import type {
     ListQuery,
 } from "@/lib/customers/list";
 import { chipsFor, SORT_LABEL, sortsFor } from "@/lib/customers/list";
-import { OptionSelect } from "@saroh/ui/option-select";
 
 const ALL_STORES = "all";
 
 /**
- * The Customers list's controls (Saroh Customers.dc.html): search, "Bought
- * at" (only with more than one storefront, and only for a role that reads
- * orders), the sort, and the chips with their counts. Everything goes into
- * the address; the server asks the API for that page again.
+ * The Customers list's controls (Saroh Customers.dc.html), in the one list
+ * toolbar's order: search, "Bought at" (only with more than one location,
+ * and only for a role that reads orders), the sort on the right, and the
+ * chips with their counts under them. Everything goes into the address;
+ * the server asks the API for that page again.
  */
 export function Filters({
     query,
@@ -39,8 +42,9 @@ export function Filters({
     const chips = chipsFor(page);
 
     return (
-        <>
-            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+        <ListToolbar
+            className="mb-3.5"
+            search={
                 <ListSearch
                     placeholder="Search customers by name, phone or email"
                     defaultValue={query.q}
@@ -48,12 +52,13 @@ export function Filters({
                     onSearch={(q) => {
                         if (q !== query.q) go({ q });
                     }}
-                    className="sm:max-w-[420px]"
                 />
-                {storefronts.length > 1 ? (
-                    <OptionSelect
-                        size="sm"
-                        aria-label="Location"
+            }
+            filters={
+                storefronts.length > 1 ? (
+                    <ListFilter
+                        holdsData
+                        label="Location"
                         value={query.store ?? ALL_STORES}
                         onValueChange={(v) =>
                             go({ store: v === ALL_STORES ? null : v })
@@ -65,62 +70,32 @@ export function Filters({
                                 label: `Bought at ${s.name}`,
                             })),
                         ]}
-                        className="w-auto min-w-[150px] max-w-full"
                     />
-                ) : null}
-                <OptionSelect<CustomerSort>
-                    size="sm"
-                    aria-label="Sort"
+                ) : null
+            }
+            end={
+                <ListFilter<CustomerSort>
+                    label="Sort"
                     value={query.sort ?? page.sort}
                     onValueChange={(sort) => go({ sort })}
                     options={sorts.map((s) => ({
                         value: s,
                         label: SORT_LABEL[s],
                     }))}
-                    className="w-auto min-w-[150px]"
                 />
-            </div>
-            <div
-                role="group"
-                aria-label="Show"
-                // Phones: one row that scrolls sideways, so the list starts
-                // where the thumb is; wider, the chips wrap as drawn.
-                className="-mx-4 mb-3.5 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
-            >
-                {chips.map((c) => (
-                    <ChipButton
-                        key={c.key}
-                        chip={c.key}
-                        label={c.label}
-                        count={c.count}
-                        on={c.key === page.chip}
-                        onPick={(chip) => go({ chip })}
-                    />
-                ))}
-            </div>
-        </>
-    );
-}
-
-function ChipButton({
-    chip,
-    label,
-    count,
-    on,
-    onPick,
-}: {
-    chip: CustomerChip;
-    label: string;
-    count: number;
-    on: boolean;
-    onPick: (chip: CustomerChip) => void;
-}) {
-    return (
-        <Chip as="toggle" on={on} onClick={() => onPick(chip)}>
-            {label}
-            <span className="ml-1.5 tabular-nums opacity-70">
-                {formatNumber(count)}
-            </span>
-        </Chip>
+            }
+            chips={
+                <FilterChips<CustomerChip>
+                    label="Show"
+                    value={page.chip}
+                    onValueChange={(chip) => go({ chip })}
+                    chips={chips.map((c) => ({
+                        value: c.key,
+                        label: c.label,
+                        count: c.count,
+                    }))}
+                />
+            }
+        />
     );
 }

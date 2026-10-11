@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 
+import { FilterChips, ListToolbar } from "@/components/shared/list-toolbar";
+
 import { productHref } from "@/lib/products/links";
 import { untrackedLine } from "@/lib/stock/screen";
 import { loadLevelsPage } from "@/lib/stock/screen-actions";
@@ -12,15 +14,15 @@ import type { StockLevels } from "@/lib/stock/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Boxes } from "lucide-react";
 
-import { chipClass } from "@/components/shared/chip";
 import { runAction } from "@/lib/api/run-action";
 import { ListSearch } from "@saroh/ui/list-search";
 import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
 
 /**
- * Levels (#527): the chips (All, Needs you, a storefront), the search, the
- * table a page at a time, and the footer naming what isn't tracked. The
+ * Levels (#527): the one list toolbar (search, then the chips All, Needs
+ * you and a location), the table a page at a time, and the footer naming
+ * what isn't tracked. The
  * chip and the search are in the address; the next page comes on "Show
  * more".
  */
@@ -84,14 +86,16 @@ export function LevelsPanel({
         : loaded.rows;
 
     const chips = [
-        { id: "all", label: "All" },
-        {
-            id: "needs",
-            label: needsYou > 0 ? `Needs you · ${needsYou}` : "Needs you",
-        },
-        // A storefront chip only where there is more than one (ADR-010).
+        { value: "all", label: "All" },
+        // The count follows the label as a quiet number; none is a fact.
+        { value: "needs", label: "Needs you", count: needsYou },
+        // A location chip only where there is more than one (ADR-010).
         ...(allStorefronts.length > 1
-            ? allStorefronts.map((s) => ({ id: s.id, label: s.name }))
+            ? allStorefronts.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  holdsData: true,
+              }))
             : []),
     ];
 
@@ -134,34 +138,30 @@ export function LevelsPanel({
 
     return (
         <div>
-            <ListSearch
-                placeholder="Search stock by product or SKU"
-                defaultValue={q}
-                searching={searching}
-                onSearch={search}
-                className="mb-3"
+            <ListToolbar
+                className="mb-3.5"
+                search={
+                    <ListSearch
+                        placeholder="Search stock by product or SKU"
+                        defaultValue={q}
+                        searching={searching}
+                        onSearch={search}
+                    />
+                }
+                chips={
+                    <FilterChips
+                        label="Which products"
+                        value={show}
+                        onValueChange={(id) =>
+                            router.push(
+                                href({ show: id === "all" ? undefined : id }),
+                                { scroll: false },
+                            )
+                        }
+                        chips={chips}
+                    />
+                }
             />
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div
-                    role="group"
-                    aria-label="Which products"
-                    className="flex flex-wrap gap-2"
-                >
-                    {chips.map((c) => (
-                        <Link
-                            key={c.id}
-                            href={href({
-                                show: c.id === "all" ? undefined : c.id,
-                            })}
-                            scroll={false}
-                            aria-current={show === c.id ? "true" : undefined}
-                            className={chipClass(show === c.id)}
-                        >
-                            {c.label}
-                        </Link>
-                    ))}
-                </div>
-            </div>
 
             <LevelsTable
                 storefronts={levels.storefronts}
