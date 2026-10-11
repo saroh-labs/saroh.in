@@ -9,6 +9,7 @@ import {
 } from "../modules/automations/dto";
 import { CancelSubscriptionDto } from "../modules/billing/dto";
 import { CreateServiceDto, UpdateServiceDto } from "../modules/bookings/dto";
+import { SetAccountUpdatesDto } from "../modules/communications/dto";
 import { CreatePostDto, UpdatePostDto } from "../modules/content/dto";
 import {
     CreateAttentionDto,
@@ -99,6 +100,12 @@ const BOOLEAN_FIELDS: {
         what: "whether a subscription change applies now",
         dto: CancelSubscriptionDto,
         field: "immediate",
+        rest: {},
+    },
+    {
+        what: "whether Saroh posts updates into customers' Messages",
+        dto: SetAccountUpdatesDto,
+        field: "on",
         rest: {},
     },
     {

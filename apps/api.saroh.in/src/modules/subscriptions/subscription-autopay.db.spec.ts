@@ -741,6 +741,44 @@ describe("telling the customer their autopay was cancelled (D14)", () => {
         );
     });
 
+    it("a business that turned its updates off: email only, as where the thread is not live", async () => {
+        area.SITE_ACCOUNT_AREA = "on";
+        await prisma.featureFlag.create({
+            data: { key: "ACCOUNT_THREAD", enabledByDefault: true },
+        });
+        const choice = (accountUpdates: boolean) =>
+            prisma.businessProfile.upsert({
+                where: { organizationId: owner.organizationId },
+                create: {
+                    organizationId: owner.organizationId,
+                    accountUpdates,
+                },
+                update: { accountUpdates },
+            });
+        await choice(false);
+        try {
+            const m = await member();
+            await activeMandate(m);
+            const res = await staff.cancel(owner, m.subscriptionId);
+            expect(res.told).toEqual({
+                email: m.email,
+                suppressed: false,
+                account: false,
+            });
+            expect(
+                await prisma.customerThreadMessage.count({
+                    where: {
+                        organizationId: owner.organizationId,
+                        event: "AUTOPAY_CANCELLED",
+                        thread: { contactId: m.contactId },
+                    },
+                }),
+            ).toBe(0);
+        } finally {
+            await choice(true);
+        }
+    });
+
     it("tells nobody about a set-up they never approved", async () => {
         const m = await member();
         await prisma.paymentMandate.create({

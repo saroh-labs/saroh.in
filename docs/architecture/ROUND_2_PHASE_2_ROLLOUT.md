@@ -1304,6 +1304,49 @@ since the previous API already verifies with a saved webhook secret.
 (A Cashfree connection without one goes back to refusing its webhooks; P1
 still confirms its payments.)
 
+## Updates in Messages: the business's own choice (12 Oct 2026)
+
+Saroh's own posts into a customer's Messages now ask three things in one
+place (`accountThreadOn`, `communications/account-thread.ts`): the account
+area (`SITE_ACCOUNT_AREA`), the `ACCOUNT_THREAD` flag for the business, and
+the business's own choice, which is on unless it turned it off on
+Settings › Providers. The flag's default and how it resolves are unchanged:
+turning it on for everyone is still the operator's step in the console.
+
+- **Migration** `20261119143000_account_updates_choice`: one column,
+  `BusinessProfile.accountUpdates BOOLEAN NOT NULL DEFAULT true`. Additive;
+  every business, with or without a profile row, reads as on, and the
+  previous API never reads it.
+- **API before app.** The row reads `GET …/customer-notices/account-updates`
+  and is drawn only when the answer says `offered`; the new app on the old
+  API gets a 404 and draws no row. The old app ignores the new routes.
+- **One behaviour change besides the choice.** The invoice send asked the
+  flag alone; it now asks the account area too, as booking and order
+  notices always did. An instance with the flag on and
+  `SITE_ACCOUNT_AREA` off no longer posts invoices into a thread nobody
+  can open: they go by email, as with the flag off.
+- **Nothing is taken back.** Turning updates off stops posts from the next
+  one on. What is already in a customer's Messages stays.
+
+### Verify
+
+1. A business with the flag on and the account area on: Settings ›
+   Providers shows "Updates in Messages: On". Mark an order Ready for a
+   customer with an account: it shows in their Messages.
+2. Edit, "Don't post updates", Save: the row reads Off. Mark another
+   order Ready: nothing new in Messages, the email still goes where the
+   business has its own provider, and Order Detail says how it reached
+   them. The customer can still write, and a Reply still reaches them.
+3. Undo within ten seconds puts it back to On.
+4. A business with the flag off (or an instance with the account area
+   off): no row.
+
+### Rollback
+
+Deploy the previous API and app. The column stays and is not read, so
+every business posts again as the flag says; a business that had turned
+its updates off is posted to until the release is restored.
+
 ## Before switching a flag on (advisory)
 
 These browser suites are skipped in CI while their features are off. Run

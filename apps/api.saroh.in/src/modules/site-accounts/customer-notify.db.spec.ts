@@ -344,6 +344,58 @@ describe("an order's Ready (real database)", () => {
         );
     });
 
+    it("a business that turned its updates off: email alone, as with the thread off, and on again posts", async () => {
+        await threadOn();
+        const b = await business();
+        await comms.setAccountUpdates(b.owner, false);
+        const order = await preparingOrder(b);
+        await kitchen.moveStage(b.owner, order.id, { to: "READY" });
+        const [job] = await jobsOf(
+            b.owner.organizationId,
+            CUSTOMER_NOTIFY_TYPE,
+        );
+        await customerNotify.handle(job);
+        expect(await threadMessages(b.owner.organizationId)).toHaveLength(0);
+        expect(
+            await prisma.message.count({
+                where: { organizationId: b.owner.organizationId },
+            }),
+        ).toBe(1);
+        expect((await kitchen.read(b.owner, order.id)).customerNotice).toBe(
+            "EMAIL",
+        );
+
+        await comms.setAccountUpdates(b.owner, true);
+        const next = await preparingOrder(b);
+        await kitchen.moveStage(b.owner, next.id, { to: "READY" });
+        const jobs = await jobsOf(b.owner.organizationId, CUSTOMER_NOTIFY_TYPE);
+        await customerNotify.handle(jobs[jobs.length - 1]);
+        expect(await threadMessages(b.owner.organizationId)).toHaveLength(1);
+    });
+
+    it("updates off and no email provider: nothing is sent, and Order Detail says so", async () => {
+        await threadOn();
+        const b = await business({ email: false });
+        await comms.setAccountUpdates(b.owner, false);
+        const order = await preparingOrder(b);
+        await kitchen.moveStage(b.owner, order.id, { to: "READY" });
+        for (const job of await jobsOf(
+            b.owner.organizationId,
+            CUSTOMER_NOTIFY_TYPE,
+        )) {
+            await customerNotify.handle(job);
+        }
+        expect(await threadMessages(b.owner.organizationId)).toHaveLength(0);
+        expect(
+            await prisma.message.count({
+                where: { organizationId: b.owner.organizationId },
+            }),
+        ).toBe(0);
+        expect((await kitchen.read(b.owner, order.id)).customerNotice).toBe(
+            "NONE",
+        );
+    });
+
     it("a failed send: the Delivery is FAILED and retried, the thread message stays, nothing is stamped", async () => {
         await threadOn();
         const b = await business({ verified: false });
