@@ -81,7 +81,7 @@ const NOTES_WORDS = {
 
 /** "More": a quiet control, 44px to press, that opens what is rarely needed. */
 const quietButton = cn(
-    "text-site-fg inline-flex h-11 cursor-pointer items-center rounded-[calc(var(--site-radius)+8px)] px-3 text-[14px] font-semibold underline-offset-[3px] transition-opacity duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:underline active:opacity-70 motion-reduce:transition-none",
+    "text-site-fg inline-flex h-11 cursor-pointer items-center rounded-[calc(var(--site-radius)+8px)] px-3 text-[14px] font-semibold underline-offset-[3px] transition-opacity duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] hover:underline active:opacity-70 motion-reduce:transition-none",
     focusRing,
 );
 
@@ -294,7 +294,7 @@ export function Me({
                         <span
                             aria-hidden="true"
                             className={cn(
-                                "ml-1 inline-block transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none",
+                                "ml-1 inline-block transition-transform duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none",
                                 more && "rotate-180",
                             )}
                         >

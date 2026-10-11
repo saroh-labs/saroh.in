@@ -81,7 +81,7 @@ export function AccountHeader({
                     aria-label={`Back to the site: ${businessName}`}
                     title="Back to the site"
                     className={cn(
-                        "bg-site-accent text-site-accent-fg font-site-heading grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[calc(var(--site-radius)+8px)] text-lg font-bold transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:opacity-90 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
+                        "bg-site-accent text-site-accent-fg font-site-heading grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-[calc(var(--site-radius)+8px)] text-lg font-bold transition-[opacity,transform] duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] hover:opacity-90 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100",
                         focusRing,
                     )}
                 >

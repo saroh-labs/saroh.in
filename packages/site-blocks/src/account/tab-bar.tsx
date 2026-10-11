@@ -80,7 +80,7 @@ export function AccountTabBar({
                             href={ACCOUNT_TAB_HREF[tab.key]}
                             aria-current={on ? "page" : undefined}
                             className={cn(
-                                "relative grid min-h-[52px] cursor-pointer content-start justify-items-center gap-0.5 rounded-[calc(var(--site-radius)+6px)] px-0.5 py-1.5 text-[11px] transition-[color,background-color,opacity] duration-150 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none",
+                                "relative grid min-h-[52px] cursor-pointer content-start justify-items-center gap-0.5 rounded-[calc(var(--site-radius)+6px)] px-0.5 py-1.5 text-[11px] transition-[color,background-color,opacity] duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none",
                                 "hover:text-site-fg focus-visible:ring-site-fg focus-visible:outline-none focus-visible:ring-2 active:opacity-70",
                                 // A row tab: the icon beside the word, and
                                 // the accent under the current one.

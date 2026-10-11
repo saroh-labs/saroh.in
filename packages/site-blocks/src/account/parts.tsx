@@ -16,9 +16,13 @@ import { cn } from "../lib/utils";
  * 1px shift, and none at all for someone who asked for less.
  */
 
-/** One easing and one length for every control here. */
+/**
+ * One easing and one length for every control here: the site's own curve
+ * (`--site-ease`, the craft layer's, `site-craft.ts`), so the account moves
+ * as the rest of the business's site does.
+ */
 const MOTION =
-    "transition-[background-color,border-color,opacity,transform] duration-150 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none motion-reduce:active:translate-y-0";
+    "transition-[background-color,border-color,opacity,transform] duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none motion-reduce:active:translate-y-0";
 
 /** A card's or page's heading size, on the site's own scale. */
 const TITLE =
@@ -75,7 +79,9 @@ export function AccountCard({
                 ) : null}
             </div>
             {lead ? (
-                <div className="text-site-body mt-1.5 max-w-[60ch] text-[15px] leading-normal [text-wrap:pretty]">
+                // The site's own body size (its type scale), held to 17px
+                // so a card stays a card.
+                <div className="text-site-body mt-1.5 max-w-[60ch] text-[length:min(var(--site-body-size,1rem),1.0625rem)] leading-normal [text-wrap:pretty]">
                     {lead}
                 </div>
             ) : null}

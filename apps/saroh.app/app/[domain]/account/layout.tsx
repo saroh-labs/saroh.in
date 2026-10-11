@@ -49,7 +49,13 @@ export async function generateMetadata({
     return accountMetadata(site?.snapshot.site.name ?? "");
 }
 
-/** The page's column: a phone's width, and room for two columns beyond it. */
+/**
+ * The page's column: a phone's width, and room for two columns beyond it.
+ * Each `<main>` is marked `data-site-page`, which puts the account inside
+ * the site's craft layer (`site-blocks/site-craft.ts`): the site's heading
+ * face, balanced lines, its focus ring and its one curve, under the
+ * account's own classes.
+ */
 const COLUMN =
     "mx-auto w-full max-w-[640px] px-[18px] md:max-w-[960px] md:px-6";
 
@@ -80,7 +86,10 @@ export default async function AccountLayout({
                             : "Your account"
                     }
                 />
-                <main className={`${COLUMN} pb-6 pt-4 md:pb-12`}>
+                <main
+                    data-site-page=""
+                    className={`${COLUMN} pb-6 pt-4 md:pb-12`}
+                >
                     <div className="md:max-w-[560px]">
                         {lookup.reason === "signed-out" ? (
                             <AccountCard
@@ -131,7 +140,10 @@ export default async function AccountLayout({
                 tabs={lookup.account.tabs}
                 unreadMessages={lookup.account.unreadMessages ?? 0}
             />
-            <main className={`${COLUMN} pb-[96px] pt-4 md:pb-16 md:pt-6`}>
+            <main
+                data-site-page=""
+                className={`${COLUMN} pb-[96px] pt-4 md:pb-16 md:pt-6`}
+            >
                 {children}
             </main>
         </>

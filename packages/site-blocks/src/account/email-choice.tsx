@@ -119,7 +119,7 @@ export function EmailChoice({
                     <span
                         aria-hidden="true"
                         className={cn(
-                            "flex h-7 w-[52px] items-center rounded-full border px-[3px] transition-colors duration-150 ease-[cubic-bezier(0.2,0,0,1)] group-active:opacity-80 motion-reduce:transition-none",
+                            "flex h-7 w-[52px] items-center rounded-full border px-[3px] transition-colors duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] group-active:opacity-80 motion-reduce:transition-none",
                             on
                                 ? "bg-site-accent border-site-accent"
                                 : "border-site-fg bg-[color-mix(in_srgb,hsl(var(--site-fg))_10%,hsl(var(--site-bg)))]",
@@ -127,7 +127,7 @@ export function EmailChoice({
                     >
                         <span
                             className={cn(
-                                "size-5 rounded-full transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none",
+                                "size-5 rounded-full transition-transform duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none",
                                 on
                                     ? "bg-site-accent-fg translate-x-6"
                                     : "bg-site-fg translate-x-0",
