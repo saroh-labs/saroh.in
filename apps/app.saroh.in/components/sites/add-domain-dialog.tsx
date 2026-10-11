@@ -24,9 +24,11 @@ const NEEDS_DOMAIN = "Enter the domain to add.";
  * new domain's card under the dialog to carry on.
  *
  * A refusal stays here with what was typed, in the api's own words: a
- * taken hostname (409), a plan without custom domains (403), a malformed
- * name (400, plain since UX-066). Each says what to do. Mounted per
- * opening (`key`), so each one starts empty.
+ * taken hostname (409), a malformed name (400, plain since UX-066). Each
+ * says what to do. A plan without its own domain (403) is the plan's
+ * notice instead, as every plan refusal is, and this dialog closes for it
+ * (DEC-139); while plans aren't shown (DEC-136) it is said here like the
+ * others. Mounted per opening (`key`), so each one starts empty.
  */
 export function AddDomainDialog({
     open,
