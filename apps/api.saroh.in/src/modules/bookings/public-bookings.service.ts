@@ -10,6 +10,7 @@ import {
 import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import { notTakingOrders } from "../billing/paused-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
@@ -77,6 +78,7 @@ import {
     bookingByKey,
     holdsSlotAlready,
     loadBookableService,
+    lostRace,
     ownHoldOn,
     reserve,
 } from "./reservation";
@@ -125,6 +127,13 @@ export interface PublicHold {
  * the central guarantee, "only one confirmed booking can own a
  * capacity-one slot", is the serializable re-count in {@link book}.
  */
+/**
+ * How long the loser of a race waits before reading again for the booking
+ * that beat it, in turn: the winner's commit lands within a few
+ * milliseconds, and 300ms in all is not felt on a refusal.
+ */
+const RACE_REREAD_MS = [20, 80, 200] as const;
+
 @Injectable()
 export class PublicBookingsService {
     /**
@@ -645,19 +654,36 @@ export class PublicBookingsService {
             );
         } catch (err) {
             // Two tabs of one customer racing for one slot: the loser's
-            // conflict is theirs already, not the slot being full.
-            if (
-                account &&
-                err instanceof ConflictException &&
-                (await holdsSlotAlready(
-                    prisma,
-                    service.organizationId,
-                    account,
-                    serviceId,
-                    startAt,
-                ))
-            ) {
-                throw alreadyBooked();
+            // conflict is theirs already, not the slot being full. The
+            // database can refuse the loser three ways: the gate in the
+            // transaction (a ConflictException), a serialization failure,
+            // or the unique index that keeps one account to one booking of
+            // a session (P2002). The last two arrive as Prisma's own
+            // errors, and went out as a bare 409 that named no reason.
+            const lost =
+                err instanceof ConflictException ||
+                ["P2002", "P2034"].includes(prismaErrorCode(err) ?? "");
+            if (account && lost) {
+                const holds = () =>
+                    holdsSlotAlready(
+                        prisma,
+                        service.organizationId,
+                        account,
+                        serviceId,
+                        startAt,
+                    );
+                // The loser of a race is told while the winner is still
+                // committing, so the winner's booking may not be readable
+                // yet: look again, briefly, before calling it a full slot.
+                const raced =
+                    lostRace(err) || prismaErrorCode(err) !== undefined;
+                let theirs = await holds();
+                for (const wait of raced ? RACE_REREAD_MS : []) {
+                    if (theirs) break;
+                    await new Promise((r) => setTimeout(r, wait));
+                    theirs = await holds();
+                }
+                if (theirs) throw alreadyBooked();
             }
             throw err;
         }
