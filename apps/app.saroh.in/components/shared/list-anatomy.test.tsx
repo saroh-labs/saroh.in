@@ -75,6 +75,22 @@ const FILTERS = 'data-slot="list-filters"';
 const END = 'data-slot="list-end"';
 const ATTENTION = 'data-slot="list-attention"';
 
+/**
+ * `html` with every match of `tag` taken out, again until none is left:
+ * one pass can leave a tag that two halves make, which the code scanner
+ * refuses (js/incomplete-multi-character-sanitization).
+ */
+function without(html: string, tag: RegExp): string {
+    let out = html;
+    for (let before = ""; before !== out;) {
+        before = out;
+        out = out.replace(tag, "");
+    }
+    return out;
+}
+/** Markup's words, with no tag left in them. */
+const words = (html: string) => without(html, /<[^>]+>/g);
+
 /** The box of the dropdown with this accessible name, as its tag. */
 const box = (markup: string, label: string) =>
     new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`).exec(markup)?.[0] ??
@@ -83,10 +99,7 @@ const box = (markup: string, label: string) =>
 const says = (markup: string, label: string) => {
     const from = markup.indexOf(box(markup, label));
     const to = markup.indexOf("</button>", from);
-    return markup
-        .slice(from, to)
-        .replace(/<svg[\s\S]*?<\/svg>/g, "")
-        .replace(/<[^>]+>/g, "")
+    return words(without(markup.slice(from, to), /<svg[\s\S]*?<\/svg>/g))
         .replace(/\s+/g, " ")
         .trim();
 };
@@ -362,14 +375,14 @@ describe("a list read a page at a time, with views above it: Stock › Levels", 
             /<button[^>]*data-attention-toggle[\s\S]*?<\/button>/.exec(
                 off,
             )?.[0];
-        expect(toggle?.replace(/<[^>]+>/g, "")).toBe("Needs you 4");
+        expect(words(toggle ?? "")).toBe("Needs you 4");
         expect(toggle).toMatch(/data-count-badge=""[^>]*data-tone="strong"/);
         expect(out).not.toContain("Needs you ·");
         // Nothing waiting: a plain chip, with zero said.
         const none = /<button[^>]*data-attention-toggle[\s\S]*?<\/button>/.exec(
             draw("all", 0),
         )?.[0];
-        expect(none?.replace(/<[^>]+>/g, "")).toBe("Needs you 0");
+        expect(words(none ?? "")).toBe("Needs you 0");
         expect(none).not.toContain("data-count-badge");
     });
 

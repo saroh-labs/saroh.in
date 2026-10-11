@@ -4290,3 +4290,20 @@ is said beside the button while it runs.
 rules already say. No other template-string busy label is left in the app.
 **Category**: frontend · `docs/patterns/frontend-design-system.md` → A list
 screen's anatomy
+
+## The code scanner found the same tag strip again
+
+**Symptom**: CodeQL failed the list batch's pull request with three findings
+of `js/incomplete-multi-character-sanitization`, all in one new test file
+(`components/shared/list-anatomy.test.tsx`): helpers that read a button's
+words with `markup.replace(/<[^>]+>/g, "")` (11 Oct 2026).
+**Cause**: the same miss as the entry above, three days on. That entry fixed
+the code and wrote the rule down, and prose did not stop an agent writing
+the pattern again in a test.
+**Fix**: the helpers take tags out in a loop until nothing changes
+(`without`). `pnpm check:tag-strip` (`scripts/check-tag-strip.mjs`) now fails
+a tag pattern replaced with nothing in one pass, anywhere in `apps`,
+`packages` or `e2e`; prepush and CI run it.
+**Rule**: to read markup's words, loop the replace until the string stops
+changing, or put a space where the tag was. Never one pass with `""`.
+**Category**: security · CodeQL on PRs · `scripts/check-tag-strip.mjs`
